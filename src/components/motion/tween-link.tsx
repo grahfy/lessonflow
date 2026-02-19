@@ -5,6 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { AnchorHTMLAttributes, MouseEvent, PropsWithChildren } from "react";
 
 import { findClosestMotionRoot, useTweenOrchestrator } from "@/components/motion/tween-orchestrator";
+import { ensurePublicHeroReady } from "@/lib/public-hero-preload";
+import { getRouteDirection } from "@/lib/site-data";
 
 type TweenLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href" | "onClick" | "children"> &
   PropsWithChildren<{
@@ -35,14 +37,16 @@ export function TweenLink({ href, children, ...rest }: TweenLinkProps) {
     }
 
     event.preventDefault();
+    await ensurePublicHeroReady(href);
 
     const root = findClosestMotionRoot(event.currentTarget);
-    const accepted = await beginExitTransition(root);
+    const direction = getRouteDirection(pathname, href);
+    const accepted = await beginExitTransition(root, direction, () => {
+      router.push(href);
+    });
     if (!accepted) {
       return;
     }
-
-    router.push(href);
   }
 
   return (

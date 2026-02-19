@@ -15,7 +15,7 @@ export function SiteShell({ footerCopy, children }: SiteShellProps) {
 
   return (
     <div className="site-shell" data-motion-root="public" data-motion-primary="true">
-      <header className="site-header" data-motion-item="header">
+      <header className="site-header">
         <TweenLink className="brand" href="/">
           <span className="brand-mark" aria-hidden="true"></span>
           <span className="brand-text">Melbourne Guitar School</span>
@@ -30,7 +30,6 @@ export function SiteShell({ footerCopy, children }: SiteShellProps) {
                 key={item.href}
                 className={active ? "is-active" : ""}
                 aria-current={active ? "page" : undefined}
-                data-motion-item="nav-link"
               >
                 {item.label}
               </TweenLink>
@@ -41,7 +40,7 @@ export function SiteShell({ footerCopy, children }: SiteShellProps) {
 
       {children}
 
-      <footer className="site-footer" data-motion-item="footer">
+      <footer className="site-footer">
         <p>{footerCopy}</p>
         <p>Melbourne Guitar School {new Date().getFullYear()}</p>
       </footer>

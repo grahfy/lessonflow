@@ -9,7 +9,6 @@ export default function ContactPage() {
       lead="Reach out by call, text, or email and we will guide you to the right lesson package for your goals."
       visualLabel="Guitar lesson studio"
       visualClassName="contact-hero"
-      footerCopy="Fast response by phone, text, or email."
       leadJustified
     >
       <ul className="list" data-motion-item="contact-list">

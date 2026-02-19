@@ -9,7 +9,6 @@ export default function HomePage() {
       lead="Melbourne Guitar School is built around your goals, your music taste, and your pace. From first chords to advanced lead work, every lesson is tailored so you keep moving forward."
       visualLabel="Guitar performance"
       visualClassName="home-hero"
-      footerCopy="Arrow keys or swipe to move between pages."
       actions={
         <div className="button-row" data-motion-item="home-actions">
           <TweenLink className="btn btn-primary" href="/book" data-motion-item="home-action-book">

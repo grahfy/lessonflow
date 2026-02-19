@@ -9,7 +9,6 @@ export default function BookPage() {
       lead="Submit your preferred lesson time and details. Requests are reviewed and confirmed by the owner."
       visualLabel="Booking"
       visualClassName="contact-hero"
-      footerCopy="Pending requests are reviewed quickly."
       leadJustified
     >
       <p className="helper-text" data-motion-item="book-helper-text">

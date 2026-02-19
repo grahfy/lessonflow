@@ -6,13 +6,10 @@ type PanelLayoutProps = PropsWithChildren<{
   lead: string;
   visualLabel: string;
   visualClassName?: string;
-  footerCopy: string;
   leadJustified?: boolean;
   actions?: ReactNode;
   secondary?: ReactNode;
 }>;
-
-import { SiteShell } from "@/components/site-shell";
 
 export function PanelLayout({
   kicker,
@@ -20,15 +17,14 @@ export function PanelLayout({
   lead,
   visualLabel,
   visualClassName,
-  footerCopy,
   leadJustified = false,
   actions,
   secondary,
   children
 }: PanelLayoutProps) {
   return (
-    <SiteShell footerCopy={footerCopy}>
-      <main className="view" aria-label="Page Content" data-motion-item="view">
+    <main className="view" aria-label="Page Content">
+      <div className="view-stage" data-motion-stage="true">
         <section className="panel-copy" data-motion-item="copy">
           <p className="kicker" data-motion-item="kicker">
             {kicker}
@@ -43,14 +39,14 @@ export function PanelLayout({
         </section>
 
         <section className="panel-visual" aria-label={`${visualLabel} visual`} data-motion-item="visual">
-          <div className={`hero-image ${visualClassName || ""}`} role="img" aria-label={`${visualLabel} visual`} data-motion-item="hero" />
-          <div className="film-strip" aria-hidden="true" data-motion-item="film-strip">
+          <div className={`hero-image ${visualClassName || ""}`} role="img" aria-label={`${visualLabel} visual`} />
+          <div className="film-strip" aria-hidden="true">
             <div className="thumb"></div>
             <div className="thumb"></div>
             <div className="thumb"></div>
           </div>
         </section>
-      </main>
-    </SiteShell>
+      </div>
+    </main>
   );
 }

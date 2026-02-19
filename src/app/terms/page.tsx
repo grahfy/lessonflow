@@ -9,7 +9,6 @@ export default function TermsPage() {
       lead="These summaries reflect the current policy structure. Final wording should always be confirmed before launch."
       visualLabel="Acoustic guitar"
       visualClassName="terms-hero"
-      footerCopy="Policy clarity keeps lessons predictable for everyone."
       leadJustified
     >
       <ul className="list" data-motion-item="terms-list">

@@ -9,7 +9,6 @@ export default function TeacherPage() {
       lead="Jon has over 30 years of guitar experience, a music production background, and a long teaching history with students of different ages and levels."
       visualLabel="Teacher playing guitar"
       visualClassName="teacher-hero"
-      footerCopy="Clear instruction. Real-world musical outcomes."
       leadJustified
     >
       <ul className="list" data-motion-item="teacher-highlights">

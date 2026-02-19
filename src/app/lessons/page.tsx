@@ -9,7 +9,6 @@ export default function LessonsPage() {
       lead="Lessons are custom-built to your current level. You will work on technique, songs, rhythm, fretboard understanding, and confidence in real playing situations."
       visualLabel="Lesson"
       visualClassName="lessons-hero"
-      footerCopy="Structured pathway with room for your own music style."
     >
       <div className="card-grid" data-motion-item="lessons-cards">
         <article className="info-card" data-motion-item="lessons-beginner-card">

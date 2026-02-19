@@ -9,7 +9,6 @@ export default function VouchersPage() {
       lead="Gift vouchers are ideal for beginners and returning players. Packages are delivered digitally and can be redeemed for lessons that fit the student schedule."
       visualLabel="Gift voucher"
       visualClassName="vouchers-hero"
-      footerCopy="Digital delivery with simple booking follow-up."
       leadJustified
     >
       <div className="card-grid" data-motion-item="vouchers-cards">

@@ -13,13 +13,17 @@ import {
   useState
 } from "react";
 
+import { getRouteDirection } from "@/lib/site-data";
+
 export type MotionScope = "public" | "admin" | "calendar";
 export type TransitionState = "idle" | "entering" | "exiting" | "navigating";
+export type MotionDirection = -1 | 0 | 1;
 
 export const MAX_STAGGER_ITEMS_PUBLIC = 36;
 export const MAX_STAGGER_ITEMS_ADMIN = 24;
 export const MAX_STAGGER_ITEMS_CALENDAR = 12;
-export const EXIT_WATCHDOG_MS = 280;
+export const MAX_DIRECTIONAL_ITEMS_PUBLIC = 12;
+export const EXIT_WATCHDOG_MS = 520;
 const ENTER_WATCHDOG_BUFFER_MS = 140;
 const ENTER_WATCHDOG_MAX_MS = 2000;
 
@@ -42,7 +46,11 @@ const timelineRegistry = new WeakMap<HTMLElement, gsap.core.Timeline>();
 
 type MotionContextValue = {
   transitionState: TransitionState;
-  beginExitTransition: (root?: HTMLElement | null) => Promise<boolean>;
+  beginExitTransition: (
+    root?: HTMLElement | null,
+    direction?: MotionDirection,
+    navigate?: () => void
+  ) => Promise<boolean>;
 };
 
 const MotionContext = createContext<MotionContextValue | null>(null);
@@ -139,6 +147,47 @@ function collectMotionItems(root: HTMLElement, scope: MotionScope, explicitItems
   return visibleItems.slice(0, getMotionItemLimit(scope));
 }
 
+function collectDirectionalPublicItems(root: HTMLElement): HTMLElement[] {
+  const view = findDirectionalStage(root);
+  const order = [
+    "[data-motion-item='kicker']",
+    "[data-motion-item='title']",
+    "[data-motion-item='lead']",
+    "[data-motion-item='copy'] .button-row, .button-row",
+    "[data-motion-item='copy'] .metrics, [data-motion-item='copy'] .card-grid, [data-motion-item='copy'] .list, [data-motion-item='copy'] .form-grid, [data-motion-item='copy'] .helper-text"
+  ];
+
+  const requested: HTMLElement[] = [];
+  for (const selector of order) {
+    const match = view.querySelector<HTMLElement>(selector);
+    if (match) {
+      requested.push(match);
+    }
+  }
+
+  if (!requested.length) {
+    return collectMotionItems(root, "public").slice(0, MAX_DIRECTIONAL_ITEMS_PUBLIC);
+  }
+
+  return uniqueElements(requested).filter(isVisibleElement).slice(0, MAX_DIRECTIONAL_ITEMS_PUBLIC);
+}
+
+function findDirectionalStage(root: HTMLElement): HTMLElement {
+  return (
+    root.querySelector<HTMLElement>("[data-motion-stage='true']") ||
+    root.querySelector<HTMLElement>(".view") ||
+    root
+  );
+}
+
+function getDirectionalDistance(stage: HTMLElement): number {
+  return Math.max(420, stage.clientWidth + 64);
+}
+
+function getDirectionalOffset(stage: HTMLElement): number {
+  return Math.min(96, Math.max(52, Math.round(stage.clientWidth * 0.11)));
+}
+
 function clearTimeline(root: HTMLElement): void {
   const existing = timelineRegistry.get(root);
   if (!existing) {
@@ -200,6 +249,7 @@ type AnimationOptions = {
   duration?: number;
   y?: number;
   stagger?: number;
+  direction?: MotionDirection;
 };
 
 export async function animateIn(root: HTMLElement | null, options: AnimationOptions = {}): Promise<void> {
@@ -210,33 +260,88 @@ export async function animateIn(root: HTMLElement | null, options: AnimationOpti
   clearTimeline(root);
 
   const scope = options.scope || inferMotionScope(root);
-  const items = collectMotionItems(root, scope, options.explicitItems);
-  if (!items.length) {
+  const direction = options.direction ?? 0;
+  const useHorizontalMotion = scope === "public" && direction !== 0;
+  const directionalStage = useHorizontalMotion ? findDirectionalStage(root) : null;
+  const items = useHorizontalMotion
+    ? collectDirectionalPublicItems(root)
+    : collectMotionItems(root, scope, options.explicitItems);
+  if (!items.length && !directionalStage) {
     return;
   }
 
   if (prefersReducedMotion()) {
+    if (directionalStage) {
+      gsap.set(directionalStage, {
+        clearProps: "transform"
+      });
+    }
     gsap.set(items, {
       clearProps: "opacity,transform"
     });
     return;
   }
 
-  gsap.set(items, {
-    opacity: 0,
-    y: options.y ?? 10
-  });
+  if (useHorizontalMotion && directionalStage) {
+    const stageDistance = getDirectionalDistance(directionalStage);
+    const itemOffset = getDirectionalOffset(directionalStage);
+    gsap.set(directionalStage, {
+      x: direction > 0 ? stageDistance : -stageDistance,
+      force3D: true
+    });
+    if (items.length) {
+      gsap.set(items, {
+        x: direction > 0 ? itemOffset : -itemOffset,
+        force3D: true
+      });
+    }
+  } else {
+    gsap.set(items, {
+      opacity: 0,
+      y: options.y ?? 10
+    });
+  }
 
   const timeline = gsap.timeline();
-  timeline.to(items, {
-    opacity: 1,
-    y: 0,
-    duration: options.duration ?? 0.2,
-    stagger: options.stagger ?? 0.024,
-    ease: "power2.out",
-    overwrite: "auto",
-    clearProps: "opacity,transform"
-  });
+  if (useHorizontalMotion && directionalStage) {
+    timeline.to(
+      directionalStage,
+      {
+        x: 0,
+        duration: options.duration ?? 0.42,
+        ease: "power4.out",
+        force3D: true,
+        overwrite: "auto",
+        clearProps: "transform"
+      },
+      0
+    );
+    if (items.length) {
+      timeline.to(
+        items,
+        {
+          x: 0,
+          duration: 0.34,
+          stagger: options.stagger ?? 0.018,
+          ease: "power3.out",
+          force3D: true,
+          overwrite: "auto",
+          clearProps: "transform"
+        },
+        0.08
+      );
+    }
+  } else {
+    timeline.to(items, {
+      opacity: 1,
+      y: 0,
+      duration: options.duration ?? 0.2,
+      stagger: options.stagger ?? 0.024,
+      ease: "power2.out",
+      overwrite: "auto",
+      clearProps: "opacity,transform"
+    });
+  }
 
   const enterWatchdogMs = Math.min(
     ENTER_WATCHDOG_MAX_MS,
@@ -245,9 +350,16 @@ export async function animateIn(root: HTMLElement | null, options: AnimationOpti
 
   timelineRegistry.set(root, timeline);
   await runTimelineWithWatchdog(timeline, enterWatchdogMs);
-  gsap.set(items, {
-    clearProps: "opacity,transform"
-  });
+  if (directionalStage) {
+    gsap.set(directionalStage, {
+      clearProps: "transform"
+    });
+  }
+  if (items.length) {
+    gsap.set(items, {
+      clearProps: "opacity,transform"
+    });
+  }
   timelineRegistry.delete(root);
 }
 
@@ -259,20 +371,55 @@ export async function animateOut(root: HTMLElement | null, options: AnimationOpt
   clearTimeline(root);
 
   const scope = options.scope || inferMotionScope(root);
-  const items = collectMotionItems(root, scope, options.explicitItems);
-  if (!items.length || prefersReducedMotion()) {
+  const direction = options.direction ?? 0;
+  const useHorizontalMotion = scope === "public" && direction !== 0;
+  const directionalStage = useHorizontalMotion ? findDirectionalStage(root) : null;
+  const items = useHorizontalMotion
+    ? collectDirectionalPublicItems(root)
+    : collectMotionItems(root, scope, options.explicitItems);
+  if ((!items.length && !directionalStage) || prefersReducedMotion()) {
     return;
   }
 
   const timeline = gsap.timeline();
-  timeline.to(items, {
-    opacity: 0,
-    y: options.y ?? -8,
-    duration: options.duration ?? 0.16,
-    stagger: options.stagger ?? 0.018,
-    ease: "power2.in",
-    overwrite: "auto"
-  });
+  if (useHorizontalMotion && directionalStage) {
+    const stageDistance = getDirectionalDistance(directionalStage);
+    const itemOffset = getDirectionalOffset(directionalStage);
+    if (items.length) {
+      timeline.to(
+        items,
+        {
+          x: direction > 0 ? -itemOffset : itemOffset,
+          duration: options.duration ?? 0.24,
+          stagger: options.stagger ?? 0.015,
+          ease: "power3.in",
+          force3D: true,
+          overwrite: "auto"
+        },
+        0
+      );
+    }
+    timeline.to(
+      directionalStage,
+      {
+        x: direction > 0 ? -stageDistance : stageDistance,
+        duration: 0.36,
+        ease: "power4.inOut",
+        force3D: true,
+        overwrite: "auto"
+      },
+      0.03
+    );
+  } else {
+    timeline.to(items, {
+      opacity: 0,
+      y: options.y ?? -8,
+      duration: options.duration ?? 0.16,
+      stagger: options.stagger ?? 0.018,
+      ease: "power2.in",
+      overwrite: "auto"
+    });
+  }
 
   timelineRegistry.set(root, timeline);
   await runTimelineWithWatchdog(timeline, EXIT_WATCHDOG_MS);
@@ -283,38 +430,68 @@ export function MotionProvider({ children }: PropsWithChildren) {
   const pathname = usePathname();
   const [transitionState, setTransitionState] = useState<TransitionState>("idle");
   const lockedRef = useRef(false);
+  const lastPathnameRef = useRef(pathname);
+  const pendingDirectionRef = useRef<MotionDirection>(0);
 
-  const beginExitTransition = useCallback(async (root?: HTMLElement | null) => {
+  const beginExitTransition = useCallback(async (
+    root?: HTMLElement | null,
+    direction: MotionDirection = 0,
+    navigate?: () => void
+  ) => {
     if (lockedRef.current) {
       return false;
     }
 
     lockedRef.current = true;
-    setTransitionState("exiting");
+    pendingDirectionRef.current = direction;
 
     const targetRoot = root || findPrimaryMotionRoot();
+    const scope = inferMotionScope(targetRoot);
+
+    setTransitionState("exiting");
     await animateOut(targetRoot, {
-      scope: inferMotionScope(targetRoot)
+      scope,
+      direction
     });
 
     setTransitionState("navigating");
+    if (navigate) {
+      navigate();
+      return true;
+    }
+
+    lockedRef.current = false;
+    pendingDirectionRef.current = 0;
+    setTransitionState("idle");
     return true;
   }, []);
 
   useEffect(() => {
+    const inferredDirection = (() => {
+      const previous = lastPathnameRef.current;
+      lastPathnameRef.current = pathname;
+      if (pendingDirectionRef.current !== 0) {
+        return pendingDirectionRef.current;
+      }
+      return getRouteDirection(previous, pathname);
+    })();
+
     const frame = window.requestAnimationFrame(() => {
       const root = findPrimaryMotionRoot();
       if (!root) {
         lockedRef.current = false;
+        pendingDirectionRef.current = 0;
         setTransitionState("idle");
         return;
       }
 
       setTransitionState("entering");
       animateIn(root, {
-        scope: inferMotionScope(root)
+        scope: inferMotionScope(root),
+        direction: inferredDirection
       }).finally(() => {
         lockedRef.current = false;
+        pendingDirectionRef.current = 0;
         setTransitionState("idle");
       });
     });
