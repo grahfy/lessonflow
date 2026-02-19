@@ -1,45 +1,60 @@
-# Melbourne Guitar School Fullscreen Site (Starter)
+# Melbourne Guitar School Booking Platform
 
-A from-scratch static website starter with:
-- Full viewport pages (no document scrolling)
-- Animated transitions between pages
-- Keyboard and swipe navigation
-- Simpler visual variant on iPad/mobile
+Next.js full-stack implementation for public marketing pages, contact form submission, booking requests, and owner-managed booking administration.
 
-## Pages
-- `index.html`
-- `lessons.html`
-- `teacher.html`
-- `vouchers.html`
-- `contact.html`
-- `terms.html`
+## Stack
+- Next.js (App Router) + TypeScript
+- Prisma ORM + SQLite (local dev)
+- API routes for booking/contact/admin workflows
+- SMTP-backed email delivery with DB logging fallback
 
-## Run Locally
-From the project root:
-
+## Setup
+1. Install dependencies:
 ```bash
-python3 -m http.server 4173
+npm install
+```
+2. Configure environment:
+```bash
+cp .env.example .env
+```
+3. Run database migrations:
+```bash
+DATABASE_URL="file:./prisma/dev.db" npx prisma migrate dev --name init_booking
+```
+4. Start development server:
+```bash
+npm run dev
 ```
 
-Then open:
-- `http://127.0.0.1:4173/index.html`
+## Key Routes
+- Public pages: `/`, `/lessons`, `/teacher`, `/vouchers`, `/terms`
+- Contact form: `/contact`
+- Booking request form: `/book`
+- Owner login: `/admin/login`
+- Owner dashboard: `/admin/bookings`
 
-## Edit Content
-- Text and layout per page: each `*.html` file
-- Global styles: `assets/css/styles.css`
-- Page transitions and navigation logic: `assets/js/site.js`
+## Environment Variables
+- `DATABASE_URL`: Prisma connection string (`file:./prisma/dev.db` for local).
+- `ADMIN_EMAIL`: owner login email and notification destination.
+- `ADMIN_PASSWORD`: owner login password bootstrap.
+- `ADMIN_SESSION_SECRET`: signing secret for admin session cookie.
+- `CRON_SECRET`: secret required by daily digest job endpoint.
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`: SMTP settings. If unset, emails are logged to `OutboundEmail` with `queued_no_smtp`.
 
-## Add a New Page
-1. Copy an existing page file (for example `lessons.html`).
-2. Add the new link to the navigation in each page file.
-3. Add the page filename to `PAGE_ORDER` in `assets/js/site.js`.
-4. Add any page-specific image style class in `assets/css/styles.css`.
+## Admin Operations
+Owner dashboard supports:
+- Pending request approval and rejection.
+- Day/week/month booking views.
+- Manual booking create.
+- Booking move/cancel.
+- Recurring series cancellation for future instances.
 
-## Image Notes
-Current visuals use royalty-free image URLs from Unsplash as placeholders.
-Replace with your own approved photos when ready.
+## Daily Digest Job
+Endpoint: `POST /api/jobs/daily-bookings-digest`  
+Required header: `x-cron-secret: <CRON_SECRET>`
 
-## Open Source References Reviewed
-- HTML5 UP templates: https://html5up.net/
-- Codrops page transition patterns: https://tympanus.net/codrops/2013/05/07/a-collection-of-page-transitions/
-- Swup (MIT) transition library: https://github.com/swup/swup
+`vercel.json` includes daily cron scheduling.
+
+## Notes
+- Legacy static HTML files remain in repository root for reference during migration.
+- Current-year booking constraints are enforced by server-side validation.

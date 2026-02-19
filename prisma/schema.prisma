@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum LessonMode {
+  in_person
+  video
+}
+
+enum SkillLevel {
+  beginner
+  intermediate
+  advanced
+}
+
+enum LessonDuration {
+  min30
+  min60
+}
+
+enum BookingRequestStatus {
+  pending
+  approved
+  rejected
+  cancelled
+}
+
+enum BookingStatus {
+  approved
+  cancelled
+}
+
+enum AuditAction {
+  created
+  approved
+  rejected
+  moved
+  cancelled
+  edited
+  series_removed
+}
+
+model ContactSubmission {
+  id         String   @id @default(cuid())
+  name       String
+  email      String
+  phone      String?
+  message    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model BookingRequest {
+  id               String               @id @default(cuid())
+  status           BookingRequestStatus @default(pending)
+  name             String
+  email            String
+  phone            String
+  address          String
+  lessonMode       LessonMode
+  skillLevel       SkillLevel
+  lessonDuration   LessonDuration
+  requestedStartAt DateTime
+  notes            String?
+  isRecurring      Boolean              @default(false)
+  recurrenceEndAt  DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  approvedById     String?
+  approvedBy       AdminUser?           @relation("RequestApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
+  bookings         Booking[]
+
+  @@index([requestedStartAt, status])
+}
+
+model BookingSeries {
+  id              String    @id @default(cuid())
+  name            String
+  email           String
+  phone           String
+  address         String
+  lessonMode      LessonMode
+  skillLevel      SkillLevel
+  lessonDuration  LessonDuration
+  dayOfWeek       Int
+  startTimeLocal  String
+  startDate       DateTime
+  recurrenceEndAt DateTime
+  timezone        String
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  bookings        Booking[]
+}
+
+model Booking {
+  id               String          @id @default(cuid())
+  status           BookingStatus   @default(approved)
+  name             String
+  email            String
+  phone            String
+  address          String
+  lessonMode       LessonMode
+  skillLevel       SkillLevel
+  lessonDuration   LessonDuration
+  startAt          DateTime
+  endAt            DateTime
+  timezone         String
+  notes            String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  cancelledAt      DateTime?
+  requestId        String?
+  request          BookingRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  seriesId         String?
+  series           BookingSeries?  @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  modifiedById     String?
+  modifiedBy       AdminUser?      @relation("BookingEdits", fields: [modifiedById], references: [id], onDelete: SetNull)
+  auditLogs        BookingAuditLog[]
+
+  @@index([startAt, status])
+}
+
+model BookingAuditLog {
+  id        String      @id @default(cuid())
+  bookingId String?
+  booking   Booking?    @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  action    AuditAction
+  actorId   String?
+  actor     AdminUser?  @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  details   String?
+  createdAt DateTime    @default(now())
+
+  @@index([createdAt])
+  @@index([bookingId])
+}
+
+model AdminUser {
+  id                     String           @id @default(cuid())
+  email                  String           @unique
+  displayName            String
+  passwordHash           String
+  isActive               Boolean          @default(true)
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  approvedRequests       BookingRequest[] @relation("RequestApprovals")
+  editedBookings         Booking[]        @relation("BookingEdits")
+  auditLogs              BookingAuditLog[]
+}
+
+model OutboundEmail {
+  id        String   @id @default(cuid())
+  toEmail   String
+  subject   String
+  htmlBody  String
+  status    String
+  error     String?
+  createdAt DateTime @default(now())
+}
