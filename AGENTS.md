@@ -34,6 +34,19 @@ There is currently no automated test framework in this repo. Use manual verifica
 - Verify swipe navigation on touch devices.
 - Check layout at desktop and mobile widths, including no unintended page scrolling.
 
+## Test Environment Sync Requirement
+Whenever main changes are made to the codebase, update the test environment automatically as part of the same change.
+
+Main changes include:
+- Shared behavior changes (`assets/js/site.js`, global CSS, navigation flow, page structure).
+- Dependency, configuration, environment variable, or schema updates.
+- Any change that alters setup, runtime assumptions, or verification steps.
+
+Required actions in the same task/PR:
+- Update test environment config/artifacts (for example `.env.example`, fixtures, seeds, mocks, or setup docs) to match the code changes.
+- Update manual verification steps if behavior changed.
+- Re-run the relevant checks/manual tests in the updated test environment before merging.
+
 ## Commit & Pull Request Guidelines
 Git history is not available in this workspace snapshot, so no project-specific convention can be inferred. Use Conventional Commit style:
 - `feat: add FAQ section to lessons page`

@@ -33,7 +33,7 @@ body {
   position: relative;
   color: var(--ink-0);
   font-family: 'Sora', 'Segoe UI', Tahoma, sans-serif;
-  background: radial-gradient(150% 130% at 85% 10%, #22245f 0%, var(--bg-1) 42%, var(--bg-0) 100%);
+  background: radial-gradient(150% 130% at 85% 10%, #2a1758 0%, #140828 42%, #090415 100%);
   opacity: 0;
   transform: translateY(20px) scale(1.01);
   filter: blur(6px);
