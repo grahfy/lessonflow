@@ -33,6 +33,13 @@ function fmt(date: Date): string {
   }).format(date);
 }
 
+function money(cents: number): string {
+  return new Intl.NumberFormat("en-AU", {
+    style: "currency",
+    currency: "AUD"
+  }).format(cents / 100);
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -145,6 +152,52 @@ export function customerCustomMessageTemplate(input: {
       <h2>${escapeHtml(input.subject)}</h2>
       <p>Hi ${escapeHtml(input.name)},</p>
       <p>${escapeHtml(input.message).replace(/\n/g, "<br/>")}</p>
+    `
+  };
+}
+
+export function customerInvoiceTemplate(input: {
+  invoiceNumber: string;
+  customerName: string;
+  dueAt: Date;
+  totalCents: number;
+  sellerBusinessName: string;
+}) {
+  return {
+    subject: `Invoice ${input.invoiceNumber} from ${input.sellerBusinessName}`,
+    html: `
+      <h2>Your invoice is ready</h2>
+      <p>Hi ${escapeHtml(input.customerName)},</p>
+      <p>Please find invoice <strong>${escapeHtml(input.invoiceNumber)}</strong> attached as a PDF.</p>
+      <p><strong>Total due:</strong> ${money(input.totalCents)}</p>
+      <p><strong>Due date:</strong> ${fmt(input.dueAt)}</p>
+      <p>If you've already paid, please disregard this message.</p>
+    `
+  };
+}
+
+/**
+ * Reminder template for overdue invoices using staged follow-up cadence.
+ */
+export function customerInvoiceReminderTemplate(input: {
+  invoiceNumber: string;
+  customerName: string;
+  dueAt: Date;
+  totalCents: number;
+  sellerBusinessName: string;
+  overdueDays: number;
+}) {
+  return {
+    subject: `Reminder: invoice ${input.invoiceNumber} is overdue`,
+    html: `
+      <h2>Invoice payment reminder</h2>
+      <p>Hi ${escapeHtml(input.customerName)},</p>
+      <p>This is a reminder that invoice <strong>${escapeHtml(input.invoiceNumber)}</strong> is currently overdue.</p>
+      <p><strong>Total due:</strong> ${money(input.totalCents)}</p>
+      <p><strong>Due date:</strong> ${fmt(input.dueAt)}</p>
+      <p><strong>Overdue by:</strong> ${input.overdueDays} day${input.overdueDays === 1 ? "" : "s"}</p>
+      <p>If payment has already been made, please disregard this reminder.</p>
+      <p>${escapeHtml(input.sellerBusinessName)}</p>
     `
   };
 }

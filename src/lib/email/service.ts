@@ -7,6 +7,11 @@ type SendEmailInput = {
   to: string;
   subject: string;
   html: string;
+  attachments?: Array<{
+    filename: string;
+    content: Buffer;
+    contentType?: string;
+  }>;
 };
 
 let transporter: nodemailer.Transporter | null = null;
@@ -58,7 +63,12 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
       from,
       to: input.to,
       subject: input.subject,
-      html: input.html
+      html: input.html,
+      attachments: input.attachments?.map((attachment) => ({
+        filename: attachment.filename,
+        content: attachment.content,
+        contentType: attachment.contentType
+      }))
     });
 
     await prisma.outboundEmail.create({

@@ -63,6 +63,7 @@ Optional flags:
 - Booking request form: `/book`
 - Owner login: `/admin/login`
 - Owner dashboard: `/admin/bookings`
+- Owner invoices: `/admin/invoices`
 
 ## Environment Variables
 - `DATABASE_URL`: Prisma connection string (`file:./prisma/dev.db` for local).
@@ -71,6 +72,11 @@ Optional flags:
 - `ADMIN_SESSION_SECRET`: signing secret for admin session cookie.
 - `CRON_SECRET`: secret required by daily digest job endpoint.
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`: SMTP settings. If unset, emails are logged to `OutboundEmail` with `queued_no_smtp`.
+- `INVOICE_BUSINESS_NAME`, `INVOICE_BUSINESS_ABN`: supplier details shown on invoices.
+- `INVOICE_BANK_NAME`, `INVOICE_BANK_BSB`, `INVOICE_BANK_ACCOUNT_NAME`, `INVOICE_BANK_ACCOUNT_NUMBER`: bank payment details shown on invoices.
+- `INVOICE_PAYMENT_TERMS_DAYS`: default due date offset for newly created invoices.
+- `INVOICE_GST_REGISTERED`, `INVOICE_DEFAULT_TAX_MODE`: invoice GST behavior defaults.
+- `INVOICE_CREDIT_NOTE_PREFIX`: prefix used when generating credit-note numbers.
 
 ## Admin Operations
 Owner dashboard supports:
@@ -85,10 +91,16 @@ Owner dashboard supports:
 - Manual booking popup launched from `Add Manual Booking`.
 - Customer directory popup launched from `Customers`.
 - Customer create/edit/delete (delete archives linked profiles to preserve history).
+- Customer-level invoice history via invoices filter shortcut.
 - Existing customer selection in manual booking popup (auto-fill supported).
 - Deterministic duplicate detection (email/phone) during manual booking entry with confirmation workflow.
 - Optional customer-profile update from manual booking confirmation flow.
 - Booking edit/move/cancel.
+- Create invoice from confirmed booking dialog (lesson fee + optional extras + custom charge).
+- Dedicated invoice console with search, status filters, aging buckets, outstanding toggle, line-item editing, send/download/mark-paid actions.
+- Overdue reminder workflow with per-invoice reminders and bulk 7/14/30-day reminder sends.
+- Credit-note creation flow for sent/paid invoices (replaces delete for historical integrity).
+- Invoice PDF download and invoice email send with attached PDF.
 - Pending request edit/move/reject (cancel maps to reject).
 - Recurring series cancellation for future instances.
 - Manual reminder and custom customer emails from dialog.
@@ -116,6 +128,18 @@ Endpoint: `POST /api/jobs/daily-bookings-digest`
 Required header: `x-cron-secret: <CRON_SECRET>`
 
 `vercel.json` includes daily cron scheduling.
+
+## Invoice Reminder Job
+Endpoint: `POST /api/jobs/invoice-reminders`  
+Required header: `x-cron-secret: <CRON_SECRET>`
+
+Optional JSON body:
+- `dryRun` (`boolean`)
+- `maxInvoices` (`number`, default `100`)
+- `customerId` (`string`)
+- `stage` (`7 | 14 | 30`)
+
+`vercel.json` includes daily cron scheduling for staged overdue reminders.
 
 ## Notes
 - This repository now runs only the Next.js App Router implementation.

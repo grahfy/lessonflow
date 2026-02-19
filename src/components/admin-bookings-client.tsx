@@ -10,7 +10,14 @@ import { usePresenceExit } from "@/components/motion/use-presence-exit";
 type CalendarView = "day" | "week" | "month";
 type AuState = "ACT" | "NSW" | "NT" | "QLD" | "SA" | "TAS" | "VIC" | "WA";
 type DurationChoice = "min30" | "min60" | "custom";
+type ManualStep = "customer" | "lesson" | "schedule";
 const AU_STATES: AuState[] = ["ACT", "NSW", "NT", "QLD", "SA", "TAS", "VIC", "WA"];
+const MANUAL_STEP_ORDER: ManualStep[] = ["customer", "lesson", "schedule"];
+const MANUAL_STEP_LABEL: Record<ManualStep, string> = {
+  customer: "Customer",
+  lesson: "Lesson",
+  schedule: "Schedule & Confirm"
+};
 
 const PHONE_PATTERN = /^\d{10}$/;
 const POSTCODE_PATTERN = /^\d{4}$/;
@@ -115,6 +122,48 @@ type DialogForm = {
   startAtLocal: string;
   notes: string;
 };
+
+type InvoiceTaxMode = "taxable" | "gst_free";
+
+type BookingInvoiceForm = {
+  lessonPrice: string;
+  includeEducationalBooks: boolean;
+  educationalBooksPrice: string;
+  includeDigitalGuitarLessons: boolean;
+  digitalGuitarLessonsPrice: string;
+  includeCustomCharge: boolean;
+  customChargeDescription: string;
+  customChargePrice: string;
+  dueAtLocal: string;
+  taxMode: InvoiceTaxMode;
+  notes: string;
+};
+
+function defaultBookingInvoiceForm(): BookingInvoiceForm {
+  const dueAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+  const shifted = new Date(dueAt.getTime() - dueAt.getTimezoneOffset() * 60_000);
+  return {
+    lessonPrice: "",
+    includeEducationalBooks: false,
+    educationalBooksPrice: "",
+    includeDigitalGuitarLessons: false,
+    digitalGuitarLessonsPrice: "",
+    includeCustomCharge: false,
+    customChargeDescription: "",
+    customChargePrice: "",
+    dueAtLocal: shifted.toISOString().slice(0, 16),
+    taxMode: "taxable",
+    notes: ""
+  };
+}
+
+function dollarsToCents(value: string): number | null {
+  const amount = Number.parseFloat(value);
+  if (!Number.isFinite(amount) || amount < 0) {
+    return null;
+  }
+  return Math.round(amount * 100);
+}
 
 function emptyCustomerForm(): CustomerForm {
   return {
@@ -263,6 +312,7 @@ export function AdminBookingsClient() {
   const [selectedEvent, setSelectedEvent] = useState<EventWithRow | null>(null);
   const [dialogForm, setDialogForm] = useState<DialogForm | null>(null);
   const [manualDurationChoice, setManualDurationChoice] = useState<DurationChoice>("min60");
+  const [manualStep, setManualStep] = useState<ManualStep>("customer");
   const [manualCustomerId, setManualCustomerId] = useState("");
   const [manualMatch, setManualMatch] = useState<CustomerRow | null>(null);
   const [manualUpdateCustomerFromBooking, setManualUpdateCustomerFromBooking] = useState(false);
@@ -271,16 +321,19 @@ export function AdminBookingsClient() {
   const [customerForm, setCustomerForm] = useState<CustomerForm>(emptyCustomerForm());
   const [emailSubject, setEmailSubject] = useState("");
   const [emailMessage, setEmailMessage] = useState("");
+  const [invoiceForm, setInvoiceForm] = useState<BookingInvoiceForm>(defaultBookingInvoiceForm());
   const dialogPresence = usePresenceExit();
   const manualDialogPresence = usePresenceExit();
   const customersDialogPresence = usePresenceExit();
   const customerEditorPresence = usePresenceExit();
   const emailDialogPresence = usePresenceExit();
+  const invoiceDialogPresence = usePresenceExit();
   const dialogRootRef = useRef<HTMLDivElement | null>(null);
   const manualDialogRootRef = useRef<HTMLDivElement | null>(null);
   const customersDialogRootRef = useRef<HTMLDivElement | null>(null);
   const customerEditorRootRef = useRef<HTMLDivElement | null>(null);
   const emailDialogRootRef = useRef<HTMLDivElement | null>(null);
+  const invoiceDialogRootRef = useRef<HTMLDivElement | null>(null);
   const calendarRootRef = useRef<HTMLDivElement | null>(null);
   const manualFormRef = useRef<HTMLFormElement | null>(null);
 
@@ -349,6 +402,13 @@ export function AdminBookingsClient() {
   }, [emailDialogPresence.isMounted]);
 
   useEffect(() => {
+    if (!invoiceDialogPresence.isMounted || !invoiceDialogRootRef.current) {
+      return;
+    }
+    void animateIn(invoiceDialogRootRef.current, { scope: "admin" });
+  }, [invoiceDialogPresence.isMounted]);
+
+  useEffect(() => {
     if (!manualDialogPresence.isMounted || !manualDialogRootRef.current) {
       return;
     }
@@ -389,13 +449,18 @@ export function AdminBookingsClient() {
     setDialogForm(defaultFormFromEvent(event));
     setEmailSubject("");
     setEmailMessage("");
+    setInvoiceForm(defaultBookingInvoiceForm());
     emailDialogPresence.hide(undefined, { immediate: true });
+    invoiceDialogPresence.hide(undefined, { immediate: true });
     dialogPresence.show();
   }
 
   async function closeDialog() {
     if (emailDialogPresence.isMounted) {
       await closeEmailDialog();
+    }
+    if (invoiceDialogPresence.isMounted) {
+      await closeInvoiceDialog();
     }
 
     setBusyAction(null);
@@ -408,6 +473,7 @@ export function AdminBookingsClient() {
         setDialogForm(null);
         setEmailSubject("");
         setEmailMessage("");
+        setInvoiceForm(defaultBookingInvoiceForm());
       },
       { immediate: true }
     );
@@ -426,6 +492,78 @@ export function AdminBookingsClient() {
     emailDialogPresence.hide(undefined, { immediate: true });
     setEmailSubject("");
     setEmailMessage("");
+  }
+
+  function openInvoiceDialog() {
+    setInvoiceForm(defaultBookingInvoiceForm());
+    invoiceDialogPresence.show();
+  }
+
+  async function closeInvoiceDialog() {
+    if (invoiceDialogRootRef.current) {
+      await animateOut(invoiceDialogRootRef.current, { scope: "admin" });
+    }
+    invoiceDialogPresence.hide(undefined, { immediate: true });
+    setInvoiceForm(defaultBookingInvoiceForm());
+  }
+
+  async function createInvoiceFromBooking() {
+    if (!selectedEvent || selectedEvent.entityType !== "booking") {
+      return;
+    }
+
+    const lessonPriceCents = dollarsToCents(invoiceForm.lessonPrice);
+    if (lessonPriceCents === null) {
+      setError("Lesson price is required.");
+      return;
+    }
+
+    const booksPriceCents = dollarsToCents(invoiceForm.educationalBooksPrice);
+    const digitalPriceCents = dollarsToCents(invoiceForm.digitalGuitarLessonsPrice);
+    const customPriceCents = dollarsToCents(invoiceForm.customChargePrice);
+    if (invoiceForm.includeCustomCharge && !invoiceForm.customChargeDescription.trim()) {
+      setError("Custom charge description is required when custom charge is enabled.");
+      return;
+    }
+    if (!invoiceForm.dueAtLocal) {
+      setError("Invoice due date is required.");
+      return;
+    }
+
+    setBusyAction("create_invoice");
+    setError("");
+    const response = await fetch(`/api/admin/bookings/${selectedEvent.id}/invoice`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lessonPriceCents,
+        includeEducationalBooks: invoiceForm.includeEducationalBooks,
+        educationalBooksPriceCents: invoiceForm.includeEducationalBooks ? booksPriceCents ?? 0 : undefined,
+        includeDigitalGuitarLessons: invoiceForm.includeDigitalGuitarLessons,
+        digitalGuitarLessonsPriceCents: invoiceForm.includeDigitalGuitarLessons ? digitalPriceCents ?? 0 : undefined,
+        includeCustomCharge: invoiceForm.includeCustomCharge,
+        customChargeDescription: invoiceForm.includeCustomCharge ? invoiceForm.customChargeDescription.trim() : undefined,
+        customChargePriceCents: invoiceForm.includeCustomCharge ? customPriceCents ?? 0 : undefined,
+        dueAt: new Date(invoiceForm.dueAtLocal).toISOString(),
+        taxMode: invoiceForm.taxMode,
+        notes: invoiceForm.notes.trim() || undefined
+      })
+    });
+    setBusyAction(null);
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      setError(payload?.error || "Unable to create invoice.");
+      return;
+    }
+
+    const payload = (await response.json().catch(() => null)) as { invoice?: { id: string } } | null;
+    setNotice("Invoice created.");
+    await closeInvoiceDialog();
+    if (payload?.invoice?.id) {
+      router.push(`/admin/invoices?invoiceId=${payload.invoice.id}`);
+      return;
+    }
+    router.push("/admin/invoices");
   }
 
   function setManualFieldValue(name: string, value: string) {
@@ -456,6 +594,83 @@ export function AdminBookingsClient() {
     setManualMatch(null);
   }
 
+  function validateManualFields(selectors: string[]): boolean {
+    const form = manualFormRef.current;
+    if (!form) {
+      return false;
+    }
+    for (const selector of selectors) {
+      const field = form.querySelector(selector);
+      if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement) {
+        if (!field.reportValidity()) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  function validateManualStep(step: ManualStep): boolean {
+    if (step === "customer") {
+      return validateManualFields([
+        "input[name='name']",
+        "input[name='email']",
+        "input[name='phone']",
+        "input[name='houseNumber']",
+        "input[name='streetName']",
+        "input[name='suburb']",
+        "input[name='postcode']"
+      ]);
+    }
+    if (step === "lesson") {
+      const selectors = ["select[name='lessonMode']", "select[name='skillLevel']", "select[name='lessonDuration']"];
+      if (manualDurationChoice === "custom") {
+        selectors.push("input[name='customDurationMinutes']");
+      }
+      return validateManualFields(selectors);
+    }
+
+    const scheduleValid = validateManualFields(["input[name='requestedStartAt']"]);
+    if (!scheduleValid) {
+      return false;
+    }
+    const form = manualFormRef.current;
+    if (!form) {
+      return false;
+    }
+    const recurringField = form.querySelector("input[name='isRecurring']");
+    const recurrenceEndField = form.querySelector("input[name='recurrenceEndAt']");
+    if (recurringField instanceof HTMLInputElement && recurringField.checked) {
+      if (recurrenceEndField instanceof HTMLInputElement && !recurrenceEndField.value) {
+        setError("Recurrence end is required when weekly recurring is selected.");
+        recurrenceEndField.focus();
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function goToPreviousManualStep() {
+    const currentIndex = MANUAL_STEP_ORDER.indexOf(manualStep);
+    if (currentIndex <= 0) {
+      return;
+    }
+    setError("");
+    setManualStep(MANUAL_STEP_ORDER[currentIndex - 1]);
+  }
+
+  function goToNextManualStep() {
+    const currentIndex = MANUAL_STEP_ORDER.indexOf(manualStep);
+    if (currentIndex < 0 || currentIndex >= MANUAL_STEP_ORDER.length - 1) {
+      return;
+    }
+    if (!validateManualStep(manualStep)) {
+      return;
+    }
+    setError("");
+    setManualStep(MANUAL_STEP_ORDER[currentIndex + 1]);
+  }
+
   function openManualDialog() {
     setError("");
     setNotice("");
@@ -463,6 +678,7 @@ export function AdminBookingsClient() {
     setManualCustomerId("");
     setManualUpdateCustomerFromBooking(false);
     setManualDurationChoice("min60");
+    setManualStep("customer");
     setCustomerQuery("");
     manualDialogPresence.show();
   }
@@ -479,6 +695,7 @@ export function AdminBookingsClient() {
         setManualCustomerId("");
         setManualUpdateCustomerFromBooking(false);
         setManualDurationChoice("min60");
+        setManualStep("customer");
       },
       { immediate: true }
     );
@@ -489,6 +706,10 @@ export function AdminBookingsClient() {
     setNotice("");
     setCustomerQuery("");
     customersDialogPresence.show();
+  }
+
+  function openCustomerInvoices(customerId: string) {
+    router.push(`/admin/invoices?customerId=${customerId}`);
   }
 
   async function closeCustomersDialog() {
@@ -687,6 +908,14 @@ export function AdminBookingsClient() {
     if (!selectedEvent) {
       return;
     }
+    const confirmed = window.confirm(
+      selectedEvent.entityType === "booking_request"
+        ? "Cancel this booking request? This will remove it from pending approvals."
+        : "Cancel this booking?"
+    );
+    if (!confirmed) {
+      return;
+    }
     setBusyAction("cancel");
     const ok =
       selectedEvent.entityType === "booking"
@@ -704,6 +933,12 @@ export function AdminBookingsClient() {
     if (!selectedEvent || selectedEvent.entityType !== "booking_request") {
       return;
     }
+    if (action === "reject") {
+      const confirmed = window.confirm("Reject this booking request?");
+      if (!confirmed) {
+        return;
+      }
+    }
     setBusyAction(action);
     const ok = await mutateRequest(action, {});
     setBusyAction(null);
@@ -715,6 +950,10 @@ export function AdminBookingsClient() {
   }
 
   async function removeSeries(seriesId: string) {
+    const confirmed = window.confirm("Remove this recurring series? This will remove all upcoming linked bookings.");
+    if (!confirmed) {
+      return;
+    }
     const response = await fetch(`/api/admin/booking-series/${seriesId}`, {
       method: "DELETE"
     });
@@ -730,6 +969,9 @@ export function AdminBookingsClient() {
   async function addManualBooking(matchResolution?: "use_existing" | "create_new" | "update_existing") {
     const formElement = manualFormRef.current;
     if (!formElement) {
+      return;
+    }
+    if (!validateManualStep("schedule")) {
       return;
     }
 
@@ -898,6 +1140,7 @@ export function AdminBookingsClient() {
       ? ((selectedEvent.row as BookingRow).seriesId ?? null)
       : null;
   const selectedManualCustomer = manualCustomerId ? customers.find((customer) => customer.id === manualCustomerId) ?? null : null;
+  const manualStepIndex = MANUAL_STEP_ORDER.indexOf(manualStep);
 
   return (
     <div className="admin-shell" data-motion-root="admin" data-motion-primary="true">
@@ -947,6 +1190,9 @@ export function AdminBookingsClient() {
           <button className="btn btn-secondary" type="button" data-motion-item="legend-action-customers" onClick={openCustomersDialog}>
             Customers
           </button>
+          <button className="btn btn-secondary" type="button" data-motion-item="legend-action-invoices" onClick={() => router.push("/admin/invoices")}>
+            Invoices
+          </button>
         </div>
       </div>
 
@@ -992,10 +1238,13 @@ export function AdminBookingsClient() {
           <div
             className="dialog-panel dialog-panel-wide"
             data-motion-item="manual-dialog-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="manual-dialog-title"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="dialog-head">
-              <h3>Add Manual Booking</h3>
+              <h3 id="manual-dialog-title">Add Manual Booking</h3>
               <button className="btn btn-secondary" type="button" onClick={() => void closeManualDialog()}>
                 Close
               </button>
@@ -1003,15 +1252,30 @@ export function AdminBookingsClient() {
             <p className="helper-text dialog-status">
               Select an existing customer first where possible. If you enter details manually, matching customers will be detected.
             </p>
+            <div className="manual-steps" aria-label="Manual booking steps">
+              {MANUAL_STEP_ORDER.map((step, index) => (
+                <div
+                  key={step}
+                  className={`manual-step-chip ${index === manualStepIndex ? "is-active" : ""} ${index < manualStepIndex ? "is-complete" : ""}`}
+                >
+                  <span>{index + 1}</span>
+                  <strong>{MANUAL_STEP_LABEL[step]}</strong>
+                </div>
+              ))}
+            </div>
             <form
               ref={manualFormRef}
               className="manual-booking-form"
               onSubmit={(event) => {
                 event.preventDefault();
+                if (manualStep !== "schedule") {
+                  goToNextManualStep();
+                  return;
+                }
                 void addManualBooking();
               }}
             >
-              <section className="manual-section">
+              <section className={`manual-section ${manualStep !== "customer" ? "is-step-hidden" : ""}`}>
                 <h3 className="manual-section-title">Customer</h3>
                 <div className="manual-grid manual-grid-3">
                   <div className="field">
@@ -1084,7 +1348,7 @@ export function AdminBookingsClient() {
                 </div>
               </section>
 
-              <section className="manual-section">
+              <section className={`manual-section ${manualStep !== "customer" ? "is-step-hidden" : ""}`}>
                 <h3 className="manual-section-title">Student</h3>
                 <div className="manual-grid manual-grid-2">
                   <div className="field manual-span-2">
@@ -1094,7 +1358,7 @@ export function AdminBookingsClient() {
                 </div>
               </section>
 
-              <section className="manual-section">
+              <section className={`manual-section ${manualStep !== "customer" ? "is-step-hidden" : ""}`}>
                 <h3 className="manual-section-title">Contact</h3>
                 <div className="manual-grid manual-grid-3">
                   <div className="field manual-span-2">
@@ -1119,7 +1383,7 @@ export function AdminBookingsClient() {
                 </div>
               </section>
 
-              <section className="manual-section">
+              <section className={`manual-section ${manualStep !== "customer" ? "is-step-hidden" : ""}`}>
                 <h3 className="manual-section-title">Address</h3>
                 <div className="manual-grid manual-grid-3">
                   <div className="field field-compact">
@@ -1203,7 +1467,7 @@ export function AdminBookingsClient() {
                 </div>
               </section>
 
-              <section className="manual-section">
+              <section className={`manual-section ${manualStep !== "lesson" ? "is-step-hidden" : ""}`}>
                 <h3 className="manual-section-title">Lesson</h3>
                 <div className="manual-grid manual-grid-3">
                   <div className="field">
@@ -1224,6 +1488,7 @@ export function AdminBookingsClient() {
                   <div className="field">
                     <label>Duration *</label>
                     <select
+                      name="lessonDuration"
                       value={manualDurationChoice}
                       onChange={(event) => setManualDurationChoice(event.target.value as DurationChoice)}
                     >
@@ -1251,8 +1516,9 @@ export function AdminBookingsClient() {
                 </div>
               </section>
 
-              <section className="manual-section">
+              <section className={`manual-section ${manualStep !== "schedule" ? "is-step-hidden" : ""}`}>
                 <h3 className="manual-section-title">Schedule</h3>
+                <p className="helper-text">Review timing details, then confirm to create the booking.</p>
                 <div className="manual-grid manual-grid-2">
                   <div className="field">
                     <label>Start *</label>
@@ -1270,7 +1536,7 @@ export function AdminBookingsClient() {
                 </div>
               </section>
 
-              {manualMatch ? (
+              {manualStep === "schedule" && manualMatch ? (
                 <section className="manual-section manual-match">
                   <h3 className="manual-section-title">Existing Customer Match Found</h3>
                   <p className="helper-text">
@@ -1301,9 +1567,22 @@ export function AdminBookingsClient() {
 
               <div className="manual-form-footer">
                 <p className="helper-text form-required-note">* Required fields</p>
-                <button className="btn btn-primary" type="submit" disabled={creating}>
-                  {creating ? "Adding..." : "Add booking"}
-                </button>
+                <div className="manual-step-footer-actions">
+                  {manualStep !== "customer" ? (
+                    <button className="btn btn-secondary" type="button" disabled={creating} onClick={goToPreviousManualStep}>
+                      Back
+                    </button>
+                  ) : null}
+                  {manualStep !== "schedule" ? (
+                    <button className="btn btn-primary" type="button" disabled={creating} onClick={goToNextManualStep}>
+                      {manualStep === "customer" ? "Next: Lesson" : "Next: Schedule & Confirm"}
+                    </button>
+                  ) : (
+                    <button className="btn btn-primary" type="submit" disabled={creating}>
+                      {creating ? "Adding..." : "Add booking"}
+                    </button>
+                  )}
+                </div>
               </div>
             </form>
           </div>
@@ -1318,9 +1597,16 @@ export function AdminBookingsClient() {
           data-motion-item="customers-dialog-backdrop"
           onClick={() => void closeCustomersDialog()}
         >
-          <div className="dialog-panel dialog-panel-wide" data-motion-item="customers-dialog-panel" onClick={(event) => event.stopPropagation()}>
+          <div
+            className="dialog-panel dialog-panel-wide"
+            data-motion-item="customers-dialog-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="customers-dialog-title"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="dialog-head">
-              <h3>Customers</h3>
+              <h3 id="customers-dialog-title">Customers</h3>
               <button className="btn btn-secondary" type="button" onClick={() => void closeCustomersDialog()}>
                 Close
               </button>
@@ -1362,6 +1648,9 @@ export function AdminBookingsClient() {
                       </span>
                     </div>
                     <div className="customer-item-actions">
+                      <button className="btn btn-secondary" type="button" onClick={() => openCustomerInvoices(customer.id)}>
+                        Invoices
+                      </button>
                       <button className="btn btn-secondary" type="button" onClick={() => openCustomerEditor("edit", customer)}>
                         Edit
                       </button>
@@ -1395,10 +1684,13 @@ export function AdminBookingsClient() {
               <div
                 className="dialog-panel dialog-panel-compact"
                 data-motion-item="customer-editor-dialog-panel"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="customer-editor-dialog-title"
                 onClick={(event) => event.stopPropagation()}
               >
                 <div className="dialog-head">
-                  <h3>{customerEditorMode === "create" ? "Create Customer" : "Edit Customer"}</h3>
+                  <h3 id="customer-editor-dialog-title">{customerEditorMode === "create" ? "Create Customer" : "Edit Customer"}</h3>
                   <button className="btn btn-secondary" type="button" onClick={() => void closeCustomerEditor()}>
                     Cancel
                   </button>
@@ -1565,9 +1857,18 @@ export function AdminBookingsClient() {
           data-motion-item="booking-dialog-backdrop"
           onClick={() => void closeDialog()}
         >
-          <div className="dialog-panel" data-motion-item="booking-dialog-panel" onClick={(event) => event.stopPropagation()}>
+          <div
+            className="dialog-panel booking-dialog-panel"
+            data-motion-item="booking-dialog-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="booking-dialog-title"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="dialog-head" data-motion-item="booking-dialog-head">
-              <h3 data-motion-item="booking-dialog-title">{selectedEvent.title}</h3>
+              <h3 id="booking-dialog-title" data-motion-item="booking-dialog-title">
+                {selectedEvent.title}
+              </h3>
               <button className="btn btn-secondary" type="button" onClick={() => void closeDialog()}>
                 Close
               </button>
@@ -1577,254 +1878,236 @@ export function AdminBookingsClient() {
               <strong>{selectedEvent.entityType === "booking" ? "Confirmed booking" : "Booking request"}</strong>
             </p>
             <form className="dialog-form" data-motion-item="booking-dialog-form" onSubmit={(event) => event.preventDefault()}>
-              <div className="dialog-layout" data-motion-item="booking-dialog-layout">
-                <div className="dialog-col" data-motion-item="booking-dialog-customer-col">
-                  <h4 data-motion-item="booking-dialog-customer-title">Customer details</h4>
-                  <div className="form-grid dialog-form-grid">
-                    <div className="field">
-                      <label>Name</label>
-                      <input
-                        value={dialogForm.name}
-                        onChange={(event) => setDialogForm((prev) => (prev ? { ...prev, name: event.target.value } : prev))}
-                      />
-                    </div>
-                    <div className="field">
-                      <label>Email</label>
-                      <input
-                        type="email"
-                        value={dialogForm.email}
-                        onChange={(event) => setDialogForm((prev) => (prev ? { ...prev, email: event.target.value } : prev))}
-                      />
-                    </div>
-                    <div className="field">
-                      <label>Phone</label>
-                      <input
-                        value={dialogForm.phone}
-                        maxLength={10}
-                        inputMode="numeric"
-                        pattern="[0-9]{10}"
-                        placeholder="10 digits"
-                        title="Phone must be exactly 10 digits"
-                        onChange={(event) =>
-                          setDialogForm((prev) => (prev ? { ...prev, phone: toDigits(event.target.value, 10) } : prev))
-                        }
-                      />
-                    </div>
-                    <div className="field">
-                      <label>Unit / Apartment (optional)</label>
-                      <input
-                        value={dialogForm.unitNumber}
-                        onChange={(event) =>
-                          setDialogForm((prev) => (prev ? { ...prev, unitNumber: event.target.value } : prev))
-                        }
-                      />
-                    </div>
-                    <div className="field">
-                      <label>House number</label>
-                      <input
-                        value={dialogForm.houseNumber}
-                        onChange={(event) =>
-                          setDialogForm((prev) => (prev ? { ...prev, houseNumber: event.target.value } : prev))
-                        }
-                      />
-                    </div>
-                    <div className="field">
-                      <label>Street name</label>
-                      <input
-                        value={dialogForm.streetName}
-                        onChange={(event) =>
-                          setDialogForm((prev) => (prev ? { ...prev, streetName: event.target.value } : prev))
-                        }
-                      />
-                    </div>
-                    <div className="field">
-                      <label>Street type</label>
-                      <select
-                        value={dialogForm.streetType}
-                        onChange={(event) =>
-                          setDialogForm((prev) => (prev ? { ...prev, streetType: event.target.value } : prev))
-                        }
-                      >
-                        <option value="Street">Street</option>
-                        <option value="Road">Road</option>
-                        <option value="Avenue">Avenue</option>
-                        <option value="Drive">Drive</option>
-                        <option value="Lane">Lane</option>
-                        <option value="Court">Court</option>
-                        <option value="Crescent">Crescent</option>
-                        <option value="Place">Place</option>
-                        <option value="Boulevard">Boulevard</option>
-                        <option value="Terrace">Terrace</option>
-                        <option value="Parade">Parade</option>
-                        <option value="Close">Close</option>
-                      </select>
-                    </div>
-                    <div className="field">
-                      <label>Suburb</label>
-                      <input
-                        value={dialogForm.suburb}
-                        onChange={(event) => setDialogForm((prev) => (prev ? { ...prev, suburb: event.target.value } : prev))}
-                      />
-                    </div>
-                    <div className="field">
-                      <label>State</label>
-                      <select
-                        value={dialogForm.state}
-                        onChange={(event) =>
-                          setDialogForm((prev) => (prev ? { ...prev, state: event.target.value as AuState } : prev))
-                        }
-                      >
-                        <option value="ACT">Australian Capital Territory</option>
-                        <option value="NSW">New South Wales</option>
-                        <option value="NT">Northern Territory</option>
-                        <option value="QLD">Queensland</option>
-                        <option value="SA">South Australia</option>
-                        <option value="TAS">Tasmania</option>
-                        <option value="VIC">Victoria</option>
-                        <option value="WA">Western Australia</option>
-                      </select>
-                    </div>
-                    <div className="field">
-                      <label>Postcode</label>
-                      <input
-                        value={dialogForm.postcode}
-                        maxLength={4}
-                        inputMode="numeric"
-                        pattern="[0-9]{4}"
-                        placeholder="3000"
-                        title="Postcode must be 4 digits"
-                        onChange={(event) =>
-                          setDialogForm((prev) => (prev ? { ...prev, postcode: toDigits(event.target.value, 4) } : prev))
-                        }
-                      />
-                    </div>
-                    <div className="field">
-                      <label>Mode</label>
-                      <select
-                        value={dialogForm.lessonMode}
-                        onChange={(event) =>
-                          setDialogForm((prev) =>
-                            prev ? { ...prev, lessonMode: event.target.value as DialogForm["lessonMode"] } : prev
-                          )
-                        }
-                      >
-                        <option value="in_person">In-person</option>
-                        <option value="video">Video</option>
-                      </select>
-                    </div>
-                    <div className="field">
-                      <label>Skill level</label>
-                      <select
-                        value={dialogForm.skillLevel}
-                        onChange={(event) =>
-                          setDialogForm((prev) =>
-                            prev ? { ...prev, skillLevel: event.target.value as DialogForm["skillLevel"] } : prev
-                          )
-                        }
-                      >
-                        <option value="beginner">Beginner</option>
-                        <option value="intermediate">Intermediate</option>
-                        <option value="advanced">Advanced</option>
-                      </select>
-                    </div>
-                    <div className="field">
-                      <label>Duration</label>
-                      <select
-                        value={dialogForm.durationChoice}
-                        onChange={(event) =>
-                          setDialogForm((prev) =>
-                            prev ? { ...prev, durationChoice: event.target.value as DurationChoice } : prev
-                          )
-                        }
-                      >
-                        <option value="min30">30 minutes</option>
-                        <option value="min60">60 minutes</option>
-                        <option value="custom">Other amount</option>
-                      </select>
-                    </div>
-                    {dialogForm.durationChoice === "custom" ? (
+              <div className="booking-dialog-scroll" data-motion-item="booking-dialog-scroll">
+                <div className="dialog-layout" data-motion-item="booking-dialog-layout">
+                  <div className="dialog-col" data-motion-item="booking-dialog-customer-col">
+                    <h4 data-motion-item="booking-dialog-customer-title">Customer details</h4>
+                    <div className="form-grid dialog-form-grid">
                       <div className="field">
-                        <label>Custom Duration (minutes)</label>
+                        <label>Name</label>
                         <input
-                          value={dialogForm.customDurationMinutes}
-                          maxLength={3}
+                          value={dialogForm.name}
+                          onChange={(event) => setDialogForm((prev) => (prev ? { ...prev, name: event.target.value } : prev))}
+                        />
+                      </div>
+                      <div className="field">
+                        <label>Email</label>
+                        <input
+                          type="email"
+                          value={dialogForm.email}
+                          onChange={(event) => setDialogForm((prev) => (prev ? { ...prev, email: event.target.value } : prev))}
+                        />
+                      </div>
+                      <div className="field">
+                        <label>Phone</label>
+                        <input
+                          value={dialogForm.phone}
+                          maxLength={10}
                           inputMode="numeric"
-                          pattern="[0-9]{2,3}"
-                          placeholder="e.g. 45"
+                          pattern="[0-9]{10}"
+                          placeholder="10 digits"
+                          title="Phone must be exactly 10 digits"
                           onChange={(event) =>
-                            setDialogForm((prev) =>
-                              prev ? { ...prev, customDurationMinutes: toDigits(event.target.value, 3) } : prev
-                            )
+                            setDialogForm((prev) => (prev ? { ...prev, phone: toDigits(event.target.value, 10) } : prev))
                           }
                         />
                       </div>
-                    ) : null}
+                      <div className="field">
+                        <label>Unit / Apartment (optional)</label>
+                        <input
+                          value={dialogForm.unitNumber}
+                          onChange={(event) =>
+                            setDialogForm((prev) => (prev ? { ...prev, unitNumber: event.target.value } : prev))
+                          }
+                        />
+                      </div>
+                      <div className="field">
+                        <label>House number</label>
+                        <input
+                          value={dialogForm.houseNumber}
+                          onChange={(event) =>
+                            setDialogForm((prev) => (prev ? { ...prev, houseNumber: event.target.value } : prev))
+                          }
+                        />
+                      </div>
+                      <div className="field">
+                        <label>Street name</label>
+                        <input
+                          value={dialogForm.streetName}
+                          onChange={(event) =>
+                            setDialogForm((prev) => (prev ? { ...prev, streetName: event.target.value } : prev))
+                          }
+                        />
+                      </div>
+                      <div className="field">
+                        <label>Street type</label>
+                        <select
+                          value={dialogForm.streetType}
+                          onChange={(event) =>
+                            setDialogForm((prev) => (prev ? { ...prev, streetType: event.target.value } : prev))
+                          }
+                        >
+                          <option value="Street">Street</option>
+                          <option value="Road">Road</option>
+                          <option value="Avenue">Avenue</option>
+                          <option value="Drive">Drive</option>
+                          <option value="Lane">Lane</option>
+                          <option value="Court">Court</option>
+                          <option value="Crescent">Crescent</option>
+                          <option value="Place">Place</option>
+                          <option value="Boulevard">Boulevard</option>
+                          <option value="Terrace">Terrace</option>
+                          <option value="Parade">Parade</option>
+                          <option value="Close">Close</option>
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label>Suburb</label>
+                        <input
+                          value={dialogForm.suburb}
+                          onChange={(event) => setDialogForm((prev) => (prev ? { ...prev, suburb: event.target.value } : prev))}
+                        />
+                      </div>
+                      <div className="field">
+                        <label>State</label>
+                        <select
+                          value={dialogForm.state}
+                          onChange={(event) =>
+                            setDialogForm((prev) => (prev ? { ...prev, state: event.target.value as AuState } : prev))
+                          }
+                        >
+                          <option value="ACT">Australian Capital Territory</option>
+                          <option value="NSW">New South Wales</option>
+                          <option value="NT">Northern Territory</option>
+                          <option value="QLD">Queensland</option>
+                          <option value="SA">South Australia</option>
+                          <option value="TAS">Tasmania</option>
+                          <option value="VIC">Victoria</option>
+                          <option value="WA">Western Australia</option>
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label>Postcode</label>
+                        <input
+                          value={dialogForm.postcode}
+                          maxLength={4}
+                          inputMode="numeric"
+                          pattern="[0-9]{4}"
+                          placeholder="3000"
+                          title="Postcode must be 4 digits"
+                          onChange={(event) =>
+                            setDialogForm((prev) => (prev ? { ...prev, postcode: toDigits(event.target.value, 4) } : prev))
+                          }
+                        />
+                      </div>
+                      <div className="field">
+                        <label>Mode</label>
+                        <select
+                          value={dialogForm.lessonMode}
+                          onChange={(event) =>
+                            setDialogForm((prev) =>
+                              prev ? { ...prev, lessonMode: event.target.value as DialogForm["lessonMode"] } : prev
+                            )
+                          }
+                        >
+                          <option value="in_person">In-person</option>
+                          <option value="video">Video</option>
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label>Skill level</label>
+                        <select
+                          value={dialogForm.skillLevel}
+                          onChange={(event) =>
+                            setDialogForm((prev) =>
+                              prev ? { ...prev, skillLevel: event.target.value as DialogForm["skillLevel"] } : prev
+                            )
+                          }
+                        >
+                          <option value="beginner">Beginner</option>
+                          <option value="intermediate">Intermediate</option>
+                          <option value="advanced">Advanced</option>
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label>Duration</label>
+                        <select
+                          value={dialogForm.durationChoice}
+                          onChange={(event) =>
+                            setDialogForm((prev) =>
+                              prev ? { ...prev, durationChoice: event.target.value as DurationChoice } : prev
+                            )
+                          }
+                        >
+                          <option value="min30">30 minutes</option>
+                          <option value="min60">60 minutes</option>
+                          <option value="custom">Other amount</option>
+                        </select>
+                      </div>
+                      {dialogForm.durationChoice === "custom" ? (
+                        <div className="field">
+                          <label>Custom Duration (minutes)</label>
+                          <input
+                            value={dialogForm.customDurationMinutes}
+                            maxLength={3}
+                            inputMode="numeric"
+                            pattern="[0-9]{2,3}"
+                            placeholder="e.g. 45"
+                            onChange={(event) =>
+                              setDialogForm((prev) =>
+                                prev ? { ...prev, customDurationMinutes: toDigits(event.target.value, 3) } : prev
+                              )
+                            }
+                          />
+                        </div>
+                      ) : null}
+                      <div className="field">
+                        <label>Start</label>
+                        <input
+                          type="datetime-local"
+                          value={dialogForm.startAtLocal}
+                          onChange={(event) =>
+                            setDialogForm((prev) => (prev ? { ...prev, startAtLocal: event.target.value } : prev))
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="dialog-col is-notes" data-motion-item="booking-dialog-notes-col">
+                    <h4 data-motion-item="booking-dialog-notes-title">Notes</h4>
                     <div className="field">
-                      <label>Start</label>
-                      <input
-                        type="datetime-local"
-                        value={dialogForm.startAtLocal}
-                        onChange={(event) =>
-                          setDialogForm((prev) => (prev ? { ...prev, startAtLocal: event.target.value } : prev))
-                        }
+                      <label>Lesson notes</label>
+                      <textarea
+                        className="dialog-notes"
+                        value={dialogForm.notes}
+                        onChange={(event) => setDialogForm((prev) => (prev ? { ...prev, notes: event.target.value } : prev))}
                       />
                     </div>
                   </div>
                 </div>
-                <div className="dialog-col is-notes" data-motion-item="booking-dialog-notes-col">
-                  <h4 data-motion-item="booking-dialog-notes-title">Notes</h4>
-                  <div className="field">
-                    <label>Lesson notes</label>
-                    <textarea
-                      className="dialog-notes"
-                      value={dialogForm.notes}
-                      onChange={(event) => setDialogForm((prev) => (prev ? { ...prev, notes: event.target.value } : prev))}
-                    />
-                  </div>
-                </div>
               </div>
-              <div className="dialog-actions dialog-actions-primary" data-motion-item="booking-dialog-actions-primary">
+              <div className="dialog-actions dialog-actions-booking" data-motion-item="booking-dialog-actions-booking">
                 <button className="btn btn-primary" type="button" disabled={!!busyAction} onClick={() => void saveDetails()}>
                   {busyAction === "save" ? "Saving..." : "Save details"}
                 </button>
                 <button className="btn btn-secondary" type="button" disabled={!!busyAction} onClick={() => void moveSelected()}>
                   {busyAction === "move" ? "Moving..." : "Move booking"}
                 </button>
-                <button className="btn btn-danger" type="button" disabled={!!busyAction} onClick={() => void cancelSelected()}>
-                  {busyAction === "cancel" ? "Cancelling..." : selectedIsPending ? "Reject request" : "Cancel booking"}
-                </button>
-                {selectedIsPending ? (
-                  <>
-                    <button
-                      className="btn btn-primary"
-                      type="button"
-                      disabled={!!busyAction}
-                      onClick={() => void approveSelected("approve")}
-                    >
-                      {busyAction === "approve" ? "Approving..." : "Approve"}
-                    </button>
-                    <button
-                      className="btn btn-danger"
-                      type="button"
-                      disabled={!!busyAction}
-                      onClick={() => void approveSelected("reject")}
-                    >
-                      {busyAction === "reject" ? "Rejecting..." : "Reject"}
-                    </button>
-                  </>
-                ) : null}
-                {selectedSeriesId ? (
-                  <button
-                    className="btn btn-secondary"
-                    type="button"
-                    disabled={!!busyAction}
-                    onClick={() => void removeSeries(selectedSeriesId)}
-                  >
-                    Remove series
+                {!selectedIsPending ? (
+                  <button className="btn btn-primary" type="button" disabled={!!busyAction} onClick={openInvoiceDialog}>
+                    Create invoice
                   </button>
                 ) : null}
-              </div>
-              <div className="dialog-actions dialog-actions-secondary" data-motion-item="booking-dialog-actions-secondary">
+                {selectedIsPending ? (
+                  <button
+                    className="btn btn-primary"
+                    type="button"
+                    disabled={!!busyAction}
+                    onClick={() => void approveSelected("approve")}
+                  >
+                    {busyAction === "approve" ? "Approving..." : "Approve request"}
+                  </button>
+                ) : null}
                 <button
                   className="btn btn-secondary"
                   type="button"
@@ -1836,9 +2119,176 @@ export function AdminBookingsClient() {
                 <button className="btn btn-primary" type="button" disabled={!!busyAction} onClick={openEmailDialog}>
                   Email customer
                 </button>
+                <button className="btn btn-danger" type="button" disabled={!!busyAction} onClick={() => void cancelSelected()}>
+                  {busyAction === "cancel" ? "Cancelling..." : selectedIsPending ? "Cancel request" : "Cancel booking"}
+                </button>
+                {selectedIsPending ? (
+                  <button
+                    className="btn btn-danger"
+                    type="button"
+                    disabled={!!busyAction}
+                    onClick={() => void approveSelected("reject")}
+                  >
+                    {busyAction === "reject" ? "Rejecting..." : "Reject request"}
+                  </button>
+                ) : null}
+                {selectedSeriesId ? (
+                  <button className="btn btn-danger" type="button" disabled={!!busyAction} onClick={() => void removeSeries(selectedSeriesId)}>
+                    Remove series
+                  </button>
+                ) : null}
               </div>
             </form>
           </div>
+          {invoiceDialogPresence.isMounted ? (
+            <div
+              className="dialog-backdrop is-secondary"
+              ref={invoiceDialogRootRef}
+              data-motion-root="admin"
+              data-motion-item="invoice-dialog-backdrop"
+              onClick={(event) => {
+                event.stopPropagation();
+                void closeInvoiceDialog();
+              }}
+            >
+              <div
+                className="dialog-panel dialog-panel-compact"
+                data-motion-item="invoice-dialog-panel"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="invoice-dialog-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="dialog-head" data-motion-item="invoice-dialog-head">
+                  <h3 id="invoice-dialog-title" data-motion-item="invoice-dialog-title">
+                    Create invoice
+                  </h3>
+                  <button className="btn btn-secondary" type="button" onClick={() => void closeInvoiceDialog()}>
+                    Cancel
+                  </button>
+                </div>
+                <p className="helper-text dialog-status" data-motion-item="invoice-dialog-status">
+                  Add lesson price and optional extras. You can edit and send the invoice from the invoice console.
+                </p>
+                <div className="manual-grid manual-grid-2">
+                  <div className="field">
+                    <label>Lesson fee (AUD) *</label>
+                    <input
+                      value={invoiceForm.lessonPrice}
+                      placeholder="e.g. 80"
+                      onChange={(event) => setInvoiceForm((prev) => ({ ...prev, lessonPrice: event.target.value }))}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Due date *</label>
+                    <input
+                      type="datetime-local"
+                      value={invoiceForm.dueAtLocal}
+                      onChange={(event) => setInvoiceForm((prev) => ({ ...prev, dueAtLocal: event.target.value }))}
+                    />
+                  </div>
+                  <div className="field">
+                    <label className="helper-toggle">
+                      <input
+                        type="checkbox"
+                        checked={invoiceForm.includeEducationalBooks}
+                        onChange={(event) =>
+                          setInvoiceForm((prev) => ({ ...prev, includeEducationalBooks: event.target.checked }))
+                        }
+                      />{" "}
+                      Educational books
+                    </label>
+                    <input
+                      disabled={!invoiceForm.includeEducationalBooks}
+                      value={invoiceForm.educationalBooksPrice}
+                      placeholder="AUD"
+                      onChange={(event) =>
+                        setInvoiceForm((prev) => ({ ...prev, educationalBooksPrice: event.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="field">
+                    <label className="helper-toggle">
+                      <input
+                        type="checkbox"
+                        checked={invoiceForm.includeDigitalGuitarLessons}
+                        onChange={(event) =>
+                          setInvoiceForm((prev) => ({ ...prev, includeDigitalGuitarLessons: event.target.checked }))
+                        }
+                      />{" "}
+                      Digital guitar lessons
+                    </label>
+                    <input
+                      disabled={!invoiceForm.includeDigitalGuitarLessons}
+                      value={invoiceForm.digitalGuitarLessonsPrice}
+                      placeholder="AUD"
+                      onChange={(event) =>
+                        setInvoiceForm((prev) => ({ ...prev, digitalGuitarLessonsPrice: event.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="field manual-span-2">
+                    <label className="helper-toggle">
+                      <input
+                        type="checkbox"
+                        checked={invoiceForm.includeCustomCharge}
+                        onChange={(event) => setInvoiceForm((prev) => ({ ...prev, includeCustomCharge: event.target.checked }))}
+                      />{" "}
+                      Custom charge
+                    </label>
+                  </div>
+                  <div className="field">
+                    <label>Custom description</label>
+                    <input
+                      disabled={!invoiceForm.includeCustomCharge}
+                      value={invoiceForm.customChargeDescription}
+                      onChange={(event) =>
+                        setInvoiceForm((prev) => ({ ...prev, customChargeDescription: event.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Custom amount (AUD)</label>
+                    <input
+                      disabled={!invoiceForm.includeCustomCharge}
+                      value={invoiceForm.customChargePrice}
+                      onChange={(event) => setInvoiceForm((prev) => ({ ...prev, customChargePrice: event.target.value }))}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Tax mode</label>
+                    <select
+                      value={invoiceForm.taxMode}
+                      onChange={(event) => setInvoiceForm((prev) => ({ ...prev, taxMode: event.target.value as InvoiceTaxMode }))}
+                    >
+                      <option value="taxable">Taxable (GST)</option>
+                      <option value="gst_free">GST-free</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label>Notes</label>
+                    <textarea
+                      value={invoiceForm.notes}
+                      onChange={(event) => setInvoiceForm((prev) => ({ ...prev, notes: event.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div className="dialog-actions" data-motion-item="invoice-dialog-actions">
+                  <button className="btn btn-secondary" type="button" disabled={!!busyAction} onClick={() => void closeInvoiceDialog()}>
+                    Cancel
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    type="button"
+                    disabled={!!busyAction}
+                    onClick={() => void createInvoiceFromBooking()}
+                  >
+                    {busyAction === "create_invoice" ? "Creating..." : "Create invoice"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
           {emailDialogPresence.isMounted ? (
             <div
               className="dialog-backdrop is-secondary"
@@ -1853,10 +2303,15 @@ export function AdminBookingsClient() {
               <div
                 className="dialog-panel dialog-panel-compact"
                 data-motion-item="email-dialog-panel"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="email-dialog-title"
                 onClick={(event) => event.stopPropagation()}
               >
                 <div className="dialog-head" data-motion-item="email-dialog-head">
-                  <h3 data-motion-item="email-dialog-title">Email customer</h3>
+                  <h3 id="email-dialog-title" data-motion-item="email-dialog-title">
+                    Email customer
+                  </h3>
                   <button className="btn btn-secondary" type="button" onClick={() => void closeEmailDialog()}>
                     Cancel
                   </button>

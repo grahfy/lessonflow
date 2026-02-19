@@ -887,7 +887,7 @@ h1 {
 
 .booking-dialog-scroll {
   min-height: 0;
-  max-height: min(56vh, 560px);
+  max-height: min(68vh, 760px);
   overflow: auto;
   padding-right: 4px;
 }
@@ -914,6 +914,18 @@ h1 {
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.025);
   padding: 10px;
+}
+
+.dialog-col.is-notes {
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
+}
+
+.dialog-col.is-notes .field {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .dialog-col h4 {
@@ -979,7 +991,8 @@ h1 {
 }
 
 .dialog-notes {
-  min-height: 220px;
+  min-height: min(58vh, 620px);
+  height: 100%;
 }
 
 .dialog-col .field textarea.dialog-notes {
@@ -1095,6 +1108,75 @@ h1 {
   margin-top: 8px;
 }
 
+.invoice-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.8fr) minmax(0, 0.8fr) auto auto auto auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.invoice-list-card {
+  min-height: 160px;
+}
+
+.invoice-item {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.invoice-line-list {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.invoice-line-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.82rem;
+  color: var(--ink-1);
+}
+
+.invoice-line-item:last-child {
+  border-bottom: 0;
+}
+
+.invoice-line-item.invoice-line-item-editable {
+  grid-template-columns: minmax(0, 1.5fr) minmax(84px, 0.4fr) minmax(120px, 0.7fr) minmax(140px, 0.7fr) auto;
+}
+
+.invoice-line-item.invoice-line-item-editable input,
+.invoice-line-item.invoice-line-item-editable select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink-0);
+  padding: 6px 8px;
+  font-size: 0.8rem;
+}
+
+.invoice-line-item.invoice-line-item-editable .btn {
+  min-width: 90px;
+}
+
+.dialog-actions-inline {
+  justify-content: flex-start;
+}
+
+.invoice-total-stack {
+  margin-top: 10px;
+  display: grid;
+  gap: 4px;
+  justify-content: end;
+  text-align: right;
+  color: var(--ink-1);
+}
+
 .booking-list {
   display: grid;
   gap: 8px;
@@ -1183,15 +1265,19 @@ h1 {
   }
 
   .dialog-notes {
-    min-height: 160px;
+    min-height: min(42vh, 360px);
   }
 
   .booking-dialog-scroll {
-    max-height: min(52vh, 420px);
+    max-height: min(62vh, 560px);
   }
 
   .customers-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .invoice-toolbar {
+    grid-template-columns: 1fr 1fr;
   }
 
   .manual-customer-summary .btn {
@@ -1304,6 +1390,34 @@ h1 {
 
   .dialog-actions-secondary {
     justify-content: stretch;
+  }
+
+  .invoice-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .invoice-line-item {
+    grid-template-columns: 1fr;
+  }
+
+  .invoice-line-item.invoice-line-item-editable {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  .site-header,
+  .site-footer,
+  .btn,
+  .dialog-backdrop {
+    display: none !important;
+  }
+
+  .view,
+  .admin-card {
+    box-shadow: none !important;
+    background: white !important;
+    border: 1px solid #ddd !important;
   }
 }
 

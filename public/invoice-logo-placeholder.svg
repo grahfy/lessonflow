@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-labelledby="title desc">
+  <title id="title">Invoice Logo Placeholder</title>
+  <desc id="desc">Temporary logo placeholder for Melbourne Guitar School invoices.</desc>
+  <rect x="2" y="2" width="116" height="116" rx="12" fill="#f8fafc" stroke="#94a3b8" stroke-width="4" />
+  <path d="M35 87c0-23 19-42 42-42h8" fill="none" stroke="#0f172a" stroke-width="8" stroke-linecap="round" />
+  <circle cx="84" cy="45" r="8" fill="#0f172a" />
+  <text x="60" y="108" text-anchor="middle" font-size="11" font-family="Arial, sans-serif" fill="#334155">LOGO PLACEHOLDER</text>
+</svg>

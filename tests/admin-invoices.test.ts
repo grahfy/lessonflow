@@ -1,0 +1,222 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import { NextRequest } from "next/server";
+
+import { POST as createBookingInvoice } from "@/app/api/admin/bookings/[id]/invoice/route";
+import { PATCH as patchInvoice } from "@/app/api/admin/invoices/[id]/route";
+import { GET, POST } from "@/app/api/admin/invoices/route";
+import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
+import { prisma } from "@/lib/db";
+
+function adminRequest(url: string, method: "GET" | "POST" | "PATCH", token: string, body?: Record<string, unknown>) {
+  return new NextRequest(url, {
+    method,
+    body: body ? JSON.stringify(body) : undefined,
+    headers: {
+      "content-type": "application/json",
+      cookie: `${getSessionCookieName()}=${token}`
+    }
+  });
+}
+
+describe("admin-invoices", () => {
+  beforeEach(async () => {
+    await prisma.invoiceAuditLog.deleteMany();
+    await prisma.invoiceLineItem.deleteMany();
+    await prisma.invoice.deleteMany();
+    await prisma.bookingAuditLog.deleteMany();
+    await prisma.booking.deleteMany();
+    await prisma.bookingSeries.deleteMany();
+    await prisma.bookingRequest.deleteMany();
+    await prisma.customer.deleteMany();
+  });
+
+  it("rejects unauthenticated invoice list requests", async () => {
+    const req = new NextRequest("http://localhost/api/admin/invoices");
+    const res = await GET(req);
+    expect(res.status).toBe(401);
+  });
+
+  it("creates invoices and excludes paid invoices from outstanding filter", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const createReq = adminRequest("http://localhost/api/admin/invoices", "POST", token, {
+      customerName: "Alex Student",
+      customerEmail: "alex@example.com",
+      customerPhone: "0400123456",
+      customerAddress: "10 Main Street, Northcote VIC 3070",
+      taxMode: "taxable",
+      dueAt: "2026-08-01T10:00:00.000Z",
+      lineItems: [
+        {
+          kind: "lesson_fee",
+          description: "Lesson fee",
+          quantity: 1,
+          unitPriceCents: 9000,
+          taxMode: "taxable",
+          sortOrder: 0
+        }
+      ]
+    });
+    const createRes = await POST(createReq);
+    expect(createRes.status).toBe(201);
+    const createdBody = (await createRes.json()) as { invoice: { id: string } };
+
+    const outstandingBeforeReq = adminRequest("http://localhost/api/admin/invoices?outstanding=true", "GET", token);
+    const outstandingBeforeRes = await GET(outstandingBeforeReq);
+    expect(outstandingBeforeRes.status).toBe(200);
+    const outstandingBeforeBody = (await outstandingBeforeRes.json()) as { invoices: Array<{ id: string }> };
+    expect(outstandingBeforeBody.invoices.some((invoice) => invoice.id === createdBody.invoice.id)).toBe(true);
+
+    const markPaidReq = adminRequest(`http://localhost/api/admin/invoices/${createdBody.invoice.id}`, "PATCH", token, {
+      action: "mark_paid"
+    });
+    const markPaidRes = await patchInvoice(markPaidReq, {
+      params: Promise.resolve({ id: createdBody.invoice.id })
+    });
+    expect(markPaidRes.status).toBe(200);
+
+    const outstandingAfterReq = adminRequest("http://localhost/api/admin/invoices?outstanding=true", "GET", token);
+    const outstandingAfterRes = await GET(outstandingAfterReq);
+    expect(outstandingAfterRes.status).toBe(200);
+    const outstandingAfterBody = (await outstandingAfterRes.json()) as { invoices: Array<{ id: string }> };
+    expect(outstandingAfterBody.invoices.some((invoice) => invoice.id === createdBody.invoice.id)).toBe(false);
+  });
+
+  it("creates draft invoice from booking endpoint", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const booking = await prisma.booking.create({
+      data: {
+        name: "Booking Student",
+        email: "booking.student@example.com",
+        phone: "0400111222",
+        address: "22 High Street, Fitzroy VIC 3065",
+        houseNumber: "22",
+        streetName: "High",
+        streetType: "Street",
+        suburb: "Fitzroy",
+        state: "VIC",
+        postcode: "3065",
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min60",
+        startAt: new Date("2026-07-10T09:00:00.000Z"),
+        endAt: new Date("2026-07-10T10:00:00.000Z"),
+        timezone: "Australia/Melbourne",
+        modifiedById: admin.id
+      }
+    });
+
+    const req = adminRequest(`http://localhost/api/admin/bookings/${booking.id}/invoice`, "POST", token, {
+      lessonPriceCents: 9500,
+      includeEducationalBooks: true,
+      educationalBooksPriceCents: 1500,
+      includeDigitalGuitarLessons: true,
+      digitalGuitarLessonsPriceCents: 2000,
+      includeCustomCharge: true,
+      customChargeDescription: "String pack",
+      customChargePriceCents: 3000
+    });
+    const res = await createBookingInvoice(req, { params: Promise.resolve({ id: booking.id }) });
+    expect(res.status).toBe(201);
+
+    const body = (await res.json()) as { invoice: { status: string; bookingId: string; lineItems: Array<{ description: string }> } };
+    expect(body.invoice.status).toBe("draft");
+    expect(body.invoice.bookingId).toBe(booking.id);
+    expect(body.invoice.lineItems.length).toBe(4);
+  });
+
+  it("filters invoice list by aging bucket", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    await prisma.invoice.create({
+      data: {
+        invoiceNumber: "MGS-2026-8801",
+        status: "sent",
+        taxMode: "taxable",
+        customerName: "Current Student",
+        customerEmail: "current@example.com",
+        customerPhone: "0400000001",
+        customerAddress: "1 Main Street",
+        sellerBusinessName: "Melbourne Guitar School",
+        sellerAbn: "12345678901",
+        sellerEmail: "no-reply@example.com",
+        bankName: "ANZ",
+        bankBsb: "013001",
+        bankAccountName: "Melbourne Guitar School",
+        bankAccountNumber: "12345678",
+        subtotalCents: 10000,
+        gstCents: 1000,
+        totalCents: 11000,
+        issuedAt: new Date("2026-07-01T00:00:00.000Z"),
+        dueAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+        createdById: admin.id,
+        updatedById: admin.id,
+        lineItems: {
+          create: {
+            kind: "lesson_fee",
+            description: "Lesson",
+            quantity: 1,
+            unitPriceCents: 10000,
+            taxMode: "taxable",
+            lineSubtotalCents: 10000,
+            lineGstCents: 1000,
+            lineTotalCents: 11000,
+            sortOrder: 0
+          }
+        }
+      }
+    });
+
+    await prisma.invoice.create({
+      data: {
+        invoiceNumber: "MGS-2026-8802",
+        status: "sent",
+        taxMode: "taxable",
+        customerName: "Overdue Student",
+        customerEmail: "overdue@example.com",
+        customerPhone: "0400000002",
+        customerAddress: "2 Main Street",
+        sellerBusinessName: "Melbourne Guitar School",
+        sellerAbn: "12345678901",
+        sellerEmail: "no-reply@example.com",
+        bankName: "ANZ",
+        bankBsb: "013001",
+        bankAccountName: "Melbourne Guitar School",
+        bankAccountNumber: "12345678",
+        subtotalCents: 10000,
+        gstCents: 1000,
+        totalCents: 11000,
+        issuedAt: new Date("2026-07-01T00:00:00.000Z"),
+        dueAt: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000),
+        createdById: admin.id,
+        updatedById: admin.id,
+        lineItems: {
+          create: {
+            kind: "lesson_fee",
+            description: "Lesson",
+            quantity: 1,
+            unitPriceCents: 10000,
+            taxMode: "taxable",
+            lineSubtotalCents: 10000,
+            lineGstCents: 1000,
+            lineTotalCents: 11000,
+            sortOrder: 0
+          }
+        }
+      }
+    });
+
+    const req = adminRequest("http://localhost/api/admin/invoices?agingBucket=overdue_31_plus", "GET", token);
+    const res = await GET(req);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { invoices: Array<{ invoiceNumber: string; agingBucket: string }> };
+
+    expect(body.invoices.length).toBe(1);
+    expect(body.invoices[0].invoiceNumber).toBe("MGS-2026-8802");
+    expect(body.invoices[0].agingBucket).toBe("overdue_31_plus");
+  });
+});

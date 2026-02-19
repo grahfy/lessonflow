@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   customerBookingMovedTemplate,
   customerBookingReminderTemplate,
+  customerInvoiceReminderTemplate,
+  customerInvoiceTemplate,
   customerCustomMessageTemplate,
   ownerDailyDigestTemplate,
   ownerPendingBookingTemplate
@@ -59,5 +61,34 @@ describe("email-templates", () => {
 
     expect(custom.html).toContain("&lt;Test&gt;");
     expect(custom.html).toContain("Line &lt;2&gt;");
+  });
+
+  it("renders invoice template with amount and invoice number", () => {
+    const invoice = customerInvoiceTemplate({
+      invoiceNumber: "MGS-2026-0001",
+      customerName: "Alex",
+      dueAt: new Date("2026-08-10T00:00:00.000Z"),
+      totalCents: 12345,
+      sellerBusinessName: "Melbourne Guitar School"
+    });
+
+    expect(invoice.subject).toContain("MGS-2026-0001");
+    expect(invoice.html).toContain("Alex");
+    expect(invoice.html).toContain("$123.45");
+  });
+
+  it("renders invoice reminder template with overdue days", () => {
+    const reminder = customerInvoiceReminderTemplate({
+      invoiceNumber: "MGS-2026-0002",
+      customerName: "Alex",
+      dueAt: new Date("2026-08-10T00:00:00.000Z"),
+      totalCents: 12345,
+      sellerBusinessName: "Melbourne Guitar School",
+      overdueDays: 14
+    });
+
+    expect(reminder.subject).toContain("overdue");
+    expect(reminder.html).toContain("14 day");
+    expect(reminder.html).toContain("MGS-2026-0002");
   });
 });

@@ -47,6 +47,36 @@ enum AuditAction {
   series_removed
 }
 
+enum InvoiceStatus {
+  draft
+  sent
+  paid
+  void
+}
+
+enum InvoiceDocumentType {
+  invoice
+  credit_note
+}
+
+enum InvoiceTaxMode {
+  taxable
+  gst_free
+}
+
+enum InvoiceAuditAction {
+  created
+  edited
+  sent
+  reminder_sent
+  marked_paid
+  marked_unpaid
+  credit_note_created
+  deleted
+  restored
+  voided
+}
+
 model ContactSubmission {
   id         String   @id @default(cuid())
   name       String
@@ -157,6 +187,7 @@ model Booking {
   modifiedById     String?
   modifiedBy       AdminUser?      @relation("BookingEdits", fields: [modifiedById], references: [id], onDelete: SetNull)
   auditLogs        BookingAuditLog[]
+  invoices         Invoice[]
 
   @@index([startAt, status])
   @@index([customerId])
@@ -187,6 +218,9 @@ model AdminUser {
   approvedRequests       BookingRequest[] @relation("RequestApprovals")
   editedBookings         Booking[]        @relation("BookingEdits")
   auditLogs              BookingAuditLog[]
+  createdInvoices        Invoice[]        @relation("InvoiceCreatedBy")
+  updatedInvoices        Invoice[]        @relation("InvoiceUpdatedBy")
+  invoiceAuditLogs       InvoiceAuditLog[] @relation("InvoiceAuditActors")
 }
 
 model Customer {
@@ -211,6 +245,7 @@ model Customer {
   bookingRequests BookingRequest[]
   bookingSeries   BookingSeries[]
   bookings        Booking[]
+  invoices        Invoice[]
 
   @@index([isArchived, fullName])
   @@index([normalizedEmail])
@@ -225,4 +260,91 @@ model OutboundEmail {
   status    String
   error     String?
   createdAt DateTime @default(now())
+}
+
+model Invoice {
+  id                   String         @id @default(cuid())
+  invoiceNumber        String         @unique
+  status               InvoiceStatus  @default(draft)
+  documentType         InvoiceDocumentType @default(invoice)
+  taxMode              InvoiceTaxMode @default(taxable)
+  currency             String         @default("AUD")
+  customerId           String?
+  customer             Customer?      @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  bookingId            String?
+  booking              Booking?       @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  originalInvoiceId    String?
+  originalInvoice      Invoice?       @relation("InvoiceCreditNotes", fields: [originalInvoiceId], references: [id], onDelete: SetNull)
+  creditNotes          Invoice[]      @relation("InvoiceCreditNotes")
+  customerName         String
+  customerEmail        String
+  customerPhone        String
+  customerAddress      String
+  sellerBusinessName   String
+  sellerAbn            String
+  sellerEmail          String?
+  bankName             String
+  bankBsb              String
+  bankAccountName      String
+  bankAccountNumber    String
+  subtotalCents        Int
+  gstCents             Int
+  totalCents           Int
+  notes                String?
+  issuedAt             DateTime
+  dueAt                DateTime
+  sentAt               DateTime?
+  paidAt               DateTime?
+  lastReminderSentAt   DateTime?
+  lastReminderStage    Int?
+  isDeleted            Boolean        @default(false)
+  createdById          String?
+  createdBy            AdminUser?     @relation("InvoiceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById          String?
+  updatedBy            AdminUser?     @relation("InvoiceUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  lineItems            InvoiceLineItem[]
+  auditLogs            InvoiceAuditLog[]
+
+  @@index([status, isDeleted, dueAt])
+  @@index([documentType, createdAt])
+  @@index([originalInvoiceId])
+  @@index([customerId, createdAt])
+  @@index([bookingId, createdAt])
+  @@index([paidAt])
+  @@index([lastReminderStage, dueAt])
+}
+
+model InvoiceLineItem {
+  id                String         @id @default(cuid())
+  invoiceId         String
+  invoice           Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  kind              String         @default("custom")
+  description       String
+  quantity          Int            @default(1)
+  unitPriceCents    Int
+  taxMode           InvoiceTaxMode @default(taxable)
+  lineSubtotalCents Int
+  lineGstCents      Int
+  lineTotalCents    Int
+  sortOrder         Int            @default(0)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([invoiceId, sortOrder])
+}
+
+model InvoiceAuditLog {
+  id        String             @id @default(cuid())
+  invoiceId String
+  invoice   Invoice            @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  action    InvoiceAuditAction
+  actorId   String?
+  actor     AdminUser?         @relation("InvoiceAuditActors", fields: [actorId], references: [id], onDelete: SetNull)
+  details   String?
+  createdAt DateTime           @default(now())
+
+  @@index([invoiceId, createdAt])
+  @@index([actorId])
 }
