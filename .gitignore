@@ -11,7 +11,11 @@ dist
 .env.production.local
 prisma/dev.db
 prisma/dev.db-journal
+prisma/test.db
+prisma/test.db-journal
 prisma/prisma/dev.db
 prisma/prisma/dev.db-journal
+prisma/prisma/test.db
+prisma/prisma/test.db-journal
 
 tsconfig.tsbuildinfo

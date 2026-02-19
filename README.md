@@ -26,6 +26,37 @@ DATABASE_URL="file:./prisma/dev.db" npx prisma migrate dev --name init_booking
 npm run dev
 ```
 
+## Test Environment
+Tests run against an isolated SQLite database (`prisma/test.db`) and load env values in this order:
+`.env.test.local` -> `.env.test` -> `.env.local` -> `.env`.
+
+1. Create optional local test env overrides:
+```bash
+cp .env.test.example .env.test.local
+```
+2. Prepare/reset the test database:
+```bash
+npm run test:prepare
+```
+3. Run tests:
+```bash
+npm test
+```
+
+## Full Local Site Check
+Run the full local verification flow (install deps, prepare local dev DB, run tests, then start the app):
+
+```bash
+npm run local:full-site
+```
+
+The site will be available at `http://127.0.0.1:3000` by default.
+If tests fail, the script still starts the local site so manual QA can continue.
+Optional flags:
+- `npm run local:full-site -- --no-start` (run setup + tests only)
+- `npm run local:full-site -- --skip-install` (skip `npm ci`)
+- `npm run local:full-site -- --skip-tests` (start site without running tests)
+
 ## Key Routes
 - Public pages: `/`, `/lessons`, `/teacher`, `/vouchers`, `/terms`
 - Contact form: `/contact`
@@ -43,11 +74,20 @@ npm run dev
 
 ## Admin Operations
 Owner dashboard supports:
+- Visual day/week/month booking calendar.
+- Status colors:
+  - confirmed bookings (green)
+  - pending requests (yellow)
+  - rejected requests (red, visible for 48 hours)
+  - cancelled bookings (slate, visible for 48 hours)
+- Click-to-open booking dialog with full customer and lesson details.
 - Pending request approval and rejection.
-- Day/week/month booking views.
 - Manual booking create.
-- Booking move/cancel.
+- Booking edit/move/cancel.
+- Pending request edit/move/reject (cancel maps to reject).
 - Recurring series cancellation for future instances.
+- Manual reminder and custom customer emails from dialog.
+- Automatic customer update email when confirmed bookings are moved.
 
 ## Daily Digest Job
 Endpoint: `POST /api/jobs/daily-bookings-digest`  
