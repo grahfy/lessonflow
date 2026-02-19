@@ -51,6 +51,7 @@ Required actions in the same task/PR:
 Git history is not available in this workspace snapshot, so no project-specific convention can be inferred. Use Conventional Commit style:
 - `feat: add FAQ section to lessons page`
 - `fix: correct contact email link`
+- Always use multiline commit messages/comments (`git commit -m "<title>" -m "<details>"`), not single-line-only commit text.
 
 For PRs, include:
 - Clear summary and rationale.
