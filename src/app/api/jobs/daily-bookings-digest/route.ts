@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
       name: row.name,
       startAt: row.startAt,
       lessonDuration: row.lessonDuration,
+      customDurationMinutes: row.customDurationMinutes,
       lessonMode: row.lessonMode,
       status: row.status
     }))

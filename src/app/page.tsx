@@ -1,5 +1,4 @@
-import Link from "next/link";
-
+import { TweenLink } from "@/components/motion/tween-link";
 import { PanelLayout } from "@/components/panel-layout";
 
 export default function HomePage() {
@@ -13,12 +12,12 @@ export default function HomePage() {
       footerCopy="Arrow keys or swipe to move between pages."
       actions={
         <div className="button-row">
-          <Link className="btn btn-primary" href="/book">
+          <TweenLink className="btn btn-primary" href="/book">
             Book Intro Lesson
-          </Link>
-          <Link className="btn btn-secondary" href="/lessons">
+          </TweenLink>
+          <TweenLink className="btn btn-secondary" href="/lessons">
             View Lesson Paths
-          </Link>
+          </TweenLink>
         </div>
       }
     >

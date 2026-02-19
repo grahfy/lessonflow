@@ -3,10 +3,13 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { useNoticeTween } from "@/components/motion/use-notice-tween";
+
 export function AdminLoginForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const errorNoticeRef = useNoticeTween(Boolean(error));
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -34,21 +37,25 @@ export function AdminLoginForm() {
   }
 
   return (
-    <form className="form-grid" onSubmit={onSubmit}>
-      <div className="field full">
+    <form className="form-grid" onSubmit={onSubmit} data-motion-item="admin-login-form">
+      <div className="field full" data-motion-item="admin-login-email-field">
         <label htmlFor="admin-email">Admin email</label>
         <input id="admin-email" type="email" name="email" required />
       </div>
-      <div className="field full">
+      <div className="field full" data-motion-item="admin-login-password-field">
         <label htmlFor="admin-password">Password</label>
         <input id="admin-password" type="password" name="password" required />
       </div>
-      <div className="button-row">
+      <div className="button-row" data-motion-item="admin-login-actions">
         <button className="btn btn-primary" type="submit" disabled={loading}>
           {loading ? "Signing in..." : "Sign in"}
         </button>
       </div>
-      {error ? <p className="notice error">{error}</p> : null}
+      {error ? (
+        <p className="notice error" ref={errorNoticeRef} data-motion-item="admin-login-error-notice">
+          {error}
+        </p>
+      ) : null}
     </form>
   );
 }

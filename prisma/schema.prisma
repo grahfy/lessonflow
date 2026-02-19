@@ -42,6 +42,8 @@ enum AuditAction {
   moved
   cancelled
   edited
+  reminder_sent
+  custom_email_sent
   series_removed
 }
 
@@ -62,9 +64,17 @@ model BookingRequest {
   email            String
   phone            String
   address          String
+  unitNumber       String?
+  houseNumber      String               @default("")
+  streetName       String               @default("")
+  streetType       String               @default("")
+  suburb           String               @default("")
+  state            String               @default("")
+  postcode         String               @default("")
   lessonMode       LessonMode
   skillLevel       SkillLevel
   lessonDuration   LessonDuration
+  customDurationMinutes Int?
   requestedStartAt DateTime
   notes            String?
   isRecurring      Boolean              @default(false)
@@ -84,9 +94,17 @@ model BookingSeries {
   email           String
   phone           String
   address         String
+  unitNumber      String?
+  houseNumber     String    @default("")
+  streetName      String    @default("")
+  streetType      String    @default("")
+  suburb          String    @default("")
+  state           String    @default("")
+  postcode        String    @default("")
   lessonMode      LessonMode
   skillLevel      SkillLevel
   lessonDuration  LessonDuration
+  customDurationMinutes Int?
   dayOfWeek       Int
   startTimeLocal  String
   startDate       DateTime
@@ -105,9 +123,17 @@ model Booking {
   email            String
   phone            String
   address          String
+  unitNumber       String?
+  houseNumber      String          @default("")
+  streetName       String          @default("")
+  streetType       String          @default("")
+  suburb           String          @default("")
+  state            String          @default("")
+  postcode         String          @default("")
   lessonMode       LessonMode
   skillLevel       SkillLevel
   lessonDuration   LessonDuration
+  customDurationMinutes Int?
   startAt          DateTime
   endAt            DateTime
   timezone         String

@@ -1,5 +1,4 @@
-import Link from "next/link";
-
+import { TweenLink } from "@/components/motion/tween-link";
 import { PanelLayout } from "@/components/panel-layout";
 
 export default function VouchersPage() {
@@ -29,12 +28,12 @@ export default function VouchersPage() {
       </div>
 
       <div className="button-row">
-        <Link className="btn btn-primary" href="/book">
+        <TweenLink className="btn btn-primary" href="/book">
           Order a Voucher
-        </Link>
-        <Link className="btn btn-secondary" href="/terms">
+        </TweenLink>
+        <TweenLink className="btn btn-secondary" href="/terms">
           Voucher Terms
-        </Link>
+        </TweenLink>
       </div>
     </PanelLayout>
   );

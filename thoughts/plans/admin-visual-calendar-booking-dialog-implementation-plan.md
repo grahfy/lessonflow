@@ -1,7 +1,7 @@
 # Admin Visual Calendar Booking Dialog Implementation Plan
 
 ## Overview
-Implement a calendar-first admin booking interface where confirmed bookings and pending requests are shown visually, status-colored, and editable through a popup dialog that also supports manual customer reminders and custom emails, with polished in-ease/out-ease UI animations.
+Implement a calendar-first admin booking interface where confirmed bookings and pending requests are shown visually, status-colored, and editable through a popup dialog that also supports manual customer reminders and custom emails, with polished in-ease/out-ease UI animations. Pending items are shown only when they fall in the current calendar range, and cancelled/rejected items remain visible for 48 hours.
 
 ## Current State Analysis
 - Admin bookings UI is currently list-based (`Bookings` + `Pending Approvals`) and not event-calendar based (`src/components/admin-bookings-client.tsx:184`).
@@ -14,6 +14,8 @@ Implement a calendar-first admin booking interface where confirmed bookings and 
 - Admin can view a visual day/week/month calendar that includes:
   - Confirmed bookings in green.
   - Pending requests in yellow.
+- Pending requests are rendered only when `requestedStartAt` is inside the active day/week/month range.
+- Cancelled bookings and rejected requests remain visible for up to 48 hours, then drop from the default calendar view.
 - Clicking any calendar event opens a popup dialog with full customer and booking/request details.
 - In popup, admin can:
   - Edit details.
@@ -21,6 +23,7 @@ Implement a calendar-first admin booking interface where confirmed bookings and 
   - Cancel booking/request.
   - Send a manual reminder/notification email.
   - Send a custom email.
+- Moving a confirmed booking automatically sends a customer update email.
 - Calendar events, dialog open/close, and transient notices use subtle in-ease/out-ease animations for better interaction feedback.
 - Existing approval/rejection, recurring behavior, audit logs, and admin authentication remain intact.
 
@@ -53,11 +56,12 @@ Selected approach: Option 2.
 - Render day/week/month in a visual calendar component and use event click to open a modal dialog.
 - Route dialog actions to explicit APIs:
   - booking mutate (edit/move/cancel),
-  - request mutate (edit/move/cancel/approve/reject),
+  - request mutate (edit/move/cancel/approve/reject), with pending cancel mapped to `rejected`,
   - notify endpoints for reminder/custom email.
 - Add dedicated email templates for reminder and admin custom messages.
+- Trigger automatic customer update email on confirmed-booking move operations.
 - Add a shared motion pattern (duration/easing tokens) for event state transitions and dialog enter/exit animations, with `prefers-reduced-motion` support.
-- Keep all actions auditable and logged to `BookingAuditLog` (for booking records) plus `OutboundEmail`.
+- Keep all actions auditable and logged to `BookingAuditLog` (for booking records) plus `OutboundEmail`; include communication actions in audit history.
 
 ## Phase 1: Calendar Event Data Contract
 
@@ -67,7 +71,7 @@ Create a unified data contract for confirmed bookings and pending requests suita
 ### Changes Required
 #### 1. Unified Events API
 **File**: `src/app/api/admin/bookings/route.ts`  
-**Changes**: Extend GET response to include both confirmed bookings and pending requests in one `events` payload with event type, status, and color token (`green` for confirmed, `yellow` for pending).
+**Changes**: Extend GET response to include both confirmed bookings and pending requests in one `events` payload with event type, status, and color token (`green` for confirmed, `yellow` for pending). Pending events must be filtered to the active range, and cancelled/rejected events should be included only for the 48-hour post-status-change window.
 
 #### 2. View Range Reuse
 **File**: `src/lib/calendar-range.ts`  
@@ -79,8 +83,8 @@ Create a unified data contract for confirmed bookings and pending requests suita
 
 ### Success Criteria
 #### Automated Verification
-- [ ] `npm run test -- admin-bookings`
-- [ ] Add/update API tests verifying both confirmed + pending are returned in selected range.
+- [x] `npm run test -- admin-bookings`
+- [x] Add/update API tests verifying both confirmed + pending are returned in selected range.
 
 #### Manual Verification
 - [ ] API response for each view contains unified events with status metadata.
@@ -118,8 +122,8 @@ Replace list-first admin booking rendering with a visual calendar surface for da
 
 ### Success Criteria
 #### Automated Verification
-- [ ] `npm run lint`
-- [ ] `npm run typecheck`
+- [x] `npm run lint`
+- [x] `npm run typecheck`
 
 #### Manual Verification
 - [ ] Day/week/month views are visually navigable.
@@ -145,17 +149,18 @@ Introduce click-to-open popup dialog that shows full details and supports edit, 
 
 #### 3. Pending Request Mutation Enhancements
 **File**: `src/app/api/admin/booking-requests/[id]/route.ts`  
-**Changes**: Add editable pending-request update action (details + requested time) and add cancel/reject handling from dialog controls.
+**Changes**: Add editable pending-request update action (details + requested time) and add cancel/reject handling from dialog controls; popup cancel maps to `rejected`.
 
 ### Success Criteria
 #### Automated Verification
-- [ ] Add/extend tests for booking PATCH `edit/move/cancel`.
-- [ ] Add/extend tests for pending request PATCH `edit/reject`.
+- [x] Add/extend tests for booking PATCH `edit/move/cancel`.
+- [x] Add/extend tests for pending request PATCH `edit/reject`.
 
 #### Manual Verification
 - [ ] Clicking an event opens popup with full details.
 - [ ] Dialog open/close uses in-ease/out-ease motion and feels responsive on desktop and mobile.
 - [ ] Edit, move, and cancel actions work from popup and refresh calendar state.
+- [ ] Moving a confirmed booking triggers automatic customer update email.
 - [ ] Approval/rejection still works for pending requests.
 
 ---
@@ -178,7 +183,11 @@ Support direct customer communication from the popup without changing booking st
 **File**: `src/app/api/admin/booking-requests/[id]/notify/route.ts`  
 **Changes**: Add secured endpoint for pending requests.
 
-#### 3. Dialog Actions
+#### 3. Audit Trail for Communication
+**File**: `prisma/schema.prisma`  
+**Changes**: Extend `AuditAction` with communication events (for example `reminder_sent`, `custom_email_sent`) and write corresponding `BookingAuditLog` rows when manual reminder/custom emails are sent. For pending-request notifications, include `requestId` in audit `details` if no booking record exists yet.
+
+#### 4. Dialog Actions
 **File**: `src/components/admin-bookings-client.tsx`  
 **Changes**: Add popup controls:
 - `Send reminder`,
@@ -187,8 +196,8 @@ Support direct customer communication from the popup without changing booking st
 
 ### Success Criteria
 #### Automated Verification
-- [ ] Add tests for notify route authorization and payload validation.
-- [ ] Add template tests for reminder/custom subjects and body content.
+- [x] Add tests for notify route authorization and payload validation.
+- [x] Add template tests for reminder/custom subjects and body content.
 
 #### Manual Verification
 - [ ] Reminder email can be sent from popup for both confirmed and pending records.
@@ -205,9 +214,9 @@ Ensure the new admin workflow is reliable and does not regress existing booking 
 ### Changes Required
 #### 1. Regression Tests
 **File**: `tests/admin-bookings.test.ts`  
-**Changes**: Cover unified events response and status-color mapping contract.
+**Changes**: Cover unified events response and status-color mapping contract, pending-in-range filtering, and 48-hour cancelled/rejected visibility window.
 **File**: `tests/booking-events.test.ts`  
-**Changes**: Cover reminder/custom email queue behavior.
+**Changes**: Cover reminder/custom email queue behavior and move-triggered automatic customer update emails.
 
 #### 2. Operational Notes
 **File**: `README.md`  
@@ -215,8 +224,8 @@ Ensure the new admin workflow is reliable and does not regress existing booking 
 
 ### Success Criteria
 #### Automated Verification
-- [ ] `npm run test`
-- [ ] `npm run lint && npm run typecheck && npm run build`
+- [x] `npm run test`
+- [x] `npm run lint && npm run typecheck && npm run build`
 
 #### Manual Verification
 - [ ] End-to-end admin flow: view calendar -> open popup -> edit -> move -> send reminder -> send custom email -> cancel.

@@ -1,7 +1,7 @@
 # Admin Visual Calendar and Booking Dialog Enhancements
 
 ## Status
-`planned`
+`researched`
 
 ## Request Summary
 Upgrade the owner booking system UI from list-oriented management to a visual calendar workflow:
@@ -22,8 +22,18 @@ Upgrade the owner booking system UI from list-oriented management to a visual ca
 - Keep existing admin authentication and existing booking approval workflows.
 - Reuse existing SMTP + `OutboundEmail` infrastructure for manual reminder/custom emails.
 - Preserve current timezone behavior (`Australia/Melbourne`) and existing current-year booking constraints.
+- Show pending requests only when `requestedStartAt` falls inside the active day/week/month range.
+- Treat popup cancel on pending requests as `rejected`.
+- Automatically send customer update email when a confirmed booking is moved.
+- Show cancelled and rejected items in calendar/history views for up to 48 hours.
 
 ## Non-Goals
 - Rebuilding the public booking form flow.
 - SMS/WhatsApp notifications.
 - Multi-teacher calendars or payment workflows.
+
+## Resolution Linkage
+- Functional admin calendar/dialog requirements in this ticket are implemented in live code.
+- Motion-depth and transition-risk concerns from this ticket are resolved through the global tween rollout spec:
+  - `thoughts/tickets/2026-02-19-global-sequenced-ui-tween-animations.md`
+  - `thoughts/plans/global-sequenced-ui-tween-animations-implementation-plan.md`

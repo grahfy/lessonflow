@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { bookingRequestSchema } from "@/lib/booking-rules";
+import { bookingRequestSchema, formatBookingAddress } from "@/lib/booking-rules";
 import { prisma } from "@/lib/db";
 import { ownerPendingBookingTemplate } from "@/lib/email/templates";
 import { sendEmail } from "@/lib/email/service";
@@ -32,10 +32,18 @@ export async function POST(request: Request) {
       name: parsed.data.name,
       email: parsed.data.email,
       phone: parsed.data.phone,
-      address: parsed.data.address,
+      address: formatBookingAddress(parsed.data),
+      unitNumber: parsed.data.unitNumber,
+      houseNumber: parsed.data.houseNumber,
+      streetName: parsed.data.streetName,
+      streetType: parsed.data.streetType,
+      suburb: parsed.data.suburb,
+      state: parsed.data.state,
+      postcode: parsed.data.postcode,
       lessonMode: parsed.data.lessonMode,
       skillLevel: parsed.data.skillLevel,
       lessonDuration: parsed.data.lessonDuration,
+      customDurationMinutes: parsed.data.customDurationMinutes ?? null,
       requestedStartAt: new Date(parsed.data.requestedStartAt),
       notes: parsed.data.notes,
       isRecurring: parsed.data.isRecurring,
@@ -52,6 +60,7 @@ export async function POST(request: Request) {
     lessonMode: created.lessonMode,
     skillLevel: created.skillLevel,
     lessonDuration: created.lessonDuration,
+    customDurationMinutes: created.customDurationMinutes,
     requestedStartAt: created.requestedStartAt,
     isRecurring: created.isRecurring,
     recurrenceEndAt: created.recurrenceEndAt

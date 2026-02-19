@@ -77,6 +77,9 @@ if [[ "$SKIP_TESTS" -eq 0 ]]; then
   fi
 fi
 
+log "Cleaning stale Next.js artifacts..."
+npm run clean
+
 if [[ "$NO_START" -eq 1 ]]; then
   if [[ "$TESTS_FAILED" -eq 1 ]]; then
     exit 1

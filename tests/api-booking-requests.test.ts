@@ -21,8 +21,14 @@ describe("api-booking-requests", () => {
       body: JSON.stringify({
         name: "Taylor",
         email: "taylor@example.com",
-        phone: "0401111111",
-        address: "66 High Street, Northcote",
+        phone: "0401-111-111",
+        unitNumber: "4",
+        houseNumber: "66",
+        streetName: "High",
+        streetType: "Street",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070",
         lessonMode: "video",
         skillLevel: "advanced",
         lessonDuration: "min30",
@@ -34,8 +40,14 @@ describe("api-booking-requests", () => {
 
     const response = await POST(request);
     expect(response.status).toBe(200);
+    const payload = (await response.json()) as { id?: string };
+    expect(typeof payload.id).toBe("string");
 
-    const row = await prisma.bookingRequest.findFirst();
+    const row = await prisma.bookingRequest.findUnique({
+      where: {
+        id: payload.id
+      }
+    });
     expect(row?.status).toBe("pending");
     expect(row?.isRecurring).toBe(true);
   });

@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "clean": "node -e \"const fs=require('node:fs');const paths=['.next'];for(const p of paths){if(fs.existsSync(p)){fs.rmSync(p,{recursive:true,force:true});}}for(const name of fs.readdirSync('.')){if(name.startsWith('.next_stale_')){fs.rmSync(name,{recursive:true,force:true});}}\"",
     "dev": "next dev",
+    "dev:clean": "npm run clean && npm run dev",
     "local:full-site": "bash ./scripts/test-full-site-local.sh",
     "build": "next build",
     "start": "next start",
@@ -21,6 +23,7 @@
     "@prisma/client": "^6.5.0",
     "bcryptjs": "^3.0.2",
     "date-fns": "^4.1.0",
+    "gsap": "^3.14.2",
     "next": "^15.2.0",
     "nodemailer": "^7.0.5",
     "react": "^19.0.0",

@@ -8,6 +8,7 @@ type BookingSummary = {
   lessonMode: LessonMode;
   skillLevel: SkillLevel;
   lessonDuration: LessonDuration;
+  customDurationMinutes?: number | null;
   requestedStartAt: Date;
   isRecurring: boolean;
   recurrenceEndAt: Date | null;
@@ -17,7 +18,10 @@ function describeMode(mode: LessonMode): string {
   return mode === "in_person" ? "In-person" : "Video";
 }
 
-function describeDuration(duration: LessonDuration): string {
+function describeDuration(duration: LessonDuration, customDurationMinutes?: number | null): string {
+  if (customDurationMinutes && customDurationMinutes > 0) {
+    return `${customDurationMinutes} minutes`;
+  }
   return duration === "min30" ? "30 minutes" : "60 minutes";
 }
 
@@ -27,6 +31,15 @@ function fmt(date: Date): string {
     timeStyle: "short",
     timeZone: "Australia/Melbourne"
   }).format(date);
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 export function ownerNewContactTemplate(input: {
@@ -53,7 +66,10 @@ export function ownerPendingBookingTemplate(booking: BookingSummary) {
     ? `Yes, until ${booking.recurrenceEndAt ? fmt(booking.recurrenceEndAt) : "-"}`
     : "No";
   return {
-    subject: `New booking request: ${booking.name} (${describeDuration(booking.lessonDuration)})`,
+    subject: `New booking request: ${booking.name} (${describeDuration(
+      booking.lessonDuration,
+      booking.customDurationMinutes
+    )})`,
     html: `
       <h2>New booking request awaiting approval</h2>
       <p><strong>Name:</strong> ${booking.name}</p>
@@ -62,7 +78,7 @@ export function ownerPendingBookingTemplate(booking: BookingSummary) {
       <p><strong>Address:</strong> ${booking.address}</p>
       <p><strong>Mode:</strong> ${describeMode(booking.lessonMode)}</p>
       <p><strong>Skill level:</strong> ${booking.skillLevel}</p>
-      <p><strong>Duration:</strong> ${describeDuration(booking.lessonDuration)}</p>
+      <p><strong>Duration:</strong> ${describeDuration(booking.lessonDuration, booking.customDurationMinutes)}</p>
       <p><strong>Requested start:</strong> ${fmt(booking.requestedStartAt)}</p>
       <p><strong>Recurring weekly:</strong> ${recurring}</p>
     `
@@ -86,12 +102,60 @@ export function customerBookingStatusTemplate(input: {
   };
 }
 
+export function customerBookingMovedTemplate(input: {
+  name: string;
+  oldWhen: Date;
+  newWhen: Date;
+}) {
+  return {
+    subject: "Your lesson time has been updated",
+    html: `
+      <h2>Lesson time updated</h2>
+      <p>Hi ${escapeHtml(input.name)},</p>
+      <p>Your lesson time has been updated.</p>
+      <p><strong>Previous time:</strong> ${fmt(input.oldWhen)}</p>
+      <p><strong>New time:</strong> ${fmt(input.newWhen)}</p>
+    `
+  };
+}
+
+export function customerBookingReminderTemplate(input: {
+  name: string;
+  when: Date;
+}) {
+  return {
+    subject: "Lesson reminder",
+    html: `
+      <h2>Lesson reminder</h2>
+      <p>Hi ${escapeHtml(input.name)},</p>
+      <p>This is a reminder for your upcoming lesson.</p>
+      <p><strong>Lesson time:</strong> ${fmt(input.when)}</p>
+    `
+  };
+}
+
+export function customerCustomMessageTemplate(input: {
+  name: string;
+  subject: string;
+  message: string;
+}) {
+  return {
+    subject: input.subject.trim(),
+    html: `
+      <h2>${escapeHtml(input.subject)}</h2>
+      <p>Hi ${escapeHtml(input.name)},</p>
+      <p>${escapeHtml(input.message).replace(/\n/g, "<br/>")}</p>
+    `
+  };
+}
+
 export function ownerDailyDigestTemplate(input: {
   date: Date;
   rows: Array<{
     name: string;
     startAt: Date;
     lessonDuration: LessonDuration;
+    customDurationMinutes?: number | null;
     lessonMode: LessonMode;
     status: string;
   }>;
@@ -99,7 +163,10 @@ export function ownerDailyDigestTemplate(input: {
   const items = input.rows
     .map(
       (row) =>
-        `<li>${fmt(row.startAt)} - ${row.name} - ${describeDuration(row.lessonDuration)} - ${describeMode(
+        `<li>${fmt(row.startAt)} - ${row.name} - ${describeDuration(
+          row.lessonDuration,
+          row.customDurationMinutes
+        )} - ${describeMode(
           row.lessonMode
         )} (${row.status})</li>`
     )
