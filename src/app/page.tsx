@@ -11,26 +11,26 @@ export default function HomePage() {
       visualClassName="home-hero"
       footerCopy="Arrow keys or swipe to move between pages."
       actions={
-        <div className="button-row">
-          <TweenLink className="btn btn-primary" href="/book">
+        <div className="button-row" data-motion-item="home-actions">
+          <TweenLink className="btn btn-primary" href="/book" data-motion-item="home-action-book">
             Book Intro Lesson
           </TweenLink>
-          <TweenLink className="btn btn-secondary" href="/lessons">
+          <TweenLink className="btn btn-secondary" href="/lessons" data-motion-item="home-action-lessons">
             View Lesson Paths
           </TweenLink>
         </div>
       }
     >
-      <div className="metrics">
-        <div className="metric">
+      <div className="metrics" data-motion-item="home-metrics">
+        <div className="metric" data-motion-item="home-metric-experience">
           <strong>30+</strong>
           <span>Years Playing</span>
         </div>
-        <div className="metric">
+        <div className="metric" data-motion-item="home-metric-levels">
           <strong>All Levels</strong>
           <span>Beginner to Advanced</span>
         </div>
-        <div className="metric">
+        <div className="metric" data-motion-item="home-metric-location">
           <strong>Northcote</strong>
           <span>In Person + Online</span>
         </div>

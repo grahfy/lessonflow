@@ -8,6 +8,10 @@ type PresenceOptions = {
   timeoutMs?: number;
 };
 
+type HideOptions = {
+  immediate?: boolean;
+};
+
 export function usePresenceExit(options: PresenceOptions = {}) {
   const timeoutMs = options.timeoutMs ?? EXIT_WATCHDOG_MS;
   const [isMounted, setIsMounted] = useState(false);
@@ -30,11 +34,11 @@ export function usePresenceExit(options: PresenceOptions = {}) {
   }, [clearTimer]);
 
   const hide = useCallback(
-    (onAfterHide?: () => void) => {
+    (onAfterHide?: () => void, hideOptions: HideOptions = {}) => {
       clearTimer();
       setIsVisible(false);
 
-      if (prefersReducedMotion()) {
+      if (hideOptions.immediate || prefersReducedMotion()) {
         setIsMounted(false);
         onAfterHide?.();
         return;

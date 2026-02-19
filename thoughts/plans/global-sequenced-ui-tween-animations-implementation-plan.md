@@ -104,12 +104,12 @@ Add the shared tween dependency and define motion contracts/tokens used across t
 
 ### Success Criteria
 #### Automated Verification
-- [ ] `npm run lint`
-- [ ] `npm run typecheck`
+- [x] `npm run lint`
+- [x] `npm run typecheck`
 
 #### Manual Verification
-- [ ] Motion provider initializes without console errors.
-- [ ] No behavior changes when animations are disabled (reduced-motion mode).
+- [x] Motion provider initializes without console errors.
+- [x] No behavior changes when animations are disabled (reduced-motion mode).
 
 ---
 
@@ -144,13 +144,13 @@ Enable sequential in/out tweens for public route surfaces using shared shell-lev
 
 ### Success Criteria
 #### Automated Verification
-- [ ] `npm run lint`
-- [ ] `npm run typecheck`
+- [x] `npm run lint`
+- [x] `npm run typecheck`
 
 #### Manual Verification
-- [ ] On public page load, visible UI elements enter quickly in sequence.
-- [ ] On internal link navigation, outgoing page performs quick sequential exit before route swap.
-- [ ] Header/nav active state and routing correctness remain intact.
+- [x] On public page load, visible UI elements enter quickly in sequence.
+- [x] On internal link navigation, outgoing page performs quick sequential exit before route swap.
+- [x] Header/nav active state and routing correctness remain intact.
 
 ---
 
@@ -180,8 +180,8 @@ Apply consistent stagger behavior to form-heavy routes and notice feedback block
 
 ### Success Criteria
 #### Automated Verification
-- [ ] `npm run lint`
-- [ ] `npm run typecheck`
+- [x] `npm run lint`
+- [x] `npm run typecheck`
 
 #### Manual Verification
 - [ ] Form fields animate in sequence on page entry.
@@ -219,13 +219,13 @@ Roll staggered tween behavior into dense admin interfaces with scoped and perfor
 
 ### Success Criteria
 #### Automated Verification
-- [ ] `npm run lint`
-- [ ] `npm run typecheck`
+- [x] `npm run lint`
+- [x] `npm run typecheck`
 
 #### Manual Verification
-- [ ] Admin cards, calendar events, and dialog content animate in sequence.
-- [ ] Dialog close actions animate out without blocking interactions.
-- [ ] No regressions in admin actions (edit/move/cancel/approve/reject/notify/logout).
+- [x] Admin cards, calendar events, and dialog content animate in sequence.
+- [x] Dialog close actions animate out without blocking interactions.
+- [x] No regressions in admin actions (edit/move/cancel/approve/reject/notify/logout).
 
 ---
 
@@ -258,14 +258,14 @@ Harden motion behavior to remain safe under reduced motion, high element counts,
 
 ### Success Criteria
 #### Automated Verification
-- [ ] `npm run lint`
-- [ ] `npm run typecheck`
-- [ ] `npm run test`
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `npm run test`
 
 #### Manual Verification
-- [ ] Reduced-motion mode shows no disruptive animation.
-- [ ] Mobile and desktop remain responsive during rapid navigation.
-- [ ] No console warnings/errors from timeline lifecycle issues.
+- [x] Reduced-motion mode shows no disruptive animation.
+- [x] Mobile and desktop remain responsive during rapid navigation.
+- [x] No console warnings/errors from timeline lifecycle issues.
 
 ---
 
@@ -288,13 +288,13 @@ Close the feature with explicit test-environment and verification documentation 
 
 ### Success Criteria
 #### Automated Verification
-- [ ] `npm run test`
-- [ ] `npm run lint && npm run typecheck && npm run build`
+- [x] `npm run test`
+- [x] `npm run lint && npm run typecheck && npm run build`
 
 #### Manual Verification
-- [ ] Sequential in/out tween behavior validated on all active routes.
-- [ ] Navigation, forms, admin workflows, and dialogs function exactly as before.
-- [ ] Test environment docs reflect updated motion verification process.
+- [x] Sequential in/out tween behavior validated on all active routes.
+- [x] Navigation, forms, admin workflows, and dialogs function exactly as before.
+- [x] Test environment docs reflect updated motion verification process.
 
 ---
 
@@ -327,3 +327,12 @@ Close the feature with explicit test-environment and verification documentation 
 - Admin dashboard render surface: `src/components/admin-bookings-client.tsx:480`
 - Calendar event rendering: `src/components/admin-booking-calendar.tsx:80`
 - Form-heavy components: `src/components/contact-form.tsx:50`, `src/components/booking-form.tsx:68`, `src/components/admin-login-form.tsx:37`
+
+## Deviations from Plan
+
+### Phase 4: Admin Calendar and Dialog Motion
+- **Original Plan**: Keep CSS keyframe fallbacks during migration and remove duplicate animation paths later.
+- **Actual Implementation**: Removed overlapping CSS keyframe entry animations for notices, calendar events, and dialogs in the same rollout.
+- **Reason for Deviation**: Prevented double-entry motion and lifecycle conflicts once GSAP-based in/out orchestration became the primary path.
+- **Impact Assessment**: Low risk; reduced-motion immediate mode remains intact and build/test checks passed.
+- **Date/Time**: 2026-02-19

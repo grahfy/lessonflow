@@ -11,26 +11,26 @@ export default function LessonsPage() {
       visualClassName="lessons-hero"
       footerCopy="Structured pathway with room for your own music style."
     >
-      <div className="card-grid">
-        <article className="info-card">
+      <div className="card-grid" data-motion-item="lessons-cards">
+        <article className="info-card" data-motion-item="lessons-beginner-card">
           <h3>Beginner</h3>
           <p>Foundations, posture, tuning, chords, rhythm basics, and your first complete songs.</p>
         </article>
-        <article className="info-card">
+        <article className="info-card" data-motion-item="lessons-intermediate-card">
           <h3>Intermediate</h3>
           <p>Scale fluency, phrasing, timing control, and cleaner transitions between rhythm and lead.</p>
         </article>
-        <article className="info-card">
+        <article className="info-card" data-motion-item="lessons-advanced-card">
           <h3>Advanced</h3>
           <p>Speed control, improvisation systems, hybrid techniques, and performance-ready execution.</p>
         </article>
       </div>
 
-      <div className="button-row">
-        <TweenLink className="btn btn-primary" href="/book">
+      <div className="button-row" data-motion-item="lessons-actions">
+        <TweenLink className="btn btn-primary" href="/book" data-motion-item="lessons-action-start">
           Start Lessons
         </TweenLink>
-        <TweenLink className="btn btn-secondary" href="/vouchers">
+        <TweenLink className="btn btn-secondary" href="/vouchers" data-motion-item="lessons-action-voucher">
           Gift a Package
         </TweenLink>
       </div>

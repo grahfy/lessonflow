@@ -12,17 +12,23 @@ export default function TeacherPage() {
       footerCopy="Clear instruction. Real-world musical outcomes."
       leadJustified
     >
-      <ul className="list">
-        <li>Local endorsement history with Ernie Ball Musicman Guitars Australia.</li>
-        <li>Touring experience across Europe and live performance with major acts.</li>
-        <li>Focus on practical progress, musical confidence, and long-term technique.</li>
+      <ul className="list" data-motion-item="teacher-highlights">
+        <li data-motion-item="teacher-highlight-endorsement">
+          Local endorsement history with Ernie Ball Musicman Guitars Australia.
+        </li>
+        <li data-motion-item="teacher-highlight-touring">
+          Touring experience across Europe and live performance with major acts.
+        </li>
+        <li data-motion-item="teacher-highlight-focus">
+          Focus on practical progress, musical confidence, and long-term technique.
+        </li>
       </ul>
 
-      <div className="button-row">
-        <TweenLink className="btn btn-primary" href="/book">
+      <div className="button-row" data-motion-item="teacher-actions">
+        <TweenLink className="btn btn-primary" href="/book" data-motion-item="teacher-action-book">
           Work With Jon
         </TweenLink>
-        <TweenLink className="btn btn-secondary" href="/lessons">
+        <TweenLink className="btn btn-secondary" href="/lessons" data-motion-item="teacher-action-lessons">
           See Learning Paths
         </TweenLink>
       </div>

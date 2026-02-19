@@ -89,6 +89,23 @@ Owner dashboard supports:
 - Manual reminder and custom customer emails from dialog.
 - Automatic customer update email when confirmed bookings are moved.
 
+## Motion Verification Checklist
+After `npm run dev`, validate the global tween choreography in both normal and reduced-motion modes.
+
+1. Public route sequencing:
+   - Navigate between `/`, `/lessons`, `/teacher`, `/vouchers`, `/contact`, `/book`, `/terms`.
+   - Confirm outgoing page elements tween out quickly before route swap.
+   - Confirm incoming page elements tween in sequentially.
+2. Admin route sequencing:
+   - Sign in at `/admin/login` and load `/admin/bookings`.
+   - Confirm admin cards enter in sequence, calendar events animate in capped batches, and dense month views remain responsive.
+3. Dialog lifecycle:
+   - Open a booking dialog from the calendar and then open/close the nested email dialog.
+   - Confirm both dialog layers tween in/out and only unmount after exit completes (no abrupt teardown).
+4. Reduced-motion fallback:
+   - Enable OS/browser reduced motion and repeat the checks above.
+   - Confirm transitions become immediate without interaction regressions.
+
 ## Daily Digest Job
 Endpoint: `POST /api/jobs/daily-bookings-digest`  
 Required header: `x-cron-secret: <CRON_SECRET>`

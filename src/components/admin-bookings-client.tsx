@@ -192,9 +192,13 @@ export function AdminBookingsClient() {
   const [selectedEvent, setSelectedEvent] = useState<EventWithRow | null>(null);
   const [dialogForm, setDialogForm] = useState<DialogForm | null>(null);
   const [manualDurationChoice, setManualDurationChoice] = useState<DurationChoice>("min60");
-  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailSubject, setEmailSubject] = useState("");
   const [emailMessage, setEmailMessage] = useState("");
+  const dialogPresence = usePresenceExit();
+  const emailDialogPresence = usePresenceExit();
+  const dialogRootRef = useRef<HTMLDivElement | null>(null);
+  const emailDialogRootRef = useRef<HTMLDivElement | null>(null);
+  const calendarRootRef = useRef<HTMLDivElement | null>(null);
 
   const rangeLabel = useMemo(() => `${view.toUpperCase()} VIEW`, [view]);
 
@@ -216,32 +220,68 @@ export function AdminBookingsClient() {
     load().catch((err) => setError(err instanceof Error ? err.message : "Load failed"));
   }, [load]);
 
+  useEffect(() => {
+    if (!dialogPresence.isMounted || !dialogRootRef.current) {
+      return;
+    }
+    void animateIn(dialogRootRef.current, { scope: "admin" });
+  }, [dialogPresence.isMounted, selectedEvent?.id]);
+
+  useEffect(() => {
+    if (!emailDialogPresence.isMounted || !emailDialogRootRef.current) {
+      return;
+    }
+    void animateIn(emailDialogRootRef.current, { scope: "admin" });
+  }, [emailDialogPresence.isMounted]);
+
+  useEffect(() => {
+    if (loading || !calendarRootRef.current) {
+      return;
+    }
+    void animateIn(calendarRootRef.current, { scope: "calendar" });
+  }, [events, loading, view, date]);
+
   function openDialog(event: EventWithRow) {
     setNotice("");
     setSelectedEvent(event);
     setDialogForm(defaultFormFromEvent(event));
-    setEmailDialogOpen(false);
     setEmailSubject("");
     setEmailMessage("");
+    emailDialogPresence.hide(undefined, { immediate: true });
+    dialogPresence.show();
   }
 
-  function closeDialog() {
-    setSelectedEvent(null);
-    setDialogForm(null);
-    setEmailDialogOpen(false);
-    setEmailSubject("");
-    setEmailMessage("");
+  async function closeDialog() {
+    if (emailDialogPresence.isMounted) {
+      await closeEmailDialog();
+    }
+
     setBusyAction(null);
+    if (dialogRootRef.current) {
+      await animateOut(dialogRootRef.current, { scope: "admin" });
+    }
+    dialogPresence.hide(
+      () => {
+        setSelectedEvent(null);
+        setDialogForm(null);
+        setEmailSubject("");
+        setEmailMessage("");
+      },
+      { immediate: true }
+    );
   }
 
   function openEmailDialog() {
     setEmailSubject("");
     setEmailMessage("");
-    setEmailDialogOpen(true);
+    emailDialogPresence.show();
   }
 
-  function closeEmailDialog() {
-    setEmailDialogOpen(false);
+  async function closeEmailDialog() {
+    if (emailDialogRootRef.current) {
+      await animateOut(emailDialogRootRef.current, { scope: "admin" });
+    }
+    emailDialogPresence.hide(undefined, { immediate: true });
     setEmailSubject("");
     setEmailMessage("");
   }
@@ -312,7 +352,7 @@ export function AdminBookingsClient() {
     }
     setNotice(action === "reminder" ? "Reminder sent." : "Custom email sent.");
     if (action === "custom") {
-      closeEmailDialog();
+      await closeEmailDialog();
     }
     await load();
   }
@@ -410,7 +450,7 @@ export function AdminBookingsClient() {
     if (!ok) {
       return;
     }
-    closeDialog();
+    await closeDialog();
     await load();
   }
 
@@ -424,7 +464,7 @@ export function AdminBookingsClient() {
     if (!ok) {
       return;
     }
-    closeDialog();
+    await closeDialog();
     await load();
   }
 
@@ -437,7 +477,7 @@ export function AdminBookingsClient() {
       setError(payload?.error || "Unable to remove series.");
       return;
     }
-    closeDialog();
+    await closeDialog();
     await load();
   }
 
@@ -509,17 +549,19 @@ export function AdminBookingsClient() {
       : null;
 
   return (
-    <div className="admin-shell">
-      <div className="admin-card booking-row">
-        <h1 style={{ marginRight: "auto", fontSize: "1.3rem" }}>Owner Booking Console</h1>
-        <button className="btn btn-secondary" onClick={logout}>
+    <div className="admin-shell" data-motion-root="admin" data-motion-primary="true">
+      <div className="admin-card booking-row" data-motion-item="admin-header-card">
+        <h1 style={{ marginRight: "auto", fontSize: "1.3rem" }} data-motion-item="admin-title">
+          Owner Booking Console
+        </h1>
+        <button className="btn btn-secondary" data-motion-item="admin-logout" onClick={() => void logout()}>
           Sign out
         </button>
       </div>
 
-      <div className="admin-card booking-row">
-        <strong>{rangeLabel}</strong>
-        <label>
+      <div className="admin-card booking-row" data-motion-item="admin-range-card">
+        <strong data-motion-item="admin-range-label">{rangeLabel}</strong>
+        <label data-motion-item="admin-view-select">
           View{" "}
           <select value={view} onChange={(e) => setView(e.target.value as CalendarView)}>
             <option value="day">Day</option>
@@ -527,23 +569,48 @@ export function AdminBookingsClient() {
             <option value="month">Month</option>
           </select>
         </label>
-        <label>
+        <label data-motion-item="admin-date-select">
           Base date <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
       </div>
 
-      <div className="admin-card calendar-legend">
-        <span className="legend-chip event-green">Confirmed</span>
-        <span className="legend-chip event-yellow">Pending</span>
-        <span className="legend-chip event-red">Rejected (48h)</span>
-        <span className="legend-chip event-slate">Cancelled (48h)</span>
+      <div className="admin-card calendar-legend" data-motion-item="admin-legend-card">
+        <span className="legend-chip event-green" data-motion-item="legend-confirmed">
+          Confirmed
+        </span>
+        <span className="legend-chip event-yellow" data-motion-item="legend-pending">
+          Pending
+        </span>
+        <span className="legend-chip event-red" data-motion-item="legend-rejected">
+          Rejected (48h)
+        </span>
+        <span className="legend-chip event-slate" data-motion-item="legend-cancelled">
+          Cancelled (48h)
+        </span>
       </div>
 
-      {error ? <p className="notice error">{error}</p> : null}
-      {notice ? <p className="notice success">{notice}</p> : null}
-      {loading ? <p className="notice">Loading...</p> : null}
+      {error ? (
+        <p className="notice error" data-motion-item="admin-error-notice">
+          {error}
+        </p>
+      ) : null}
+      {notice ? (
+        <p className="notice success" data-motion-item="admin-success-notice">
+          {notice}
+        </p>
+      ) : null}
+      {loading ? (
+        <p className="notice" data-motion-item="admin-loading-notice">
+          Loading...
+        </p>
+      ) : null}
 
-      <div className="admin-card">
+      <div
+        className="admin-card"
+        ref={calendarRootRef}
+        data-motion-root="calendar"
+        data-motion-item="admin-calendar-card"
+      >
         <AdminBookingCalendar
           view={view}
           date={date}
@@ -553,12 +620,14 @@ export function AdminBookingsClient() {
         />
       </div>
 
-      <div className="admin-card">
-        <h2>Add Manual Booking</h2>
-        <form className="manual-booking-form" onSubmit={addManualBooking}>
-          <section className="manual-section">
-            <h3 className="manual-section-title">Student</h3>
-            <div className="manual-grid manual-grid-3">
+      <div className="admin-card" data-motion-item="manual-booking-card">
+        <h2 data-motion-item="manual-booking-title">Add Manual Booking</h2>
+        <form className="manual-booking-form" onSubmit={addManualBooking} data-motion-item="manual-booking-form">
+          <section className="manual-section" data-motion-item="manual-student-section">
+            <h3 className="manual-section-title" data-motion-item="manual-student-title">
+              Student
+            </h3>
+            <div className="manual-grid manual-grid-3" data-motion-item="manual-student-grid">
               <div className="field">
                 <label>First Name *</label>
                 <input name="firstName" required />
@@ -574,9 +643,11 @@ export function AdminBookingsClient() {
             </div>
           </section>
 
-          <section className="manual-section">
-            <h3 className="manual-section-title">Contact</h3>
-            <div className="manual-grid manual-grid-3">
+          <section className="manual-section" data-motion-item="manual-contact-section">
+            <h3 className="manual-section-title" data-motion-item="manual-contact-title">
+              Contact
+            </h3>
+            <div className="manual-grid manual-grid-3" data-motion-item="manual-contact-grid">
               <div className="field manual-span-2">
                 <label>Email *</label>
                 <input name="email" type="email" required />
@@ -588,7 +659,7 @@ export function AdminBookingsClient() {
                   required
                   maxLength={10}
                   inputMode="numeric"
-                  pattern="\\d{10}"
+                  pattern="[0-9]{10}"
                   placeholder="10 digits"
                   title="Phone must be exactly 10 digits"
                   onInput={(event) => {
@@ -599,16 +670,18 @@ export function AdminBookingsClient() {
             </div>
           </section>
 
-          <section className="manual-section">
-            <h3 className="manual-section-title">Address</h3>
-            <div className="manual-grid manual-grid-3">
+          <section className="manual-section" data-motion-item="manual-address-section">
+            <h3 className="manual-section-title" data-motion-item="manual-address-title">
+              Address
+            </h3>
+            <div className="manual-grid manual-grid-3" data-motion-item="manual-address-grid">
               <div className="field field-compact">
                 <label>Unit/Apartment</label>
                 <input
                   name="unitNumber"
                   maxLength={5}
                   inputMode="numeric"
-                  pattern="\\d{1,5}"
+                  pattern="[0-9]{1,5}"
                   onInput={(event) => {
                     event.currentTarget.value = toDigits(event.currentTarget.value, 5);
                   }}
@@ -621,7 +694,7 @@ export function AdminBookingsClient() {
                   required
                   maxLength={5}
                   inputMode="numeric"
-                  pattern="\\d{1,5}"
+                  pattern="[0-9]{1,5}"
                   onInput={(event) => {
                     event.currentTarget.value = toDigits(event.currentTarget.value, 5);
                   }}
@@ -675,7 +748,7 @@ export function AdminBookingsClient() {
                   required
                   maxLength={4}
                   inputMode="numeric"
-                  pattern="\\d{4}"
+                  pattern="[0-9]{4}"
                   placeholder="3000"
                   title="Postcode must be 4 digits"
                   onInput={(event) => {
@@ -686,9 +759,11 @@ export function AdminBookingsClient() {
             </div>
           </section>
 
-          <section className="manual-section">
-            <h3 className="manual-section-title">Lesson</h3>
-            <div className="manual-grid manual-grid-3">
+          <section className="manual-section" data-motion-item="manual-lesson-section">
+            <h3 className="manual-section-title" data-motion-item="manual-lesson-title">
+              Lesson
+            </h3>
+            <div className="manual-grid manual-grid-3" data-motion-item="manual-lesson-grid">
               <div className="field">
                 <label>Mode *</label>
                 <select name="lessonMode" defaultValue="in_person">
@@ -723,7 +798,7 @@ export function AdminBookingsClient() {
                     required
                     maxLength={3}
                     inputMode="numeric"
-                    pattern="\\d{2,3}"
+                    pattern="[0-9]{2,3}"
                     placeholder="e.g. 45"
                     onInput={(event) => {
                       event.currentTarget.value = toDigits(event.currentTarget.value, 3);
@@ -734,9 +809,11 @@ export function AdminBookingsClient() {
             </div>
           </section>
 
-          <section className="manual-section">
-            <h3 className="manual-section-title">Schedule</h3>
-            <div className="manual-grid manual-grid-2">
+          <section className="manual-section" data-motion-item="manual-schedule-section">
+            <h3 className="manual-section-title" data-motion-item="manual-schedule-title">
+              Schedule
+            </h3>
+            <div className="manual-grid manual-grid-2" data-motion-item="manual-schedule-grid">
               <div className="field">
                 <label>Start *</label>
                 <input name="requestedStartAt" type="datetime-local" required />
@@ -753,8 +830,10 @@ export function AdminBookingsClient() {
             </div>
           </section>
 
-          <div className="manual-form-footer">
-            <p className="helper-text form-required-note">* Required fields</p>
+          <div className="manual-form-footer" data-motion-item="manual-actions">
+            <p className="helper-text form-required-note" data-motion-item="manual-required-note">
+              * Required fields
+            </p>
             <button className="btn btn-primary" type="submit" disabled={creating}>
               {creating ? "Adding..." : "Add booking"}
             </button>
@@ -762,23 +841,29 @@ export function AdminBookingsClient() {
         </form>
       </div>
 
-      {selectedEvent && dialogForm ? (
-        <div className="dialog-backdrop" onClick={closeDialog}>
-          <div className="dialog-panel" onClick={(event) => event.stopPropagation()}>
-            <div className="dialog-head">
-              <h3>{selectedEvent.title}</h3>
-              <button className="btn btn-secondary" type="button" onClick={closeDialog}>
+      {dialogPresence.isMounted && selectedEvent && dialogForm ? (
+        <div
+          className="dialog-backdrop"
+          ref={dialogRootRef}
+          data-motion-root="admin"
+          data-motion-item="booking-dialog-backdrop"
+          onClick={() => void closeDialog()}
+        >
+          <div className="dialog-panel" data-motion-item="booking-dialog-panel" onClick={(event) => event.stopPropagation()}>
+            <div className="dialog-head" data-motion-item="booking-dialog-head">
+              <h3 data-motion-item="booking-dialog-title">{selectedEvent.title}</h3>
+              <button className="btn btn-secondary" type="button" onClick={() => void closeDialog()}>
                 Close
               </button>
             </div>
-            <p className="helper-text dialog-status">
+            <p className="helper-text dialog-status" data-motion-item="booking-dialog-status">
               Status: <strong>{selectedEvent.status}</strong> / Type:{" "}
               <strong>{selectedEvent.entityType === "booking" ? "Confirmed booking" : "Booking request"}</strong>
             </p>
-            <form className="dialog-form" onSubmit={(event) => event.preventDefault()}>
-              <div className="dialog-layout">
-                <div className="dialog-col">
-                  <h4>Customer details</h4>
+            <form className="dialog-form" data-motion-item="booking-dialog-form" onSubmit={(event) => event.preventDefault()}>
+              <div className="dialog-layout" data-motion-item="booking-dialog-layout">
+                <div className="dialog-col" data-motion-item="booking-dialog-customer-col">
+                  <h4 data-motion-item="booking-dialog-customer-title">Customer details</h4>
                   <div className="form-grid dialog-form-grid">
                     <div className="field">
                       <label>Name</label>
@@ -801,7 +886,7 @@ export function AdminBookingsClient() {
                         value={dialogForm.phone}
                         maxLength={10}
                         inputMode="numeric"
-                        pattern="\\d{10}"
+                        pattern="[0-9]{10}"
                         placeholder="10 digits"
                         title="Phone must be exactly 10 digits"
                         onChange={(event) =>
@@ -889,7 +974,7 @@ export function AdminBookingsClient() {
                         value={dialogForm.postcode}
                         maxLength={4}
                         inputMode="numeric"
-                        pattern="\\d{4}"
+                        pattern="[0-9]{4}"
                         placeholder="3000"
                         title="Postcode must be 4 digits"
                         onChange={(event) =>
@@ -948,7 +1033,7 @@ export function AdminBookingsClient() {
                           value={dialogForm.customDurationMinutes}
                           maxLength={3}
                           inputMode="numeric"
-                          pattern="\\d{2,3}"
+                          pattern="[0-9]{2,3}"
                           placeholder="e.g. 45"
                           onChange={(event) =>
                             setDialogForm((prev) =>
@@ -970,8 +1055,8 @@ export function AdminBookingsClient() {
                     </div>
                   </div>
                 </div>
-                <div className="dialog-col is-notes">
-                  <h4>Notes</h4>
+                <div className="dialog-col is-notes" data-motion-item="booking-dialog-notes-col">
+                  <h4 data-motion-item="booking-dialog-notes-title">Notes</h4>
                   <div className="field">
                     <label>Lesson notes</label>
                     <textarea
@@ -982,14 +1067,14 @@ export function AdminBookingsClient() {
                   </div>
                 </div>
               </div>
-              <div className="dialog-actions dialog-actions-primary">
-                <button className="btn btn-primary" type="button" disabled={!!busyAction} onClick={saveDetails}>
+              <div className="dialog-actions dialog-actions-primary" data-motion-item="booking-dialog-actions-primary">
+                <button className="btn btn-primary" type="button" disabled={!!busyAction} onClick={() => void saveDetails()}>
                   {busyAction === "save" ? "Saving..." : "Save details"}
                 </button>
-                <button className="btn btn-secondary" type="button" disabled={!!busyAction} onClick={moveSelected}>
+                <button className="btn btn-secondary" type="button" disabled={!!busyAction} onClick={() => void moveSelected()}>
                   {busyAction === "move" ? "Moving..." : "Move booking"}
                 </button>
-                <button className="btn btn-danger" type="button" disabled={!!busyAction} onClick={cancelSelected}>
+                <button className="btn btn-danger" type="button" disabled={!!busyAction} onClick={() => void cancelSelected()}>
                   {busyAction === "cancel" ? "Cancelling..." : selectedIsPending ? "Reject request" : "Cancel booking"}
                 </button>
                 {selectedIsPending ? (
@@ -998,7 +1083,7 @@ export function AdminBookingsClient() {
                       className="btn btn-primary"
                       type="button"
                       disabled={!!busyAction}
-                      onClick={() => approveSelected("approve")}
+                      onClick={() => void approveSelected("approve")}
                     >
                       {busyAction === "approve" ? "Approving..." : "Approve"}
                     </button>
@@ -1006,7 +1091,7 @@ export function AdminBookingsClient() {
                       className="btn btn-danger"
                       type="button"
                       disabled={!!busyAction}
-                      onClick={() => approveSelected("reject")}
+                      onClick={() => void approveSelected("reject")}
                     >
                       {busyAction === "reject" ? "Rejecting..." : "Reject"}
                     </button>
@@ -1017,14 +1102,19 @@ export function AdminBookingsClient() {
                     className="btn btn-secondary"
                     type="button"
                     disabled={!!busyAction}
-                    onClick={() => removeSeries(selectedSeriesId)}
+                    onClick={() => void removeSeries(selectedSeriesId)}
                   >
                     Remove series
                   </button>
                 ) : null}
               </div>
-              <div className="dialog-actions dialog-actions-secondary">
-                <button className="btn btn-secondary" type="button" disabled={!!busyAction} onClick={() => sendNotification("reminder")}>
+              <div className="dialog-actions dialog-actions-secondary" data-motion-item="booking-dialog-actions-secondary">
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  disabled={!!busyAction}
+                  onClick={() => void sendNotification("reminder")}
+                >
                   {busyAction === "reminder" ? "Sending..." : "Send reminder"}
                 </button>
                 <button className="btn btn-primary" type="button" disabled={!!busyAction} onClick={openEmailDialog}>
@@ -1033,39 +1123,53 @@ export function AdminBookingsClient() {
               </div>
             </form>
           </div>
-          {emailDialogOpen ? (
+          {emailDialogPresence.isMounted ? (
             <div
               className="dialog-backdrop is-secondary"
+              ref={emailDialogRootRef}
+              data-motion-root="admin"
+              data-motion-item="email-dialog-backdrop"
               onClick={(event) => {
                 event.stopPropagation();
-                closeEmailDialog();
+                void closeEmailDialog();
               }}
             >
-              <div className="dialog-panel dialog-panel-compact" onClick={(event) => event.stopPropagation()}>
-                <div className="dialog-head">
-                  <h3>Email customer</h3>
-                  <button className="btn btn-secondary" type="button" onClick={closeEmailDialog}>
+              <div
+                className="dialog-panel dialog-panel-compact"
+                data-motion-item="email-dialog-panel"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="dialog-head" data-motion-item="email-dialog-head">
+                  <h3 data-motion-item="email-dialog-title">Email customer</h3>
+                  <button className="btn btn-secondary" type="button" onClick={() => void closeEmailDialog()}>
                     Cancel
                   </button>
                 </div>
-                <p className="helper-text dialog-status">Send a tailored message to this customer.</p>
-                <div className="field">
+                <p className="helper-text dialog-status" data-motion-item="email-dialog-status">
+                  Send a tailored message to this customer.
+                </p>
+                <div className="field" data-motion-item="email-dialog-subject-field">
                   <label>Subject</label>
                   <input value={emailSubject} onChange={(event) => setEmailSubject(event.target.value)} />
                 </div>
-                <div className="field">
+                <div className="field" data-motion-item="email-dialog-message-field">
                   <label>Message</label>
                   <textarea value={emailMessage} onChange={(event) => setEmailMessage(event.target.value)} />
                 </div>
-                <div className="dialog-actions">
-                  <button className="btn btn-secondary" type="button" disabled={!!busyAction} onClick={closeEmailDialog}>
+                <div className="dialog-actions" data-motion-item="email-dialog-actions">
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    disabled={!!busyAction}
+                    onClick={() => void closeEmailDialog()}
+                  >
                     Cancel
                   </button>
                   <button
                     className="btn btn-primary"
                     type="button"
                     disabled={!!busyAction}
-                    onClick={() => sendNotification("custom", { subject: emailSubject, message: emailMessage })}
+                    onClick={() => void sendNotification("custom", { subject: emailSubject, message: emailMessage })}
                   >
                     {busyAction === "custom" ? "Sending..." : "Send email"}
                   </button>

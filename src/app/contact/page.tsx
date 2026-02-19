@@ -12,11 +12,11 @@ export default function ContactPage() {
       footerCopy="Fast response by phone, text, or email."
       leadJustified
     >
-      <ul className="list">
-        <li>Phone: 0401 489 437</li>
-        <li>Email: melbourneguitarschool@gmail.com</li>
-        <li>Studio: Rear 66/68 High St, Northcote VIC 3070</li>
-        <li>Lesson formats: In-person and online</li>
+      <ul className="list" data-motion-item="contact-list">
+        <li data-motion-item="contact-phone">Phone: 0401 489 437</li>
+        <li data-motion-item="contact-email">Email: melbourneguitarschool@gmail.com</li>
+        <li data-motion-item="contact-studio">Studio: Rear 66/68 High St, Northcote VIC 3070</li>
+        <li data-motion-item="contact-formats">Lesson formats: In-person and online</li>
       </ul>
 
       <ContactForm />

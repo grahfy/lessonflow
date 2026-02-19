@@ -12,7 +12,7 @@ export default function BookPage() {
       footerCopy="Pending requests are reviewed quickly."
       leadJustified
     >
-      <p className="helper-text">
+      <p className="helper-text" data-motion-item="book-helper-text">
         Booking requests are currently limited to the active calendar year and are approved manually to avoid clashes.
       </p>
       <BookingForm />

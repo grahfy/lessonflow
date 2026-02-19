@@ -81,23 +81,23 @@ export function BookingForm() {
 
   return (
     <form className="form-grid" onSubmit={onSubmit} data-motion-item="booking-form">
-      <div className="field">
+      <div className="field" data-motion-item="booking-field">
         <label htmlFor="book-first-name">First Name *</label>
         <input id="book-first-name" name="firstName" required />
       </div>
-      <div className="field">
+      <div className="field" data-motion-item="booking-field">
         <label htmlFor="book-middle-name">Middle Name</label>
         <input id="book-middle-name" name="middleName" />
       </div>
-      <div className="field">
+      <div className="field" data-motion-item="booking-field">
         <label htmlFor="book-last-name">Last Name *</label>
         <input id="book-last-name" name="lastName" required />
       </div>
-      <div className="field">
+      <div className="field" data-motion-item="booking-field">
         <label htmlFor="book-email">Email *</label>
         <input id="book-email" type="email" name="email" required />
       </div>
-      <div className="field field-compact">
+      <div className="field field-compact" data-motion-item="booking-field">
         <label htmlFor="book-phone">Phone *</label>
         <input
           id="book-phone"
@@ -105,7 +105,7 @@ export function BookingForm() {
           required
           maxLength={10}
           inputMode="numeric"
-          pattern="\\d{10}"
+          pattern="[0-9]{10}"
           placeholder="10 digits"
           title="Phone must be exactly 10 digits"
           onInput={(event) => {
@@ -113,20 +113,20 @@ export function BookingForm() {
           }}
         />
       </div>
-      <div className="field field-compact">
+      <div className="field field-compact" data-motion-item="booking-field">
         <label htmlFor="book-unit-number">Unit/Apartment</label>
         <input
           id="book-unit-number"
           name="unitNumber"
           maxLength={5}
           inputMode="numeric"
-          pattern="\\d{1,5}"
+          pattern="[0-9]{1,5}"
           onInput={(event) => {
             event.currentTarget.value = event.currentTarget.value.replace(/\D/g, "").slice(0, 5);
           }}
         />
       </div>
-      <div className="field field-compact">
+      <div className="field field-compact" data-motion-item="booking-field">
         <label htmlFor="book-house-number">House/Building Number *</label>
         <input
           id="book-house-number"
@@ -134,17 +134,17 @@ export function BookingForm() {
           required
           maxLength={5}
           inputMode="numeric"
-          pattern="\\d{1,5}"
+          pattern="[0-9]{1,5}"
           onInput={(event) => {
             event.currentTarget.value = event.currentTarget.value.replace(/\D/g, "").slice(0, 5);
           }}
         />
       </div>
-      <div className="field">
+      <div className="field" data-motion-item="booking-field">
         <label htmlFor="book-street-name">Street Name *</label>
         <input id="book-street-name" name="streetName" required />
       </div>
-      <div className="field">
+      <div className="field" data-motion-item="booking-field">
         <label htmlFor="book-street-type">Street Type *</label>
         <select id="book-street-type" name="streetType" required defaultValue="">
           <option value="" disabled>
@@ -164,7 +164,7 @@ export function BookingForm() {
           <option value="Close">Close</option>
         </select>
       </div>
-      <div className="field">
+      <div className="field" data-motion-item="booking-field">
         <label htmlFor="book-suburb">Suburb *</label>
         <input id="book-suburb" name="suburb" required />
       </div>
@@ -181,7 +181,7 @@ export function BookingForm() {
           <option value="WA">Western Australia</option>
         </select>
       </div>
-      <div className="field field-compact">
+      <div className="field field-compact" data-motion-item="booking-field">
         <label htmlFor="book-postcode">Postcode *</label>
         <input
           id="book-postcode"
@@ -189,7 +189,7 @@ export function BookingForm() {
           required
           maxLength={4}
           inputMode="numeric"
-          pattern="\\d{4}"
+          pattern="[0-9]{4}"
           placeholder="3000"
           title="Postcode must be 4 digits"
           onInput={(event) => {
@@ -197,14 +197,14 @@ export function BookingForm() {
           }}
         />
       </div>
-      <div className="field">
+      <div className="field" data-motion-item="booking-field">
         <label htmlFor="book-mode">Mode *</label>
         <select id="book-mode" name="lessonMode" required defaultValue="in_person">
           <option value="in_person">In-person</option>
           <option value="video">Video</option>
         </select>
       </div>
-      <div className="field">
+      <div className="field" data-motion-item="booking-field">
         <label htmlFor="book-level">Skill Level *</label>
         <select id="book-level" name="skillLevel" required defaultValue="beginner">
           <option value="beginner">Beginner</option>
@@ -212,7 +212,7 @@ export function BookingForm() {
           <option value="advanced">Advanced</option>
         </select>
       </div>
-      <div className="field">
+      <div className="field" data-motion-item="booking-field">
         <label htmlFor="book-duration">Duration *</label>
         <select
           id="book-duration"
@@ -226,7 +226,7 @@ export function BookingForm() {
         </select>
       </div>
       {durationType === "custom" ? (
-        <div className="field field-compact">
+        <div className="field field-compact" data-motion-item="booking-field">
           <label htmlFor="book-custom-duration">Custom Duration (minutes) *</label>
           <input
             id="book-custom-duration"
@@ -234,7 +234,7 @@ export function BookingForm() {
             required
             maxLength={3}
             inputMode="numeric"
-            pattern="\\d{2,3}"
+            pattern="[0-9]{2,3}"
             placeholder="e.g. 45"
             onInput={(event) => {
               event.currentTarget.value = event.currentTarget.value.replace(/\D/g, "").slice(0, 3);
@@ -242,17 +242,17 @@ export function BookingForm() {
           />
         </div>
       ) : null}
-      <div className="field">
+      <div className="field" data-motion-item="booking-field">
         <label htmlFor="book-start">Start *</label>
         <input id="book-start" type="datetime-local" name="requestedStartAt" required />
       </div>
 
-      <div className="field full">
+      <div className="field full" data-motion-item="booking-field">
         <label htmlFor="book-notes">Notes (optional)</label>
         <textarea id="book-notes" name="notes" />
       </div>
 
-      <div className="field full">
+      <div className="field full" data-motion-item="booking-field">
         <label htmlFor="book-recurring">
           <input
             id="book-recurring"
@@ -265,7 +265,7 @@ export function BookingForm() {
       </div>
 
       {isRecurring ? (
-        <div className="field full">
+        <div className="field full" data-motion-item="booking-field">
           <label htmlFor="book-recurring-end">Recurrence end date</label>
           <input id="book-recurring-end" type="datetime-local" name="recurrenceEndAt" required />
         </div>

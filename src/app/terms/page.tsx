@@ -12,18 +12,20 @@ export default function TermsPage() {
       footerCopy="Policy clarity keeps lessons predictable for everyone."
       leadJustified
     >
-      <ul className="list">
-        <li>24 hours notice is required for lesson changes where possible.</li>
-        <li>No refund policy once lesson payments are completed.</li>
-        <li>Gift vouchers are non-refundable and follow standard cancellation rules.</li>
-        <li>Gift vouchers are valid for six months from purchase date.</li>
+      <ul className="list" data-motion-item="terms-list">
+        <li data-motion-item="terms-item-notice">24 hours notice is required for lesson changes where possible.</li>
+        <li data-motion-item="terms-item-refund">No refund policy once lesson payments are completed.</li>
+        <li data-motion-item="terms-item-voucher-rules">
+          Gift vouchers are non-refundable and follow standard cancellation rules.
+        </li>
+        <li data-motion-item="terms-item-validity">Gift vouchers are valid for six months from purchase date.</li>
       </ul>
 
-      <div className="button-row">
-        <TweenLink className="btn btn-primary" href="/contact">
+      <div className="button-row" data-motion-item="terms-actions">
+        <TweenLink className="btn btn-primary" href="/contact" data-motion-item="terms-action-contact">
           Ask a Question
         </TweenLink>
-        <TweenLink className="btn btn-secondary" href="/">
+        <TweenLink className="btn btn-secondary" href="/" data-motion-item="terms-action-home">
           Back to Home
         </TweenLink>
       </div>

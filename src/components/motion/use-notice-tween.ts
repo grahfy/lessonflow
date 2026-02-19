@@ -5,8 +5,8 @@ import { useEffect, useRef } from "react";
 
 import { prefersReducedMotion } from "@/components/motion/tween-orchestrator";
 
-export function useNoticeTween(isActive: boolean) {
-  const ref = useRef<HTMLElement | null>(null);
+export function useNoticeTween<T extends HTMLElement = HTMLParagraphElement>(isActive: boolean) {
+  const ref = useRef<T | null>(null);
 
   useEffect(() => {
     if (!isActive || !ref.current || prefersReducedMotion()) {

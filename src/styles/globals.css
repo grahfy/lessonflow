@@ -19,6 +19,10 @@
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
   --motion-fast: 140ms;
   --motion-base: 220ms;
+  --motion-enter-duration: 200ms;
+  --motion-exit-duration: 160ms;
+  --motion-stagger-step: 24ms;
+  --motion-enter-distance: 10px;
 }
 
 * {
@@ -483,7 +487,6 @@ h1 {
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.05);
   font-size: 0.85rem;
-  animation: notice-in var(--motion-base) var(--ease-out);
 }
 
 .notice.success {
@@ -616,7 +619,6 @@ h1 {
   transform: translateY(0);
   transition: transform var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out),
     border-color var(--motion-fast) var(--ease-out), filter var(--motion-fast) var(--ease-out);
-  animation: event-in var(--motion-base) var(--ease-out);
 }
 
 .calendar-event span {
@@ -669,7 +671,6 @@ h1 {
   display: grid;
   place-items: center;
   padding: 16px;
-  animation: overlay-in var(--motion-base) var(--ease-out);
 }
 
 .dialog-panel {
@@ -681,7 +682,6 @@ h1 {
   background: linear-gradient(145deg, rgba(9, 14, 36, 0.98), rgba(8, 12, 30, 0.96));
   box-shadow: var(--shadow);
   padding: 16px;
-  animation: dialog-in var(--motion-base) var(--ease-out);
 }
 
 .dialog-head {
@@ -794,48 +794,6 @@ h1 {
 
 .dialog-panel-compact .field textarea {
   min-height: 160px;
-}
-
-@keyframes overlay-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes dialog-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes event-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes notice-in {
-  from {
-    opacity: 0;
-    transform: translateY(-3px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .booking-list {

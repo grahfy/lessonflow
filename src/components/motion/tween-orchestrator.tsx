@@ -20,6 +20,8 @@ export const MAX_STAGGER_ITEMS_PUBLIC = 36;
 export const MAX_STAGGER_ITEMS_ADMIN = 24;
 export const MAX_STAGGER_ITEMS_CALENDAR = 12;
 export const EXIT_WATCHDOG_MS = 280;
+const ENTER_WATCHDOG_BUFFER_MS = 140;
+const ENTER_WATCHDOG_MAX_MS = 2000;
 
 const FALLBACK_SELECTOR = [
   "h1",
@@ -111,17 +113,29 @@ function isVisibleElement(element: HTMLElement): boolean {
 }
 
 function collectMotionItems(root: HTMLElement, scope: MotionScope, explicitItems?: HTMLElement[]): HTMLElement[] {
+  const rootIsScoped = root.hasAttribute("data-motion-root");
+  const isItemInsideScopedRoot = (item: HTMLElement) => {
+    if (!rootIsScoped) {
+      return true;
+    }
+    const closestRoot = item.closest("[data-motion-root]") as HTMLElement | null;
+    return !closestRoot || closestRoot === root;
+  };
+
   const requested = explicitItems && explicitItems.length > 0
     ? explicitItems
     : (() => {
         const explicit = Array.from(root.querySelectorAll<HTMLElement>("[data-motion-item]"));
+        if (root.hasAttribute("data-motion-item")) {
+          explicit.unshift(root);
+        }
         if (explicit.length > 0) {
           return explicit;
         }
         return Array.from(root.querySelectorAll<HTMLElement>(FALLBACK_SELECTOR));
       })();
 
-  const visibleItems = uniqueElements(requested).filter(isVisibleElement);
+  const visibleItems = uniqueElements(requested).filter(isItemInsideScopedRoot).filter(isVisibleElement);
   return visibleItems.slice(0, getMotionItemLimit(scope));
 }
 
@@ -224,8 +238,16 @@ export async function animateIn(root: HTMLElement | null, options: AnimationOpti
     clearProps: "opacity,transform"
   });
 
+  const enterWatchdogMs = Math.min(
+    ENTER_WATCHDOG_MAX_MS,
+    Math.max(EXIT_WATCHDOG_MS, Math.ceil(timeline.totalDuration() * 1000 + ENTER_WATCHDOG_BUFFER_MS))
+  );
+
   timelineRegistry.set(root, timeline);
-  await runTimelineWithWatchdog(timeline, EXIT_WATCHDOG_MS);
+  await runTimelineWithWatchdog(timeline, enterWatchdogMs);
+  gsap.set(items, {
+    clearProps: "opacity,transform"
+  });
   timelineRegistry.delete(root);
 }
 

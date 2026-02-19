@@ -1,7 +1,7 @@
 # Global Sequenced UI Tween Animations
 
 ## Status
-`planned`
+`implemented`
 
 ## Request Summary
 Implement quick, sequential tween-based in/out animations for small UI elements across every active page in the Next.js site.

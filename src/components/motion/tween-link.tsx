@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { MouseEvent, PropsWithChildren } from "react";
+import { AnchorHTMLAttributes, MouseEvent, PropsWithChildren } from "react";
 
 import { findClosestMotionRoot, useTweenOrchestrator } from "@/components/motion/tween-orchestrator";
 
-type TweenLinkProps = PropsWithChildren<{
+type TweenLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href" | "onClick" | "children"> &
+  PropsWithChildren<{
   href: string;
-  className?: string;
-  "aria-current"?: "page" | undefined;
   prefetch?: boolean;
 }>;
 
