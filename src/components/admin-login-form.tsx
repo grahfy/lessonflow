@@ -40,11 +40,11 @@ export function AdminLoginForm() {
     <form className="form-grid" onSubmit={onSubmit} data-motion-item="admin-login-form">
       <div className="field full" data-motion-item="admin-login-email-field">
         <label htmlFor="admin-email">Admin email</label>
-        <input id="admin-email" type="email" name="email" required />
+        <input id="admin-email" type="email" name="email" autoComplete="username" required />
       </div>
       <div className="field full" data-motion-item="admin-login-password-field">
         <label htmlFor="admin-password">Password</label>
-        <input id="admin-password" type="password" name="password" required />
+        <input id="admin-password" type="password" name="password" autoComplete="current-password" required />
       </div>
       <div className="button-row" data-motion-item="admin-login-actions">
         <button className="btn btn-primary" type="submit" disabled={loading}>

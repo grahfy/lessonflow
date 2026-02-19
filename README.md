@@ -1,146 +1,216 @@
-# Melbourne Guitar School Booking Platform
+# Melbourne Guitar School Platform
 
-Next.js full-stack implementation for public marketing pages, contact form submission, booking requests, and owner-managed booking administration.
+Turn enquiries into confirmed lessons and paid invoices in one system.
 
-## Stack
-- Next.js (App Router) + TypeScript
-- Prisma ORM + SQLite (local dev)
-- API routes for booking/contact/admin workflows
-- SMTP-backed email delivery with DB logging fallback
+This software combines:
+- public marketing pages,
+- contact and booking intake,
+- admin scheduling and customer management,
+- invoice generation, reminders, and payment tracking.
 
-## Setup
+It is built for a real-world teaching business that needs fast admin operations, clean customer communication, and a reliable billing workflow.
+
+## What This Software Does
+Melbourne Guitar School Platform is a full-stack web application for running day-to-day operations:
+- Capture leads and lesson requests from the public website.
+- Manage bookings in an owner/admin calendar workflow.
+- Maintain a customer directory linked to bookings.
+- Generate and send professional invoices with PDF attachments.
+- Track outstanding balances, payment status, reminders, and credit notes.
+
+## Why It’s Valuable
+- One workflow from enquiry to payment.
+- Fewer manual handoffs between calendar, email, and invoicing tools.
+- Better data integrity with audit trails and invoice history.
+- Built-in communication flows for reminders and updates.
+- Supports AU-friendly invoice fields and GST-aware defaults.
+
+## Feature Summary
+
+### Public Website
+- Marketing pages: `/`, `/lessons`, `/teacher`, `/vouchers`, `/terms`.
+- Contact form at `/contact`.
+- Booking request form at `/book`.
+- Smooth page transitions and reduced-motion support.
+
+### Booking & Admin Operations
+- Admin login at `/admin/login`.
+- Booking console at `/admin/bookings`.
+- Day/week/month visual calendar.
+- Click-to-open booking dialogs with full details.
+- Approve/reject pending requests.
+- Edit/move/cancel confirmed bookings.
+- Recurring booking support and series cancellation.
+- Manual reminder/custom email actions from admin.
+- Automatic booking move email to customer.
+
+### Customer Management
+- Customer directory with search/filter workflows.
+- Create/edit/archive customer records.
+- Duplicate protection during manual booking flows.
+- Customer-to-booking linkage preserved for history.
+
+### Invoicing & Billing
+- Invoice console at `/admin/invoices`.
+- Create invoice from confirmed appointment.
+- Create invoice from customer context.
+- Temporary line-item options:
+  - lesson fee,
+  - educational books,
+  - digital guitar lessons,
+  - custom product/charge.
+- Line-item editing in invoice detail.
+- GST-aware calculations with configurable defaults.
+- Download invoice as PDF.
+- Send invoice via email with PDF attached.
+- Mark paid / mark unpaid.
+- Outstanding invoice view and aging filters.
+- 7/14/30-day overdue reminder workflow:
+  - single invoice reminder,
+  - bulk reminder run.
+- Credit note creation for sent/paid invoices.
+- Invoice audit/history data retained for traceability.
+
+## Tech Stack
+- Next.js App Router + TypeScript
+- Prisma ORM
+- SQLite for local/test environments
+- Nodemailer for SMTP delivery
+- pdf-lib for invoice PDF generation
+
+## Project Structure
+- `src/app`: routes and API handlers
+- `src/components`: reusable UI and admin clients
+- `src/lib`: business logic, services, utilities
+- `prisma`: schema and migrations
+- `tests`: automated test suite
+- `thoughts`: tickets, research, implementation plans
+
+## Installation
+
+### Prerequisites
+- Node.js 20+ recommended
+- npm
+
+### Quick Start
 1. Install dependencies:
 ```bash
 npm install
 ```
-2. Configure environment:
+2. Create environment file:
 ```bash
 cp .env.example .env
 ```
-3. Run database migrations:
+3. Apply local migrations:
 ```bash
-DATABASE_URL="file:./prisma/dev.db" npx prisma migrate dev --name init_booking
+DATABASE_URL="file:./prisma/dev.db" npx prisma migrate deploy
 ```
-4. Start development server:
+4. Start dev server:
 ```bash
 npm run dev
 ```
 
-## Test Environment
-Tests run against an isolated SQLite database (`prisma/test.db`) and load env values in this order:
-`.env.test.local` -> `.env.test` -> `.env.local` -> `.env`.
+Default local app URL:
+- `http://127.0.0.1:3000`
 
-1. Create optional local test env overrides:
-```bash
-cp .env.test.example .env.test.local
-```
-2. Prepare/reset the test database:
-```bash
-npm run test:prepare
-```
-3. Run tests:
-```bash
-npm test
-```
-
-## Full Local Site Check
-Run the full local verification flow (install deps, prepare local dev DB, run tests, then start the app):
+## Full Local Verification Flow
+Run dependency install, local DB prep, tests, and then launch the site:
 
 ```bash
 npm run local:full-site
 ```
 
-The site will be available at `http://127.0.0.1:3000` by default.
-If tests fail, the script still starts the local site so manual QA can continue.
-Optional flags:
-- `npm run local:full-site -- --no-start` (run setup + tests only)
-- `npm run local:full-site -- --skip-install` (skip `npm ci`)
-- `npm run local:full-site -- --skip-tests` (start site without running tests)
+By default this script binds to `0.0.0.0` so it can be reached:
+- locally via `http://127.0.0.1:3000`,
+- from another device via your machine’s LAN IP.
 
-## Key Routes
-- Public pages: `/`, `/lessons`, `/teacher`, `/vouchers`, `/terms`
-- Contact form: `/contact`
-- Booking request form: `/book`
-- Owner login: `/admin/login`
-- Owner dashboard: `/admin/bookings`
-- Owner invoices: `/admin/invoices`
+Optional flags:
+- `npm run local:full-site -- --no-start`
+- `npm run local:full-site -- --skip-install`
+- `npm run local:full-site -- --skip-tests`
+
+Host/port override:
+```bash
+HOST=0.0.0.0 PORT=3000 npm run local:full-site
+```
+
+## Testing
+Tests run against isolated SQLite DB `prisma/test.db`.
+
+Env loading order for tests:
+- `.env.test.local` -> `.env.test` -> `.env.local` -> `.env`
+
+Commands:
+```bash
+npm run test:prepare
+npm test
+npm run lint
+npm run typecheck
+```
 
 ## Environment Variables
-- `DATABASE_URL`: Prisma connection string (`file:./prisma/dev.db` for local).
-- `ADMIN_EMAIL`: owner login email and notification destination.
-- `ADMIN_PASSWORD`: owner login password bootstrap.
-- `ADMIN_SESSION_SECRET`: signing secret for admin session cookie.
-- `CRON_SECRET`: secret required by daily digest job endpoint.
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`: SMTP settings. If unset, emails are logged to `OutboundEmail` with `queued_no_smtp`.
-- `INVOICE_BUSINESS_NAME`, `INVOICE_BUSINESS_ABN`: supplier details shown on invoices.
-- `INVOICE_BANK_NAME`, `INVOICE_BANK_BSB`, `INVOICE_BANK_ACCOUNT_NAME`, `INVOICE_BANK_ACCOUNT_NUMBER`: bank payment details shown on invoices.
-- `INVOICE_PAYMENT_TERMS_DAYS`: default due date offset for newly created invoices.
-- `INVOICE_GST_REGISTERED`, `INVOICE_DEFAULT_TAX_MODE`: invoice GST behavior defaults.
-- `INVOICE_CREDIT_NOTE_PREFIX`: prefix used when generating credit-note numbers.
 
-## Admin Operations
-Owner dashboard supports:
-- Visual day/week/month booking calendar.
-- Status colors:
-  - confirmed bookings (green)
-  - pending requests (yellow)
-  - rejected requests (red, visible for 48 hours)
-  - cancelled bookings (slate, visible for 48 hours)
-- Click-to-open booking dialog with full customer and lesson details.
-- Pending request approval and rejection.
-- Manual booking popup launched from `Add Manual Booking`.
-- Customer directory popup launched from `Customers`.
-- Customer create/edit/delete (delete archives linked profiles to preserve history).
-- Customer-level invoice history via invoices filter shortcut.
-- Existing customer selection in manual booking popup (auto-fill supported).
-- Deterministic duplicate detection (email/phone) during manual booking entry with confirmation workflow.
-- Optional customer-profile update from manual booking confirmation flow.
-- Booking edit/move/cancel.
-- Create invoice from confirmed booking dialog (lesson fee + optional extras + custom charge).
-- Dedicated invoice console with search, status filters, aging buckets, outstanding toggle, line-item editing, send/download/mark-paid actions.
-- Overdue reminder workflow with per-invoice reminders and bulk 7/14/30-day reminder sends.
-- Credit-note creation flow for sent/paid invoices (replaces delete for historical integrity).
-- Invoice PDF download and invoice email send with attached PDF.
-- Pending request edit/move/reject (cancel maps to reject).
-- Recurring series cancellation for future instances.
-- Manual reminder and custom customer emails from dialog.
-- Automatic customer update email when confirmed bookings are moved.
+### Core
+- `DATABASE_URL`: Prisma DB URL (`file:./prisma/dev.db` locally).
+- `ADMIN_EMAIL`: admin login and owner notification email.
+- `ADMIN_PASSWORD`: bootstrap admin password.
+- `ADMIN_SESSION_SECRET`: admin session signing secret.
+- `CRON_SECRET`: shared secret for scheduled job endpoints.
 
-## Motion Verification Checklist
-After `npm run dev`, validate the global tween choreography in both normal and reduced-motion modes.
+### SMTP / Email
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `SMTP_FROM`
 
-1. Public route sequencing:
-   - Navigate between `/`, `/lessons`, `/teacher`, `/vouchers`, `/contact`, `/book`, `/terms`.
-   - Confirm outgoing page elements tween out quickly before route swap.
-   - Confirm incoming page elements tween in sequentially.
-2. Admin route sequencing:
-   - Sign in at `/admin/login` and load `/admin/bookings`.
-   - Confirm admin cards enter in sequence, calendar events animate in capped batches, and dense month views remain responsive.
-3. Dialog lifecycle:
-   - Open a booking dialog from the calendar and then open/close the nested email dialog.
-   - Confirm both dialog layers tween in/out and only unmount after exit completes (no abrupt teardown).
-4. Reduced-motion fallback:
-   - Enable OS/browser reduced motion and repeat the checks above.
-   - Confirm transitions become immediate without interaction regressions.
+If SMTP is not configured, outbound emails are recorded in DB as `queued_no_smtp`.
 
-## Daily Digest Job
-Endpoint: `POST /api/jobs/daily-bookings-digest`  
-Required header: `x-cron-secret: <CRON_SECRET>`
+### Invoice Configuration
+- `INVOICE_BUSINESS_NAME`
+- `INVOICE_BUSINESS_ABN`
+- `INVOICE_BANK_NAME`
+- `INVOICE_BANK_BSB`
+- `INVOICE_BANK_ACCOUNT_NAME`
+- `INVOICE_BANK_ACCOUNT_NUMBER`
+- `INVOICE_PAYMENT_TERMS_DAYS`
+- `INVOICE_GST_REGISTERED`
+- `INVOICE_DEFAULT_TAX_MODE`
+- `INVOICE_CREDIT_NOTE_PREFIX`
 
-`vercel.json` includes daily cron scheduling.
+## Scheduled Jobs
 
-## Invoice Reminder Job
-Endpoint: `POST /api/jobs/invoice-reminders`  
-Required header: `x-cron-secret: <CRON_SECRET>`
+### Daily Bookings Digest
+- Endpoint: `POST /api/jobs/daily-bookings-digest`
+- Header: `x-cron-secret: <CRON_SECRET>`
 
-Optional JSON body:
-- `dryRun` (`boolean`)
-- `maxInvoices` (`number`, default `100`)
-- `customerId` (`string`)
-- `stage` (`7 | 14 | 30`)
+### Invoice Reminders
+- Endpoint: `POST /api/jobs/invoice-reminders`
+- Header: `x-cron-secret: <CRON_SECRET>`
+- Optional JSON payload:
+  - `dryRun` (`boolean`)
+  - `maxInvoices` (`number`, default `100`)
+  - `customerId` (`string`)
+  - `stage` (`7 | 14 | 30`)
 
-`vercel.json` includes daily cron scheduling for staged overdue reminders.
+Schedules are configured in `vercel.json`.
 
-## Notes
-- This repository now runs only the Next.js App Router implementation.
-- Current-year booking constraints are enforced by server-side validation.
+## Available Routes
+- Public:
+  - `/`
+  - `/lessons`
+  - `/teacher`
+  - `/vouchers`
+  - `/contact`
+  - `/book`
+  - `/terms`
+- Admin:
+  - `/admin/login`
+  - `/admin/bookings`
+  - `/admin/invoices`
+
+## Operational Notes
+- Booking constraints and validation are server-side enforced.
+- Invoice records are designed to preserve historical context.
+- Sent/paid invoices use credit notes for correction workflows.
+- Additional user-facing docs planning lives in `Documentation/`.

@@ -1,9 +1,9 @@
 import { AdminLoginForm } from "@/components/admin-login-form";
-import { SiteShell } from "@/components/site-shell";
+import { AdminAuthShell } from "@/components/admin-auth-shell";
 
 export default function AdminLoginPage() {
   return (
-    <SiteShell footerCopy="Owner sign-in">
+    <AdminAuthShell footerCopy="Owner sign-in">
       <main className="view" aria-label="Admin Login" data-motion-item="admin-login-view">
         <section className="panel-copy" data-motion-item="admin-login-copy">
           <p className="kicker" data-motion-item="admin-login-kicker">
@@ -19,6 +19,6 @@ export default function AdminLoginPage() {
           <div className="hero-image contact-hero" role="img" aria-label="Studio visual" data-motion-item="admin-login-hero" />
         </section>
       </main>
-    </SiteShell>
+    </AdminAuthShell>
   );
 }

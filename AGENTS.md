@@ -1,63 +1,74 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-This repository is a static website with page-level HTML entry points at the root:
-`index.html`, `lessons.html`, `teacher.html`, `vouchers.html`, `contact.html`, and `terms.html`.
+This repository is a Next.js App Router application.
 
-Shared assets live in:
-- `assets/css/styles.css` for global theme, layout, and responsive rules.
-- `assets/js/site.js` for transitions, keyboard/swipe navigation, and page ordering (`PAGE_ORDER`).
-
-Planning artifacts are kept in `thoughts/`:
-- `thoughts/tickets/` for scoped requests.
-- `thoughts/plans/` for implementation plans.
+- Route entry points live in `src/app`:
+  - Public: `/`, `/lessons`, `/teacher`, `/vouchers`, `/contact`, `/book`, `/terms`
+  - Admin: `/admin/login`, `/admin/bookings`
+  - APIs: `src/app/api/**`
+- Shared UI and client behavior live in `src/components`.
+- Global styles live in `src/styles/globals.css`.
+- Shared data and utilities live in `src/lib`.
+- Planning artifacts live in `thoughts/`:
+  - `thoughts/tickets/`
+  - `thoughts/research/`
+  - `thoughts/plans/`
 
 ## Build, Test, and Development Commands
-No build pipeline is required for local development.
-
-- `python3 -m http.server 4173`
-  Serves the site locally from the repository root.
-- Open `http://127.0.0.1:4173/index.html`
-  Starts from the home page and validates linked navigation.
+- `npm run dev`
+  Starts the local app.
+- `npm run lint`
+  Runs ESLint checks.
+- `npm run typecheck`
+  Runs TypeScript type checks.
+- `npm test`
+  Runs tests.
+- `npm run test:prepare`
+  Resets/prepares the test database.
 
 ## Coding Style & Naming Conventions
-- Use 2-space indentation in HTML, CSS, and JavaScript.
-- Keep filenames lowercase with `.html` suffix (for example, `gift-vouchers.html` if added).
-- Use kebab-case CSS class names (for example, `panel-copy`, `site-header`).
-- Keep reusable behavior in `assets/js/site.js`; avoid page-specific inline scripts.
-- When adding a page, update navigation links across pages and append it to `PAGE_ORDER`.
+- Use TypeScript for app/components code.
+- Use 2-space indentation in TS/TSX/CSS.
+- Keep reusable UI and behavior in `src/components` and `src/lib`.
+- Keep route handlers and page composition in `src/app`.
+- Use kebab-case CSS class names.
+- For generated or modified code, add extensive, clean comments for all functions and key design choices.
 
 ## Testing Guidelines
-There is currently no automated test framework in this repo. Use manual verification before merging:
-- Confirm each page loads without console errors.
-- Verify nav links, active link state, and `ArrowLeft`/`ArrowRight` page navigation.
-- Verify swipe navigation on touch devices.
-- Check layout at desktop and mobile widths, including no unintended page scrolling.
+- Run `npm run lint` and `npm run typecheck` before merge.
+- Run `npm test` for behavior changes.
+- Manually verify:
+  - Public route navigation and active nav state.
+  - Booking/contact/admin workflows.
+  - Motion behavior in normal and reduced-motion modes.
+  - Desktop/mobile layout behavior.
 
 ## Test Environment Sync Requirement
-Whenever main changes are made to the codebase, update the test environment automatically as part of the same change.
+Whenever main changes are made, update test environment/config and docs in the same task.
 
 Main changes include:
-- Shared behavior changes (`assets/js/site.js`, global CSS, navigation flow, page structure).
-- Dependency, configuration, environment variable, or schema updates.
-- Any change that alters setup, runtime assumptions, or verification steps.
+- Shared behavior changes (global CSS, navigation flow, route structure).
+- Dependency/config/environment/schema updates.
+- Any change that alters setup/runtime assumptions or verification steps.
 
-Required actions in the same task/PR:
-- Update test environment config/artifacts (for example `.env.example`, fixtures, seeds, mocks, or setup docs) to match the code changes.
+Required actions:
+- Update `.env.example`/test fixtures/setup docs as needed.
 - Update manual verification steps if behavior changed.
-- Re-run the relevant checks/manual tests in the updated test environment before merging.
+- Re-run relevant checks in the updated environment.
 
 ## Commit & Pull Request Guidelines
-Git history is not available in this workspace snapshot, so no project-specific convention can be inferred. Use Conventional Commit style:
-- `feat: add FAQ section to lessons page`
-- `fix: correct contact email link`
-- Always use multiline commit messages/comments (`git commit -m "<title>" -m "<details>"`), not single-line-only commit text.
+Use Conventional Commits:
+- `feat: add booking conflict warning`
+- `fix: preserve public shell during route transitions`
+
+Use multiline commit messages (`git commit -m "<title>" -m "<details>"`).
 
 For PRs, include:
-- Clear summary and rationale.
-- List of changed pages/assets.
-- Before/after screenshots (desktop + mobile).
-- Manual test checklist covering navigation and responsiveness.
+- Summary and rationale.
+- List of changed routes/components.
+- Before/after screenshots (desktop + mobile) for UI changes.
+- Manual test checklist.
 
 ## Content & Asset Notes
 Current visuals include placeholder image sources. Replace with licensed or client-approved assets before production release.
