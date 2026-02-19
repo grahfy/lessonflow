@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AdminBookingCalendar, AdminCalendarEvent } from "@/components/admin-booking-calendar";
@@ -60,6 +60,38 @@ type BookingRequestRow = {
   notes: string | null;
 };
 
+type CustomerRow = {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  skillLevel: "beginner" | "intermediate" | "advanced";
+  lessonMode: "in_person" | "video";
+  unitNumber: string | null;
+  houseNumber: string;
+  streetName: string;
+  streetType: string;
+  suburb: string;
+  state: string;
+  postcode: string;
+  isArchived: boolean;
+};
+
+type CustomerForm = {
+  fullName: string;
+  email: string;
+  phone: string;
+  skillLevel: "beginner" | "intermediate" | "advanced";
+  lessonMode: "in_person" | "video";
+  unitNumber: string;
+  houseNumber: string;
+  streetName: string;
+  streetType: string;
+  suburb: string;
+  state: AuState;
+  postcode: string;
+};
+
 type EventWithRow = AdminCalendarEvent & {
   row: BookingRow | BookingRequestRow;
 };
@@ -83,6 +115,40 @@ type DialogForm = {
   startAtLocal: string;
   notes: string;
 };
+
+function emptyCustomerForm(): CustomerForm {
+  return {
+    fullName: "",
+    email: "",
+    phone: "",
+    skillLevel: "beginner",
+    lessonMode: "in_person",
+    unitNumber: "",
+    houseNumber: "",
+    streetName: "",
+    streetType: "Street",
+    suburb: "",
+    state: "VIC",
+    postcode: ""
+  };
+}
+
+function customerFormFromRow(customer: CustomerRow): CustomerForm {
+  return {
+    fullName: customer.fullName,
+    email: customer.email,
+    phone: toDigits(customer.phone, 10),
+    skillLevel: customer.skillLevel,
+    lessonMode: customer.lessonMode,
+    unitNumber: customer.unitNumber ?? "",
+    houseNumber: customer.houseNumber ?? "",
+    streetName: customer.streetName ?? "",
+    streetType: customer.streetType ?? "Street",
+    suburb: customer.suburb ?? "",
+    state: toAuState(customer.state),
+    postcode: customer.postcode ?? ""
+  };
+}
 
 function toDateInputValue(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -184,21 +250,39 @@ export function AdminBookingsClient() {
   const [view, setView] = useState<CalendarView>("week");
   const [date, setDate] = useState<string>(toDateInputValue(new Date()));
   const [events, setEvents] = useState<EventWithRow[]>([]);
+  const [customers, setCustomers] = useState<CustomerRow[]>([]);
+  const [customerQuery, setCustomerQuery] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [savingCustomer, setSavingCustomer] = useState(false);
+  const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<EventWithRow | null>(null);
   const [dialogForm, setDialogForm] = useState<DialogForm | null>(null);
   const [manualDurationChoice, setManualDurationChoice] = useState<DurationChoice>("min60");
+  const [manualCustomerId, setManualCustomerId] = useState("");
+  const [manualMatch, setManualMatch] = useState<CustomerRow | null>(null);
+  const [manualUpdateCustomerFromBooking, setManualUpdateCustomerFromBooking] = useState(false);
+  const [customerEditorMode, setCustomerEditorMode] = useState<"create" | "edit" | null>(null);
+  const [customerEditorId, setCustomerEditorId] = useState<string | null>(null);
+  const [customerForm, setCustomerForm] = useState<CustomerForm>(emptyCustomerForm());
   const [emailSubject, setEmailSubject] = useState("");
   const [emailMessage, setEmailMessage] = useState("");
   const dialogPresence = usePresenceExit();
+  const manualDialogPresence = usePresenceExit();
+  const customersDialogPresence = usePresenceExit();
+  const customerEditorPresence = usePresenceExit();
   const emailDialogPresence = usePresenceExit();
   const dialogRootRef = useRef<HTMLDivElement | null>(null);
+  const manualDialogRootRef = useRef<HTMLDivElement | null>(null);
+  const customersDialogRootRef = useRef<HTMLDivElement | null>(null);
+  const customerEditorRootRef = useRef<HTMLDivElement | null>(null);
   const emailDialogRootRef = useRef<HTMLDivElement | null>(null);
   const calendarRootRef = useRef<HTMLDivElement | null>(null);
+  const manualFormRef = useRef<HTMLFormElement | null>(null);
 
   const rangeLabel = useMemo(() => `${view.toUpperCase()} VIEW`, [view]);
 
@@ -215,6 +299,36 @@ export function AdminBookingsClient() {
     setEvents(bookingData.events || []);
     setLoading(false);
   }, [date, view]);
+
+  const loadCustomers = useCallback(async (query?: string) => {
+    setLoadingCustomers(true);
+    const search = (query ?? "").trim();
+    const response = await fetch(`/api/admin/customers?limit=250&q=${encodeURIComponent(search)}`, {
+      cache: "no-store"
+    });
+    if (!response.ok) {
+      setLoadingCustomers(false);
+      const payload = await response.json().catch(() => null);
+      setError(payload?.error || "Unable to load customers.");
+      return;
+    }
+    const data = await response.json();
+    setCustomers(data.customers || []);
+    setLoadingCustomers(false);
+  }, []);
+
+  const visibleCustomers = useMemo(() => {
+    const query = customerQuery.trim().toLowerCase();
+    if (!query) {
+      return customers;
+    }
+    return customers.filter(
+      (customer) =>
+        customer.fullName.toLowerCase().includes(query) ||
+        customer.email.toLowerCase().includes(query) ||
+        customer.phone.toLowerCase().includes(query)
+    );
+  }, [customerQuery, customers]);
 
   useEffect(() => {
     load().catch((err) => setError(err instanceof Error ? err.message : "Load failed"));
@@ -235,11 +349,39 @@ export function AdminBookingsClient() {
   }, [emailDialogPresence.isMounted]);
 
   useEffect(() => {
+    if (!manualDialogPresence.isMounted || !manualDialogRootRef.current) {
+      return;
+    }
+    void animateIn(manualDialogRootRef.current, { scope: "admin" });
+  }, [manualDialogPresence.isMounted]);
+
+  useEffect(() => {
+    if (!customersDialogPresence.isMounted || !customersDialogRootRef.current) {
+      return;
+    }
+    void animateIn(customersDialogRootRef.current, { scope: "admin" });
+  }, [customersDialogPresence.isMounted]);
+
+  useEffect(() => {
+    if (!customerEditorPresence.isMounted || !customerEditorRootRef.current) {
+      return;
+    }
+    void animateIn(customerEditorRootRef.current, { scope: "admin" });
+  }, [customerEditorPresence.isMounted]);
+
+  useEffect(() => {
     if (loading || !calendarRootRef.current) {
       return;
     }
     void animateIn(calendarRootRef.current, { scope: "calendar" });
   }, [events, loading, view, date]);
+
+  useEffect(() => {
+    if (!manualDialogPresence.isMounted && !customersDialogPresence.isMounted) {
+      return;
+    }
+    void loadCustomers();
+  }, [customersDialogPresence.isMounted, loadCustomers, manualDialogPresence.isMounted]);
 
   function openDialog(event: EventWithRow) {
     setNotice("");
@@ -284,6 +426,110 @@ export function AdminBookingsClient() {
     emailDialogPresence.hide(undefined, { immediate: true });
     setEmailSubject("");
     setEmailMessage("");
+  }
+
+  function setManualFieldValue(name: string, value: string) {
+    const form = manualFormRef.current;
+    if (!form) {
+      return;
+    }
+    const field = form.elements.namedItem(name);
+    if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement) {
+      field.value = value;
+    }
+  }
+
+  function applyCustomerToManual(customer: CustomerRow) {
+    setManualCustomerId(customer.id);
+    setManualFieldValue("name", customer.fullName);
+    setManualFieldValue("email", customer.email);
+    setManualFieldValue("phone", toDigits(customer.phone, 10));
+    setManualFieldValue("unitNumber", customer.unitNumber ?? "");
+    setManualFieldValue("houseNumber", customer.houseNumber ?? "");
+    setManualFieldValue("streetName", customer.streetName ?? "");
+    setManualFieldValue("streetType", customer.streetType || "Street");
+    setManualFieldValue("suburb", customer.suburb ?? "");
+    setManualFieldValue("state", toAuState(customer.state));
+    setManualFieldValue("postcode", customer.postcode ?? "");
+    setManualFieldValue("skillLevel", customer.skillLevel);
+    setManualFieldValue("lessonMode", customer.lessonMode);
+    setManualMatch(null);
+  }
+
+  function openManualDialog() {
+    setError("");
+    setNotice("");
+    setManualMatch(null);
+    setManualCustomerId("");
+    setManualUpdateCustomerFromBooking(false);
+    setManualDurationChoice("min60");
+    setCustomerQuery("");
+    manualDialogPresence.show();
+  }
+
+  async function closeManualDialog() {
+    if (manualDialogRootRef.current) {
+      await animateOut(manualDialogRootRef.current, { scope: "admin" });
+    }
+    manualDialogPresence.hide(
+      () => {
+        manualFormRef.current?.reset();
+        setCreating(false);
+        setManualMatch(null);
+        setManualCustomerId("");
+        setManualUpdateCustomerFromBooking(false);
+        setManualDurationChoice("min60");
+      },
+      { immediate: true }
+    );
+  }
+
+  function openCustomersDialog() {
+    setError("");
+    setNotice("");
+    setCustomerQuery("");
+    customersDialogPresence.show();
+  }
+
+  async function closeCustomersDialog() {
+    if (customerEditorPresence.isMounted) {
+      await closeCustomerEditor();
+    }
+    if (customersDialogRootRef.current) {
+      await animateOut(customersDialogRootRef.current, { scope: "admin" });
+    }
+    customersDialogPresence.hide(undefined, { immediate: true });
+  }
+
+  function openCustomerEditor(mode: "create" | "edit", customer?: CustomerRow) {
+    setError("");
+    if (mode === "create") {
+      setCustomerEditorMode("create");
+      setCustomerEditorId(null);
+      setCustomerForm(emptyCustomerForm());
+    } else {
+      if (!customer) {
+        return;
+      }
+      setCustomerEditorMode("edit");
+      setCustomerEditorId(customer.id);
+      setCustomerForm(customerFormFromRow(customer));
+    }
+    customerEditorPresence.show();
+  }
+
+  async function closeCustomerEditor() {
+    if (customerEditorRootRef.current) {
+      await animateOut(customerEditorRootRef.current, { scope: "admin" });
+    }
+    customerEditorPresence.hide(
+      () => {
+        setCustomerEditorMode(null);
+        setCustomerEditorId(null);
+        setCustomerForm(emptyCustomerForm());
+      },
+      { immediate: true }
+    );
   }
 
   async function mutateBooking(action: "edit" | "move" | "cancel", body: Record<string, unknown>) {
@@ -481,20 +727,28 @@ export function AdminBookingsClient() {
     await load();
   }
 
-  async function addManualBooking(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function addManualBooking(matchResolution?: "use_existing" | "create_new" | "update_existing") {
+    const formElement = manualFormRef.current;
+    if (!formElement) {
+      return;
+    }
+
     setCreating(true);
-    const formElement = event.currentTarget;
+    setError("");
 
     const form = new FormData(formElement);
-    const firstName = String(form.get("firstName") || "").trim();
-    const middleName = String(form.get("middleName") || "").trim();
-    const lastName = String(form.get("lastName") || "").trim();
-    const fullName = [firstName, middleName, lastName].filter(Boolean).join(" ");
+    const fullName = String(form.get("name") || "").trim();
     const phone = toDigits(String(form.get("phone") || ""), 10);
     const customDurationRaw = String(form.get("customDurationMinutes") || "");
     const customDurationMinutes =
       manualDurationChoice === "custom" && customDurationRaw ? Number.parseInt(customDurationRaw, 10) : undefined;
+
+    if (!fullName) {
+      setCreating(false);
+      setError("Name is required.");
+      return;
+    }
+
     const payload = {
       name: fullName,
       email: String(form.get("email") || ""),
@@ -514,7 +768,10 @@ export function AdminBookingsClient() {
       isRecurring: Boolean(form.get("isRecurring")),
       recurrenceEndAt: form.get("recurrenceEndAt")
         ? new Date(String(form.get("recurrenceEndAt") || "")).toISOString()
-        : undefined
+        : undefined,
+      customerId: manualCustomerId || undefined,
+      matchResolution,
+      updateCustomerFromBooking: manualUpdateCustomerFromBooking || undefined
     };
 
     const response = await fetch("/api/admin/bookings", {
@@ -524,15 +781,108 @@ export function AdminBookingsClient() {
     });
 
     setCreating(false);
+    if (response.status === 409) {
+      const payloadResponse = await response.json().catch(() => null);
+      if (payloadResponse?.code === "CUSTOMER_MATCH" && payloadResponse?.customer) {
+        setManualMatch(payloadResponse.customer as CustomerRow);
+        setError("Matching customer found. Confirm how to proceed.");
+        return;
+      }
+    }
     if (!response.ok) {
       const payloadResponse = await response.json().catch(() => null);
       setError(payloadResponse?.error || "Manual booking create failed.");
       return;
     }
     formElement.reset();
+    setManualMatch(null);
+    setManualCustomerId("");
+    setManualUpdateCustomerFromBooking(false);
     setManualDurationChoice("min60");
     setNotice("Manual booking added.");
+    await closeManualDialog();
     await load();
+    await loadCustomers();
+  }
+
+  async function resolveManualMatch(action: "use_existing" | "create_new" | "update_existing") {
+    if (!manualMatch) {
+      return;
+    }
+    if (action !== "create_new") {
+      setManualCustomerId(manualMatch.id);
+      if (action === "use_existing") {
+        applyCustomerToManual(manualMatch);
+      }
+    }
+    await addManualBooking(action);
+  }
+
+  async function saveCustomer() {
+    if (!customerEditorMode) {
+      return;
+    }
+    setSavingCustomer(true);
+    setError("");
+
+    const payload = {
+      fullName: customerForm.fullName.trim(),
+      email: customerForm.email.trim(),
+      phone: toDigits(customerForm.phone, 10),
+      skillLevel: customerForm.skillLevel,
+      lessonMode: customerForm.lessonMode,
+      unitNumber: customerForm.unitNumber.trim() || null,
+      houseNumber: customerForm.houseNumber.trim() || undefined,
+      streetName: customerForm.streetName.trim() || undefined,
+      streetType: customerForm.streetType.trim() || undefined,
+      suburb: customerForm.suburb.trim() || undefined,
+      state: customerForm.state || undefined,
+      postcode: customerForm.postcode.trim() || undefined
+    };
+
+    const endpoint =
+      customerEditorMode === "create" ? "/api/admin/customers" : `/api/admin/customers/${String(customerEditorId || "")}`;
+    const method = customerEditorMode === "create" ? "POST" : "PATCH";
+    const response = await fetch(endpoint, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    setSavingCustomer(false);
+    if (!response.ok) {
+      const responsePayload = await response.json().catch(() => null);
+      setError(responsePayload?.error || "Unable to save customer.");
+      return;
+    }
+
+    await loadCustomers(customerQuery);
+    await closeCustomerEditor();
+    setNotice(customerEditorMode === "create" ? "Customer created." : "Customer updated.");
+  }
+
+  async function deleteCustomer(customer: CustomerRow) {
+    const confirmed = window.confirm(`Delete customer "${customer.fullName}"? Linked records will be archived instead.`);
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingCustomerId(customer.id);
+    setError("");
+    const response = await fetch(`/api/admin/customers/${customer.id}`, { method: "DELETE" });
+    setDeletingCustomerId(null);
+    if (!response.ok) {
+      const payloadResponse = await response.json().catch(() => null);
+      setError(payloadResponse?.error || "Unable to delete customer.");
+      return;
+    }
+
+    const payload = await response.json().catch(() => null);
+    if (manualCustomerId === customer.id) {
+      setManualCustomerId("");
+    }
+    setManualMatch((prev) => (prev?.id === customer.id ? null : prev));
+    await loadCustomers(customerQuery);
+    setNotice(payload?.archived ? "Customer archived (linked booking history kept)." : "Customer deleted.");
   }
 
   async function logout() {
@@ -547,11 +897,12 @@ export function AdminBookingsClient() {
     selectedEvent && selectedEvent.entityType === "booking"
       ? ((selectedEvent.row as BookingRow).seriesId ?? null)
       : null;
+  const selectedManualCustomer = manualCustomerId ? customers.find((customer) => customer.id === manualCustomerId) ?? null : null;
 
   return (
     <div className="admin-shell" data-motion-root="admin" data-motion-primary="true">
-      <div className="admin-card booking-row" data-motion-item="admin-header-card">
-        <h1 style={{ marginRight: "auto", fontSize: "1.3rem" }} data-motion-item="admin-title">
+      <div className="admin-card booking-row admin-header-row" data-motion-item="admin-header-card">
+        <h1 className="admin-console-title" data-motion-item="admin-title">
           Owner Booking Console
         </h1>
         <button className="btn btn-secondary" data-motion-item="admin-logout" onClick={() => void logout()}>
@@ -559,9 +910,9 @@ export function AdminBookingsClient() {
         </button>
       </div>
 
-      <div className="admin-card booking-row" data-motion-item="admin-range-card">
+      <div className="admin-card booking-row admin-range-row" data-motion-item="admin-range-card">
         <strong data-motion-item="admin-range-label">{rangeLabel}</strong>
-        <label data-motion-item="admin-view-select">
+        <label className="admin-inline-field" data-motion-item="admin-view-select">
           View{" "}
           <select value={view} onChange={(e) => setView(e.target.value as CalendarView)}>
             <option value="day">Day</option>
@@ -569,24 +920,34 @@ export function AdminBookingsClient() {
             <option value="month">Month</option>
           </select>
         </label>
-        <label data-motion-item="admin-date-select">
+        <label className="admin-inline-field" data-motion-item="admin-date-select">
           Base date <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
       </div>
 
       <div className="admin-card calendar-legend" data-motion-item="admin-legend-card">
-        <span className="legend-chip event-green" data-motion-item="legend-confirmed">
-          Confirmed
-        </span>
-        <span className="legend-chip event-yellow" data-motion-item="legend-pending">
-          Pending
-        </span>
-        <span className="legend-chip event-red" data-motion-item="legend-rejected">
-          Rejected (48h)
-        </span>
-        <span className="legend-chip event-slate" data-motion-item="legend-cancelled">
-          Cancelled (48h)
-        </span>
+        <div className="legend-chip-row">
+          <span className="legend-chip event-green" data-motion-item="legend-confirmed">
+            Confirmed
+          </span>
+          <span className="legend-chip event-yellow" data-motion-item="legend-pending">
+            Pending
+          </span>
+          <span className="legend-chip event-red" data-motion-item="legend-rejected">
+            Rejected (48h)
+          </span>
+          <span className="legend-chip event-slate" data-motion-item="legend-cancelled">
+            Cancelled (48h)
+          </span>
+        </div>
+        <div className="legend-action-row">
+          <button className="btn btn-primary" type="button" data-motion-item="legend-action-add-manual" onClick={openManualDialog}>
+            Add Manual Booking
+          </button>
+          <button className="btn btn-secondary" type="button" data-motion-item="legend-action-customers" onClick={openCustomersDialog}>
+            Customers
+          </button>
+        </div>
       </div>
 
       {error ? (
@@ -620,226 +981,581 @@ export function AdminBookingsClient() {
         />
       </div>
 
-      <div className="admin-card" data-motion-item="manual-booking-card">
-        <h2 data-motion-item="manual-booking-title">Add Manual Booking</h2>
-        <form className="manual-booking-form" onSubmit={addManualBooking} data-motion-item="manual-booking-form">
-          <section className="manual-section" data-motion-item="manual-student-section">
-            <h3 className="manual-section-title" data-motion-item="manual-student-title">
-              Student
-            </h3>
-            <div className="manual-grid manual-grid-3" data-motion-item="manual-student-grid">
-              <div className="field">
-                <label>First Name *</label>
-                <input name="firstName" required />
-              </div>
-              <div className="field">
-                <label>Middle Name</label>
-                <input name="middleName" />
-              </div>
-              <div className="field">
-                <label>Last Name *</label>
-                <input name="lastName" required />
-              </div>
+      {manualDialogPresence.isMounted ? (
+        <div
+          className="dialog-backdrop"
+          ref={manualDialogRootRef}
+          data-motion-root="admin"
+          data-motion-item="manual-dialog-backdrop"
+          onClick={() => void closeManualDialog()}
+        >
+          <div
+            className="dialog-panel dialog-panel-wide"
+            data-motion-item="manual-dialog-panel"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="dialog-head">
+              <h3>Add Manual Booking</h3>
+              <button className="btn btn-secondary" type="button" onClick={() => void closeManualDialog()}>
+                Close
+              </button>
             </div>
-          </section>
-
-          <section className="manual-section" data-motion-item="manual-contact-section">
-            <h3 className="manual-section-title" data-motion-item="manual-contact-title">
-              Contact
-            </h3>
-            <div className="manual-grid manual-grid-3" data-motion-item="manual-contact-grid">
-              <div className="field manual-span-2">
-                <label>Email *</label>
-                <input name="email" type="email" required />
-              </div>
-              <div className="field field-compact">
-                <label>Phone *</label>
-                <input
-                  name="phone"
-                  required
-                  maxLength={10}
-                  inputMode="numeric"
-                  pattern="[0-9]{10}"
-                  placeholder="10 digits"
-                  title="Phone must be exactly 10 digits"
-                  onInput={(event) => {
-                    event.currentTarget.value = toDigits(event.currentTarget.value, 10);
-                  }}
-                />
-              </div>
-            </div>
-          </section>
-
-          <section className="manual-section" data-motion-item="manual-address-section">
-            <h3 className="manual-section-title" data-motion-item="manual-address-title">
-              Address
-            </h3>
-            <div className="manual-grid manual-grid-3" data-motion-item="manual-address-grid">
-              <div className="field field-compact">
-                <label>Unit/Apartment</label>
-                <input
-                  name="unitNumber"
-                  maxLength={5}
-                  inputMode="numeric"
-                  pattern="[0-9]{1,5}"
-                  onInput={(event) => {
-                    event.currentTarget.value = toDigits(event.currentTarget.value, 5);
-                  }}
-                />
-              </div>
-              <div className="field field-compact">
-                <label>House/Building Number *</label>
-                <input
-                  name="houseNumber"
-                  required
-                  maxLength={5}
-                  inputMode="numeric"
-                  pattern="[0-9]{1,5}"
-                  onInput={(event) => {
-                    event.currentTarget.value = toDigits(event.currentTarget.value, 5);
-                  }}
-                />
-              </div>
-              <div className="field">
-                <label>Street Type *</label>
-                <select name="streetType" required defaultValue="">
-                  <option value="" disabled>
-                    Select street type
-                  </option>
-                  <option value="Street">Street</option>
-                  <option value="Road">Road</option>
-                  <option value="Avenue">Avenue</option>
-                  <option value="Drive">Drive</option>
-                  <option value="Lane">Lane</option>
-                  <option value="Court">Court</option>
-                  <option value="Crescent">Crescent</option>
-                  <option value="Place">Place</option>
-                  <option value="Boulevard">Boulevard</option>
-                  <option value="Terrace">Terrace</option>
-                  <option value="Parade">Parade</option>
-                  <option value="Close">Close</option>
-                </select>
-              </div>
-              <div className="field manual-span-2">
-                <label>Street Name *</label>
-                <input name="streetName" required />
-              </div>
-              <div className="field">
-                <label>Suburb *</label>
-                <input name="suburb" required />
-              </div>
-              <div className="field manual-span-2">
-                <label>State *</label>
-                <select name="state" required defaultValue="VIC">
-                  <option value="ACT">Australian Capital Territory</option>
-                  <option value="NSW">New South Wales</option>
-                  <option value="NT">Northern Territory</option>
-                  <option value="QLD">Queensland</option>
-                  <option value="SA">South Australia</option>
-                  <option value="TAS">Tasmania</option>
-                  <option value="VIC">Victoria</option>
-                  <option value="WA">Western Australia</option>
-                </select>
-              </div>
-              <div className="field field-compact">
-                <label>Postcode *</label>
-                <input
-                  name="postcode"
-                  required
-                  maxLength={4}
-                  inputMode="numeric"
-                  pattern="[0-9]{4}"
-                  placeholder="3000"
-                  title="Postcode must be 4 digits"
-                  onInput={(event) => {
-                    event.currentTarget.value = toDigits(event.currentTarget.value, 4);
-                  }}
-                />
-              </div>
-            </div>
-          </section>
-
-          <section className="manual-section" data-motion-item="manual-lesson-section">
-            <h3 className="manual-section-title" data-motion-item="manual-lesson-title">
-              Lesson
-            </h3>
-            <div className="manual-grid manual-grid-3" data-motion-item="manual-lesson-grid">
-              <div className="field">
-                <label>Mode *</label>
-                <select name="lessonMode" defaultValue="in_person">
-                  <option value="in_person">In-person</option>
-                  <option value="video">Video</option>
-                </select>
-              </div>
-              <div className="field">
-                <label>Skill Level *</label>
-                <select name="skillLevel" defaultValue="beginner">
-                  <option value="beginner">Beginner</option>
-                  <option value="intermediate">Intermediate</option>
-                  <option value="advanced">Advanced</option>
-                </select>
-              </div>
-              <div className="field">
-                <label>Duration *</label>
-                <select
-                  value={manualDurationChoice}
-                  onChange={(event) => setManualDurationChoice(event.target.value as DurationChoice)}
-                >
-                  <option value="min30">30 minutes</option>
-                  <option value="min60">60 minutes</option>
-                  <option value="custom">Other amount</option>
-                </select>
-              </div>
-              {manualDurationChoice === "custom" ? (
-                <div className="field field-compact">
-                  <label>Custom Duration (minutes) *</label>
-                  <input
-                    name="customDurationMinutes"
-                    required
-                    maxLength={3}
-                    inputMode="numeric"
-                    pattern="[0-9]{2,3}"
-                    placeholder="e.g. 45"
-                    onInput={(event) => {
-                      event.currentTarget.value = toDigits(event.currentTarget.value, 3);
-                    }}
-                  />
-                </div>
-              ) : null}
-            </div>
-          </section>
-
-          <section className="manual-section" data-motion-item="manual-schedule-section">
-            <h3 className="manual-section-title" data-motion-item="manual-schedule-title">
-              Schedule
-            </h3>
-            <div className="manual-grid manual-grid-2" data-motion-item="manual-schedule-grid">
-              <div className="field">
-                <label>Start *</label>
-                <input name="requestedStartAt" type="datetime-local" required />
-              </div>
-              <div className="field">
-                <label>Recurrence end</label>
-                <input name="recurrenceEndAt" type="datetime-local" />
-              </div>
-              <div className="field manual-span-2">
-                <label>
-                  <input type="checkbox" name="isRecurring" /> Weekly recurring
-                </label>
-              </div>
-            </div>
-          </section>
-
-          <div className="manual-form-footer" data-motion-item="manual-actions">
-            <p className="helper-text form-required-note" data-motion-item="manual-required-note">
-              * Required fields
+            <p className="helper-text dialog-status">
+              Select an existing customer first where possible. If you enter details manually, matching customers will be detected.
             </p>
-            <button className="btn btn-primary" type="submit" disabled={creating}>
-              {creating ? "Adding..." : "Add booking"}
-            </button>
+            <form
+              ref={manualFormRef}
+              className="manual-booking-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void addManualBooking();
+              }}
+            >
+              <section className="manual-section">
+                <h3 className="manual-section-title">Customer</h3>
+                <div className="manual-grid manual-grid-3">
+                  <div className="field">
+                    <label>Search customer</label>
+                    <input
+                      value={customerQuery}
+                      placeholder="Filter by name, email, or phone"
+                      onChange={(event) => setCustomerQuery(event.target.value)}
+                    />
+                  </div>
+                  <div className="field manual-span-2">
+                    <label>Select existing customer</label>
+                    <select
+                      disabled={loadingCustomers}
+                      value={manualCustomerId}
+                      onChange={(event) => {
+                        const nextId = event.target.value;
+                        setManualCustomerId(nextId);
+                        const selected = customers.find((customer) => customer.id === nextId);
+                        if (selected) {
+                          applyCustomerToManual(selected);
+                        }
+                      }}
+                    >
+                      <option value="">{loadingCustomers ? "Loading customers..." : "None selected"}</option>
+                      {visibleCustomers.map((customer) => (
+                        <option key={customer.id} value={customer.id}>
+                          {customer.fullName} · {customer.phone} · {customer.skillLevel}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field manual-span-2">
+                    <label className="helper-toggle">
+                      <input
+                        type="checkbox"
+                        checked={manualUpdateCustomerFromBooking}
+                        onChange={(event) => setManualUpdateCustomerFromBooking(event.target.checked)}
+                      />{" "}
+                      Update linked customer profile from this booking
+                    </label>
+                  </div>
+                  {selectedManualCustomer ? (
+                    <div className="manual-customer-summary manual-span-2">
+                      <strong>Selected:</strong> {selectedManualCustomer.fullName} · {selectedManualCustomer.email} ·{" "}
+                      {selectedManualCustomer.phone}
+                      <button
+                        className="btn btn-secondary"
+                        type="button"
+                        onClick={() => {
+                          setManualCustomerId("");
+                          setManualFieldValue("name", "");
+                          setManualFieldValue("email", "");
+                          setManualFieldValue("phone", "");
+                          setManualFieldValue("unitNumber", "");
+                          setManualFieldValue("houseNumber", "");
+                          setManualFieldValue("streetName", "");
+                          setManualFieldValue("streetType", "Street");
+                          setManualFieldValue("suburb", "");
+                          setManualFieldValue("state", "VIC");
+                          setManualFieldValue("postcode", "");
+                          setManualFieldValue("skillLevel", "beginner");
+                          setManualFieldValue("lessonMode", "in_person");
+                        }}
+                      >
+                        Clear selection
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+
+              <section className="manual-section">
+                <h3 className="manual-section-title">Student</h3>
+                <div className="manual-grid manual-grid-2">
+                  <div className="field manual-span-2">
+                    <label>Full Name *</label>
+                    <input name="name" required />
+                  </div>
+                </div>
+              </section>
+
+              <section className="manual-section">
+                <h3 className="manual-section-title">Contact</h3>
+                <div className="manual-grid manual-grid-3">
+                  <div className="field manual-span-2">
+                    <label>Email *</label>
+                    <input name="email" type="email" required />
+                  </div>
+                  <div className="field field-compact">
+                    <label>Phone *</label>
+                    <input
+                      name="phone"
+                      required
+                      maxLength={10}
+                      inputMode="numeric"
+                      pattern="[0-9]{10}"
+                      placeholder="10 digits"
+                      title="Phone must be exactly 10 digits"
+                      onInput={(event) => {
+                        event.currentTarget.value = toDigits(event.currentTarget.value, 10);
+                      }}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <section className="manual-section">
+                <h3 className="manual-section-title">Address</h3>
+                <div className="manual-grid manual-grid-3">
+                  <div className="field field-compact">
+                    <label>Unit/Apartment</label>
+                    <input
+                      name="unitNumber"
+                      maxLength={5}
+                      inputMode="numeric"
+                      pattern="[0-9]{1,5}"
+                      onInput={(event) => {
+                        event.currentTarget.value = toDigits(event.currentTarget.value, 5);
+                      }}
+                    />
+                  </div>
+                  <div className="field field-compact">
+                    <label>House/Building Number *</label>
+                    <input
+                      name="houseNumber"
+                      required
+                      maxLength={5}
+                      inputMode="numeric"
+                      pattern="[0-9]{1,5}"
+                      onInput={(event) => {
+                        event.currentTarget.value = toDigits(event.currentTarget.value, 5);
+                      }}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Street Type *</label>
+                    <select name="streetType" required defaultValue="Street">
+                      <option value="Street">Street</option>
+                      <option value="Road">Road</option>
+                      <option value="Avenue">Avenue</option>
+                      <option value="Drive">Drive</option>
+                      <option value="Lane">Lane</option>
+                      <option value="Court">Court</option>
+                      <option value="Crescent">Crescent</option>
+                      <option value="Place">Place</option>
+                      <option value="Boulevard">Boulevard</option>
+                      <option value="Terrace">Terrace</option>
+                      <option value="Parade">Parade</option>
+                      <option value="Close">Close</option>
+                    </select>
+                  </div>
+                  <div className="field manual-span-2">
+                    <label>Street Name *</label>
+                    <input name="streetName" required />
+                  </div>
+                  <div className="field">
+                    <label>Suburb *</label>
+                    <input name="suburb" required />
+                  </div>
+                  <div className="field manual-span-2">
+                    <label>State *</label>
+                    <select name="state" required defaultValue="VIC">
+                      <option value="ACT">Australian Capital Territory</option>
+                      <option value="NSW">New South Wales</option>
+                      <option value="NT">Northern Territory</option>
+                      <option value="QLD">Queensland</option>
+                      <option value="SA">South Australia</option>
+                      <option value="TAS">Tasmania</option>
+                      <option value="VIC">Victoria</option>
+                      <option value="WA">Western Australia</option>
+                    </select>
+                  </div>
+                  <div className="field field-compact">
+                    <label>Postcode *</label>
+                    <input
+                      name="postcode"
+                      required
+                      maxLength={4}
+                      inputMode="numeric"
+                      pattern="[0-9]{4}"
+                      placeholder="3000"
+                      title="Postcode must be 4 digits"
+                      onInput={(event) => {
+                        event.currentTarget.value = toDigits(event.currentTarget.value, 4);
+                      }}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <section className="manual-section">
+                <h3 className="manual-section-title">Lesson</h3>
+                <div className="manual-grid manual-grid-3">
+                  <div className="field">
+                    <label>Mode *</label>
+                    <select name="lessonMode" defaultValue="in_person">
+                      <option value="in_person">In-person</option>
+                      <option value="video">Video</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label>Skill Level *</label>
+                    <select name="skillLevel" defaultValue="beginner">
+                      <option value="beginner">Beginner</option>
+                      <option value="intermediate">Intermediate</option>
+                      <option value="advanced">Advanced</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label>Duration *</label>
+                    <select
+                      value={manualDurationChoice}
+                      onChange={(event) => setManualDurationChoice(event.target.value as DurationChoice)}
+                    >
+                      <option value="min30">30 minutes</option>
+                      <option value="min60">60 minutes</option>
+                      <option value="custom">Other amount</option>
+                    </select>
+                  </div>
+                  {manualDurationChoice === "custom" ? (
+                    <div className="field field-compact">
+                      <label>Custom Duration (minutes) *</label>
+                      <input
+                        name="customDurationMinutes"
+                        required
+                        maxLength={3}
+                        inputMode="numeric"
+                        pattern="[0-9]{2,3}"
+                        placeholder="e.g. 45"
+                        onInput={(event) => {
+                          event.currentTarget.value = toDigits(event.currentTarget.value, 3);
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+
+              <section className="manual-section">
+                <h3 className="manual-section-title">Schedule</h3>
+                <div className="manual-grid manual-grid-2">
+                  <div className="field">
+                    <label>Start *</label>
+                    <input name="requestedStartAt" type="datetime-local" required />
+                  </div>
+                  <div className="field">
+                    <label>Recurrence end</label>
+                    <input name="recurrenceEndAt" type="datetime-local" />
+                  </div>
+                  <div className="field manual-span-2">
+                    <label>
+                      <input type="checkbox" name="isRecurring" /> Weekly recurring
+                    </label>
+                  </div>
+                </div>
+              </section>
+
+              {manualMatch ? (
+                <section className="manual-section manual-match">
+                  <h3 className="manual-section-title">Existing Customer Match Found</h3>
+                  <p className="helper-text">
+                    {manualMatch.fullName} · {manualMatch.email} · {manualMatch.phone}
+                  </p>
+                  <div className="booking-row">
+                    <button
+                      className="btn btn-primary"
+                      type="button"
+                      disabled={creating}
+                      onClick={() =>
+                        void resolveManualMatch(manualUpdateCustomerFromBooking ? "update_existing" : "use_existing")
+                      }
+                    >
+                      Use existing customer
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      type="button"
+                      disabled={creating}
+                      onClick={() => void resolveManualMatch("create_new")}
+                    >
+                      Create new customer anyway
+                    </button>
+                  </div>
+                </section>
+              ) : null}
+
+              <div className="manual-form-footer">
+                <p className="helper-text form-required-note">* Required fields</p>
+                <button className="btn btn-primary" type="submit" disabled={creating}>
+                  {creating ? "Adding..." : "Add booking"}
+                </button>
+              </div>
+            </form>
           </div>
-        </form>
-      </div>
+        </div>
+      ) : null}
+
+      {customersDialogPresence.isMounted ? (
+        <div
+          className="dialog-backdrop"
+          ref={customersDialogRootRef}
+          data-motion-root="admin"
+          data-motion-item="customers-dialog-backdrop"
+          onClick={() => void closeCustomersDialog()}
+        >
+          <div className="dialog-panel dialog-panel-wide" data-motion-item="customers-dialog-panel" onClick={(event) => event.stopPropagation()}>
+            <div className="dialog-head">
+              <h3>Customers</h3>
+              <button className="btn btn-secondary" type="button" onClick={() => void closeCustomersDialog()}>
+                Close
+              </button>
+            </div>
+            <p className="helper-text dialog-status">
+              Manage customer profiles used to speed up manual booking creation.
+            </p>
+            <div className="customers-toolbar">
+              <div className="field">
+                <label>Search</label>
+                <input
+                  value={customerQuery}
+                  placeholder="Search customer directory"
+                  onChange={(event) => setCustomerQuery(event.target.value)}
+                />
+              </div>
+              <button className="btn btn-primary" type="button" onClick={() => openCustomerEditor("create")}>
+                Create New Customer
+              </button>
+            </div>
+            <p className="helper-text customers-count">
+              {loadingCustomers ? "Loading..." : `${visibleCustomers.length} customer${visibleCustomers.length === 1 ? "" : "s"}`}
+            </p>
+            {loadingCustomers ? <p className="helper-text">Loading customers...</p> : null}
+            <div className="customers-list">
+              {visibleCustomers.length ? (
+                visibleCustomers.map((customer) => (
+                  <div key={customer.id} className="customer-item">
+                    <div className="customer-item-meta">
+                      <strong>{customer.fullName}</strong>
+                      <span>
+                        <small>Phone</small> {customer.phone}
+                      </span>
+                      <span>
+                        <small>Email</small> {customer.email}
+                      </span>
+                      <span>
+                        <small>Skill</small> {customer.skillLevel}
+                      </span>
+                    </div>
+                    <div className="customer-item-actions">
+                      <button className="btn btn-secondary" type="button" onClick={() => openCustomerEditor("edit", customer)}>
+                        Edit
+                      </button>
+                      <button
+                        className="btn btn-danger"
+                        type="button"
+                        disabled={deletingCustomerId === customer.id}
+                        onClick={() => void deleteCustomer(customer)}
+                      >
+                        {deletingCustomerId === customer.id ? "Deleting..." : "Delete"}
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="helper-text">No customers found.</p>
+              )}
+            </div>
+          </div>
+          {customerEditorPresence.isMounted ? (
+            <div
+              className="dialog-backdrop is-secondary"
+              ref={customerEditorRootRef}
+              data-motion-root="admin"
+              data-motion-item="customer-editor-dialog-backdrop"
+              onClick={(event) => {
+                event.stopPropagation();
+                void closeCustomerEditor();
+              }}
+            >
+              <div
+                className="dialog-panel dialog-panel-compact"
+                data-motion-item="customer-editor-dialog-panel"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="dialog-head">
+                  <h3>{customerEditorMode === "create" ? "Create Customer" : "Edit Customer"}</h3>
+                  <button className="btn btn-secondary" type="button" onClick={() => void closeCustomerEditor()}>
+                    Cancel
+                  </button>
+                </div>
+                <p className="helper-text dialog-status">Name, phone, email, and skill are primary. Address fields are optional.</p>
+                <div className="form-grid dialog-form-grid">
+                  <div className="field">
+                    <label>Full Name *</label>
+                    <input
+                      value={customerForm.fullName}
+                      onChange={(event) => setCustomerForm((prev) => ({ ...prev, fullName: event.target.value }))}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Email *</label>
+                    <input
+                      type="email"
+                      value={customerForm.email}
+                      onChange={(event) => setCustomerForm((prev) => ({ ...prev, email: event.target.value }))}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Phone *</label>
+                    <input
+                      value={customerForm.phone}
+                      maxLength={10}
+                      inputMode="numeric"
+                      pattern="[0-9]{10}"
+                      placeholder="10 digits"
+                      onChange={(event) =>
+                        setCustomerForm((prev) => ({ ...prev, phone: toDigits(event.target.value, 10) }))
+                      }
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Skill Level *</label>
+                    <select
+                      value={customerForm.skillLevel}
+                      onChange={(event) =>
+                        setCustomerForm((prev) => ({
+                          ...prev,
+                          skillLevel: event.target.value as CustomerForm["skillLevel"]
+                        }))
+                      }
+                    >
+                      <option value="beginner">Beginner</option>
+                      <option value="intermediate">Intermediate</option>
+                      <option value="advanced">Advanced</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label>Mode *</label>
+                    <select
+                      value={customerForm.lessonMode}
+                      onChange={(event) =>
+                        setCustomerForm((prev) => ({
+                          ...prev,
+                          lessonMode: event.target.value as CustomerForm["lessonMode"]
+                        }))
+                      }
+                    >
+                      <option value="in_person">In-person</option>
+                      <option value="video">Video</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label>Unit/Apartment</label>
+                    <input
+                      value={customerForm.unitNumber}
+                      onChange={(event) => setCustomerForm((prev) => ({ ...prev, unitNumber: event.target.value }))}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>House Number</label>
+                    <input
+                      value={customerForm.houseNumber}
+                      onChange={(event) => setCustomerForm((prev) => ({ ...prev, houseNumber: toDigits(event.target.value, 5) }))}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Street Name</label>
+                    <input
+                      value={customerForm.streetName}
+                      onChange={(event) => setCustomerForm((prev) => ({ ...prev, streetName: event.target.value }))}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Street Type</label>
+                    <select
+                      value={customerForm.streetType}
+                      onChange={(event) => setCustomerForm((prev) => ({ ...prev, streetType: event.target.value }))}
+                    >
+                      <option value="Street">Street</option>
+                      <option value="Road">Road</option>
+                      <option value="Avenue">Avenue</option>
+                      <option value="Drive">Drive</option>
+                      <option value="Lane">Lane</option>
+                      <option value="Court">Court</option>
+                      <option value="Crescent">Crescent</option>
+                      <option value="Place">Place</option>
+                      <option value="Boulevard">Boulevard</option>
+                      <option value="Terrace">Terrace</option>
+                      <option value="Parade">Parade</option>
+                      <option value="Close">Close</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label>Suburb</label>
+                    <input
+                      value={customerForm.suburb}
+                      onChange={(event) => setCustomerForm((prev) => ({ ...prev, suburb: event.target.value }))}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>State</label>
+                    <select
+                      value={customerForm.state}
+                      onChange={(event) =>
+                        setCustomerForm((prev) => ({ ...prev, state: event.target.value as CustomerForm["state"] }))
+                      }
+                    >
+                      <option value="ACT">Australian Capital Territory</option>
+                      <option value="NSW">New South Wales</option>
+                      <option value="NT">Northern Territory</option>
+                      <option value="QLD">Queensland</option>
+                      <option value="SA">South Australia</option>
+                      <option value="TAS">Tasmania</option>
+                      <option value="VIC">Victoria</option>
+                      <option value="WA">Western Australia</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label>Postcode</label>
+                    <input
+                      value={customerForm.postcode}
+                      maxLength={4}
+                      inputMode="numeric"
+                      placeholder="3000"
+                      onChange={(event) =>
+                        setCustomerForm((prev) => ({ ...prev, postcode: toDigits(event.target.value, 4) }))
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="dialog-actions">
+                  <button className="btn btn-secondary" type="button" disabled={savingCustomer} onClick={() => void closeCustomerEditor()}>
+                    Cancel
+                  </button>
+                  <button className="btn btn-primary" type="button" disabled={savingCustomer} onClick={() => void saveCustomer()}>
+                    {savingCustomer ? "Saving..." : "Save customer"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {dialogPresence.isMounted && selectedEvent && dialogForm ? (
         <div

@@ -83,9 +83,12 @@ model BookingRequest {
   updatedAt        DateTime             @updatedAt
   approvedById     String?
   approvedBy       AdminUser?           @relation("RequestApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
+  customerId       String?
+  customer         Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
   bookings         Booking[]
 
   @@index([requestedStartAt, status])
+  @@index([customerId])
 }
 
 model BookingSeries {
@@ -113,7 +116,11 @@ model BookingSeries {
   isActive        Boolean   @default(true)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+  customerId      String?
+  customer        Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   bookings        Booking[]
+
+  @@index([customerId])
 }
 
 model Booking {
@@ -145,11 +152,14 @@ model Booking {
   request          BookingRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
   seriesId         String?
   series           BookingSeries?  @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  customerId       String?
+  customer         Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
   modifiedById     String?
   modifiedBy       AdminUser?      @relation("BookingEdits", fields: [modifiedById], references: [id], onDelete: SetNull)
   auditLogs        BookingAuditLog[]
 
   @@index([startAt, status])
+  @@index([customerId])
 }
 
 model BookingAuditLog {
@@ -177,6 +187,34 @@ model AdminUser {
   approvedRequests       BookingRequest[] @relation("RequestApprovals")
   editedBookings         Booking[]        @relation("BookingEdits")
   auditLogs              BookingAuditLog[]
+}
+
+model Customer {
+  id              String         @id @default(cuid())
+  fullName        String
+  email           String
+  phone           String
+  normalizedEmail String
+  normalizedPhone String
+  skillLevel      SkillLevel     @default(beginner)
+  lessonMode      LessonMode     @default(in_person)
+  unitNumber      String?
+  houseNumber     String         @default("")
+  streetName      String         @default("")
+  streetType      String         @default("")
+  suburb          String         @default("")
+  state           String         @default("")
+  postcode        String         @default("")
+  isArchived      Boolean        @default(false)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  bookingRequests BookingRequest[]
+  bookingSeries   BookingSeries[]
+  bookings        Booking[]
+
+  @@index([isArchived, fullName])
+  @@index([normalizedEmail])
+  @@index([normalizedPhone])
 }
 
 model OutboundEmail {

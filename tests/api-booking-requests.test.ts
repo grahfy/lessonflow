@@ -8,7 +8,9 @@ describe("api-booking-requests", () => {
   beforeEach(async () => {
     await prisma.outboundEmail.deleteMany();
     await prisma.booking.deleteMany();
+    await prisma.bookingSeries.deleteMany();
     await prisma.bookingRequest.deleteMany();
+    await prisma.customer.deleteMany();
   });
 
   it("creates a pending booking request", async () => {

@@ -23,6 +23,7 @@ describe("admin-booking-mutations", () => {
     await prisma.booking.deleteMany();
     await prisma.bookingSeries.deleteMany();
     await prisma.bookingRequest.deleteMany();
+    await prisma.customer.deleteMany();
   });
 
   it("edits and moves confirmed bookings", async () => {

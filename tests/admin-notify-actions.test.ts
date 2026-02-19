@@ -22,7 +22,9 @@ describe("admin-notify-actions", () => {
     await prisma.bookingAuditLog.deleteMany();
     await prisma.outboundEmail.deleteMany();
     await prisma.booking.deleteMany();
+    await prisma.bookingSeries.deleteMany();
     await prisma.bookingRequest.deleteMany();
+    await prisma.customer.deleteMany();
   });
 
   it("sends booking reminders and writes audit + outbound records", async () => {

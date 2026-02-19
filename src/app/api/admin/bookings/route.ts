@@ -1,10 +1,61 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
 import { bookingColor, bookingRequestColor, getRecencyCutoff } from "@/lib/admin-calendar-events";
 import { bookingRequestSchema, formatBookingAddress, generateRecurringStartDates, getBookingEnd } from "@/lib/booking-rules";
+import { customerSnapshotFromInput, normalizeEmail, normalizePhone } from "@/lib/customer-match";
 import { getCalendarRange } from "@/lib/calendar-range";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { prisma } from "@/lib/db";
+
+const manualBookingSchema = bookingRequestSchema.and(
+  z.object({
+    customerId: z.string().trim().min(1).optional(),
+    matchResolution: z.enum(["use_existing", "create_new", "update_existing"]).optional(),
+    updateCustomerFromBooking: z.boolean().optional()
+  })
+);
+
+type ManualBookingInput = z.infer<typeof manualBookingSchema>;
+
+async function createCustomerFromBooking(input: ManualBookingInput) {
+  return prisma.customer.create({
+    data: customerSnapshotFromInput({
+      name: input.name,
+      email: input.email,
+      phone: input.phone,
+      skillLevel: input.skillLevel,
+      lessonMode: input.lessonMode,
+      unitNumber: input.unitNumber ?? undefined,
+      houseNumber: input.houseNumber,
+      streetName: input.streetName,
+      streetType: input.streetType,
+      suburb: input.suburb,
+      state: input.state,
+      postcode: input.postcode
+    })
+  });
+}
+
+async function updateCustomerFromBooking(id: string, input: ManualBookingInput) {
+  return prisma.customer.update({
+    where: { id },
+    data: customerSnapshotFromInput({
+      name: input.name,
+      email: input.email,
+      phone: input.phone,
+      skillLevel: input.skillLevel,
+      lessonMode: input.lessonMode,
+      unitNumber: input.unitNumber ?? undefined,
+      houseNumber: input.houseNumber,
+      streetName: input.streetName,
+      streetType: input.streetType,
+      suburb: input.suburb,
+      state: input.state,
+      postcode: input.postcode
+    })
+  });
+}
 
 export async function GET(request: NextRequest) {
   const admin = await requireAdminFromRequest(request);
@@ -112,9 +163,64 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => null);
-  const parsed = bookingRequestSchema.safeParse(body);
+  const parsed = manualBookingSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid booking payload.", details: parsed.error.flatten() }, { status: 400 });
+  }
+
+  let customerId: string | null = null;
+  if (parsed.data.customerId) {
+    const selected = await prisma.customer.findUnique({
+      where: {
+        id: parsed.data.customerId
+      }
+    });
+    if (!selected || selected.isArchived) {
+      return NextResponse.json({ error: "Selected customer does not exist." }, { status: 400 });
+    }
+    customerId = selected.id;
+    if (parsed.data.updateCustomerFromBooking) {
+      await updateCustomerFromBooking(selected.id, parsed.data);
+    }
+  } else {
+    const existing = await prisma.customer.findFirst({
+      where: {
+        isArchived: false,
+        OR: [
+          { normalizedEmail: normalizeEmail(parsed.data.email) },
+          { normalizedPhone: normalizePhone(parsed.data.phone) }
+        ]
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    });
+
+    if (existing && !parsed.data.matchResolution) {
+      return NextResponse.json(
+        {
+          error: "Possible existing customer match found.",
+          code: "CUSTOMER_MATCH",
+          customer: existing
+        },
+        { status: 409 }
+      );
+    }
+
+    if (existing) {
+      if (parsed.data.matchResolution === "create_new") {
+        const created = await createCustomerFromBooking(parsed.data);
+        customerId = created.id;
+      } else {
+        customerId = existing.id;
+        if (parsed.data.matchResolution === "update_existing" || parsed.data.updateCustomerFromBooking) {
+          await updateCustomerFromBooking(existing.id, parsed.data);
+        }
+      }
+    } else {
+      const created = await createCustomerFromBooking(parsed.data);
+      customerId = created.id;
+    }
   }
 
   const startAt = new Date(parsed.data.requestedStartAt);
@@ -143,7 +249,8 @@ export async function POST(request: NextRequest) {
         startTimeLocal: startAt.toISOString().slice(11, 16),
         startDate: startAt,
         recurrenceEndAt: endAt,
-        timezone: "Australia/Melbourne"
+        timezone: "Australia/Melbourne",
+        customerId
       }
     });
 
@@ -171,6 +278,7 @@ export async function POST(request: NextRequest) {
             timezone: "Australia/Melbourne",
             notes: parsed.data.notes,
             seriesId: series.id,
+            customerId,
             modifiedById: admin.id
           }
         })
@@ -198,6 +306,7 @@ export async function POST(request: NextRequest) {
         endAt: getBookingEnd(startAt, parsed.data.lessonDuration, parsed.data.customDurationMinutes),
         timezone: "Australia/Melbourne",
         notes: parsed.data.notes,
+        customerId,
         modifiedById: admin.id
       }
     });

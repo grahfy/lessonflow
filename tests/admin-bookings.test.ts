@@ -11,7 +11,9 @@ describe("admin-bookings", () => {
   beforeEach(async () => {
     await prisma.bookingAuditLog.deleteMany();
     await prisma.booking.deleteMany();
+    await prisma.bookingSeries.deleteMany();
     await prisma.bookingRequest.deleteMany();
+    await prisma.customer.deleteMany();
   });
 
   it("computes date ranges for day/week/month views", () => {

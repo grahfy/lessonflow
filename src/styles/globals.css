@@ -504,6 +504,9 @@ h1 {
   padding: 20px;
   display: grid;
   gap: 14px;
+  align-content: start;
+  align-items: start;
+  grid-auto-rows: min-content;
 }
 
 .admin-card {
@@ -511,6 +514,8 @@ h1 {
   border-radius: 14px;
   background: rgba(8, 11, 28, 0.84);
   padding: 14px;
+  min-height: 0;
+  width: 100%;
 }
 
 .admin-grid {
@@ -520,9 +525,65 @@ h1 {
 }
 
 .calendar-legend {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-header-row {
+  justify-content: space-between;
+}
+
+.admin-console-title {
+  margin: 0;
+  margin-right: auto;
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.admin-range-row {
+  justify-content: flex-start;
+}
+
+.admin-inline-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-1);
+  font-size: 0.82rem;
+}
+
+.admin-range-row select,
+.admin-range-row input[type="date"] {
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink-0);
+  padding: 5px 8px;
+  font-size: 0.8rem;
+}
+
+.admin-range-row select:focus,
+.admin-range-row input[type="date"]:focus {
+  outline: none;
+  border-color: rgba(143, 114, 255, 0.75);
+  box-shadow: 0 0 0 2px rgba(143, 114, 255, 0.2);
+}
+
+.legend-chip-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.legend-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.legend-action-row .btn {
+  min-width: 180px;
 }
 
 .legend-chip {
@@ -684,6 +745,10 @@ h1 {
   padding: 16px;
 }
 
+.dialog-panel-wide {
+  width: min(1040px, 96vw);
+}
+
 .dialog-head {
   display: flex;
   align-items: center;
@@ -796,6 +861,91 @@ h1 {
   min-height: 160px;
 }
 
+.helper-toggle {
+  font-size: 0.82rem;
+  color: var(--ink-1);
+}
+
+.manual-customer-summary {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--ink-1);
+}
+
+.manual-customer-summary .btn {
+  margin-left: auto;
+}
+
+.manual-match {
+  border-color: rgba(255, 227, 124, 0.45);
+  background: rgba(255, 227, 124, 0.06);
+}
+
+.customers-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-top: 10px;
+}
+
+.customers-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  max-height: min(50vh, 480px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.customer-item {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.025);
+  display: grid;
+  gap: 8px;
+}
+
+.customer-item-meta {
+  display: grid;
+  gap: 4px;
+}
+
+.customer-item-meta strong {
+  font-family: "Space Grotesk", "Sora", sans-serif;
+}
+
+.customer-item-meta span {
+  color: var(--ink-1);
+  font-size: 0.82rem;
+}
+
+.customer-item-meta span small {
+  color: rgba(255, 255, 255, 0.62);
+  margin-right: 5px;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.customer-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.customers-count {
+  margin-top: 8px;
+}
+
 .booking-list {
   display: grid;
   gap: 8px;
@@ -818,6 +968,7 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
 }
 
 .booking-row .btn {
@@ -885,6 +1036,14 @@ h1 {
   .dialog-notes {
     min-height: 200px;
   }
+
+  .customers-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .manual-customer-summary .btn {
+    margin-left: 0;
+  }
 }
 
 @media (max-width: 760px) {
@@ -942,6 +1101,11 @@ h1 {
 
   .manual-form-footer .btn {
     width: 100%;
+  }
+
+  .legend-action-row .btn {
+    width: 100%;
+    min-width: 0;
   }
 
   .field.field-compact input,

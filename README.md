@@ -82,7 +82,12 @@ Owner dashboard supports:
   - cancelled bookings (slate, visible for 48 hours)
 - Click-to-open booking dialog with full customer and lesson details.
 - Pending request approval and rejection.
-- Manual booking create.
+- Manual booking popup launched from `Add Manual Booking`.
+- Customer directory popup launched from `Customers`.
+- Customer create/edit/delete (delete archives linked profiles to preserve history).
+- Existing customer selection in manual booking popup (auto-fill supported).
+- Deterministic duplicate detection (email/phone) during manual booking entry with confirmation workflow.
+- Optional customer-profile update from manual booking confirmation flow.
 - Booking edit/move/cancel.
 - Pending request edit/move/reject (cancel maps to reject).
 - Recurring series cancellation for future instances.
@@ -113,5 +118,5 @@ Required header: `x-cron-secret: <CRON_SECRET>`
 `vercel.json` includes daily cron scheduling.
 
 ## Notes
-- Legacy static HTML files remain in repository root for reference during migration.
+- This repository now runs only the Next.js App Router implementation.
 - Current-year booking constraints are enforced by server-side validation.

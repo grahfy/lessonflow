@@ -97,7 +97,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           startTimeLocal: localTime(bookingRequest.requestedStartAt),
           startDate: bookingRequest.requestedStartAt,
           recurrenceEndAt: bookingRequest.recurrenceEndAt,
-          timezone: "Australia/Melbourne"
+          timezone: "Australia/Melbourne",
+          customerId: bookingRequest.customerId
         }
       });
 
@@ -130,6 +131,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
               timezone: "Australia/Melbourne",
               requestId: bookingRequest.id,
               seriesId: series.id,
+              customerId: bookingRequest.customerId,
               modifiedById: admin.id
             }
           })
@@ -161,6 +163,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           ),
           timezone: "Australia/Melbourne",
           requestId: bookingRequest.id,
+          customerId: bookingRequest.customerId,
           modifiedById: admin.id
         }
       });
