@@ -86,6 +86,7 @@ Melbourne Guitar School Platform is a full-stack web application for running day
 - Next.js App Router + TypeScript
 - Prisma ORM
 - SQLite for local/test environments
+- MySQL for production environments
 - Nodemailer for SMTP delivery
 - pdf-lib for invoice PDF generation
 
@@ -112,7 +113,7 @@ npm install
 ```bash
 cp .env.example .env
 ```
-3. Apply local migrations:
+3. Apply local migrations (SQLite):
 ```bash
 DATABASE_URL="file:./prisma/dev.db" npx prisma migrate deploy
 ```
@@ -124,6 +125,15 @@ npm run dev
 ```bash
 http://127.0.0.1:3000/setup
 ```
+
+### MySQL Setup (Production)
+For production, use MySQL instead of SQLite:
+```bash
+# Create MySQL database first
+DATABASE_URL="mysql://user:password@host:3306/database_name" npx prisma migrate deploy
+```
+
+Alternatively, configure the database connection through the setup wizard at `/setup` after starting the server.
 
 Default local app URL:
 - `http://127.0.0.1:3000`
@@ -243,7 +253,26 @@ Schedules are configured in `vercel.json`.
 
 ## First-Run Production Setup
 Run this once after deploying to hosting:
-1. Set production env vars (DB, secrets, SMTP, site URL, cron secret).
+
+### Option 1: Configure via Setup Wizard (Recommended)
+1. Set initial production env vars (at minimum, `DATABASE_URL` pointing to MySQL)
+2. Deploy and run database migrations:
+```bash
+npx prisma migrate deploy
+```
+3. Visit `/setup`.
+4. Click "Configure Environment" to add or update env vars directly in the browser:
+   - Database connection (MySQL)
+   - SMTP settings
+   - Session secrets
+   - Invoice business details
+5. Save configuration and restart the server.
+6. Resolve any remaining failing checks in the wizard.
+7. Create the first admin account.
+8. Sign in at `/admin/login`.
+
+### Option 2: Manual Environment Setup
+1. Set all required production env vars in `.env` before deploying.
 2. Deploy and run database migrations:
 ```bash
 npx prisma migrate deploy
@@ -252,6 +281,12 @@ npx prisma migrate deploy
 4. Resolve all failing checks in the wizard.
 5. Create the first admin account.
 6. Sign in at `/admin/login`.
+
+### Required Environment Variables
+At minimum, production requires:
+- `DATABASE_URL` - MySQL connection string
+- `ADMIN_SESSION_SECRET` - Secure random string for admin sessions
+- `STUDENT_SESSION_SECRET` - Secure random string for student portal sessions
 
 ## Operational Notes
 - Booking constraints and validation are server-side enforced.
