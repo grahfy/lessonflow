@@ -25,9 +25,14 @@ export function getStudentSessionMaxAgeSeconds(): number {
 
 /**
  * Resolves the secret used for signing student session tokens.
+ * Throws in production if not configured.
  */
 function getStudentSessionSecret(): string {
-  return process.env.STUDENT_SESSION_SECRET || process.env.ADMIN_SESSION_SECRET || "dev-student-session-secret";
+  const secret = process.env.STUDENT_SESSION_SECRET || process.env.ADMIN_SESSION_SECRET;
+  if (!secret) {
+    throw new Error("STUDENT_SESSION_SECRET or ADMIN_SESSION_SECRET is required. Set it in your environment variables.");
+  }
+  return secret;
 }
 
 /**

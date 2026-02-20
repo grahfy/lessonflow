@@ -6,6 +6,10 @@ export function getCronSecret(): string {
   return process.env.CRON_SECRET || "";
 }
 
+export function hasCronSecret(): boolean {
+  return !!process.env.CRON_SECRET && process.env.CRON_SECRET.length > 0;
+}
+
 /**
  * Returns canonical site URL used in customer-facing links.
  */

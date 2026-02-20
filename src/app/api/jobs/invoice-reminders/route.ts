@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getPrimaryActiveAdmin } from "@/lib/admin-auth";
-import { getCronSecret } from "@/lib/env";
+import { getCronSecret, hasCronSecret } from "@/lib/env";
 import { runInvoiceReminderBatch } from "@/lib/invoices/reminder-runner";
 import { sendInvoiceRemindersSchema } from "@/lib/invoices/schema";
 
@@ -12,6 +12,9 @@ import { sendInvoiceRemindersSchema } from "@/lib/invoices/schema";
  * reminders per run unless overridden in the request payload.
  */
 export async function POST(request: NextRequest) {
+  if (!hasCronSecret()) {
+    return NextResponse.json({ error: "Cron secret not configured" }, { status: 401 });
+  }
   const secret = request.headers.get("x-cron-secret");
   if (!secret || secret !== getCronSecret()) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

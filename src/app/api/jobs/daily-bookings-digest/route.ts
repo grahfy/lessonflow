@@ -4,9 +4,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/email/service";
 import { ownerDailyDigestTemplate } from "@/lib/email/templates";
-import { getCronSecret, getOwnerEmail } from "@/lib/env";
+import { getCronSecret, getOwnerEmail, hasCronSecret } from "@/lib/env";
 
 export async function POST(request: NextRequest) {
+  if (!hasCronSecret()) {
+    return NextResponse.json({ error: "Cron secret not configured" }, { status: 401 });
+  }
   const secret = request.headers.get("x-cron-secret");
   if (!secret || secret !== getCronSecret()) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

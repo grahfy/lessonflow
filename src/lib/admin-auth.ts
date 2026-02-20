@@ -8,7 +8,11 @@ import { prisma } from "@/lib/db";
 const COOKIE_NAME = "admin_session";
 
 function getSessionSecret(): string {
-  return process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_PASSWORD || "dev-secret";
+  const secret = process.env.ADMIN_SESSION_SECRET;
+  if (!secret) {
+    throw new Error("ADMIN_SESSION_SECRET is required. Set it in your environment variables.");
+  }
+  return secret;
 }
 
 function signPayload(payload: string): string {
