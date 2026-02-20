@@ -31,6 +31,7 @@ Melbourne Guitar School Platform is a full-stack web application for running day
 - Marketing pages: `/`, `/lessons`, `/teacher`, `/vouchers`, `/terms`.
 - Contact form at `/contact`.
 - Booking request form at `/book`.
+- Student portal entry at `/student/login`.
 - Smooth page transitions and reduced-motion support.
 
 ### Booking & Admin Operations
@@ -49,6 +50,16 @@ Melbourne Guitar School Platform is a full-stack web application for running day
 - Create/edit/archive customer records.
 - Duplicate protection during manual booking flows.
 - Customer-to-booking linkage preserved for history.
+- Portal credential reveal/regenerate controls with audit logging.
+- Customer learning-material management tied to selected appointments.
+
+### Student Portal
+- Student login via full name + postcode + generated password.
+- Automatic credential generation when first appointment is approved.
+- Approval email includes student portal login instructions and initial password.
+- Student dashboard at `/student/portal`:
+  - upcoming and previous appointments,
+  - assigned lesson materials (audio/PDF) with authenticated downloads.
 
 ### Invoicing & Billing
 - Invoice console at `/admin/invoices`.
@@ -155,6 +166,10 @@ npm run typecheck
 - `ADMIN_EMAIL`: admin login and owner notification email.
 - `ADMIN_PASSWORD`: bootstrap admin password.
 - `ADMIN_SESSION_SECRET`: admin session signing secret.
+- `STUDENT_SESSION_SECRET`: student portal session signing secret.
+- `STUDENT_SESSION_MAX_AGE_SECONDS`: student session TTL in seconds.
+- `STUDENT_PORTAL_PASSWORD_ENCRYPTION_KEY`: at-rest encryption key for revealable portal passwords.
+- `STUDENT_PORTAL_PASSWORD_LENGTH`: generated portal password length (bounded).
 - `CRON_SECRET`: shared secret for scheduled job endpoints.
 
 ### SMTP / Email
@@ -165,6 +180,15 @@ npm run typecheck
 - `SMTP_FROM`
 
 If SMTP is not configured, outbound emails are recorded in DB as `queued_no_smtp`.
+
+### Learning Materials Storage
+- `LEARNING_MATERIALS_STORAGE_DRIVER`: `local` or `s3` (`local` default).
+- `LEARNING_MATERIALS_LOCAL_ROOT`: local filesystem root when using `local`.
+- `LEARNING_MATERIALS_S3_BUCKET`
+- `LEARNING_MATERIALS_S3_REGION`
+- `LEARNING_MATERIALS_S3_ACCESS_KEY_ID`
+- `LEARNING_MATERIALS_S3_SECRET_ACCESS_KEY`
+- `LEARNING_MATERIALS_S3_PUBLIC_BASE_URL` (optional).
 
 ### Invoice Configuration
 - `INVOICE_BUSINESS_NAME`
@@ -204,6 +228,8 @@ Schedules are configured in `vercel.json`.
   - `/contact`
   - `/book`
   - `/terms`
+  - `/student/login`
+  - `/student/portal`
 - Admin:
   - `/admin/login`
   - `/admin/bookings`

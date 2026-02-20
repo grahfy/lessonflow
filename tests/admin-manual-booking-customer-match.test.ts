@@ -65,6 +65,12 @@ describe("admin-manual-booking-customer-match", () => {
       }
     });
     expect(booking.customerId).toBe(customer.id);
+    const credential = await prisma.customerPortalCredential.findUnique({
+      where: {
+        customerId: customer.id
+      }
+    });
+    expect(credential).not.toBeNull();
   });
 
   it("returns conflict for existing deterministic customer match and allows using existing", async () => {
@@ -107,6 +113,12 @@ describe("admin-manual-booking-customer-match", () => {
       }
     });
     expect(booking.customerId).toBe(existing.id);
+    const credential = await prisma.customerPortalCredential.findUnique({
+      where: {
+        customerId: existing.id
+      }
+    });
+    expect(credential).not.toBeNull();
   });
 
   it("updates existing customer profile when requested during conflict resolution", async () => {

@@ -1,4 +1,5 @@
 import { BookingRequestInput } from "@/lib/booking-rules";
+import { buildNameSearchTokens, normalizeFullNameForLookup } from "@/lib/student-portal/credentials";
 
 export function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
@@ -34,6 +35,8 @@ export type CustomerSnapshotInput = Pick<
 export function customerSnapshotFromInput(input: CustomerSnapshotInput) {
   return {
     fullName: input.name.trim(),
+    normalizedFullName: normalizeFullNameForLookup(input.name),
+    nameSearchTokens: buildNameSearchTokens(input.name),
     email: input.email.trim(),
     phone: input.phone.trim(),
     normalizedEmail: normalizeEmail(input.email),

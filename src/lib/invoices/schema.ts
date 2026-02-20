@@ -51,6 +51,18 @@ export const createInvoiceSchema = z.object({
 });
 
 /**
+ * Customer-scoped invoice create payload used by `/customers/:id/invoices`.
+ * Supports optional booking linkage while deriving customer snapshot server-side.
+ */
+export const createCustomerInvoiceSchema = z.object({
+  bookingId: z.string().trim().min(1).optional(),
+  lineItems: z.array(invoiceLineItemInputSchema).min(1).max(100),
+  dueAt: z.string().datetime({ offset: true }).optional(),
+  notes: z.string().trim().max(2_000).optional(),
+  taxMode: invoiceTaxModeSchema.optional()
+});
+
+/**
  * Invoice update payload for editing draft/sent invoices and toggling payment state.
  */
 export const updateInvoiceSchema = z
@@ -123,6 +135,7 @@ export const sendInvoiceRemindersSchema = z.object({
 });
 
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
+export type CreateCustomerInvoiceInput = z.infer<typeof createCustomerInvoiceSchema>;
 export type UpdateInvoiceInput = z.infer<typeof updateInvoiceSchema>;
 export type CreateBookingInvoiceInput = z.infer<typeof createBookingInvoiceSchema>;
 export type CreateCreditNoteInput = z.infer<typeof createCreditNoteSchema>;

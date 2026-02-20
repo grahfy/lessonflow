@@ -1,22 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma, InvoiceTaxMode } from "@prisma/client";
-import { z } from "zod";
+import { Prisma } from "@prisma/client";
 
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { prisma } from "@/lib/db";
 import { getInvoiceAgingBucket, getInvoiceOverdueDays } from "@/lib/invoices/aging";
 import { getDefaultInvoiceTaxMode } from "@/lib/invoices/gst-policy";
-import { listInvoicesQuerySchema, invoiceLineItemInputSchema } from "@/lib/invoices/schema";
+import { createCustomerInvoiceSchema, listInvoicesQuerySchema } from "@/lib/invoices/schema";
 import { createInvoiceRecord, getDefaultDueAt } from "@/lib/invoices/persistence";
 import { customerSnapshotFromCustomer } from "@/lib/invoices/snapshots";
 import { InvoiceLineItemDraft } from "@/lib/invoices/types";
-
-const createCustomerInvoiceSchema = z.object({
-  lineItems: z.array(invoiceLineItemInputSchema).min(1).max(100),
-  dueAt: z.string().datetime({ offset: true }).optional(),
-  notes: z.string().trim().max(2000).optional(),
-  taxMode: z.nativeEnum(InvoiceTaxMode).optional()
-});
 
 type Params = {
   params: Promise<{
@@ -50,6 +42,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid query payload.", details: parsed.error.flatten() }, { status: 400 });
   }
+  const includeBookingOptions = request.nextUrl.searchParams.get("bookingOptions") === "true";
 
   const where: Prisma.InvoiceWhereInput = {
     customerId: id,
@@ -89,7 +82,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   }
 
   const skip = (parsed.data.page - 1) * parsed.data.pageSize;
-  const [invoices, total] = await prisma.$transaction([
+  const [invoices, total, bookingOptions] = await prisma.$transaction([
     prisma.invoice.findMany({
       where,
       include: {
@@ -103,7 +96,39 @@ export async function GET(request: NextRequest, { params }: Params) {
       skip,
       take: parsed.data.pageSize
     }),
-    prisma.invoice.count({ where })
+    prisma.invoice.count({ where }),
+    includeBookingOptions
+      ? prisma.booking.findMany({
+          where: {
+            customerId: id
+          },
+          orderBy: {
+            startAt: "desc"
+          },
+          take: 80,
+          select: {
+            id: true,
+            status: true,
+            startAt: true,
+            lessonMode: true,
+            lessonDuration: true,
+            customDurationMinutes: true
+          }
+        })
+      : prisma.booking.findMany({
+          where: {
+            customerId: id
+          },
+          take: 0,
+          select: {
+            id: true,
+            status: true,
+            startAt: true,
+            lessonMode: true,
+            lessonDuration: true,
+            customDurationMinutes: true
+          }
+        })
   ]);
 
   return NextResponse.json({
@@ -119,7 +144,15 @@ export async function GET(request: NextRequest, { params }: Params) {
     total,
     page: parsed.data.page,
     pageSize: parsed.data.pageSize,
-    totalPages: Math.max(1, Math.ceil(total / parsed.data.pageSize))
+    totalPages: Math.max(1, Math.ceil(total / parsed.data.pageSize)),
+    bookingOptions: bookingOptions.map((booking) => ({
+      id: booking.id,
+      status: booking.status,
+      startAt: booking.startAt.toISOString(),
+      lessonMode: booking.lessonMode,
+      lessonDuration: booking.lessonDuration,
+      customDurationMinutes: booking.customDurationMinutes
+    }))
   });
 }
 
@@ -144,6 +177,22 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Invalid invoice payload.", details: parsed.error.flatten() }, { status: 400 });
   }
 
+  if (parsed.data.bookingId) {
+    const booking = await prisma.booking.findUnique({
+      where: { id: parsed.data.bookingId },
+      select: {
+        id: true,
+        customerId: true
+      }
+    });
+    if (!booking) {
+      return NextResponse.json({ error: "Selected booking does not exist." }, { status: 400 });
+    }
+    if (booking.customerId !== customer.id) {
+      return NextResponse.json({ error: "Selected booking does not belong to this customer." }, { status: 400 });
+    }
+  }
+
   const taxMode = parsed.data.taxMode ?? getDefaultInvoiceTaxMode();
   const lineItems: InvoiceLineItemDraft[] = parsed.data.lineItems.map((lineItem, index) => ({
     description: lineItem.description,
@@ -162,6 +211,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       adminId: admin.id,
       taxMode,
       customerId: customer.id,
+      bookingId: parsed.data.bookingId ?? null,
       customerSnapshot: customerSnapshotFromCustomer(customer),
       lineItems,
       notes: parsed.data.notes,

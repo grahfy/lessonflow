@@ -10,7 +10,8 @@ export const publicRouteOrder = [
   "/vouchers",
   "/contact",
   "/book",
-  "/terms"
+  "/terms",
+  "/student/login"
 ] as const;
 
 export const publicHeroImageByRoute: Record<(typeof publicRouteOrder)[number], string> = {
@@ -20,7 +21,8 @@ export const publicHeroImageByRoute: Record<(typeof publicRouteOrder)[number], s
   "/vouchers": "https://images.unsplash.com/photo-1510915361894-db8b60106cb1?auto=format&fit=crop&w=1300&q=80",
   "/contact": "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1300&q=80",
   "/book": "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1300&q=80",
-  "/terms": "https://images.unsplash.com/photo-1519659528534-7fd733a832a0?auto=format&fit=crop&w=1300&q=80"
+  "/terms": "https://images.unsplash.com/photo-1519659528534-7fd733a832a0?auto=format&fit=crop&w=1300&q=80",
+  "/student/login": "https://images.unsplash.com/photo-1461784121038-f088ca1e7714?auto=format&fit=crop&w=1300&q=80"
 };
 
 export const sharedVisualImageUrls = [
@@ -35,7 +37,8 @@ export const navItems: NavItem[] = [
   { href: "/teacher", label: "Teacher" },
   { href: "/vouchers", label: "Gift Vouchers" },
   { href: "/contact", label: "Contact" },
-  { href: "/terms", label: "Terms" }
+  { href: "/terms", label: "Terms" },
+  { href: "/student/login", label: "Student Portal" }
 ];
 
 function normalizePath(pathname: string): string {

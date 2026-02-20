@@ -219,4 +219,91 @@ describe("admin-invoices", () => {
     expect(body.invoices[0].invoiceNumber).toBe("MGS-2026-8802");
     expect(body.invoices[0].agingBucket).toBe("overdue_31_plus");
   });
+
+  it("rejects global create when booking and customer do not match", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const customerA = await prisma.customer.create({
+      data: {
+        fullName: "Mismatch A",
+        email: "mismatch-a@example.com",
+        phone: "0400001111",
+        normalizedEmail: "mismatch-a@example.com",
+        normalizedPhone: "0400001111",
+        skillLevel: "beginner",
+        lessonMode: "in_person",
+        houseNumber: "1",
+        streetName: "Main",
+        streetType: "Street",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070"
+      }
+    });
+
+    const customerB = await prisma.customer.create({
+      data: {
+        fullName: "Mismatch B",
+        email: "mismatch-b@example.com",
+        phone: "0400002222",
+        normalizedEmail: "mismatch-b@example.com",
+        normalizedPhone: "0400002222",
+        skillLevel: "beginner",
+        lessonMode: "in_person",
+        houseNumber: "2",
+        streetName: "Main",
+        streetType: "Street",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070"
+      }
+    });
+
+    const booking = await prisma.booking.create({
+      data: {
+        name: customerB.fullName,
+        email: customerB.email,
+        phone: customerB.phone,
+        address: "2 Main Street, Northcote VIC 3070",
+        houseNumber: "2",
+        streetName: "Main",
+        streetType: "Street",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070",
+        lessonMode: "in_person",
+        skillLevel: customerB.skillLevel,
+        lessonDuration: "min60",
+        startAt: new Date("2026-09-01T09:00:00.000Z"),
+        endAt: new Date("2026-09-01T10:00:00.000Z"),
+        timezone: "Australia/Melbourne",
+        customerId: customerB.id,
+        modifiedById: admin.id
+      }
+    });
+
+    const req = adminRequest("http://localhost/api/admin/invoices", "POST", token, {
+      customerId: customerA.id,
+      bookingId: booking.id,
+      customerName: customerA.fullName,
+      customerEmail: customerA.email,
+      customerPhone: customerA.phone,
+      customerAddress: "1 Main Street, Northcote VIC 3070",
+      taxMode: "taxable",
+      dueAt: "2026-08-01T10:00:00.000Z",
+      lineItems: [
+        {
+          kind: "custom",
+          description: "Standalone charge",
+          quantity: 1,
+          unitPriceCents: 5000,
+          taxMode: "taxable",
+          sortOrder: 0
+        }
+      ]
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+  });
 });

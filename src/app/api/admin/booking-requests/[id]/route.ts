@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import {
@@ -13,8 +14,11 @@ import {
   skillLevelSchema
 } from "@/lib/booking-rules";
 import { sendCustomerBookingStatusEmail } from "@/lib/booking-events";
+import { customerSnapshotFromInput, normalizeEmail, normalizePhone } from "@/lib/customer-match";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { prisma } from "@/lib/db";
+import { getStudentPortalLoginUrl } from "@/lib/env";
+import { ensurePortalCredentialForCustomer } from "@/lib/student-portal/credentials";
 
 type Params = {
   params: Promise<{
@@ -52,6 +56,76 @@ function localTime(date: Date): string {
   }).format(date);
 }
 
+/**
+ * Resolves the customer associated with a booking request approval.
+ * Existing linked customer wins, then deterministic email/phone match, then new customer create.
+ */
+async function resolveCustomerIdForApproval(input: {
+  tx: Prisma.TransactionClient;
+  bookingRequest: {
+    customerId: string | null;
+    name: string;
+    email: string;
+    phone: string;
+    lessonMode: "in_person" | "video";
+    skillLevel: "beginner" | "intermediate" | "advanced";
+    unitNumber: string | null;
+    houseNumber: string;
+    streetName: string;
+    streetType: string;
+    suburb: string;
+    state: string;
+    postcode: string;
+  };
+}): Promise<string> {
+  if (input.bookingRequest.customerId) {
+    const linked = await input.tx.customer.findUnique({
+      where: {
+        id: input.bookingRequest.customerId
+      }
+    });
+    if (linked && !linked.isArchived) {
+      return linked.id;
+    }
+  }
+
+  const existing = await input.tx.customer.findFirst({
+    where: {
+      isArchived: false,
+      OR: [
+        { normalizedEmail: normalizeEmail(input.bookingRequest.email) },
+        { normalizedPhone: normalizePhone(input.bookingRequest.phone) }
+      ]
+    },
+    orderBy: {
+      createdAt: "desc"
+    }
+  });
+  if (existing) {
+    return existing.id;
+  }
+
+  const normalizedState = auStateSchema.safeParse(input.bookingRequest.state);
+
+  const created = await input.tx.customer.create({
+    data: customerSnapshotFromInput({
+      name: input.bookingRequest.name,
+      email: input.bookingRequest.email,
+      phone: input.bookingRequest.phone,
+      skillLevel: input.bookingRequest.skillLevel,
+      lessonMode: input.bookingRequest.lessonMode,
+      unitNumber: input.bookingRequest.unitNumber ?? undefined,
+      houseNumber: input.bookingRequest.houseNumber,
+      streetName: input.bookingRequest.streetName,
+      streetType: input.bookingRequest.streetType,
+      suburb: input.bookingRequest.suburb,
+      state: normalizedState.success ? normalizedState.data : "VIC",
+      postcode: input.bookingRequest.postcode
+    })
+  });
+  return created.id;
+}
+
 export async function PATCH(request: NextRequest, { params }: Params) {
   const admin = await requireAdminFromRequest(request);
   if (!admin) {
@@ -75,113 +149,138 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Only pending requests can be approved." }, { status: 400 });
     }
 
-    if (bookingRequest.isRecurring && bookingRequest.recurrenceEndAt) {
-      const series = await prisma.bookingSeries.create({
-        data: {
-          name: bookingRequest.name,
-          email: bookingRequest.email,
-          phone: bookingRequest.phone,
-          address: bookingRequest.address,
-          unitNumber: bookingRequest.unitNumber,
-          houseNumber: bookingRequest.houseNumber,
-          streetName: bookingRequest.streetName,
-          streetType: bookingRequest.streetType,
-          suburb: bookingRequest.suburb,
-          state: bookingRequest.state,
-          postcode: bookingRequest.postcode,
-          lessonMode: bookingRequest.lessonMode,
-          skillLevel: bookingRequest.skillLevel,
-          lessonDuration: bookingRequest.lessonDuration,
-          customDurationMinutes: bookingRequest.customDurationMinutes,
-          dayOfWeek: bookingRequest.requestedStartAt.getDay(),
-          startTimeLocal: localTime(bookingRequest.requestedStartAt),
-          startDate: bookingRequest.requestedStartAt,
-          recurrenceEndAt: bookingRequest.recurrenceEndAt,
-          timezone: "Australia/Melbourne",
-          customerId: bookingRequest.customerId
-        }
+    const approvalResult = await prisma.$transaction(async (tx) => {
+      const customerId = await resolveCustomerIdForApproval({
+        tx,
+        bookingRequest
       });
-
-      const starts = generateRecurringStartDates({
-        startAt: bookingRequest.requestedStartAt,
-        recurrenceEndAt: bookingRequest.recurrenceEndAt
-      });
-
-      await prisma.$transaction(
-        starts.map((startAt) =>
-          prisma.booking.create({
-            data: {
-              name: bookingRequest.name,
-              email: bookingRequest.email,
-              phone: bookingRequest.phone,
-              address: bookingRequest.address,
-              unitNumber: bookingRequest.unitNumber,
-              houseNumber: bookingRequest.houseNumber,
-              streetName: bookingRequest.streetName,
-              streetType: bookingRequest.streetType,
-              suburb: bookingRequest.suburb,
-              state: bookingRequest.state,
-              postcode: bookingRequest.postcode,
-              lessonMode: bookingRequest.lessonMode,
-              skillLevel: bookingRequest.skillLevel,
-              lessonDuration: bookingRequest.lessonDuration,
-              customDurationMinutes: bookingRequest.customDurationMinutes,
-              startAt,
-              endAt: getBookingEnd(startAt, bookingRequest.lessonDuration, bookingRequest.customDurationMinutes),
-              timezone: "Australia/Melbourne",
-              requestId: bookingRequest.id,
-              seriesId: series.id,
-              customerId: bookingRequest.customerId,
-              modifiedById: admin.id
-            }
-          })
-        )
-      );
-    } else {
-      await prisma.booking.create({
-        data: {
-          name: bookingRequest.name,
-          email: bookingRequest.email,
-          phone: bookingRequest.phone,
-          address: bookingRequest.address,
-          unitNumber: bookingRequest.unitNumber,
-          houseNumber: bookingRequest.houseNumber,
-          streetName: bookingRequest.streetName,
-          streetType: bookingRequest.streetType,
-          suburb: bookingRequest.suburb,
-          state: bookingRequest.state,
-          postcode: bookingRequest.postcode,
-          lessonMode: bookingRequest.lessonMode,
-          skillLevel: bookingRequest.skillLevel,
-          lessonDuration: bookingRequest.lessonDuration,
-          customDurationMinutes: bookingRequest.customDurationMinutes,
-          startAt: bookingRequest.requestedStartAt,
-          endAt: getBookingEnd(
-            bookingRequest.requestedStartAt,
-            bookingRequest.lessonDuration,
-            bookingRequest.customDurationMinutes
-          ),
-          timezone: "Australia/Melbourne",
-          requestId: bookingRequest.id,
-          customerId: bookingRequest.customerId,
-          modifiedById: admin.id
-        }
-      });
-    }
-
-    const updated = await prisma.bookingRequest.update({
-      where: { id },
-      data: {
-        status: "approved",
-        approvedById: admin.id
+      if (!customerId) {
+        throw new Error("Unable to resolve customer before approval.");
       }
+
+      if (bookingRequest.isRecurring && bookingRequest.recurrenceEndAt) {
+        const series = await tx.bookingSeries.create({
+          data: {
+            name: bookingRequest.name,
+            email: bookingRequest.email,
+            phone: bookingRequest.phone,
+            address: bookingRequest.address,
+            unitNumber: bookingRequest.unitNumber,
+            houseNumber: bookingRequest.houseNumber,
+            streetName: bookingRequest.streetName,
+            streetType: bookingRequest.streetType,
+            suburb: bookingRequest.suburb,
+            state: bookingRequest.state,
+            postcode: bookingRequest.postcode,
+            lessonMode: bookingRequest.lessonMode,
+            skillLevel: bookingRequest.skillLevel,
+            lessonDuration: bookingRequest.lessonDuration,
+            customDurationMinutes: bookingRequest.customDurationMinutes,
+            dayOfWeek: bookingRequest.requestedStartAt.getDay(),
+            startTimeLocal: localTime(bookingRequest.requestedStartAt),
+            startDate: bookingRequest.requestedStartAt,
+            recurrenceEndAt: bookingRequest.recurrenceEndAt,
+            timezone: "Australia/Melbourne",
+            customerId
+          }
+        });
+
+        const starts = generateRecurringStartDates({
+          startAt: bookingRequest.requestedStartAt,
+          recurrenceEndAt: bookingRequest.recurrenceEndAt
+        });
+
+        await tx.booking.createMany({
+          data: starts.map((startAt) => ({
+            name: bookingRequest.name,
+            email: bookingRequest.email,
+            phone: bookingRequest.phone,
+            address: bookingRequest.address,
+            unitNumber: bookingRequest.unitNumber,
+            houseNumber: bookingRequest.houseNumber,
+            streetName: bookingRequest.streetName,
+            streetType: bookingRequest.streetType,
+            suburb: bookingRequest.suburb,
+            state: bookingRequest.state,
+            postcode: bookingRequest.postcode,
+            lessonMode: bookingRequest.lessonMode,
+            skillLevel: bookingRequest.skillLevel,
+            lessonDuration: bookingRequest.lessonDuration,
+            customDurationMinutes: bookingRequest.customDurationMinutes,
+            startAt,
+            endAt: getBookingEnd(startAt, bookingRequest.lessonDuration, bookingRequest.customDurationMinutes),
+            timezone: "Australia/Melbourne",
+            requestId: bookingRequest.id,
+            seriesId: series.id,
+            customerId,
+            modifiedById: admin.id
+          }))
+        });
+      } else {
+        await tx.booking.create({
+          data: {
+            name: bookingRequest.name,
+            email: bookingRequest.email,
+            phone: bookingRequest.phone,
+            address: bookingRequest.address,
+            unitNumber: bookingRequest.unitNumber,
+            houseNumber: bookingRequest.houseNumber,
+            streetName: bookingRequest.streetName,
+            streetType: bookingRequest.streetType,
+            suburb: bookingRequest.suburb,
+            state: bookingRequest.state,
+            postcode: bookingRequest.postcode,
+            lessonMode: bookingRequest.lessonMode,
+            skillLevel: bookingRequest.skillLevel,
+            lessonDuration: bookingRequest.lessonDuration,
+            customDurationMinutes: bookingRequest.customDurationMinutes,
+            startAt: bookingRequest.requestedStartAt,
+            endAt: getBookingEnd(
+              bookingRequest.requestedStartAt,
+              bookingRequest.lessonDuration,
+              bookingRequest.customDurationMinutes
+            ),
+            timezone: "Australia/Melbourne",
+            requestId: bookingRequest.id,
+            customerId,
+            modifiedById: admin.id
+          }
+        });
+      }
+
+      const updated = await tx.bookingRequest.update({
+        where: { id },
+        data: {
+          status: "approved",
+          approvedById: admin.id,
+          customerId
+        }
+      });
+
+      const credentialResult = await ensurePortalCredentialForCustomer({
+        customerId,
+        actorId: admin.id,
+        tx,
+        details: `Portal credential ensured during booking request approval (${id}).`
+      });
+
+      return {
+        updated,
+        generatedPassword: credentialResult.generatedPassword
+      };
     });
 
     await sendCustomerBookingStatusEmail({
-      email: updated.email,
-      name: updated.name,
-      status: updated.status,
-      when: updated.requestedStartAt
+      email: approvalResult.updated.email,
+      name: approvalResult.updated.name,
+      status: approvalResult.updated.status,
+      when: approvalResult.updated.requestedStartAt,
+      portalAccess: approvalResult.generatedPassword
+        ? {
+            loginUrl: getStudentPortalLoginUrl(),
+            generatedPassword: approvalResult.generatedPassword
+          }
+        : null
     });
 
     return NextResponse.json({ ok: true });

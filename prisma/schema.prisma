@@ -77,117 +77,129 @@ enum InvoiceAuditAction {
   voided
 }
 
+enum PortalCredentialAuditAction {
+  generated
+  rotated
+  revealed
+}
+
+enum LearningMaterialType {
+  audio
+  pdf
+}
+
 model ContactSubmission {
-  id         String   @id @default(cuid())
-  name       String
-  email      String
-  phone      String?
-  message    String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  message   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model BookingRequest {
-  id               String               @id @default(cuid())
-  status           BookingRequestStatus @default(pending)
-  name             String
-  email            String
-  phone            String
-  address          String
-  unitNumber       String?
-  houseNumber      String               @default("")
-  streetName       String               @default("")
-  streetType       String               @default("")
-  suburb           String               @default("")
-  state            String               @default("")
-  postcode         String               @default("")
-  lessonMode       LessonMode
-  skillLevel       SkillLevel
-  lessonDuration   LessonDuration
+  id                    String               @id @default(cuid())
+  status                BookingRequestStatus @default(pending)
+  name                  String
+  email                 String
+  phone                 String
+  address               String
+  unitNumber            String?
+  houseNumber           String               @default("")
+  streetName            String               @default("")
+  streetType            String               @default("")
+  suburb                String               @default("")
+  state                 String               @default("")
+  postcode              String               @default("")
+  lessonMode            LessonMode
+  skillLevel            SkillLevel
+  lessonDuration        LessonDuration
   customDurationMinutes Int?
-  requestedStartAt DateTime
-  notes            String?
-  isRecurring      Boolean              @default(false)
-  recurrenceEndAt  DateTime?
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
-  approvedById     String?
-  approvedBy       AdminUser?           @relation("RequestApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
-  customerId       String?
-  customer         Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  bookings         Booking[]
+  requestedStartAt      DateTime
+  notes                 String?
+  isRecurring           Boolean              @default(false)
+  recurrenceEndAt       DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  approvedById          String?
+  approvedBy            AdminUser?           @relation("RequestApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
+  customerId            String?
+  customer              Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  bookings              Booking[]
 
   @@index([requestedStartAt, status])
   @@index([customerId])
 }
 
 model BookingSeries {
-  id              String    @id @default(cuid())
-  name            String
-  email           String
-  phone           String
-  address         String
-  unitNumber      String?
-  houseNumber     String    @default("")
-  streetName      String    @default("")
-  streetType      String    @default("")
-  suburb          String    @default("")
-  state           String    @default("")
-  postcode        String    @default("")
-  lessonMode      LessonMode
-  skillLevel      SkillLevel
-  lessonDuration  LessonDuration
+  id                    String         @id @default(cuid())
+  name                  String
+  email                 String
+  phone                 String
+  address               String
+  unitNumber            String?
+  houseNumber           String         @default("")
+  streetName            String         @default("")
+  streetType            String         @default("")
+  suburb                String         @default("")
+  state                 String         @default("")
+  postcode              String         @default("")
+  lessonMode            LessonMode
+  skillLevel            SkillLevel
+  lessonDuration        LessonDuration
   customDurationMinutes Int?
-  dayOfWeek       Int
-  startTimeLocal  String
-  startDate       DateTime
-  recurrenceEndAt DateTime
-  timezone        String
-  isActive        Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  customerId      String?
-  customer        Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  bookings        Booking[]
+  dayOfWeek             Int
+  startTimeLocal        String
+  startDate             DateTime
+  recurrenceEndAt       DateTime
+  timezone              String
+  isActive              Boolean        @default(true)
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  customerId            String?
+  customer              Customer?      @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  bookings              Booking[]
 
   @@index([customerId])
 }
 
 model Booking {
-  id               String          @id @default(cuid())
-  status           BookingStatus   @default(approved)
-  name             String
-  email            String
-  phone            String
-  address          String
-  unitNumber       String?
-  houseNumber      String          @default("")
-  streetName       String          @default("")
-  streetType       String          @default("")
-  suburb           String          @default("")
-  state            String          @default("")
-  postcode         String          @default("")
-  lessonMode       LessonMode
-  skillLevel       SkillLevel
-  lessonDuration   LessonDuration
+  id                    String             @id @default(cuid())
+  status                BookingStatus      @default(approved)
+  name                  String
+  email                 String
+  phone                 String
+  address               String
+  unitNumber            String?
+  houseNumber           String             @default("")
+  streetName            String             @default("")
+  streetType            String             @default("")
+  suburb                String             @default("")
+  state                 String             @default("")
+  postcode              String             @default("")
+  lessonMode            LessonMode
+  skillLevel            SkillLevel
+  lessonDuration        LessonDuration
   customDurationMinutes Int?
-  startAt          DateTime
-  endAt            DateTime
-  timezone         String
-  notes            String?
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  cancelledAt      DateTime?
-  requestId        String?
-  request          BookingRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
-  seriesId         String?
-  series           BookingSeries?  @relation(fields: [seriesId], references: [id], onDelete: SetNull)
-  customerId       String?
-  customer         Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  modifiedById     String?
-  modifiedBy       AdminUser?      @relation("BookingEdits", fields: [modifiedById], references: [id], onDelete: SetNull)
-  auditLogs        BookingAuditLog[]
-  invoices         Invoice[]
+  startAt               DateTime
+  endAt                 DateTime
+  timezone              String
+  notes                 String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  cancelledAt           DateTime?
+  requestId             String?
+  request               BookingRequest?    @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  seriesId              String?
+  series                BookingSeries?     @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  customerId            String?
+  customer              Customer?          @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  modifiedById          String?
+  modifiedBy            AdminUser?         @relation("BookingEdits", fields: [modifiedById], references: [id], onDelete: SetNull)
+  auditLogs             BookingAuditLog[]
+  invoices              Invoice[]
+  learningMaterials     LearningMaterial[]
 
   @@index([startAt, status])
   @@index([customerId])
@@ -208,48 +220,108 @@ model BookingAuditLog {
 }
 
 model AdminUser {
-  id                     String           @id @default(cuid())
-  email                  String           @unique
-  displayName            String
-  passwordHash           String
-  isActive               Boolean          @default(true)
-  createdAt              DateTime         @default(now())
-  updatedAt              DateTime         @updatedAt
-  approvedRequests       BookingRequest[] @relation("RequestApprovals")
-  editedBookings         Booking[]        @relation("BookingEdits")
-  auditLogs              BookingAuditLog[]
-  createdInvoices        Invoice[]        @relation("InvoiceCreatedBy")
-  updatedInvoices        Invoice[]        @relation("InvoiceUpdatedBy")
-  invoiceAuditLogs       InvoiceAuditLog[] @relation("InvoiceAuditActors")
+  id                        String                             @id @default(cuid())
+  email                     String                             @unique
+  displayName               String
+  passwordHash              String
+  isActive                  Boolean                            @default(true)
+  createdAt                 DateTime                           @default(now())
+  updatedAt                 DateTime                           @updatedAt
+  approvedRequests          BookingRequest[]                   @relation("RequestApprovals")
+  editedBookings            Booking[]                          @relation("BookingEdits")
+  auditLogs                 BookingAuditLog[]
+  createdInvoices           Invoice[]                          @relation("InvoiceCreatedBy")
+  updatedInvoices           Invoice[]                          @relation("InvoiceUpdatedBy")
+  invoiceAuditLogs          InvoiceAuditLog[]                  @relation("InvoiceAuditActors")
+  portalCredentialAuditLogs CustomerPortalCredentialAuditLog[] @relation("PortalCredentialAuditActors")
+  uploadedLearningMaterials LearningMaterial[]                 @relation("LearningMaterialUploadedBy")
 }
 
 model Customer {
-  id              String         @id @default(cuid())
-  fullName        String
-  email           String
-  phone           String
-  normalizedEmail String
-  normalizedPhone String
-  skillLevel      SkillLevel     @default(beginner)
-  lessonMode      LessonMode     @default(in_person)
-  unitNumber      String?
-  houseNumber     String         @default("")
-  streetName      String         @default("")
-  streetType      String         @default("")
-  suburb          String         @default("")
-  state           String         @default("")
-  postcode        String         @default("")
-  isArchived      Boolean        @default(false)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  bookingRequests BookingRequest[]
-  bookingSeries   BookingSeries[]
-  bookings        Booking[]
-  invoices        Invoice[]
+  id                        String                             @id @default(cuid())
+  fullName                  String
+  normalizedFullName        String                             @default("")
+  nameSearchTokens          String?
+  email                     String
+  phone                     String
+  normalizedEmail           String
+  normalizedPhone           String
+  skillLevel                SkillLevel                         @default(beginner)
+  lessonMode                LessonMode                         @default(in_person)
+  unitNumber                String?
+  houseNumber               String                             @default("")
+  streetName                String                             @default("")
+  streetType                String                             @default("")
+  suburb                    String                             @default("")
+  state                     String                             @default("")
+  postcode                  String                             @default("")
+  isArchived                Boolean                            @default(false)
+  createdAt                 DateTime                           @default(now())
+  updatedAt                 DateTime                           @updatedAt
+  bookingRequests           BookingRequest[]
+  bookingSeries             BookingSeries[]
+  bookings                  Booking[]
+  invoices                  Invoice[]
+  portalCredential          CustomerPortalCredential?
+  portalCredentialAuditLogs CustomerPortalCredentialAuditLog[]
+  learningMaterials         LearningMaterial[]
 
   @@index([isArchived, fullName])
+  @@index([normalizedFullName, postcode, isArchived])
   @@index([normalizedEmail])
   @@index([normalizedPhone])
+}
+
+model CustomerPortalCredential {
+  id                String                             @id @default(cuid())
+  customerId        String                             @unique
+  customer          Customer                           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  passwordHash      String
+  passwordEncrypted String
+  generatedAt       DateTime                           @default(now())
+  rotatedAt         DateTime?
+  isActive          Boolean                            @default(true)
+  createdAt         DateTime                           @default(now())
+  updatedAt         DateTime                           @updatedAt
+  auditLogs         CustomerPortalCredentialAuditLog[]
+
+  @@index([isActive, generatedAt])
+}
+
+model CustomerPortalCredentialAuditLog {
+  id           String                      @id @default(cuid())
+  customerId   String
+  customer     Customer                    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  credentialId String?
+  credential   CustomerPortalCredential?   @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+  action       PortalCredentialAuditAction
+  actorId      String?
+  actor        AdminUser?                  @relation("PortalCredentialAuditActors", fields: [actorId], references: [id], onDelete: SetNull)
+  details      String?
+  createdAt    DateTime                    @default(now())
+
+  @@index([customerId, createdAt])
+  @@index([actorId, createdAt])
+}
+
+model LearningMaterial {
+  id           String               @id @default(cuid())
+  customerId   String
+  customer     Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  bookingId    String
+  booking      Booking              @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  uploadedById String?
+  uploadedBy   AdminUser?           @relation("LearningMaterialUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+  title        String
+  materialType LearningMaterialType
+  storageKey   String               @unique
+  mimeType     String
+  sizeBytes    Int
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@index([customerId, bookingId, createdAt])
+  @@index([bookingId, createdAt])
 }
 
 model OutboundEmail {
@@ -263,49 +335,49 @@ model OutboundEmail {
 }
 
 model Invoice {
-  id                   String         @id @default(cuid())
-  invoiceNumber        String         @unique
-  status               InvoiceStatus  @default(draft)
-  documentType         InvoiceDocumentType @default(invoice)
-  taxMode              InvoiceTaxMode @default(taxable)
-  currency             String         @default("AUD")
-  customerId           String?
-  customer             Customer?      @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  bookingId            String?
-  booking              Booking?       @relation(fields: [bookingId], references: [id], onDelete: SetNull)
-  originalInvoiceId    String?
-  originalInvoice      Invoice?       @relation("InvoiceCreditNotes", fields: [originalInvoiceId], references: [id], onDelete: SetNull)
-  creditNotes          Invoice[]      @relation("InvoiceCreditNotes")
-  customerName         String
-  customerEmail        String
-  customerPhone        String
-  customerAddress      String
-  sellerBusinessName   String
-  sellerAbn            String
-  sellerEmail          String?
-  bankName             String
-  bankBsb              String
-  bankAccountName      String
-  bankAccountNumber    String
-  subtotalCents        Int
-  gstCents             Int
-  totalCents           Int
-  notes                String?
-  issuedAt             DateTime
-  dueAt                DateTime
-  sentAt               DateTime?
-  paidAt               DateTime?
-  lastReminderSentAt   DateTime?
-  lastReminderStage    Int?
-  isDeleted            Boolean        @default(false)
-  createdById          String?
-  createdBy            AdminUser?     @relation("InvoiceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedById          String?
-  updatedBy            AdminUser?     @relation("InvoiceUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
-  lineItems            InvoiceLineItem[]
-  auditLogs            InvoiceAuditLog[]
+  id                 String              @id @default(cuid())
+  invoiceNumber      String              @unique
+  status             InvoiceStatus       @default(draft)
+  documentType       InvoiceDocumentType @default(invoice)
+  taxMode            InvoiceTaxMode      @default(taxable)
+  currency           String              @default("AUD")
+  customerId         String?
+  customer           Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  bookingId          String?
+  booking            Booking?            @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  originalInvoiceId  String?
+  originalInvoice    Invoice?            @relation("InvoiceCreditNotes", fields: [originalInvoiceId], references: [id], onDelete: SetNull)
+  creditNotes        Invoice[]           @relation("InvoiceCreditNotes")
+  customerName       String
+  customerEmail      String
+  customerPhone      String
+  customerAddress    String
+  sellerBusinessName String
+  sellerAbn          String
+  sellerEmail        String?
+  bankName           String
+  bankBsb            String
+  bankAccountName    String
+  bankAccountNumber  String
+  subtotalCents      Int
+  gstCents           Int
+  totalCents         Int
+  notes              String?
+  issuedAt           DateTime
+  dueAt              DateTime
+  sentAt             DateTime?
+  paidAt             DateTime?
+  lastReminderSentAt DateTime?
+  lastReminderStage  Int?
+  isDeleted          Boolean             @default(false)
+  createdById        String?
+  createdBy          AdminUser?          @relation("InvoiceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById        String?
+  updatedBy          AdminUser?          @relation("InvoiceUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  lineItems          InvoiceLineItem[]
+  auditLogs          InvoiceAuditLog[]
 
   @@index([status, isDeleted, dueAt])
   @@index([documentType, createdAt])

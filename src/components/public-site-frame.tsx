@@ -14,7 +14,8 @@ const PUBLIC_FOOTER_COPY: Record<string, string> = {
   "/vouchers": "Digital delivery with simple booking follow-up.",
   "/contact": "Fast response by phone, text, or email.",
   "/book": "Pending requests are reviewed quickly.",
-  "/terms": "Policy clarity keeps lessons predictable for everyone."
+  "/terms": "Policy clarity keeps lessons predictable for everyone.",
+  "/student/login": "Use your approval email credentials to access your portal."
 };
 
 function isPublicRoute(pathname: string): boolean {

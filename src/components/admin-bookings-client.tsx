@@ -21,6 +21,7 @@ const MANUAL_STEP_LABEL: Record<ManualStep, string> = {
 
 const PHONE_PATTERN = /^\d{10}$/;
 const POSTCODE_PATTERN = /^\d{4}$/;
+const LEARNING_MATERIAL_ACCEPT = ".pdf,.mp3,.m4a,.wav,.ogg,.webm,.aac,.flac,application/pdf,audio/*";
 
 type BookingRow = {
   id: string;
@@ -82,6 +83,43 @@ type CustomerRow = {
   state: string;
   postcode: string;
   isArchived: boolean;
+  portalCredential?: {
+    id: string;
+    generatedAt: string;
+    rotatedAt: string | null;
+    isActive: boolean;
+  } | null;
+};
+
+type CustomerPortalCredentialResponse = {
+  password: string;
+  credential: {
+    id: string;
+    generatedAt: string;
+    rotatedAt: string | null;
+    isActive: boolean;
+  };
+  created?: boolean;
+};
+
+type LearningMaterialBooking = {
+  id: string;
+  startAt: string;
+  endAt: string;
+  status: "approved" | "cancelled";
+  lessonMode: "in_person" | "video";
+  lessonDuration: "min30" | "min60";
+  customDurationMinutes: number | null;
+};
+
+type LearningMaterialRow = {
+  id: string;
+  title: string;
+  bookingId: string;
+  materialType: "audio" | "pdf";
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
 };
 
 type CustomerForm = {
@@ -235,6 +273,25 @@ function toDigits(value: string, max: number): string {
   return value.replace(/\D/g, "").slice(0, max);
 }
 
+function formatDateTime(value: string): string {
+  const date = new Date(value);
+  return new Intl.DateTimeFormat("en-AU", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Australia/Melbourne"
+  }).format(date);
+}
+
+function formatBytes(sizeBytes: number): string {
+  if (sizeBytes < 1024) {
+    return `${sizeBytes} B`;
+  }
+  if (sizeBytes < 1024 * 1024) {
+    return `${(sizeBytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function validateDialogForm(form: DialogForm): string | null {
   const email = form.email.trim();
   const name = form.name.trim();
@@ -319,23 +376,35 @@ export function AdminBookingsClient() {
   const [customerEditorMode, setCustomerEditorMode] = useState<"create" | "edit" | null>(null);
   const [customerEditorId, setCustomerEditorId] = useState<string | null>(null);
   const [customerForm, setCustomerForm] = useState<CustomerForm>(emptyCustomerForm());
+  const [revealedPortalPasswords, setRevealedPortalPasswords] = useState<Record<string, string>>({});
+  const [portalCredentialBusyCustomerId, setPortalCredentialBusyCustomerId] = useState<string | null>(null);
   const [emailSubject, setEmailSubject] = useState("");
   const [emailMessage, setEmailMessage] = useState("");
   const [invoiceForm, setInvoiceForm] = useState<BookingInvoiceForm>(defaultBookingInvoiceForm());
+  const [materialsCustomerId, setMaterialsCustomerId] = useState("");
+  const [materialsBookingId, setMaterialsBookingId] = useState("");
+  const [materialsBookings, setMaterialsBookings] = useState<LearningMaterialBooking[]>([]);
+  const [materialsList, setMaterialsList] = useState<LearningMaterialRow[]>([]);
+  const [materialsLoading, setMaterialsLoading] = useState(false);
+  const [materialsUploading, setMaterialsUploading] = useState(false);
+  const [materialsDeletingId, setMaterialsDeletingId] = useState<string | null>(null);
   const dialogPresence = usePresenceExit();
   const manualDialogPresence = usePresenceExit();
   const customersDialogPresence = usePresenceExit();
   const customerEditorPresence = usePresenceExit();
+  const materialsDialogPresence = usePresenceExit();
   const emailDialogPresence = usePresenceExit();
   const invoiceDialogPresence = usePresenceExit();
   const dialogRootRef = useRef<HTMLDivElement | null>(null);
   const manualDialogRootRef = useRef<HTMLDivElement | null>(null);
   const customersDialogRootRef = useRef<HTMLDivElement | null>(null);
   const customerEditorRootRef = useRef<HTMLDivElement | null>(null);
+  const materialsDialogRootRef = useRef<HTMLDivElement | null>(null);
   const emailDialogRootRef = useRef<HTMLDivElement | null>(null);
   const invoiceDialogRootRef = useRef<HTMLDivElement | null>(null);
   const calendarRootRef = useRef<HTMLDivElement | null>(null);
   const manualFormRef = useRef<HTMLFormElement | null>(null);
+  const materialsUploadFormRef = useRef<HTMLFormElement | null>(null);
 
   const rangeLabel = useMemo(() => `${view.toUpperCase()} VIEW`, [view]);
 
@@ -430,6 +499,13 @@ export function AdminBookingsClient() {
   }, [customerEditorPresence.isMounted]);
 
   useEffect(() => {
+    if (!materialsDialogPresence.isMounted || !materialsDialogRootRef.current) {
+      return;
+    }
+    void animateIn(materialsDialogRootRef.current, { scope: "admin" });
+  }, [materialsDialogPresence.isMounted]);
+
+  useEffect(() => {
     if (loading || !calendarRootRef.current) {
       return;
     }
@@ -437,11 +513,11 @@ export function AdminBookingsClient() {
   }, [events, loading, view, date]);
 
   useEffect(() => {
-    if (!manualDialogPresence.isMounted && !customersDialogPresence.isMounted) {
+    if (!manualDialogPresence.isMounted && !customersDialogPresence.isMounted && !materialsDialogPresence.isMounted) {
       return;
     }
     void loadCustomers();
-  }, [customersDialogPresence.isMounted, loadCustomers, manualDialogPresence.isMounted]);
+  }, [customersDialogPresence.isMounted, loadCustomers, manualDialogPresence.isMounted, materialsDialogPresence.isMounted]);
 
   function openDialog(event: EventWithRow) {
     setNotice("");
@@ -751,6 +827,186 @@ export function AdminBookingsClient() {
       },
       { immediate: true }
     );
+  }
+
+  /**
+   * Calls admin portal-credential mutations and syncs revealed password state.
+   */
+  async function mutatePortalCredential(customerId: string, action: "reveal" | "regenerate") {
+    setPortalCredentialBusyCustomerId(customerId);
+    setError("");
+    const response = await fetch(`/api/admin/customers/${customerId}/portal-credential`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action })
+    });
+    setPortalCredentialBusyCustomerId(null);
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      setError(payload?.error || "Unable to manage portal credential.");
+      return;
+    }
+
+    const payload = (await response.json()) as CustomerPortalCredentialResponse;
+    setRevealedPortalPasswords((prev) => ({
+      ...prev,
+      [customerId]: payload.password
+    }));
+    await loadCustomers(customerQuery);
+    setNotice(action === "reveal" ? "Portal password revealed." : "Portal password regenerated.");
+  }
+
+  /**
+   * Reveals a customer portal password in the customer directory view.
+   */
+  async function revealPortalPassword(customerId: string) {
+    await mutatePortalCredential(customerId, "reveal");
+  }
+
+  /**
+   * Rotates a customer portal password after explicit admin confirmation.
+   */
+  async function regeneratePortalPassword(customerId: string) {
+    const confirmed = window.confirm(
+      "Regenerate this customer portal password? The current password will stop working immediately."
+    );
+    if (!confirmed) {
+      return;
+    }
+    await mutatePortalCredential(customerId, "regenerate");
+  }
+
+  /**
+   * Loads appointments and materials for the selected customer and booking scope.
+   */
+  async function loadLearningMaterials(customerId: string, bookingId?: string) {
+    setMaterialsLoading(true);
+    setError("");
+
+    const params = new URLSearchParams();
+    if (bookingId) {
+      params.set("bookingId", bookingId);
+    }
+    const query = params.toString();
+    const response = await fetch(
+      `/api/admin/customers/${customerId}/learning-materials${query ? `?${query}` : ""}`,
+      {
+        cache: "no-store"
+      }
+    );
+    setMaterialsLoading(false);
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      setError(payload?.error || "Unable to load learning materials.");
+      return;
+    }
+
+    const payload = (await response.json()) as {
+      bookings: LearningMaterialBooking[];
+      materials: LearningMaterialRow[];
+    };
+    setMaterialsBookings(payload.bookings || []);
+    setMaterialsList(payload.materials || []);
+  }
+
+  /**
+   * Opens the learning-materials management modal with clean selection state.
+   */
+  function openLearningMaterialsDialog() {
+    setError("");
+    setNotice("");
+    setMaterialsCustomerId("");
+    setMaterialsBookingId("");
+    setMaterialsBookings([]);
+    setMaterialsList([]);
+    materialsDialogPresence.show();
+  }
+
+  /**
+   * Closes and resets the learning-materials management modal.
+   */
+  async function closeLearningMaterialsDialog() {
+    if (materialsDialogRootRef.current) {
+      await animateOut(materialsDialogRootRef.current, { scope: "admin" });
+    }
+    materialsDialogPresence.hide(
+      () => {
+        setMaterialsCustomerId("");
+        setMaterialsBookingId("");
+        setMaterialsBookings([]);
+        setMaterialsList([]);
+        setMaterialsUploading(false);
+        setMaterialsDeletingId(null);
+        materialsUploadFormRef.current?.reset();
+      },
+      { immediate: true }
+    );
+  }
+
+  /**
+   * Uploads one audio/PDF material for the selected customer appointment.
+   */
+  async function uploadLearningMaterial() {
+    const formElement = materialsUploadFormRef.current;
+    if (!formElement) {
+      return;
+    }
+    if (!materialsCustomerId || !materialsBookingId) {
+      setError("Select a customer and an appointment before uploading.");
+      return;
+    }
+
+    const form = new FormData(formElement);
+    const file = form.get("file");
+    if (!(file instanceof File)) {
+      setError("Choose a PDF or audio file to upload.");
+      return;
+    }
+    form.set("bookingId", materialsBookingId);
+
+    setMaterialsUploading(true);
+    setError("");
+    const response = await fetch(`/api/admin/customers/${materialsCustomerId}/learning-materials`, {
+      method: "POST",
+      body: form
+    });
+    setMaterialsUploading(false);
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      setError(payload?.error || "Upload failed.");
+      return;
+    }
+
+    materialsUploadFormRef.current?.reset();
+    setNotice("Learning material uploaded.");
+    await loadLearningMaterials(materialsCustomerId, materialsBookingId);
+  }
+
+  /**
+   * Deletes one material row and refreshes the current selection listing.
+   */
+  async function deleteLearningMaterial(material: LearningMaterialRow) {
+    const confirmed = window.confirm(`Delete "${material.title}"?`);
+    if (!confirmed) {
+      return;
+    }
+
+    setMaterialsDeletingId(material.id);
+    setError("");
+    const response = await fetch(`/api/admin/learning-materials/${material.id}`, {
+      method: "DELETE"
+    });
+    setMaterialsDeletingId(null);
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      setError(payload?.error || "Unable to delete learning material.");
+      return;
+    }
+
+    setNotice("Learning material deleted.");
+    if (materialsCustomerId) {
+      await loadLearningMaterials(materialsCustomerId, materialsBookingId || undefined);
+    }
   }
 
   async function mutateBooking(action: "edit" | "move" | "cancel", body: Record<string, unknown>) {
@@ -1140,6 +1396,9 @@ export function AdminBookingsClient() {
       ? ((selectedEvent.row as BookingRow).seriesId ?? null)
       : null;
   const selectedManualCustomer = manualCustomerId ? customers.find((customer) => customer.id === manualCustomerId) ?? null : null;
+  const selectedMaterialsCustomer = materialsCustomerId
+    ? customers.find((customer) => customer.id === materialsCustomerId) ?? null
+    : null;
   const manualStepIndex = MANUAL_STEP_ORDER.indexOf(manualStep);
 
   return (
@@ -1189,6 +1448,14 @@ export function AdminBookingsClient() {
           </button>
           <button className="btn btn-secondary" type="button" data-motion-item="legend-action-customers" onClick={openCustomersDialog}>
             Customers
+          </button>
+          <button
+            className="btn btn-secondary"
+            type="button"
+            data-motion-item="legend-action-learning-materials"
+            onClick={openLearningMaterialsDialog}
+          >
+            Customer Learning Materials
           </button>
           <button className="btn btn-secondary" type="button" data-motion-item="legend-action-invoices" onClick={() => router.push("/admin/invoices")}>
             Invoices
@@ -1589,6 +1856,171 @@ export function AdminBookingsClient() {
         </div>
       ) : null}
 
+      {materialsDialogPresence.isMounted ? (
+        <div
+          className="dialog-backdrop"
+          ref={materialsDialogRootRef}
+          data-motion-root="admin"
+          data-motion-item="materials-dialog-backdrop"
+          onClick={() => void closeLearningMaterialsDialog()}
+        >
+          <div
+            className="dialog-panel dialog-panel-wide"
+            data-motion-item="materials-dialog-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="materials-dialog-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="dialog-head">
+              <h3 id="materials-dialog-title">Customer Learning Materials</h3>
+              <button className="btn btn-secondary" type="button" onClick={() => void closeLearningMaterialsDialog()}>
+                Close
+              </button>
+            </div>
+            <p className="helper-text dialog-status">
+              Select a customer and one of their appointments before uploading lesson materials.
+            </p>
+
+            <div className="customers-toolbar">
+              <div className="field">
+                <label>Search customer</label>
+                <input
+                  value={customerQuery}
+                  placeholder="Filter by name, email, or phone"
+                  onChange={(event) => setCustomerQuery(event.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label>Select customer</label>
+                <select
+                  value={materialsCustomerId}
+                  onChange={(event) => {
+                    const nextCustomerId = event.target.value;
+                    setMaterialsCustomerId(nextCustomerId);
+                    setMaterialsBookingId("");
+                    setMaterialsBookings([]);
+                    setMaterialsList([]);
+                    if (nextCustomerId) {
+                      void loadLearningMaterials(nextCustomerId);
+                    }
+                  }}
+                >
+                  <option value="">{loadingCustomers ? "Loading customers..." : "Choose customer"}</option>
+                  {visibleCustomers.map((customer) => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.fullName} · {customer.phone}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {selectedMaterialsCustomer ? (
+              <p className="helper-text">
+                Selected: <strong>{selectedMaterialsCustomer.fullName}</strong> · {selectedMaterialsCustomer.email}
+              </p>
+            ) : null}
+
+            <div className="field">
+              <label>Select appointment</label>
+              <select
+                disabled={!materialsCustomerId || materialsLoading}
+                value={materialsBookingId}
+                onChange={(event) => {
+                  const nextBookingId = event.target.value;
+                  setMaterialsBookingId(nextBookingId);
+                  if (materialsCustomerId) {
+                    void loadLearningMaterials(materialsCustomerId, nextBookingId || undefined);
+                  }
+                }}
+              >
+                <option value="">
+                  {materialsCustomerId
+                    ? materialsBookings.length
+                      ? "Choose appointment"
+                      : "No appointments found for customer"
+                    : "Select customer first"}
+                </option>
+                {materialsBookings.map((booking) => (
+                  <option key={booking.id} value={booking.id}>
+                    {formatDateTime(booking.startAt)} · {booking.status}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <form
+              ref={materialsUploadFormRef}
+              className="material-upload-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void uploadLearningMaterial();
+              }}
+            >
+              <div className="manual-grid manual-grid-3">
+                <div className="field">
+                  <label>Material title</label>
+                  <input name="title" placeholder="e.g. Pentatonic exercise week 1" />
+                </div>
+                <div className="field manual-span-2">
+                  <label>File</label>
+                  <input name="file" type="file" required accept={LEARNING_MATERIAL_ACCEPT} />
+                </div>
+              </div>
+              <div className="dialog-actions">
+                <button className="btn btn-primary" type="submit" disabled={!materialsBookingId || materialsUploading}>
+                  {materialsUploading ? "Uploading..." : "Upload material"}
+                </button>
+              </div>
+            </form>
+
+            <div className="materials-list">
+              {materialsLoading ? (
+                <p className="helper-text">Loading materials...</p>
+              ) : materialsList.length ? (
+                materialsList.map((material) => {
+                  const booking = materialsBookings.find((row) => row.id === material.bookingId);
+                  return (
+                    <div key={material.id} className="customer-item">
+                      <div className="customer-item-meta">
+                        <strong>{material.title}</strong>
+                        <span>
+                          <small>Type</small> {material.materialType.toUpperCase()}
+                        </span>
+                        <span>
+                          <small>Size</small> {formatBytes(material.sizeBytes)}
+                        </span>
+                        <span>
+                          <small>Uploaded</small> {formatDateTime(material.createdAt)}
+                        </span>
+                        {booking ? (
+                          <span>
+                            <small>Appointment</small> {formatDateTime(booking.startAt)}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="customer-item-actions">
+                        <button
+                          className="btn btn-danger"
+                          type="button"
+                          disabled={materialsDeletingId === material.id}
+                          onClick={() => void deleteLearningMaterial(material)}
+                        >
+                          {materialsDeletingId === material.id ? "Deleting..." : "Delete"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="helper-text">No materials uploaded for the current selection.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {customersDialogPresence.isMounted ? (
         <div
           className="dialog-backdrop"
@@ -1646,10 +2078,40 @@ export function AdminBookingsClient() {
                       <span>
                         <small>Skill</small> {customer.skillLevel}
                       </span>
+                      <span>
+                        <small>Portal generated</small>{" "}
+                        {customer.portalCredential ? formatDateTime(customer.portalCredential.generatedAt) : "Not generated"}
+                      </span>
+                      {customer.portalCredential?.rotatedAt ? (
+                        <span>
+                          <small>Portal rotated</small> {formatDateTime(customer.portalCredential.rotatedAt)}
+                        </span>
+                      ) : null}
+                      {revealedPortalPasswords[customer.id] ? (
+                        <span>
+                          <small>Portal password</small> <code>{revealedPortalPasswords[customer.id]}</code>
+                        </span>
+                      ) : null}
                     </div>
                     <div className="customer-item-actions">
                       <button className="btn btn-secondary" type="button" onClick={() => openCustomerInvoices(customer.id)}>
                         Invoices
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        type="button"
+                        disabled={portalCredentialBusyCustomerId === customer.id}
+                        onClick={() => void revealPortalPassword(customer.id)}
+                      >
+                        {portalCredentialBusyCustomerId === customer.id ? "Loading..." : "Reveal Portal Password"}
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        type="button"
+                        disabled={portalCredentialBusyCustomerId === customer.id}
+                        onClick={() => void regeneratePortalPassword(customer.id)}
+                      >
+                        {portalCredentialBusyCustomerId === customer.id ? "Regenerating..." : "Regenerate Password"}
                       </button>
                       <button className="btn btn-secondary" type="button" onClick={() => openCustomerEditor("edit", customer)}>
                         Edit

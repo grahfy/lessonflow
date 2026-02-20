@@ -1,0 +1,114 @@
+import { NextRequest, NextResponse } from "next/server";
+
+import { prisma } from "@/lib/db";
+import { requireStudentFromRequest } from "@/lib/student-portal/session";
+
+/**
+ * Returns the authenticated student's appointment history and linked learning materials.
+ */
+export async function GET(request: NextRequest) {
+  const student = await requireStudentFromRequest(request);
+  if (!student) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const now = new Date();
+  const [bookings, pendingRequests] = await Promise.all([
+    prisma.booking.findMany({
+      where: {
+        customerId: student.id
+      },
+      include: {
+        learningMaterials: {
+          where: {
+            customerId: student.id
+          },
+          orderBy: {
+            createdAt: "desc"
+          }
+        }
+      },
+      orderBy: {
+        startAt: "asc"
+      }
+    }),
+    prisma.bookingRequest.findMany({
+      where: {
+        customerId: student.id,
+        status: "pending",
+        requestedStartAt: {
+          gte: now
+        }
+      },
+      orderBy: {
+        requestedStartAt: "asc"
+      }
+    })
+  ]);
+
+  const upcoming = bookings
+    .filter((booking) => booking.startAt >= now && booking.status !== "cancelled")
+    .map((booking) => ({
+      id: booking.id,
+      status: booking.status,
+      lessonMode: booking.lessonMode,
+      skillLevel: booking.skillLevel,
+      lessonDuration: booking.lessonDuration,
+      customDurationMinutes: booking.customDurationMinutes,
+      startAt: booking.startAt.toISOString(),
+      endAt: booking.endAt.toISOString(),
+      notes: booking.notes,
+      materials: booking.learningMaterials.map((material) => ({
+        id: material.id,
+        title: material.title,
+        materialType: material.materialType,
+        mimeType: material.mimeType,
+        sizeBytes: material.sizeBytes,
+        createdAt: material.createdAt.toISOString(),
+        downloadUrl: `/api/student/learning-materials/${material.id}/download`
+      }))
+    }));
+
+  const previous = bookings
+    .filter((booking) => booking.startAt < now || booking.status === "cancelled")
+    .sort((a, b) => b.startAt.getTime() - a.startAt.getTime())
+    .map((booking) => ({
+      id: booking.id,
+      status: booking.status,
+      lessonMode: booking.lessonMode,
+      skillLevel: booking.skillLevel,
+      lessonDuration: booking.lessonDuration,
+      customDurationMinutes: booking.customDurationMinutes,
+      startAt: booking.startAt.toISOString(),
+      endAt: booking.endAt.toISOString(),
+      notes: booking.notes,
+      materials: booking.learningMaterials.map((material) => ({
+        id: material.id,
+        title: material.title,
+        materialType: material.materialType,
+        mimeType: material.mimeType,
+        sizeBytes: material.sizeBytes,
+        createdAt: material.createdAt.toISOString(),
+        downloadUrl: `/api/student/learning-materials/${material.id}/download`
+      }))
+    }));
+
+  return NextResponse.json({
+    student: {
+      id: student.id,
+      fullName: student.fullName,
+      postcode: student.postcode
+    },
+    now: now.toISOString(),
+    upcoming,
+    previous,
+    pendingRequests: pendingRequests.map((requestRow) => ({
+      id: requestRow.id,
+      requestedStartAt: requestRow.requestedStartAt.toISOString(),
+      lessonMode: requestRow.lessonMode,
+      lessonDuration: requestRow.lessonDuration,
+      customDurationMinutes: requestRow.customDurationMinutes,
+      status: requestRow.status
+    }))
+  });
+}

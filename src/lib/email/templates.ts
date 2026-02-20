@@ -96,15 +96,32 @@ export function customerBookingStatusTemplate(input: {
   name: string;
   status: BookingRequestStatus;
   when: Date;
+  portalAccess?: {
+    loginUrl: string;
+    generatedPassword: string;
+  } | null;
 }) {
   const statusText = input.status === "approved" ? "approved" : "cancelled";
+  const includePortal = input.status === "approved" && !!input.portalAccess;
+  const portalSection = includePortal
+    ? `
+      <h3>Student portal access</h3>
+      <p>You can now access your student portal for upcoming lessons and assigned materials.</p>
+      <p><strong>Login URL:</strong> <a href="${escapeHtml(input.portalAccess?.loginUrl || "")}">${escapeHtml(
+        input.portalAccess?.loginUrl || ""
+      )}</a></p>
+      <p><strong>Login method:</strong> Full name + postcode + password</p>
+      <p><strong>Temporary password:</strong> ${escapeHtml(input.portalAccess?.generatedPassword || "")}</p>
+    `
+    : "";
   return {
     subject: `Your booking has been ${statusText}`,
     html: `
       <h2>Booking update</h2>
-      <p>Hi ${input.name},</p>
+      <p>Hi ${escapeHtml(input.name)},</p>
       <p>Your booking has been <strong>${statusText}</strong>.</p>
       <p><strong>Lesson time:</strong> ${fmt(input.when)}</p>
+      ${portalSection}
     `
   };
 }

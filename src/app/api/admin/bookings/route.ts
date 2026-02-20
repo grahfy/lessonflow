@@ -7,6 +7,7 @@ import { customerSnapshotFromInput, normalizeEmail, normalizePhone } from "@/lib
 import { getCalendarRange } from "@/lib/calendar-range";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { prisma } from "@/lib/db";
+import { ensurePortalCredentialForCustomer } from "@/lib/student-portal/credentials";
 
 const manualBookingSchema = bookingRequestSchema.and(
   z.object({
@@ -222,6 +223,16 @@ export async function POST(request: NextRequest) {
       customerId = created.id;
     }
   }
+
+  if (!customerId) {
+    return NextResponse.json({ error: "Unable to resolve customer for manual booking." }, { status: 500 });
+  }
+
+  await ensurePortalCredentialForCustomer({
+    customerId,
+    actorId: admin.id,
+    details: "Portal credential ensured during manual booking create."
+  });
 
   const startAt = new Date(parsed.data.requestedStartAt);
   if (parsed.data.isRecurring && parsed.data.recurrenceEndAt) {

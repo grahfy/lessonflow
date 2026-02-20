@@ -5,6 +5,7 @@ import { auPhoneSchema, auPostcodeSchema, auStateSchema, lessonModeSchema, skill
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { normalizeEmail, normalizePhone } from "@/lib/customer-match";
 import { prisma } from "@/lib/db";
+import { buildNameSearchTokens, normalizeFullNameForLookup } from "@/lib/student-portal/credentials";
 
 type Params = {
   params: Promise<{
@@ -28,6 +29,26 @@ const updateCustomerSchema = z.object({
   isArchived: z.boolean().optional()
 });
 
+/**
+ * Returns one customer record for admin detail flows.
+ */
+export async function GET(request: NextRequest, { params }: Params) {
+  const admin = await requireAdminFromRequest(request);
+  if (!admin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  const customer = await prisma.customer.findUnique({
+    where: { id }
+  });
+  if (!customer || customer.isArchived) {
+    return NextResponse.json({ error: "Customer not found." }, { status: 404 });
+  }
+
+  return NextResponse.json({ customer });
+}
+
 export async function PATCH(request: NextRequest, { params }: Params) {
   const admin = await requireAdminFromRequest(request);
   if (!admin) {
@@ -50,8 +71,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   const nextEmail = parsed.data.email ?? existing.email;
   const nextPhone = parsed.data.phone ?? existing.phone;
+  const nextFullName = parsed.data.fullName ?? existing.fullName;
   const normalizedEmail = normalizeEmail(nextEmail);
   const normalizedPhone = normalizePhone(nextPhone);
+  const normalizedFullName = normalizeFullNameForLookup(nextFullName);
+  const nameSearchTokens = buildNameSearchTokens(nextFullName);
 
   const duplicate = await prisma.customer.findFirst({
     where: {
@@ -75,7 +99,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const updated = await prisma.customer.update({
     where: { id },
     data: {
-      fullName: parsed.data.fullName ?? existing.fullName,
+      fullName: nextFullName,
+      normalizedFullName,
+      nameSearchTokens,
       email: nextEmail,
       phone: nextPhone,
       normalizedEmail,

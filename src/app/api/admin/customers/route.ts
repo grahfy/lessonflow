@@ -5,6 +5,7 @@ import { lessonModeSchema, skillLevelSchema, auPostcodeSchema, auPhoneSchema, au
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { customerSnapshotFromInput, normalizeEmail, normalizePhone } from "@/lib/customer-match";
 import { prisma } from "@/lib/db";
+import { ensurePortalCredentialForCustomer } from "@/lib/student-portal/credentials";
 
 const createCustomerSchema = z.object({
   fullName: z.string().trim().min(2).max(120),
@@ -45,7 +46,17 @@ export async function GET(request: NextRequest) {
         : {})
     },
     orderBy: [{ fullName: "asc" }, { createdAt: "desc" }],
-    take: limit
+    take: limit,
+    include: {
+      portalCredential: {
+        select: {
+          id: true,
+          generatedAt: true,
+          rotatedAt: true,
+          isActive: true
+        }
+      }
+    }
   });
 
   return NextResponse.json({ customers });
@@ -100,6 +111,11 @@ export async function POST(request: NextRequest) {
       state: parsed.data.state ?? "VIC",
       postcode: parsed.data.postcode ?? ""
     })
+  });
+  await ensurePortalCredentialForCustomer({
+    customerId: created.id,
+    actorId: admin.id,
+    details: "Portal credential generated during admin customer create."
   });
 
   return NextResponse.json({ customer: created }, { status: 201 });

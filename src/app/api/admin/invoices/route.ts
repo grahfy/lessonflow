@@ -132,9 +132,18 @@ export async function POST(request: NextRequest) {
   }
 
   if (parsed.data.bookingId) {
-    const booking = await prisma.booking.findUnique({ where: { id: parsed.data.bookingId } });
+    const booking = await prisma.booking.findUnique({
+      where: { id: parsed.data.bookingId },
+      select: {
+        id: true,
+        customerId: true
+      }
+    });
     if (!booking) {
       return NextResponse.json({ error: "Selected booking does not exist." }, { status: 400 });
+    }
+    if (parsed.data.customerId && booking.customerId && booking.customerId !== parsed.data.customerId) {
+      return NextResponse.json({ error: "Selected booking does not belong to selected customer." }, { status: 400 });
     }
   }
 

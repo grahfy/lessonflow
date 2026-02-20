@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  customerBookingStatusTemplate,
   customerBookingMovedTemplate,
   customerBookingReminderTemplate,
   customerInvoiceReminderTemplate,
@@ -50,6 +51,22 @@ describe("email-templates", () => {
 
     expect(reminder.subject).toContain("reminder");
     expect(moved.subject).toContain("updated");
+  });
+
+  it("includes portal access details for first-time approved bookings", () => {
+    const template = customerBookingStatusTemplate({
+      name: "Alex",
+      status: "approved",
+      when: new Date("2026-07-03T10:00:00.000Z"),
+      portalAccess: {
+        loginUrl: "https://example.com/student/login",
+        generatedPassword: "TempPass123!"
+      }
+    });
+
+    expect(template.html).toContain("student/login");
+    expect(template.html).toContain("TempPass123!");
+    expect(template.html).toContain("Student portal access");
   });
 
   it("escapes custom template content", () => {

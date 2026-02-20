@@ -67,6 +67,12 @@ describe("admin-customers", () => {
     expect(updated.fullName).toBe("Alex Student Updated");
     expect(updated.phone).toBe("0400999888");
     expect(updated.skillLevel).toBe("advanced");
+    const credential = await prisma.customerPortalCredential.findUnique({
+      where: {
+        customerId: createBody.customer.id
+      }
+    });
+    expect(credential).not.toBeNull();
   });
 
   it("archives customer deletes when linked booking records exist", async () => {

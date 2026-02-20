@@ -13,11 +13,16 @@ export async function sendCustomerBookingStatusEmail(input: {
   name: string;
   status: BookingRequestStatus;
   when: Date;
+  portalAccess?: {
+    loginUrl: string;
+    generatedPassword: string;
+  } | null;
 }) {
   const template = customerBookingStatusTemplate({
     name: input.name,
     status: input.status,
-    when: input.when
+    when: input.when,
+    portalAccess: input.portalAccess ?? null
   });
   await sendEmail({
     to: input.email,
