@@ -685,6 +685,74 @@ h1 {
   color: #ffe1e1;
 }
 
+.setup-env-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-top: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.setup-env-toggle:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--ink-3);
+}
+
+.setup-env-toggle svg {
+  transition: transform 0.2s;
+}
+
+.setup-env-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.setup-env-form {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  margin-top: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.setup-env-field {
+  display: grid;
+  gap: 6px;
+}
+
+.setup-env-field label {
+  font-size: 0.85rem;
+  color: var(--ink-2);
+}
+
+.setup-env-field .field-hint {
+  font-size: 0.75rem;
+  color: var(--ink-1);
+  margin-top: -2px;
+}
+
+.setup-env-success {
+  padding: 10px 14px;
+  background: rgba(46, 204, 113, 0.12);
+  border: 1px solid rgba(46, 204, 113, 0.4);
+  border-radius: 8px;
+  color: #a8f0c0;
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+}
+
 .admin-shell {
   min-height: 100dvh;
   width: min(1200px, 100%);

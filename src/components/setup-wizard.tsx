@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useNoticeTween } from "@/components/motion/use-notice-tween";
@@ -23,9 +23,28 @@ type SetupInitializeResponse = {
   };
 };
 
-/**
- * Renders one requirement-check row with a severity status chip.
- */
+type EnvVar = {
+  key: string;
+  title: string;
+  description: string;
+  placeholder: string;
+  isRequired: boolean;
+  isSecret: boolean;
+  currentValue: string;
+};
+
+type EnvConfigResponse = {
+  ok: boolean;
+  envVars?: EnvVar[];
+};
+
+type EnvSaveResponse = {
+  ok: boolean;
+  error?: string;
+  message?: string;
+  fieldErrors?: Record<string, string>;
+};
+
 function SetupCheckRow({ check }: { check: SetupCheck }) {
   return (
     <li className={`setup-check setup-check-${check.status}`}>
@@ -38,9 +57,6 @@ function SetupCheckRow({ check }: { check: SetupCheck }) {
   );
 }
 
-/**
- * First-run setup wizard UI for re-running checks and creating first admin.
- */
 export function SetupWizard({ initialReadiness }: SetupWizardProps) {
   const router = useRouter();
   const [readiness, setReadiness] = useState<SetupReadiness>(initialReadiness);
@@ -48,15 +64,20 @@ export function SetupWizard({ initialReadiness }: SetupWizardProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
+  const [envConfigOpen, setEnvConfigOpen] = useState(false);
+  const [envVars, setEnvVars] = useState<EnvVar[]>([]);
+  const [isLoadingEnvVars, setIsLoadingEnvVars] = useState(false);
+  const [isSavingEnv, setIsSavingEnv] = useState(false);
+  const [envSaveError, setEnvSaveError] = useState("");
+  const [envSaveSuccess, setEnvSaveSuccess] = useState("");
+  const [envFieldErrors, setEnvFieldErrors] = useState<Record<string, string>>({});
+
   const errorNoticeRef = useNoticeTween(Boolean(error));
 
   const summary = useMemo(() => {
     return `${readiness.passCount} passed, ${readiness.warnCount} warnings, ${readiness.failCount} failures`;
   }, [readiness.failCount, readiness.passCount, readiness.warnCount]);
 
-  /**
-   * Pulls latest setup checks from the server.
-   */
   async function refreshChecks() {
     setIsRefreshingChecks(true);
     setError("");
@@ -80,20 +101,92 @@ export function SetupWizard({ initialReadiness }: SetupWizardProps) {
     }
   }
 
-  /**
-   * Submits first-admin credentials and initializes setup.
-   */
+  const loadEnvVars = useCallback(async () => {
+    setIsLoadingEnvVars(true);
+    setEnvSaveError("");
+    setEnvSaveSuccess("");
+
+    try {
+      const response = await fetch("/api/setup/env", {
+        method: "GET"
+      });
+      const body = (await response.json()) as EnvConfigResponse;
+
+      if (!response.ok || !body.envVars) {
+        setEnvSaveError("Could not load environment configuration.");
+        return;
+      }
+
+      setEnvVars(body.envVars);
+    } catch {
+      setEnvSaveError("Could not load environment configuration.");
+    } finally {
+      setIsLoadingEnvVars(false);
+    }
+  }, []);
+
+  async function saveEnvConfig(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSavingEnv(true);
+    setEnvSaveError("");
+    setEnvSaveSuccess("");
+    setEnvFieldErrors({});
+
+    const form = event.currentTarget;
+    const payload: Record<string, string> = {};
+
+    for (const envVar of envVars) {
+      const input = form.elements.namedItem(envVar.key) as HTMLInputElement;
+      if (input) {
+        payload[envVar.key] = input.value;
+      }
+    }
+
+    try {
+      const response = await fetch("/api/setup/configure", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const body = (await response.json()) as EnvSaveResponse;
+
+      if (!response.ok) {
+        if (body.fieldErrors) {
+          setEnvFieldErrors(body.fieldErrors);
+        }
+        setEnvSaveError(body.error || "Failed to save configuration.");
+        return;
+      }
+
+      setEnvSaveSuccess(body.message || "Configuration saved.");
+      refreshChecks();
+    } catch {
+      setEnvSaveError("Failed to save configuration.");
+    } finally {
+      setIsSavingEnv(false);
+    }
+  }
+
+  useEffect(() => {
+    if (envConfigOpen && envVars.length === 0) {
+      loadEnvVars();
+    }
+  }, [envConfigOpen, envVars.length, loadEnvVars]);
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmitting(true);
     setError("");
 
-    const form = new FormData(event.currentTarget);
+    const form = event.currentTarget;
     const payload = {
-      displayName: String(form.get("displayName") || ""),
-      email: String(form.get("email") || ""),
-      password: String(form.get("password") || ""),
-      confirmPassword: String(form.get("confirmPassword") || "")
+      displayName: String((form.elements.namedItem("displayName") as HTMLInputElement)?.value || ""),
+      email: String((form.elements.namedItem("email") as HTMLInputElement)?.value || ""),
+      password: String((form.elements.namedItem("password") as HTMLInputElement)?.value || ""),
+      confirmPassword: String((form.elements.namedItem("confirmPassword") as HTMLInputElement)?.value || "")
     };
 
     try {
@@ -145,6 +238,64 @@ export function SetupWizard({ initialReadiness }: SetupWizardProps) {
           <SetupCheckRow key={check.id} check={check} />
         ))}
       </ul>
+
+      <div className="env-config-section">
+        <button
+          type="button"
+          className="env-config-toggle"
+          onClick={() => setEnvConfigOpen(!envConfigOpen)}
+          aria-expanded={envConfigOpen}
+        >
+          <span className="env-config-toggle-icon">{envConfigOpen ? "▼" : "▶"}</span>
+          <span>Environment Configuration</span>
+        </button>
+
+        {envConfigOpen && (
+          <div className="env-config-content">
+            {isLoadingEnvVars ? (
+              <p className="helper-text">Loading environment variables...</p>
+            ) : (
+              <form onSubmit={saveEnvConfig}>
+                {envVars.map((envVar) => (
+                  <div key={envVar.key} className="field">
+                    <label htmlFor={`env-${envVar.key}`}>
+                      {envVar.title}
+                      {envVar.isRequired && <span className="required-mark">*</span>}
+                      {envVar.isSecret && <span className="secret-mark"> (secret)</span>}
+                    </label>
+                    <p className="field-description">{envVar.description}</p>
+                    <input
+                      id={`env-${envVar.key}`}
+                      name={envVar.key}
+                      type={envVar.isSecret ? "password" : "text"}
+                      placeholder={envVar.placeholder}
+                      defaultValue={envVar.currentValue === "***SET***" ? "" : envVar.currentValue}
+                      required={envVar.isRequired}
+                      className={envFieldErrors[envVar.key] ? "input-error" : ""}
+                    />
+                    {envFieldErrors[envVar.key] && (
+                      <p className="field-error">{envFieldErrors[envVar.key]}</p>
+                    )}
+                  </div>
+                ))}
+
+                {envSaveError && (
+                  <p className="notice error">{envSaveError}</p>
+                )}
+                {envSaveSuccess && (
+                  <p className="notice success">{envSaveSuccess}</p>
+                )}
+
+                <div className="button-row">
+                  <button className="btn btn-primary" type="submit" disabled={isSavingEnv}>
+                    {isSavingEnv ? "Saving..." : "Save Configuration"}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        )}
+      </div>
 
       <form className="form-grid" onSubmit={onSubmit} data-motion-item="setup-form">
         <div className="field">
