@@ -4,6 +4,7 @@ import { z } from "zod";
 import { auPostcodeSchema } from "@/lib/booking-rules";
 import { prisma } from "@/lib/db";
 import { log } from "@/lib/observability";
+import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
 import { normalizeFullNameForLookup, verifyPortalPassword } from "@/lib/student-portal/credentials";
 import {
   createStudentSessionToken,
@@ -24,6 +25,25 @@ const loginSchema = z.object({
  * Duplicate name/postcode matches are handled by bounded hash verification attempts.
  */
 export async function POST(request: NextRequest) {
+  const rateLimit = consumeRateLimit({
+    key: `student-login:${getRequestIp(request)}`,
+    limit: 20,
+    windowMs: 15 * 60 * 1000
+  });
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      {
+        error: "Too many login attempts. Please try again shortly."
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(rateLimit.retryAfterSeconds)
+        }
+      }
+    );
+  }
+
   const body = await request.json().catch(() => null);
   const parsed = loginSchema.safeParse(body);
   if (!parsed.success) {

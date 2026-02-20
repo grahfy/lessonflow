@@ -73,6 +73,16 @@ export async function ensureOwnerAdmin(): Promise<AdminUser> {
   });
 }
 
+/**
+ * Returns the oldest active admin account as a stable system actor.
+ */
+export async function getPrimaryActiveAdmin(): Promise<AdminUser | null> {
+  return prisma.adminUser.findFirst({
+    where: { isActive: true },
+    orderBy: { createdAt: "asc" }
+  });
+}
+
 export async function verifyAdminPassword(email: string, password: string): Promise<AdminUser | null> {
   const user = await prisma.adminUser.findUnique({
     where: { email }

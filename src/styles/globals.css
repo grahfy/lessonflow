@@ -608,6 +608,83 @@ h1 {
   border-color: rgba(235, 87, 87, 0.6);
 }
 
+.setup-wizard {
+  display: grid;
+  gap: 12px;
+}
+
+.setup-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.setup-check-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.setup-check {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.setup-check-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.setup-check p {
+  margin: 0;
+  color: var(--ink-1);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.setup-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.setup-status-pass {
+  border-color: rgba(76, 204, 135, 0.5);
+  background: rgba(76, 204, 135, 0.15);
+  color: #d5ffe7;
+}
+
+.setup-status-warn {
+  border-color: rgba(244, 183, 108, 0.56);
+  background: rgba(244, 183, 108, 0.12);
+  color: #ffe9ce;
+}
+
+.setup-status-fail {
+  border-color: rgba(235, 87, 87, 0.62);
+  background: rgba(235, 87, 87, 0.12);
+  color: #ffe1e1;
+}
+
 .admin-shell {
   min-height: 100dvh;
   width: min(1200px, 100%);

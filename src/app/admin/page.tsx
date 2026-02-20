@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
 
-export default function AdminIndexPage() {
-  redirect("/admin/bookings");
+import { isSetupComplete } from "@/lib/setup";
+
+export default async function AdminIndexPage() {
+  const setupComplete = await isSetupComplete();
+  redirect(setupComplete ? "/admin/bookings" : "/setup");
 }

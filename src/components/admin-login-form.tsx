@@ -28,7 +28,8 @@ export function AdminLoginForm() {
 
     setLoading(false);
     if (!response.ok) {
-      setError("Login failed. Check your email and password.");
+      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      setError(body?.error || "Login failed. Check your email and password.");
       return;
     }
 

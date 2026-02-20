@@ -120,6 +120,10 @@ DATABASE_URL="file:./prisma/dev.db" npx prisma migrate deploy
 ```bash
 npm run dev
 ```
+5. Open setup wizard and create first admin account:
+```bash
+http://127.0.0.1:3000/setup
+```
 
 Default local app URL:
 - `http://127.0.0.1:3000`
@@ -164,7 +168,7 @@ npm run typecheck
 ### Core
 - `DATABASE_URL`: Prisma DB URL (`file:./prisma/dev.db` locally).
 - `ADMIN_EMAIL`: admin login and owner notification email.
-- `ADMIN_PASSWORD`: bootstrap admin password.
+- `ADMIN_PASSWORD`: legacy bootstrap password (kept for tests/local scripts).
 - `ADMIN_SESSION_SECRET`: admin session signing secret.
 - `STUDENT_SESSION_SECRET`: student portal session signing secret.
 - `STUDENT_SESSION_MAX_AGE_SECONDS`: student session TTL in seconds.
@@ -230,10 +234,24 @@ Schedules are configured in `vercel.json`.
   - `/terms`
   - `/student/login`
   - `/student/portal`
+- Setup:
+  - `/setup` (first-run initialization)
 - Admin:
   - `/admin/login`
   - `/admin/bookings`
   - `/admin/invoices`
+
+## First-Run Production Setup
+Run this once after deploying to hosting:
+1. Set production env vars (DB, secrets, SMTP, site URL, cron secret).
+2. Deploy and run database migrations:
+```bash
+npx prisma migrate deploy
+```
+3. Visit `/setup`.
+4. Resolve all failing checks in the wizard.
+5. Create the first admin account.
+6. Sign in at `/admin/login`.
 
 ## Operational Notes
 - Booking constraints and validation are server-side enforced.

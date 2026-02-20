@@ -1,7 +1,15 @@
+import { redirect } from "next/navigation";
+
 import { AdminLoginForm } from "@/components/admin-login-form";
 import { AdminAuthShell } from "@/components/admin-auth-shell";
+import { isSetupComplete } from "@/lib/setup";
 
-export default function AdminLoginPage() {
+export default async function AdminLoginPage() {
+  const setupComplete = await isSetupComplete();
+  if (!setupComplete) {
+    redirect("/setup");
+  }
+
   return (
     <AdminAuthShell footerCopy="Owner sign-in">
       <main className="view" aria-label="Admin Login" data-motion-item="admin-login-view">

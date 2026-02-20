@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { ensureOwnerAdmin } from "@/lib/admin-auth";
+import { getPrimaryActiveAdmin } from "@/lib/admin-auth";
 import { getCronSecret } from "@/lib/env";
 import { runInvoiceReminderBatch } from "@/lib/invoices/reminder-runner";
 import { sendInvoiceRemindersSchema } from "@/lib/invoices/schema";
@@ -23,7 +23,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid reminder payload.", details: parsed.error.flatten() }, { status: 400 });
   }
 
-  const ownerAdmin = await ensureOwnerAdmin();
+  const ownerAdmin = await getPrimaryActiveAdmin();
+  if (!ownerAdmin) {
+    return NextResponse.json({ error: "Setup incomplete. Create an admin account before running reminders." }, { status: 409 });
+  }
+
   const result = await runInvoiceReminderBatch({
     actorId: ownerAdmin.id,
     dryRun: parsed.data.dryRun,

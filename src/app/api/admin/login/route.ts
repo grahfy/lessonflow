@@ -1,13 +1,43 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-import { createSessionToken, ensureOwnerAdmin, getSessionCookieName, verifyAdminPassword } from "@/lib/admin-auth";
+import { createSessionToken, getSessionCookieName, verifyAdminPassword } from "@/lib/admin-auth";
+import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
+import { isSetupComplete } from "@/lib/setup";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const rateLimit = consumeRateLimit({
+    key: `admin-login:${getRequestIp(request)}`,
+    limit: 12,
+    windowMs: 15 * 60 * 1000
+  });
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      {
+        error: "Too many login attempts. Please try again shortly."
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(rateLimit.retryAfterSeconds)
+        }
+      }
+    );
+  }
+
+  const setupComplete = await isSetupComplete();
+  if (!setupComplete) {
+    return NextResponse.json(
+      {
+        error: "Setup is not complete. Open /setup to initialize the application.",
+        code: "SETUP_REQUIRED"
+      },
+      { status: 409 }
+    );
+  }
+
   const body = await request.json().catch(() => null);
   const email = String(body?.email || "").trim().toLowerCase();
   const password = String(body?.password || "");
-
-  await ensureOwnerAdmin();
 
   const admin = await verifyAdminPassword(email, password);
   if (!admin) {
