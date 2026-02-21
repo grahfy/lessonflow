@@ -44,7 +44,7 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord): Promise<
   try {
     const logoBytes = await fs.readFile(path.join(process.cwd(), "public/images/company-logo-invoice.png"));
     const logoImage = await document.embedPng(logoBytes);
-    const scale = 60 / logoImage.height;
+    const scale = 120 / logoImage.height;
     const logoDims = logoImage.scale(scale);
     page.drawImage(logoImage, {
       x: 40,
@@ -78,6 +78,10 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord): Promise<
   const sellerName = invoice.sellerBusinessName || "Melbourne Guitar School";
   drawRightText(sellerName, 12, true, y);
   y -= 16;
+  if (invoice.sellerAbn) {
+    drawRightText(`ABN: ${invoice.sellerAbn}`, 11, false, y);
+    y -= 16;
+  }
   drawRightText("Rear 66/68 High Street", 11, false, y);
   y -= 16;
   drawRightText("Northcote, Victoria 3070", 11, false, y);
