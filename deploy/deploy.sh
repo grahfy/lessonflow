@@ -23,6 +23,9 @@
 
 set -euo pipefail
 
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Configuration
 APP_NAME="melbourne-guitar-school"
 DEPLOY_DIR="/var/www/${APP_NAME}"
@@ -130,7 +133,6 @@ fi
 # Run package setup if requested
 if [[ "${SETUP_PACKAGES}" == true ]]; then
     log_info "Running package setup..."
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     "${SCRIPT_DIR}/setup-packages.sh" --non-interactive
 fi
 
@@ -283,6 +285,5 @@ if [[ "${SSL_SETUP}" == true ]]; then
         exit 1
     fi
     log_info "Running SSL setup..."
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     "${SCRIPT_DIR}/setup-ssl.sh" --domain "${SSL_DOMAIN}" --email "${SSL_EMAIL}"
 fi
