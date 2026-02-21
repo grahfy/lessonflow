@@ -78,7 +78,7 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord): Promise<
   const sellerName = invoice.sellerBusinessName || "Melbourne Guitar School";
   drawRightText(sellerName, 12, true, y);
   y -= 16;
-  if (invoice.sellerAbn) {
+  if (invoice.sellerAbn && invoice.sellerAbn.trim() !== "") {
     drawRightText(`ABN: ${invoice.sellerAbn}`, 11, false, y);
     y -= 16;
   }
