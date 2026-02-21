@@ -187,7 +187,8 @@ mkdir -p "${SHARED_DIR}"
 # Create release directory with timestamp
 TIMESTAMP=$(date +%Y%m%d%H%M%S)
 NEW_RELEASE_DIR="${RELEASES_DIR}/${TIMESTAMP}"
-log_info "Creating new release directory: ${NEW_RELEASE_DIR}"
+mkdir -p "${NEW_RELEASE_DIR}"
+log_info "Created release directory: ${NEW_RELEASE_DIR}"
 
 # Clone/copy repository
 if [[ -d ".git" ]]; then
