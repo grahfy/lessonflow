@@ -48,68 +48,29 @@ NC='\033[0m' # No Color
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --skip-migrate)
-            SKIP_MIGRATE=true
-            shift
-            ;;
-        --skip-deps)
-            SKIP_DEPS=true
-            shift
-            ;;
-        --branch)
-            BRANCH="$2"
-            shift 2
-            ;;
-        --rollback)
-            ROLLBACK=true
-            shift
-            ;;
-        --setup-packages)
-            SETUP_PACKAGES=true
-            shift
-            ;;
-        --ssl)
-            SSL_SETUP=true
-            shift
-            ;;
-        --domain)
-            SSL_DOMAIN="$2"
-            shift 2
-            ;;
-        --email)
-            SSL_EMAIL="$2"
-            shift 2
-            ;;
-        *)
-            echo -e "${RED}Unknown option: $1${NC}"
-            exit 1
-            ;;
+        --branch) BRANCH="$2"; shift 2 ;;
+        --ssl) ENABLE_SSL=true; shift ;;
+        --domain) DOMAIN="$2"; shift 2 ;;
+        --email) EMAIL="$2"; shift 2 ;;
+        --skip-deps) SKIP_DEPS=true; shift ;;
+        --skip-migrate) SKIP_MIGRATE=true; shift ;;
+        --db-push) DB_PUSH=true; shift ;;
+        *) log_error "Unknown argument: $1"; exit 1 ;;
     esac
 done
 
-# Logging functions
-log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
-}
+# ...
 
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-# Error handling
-cleanup() {
-    local exit_code=$?
-    if [[ $exit_code -ne 0 ]]; then
-        log_error "Deployment failed with exit code: $exit_code"
-        # Restore previous release if we were in the middle of deploying
-        if [[ -n "${NEW_RELEASE_DIR:-}" && -d "${NEW_RELEASE_DIR}" ]]; then
-            log_warn "Cleaning up failed release..."
-            rm -rf "${NEW_RELEASE_DIR}"
-        fi
+# Run database migrations
+if [[ "${DB_PUSH}" == true ]]; then
+    log_info "Pushing database schema (db push)..."
+    npm exec --no -- prisma db push --accept-data-loss
+elif [[ "${SKIP_MIGRATE}" == false ]]; then
+    log_info "Running database migrations..."
+    npm exec --no -- prisma migrate deploy
+else
+    log_info "Skipping database migrations"
+fi
     fi
     exit $exit_code
 }
