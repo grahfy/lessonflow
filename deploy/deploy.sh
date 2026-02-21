@@ -224,9 +224,24 @@ fi
 
 log_info "Build successful: $(cat .next/BUILD_ID)"
 
+# Setup standalone build (copy public and static assets)
+# This is required for next/image and other static assets to work in standalone mode
+if [[ -d ".next/standalone" ]]; then
+    log_info "Setting up standalone build assets..."
+    cp -r public ".next/standalone/"
+    mkdir -p ".next/standalone/.next"
+    cp -r ".next/static" ".next/standalone/.next/"
+fi
+
 # Update symlink atomically
 log_info "Updating current symlink..."
 ln -sfn "${NEW_RELEASE_DIR}" "${CURRENT_LINK}"
+
+# Fix permissions for the entire deploy directory
+# Do this AFTER everything is set up to ensure all new files are owned by www-data
+log_info "Fixing permissions..."
+chown -R www-data:www-data "${DEPLOY_DIR}"
+chmod -R 755 "${NEW_RELEASE_DIR}"
 
 # Ensure systemd service is installed
 SERVICE_FILE="/etc/systemd/system/${APP_NAME}.service"
