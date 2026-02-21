@@ -772,7 +772,8 @@ export function getCurrentEnvValues(): Record<string, string> {
 
   for (const envVar of CONFIGURABLE_ENV_VARS) {
     const value = process.env[envVar.key] || "";
-    if (envVar.isSecret && value) {
+    // Only mask if it's a secret AND it's not a placeholder
+    if (envVar.isSecret && value && !isLikelyPlaceholder(value)) {
       result[envVar.key] = "***SET***";
     } else {
       result[envVar.key] = value;
