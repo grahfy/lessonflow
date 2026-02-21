@@ -746,8 +746,7 @@ export async function saveEnvConfig(input: Record<string, string>): Promise<{ su
     const value = input[envVar.key] || "";
     if (value && value !== "***SET***") {
       vars.set(envVar.key, value);
-    } else if (envVar.isRequired) {
-      // Keep existing value if re-saving required vars with placeholder
+    } else {
       const existingValue = process.env[envVar.key];
       if (existingValue) {
         vars.set(envVar.key, existingValue);
