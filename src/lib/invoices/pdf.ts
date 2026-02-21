@@ -48,7 +48,7 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord): Promise<
     const logoDims = logoImage.scale(scale);
     page.drawImage(logoImage, {
       x: 40,
-      y: height - 100,
+      y: height - 60,
       width: logoDims.width,
       height: logoDims.height,
     });
