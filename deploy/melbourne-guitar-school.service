@@ -1,0 +1,47 @@
+# Melbourne Guitar School - Systemd Service
+# Install: sudo cp deploy/melbourne-guitar-school.service /etc/systemd/system/
+# Enable:  sudo systemctl enable melbourne-guitar-school
+# Start:   sudo systemctl start melbourne-guitar-school
+
+[Unit]
+Description=Melbourne Guitar School Next.js Application
+Documentation=https://github.com/your-org/melbourne-guitar-school-website
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/melbourne-guitar-school/current
+
+# Environment
+EnvironmentFile=/var/www/melbourne-guitar-school/shared/.env
+Environment=NODE_ENV=production
+Environment=PORT=3000
+
+# Executable
+ExecStart=/usr/bin/node /var/www/melbourne-guitar-school/current/.next/standalone/server.js
+
+# Restart behavior
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=melbourne-guitar-school
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/melbourne-guitar-school
+PrivateTmp=true
+
+# Resource limits
+LimitNOFILE=65535
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target
