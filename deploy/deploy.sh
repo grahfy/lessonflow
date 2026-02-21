@@ -221,12 +221,11 @@ fi
 if [[ "${SKIP_DEPS}" == false ]]; then
     log_info "Installing dependencies..."
     npm ci --omit=dev --ignore-scripts
-    
-    # Install Prisma CLI for migrations (dev dependency but needed at runtime for migrations)
-    npm install prisma --save-dev --ignore-scripts
-else
-    log_info "Skipping dependency installation"
 fi
+
+# Always install Prisma CLI (needed for generate and migrate)
+log_info "Installing Prisma CLI..."
+npm install prisma --save-dev --ignore-scripts
 
 # Generate Prisma client
 log_info "Generating Prisma client..."
