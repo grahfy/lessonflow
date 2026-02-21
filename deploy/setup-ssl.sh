@@ -80,6 +80,22 @@ fi
 log_info "Setting up SSL certificate for: ${DOMAIN}"
 log_info "Email: ${EMAIL}"
 
+# Ensure HTTP-only nginx config is active (no SSL refs that would fail before certs exist)
+NGINX_CONF="/etc/nginx/sites-available/melbourne-guitar-school"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HTTP_CONF="${SCRIPT_DIR}/nginx-http.conf"
+
+if [[ -f "${HTTP_CONF}" ]]; then
+    # Check if current config has SSL references but no certs exist
+    if grep -q "ssl_certificate" "${NGINX_CONF}" 2>/dev/null; then
+        CERT_PATH="/etc/letsencrypt/live/${DOMAIN}/fullchain.pem"
+        if [[ ! -f "${CERT_PATH}" ]]; then
+            log_info "Replacing nginx config with HTTP-only version before obtaining certs..."
+            cp "${HTTP_CONF}" "${NGINX_CONF}"
+        fi
+    fi
+fi
+
 # Check if certbot is installed
 if ! command -v certbot &> /dev/null; then
     log_info "Installing certbot..."
