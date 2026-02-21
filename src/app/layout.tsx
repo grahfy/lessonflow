@@ -5,7 +5,7 @@ import { MotionProvider } from "@/components/motion/tween-orchestrator";
 import { PublicSiteFrame } from "@/components/public-site-frame";
 import "@/styles/globals.css";
 
-const baseUrl = "https://www.melbourneguitarschool.com.au";
+const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
