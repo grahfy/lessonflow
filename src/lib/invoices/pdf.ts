@@ -44,11 +44,11 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord): Promise<
   try {
     const logoBytes = await fs.readFile(path.join(process.cwd(), "public/images/company-logo-invoice.png"));
     const logoImage = await document.embedPng(logoBytes);
-    const scale = 150 / logoImage.height;
+    const scale = 140 / logoImage.height;
     const logoDims = logoImage.scale(scale);
     page.drawImage(logoImage, {
       x: 40,
-      y: height - 40 - logoDims.height,
+      y: height - 60 - logoDims.height,
       width: logoDims.width,
       height: logoDims.height,
     });
@@ -56,7 +56,7 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord): Promise<
     console.warn("Could not load invoice logo image", e);
   }
 
-  let y = height - 70;
+  let y = height - 100;
   const rightMargin = width - 40;
 
   const drawRightText = (text: string, size: number, isBold: boolean, currentY: number) => {
@@ -122,7 +122,7 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord): Promise<
     page.drawText(invoice.customerAddress, { x: 40, y, size: 11, font, color: rgb(0, 0, 0) });
   }
 
-  const detailsY = height - 305;
+  const detailsY = height - 320;
   const labelColRightEdge = rightMargin - 120;
   
   const drawPair = (label: string, value: string, currentY: number, isValueBold: boolean = false) => {
