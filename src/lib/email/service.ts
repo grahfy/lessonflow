@@ -1,3 +1,11 @@
+/**
+ * Email sending service using nodemailer with database logging.
+ * 
+ * SECURITY: All sent emails are logged to the database for audit trail.
+ * Falls back to queueing in DB if SMTP is not configured.
+ * Supports attachments for PDF invoices.
+ */
+
 import nodemailer from "nodemailer";
 
 import { prisma } from "@/lib/db";

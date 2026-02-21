@@ -1,3 +1,10 @@
+/**
+ * Setup Wizard Configuration
+ * 
+ * First-run setup wizard for configuring environment variables and creating
+ * the initial admin account. Used during initial deployment.
+ */
+
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -8,8 +15,14 @@ import { prisma } from "@/lib/db";
 import { getOwnerEmail } from "@/lib/env";
 import { getMaterialStorageDriverName } from "@/lib/student-portal/material-storage";
 
+/**
+ * Status levels for setup checks - determines UI display and if setup can proceed.
+ */
 export type SetupCheckStatus = "pass" | "warn" | "fail";
 
+/**
+ * Individual setup check result for the wizard UI.
+ */
 export type SetupCheck = {
   id: string;
   title: string;
@@ -17,6 +30,9 @@ export type SetupCheck = {
   detail: string;
 };
 
+/**
+ * Aggregated setup readiness result.
+ */
 export type SetupReadiness = {
   completed: boolean;
   checks: SetupCheck[];

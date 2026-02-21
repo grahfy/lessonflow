@@ -1199,7 +1199,7 @@ h1 {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
-  align-items: end;
+  align-items: flex-end;
   margin-top: 10px;
 }
 
@@ -1371,7 +1371,7 @@ h1 {
   display: grid;
   gap: 8px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-items: end;
+  align-items: flex-end;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.018);
@@ -1389,7 +1389,7 @@ h1 {
 
 .student-actions-cta {
   display: flex;
-  align-items: end;
+  align-items: flex-end;
   justify-content: flex-end;
 }
 
@@ -1769,7 +1769,7 @@ h1 {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.8fr) minmax(0, 0.8fr) auto auto auto auto;
   gap: 10px;
-  align-items: end;
+  align-items: flex-end;
 }
 
 .invoice-list-card {
@@ -1829,7 +1829,7 @@ h1 {
   margin-top: 10px;
   display: grid;
   gap: 4px;
-  justify-content: end;
+  justify-content: flex-end;
   text-align: right;
   color: var(--ink-1);
 }

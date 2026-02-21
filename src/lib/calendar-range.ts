@@ -1,7 +1,16 @@
 import { addDays, endOfDay, endOfMonth, endOfWeek, parseISO, startOfDay, startOfMonth, startOfWeek } from "date-fns";
 
+/**
+ * Calendar view types for the booking interface.
+ * UI: Controls the visible date range in the booking calendar component.
+ */
 type CalendarView = "day" | "week" | "month";
 
+/**
+ * Calculates start and end dates for a given calendar view.
+ * UI: Used to determine which bookings to display in the calendar.
+ * LOGIC: Week starts on Monday (weekStartsOn: 1) for Australian context.
+ */
 export function getCalendarRange(view: CalendarView, dateIso?: string): { start: Date; end: Date } {
   const baseDate = dateIso ? parseISO(dateIso) : new Date();
 

@@ -210,3 +210,34 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   return NextResponse.json({ error: "Unsupported action." }, { status: 400 });
 }
+
+/**
+ * DELETE /api/admin/bookings/[id]
+ * Permanently deletes a booking record from the database.
+ * This is distinct from cancel - cancel marks status, delete removes entirely.
+ */
+export async function DELETE(request: NextRequest, { params }: Params) {
+  const admin = await requireAdminFromRequest(request);
+  if (!admin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+
+  const existing = await prisma.booking.findUnique({
+    where: { id }
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Booking not found." }, { status: 404 });
+  }
+
+  await prisma.bookingAuditLog.deleteMany({
+    where: { bookingId: id }
+  });
+
+  await prisma.booking.delete({
+    where: { id }
+  });
+
+  return NextResponse.json({ ok: true });
+}

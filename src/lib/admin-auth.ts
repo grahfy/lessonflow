@@ -1,3 +1,15 @@
+/**
+ * Admin Authentication Module
+ * 
+ * Session-based authentication for admin users using HMAC-signed tokens.
+ * 
+ * SECURITY:
+ * - Uses HMAC-SHA256 for session token signing
+ * - Tokens expire after 7 days
+ * - Passwords hashed with bcrypt (cost factor 12)
+ * - Session secret must be 32+ characters
+ */
+
 import { AdminUser } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
@@ -5,8 +17,15 @@ import { cookies } from "next/headers";
 
 import { prisma } from "@/lib/db";
 
+/**
+ * Cookie name for admin session token.
+ */
 const COOKIE_NAME = "admin_session";
 
+/**
+ * Retrieves the session signing secret from environment.
+ * @throws Error if not configured
+ */
 function getSessionSecret(): string {
   const secret = process.env.ADMIN_SESSION_SECRET;
   if (!secret) {
@@ -15,14 +34,24 @@ function getSessionSecret(): string {
   return secret;
 }
 
+/**
+ * Signs payload using HMAC-SHA256 with session secret.
+ */
 function signPayload(payload: string): string {
   return crypto.createHmac("sha256", getSessionSecret()).update(payload).digest("hex");
 }
 
+/**
+ * Encodes data as base64url for transport.
+ */
 function encode(data: object): string {
   return Buffer.from(JSON.stringify(data), "utf8").toString("base64url");
 }
 
+/**
+ * Decodes and verifies session token signature and expiration.
+ * @returns Payload if valid, null if invalid/expired
+ */
 function decode(token: string): { email: string; exp: number } | null {
   const [payload, signature] = token.split(".");
   if (!payload || !signature) {
@@ -41,6 +70,9 @@ function decode(token: string): { email: string; exp: number } | null {
   return parsed;
 }
 
+/**
+ * Creates a signed session token valid for 7 days.
+ */
 export function createSessionToken(email: string): string {
   const payload = encode({
     email,
@@ -53,6 +85,10 @@ export function getSessionCookieName() {
   return COOKIE_NAME;
 }
 
+/**
+ * Ensures an owner admin exists (for legacy ENV-based setup).
+ * Uses ADMIN_EMAIL and ADMIN_PASSWORD from environment.
+ */
 export async function ensureOwnerAdmin(): Promise<AdminUser> {
   const email = process.env.ADMIN_EMAIL || "owner@example.com";
   const displayName = "Owner";
@@ -87,6 +123,10 @@ export async function getPrimaryActiveAdmin(): Promise<AdminUser | null> {
   });
 }
 
+/**
+ * Verifies admin credentials against database.
+ * @returns Admin user if valid, null otherwise
+ */
 export async function verifyAdminPassword(email: string, password: string): Promise<AdminUser | null> {
   const user = await prisma.adminUser.findUnique({
     where: { email }
@@ -98,6 +138,9 @@ export async function verifyAdminPassword(email: string, password: string): Prom
   return valid ? user : null;
 }
 
+/**
+ * Retrieves admin from session token (does not verify active status).
+ */
 export async function getAdminFromToken(token?: string | null): Promise<AdminUser | null> {
   if (!token) {
     return null;
@@ -111,6 +154,9 @@ export async function getAdminFromToken(token?: string | null): Promise<AdminUse
   });
 }
 
+/**
+ * Gets current admin from request cookies.
+ */
 export async function getCurrentAdmin(): Promise<AdminUser | null> {
   const store = await cookies();
   const token = store.get(COOKIE_NAME)?.value;

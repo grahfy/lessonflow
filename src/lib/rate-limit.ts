@@ -1,33 +1,77 @@
+/**
+ * Rate Limiting Module
+ * 
+ * Provides in-memory sliding window rate limiting for API endpoints to prevent
+ * abuse and brute-force attacks.
+ * 
+ * SECURITY:
+ * - Protects against brute-force login attempts
+ * - Prevents API endpoint abuse
+ * - Uses client IP as the rate limit key
+ * 
+ * UI/USAGE:
+ * - Used by login endpoints to limit failed attempts
+ * - Used by booking API to prevent spam submissions
+ * - Returns headers: X-RateLimit-Remaining, Retry-After
+ */
+
 import { NextRequest } from "next/server";
 
+/**
+ * Input parameters for rate limit consumption.
+ */
 type RateLimitInput = {
-  key: string;
-  limit: number;
-  windowMs: number;
+  key: string;        // Unique identifier for rate limiting scope
+  limit: number;      // Maximum requests allowed in the time window
+  windowMs: number;   // Time window in milliseconds
 };
 
+/**
+ * Internal state tracking for rate limit counters.
+ */
 type RateLimitState = {
-  count: number;
-  resetAt: number;
+  count: number;      // Current request count in window
+  resetAt: number;    // Unix timestamp when window resets
 };
 
+/**
+ * Result object returned after checking rate limit.
+ */
 export type RateLimitResult = {
-  allowed: boolean;
-  remaining: number;
-  retryAfterSeconds: number;
+  allowed: boolean;           // Whether request is permitted
+  remaining: number;           // Remaining requests in window
+  retryAfterSeconds: number;  // Seconds to wait if rate limited
 };
 
+/**
+ * Global in-memory store for rate limiting state.
+ * Uses globalThis to persist across hot reloads in development.
+ * 
+ * STRUCTURE: Map<key, {count, resetAt}>
+ * SECURITY: In production with multiple instances, this should use
+ *           Redis or similar distributed store
+ */
 const globalStore = globalThis as unknown as {
   __rateLimitStore?: Map<string, RateLimitState>;
 };
 
+/**
+ * Initialize or retrieve the global rate limit store.
+ */
 const store = globalStore.__rateLimitStore ?? new Map<string, RateLimitState>();
 if (!globalStore.__rateLimitStore) {
   globalStore.__rateLimitStore = store;
 }
 
 /**
- * Extracts a stable client IP value from forwarded headers.
+ * Extracts client IP address from request headers.
+ * 
+ * Handles common proxy/load balancer header formats:
+ * - X-Forwarded-For: Client, Proxy1, Proxy2 (takes first)
+ * - X-Real-IP: Direct client IP
+ * 
+ * @param request - Next.js request object
+ * @returns Client IP string or "unknown" as fallback
  */
 export function getRequestIp(request: NextRequest): string {
   const forwarded = request.headers.get("x-forwarded-for");
@@ -42,9 +86,22 @@ export function getRequestIp(request: NextRequest): string {
 }
 
 /**
- * Sliding-window style in-memory rate limiter for sensitive API endpoints.
+ * Consumes a rate limit slot for the given key.
+ * 
+ * Implements sliding window style limiting:
+ * - If no existing state or window expired: create new counter at 1
+ * - If under limit: increment counter
+ * - If at/over limit: reject with retry time
+ * 
+ * SECURITY:
+ * - Disabled in test environment to allow unlimited testing
+ * - Returns consistent response format for client handling
+ * 
+ * @param input - Rate limit parameters
+ * @returns RateLimitResult indicating allowed/remaining/retry time
  */
 export function consumeRateLimit(input: RateLimitInput): RateLimitResult {
+  // Disable rate limiting in test environment
   if (process.env.NODE_ENV === "test") {
     return {
       allowed: true,
@@ -56,6 +113,7 @@ export function consumeRateLimit(input: RateLimitInput): RateLimitResult {
   const now = Date.now();
   const existing = store.get(input.key);
 
+  // New window or expired window - start fresh
   if (!existing || existing.resetAt <= now) {
     store.set(input.key, {
       count: 1,
@@ -68,6 +126,7 @@ export function consumeRateLimit(input: RateLimitInput): RateLimitResult {
     };
   }
 
+  // Window active but at limit - reject request
   if (existing.count >= input.limit) {
     return {
       allowed: false,
@@ -76,6 +135,7 @@ export function consumeRateLimit(input: RateLimitInput): RateLimitResult {
     };
   }
 
+  // Window active and under limit - increment
   existing.count += 1;
   store.set(input.key, existing);
 

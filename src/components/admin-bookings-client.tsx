@@ -44,6 +44,7 @@ type BookingRow = {
   startAt: string;
   notes: string | null;
   seriesId: string | null;
+  customerId: string | null;
 };
 
 type BookingRequestRow = {
@@ -368,6 +369,8 @@ export function AdminBookingsClient() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<EventWithRow | null>(null);
   const [dialogForm, setDialogForm] = useState<DialogForm | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerRow | null>(null);
+  const [isEditingCustomer, setIsEditingCustomer] = useState(false);
   const [manualDurationChoice, setManualDurationChoice] = useState<DurationChoice>("min60");
   const [manualStep, setManualStep] = useState<ManualStep>("customer");
   const [manualCustomerId, setManualCustomerId] = useState("");
@@ -523,12 +526,35 @@ export function AdminBookingsClient() {
     setNotice("");
     setSelectedEvent(event);
     setDialogForm(defaultFormFromEvent(event));
+    setSelectedCustomer(null);
+    setIsEditingCustomer(false);
     setEmailSubject("");
     setEmailMessage("");
     setInvoiceForm(defaultBookingInvoiceForm());
     emailDialogPresence.hide(undefined, { immediate: true });
     invoiceDialogPresence.hide(undefined, { immediate: true });
     dialogPresence.show();
+
+    // Fetch customer data if this booking has a linked customer
+    if ("customerId" in event.row && event.row.customerId) {
+      fetch(`/api/admin/customers/${event.row.customerId}`, { credentials: "same-origin" })
+        .then((res) => {
+          if (!res.ok) {
+            console.error("Customer fetch failed:", res.status, res.statusText);
+            return null;
+          }
+          return res.json();
+        })
+        .then((data) => {
+          if (data?.customer) {
+            setSelectedCustomer(data.customer);
+          }
+        })
+        .catch((err) => {
+          console.error("fetch customer error:", err);
+          // Silently fail - customer is optional
+        });
+    }
   }
 
   async function closeDialog() {
@@ -547,6 +573,8 @@ export function AdminBookingsClient() {
       () => {
         setSelectedEvent(null);
         setDialogForm(null);
+        setSelectedCustomer(null);
+        setIsEditingCustomer(false);
         setEmailSubject("");
         setEmailMessage("");
         setInvoiceForm(defaultBookingInvoiceForm());
@@ -781,6 +809,9 @@ export function AdminBookingsClient() {
     setError("");
     setNotice("");
     setCustomerQuery("");
+    setCustomerEditorMode(null);
+    setCustomerEditorId(null);
+    setCustomerForm(emptyCustomerForm());
     customersDialogPresence.show();
   }
 
@@ -1185,6 +1216,30 @@ export function AdminBookingsClient() {
     await load();
   }
 
+  async function deleteSelected() {
+    if (!selectedEvent || selectedEvent.entityType !== "booking") {
+      return;
+    }
+    const confirmed = window.confirm(
+      "Permanently delete this booking? This cannot be undone and will remove the record entirely."
+    );
+    if (!confirmed) {
+      return;
+    }
+    setBusyAction("delete");
+    const response = await fetch(`/api/admin/bookings/${selectedEvent.id}`, {
+      method: "DELETE"
+    });
+    setBusyAction(null);
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      setError(payload?.error || "Unable to delete booking.");
+      return;
+    }
+    await closeDialog();
+    await load();
+  }
+
   async function approveSelected(action: "approve" | "reject") {
     if (!selectedEvent || selectedEvent.entityType !== "booking_request") {
       return;
@@ -1355,6 +1410,18 @@ export function AdminBookingsClient() {
 
     await loadCustomers(customerQuery);
     await closeCustomerEditor();
+
+    // Refresh selected customer if we were editing the currently selected customer
+    if (customerEditorMode === "edit" && customerEditorId && selectedCustomer && customerEditorId === selectedCustomer.id) {
+      const customerResponse = await fetch(`/api/admin/customers/${customerEditorId}`);
+      if (customerResponse.ok) {
+        const data = await customerResponse.json();
+        if (data.customer) {
+          setSelectedCustomer(data.customer);
+        }
+      }
+    }
+
     setNotice(customerEditorMode === "create" ? "Customer created." : "Customer updated.");
   }
 
@@ -2345,123 +2412,172 @@ export function AdminBookingsClient() {
                   <div className="dialog-col" data-motion-item="booking-dialog-customer-col">
                     <h4 data-motion-item="booking-dialog-customer-title">Customer details</h4>
                     <div className="form-grid dialog-form-grid">
-                      <div className="field">
-                        <label>Name</label>
-                        <input
-                          value={dialogForm.name}
-                          onChange={(event) => setDialogForm((prev) => (prev ? { ...prev, name: event.target.value } : prev))}
-                        />
-                      </div>
-                      <div className="field">
-                        <label>Email</label>
-                        <input
-                          type="email"
-                          value={dialogForm.email}
-                          onChange={(event) => setDialogForm((prev) => (prev ? { ...prev, email: event.target.value } : prev))}
-                        />
-                      </div>
-                      <div className="field">
-                        <label>Phone</label>
-                        <input
-                          value={dialogForm.phone}
-                          maxLength={10}
-                          inputMode="numeric"
-                          pattern="[0-9]{10}"
-                          placeholder="10 digits"
-                          title="Phone must be exactly 10 digits"
-                          onChange={(event) =>
-                            setDialogForm((prev) => (prev ? { ...prev, phone: toDigits(event.target.value, 10) } : prev))
-                          }
-                        />
-                      </div>
-                      <div className="field">
-                        <label>Unit / Apartment (optional)</label>
-                        <input
-                          value={dialogForm.unitNumber}
-                          onChange={(event) =>
-                            setDialogForm((prev) => (prev ? { ...prev, unitNumber: event.target.value } : prev))
-                          }
-                        />
-                      </div>
-                      <div className="field">
-                        <label>House number</label>
-                        <input
-                          value={dialogForm.houseNumber}
-                          onChange={(event) =>
-                            setDialogForm((prev) => (prev ? { ...prev, houseNumber: event.target.value } : prev))
-                          }
-                        />
-                      </div>
-                      <div className="field">
-                        <label>Street name</label>
-                        <input
-                          value={dialogForm.streetName}
-                          onChange={(event) =>
-                            setDialogForm((prev) => (prev ? { ...prev, streetName: event.target.value } : prev))
-                          }
-                        />
-                      </div>
-                      <div className="field">
-                        <label>Street type</label>
-                        <select
-                          value={dialogForm.streetType}
-                          onChange={(event) =>
-                            setDialogForm((prev) => (prev ? { ...prev, streetType: event.target.value } : prev))
-                          }
-                        >
-                          <option value="Street">Street</option>
-                          <option value="Road">Road</option>
-                          <option value="Avenue">Avenue</option>
-                          <option value="Drive">Drive</option>
-                          <option value="Lane">Lane</option>
-                          <option value="Court">Court</option>
-                          <option value="Crescent">Crescent</option>
-                          <option value="Place">Place</option>
-                          <option value="Boulevard">Boulevard</option>
-                          <option value="Terrace">Terrace</option>
-                          <option value="Parade">Parade</option>
-                          <option value="Close">Close</option>
-                        </select>
-                      </div>
-                      <div className="field">
-                        <label>Suburb</label>
-                        <input
-                          value={dialogForm.suburb}
-                          onChange={(event) => setDialogForm((prev) => (prev ? { ...prev, suburb: event.target.value } : prev))}
-                        />
-                      </div>
-                      <div className="field">
-                        <label>State</label>
-                        <select
-                          value={dialogForm.state}
-                          onChange={(event) =>
-                            setDialogForm((prev) => (prev ? { ...prev, state: event.target.value as AuState } : prev))
-                          }
-                        >
-                          <option value="ACT">Australian Capital Territory</option>
-                          <option value="NSW">New South Wales</option>
-                          <option value="NT">Northern Territory</option>
-                          <option value="QLD">Queensland</option>
-                          <option value="SA">South Australia</option>
-                          <option value="TAS">Tasmania</option>
-                          <option value="VIC">Victoria</option>
-                          <option value="WA">Western Australia</option>
-                        </select>
-                      </div>
-                      <div className="field">
-                        <label>Postcode</label>
-                        <input
-                          value={dialogForm.postcode}
-                          maxLength={4}
-                          inputMode="numeric"
-                          pattern="[0-9]{4}"
-                          placeholder="3000"
-                          title="Postcode must be 4 digits"
-                          onChange={(event) =>
-                            setDialogForm((prev) => (prev ? { ...prev, postcode: toDigits(event.target.value, 4) } : prev))
-                          }
-                        />
-                      </div>
+                      {selectedCustomer && !isEditingCustomer ? (
+                        <>
+                          <div className="field" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ fontWeight: 600, color: "var(--text-secondary)" }}>Read-only customer</span>
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              onClick={() => {
+                                setIsEditingCustomer(true);
+                                openCustomerEditor("edit", selectedCustomer);
+                              }}
+                            >
+                              Edit
+                            </button>
+                          </div>
+                          <div className="field">
+                            <label>Name</label>
+                            <input value={selectedCustomer.fullName} readOnly />
+                          </div>
+                          <div className="field">
+                            <label>Email</label>
+                            <input value={selectedCustomer.email} readOnly />
+                          </div>
+                          <div className="field">
+                            <label>Phone</label>
+                            <input value={selectedCustomer.phone} readOnly />
+                          </div>
+                          <div className="field">
+                            <label>Address</label>
+                            <input
+                              value={[
+                                selectedCustomer.unitNumber ? `Unit ${selectedCustomer.unitNumber}` : null,
+                                selectedCustomer.houseNumber,
+                                selectedCustomer.streetName,
+                                selectedCustomer.streetType,
+                                selectedCustomer.suburb,
+                                selectedCustomer.state,
+                                selectedCustomer.postcode
+                              ]
+                                .filter(Boolean)
+                                .join(" ")}
+                              readOnly
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="field">
+                            <label>Name</label>
+                            <input
+                              value={dialogForm.name}
+                              onChange={(event) => setDialogForm((prev) => (prev ? { ...prev, name: event.target.value } : prev))}
+                            />
+                          </div>
+                          <div className="field">
+                            <label>Email</label>
+                            <input
+                              type="email"
+                              value={dialogForm.email}
+                              onChange={(event) => setDialogForm((prev) => (prev ? { ...prev, email: event.target.value } : prev))}
+                            />
+                          </div>
+                          <div className="field">
+                            <label>Phone</label>
+                            <input
+                              value={dialogForm.phone}
+                              maxLength={10}
+                              inputMode="numeric"
+                              pattern="[0-9]{10}"
+                              placeholder="10 digits"
+                              title="Phone must be exactly 10 digits"
+                              onChange={(event) =>
+                                setDialogForm((prev) => (prev ? { ...prev, phone: toDigits(event.target.value, 10) } : prev))
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label>Unit / Apartment (optional)</label>
+                            <input
+                              value={dialogForm.unitNumber}
+                              onChange={(event) =>
+                                setDialogForm((prev) => (prev ? { ...prev, unitNumber: event.target.value } : prev))
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label>House number</label>
+                            <input
+                              value={dialogForm.houseNumber}
+                              onChange={(event) =>
+                                setDialogForm((prev) => (prev ? { ...prev, houseNumber: event.target.value } : prev))
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label>Street name</label>
+                            <input
+                              value={dialogForm.streetName}
+                              onChange={(event) =>
+                                setDialogForm((prev) => (prev ? { ...prev, streetName: event.target.value } : prev))
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label>Street type</label>
+                            <select
+                              value={dialogForm.streetType}
+                              onChange={(event) =>
+                                setDialogForm((prev) => (prev ? { ...prev, streetType: event.target.value } : prev))
+                              }
+                            >
+                              <option value="Street">Street</option>
+                              <option value="Road">Road</option>
+                              <option value="Avenue">Avenue</option>
+                              <option value="Drive">Drive</option>
+                              <option value="Lane">Lane</option>
+                              <option value="Court">Court</option>
+                              <option value="Crescent">Crescent</option>
+                              <option value="Place">Place</option>
+                              <option value="Boulevard">Boulevard</option>
+                              <option value="Terrace">Terrace</option>
+                              <option value="Parade">Parade</option>
+                              <option value="Close">Close</option>
+                            </select>
+                          </div>
+                          <div className="field">
+                            <label>Suburb</label>
+                            <input
+                              value={dialogForm.suburb}
+                              onChange={(event) => setDialogForm((prev) => (prev ? { ...prev, suburb: event.target.value } : prev))}
+                            />
+                          </div>
+                          <div className="field">
+                            <label>State</label>
+                            <select
+                              value={dialogForm.state}
+                              onChange={(event) =>
+                                setDialogForm((prev) => (prev ? { ...prev, state: event.target.value as AuState } : prev))
+                              }
+                            >
+                              <option value="ACT">Australian Capital Territory</option>
+                              <option value="NSW">New South Wales</option>
+                              <option value="NT">Northern Territory</option>
+                              <option value="QLD">Queensland</option>
+                              <option value="SA">South Australia</option>
+                              <option value="TAS">Tasmania</option>
+                              <option value="VIC">Victoria</option>
+                              <option value="WA">Western Australia</option>
+                            </select>
+                          </div>
+                          <div className="field">
+                            <label>Postcode</label>
+                            <input
+                              value={dialogForm.postcode}
+                              maxLength={4}
+                              inputMode="numeric"
+                              pattern="[0-9]{4}"
+                              placeholder="3000"
+                              title="Postcode must be 4 digits"
+                              onChange={(event) =>
+                                setDialogForm((prev) => (prev ? { ...prev, postcode: toDigits(event.target.value, 4) } : prev))
+                              }
+                            />
+                          </div>
+                        </>
+                      )}
                       <div className="field">
                         <label>Mode</label>
                         <select
@@ -2584,6 +2700,16 @@ export function AdminBookingsClient() {
                 <button className="btn btn-danger" type="button" disabled={!!busyAction} onClick={() => void cancelSelected()}>
                   {busyAction === "cancel" ? "Cancelling..." : selectedIsPending ? "Cancel request" : "Cancel booking"}
                 </button>
+                {!selectedIsPending ? (
+                  <button
+                    className="btn btn-danger"
+                    type="button"
+                    disabled={!!busyAction}
+                    onClick={() => void deleteSelected()}
+                  >
+                    {busyAction === "delete" ? "Deleting..." : "Delete booking"}
+                  </button>
+                ) : null}
                 {selectedIsPending ? (
                   <button
                     className="btn btn-danger"
