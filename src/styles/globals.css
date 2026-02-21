@@ -2001,6 +2001,10 @@ h1 {
     border-radius: var(--radius-md);
   }
 
+  .teacher-hero {
+    background-position: top;
+  }
+
   .form-grid {
     grid-template-columns: 1fr;
   }
