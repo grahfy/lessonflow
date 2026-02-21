@@ -198,8 +198,14 @@ if [[ "${DB_PUSH}" == true ]]; then
     log_info "Pushing database schema (db push)..."
     npm exec --no -- prisma db push --accept-data-loss
 elif [[ "${SKIP_MIGRATE}" == false ]]; then
-    log_info "Running database migrations..."
-    npm exec --no -- prisma migrate deploy
+    # Check if migrations directory exists and has migrations
+    if [[ ! -d "prisma/migrations" || -z "$(ls -A prisma/migrations 2>/dev/null)" ]]; then
+        log_warn "No migrations found in prisma/migrations. Using db push instead."
+        npm exec --no -- prisma db push --accept-data-loss
+    else
+        log_info "Running database migrations..."
+        npm exec --no -- prisma migrate deploy
+    fi
 else
     log_info "Skipping database migrations"
 fi
