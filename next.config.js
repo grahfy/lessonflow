@@ -41,6 +41,7 @@ const securityHeaders = isProduction
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  output: "standalone",
   outputFileTracingRoot: path.join(__dirname),
   poweredByHeader: false,
   async headers() {
