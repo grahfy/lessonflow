@@ -4,15 +4,24 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useNoticeTween } from "@/components/motion/use-notice-tween";
+import { useCaptcha } from "@/components/captcha";
 
 export function AdminLoginForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const errorNoticeRef = useNoticeTween(Boolean(error));
+  const captcha = useCaptcha();
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    
+    if (!captcha.validateAnswer()) {
+      setError("Please answer the math question correctly.");
+      captcha.regenerate();
+      return;
+    }
+    
     setLoading(true);
     setError("");
 
@@ -46,6 +55,28 @@ export function AdminLoginForm() {
       <div className="field full" data-motion-item="admin-login-password-field">
         <label htmlFor="admin-password">Password</label>
         <input id="admin-password" type="password" name="password" autoComplete="current-password" required />
+      </div>
+      <div className="field full" data-motion-item="admin-login-captcha-field">
+        <label htmlFor="admin-captcha">
+          Security question: {captcha.captcha?.question}
+        </label>
+        <input
+          id="admin-captcha"
+          name="captcha"
+          type="text"
+          inputMode="numeric"
+          required
+          value={captcha.userAnswer}
+          onChange={(e) => captcha.handleChange(e.currentTarget.value)}
+          autoComplete="off"
+        />
+        <button
+          type="button"
+          className="btn btn-small"
+          onClick={() => captcha.regenerate()}
+        >
+          New question
+        </button>
       </div>
       <div className="button-row" data-motion-item="admin-login-actions">
         <button className="btn btn-primary" type="submit" disabled={loading}>

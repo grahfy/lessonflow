@@ -23,9 +23,6 @@ export default async function AdminLoginPage() {
           </p>
           <AdminLoginForm />
         </section>
-        <section className="panel-visual" aria-label="Admin Visual" data-motion-item="admin-login-visual">
-          <div className="hero-image contact-hero" role="img" aria-label="Studio visual" data-motion-item="admin-login-hero" />
-        </section>
       </main>
     </AdminAuthShell>
   );

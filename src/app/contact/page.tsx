@@ -1,5 +1,19 @@
+import type { Metadata } from "next";
+
 import { ContactForm } from "@/components/contact-form";
+import { ImageModal } from "@/components/image-modal";
 import { PanelLayout } from "@/components/panel-layout";
+
+export const metadata: Metadata = {
+  title: "Contact Us",
+  description:
+    "Get in touch with Melbourne Guitar School. Call, text, or email to book lessons or ask questions. Located in Northcote, Melbourne.",
+  openGraph: {
+    title: "Contact Us",
+    description:
+      "Get in touch with Melbourne Guitar School. Call, text, or email to book lessons or ask questions. Located in Northcote, Melbourne.",
+  },
+};
 
 export default function ContactPage() {
   return (
@@ -12,8 +26,25 @@ export default function ContactPage() {
       leadJustified
     >
       <ul className="list" data-motion-item="contact-list">
+        <li data-motion-item="map-button">
+          <ImageModal
+            src="/images/google-map.jpg"
+            alt="Melbourne Guitar School location map"
+            triggerText="Google Maps Location"
+            caption={
+              "Melbourne Guitar School Location & Directions\n\n" +
+              "Address: Rear 66/68 High St, Northcote\n\n" +
+              "We are located in the back alleyway off High Street, directly behind Vex Restaurant.\n\n" +
+              "How to Find Us:\n" +
+              "• On Foot: The entrance to the alleyway is on Westgarth Street, right next to Ultratune.\n" +
+              "• Driving & Parking: You can access the alleyway by car via 1 Cornwall Street, Northcote. There is usually plenty of street parking available on Cornwall Street.\n\n" +
+              "What to Look For:\n" +
+              "Keep an eye out for a black, double-story building with a roller door and a yellow MGS sign out front."
+            }
+          />
+        </li>
         <li data-motion-item="contact-phone">Phone: 0401 489 437</li>
-        <li data-motion-item="contact-email">Email: melbourneguitarschool@gmail.com</li>
+        <li data-motion-item="contact-email">Email: contact@melbourneguitarschool.com.au</li>
         <li data-motion-item="contact-studio">Studio: Rear 66/68 High St, Northcote VIC 3070</li>
         <li data-motion-item="contact-formats">Lesson formats: In-person and online</li>
       </ul>

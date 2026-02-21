@@ -1,5 +1,18 @@
+import type { Metadata } from "next";
+
 import { TweenLink } from "@/components/motion/tween-link";
 import { PanelLayout } from "@/components/panel-layout";
+
+export const metadata: Metadata = {
+  title: "Learn Guitar with a Modern, Personal Approach",
+  description:
+    "Melbourne Guitar School offers tailored guitar lessons in Northcote for beginners through advanced players. 30+ years experience, all levels welcome.",
+  openGraph: {
+    title: "Learn Guitar with a Modern, Personal Approach",
+    description:
+      "Melbourne Guitar School offers tailored guitar lessons in Northcote for beginners through advanced players. 30+ years experience, all levels welcome.",
+  },
+};
 
 export default function HomePage() {
   return (

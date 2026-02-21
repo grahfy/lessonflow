@@ -4,22 +4,26 @@ type PanelLayoutProps = PropsWithChildren<{
   kicker: string;
   title: string;
   lead: string;
-  visualLabel: string;
+  visualLabel?: string;
   visualClassName?: string;
   leadJustified?: boolean;
   actions?: ReactNode;
   secondary?: ReactNode;
+  visualContent?: ReactNode;
+  hideVisual?: boolean;
 }>;
 
 export function PanelLayout({
   kicker,
   title,
   lead,
-  visualLabel,
+  visualLabel = "Section",
   visualClassName,
   leadJustified = false,
   actions,
   secondary,
+  visualContent,
+  hideVisual = false,
   children
 }: PanelLayoutProps) {
   return (
@@ -38,14 +42,15 @@ export function PanelLayout({
           {secondary}
         </section>
 
-        <section className="panel-visual" aria-label={`${visualLabel} visual`} data-motion-item="visual">
-          <div className={`hero-image ${visualClassName || ""}`} role="img" aria-label={`${visualLabel} visual`} />
-          <div className="film-strip" aria-hidden="true">
-            <div className="thumb"></div>
-            <div className="thumb"></div>
-            <div className="thumb"></div>
-          </div>
-        </section>
+        {!hideVisual && (
+          <section className="panel-visual" aria-label={`${visualLabel} visual`} data-motion-item="visual">
+            {visualContent ? (
+              visualContent
+            ) : (
+              <div className={`hero-image ${visualClassName || ""}`} role="img" aria-label={`${visualLabel} visual`} />
+            )}
+          </section>
+        )}
       </div>
     </main>
   );

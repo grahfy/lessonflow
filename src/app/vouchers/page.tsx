@@ -1,5 +1,18 @@
+import type { Metadata } from "next";
+
 import { TweenLink } from "@/components/motion/tween-link";
 import { PanelLayout } from "@/components/panel-layout";
+
+export const metadata: Metadata = {
+  title: "Gift Vouchers - Guitar Lesson Gift Cards",
+  description:
+    "Give the gift of guitar lessons. Digital gift vouchers for beginners and returning players. Perfect for kids, teens, and adults of any experience level.",
+  openGraph: {
+    title: "Gift Vouchers - Guitar Lesson Gift Cards",
+    description:
+      "Give the gift of guitar lessons. Digital gift vouchers for beginners and returning players. Perfect for kids, teens, and adults of any experience level.",
+  },
+};
 
 export default function VouchersPage() {
   return (
@@ -27,9 +40,15 @@ export default function VouchersPage() {
       </div>
 
       <div className="button-row" data-motion-item="vouchers-actions">
-        <TweenLink className="btn btn-primary" href="/book" data-motion-item="vouchers-action-order">
+        <a
+          className="btn btn-primary"
+          href="https://giftup.app/place-order/903ac87a-4c81-4f66-6ec1-08de291b894b?platform=hosted"
+          target="_blank"
+          rel="noopener noreferrer"
+          data-motion-item="vouchers-action-order"
+        >
           Order a Voucher
-        </TweenLink>
+        </a>
         <TweenLink className="btn btn-secondary" href="/terms" data-motion-item="vouchers-action-terms">
           Voucher Terms
         </TweenLink>

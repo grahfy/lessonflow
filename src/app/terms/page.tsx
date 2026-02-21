@@ -1,5 +1,18 @@
+import type { Metadata } from "next";
+
 import { TweenLink } from "@/components/motion/tween-link";
 import { PanelLayout } from "@/components/panel-layout";
+
+export const metadata: Metadata = {
+  title: "Terms and Policies",
+  description:
+    "Melbourne Guitar School lesson policies including cancellation notice, refund policy, and gift voucher terms. Valid for six months from purchase.",
+  openGraph: {
+    title: "Terms and Policies",
+    description:
+      "Melbourne Guitar School lesson policies including cancellation notice, refund policy, and gift voucher terms. Valid for six months from purchase.",
+  },
+};
 
 export default function TermsPage() {
   return (
@@ -7,7 +20,7 @@ export default function TermsPage() {
       kicker="Policies"
       title="Simple terms for smooth weekly progress."
       lead="These summaries reflect the current policy structure. Final wording should always be confirmed before launch."
-      visualLabel="Acoustic guitar"
+      visualLabel="Terms photo"
       visualClassName="terms-hero"
       leadJustified
     >

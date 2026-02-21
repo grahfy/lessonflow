@@ -1,5 +1,18 @@
+import type { Metadata } from "next";
+
 import { TweenLink } from "@/components/motion/tween-link";
 import { PanelLayout } from "@/components/panel-layout";
+
+export const metadata: Metadata = {
+  title: "Your Teacher - Jon",
+  description:
+    "Learn guitar with Jon, an experienced guitarist with 30+ years playing, music production background, and endorsements from Ernie Ball Musicman Guitars Australia.",
+  openGraph: {
+    title: "Your Teacher - Jon",
+    description:
+      "Learn guitar with Jon, an experienced guitarist with 30+ years playing, music production background, and endorsements from Ernie Ball Musicman Guitars Australia.",
+  },
+};
 
 export default function TeacherPage() {
   return (

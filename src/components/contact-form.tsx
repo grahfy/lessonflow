@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 
 import { useNoticeTween } from "@/components/motion/use-notice-tween";
+import { useCaptcha } from "@/components/captcha";
 
 type ContactState =
   | { status: "idle" }
@@ -14,9 +15,17 @@ export function ContactForm() {
   const [loading, setLoading] = useState(false);
   const successNoticeRef = useNoticeTween(state.status === "success");
   const errorNoticeRef = useNoticeTween(state.status === "error");
+  const captcha = useCaptcha();
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    
+    if (!captcha.validateAnswer()) {
+      setState({ status: "error", message: "Please answer the math question correctly." });
+      captcha.regenerate();
+      return;
+    }
+    
     setLoading(true);
     setState({ status: "idle" });
 
@@ -70,6 +79,29 @@ export function ContactForm() {
       <div className="field full" data-motion-item="contact-message-field">
         <label htmlFor="contact-message">Message</label>
         <textarea id="contact-message" name="message" required />
+      </div>
+
+      <div className="field full" data-motion-item="contact-captcha-field">
+        <label htmlFor="contact-captcha">
+          Security question: {captcha.captcha?.question}
+        </label>
+        <input
+          id="contact-captcha"
+          name="captcha"
+          type="text"
+          inputMode="numeric"
+          required
+          value={captcha.userAnswer}
+          onChange={(e) => captcha.handleChange(e.currentTarget.value)}
+          autoComplete="off"
+        />
+        <button
+          type="button"
+          className="btn btn-small"
+          onClick={() => captcha.regenerate()}
+        >
+          New question
+        </button>
       </div>
 
       <div className="button-row" data-motion-item="contact-actions">
