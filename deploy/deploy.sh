@@ -230,12 +230,12 @@ fi
 
 # Generate Prisma client
 log_info "Generating Prisma client..."
-npx prisma generate
+npm exec --no -- prisma generate
 
 # Run database migrations
 if [[ "${SKIP_MIGRATE}" == false ]]; then
     log_info "Running database migrations..."
-    npx prisma migrate deploy
+    npm exec --no -- prisma migrate deploy
 else
     log_info "Skipping database migrations"
 fi
