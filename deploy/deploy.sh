@@ -144,7 +144,9 @@ log_info "Deploy directory: ${DEPLOY_DIR}"
 
 # Create directories if they don't exist
 mkdir -p "${RELEASES_DIR}"
-mkdir -p "${SHARED_DIR}"
+mkdir -p "${SHARED_DIR}/data"
+chown -R www-data:www-data "${DEPLOY_DIR}"
+chmod -R 775 "${SHARED_DIR}/data"
 
 # Create release directory with timestamp
 TIMESTAMP=$(date +%Y%m%d%H%M%S)
