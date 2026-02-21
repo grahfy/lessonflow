@@ -264,6 +264,25 @@ if [[ ! -f "${SERVICE_FILE}" ]]; then
     systemctl enable ${APP_NAME}
 fi
 
+# Ensure nginx config is installed
+NGINX_SITE_AVAILABLE="/etc/nginx/sites-available/${APP_NAME}"
+NGINX_SITE_ENABLED="/etc/nginx/sites-enabled/${APP_NAME}"
+if [[ ! -f "${NGINX_SITE_AVAILABLE}" ]]; then
+    log_info "Installing nginx configuration..."
+    cp "${NEW_RELEASE_DIR}/deploy/nginx.conf" "${NGINX_SITE_AVAILABLE}"
+    ln -sf "${NGINX_SITE_AVAILABLE}" "${NGINX_SITE_ENABLED}"
+    # Remove default site if it exists
+    rm -f /etc/nginx/sites-enabled/default
+    # Test and reload nginx
+    if nginx -t; then
+        systemctl reload nginx
+        log_info "Nginx configuration installed and reloaded"
+    else
+        log_error "Nginx configuration test failed"
+        exit 1
+    fi
+fi
+
 # Restart the service
 log_info "Restarting service..."
 systemctl restart ${APP_NAME}
