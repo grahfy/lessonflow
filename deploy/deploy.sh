@@ -256,6 +256,15 @@ log_info "Build successful: $(cat .next/BUILD_ID)"
 log_info "Updating current symlink..."
 ln -sfn "${NEW_RELEASE_DIR}" "${CURRENT_LINK}"
 
+# Ensure systemd service is installed
+SERVICE_FILE="/etc/systemd/system/${APP_NAME}.service"
+if [[ ! -f "${SERVICE_FILE}" ]]; then
+    log_info "Installing systemd service..."
+    cp "${NEW_RELEASE_DIR}/deploy/${APP_NAME}.service" "${SERVICE_FILE}"
+    systemctl daemon-reload
+    systemctl enable ${APP_NAME}
+fi
+
 # Restart the service
 log_info "Restarting service..."
 systemctl restart ${APP_NAME}
