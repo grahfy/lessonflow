@@ -35,7 +35,7 @@ export function customerSnapshotFromCustomer(customer: Pick<Customer, "fullName"
 export function sellerSnapshotFromEnv(): InvoiceSellerSnapshot {
   return {
     sellerBusinessName: process.env.INVOICE_BUSINESS_NAME || "Melbourne Guitar School",
-    sellerAbn: process.env.INVOICE_BUSINESS_ABN || "",
+    sellerAbn: process.env.INVOICE_BUSINESS_ABN || "76 971 833 749",
     sellerEmail: process.env.SMTP_FROM || null,
     bankName: process.env.INVOICE_BANK_NAME || "",
     bankBsb: process.env.INVOICE_BANK_BSB || "",
