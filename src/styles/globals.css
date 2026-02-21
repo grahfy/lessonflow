@@ -2006,6 +2006,14 @@ h1 {
     background-position: top;
   }
 
+  .home-hero {
+    min-height: 400px;
+  }
+
+  .vouchers-hero {
+    min-height: 400px;
+  }
+
   .form-grid {
     grid-template-columns: 1fr;
   }
