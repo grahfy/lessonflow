@@ -2002,6 +2002,7 @@ h1 {
   }
 
   .teacher-hero {
+    min-height: 400px;
     background-position: top;
   }
 
