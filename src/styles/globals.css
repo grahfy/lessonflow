@@ -2014,6 +2014,14 @@ h1 {
     min-height: 400px;
   }
 
+  .lessons-hero {
+    min-height: 400px;
+  }
+
+  .terms-hero {
+    min-height: 400px;
+  }
+
   .form-grid {
     grid-template-columns: 1fr;
   }
