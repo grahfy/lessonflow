@@ -44,7 +44,7 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord): Promise<
   try {
     const logoBytes = await fs.readFile(path.join(process.cwd(), "public/images/company-logo-invoice.png"));
     const logoImage = await document.embedPng(logoBytes);
-    const scale = 120 / logoImage.height;
+    const scale = 180 / logoImage.height;
     const logoDims = logoImage.scale(scale);
     page.drawImage(logoImage, {
       x: 40,
