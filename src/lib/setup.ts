@@ -169,6 +169,19 @@ export const CONFIGURABLE_ENV_VARS = [
     }
   },
   {
+    key: "STUDENT_PORTAL_PASSWORD_ENCRYPTION_KEY",
+    title: "Portal Credential Encryption Key",
+    description: "Random string used to encrypt/decrypt student portal passwords (32+ characters required).",
+    placeholder: "generate-encryption-key",
+    isRequired: true,
+    isSecret: true,
+    validation: (v: string) => {
+      if (!v.trim()) return "Portal credential encryption key is required";
+      if (v.length < 32) return "Must be at least 32 characters";
+      return null;
+    }
+  },
+  {
     key: "CRON_SECRET",
     title: "Cron Secret",
     description: "Secret for scheduled job endpoints (24+ characters recommended).",
@@ -234,6 +247,80 @@ export const CONFIGURABLE_ENV_VARS = [
     title: "Bank Account Number",
     description: "Account number for invoice payments.",
     placeholder: "12345678",
+    isRequired: false,
+    isSecret: false,
+    validation: () => null
+  },
+  {
+    key: "STUDENT_SESSION_MAX_AGE_SECONDS",
+    title: "Student Session Max Age",
+    description: "Duration of student portal sessions in seconds.",
+    placeholder: "2592000",
+    isRequired: false,
+    isSecret: false,
+    validation: (v: string) => {
+      if (!v.trim()) return null;
+      const val = parseInt(v, 10);
+      return isNaN(val) ? "Must be a number" : null;
+    }
+  },
+  {
+    key: "STUDENT_PORTAL_PASSWORD_LENGTH",
+    title: "Student Portal Password Length",
+    description: "Required length for student portal passwords.",
+    placeholder: "14",
+    isRequired: false,
+    isSecret: false,
+    validation: (v: string) => {
+      if (!v.trim()) return null;
+      const val = parseInt(v, 10);
+      return isNaN(val) ? "Must be a number" : null;
+    }
+  },
+  {
+    key: "INVOICE_PAYMENT_TERMS_DAYS",
+    title: "Invoice Payment Terms",
+    description: "Number of days for invoice payment terms.",
+    placeholder: "14",
+    isRequired: false,
+    isSecret: false,
+    validation: (v: string) => {
+      if (!v.trim()) return null;
+      const val = parseInt(v, 10);
+      return isNaN(val) ? "Must be a number" : null;
+    }
+  },
+  {
+    key: "INVOICE_GST_REGISTERED",
+    title: "GST Registered",
+    description: "Whether the business is GST registered (true/false).",
+    placeholder: "false",
+    isRequired: false,
+    isSecret: false,
+    validation: (v: string) => {
+      const val = v.toLowerCase().trim();
+      if (val !== "true" && val !== "false") return "Must be 'true' or 'false'";
+      return null;
+    }
+  },
+  {
+    key: "INVOICE_DEFAULT_TAX_MODE",
+    title: "Default Tax Mode",
+    description: "Default tax mode for invoices (gst_free, gst_inclusive, or gst_exclusive).",
+    placeholder: "gst_free",
+    isRequired: false,
+    isSecret: false,
+    validation: (v: string) => {
+      if (!v.trim()) return null;
+      if (!["gst_free", "gst_inclusive", "gst_exclusive"].includes(v)) return "Invalid tax mode";
+      return null;
+    }
+  },
+  {
+    key: "INVOICE_CREDIT_NOTE_PREFIX",
+    title: "Credit Note Prefix",
+    description: "Prefix for credit note numbers.",
+    placeholder: "MGSCN",
     isRequired: false,
     isSecret: false,
     validation: () => null
