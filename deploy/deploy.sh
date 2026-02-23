@@ -196,18 +196,45 @@ log_info "Generating Prisma client..."
 npm exec --no -- prisma generate
 
 # Run database migrations
-if [[ "${DB_PUSH}" == true ]]; then
-    log_info "Pushing database schema (db push)..."
-    npm exec --no -- prisma db push --accept-data-loss
-elif [[ "${SKIP_MIGRATE}" == false ]]; then
+run_migrations() {
     # Check if migrations directory exists and has migrations
     if [[ ! -d "prisma/migrations" || -z "$(ls -A prisma/migrations 2>/dev/null)" ]]; then
         log_warn "No migrations found in prisma/migrations. Using db push instead."
         npm exec --no -- prisma db push --accept-data-loss
-    else
-        log_info "Running database migrations..."
-        npm exec --no -- prisma migrate deploy
+        return $?
     fi
+    
+    log_info "Running database migrations..."
+    
+    # Try migrate deploy first
+    if npm exec --no -- prisma migrate deploy 2>&1; then
+        return 0
+    fi
+    
+    # If failed with P3005 (database not empty, needs baseline), handle it
+    log_warn "Migration failed, attempting to baseline existing database..."
+    
+    # Get the first migration name (for baselining)
+    local first_migration=$(ls -1 prisma/migrations | head -1)
+    
+    if [[ -z "${first_migration}" ]]; then
+        log_error "No migrations found to baseline"
+        return 1
+    fi
+    
+    log_info "Resolving migration as baseline: ${first_migration}"
+    npm exec --no -- prisma migrate resolve --applied "${first_migration}"
+    
+    # Apply any remaining migrations
+    log_info "Applying remaining migrations..."
+    npm exec --no -- prisma migrate deploy
+}
+
+if [[ "${DB_PUSH}" == true ]]; then
+    log_info "Pushing database schema (db push)..."
+    npm exec --no -- prisma db push --accept-data-loss
+elif [[ "${SKIP_MIGRATE}" == false ]]; then
+    run_migrations
 else
     log_info "Skipping database migrations"
 fi
