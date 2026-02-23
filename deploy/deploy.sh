@@ -228,12 +228,8 @@ run_migrations() {
     # Execute the baseline migration SQL manually (resolve --applied doesn't run SQL)
     local migration_sql="prisma/migrations/${first_migration}/migration.sql"
     if [[ -f "${migration_sql}" ]]; then
-        log_info "Applying baseline migration SQL..."
-        # Extract DATABASE_URL and run the SQL
-        local db_url=$(grep "^DATABASE_URL=" "${ENV_FILE}" | cut -d'=' -f2- | tr -d '"')
-        if [[ -n "${db_url}" ]]; then
-            mysql "${db_url}" < "${migration_sql}" 2>&1 || log_warn "Migration SQL may have already been applied"
-        fi
+        log_info "Applying baseline migration SQL via prisma db execute..."
+        npm exec --no -- prisma db execute --file "${migration_sql}" --schema prisma/schema.prisma 2>&1 || log_warn "Migration SQL may have already been applied"
     fi
     
     # Apply any remaining migrations
