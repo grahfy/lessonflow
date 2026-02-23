@@ -328,9 +328,9 @@ model OutboundEmail {
   id        String   @id @default(cuid())
   toEmail   String
   subject   String
-  htmlBody  String
+  htmlBody  String   @db.Text
   status    String
-  error     String?
+  error     String?  @db.Text
   createdAt DateTime @default(now())
 }
 
