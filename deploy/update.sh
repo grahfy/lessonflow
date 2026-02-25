@@ -963,7 +963,7 @@ print_tui_option_row() {
   local key="$1"
   local label="$2"
   local value="$3"
-  printf "  %b[%2s]%b %b%-22s%b %b%s%b\n" "${BOLD}${MAGENTA}" "${key}" "${NC}" "${CYAN}" "${label}" "${NC}" "${GREEN}" "${value}" "${NC}"
+  printf "  %b[%2s]%b %b%-22s%b %b%s%b\n" "${BOLD}${MAGENTA}" "${key}" "${NC}" "${BOLD}${CYAN}" "${label}" "${NC}" "${BOLD}${GREEN}" "${value}" "${NC}"
 }
 
 print_tui_option_desc() {
@@ -1027,8 +1027,8 @@ print_tui_option_pair() {
     right_desc_text="$(tui_truncate_text "${right_desc}" "${col_width}")"
   fi
 
-  printf "  %b%-*s%b  %b%-*s%b\n" "${CYAN}" "${col_width}" "${left_cell}" "${NC}" "${GREEN}" "${col_width}" "${right_cell}" "${NC}"
-  printf "  %b%-*s%b  %b%-*s%b\n" "${DIM}${BLUE}" "${col_width}" "${left_desc_text}" "${NC}" "${DIM}${BLUE}" "${col_width}" "${right_desc_text}" "${NC}"
+  printf "  %b%-*s%b  %b%-*s%b\n" "${BOLD}${CYAN}" "${col_width}" "${left_cell}" "${NC}" "${BOLD}${GREEN}" "${col_width}" "${right_cell}" "${NC}"
+  printf "  %b%-*s%b  %b%-*s%b\n" "${DIM}" "${col_width}" "${left_desc_text}" "${NC}" "${DIM}" "${col_width}" "${right_desc_text}" "${NC}"
 }
 
 print_tui_action_pair() {
