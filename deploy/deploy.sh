@@ -22,7 +22,7 @@
 # Prerequisites (unless --setup-packages):
 #   - Node.js 20+ installed
 #   - MySQL database configured
-#   - Environment file at /var/www/melbourne-guitar-school/shared/.env
+#   - .env.example present in the repo (script bootstraps shared/.env if missing)
 #   - Nginx and systemd configured
 # =============================================================================
 
@@ -258,6 +258,117 @@ prompt_yes_no() {
     done
 }
 
+# Returns 0 when the provided path resolves inside the production deploy tree.
+# This is used to decide whether to offer an .env edit prompt for ad-hoc deploys
+# started from a non-production checkout (for example a home-directory clone).
+path_is_within_deploy_dir() {
+    local candidate="$1"
+    local resolved_candidate=""
+    local resolved_deploy=""
+
+    resolved_candidate="$(cd "${candidate}" 2>/dev/null && pwd -P || true)"
+    resolved_deploy="${DEPLOY_DIR}"
+
+    [[ -n "${resolved_candidate}" ]] || return 1
+    [[ "${resolved_candidate}" == "${resolved_deploy}" || "${resolved_candidate}" == "${resolved_deploy}/"* ]]
+}
+
+# Chooses a terminal editor command for optional shared .env edits.
+# We intentionally accept a single command token (for example nano/vi/vim).
+pick_env_editor() {
+    local candidate="${VISUAL:-${EDITOR:-nano}}"
+
+    if command -v "${candidate}" >/dev/null 2>&1; then
+        printf '%s\n' "${candidate}"
+        return 0
+    fi
+
+    for candidate in nano vi vim; do
+        if command -v "${candidate}" >/dev/null 2>&1; then
+            printf '%s\n' "${candidate}"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+# Ensures the shared production .env file exists, bootstrapping it from the
+# repository .env.example when missing so first-time server deploys have a file
+# to edit before the release is built.
+ensure_shared_env_file() {
+    local env_template_path="$1"
+    local shared_env_path="${SHARED_DIR}/.env"
+
+    mkdir -p "${SHARED_DIR}"
+
+    if [[ -f "${shared_env_path}" ]]; then
+        log_info "Shared .env found: ${shared_env_path}"
+    elif [[ -f "${env_template_path}" ]]; then
+        cp "${env_template_path}" "${shared_env_path}"
+        chown www-data:www-data "${shared_env_path}" 2>/dev/null || true
+        chmod 640 "${shared_env_path}" 2>/dev/null || true
+        log_info "Created shared .env from template: ${shared_env_path}"
+    else
+        log_warn "No shared .env file found and no template available at ${env_template_path}"
+        return 1
+    fi
+
+    # Re-apply runtime ownership in case the file was previously edited as root.
+    chown www-data:www-data "${shared_env_path}" 2>/dev/null || true
+    chmod 640 "${shared_env_path}" 2>/dev/null || true
+    return 0
+}
+
+# Opens the shared production .env in a terminal editor on demand and restores
+# app runtime ownership/permissions after the edit completes.
+edit_shared_env_now() {
+    local shared_env_path="${SHARED_DIR}/.env"
+    local editor_cmd=""
+
+    [[ "${IS_TTY}" == true ]] || return 0
+
+    if [[ ! -f "${shared_env_path}" ]]; then
+        log_warn "Shared .env file not found at ${shared_env_path}"
+        return 1
+    fi
+
+    if ! editor_cmd="$(pick_env_editor)"; then
+        log_warn "No terminal editor found (checked VISUAL/EDITOR, nano, vi, vim)."
+        log_warn "Edit manually: ${shared_env_path}"
+        return 0
+    fi
+
+    if ! "${editor_cmd}" "${shared_env_path}"; then
+        log_warn "Editor exited with an error; continuing deployment."
+        return 0
+    fi
+
+    chown www-data:www-data "${shared_env_path}" 2>/dev/null || true
+    chmod 640 "${shared_env_path}" 2>/dev/null || true
+    log_info "Shared .env review complete"
+    return 0
+}
+
+maybe_edit_shared_env_before_deploy() {
+    local source_path="$1"
+    local shared_env_path="${SHARED_DIR}/.env"
+
+    [[ "${IS_TTY}" == true ]] || return 0
+    [[ -f "${shared_env_path}" ]] || return 0
+
+    if path_is_within_deploy_dir "${source_path}"; then
+        return 0
+    fi
+
+    log_warn "Deploy source is outside ${DEPLOY_DIR}; review shared .env before deploying."
+    if ! prompt_yes_no "Open ${shared_env_path} in an editor now?" "y"; then
+        return 0
+    fi
+
+    edit_shared_env_now || true
+}
+
 # Prompt for a value while supporting a visible default for common deploy fields.
 prompt_value() {
     local prompt="$1"
@@ -405,6 +516,8 @@ print_deploy_tui_menu() {
     print_tui_panel_rule 78
     print_tui_option_row "9" "Spinner UI" "$(spinner_ui_word)"
     print_tui_option_desc "Animated progress spinner for long commands (disable in noisy terminals/log capture)."
+    print_tui_option_row "10" "Edit shared .env" "Open editor now"
+    print_tui_option_desc "Bootstraps ${SHARED_DIR}/.env from .env.example if missing, then opens it."
     echo ""
     print_tui_panel_rule 78
     echo -e "  ${BOLD}Actions${NC}:  ${BOLD}S${NC} Start deploy   ${BOLD}Q${NC} Cancel"
@@ -418,7 +531,7 @@ run_interactive_setup() {
 
     while true; do
         print_deploy_tui_menu
-        read -r -p "Select option [1-9, s, q]: " choice
+        read -r -p "Select option [1-10, s, q]: " choice
 
         case "${choice,,}" in
             1)
@@ -459,6 +572,11 @@ run_interactive_setup() {
                 ;;
             9)
                 NO_SPINNER="$(toggle_bool "${NO_SPINNER}")"
+                ;;
+            10)
+                section "Environment File (.env)"
+                ensure_shared_env_file "${SCRIPT_DIR}/../.env.example" || true
+                edit_shared_env_now || true
                 ;;
             s)
                 break
@@ -1415,6 +1533,10 @@ mkdir -p "${RELEASES_DIR}"
 mkdir -p "${SHARED_DIR}/data"
 chown -R www-data:www-data "${DEPLOY_DIR}"
 chmod -R 775 "${SHARED_DIR}/data"
+
+section "Environment File (.env)"
+ensure_shared_env_file "${SOURCE_DIR}/.env.example" || true
+maybe_edit_shared_env_before_deploy "${SOURCE_DIR}"
 
 # Prune old releases before creating a new one so a previous failed deploy
 # cannot block the next build with an ENOSPC error.

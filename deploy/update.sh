@@ -40,6 +40,9 @@ ORIGINAL_ARGS=( "$@" )
 
 # Runtime configuration defaults. Branch defaults to the current checked-out
 # branch later so server operators can simply run ./deploy/update.sh.
+APP_NAME="melbourne-guitar-school"
+DEPLOY_DIR="/var/www/${APP_NAME}"
+SHARED_DIR="${DEPLOY_DIR}/shared"
 REMOTE_NAME="origin"
 BRANCH=""
 SKIP_PULL=false
@@ -263,6 +266,154 @@ prompt_value() {
   echo "${value}"
 }
 
+# Returns 0 when the provided path resolves inside the production deploy tree.
+# The update wrapper uses this to decide whether to prompt for a shared .env edit
+# before delegating to deploy.sh.
+path_is_within_deploy_dir() {
+  local candidate="$1"
+  local resolved_candidate=""
+
+  resolved_candidate="$(cd "${candidate}" 2>/dev/null && pwd -P || true)"
+  [[ -n "${resolved_candidate}" ]] || return 1
+  [[ "${resolved_candidate}" == "${DEPLOY_DIR}" || "${resolved_candidate}" == "${DEPLOY_DIR}/"* ]]
+}
+
+# Chooses a terminal editor command for optional shared .env edits.
+# We intentionally accept a single command token (for example nano/vi/vim).
+pick_env_editor() {
+  local candidate="${VISUAL:-${EDITOR:-nano}}"
+
+  if command -v "${candidate}" >/dev/null 2>&1; then
+    printf '%s\n' "${candidate}"
+    return 0
+  fi
+
+  for candidate in nano vi vim; do
+    if command -v "${candidate}" >/dev/null 2>&1; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+# Runs a privileged command for shared env maintenance. The shared deploy path
+# is typically root-owned, so the wrapper escalates as needed before deploy.sh.
+run_shared_env_cmd() {
+  if [[ ${EUID} -eq 0 ]]; then
+    "$@"
+    return $?
+  fi
+
+  if ! should_use_sudo_for_deploy; then
+    "$@"
+    return $?
+  fi
+
+  ensure_sudo_for_deploy_ready
+  sudo "$@"
+}
+
+# Ensures /var/www/.../shared/.env exists, copying the repo .env.example on
+# first-run servers so operators have a file to review before deployment.
+ensure_shared_env_file() {
+  local env_template_path="$1"
+  local shared_env_path="${SHARED_DIR}/.env"
+
+  if ! run_shared_env_cmd mkdir -p "${SHARED_DIR}"; then
+    log_warn "Unable to create ${SHARED_DIR} (permissions?)."
+    log_warn "deploy.sh will retry shared .env setup during deployment."
+    return 1
+  fi
+
+  if [[ -f "${shared_env_path}" ]]; then
+    log_info "Shared .env found: ${shared_env_path}"
+  elif [[ -f "${env_template_path}" ]]; then
+    if ! run_shared_env_cmd cp "${env_template_path}" "${shared_env_path}"; then
+      log_warn "Unable to copy ${env_template_path} to ${shared_env_path}."
+      log_warn "deploy.sh will retry shared .env setup during deployment."
+      return 1
+    fi
+    run_shared_env_cmd chown www-data:www-data "${shared_env_path}" || true
+    run_shared_env_cmd chmod 640 "${shared_env_path}" || true
+    log_info "Created shared .env from template: ${shared_env_path}"
+  else
+    log_warn "No shared .env file found and no template available at ${env_template_path}"
+    return 1
+  fi
+
+  # Re-apply runtime ownership in case a previous manual edit left the file as
+  # root-owned and unreadable by the app service user.
+  run_shared_env_cmd chown www-data:www-data "${shared_env_path}" || true
+  run_shared_env_cmd chmod 640 "${shared_env_path}" || true
+  return 0
+}
+
+# Opens the shared production .env in a terminal editor on demand and restores
+# app runtime ownership/permissions after the edit completes.
+edit_shared_env_now() {
+  local shared_env_path="${SHARED_DIR}/.env"
+  local editor_cmd=""
+
+  [[ "${IS_TTY}" == true ]] || return 0
+
+  if [[ ! -f "${shared_env_path}" ]]; then
+    log_warn "Shared .env file not found at ${shared_env_path}"
+    return 1
+  fi
+
+  if ! editor_cmd="$(pick_env_editor)"; then
+    log_warn "No terminal editor found (checked VISUAL/EDITOR, nano, vi, vim)."
+    log_warn "Edit manually: ${shared_env_path}"
+    return 0
+  fi
+
+  if [[ ${EUID} -eq 0 ]]; then
+    if ! "${editor_cmd}" "${shared_env_path}"; then
+      log_warn "Editor exited with an error; continuing deployment."
+      return 0
+    fi
+  else
+    if should_use_sudo_for_deploy; then
+      ensure_sudo_for_deploy_ready
+      if ! sudo "${editor_cmd}" "${shared_env_path}"; then
+        log_warn "Editor exited with an error; continuing deployment."
+        return 0
+      fi
+    else
+      if ! "${editor_cmd}" "${shared_env_path}"; then
+        log_warn "Editor exited with an error; continuing deployment."
+        return 0
+      fi
+    fi
+  fi
+
+  run_shared_env_cmd chown www-data:www-data "${shared_env_path}" || true
+  run_shared_env_cmd chmod 640 "${shared_env_path}" || true
+  log_info "Shared .env review complete"
+  return 0
+}
+
+maybe_edit_shared_env_before_deploy() {
+  local source_path="$1"
+  local shared_env_path="${SHARED_DIR}/.env"
+
+  [[ "${IS_TTY}" == true ]] || return 0
+  [[ -f "${shared_env_path}" ]] || return 0
+
+  if path_is_within_deploy_dir "${source_path}"; then
+    return 0
+  fi
+
+  log_warn "Repository is outside ${DEPLOY_DIR}; review shared .env before deploying."
+  if ! prompt_yes_no "Open ${shared_env_path} in an editor now?" "y"; then
+    return 0
+  fi
+
+  edit_shared_env_now || true
+}
+
 bool_word() {
   if [[ "$1" == true ]]; then
     echo "ON"
@@ -411,18 +562,20 @@ print_update_tui_menu() {
   print_tui_option_desc "ON lets deploy.sh install/update managed crontab jobs. OFF passes --skip-cron."
   print_tui_option_row "9" "Spinner UI" "$(spinner_ui_word)"
   print_tui_option_desc "Animated progress spinner for git/deploy wrapper steps."
+  print_tui_option_row "10" "Edit shared .env" "Open editor now"
+  print_tui_option_desc "Bootstraps ${SHARED_DIR}/.env from .env.example if missing, then opens it."
   if [[ "${SKIP_DEPLOY}" == false ]]; then
     print_tui_panel_rule 92
     echo -e "${BOLD}  Deploy Pass-through Options${NC}"
     print_tui_panel_rule 92
-    print_tui_option_row "10" "Database mode" "$(update_migration_mode_label)"
+    print_tui_option_row "11" "Database mode" "$(update_migration_mode_label)"
     print_tui_option_desc "Cycles deploy DB behavior: migrate deploy / skip migrations / db push."
-    print_tui_option_row "11" "SSL setup" "$(bool_word "${SSL_SETUP}")"
+    print_tui_option_row "12" "SSL setup" "$(bool_word "${SSL_SETUP}")"
     print_tui_option_desc "Passes SSL setup flags to deploy.sh to run certbot + nginx config."
     if [[ "${SSL_SETUP}" == true ]]; then
-      print_tui_option_row "12" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}"
+      print_tui_option_row "13" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}"
       print_tui_option_desc "Domain used for certificate request and nginx server_name config."
-      print_tui_option_row "13" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}"
+      print_tui_option_row "14" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}"
       print_tui_option_desc "Email for Let's Encrypt registration and renewal alerts."
     fi
   fi
@@ -676,7 +829,7 @@ run_interactive_setup() {
 
   while true; do
     print_update_tui_menu
-    read -r -p "Select option [1-13, s, q]: " choice
+    read -r -p "Select option [1-14, s, q]: " choice
 
     case "${choice,,}" in
       1)
@@ -718,13 +871,18 @@ run_interactive_setup() {
         NO_SPINNER="$(toggle_bool "${NO_SPINNER}")"
         ;;
       10)
+        section "Environment File (.env)"
+        ensure_shared_env_file "${REPO_ROOT}/.env.example" || true
+        edit_shared_env_now || true
+        ;;
+      11)
         if [[ "${SKIP_DEPLOY}" == false ]]; then
           cycle_update_migration_mode
         else
           log_warn "Enable deploy first to change deploy pass-through options."
         fi
         ;;
-      11)
+      12)
         if [[ "${SKIP_DEPLOY}" == false ]]; then
           SSL_SETUP="$(toggle_bool "${SSL_SETUP}")"
           if [[ "${SSL_SETUP}" == true ]]; then
@@ -735,14 +893,14 @@ run_interactive_setup() {
           log_warn "Enable deploy first to configure SSL options."
         fi
         ;;
-      12)
+      13)
         if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true ]]; then
           SSL_DOMAIN="$(prompt_value "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}")"
         else
           log_warn "Enable deploy + SSL setup first to edit SSL domain."
         fi
         ;;
-      13)
+      14)
         if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true ]]; then
           SSL_EMAIL="$(prompt_value "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}")"
         else
@@ -980,6 +1138,9 @@ else
 fi
 
 if [[ "${SKIP_DEPLOY}" == false ]]; then
+  section "Environment File (.env)"
+  ensure_shared_env_file "${REPO_ROOT}/.env.example" || true
+  maybe_edit_shared_env_before_deploy "${REPO_ROOT}"
   run_deploy
 else
   section "Deploy"
