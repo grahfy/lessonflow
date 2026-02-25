@@ -321,6 +321,10 @@ async function readApiErrorFromResponse(response: Response, fallback: string): P
     return "Your admin session has expired. Please sign in again.";
   }
 
+  if (response.status === 413) {
+    return `${fallback} The file is too large for the server upload limit. Try a smaller file (app limit: 25MB), or increase nginx client_max_body_size.`;
+  }
+
   if (contentType.includes("text/html")) {
     return `${fallback} The server returned HTML instead of JSON. Check login status or proxy redirects.`;
   }
@@ -413,6 +417,8 @@ export function AdminBookingsClient() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<EventWithRow | null>(null);
   const [dialogForm, setDialogForm] = useState<DialogForm | null>(null);
+  const [moveDialogOpen, setMoveDialogOpen] = useState(false);
+  const [moveDialogStartAtLocal, setMoveDialogStartAtLocal] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerRow | null>(null);
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
   const [manualDurationChoice, setManualDurationChoice] = useState<DurationChoice>("min60");
@@ -633,6 +639,8 @@ export function AdminBookingsClient() {
     setNotice("");
     setSelectedEvent(event);
     setDialogForm(defaultFormFromEvent(event));
+    setMoveDialogOpen(false);
+    setMoveDialogStartAtLocal("");
     setSelectedCustomer(null);
     setIsEditingCustomer(false);
     setEmailSubject("");
@@ -679,6 +687,8 @@ export function AdminBookingsClient() {
     }
 
     setBusyAction(null);
+    setMoveDialogOpen(false);
+    setMoveDialogStartAtLocal("");
     if (dialogRootRef.current) {
       await animateOut(dialogRootRef.current, { scope: "admin" });
     }
@@ -1280,18 +1290,35 @@ export function AdminBookingsClient() {
     await load();
   }
 
+  function openMoveDialog() {
+    if (!selectedEvent || !dialogForm) {
+      return;
+    }
+    setError("");
+    setMoveDialogStartAtLocal(dialogForm.startAtLocal);
+    setMoveDialogOpen(true);
+  }
+
+  function closeMoveDialog() {
+    if (busyAction === "move") {
+      return;
+    }
+    setMoveDialogOpen(false);
+    setMoveDialogStartAtLocal("");
+  }
+
   async function moveSelected() {
     if (!selectedEvent || !dialogForm) {
       return;
     }
-    const newStartAt = toIsoFromLocal(dialogForm.startAtLocal);
+    const newStartAt = toIsoFromLocal(moveDialogStartAtLocal);
     if (!newStartAt) {
       setError("Please enter a valid date and time.");
       return;
     }
 
     setBusyAction("move");
-    // "Move" uses the editable Start field in the current dialog (no separate modal).
+    // Move runs through a dedicated popup so admins can confirm the new date/time explicitly.
     const ok =
       selectedEvent.entityType === "booking"
         ? await mutateBooking("move", { newStartAt })
@@ -1300,6 +1327,9 @@ export function AdminBookingsClient() {
     if (!ok) {
       return;
     }
+    setDialogForm((prev) => (prev ? { ...prev, startAtLocal: moveDialogStartAtLocal } : prev));
+    setMoveDialogOpen(false);
+    setMoveDialogStartAtLocal("");
     setNotice("Booking moved.");
     await load();
   }
@@ -2759,7 +2789,7 @@ export function AdminBookingsClient() {
                         </div>
                       ) : null}
                       <div className="field">
-                        <label>Start (edit this field to move)</label>
+                        <label>Start</label>
                         <input
                           type="datetime-local"
                           value={dialogForm.startAtLocal}
@@ -2787,8 +2817,8 @@ export function AdminBookingsClient() {
                 <button className="btn btn-primary" type="button" disabled={!!busyAction} onClick={() => void saveDetails()}>
                   {busyAction === "save" ? "Saving..." : "Save details"}
                 </button>
-                <button className="btn btn-secondary" type="button" disabled={!!busyAction} onClick={() => void moveSelected()}>
-                  {busyAction === "move" ? "Moving..." : "Move booking"}
+                <button className="btn btn-secondary" type="button" disabled={!!busyAction} onClick={openMoveDialog}>
+                  {busyAction === "move" ? "Moving..." : selectedIsPending ? "Move request" : "Move booking"}
                 </button>
                 {!selectedIsPending ? (
                   <button className="btn btn-primary" type="button" disabled={!!busyAction} onClick={openInvoiceDialog}>
@@ -2849,6 +2879,53 @@ export function AdminBookingsClient() {
               </div>
             </form>
           </div>
+          {moveDialogOpen ? (
+            <div
+              className="dialog-backdrop is-secondary"
+              role="presentation"
+              data-motion-item="move-dialog-backdrop"
+              onClick={closeMoveDialog}
+            >
+              <div
+                className="dialog-panel dialog-panel-compact"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="move-dialog-title"
+                data-motion-item="move-dialog-panel"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="dialog-head" data-motion-item="move-dialog-head">
+                  <h3 id="move-dialog-title" data-motion-item="move-dialog-title">
+                    {selectedIsPending ? "Move Booking Request" : "Move Booking"}
+                  </h3>
+                  <button className="btn btn-secondary" type="button" disabled={busyAction === "move"} onClick={closeMoveDialog}>
+                    Close
+                  </button>
+                </div>
+                <p className="helper-text dialog-status" data-motion-item="move-dialog-status">
+                  Choose the new date and time, then confirm to update the calendar event.
+                </p>
+                <div className="field" data-motion-item="move-dialog-start-field">
+                  <label htmlFor="move-dialog-start-at">New start date & time</label>
+                  <input
+                    id="move-dialog-start-at"
+                    type="datetime-local"
+                    value={moveDialogStartAtLocal}
+                    autoFocus
+                    onChange={(event) => setMoveDialogStartAtLocal(event.target.value)}
+                  />
+                </div>
+                <div className="dialog-actions dialog-actions-secondary" data-motion-item="move-dialog-actions">
+                  <button className="btn btn-secondary" type="button" disabled={busyAction === "move"} onClick={closeMoveDialog}>
+                    Cancel
+                  </button>
+                  <button className="btn btn-primary" type="button" disabled={busyAction === "move"} onClick={() => void moveSelected()}>
+                    {busyAction === "move" ? "Moving..." : "Confirm move"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
           {invoiceDialogPresence.isMounted ? (
             <div
               className="dialog-backdrop is-secondary"
