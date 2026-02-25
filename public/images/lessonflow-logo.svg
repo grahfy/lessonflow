@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="960" height="240" viewBox="0 0 960 240" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="lessonflow-logo-title lessonflow-logo-desc">
+  <title id="lessonflow-logo-title">LessonFlow logo</title>
+  <desc id="lessonflow-logo-desc">A rounded square icon with flowing lines and a music note, followed by the LessonFlow wordmark.</desc>
+  <defs>
+    <linearGradient id="lf-bg" x1="36" y1="28" x2="220" y2="212" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0B1220"/>
+      <stop offset="0.55" stop-color="#11223E"/>
+      <stop offset="1" stop-color="#0C3A4A"/>
+    </linearGradient>
+    <linearGradient id="lf-flow" x1="45" y1="71" x2="210" y2="176" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#54E3C2"/>
+      <stop offset="0.55" stop-color="#63A7FF"/>
+      <stop offset="1" stop-color="#F4D36B"/>
+    </linearGradient>
+    <linearGradient id="lf-word" x1="282" y1="58" x2="775" y2="175" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#EAF6FF"/>
+      <stop offset="0.58" stop-color="#D8E8FF"/>
+      <stop offset="1" stop-color="#BEEFFF"/>
+    </linearGradient>
+    <filter id="lf-shadow" x="18" y="14" width="224" height="224" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#08101D" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Icon mark -->
+  <g filter="url(#lf-shadow)">
+    <rect x="30" y="26" width="200" height="200" rx="44" fill="url(#lf-bg)"/>
+    <rect x="31" y="27" width="198" height="198" rx="43" stroke="rgba(255,255,255,0.12)"/>
+  </g>
+
+  <!-- Flow lines (appointments -> invoices -> reports) -->
+  <path d="M56 85C88 61 119 59 144 76C163 88 179 110 204 111" stroke="url(#lf-flow)" stroke-width="11" stroke-linecap="round"/>
+  <path d="M58 119C89 97 117 96 142 112C164 126 180 149 205 150" stroke="url(#lf-flow)" stroke-width="9" stroke-linecap="round" opacity="0.92"/>
+  <path d="M60 153C88 136 114 135 136 149C157 163 177 182 205 184" stroke="url(#lf-flow)" stroke-width="7" stroke-linecap="round" opacity="0.82"/>
+
+  <!-- Appointment nodes -->
+  <circle cx="72" cy="84" r="8" fill="#54E3C2"/>
+  <circle cx="72" cy="119" r="7" fill="#63A7FF"/>
+  <circle cx="72" cy="153" r="6" fill="#F4D36B"/>
+
+  <!-- Music note + portal dot motif -->
+  <circle cx="146" cy="147" r="18" fill="#0C1326" stroke="#9FD2FF" stroke-width="4"/>
+  <path d="M164 86V140" stroke="#DDF4FF" stroke-width="8" stroke-linecap="round"/>
+  <path d="M164 97C176 90 186 88 193 88V132" stroke="#DDF4FF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="191" cy="134" r="12" fill="#0C1326" stroke="#F4D36B" stroke-width="4"/>
+
+  <!-- Wordmark -->
+  <text x="278" y="126" fill="url(#lf-word)" font-size="72" font-weight="700" letter-spacing="0.2" font-family="Inter, Sora, Segoe UI, Arial, sans-serif">LessonFlow</text>
+  <text x="282" y="166" fill="#A8BED3" font-size="22" letter-spacing="1.4" font-family="Inter, Segoe UI, Arial, sans-serif">MUSIC TEACHING OPERATIONS PLATFORM</text>
+
+  <!-- Accent divider -->
+  <rect x="282" y="180" width="416" height="4" rx="2" fill="url(#lf-flow)" opacity="0.9"/>
+</svg>

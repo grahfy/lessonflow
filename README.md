@@ -1,121 +1,307 @@
-# Melbourne Guitar School Platform
+# LessonFlow
 
-A Next.js application for running Melbourne Guitar School operations end to end:
-public website, booking intake, admin scheduling, customer records, invoicing, reminders, and student portal access.
+<p align="center">
+  <img src="public/images/lessonflow-logo.svg" alt="LessonFlow logo" width="640" />
+</p>
 
-## What It Includes
+LessonFlow is an MIT-licensed platform for individual music teachers and music schools who want to automate the admin work around lessons.
 
-- Public marketing pages and enquiry/booking forms
-- Admin booking console (`/admin/bookings`)
-- Admin invoice console (`/admin/invoices`)
-- Admin reports (`/admin/reports`) and settings (`/admin/settings`)
-- Admin manual/docs hub (`/admin/manual`)
-- Student login + portal (`/student/login`, `/student/portal`)
-- Invoice PDFs, reminders, credit notes, and payment status tracking
-- Learning materials upload/preview/download for students
+It combines appointment workflows, invoicing, reporting, and a student portal with learning materials that can be:
+- assigned to a specific student,
+- linked to a specific appointment, or
+- stored as general (not appointment-linked) resources.
 
-## Tech Stack
+## What LessonFlow Solves
 
-- Next.js (App Router) + React + TypeScript
+Music teaching businesses often juggle multiple tools for:
+- booking requests,
+- calendars,
+- customer records,
+- invoices,
+- reminders,
+- lesson resources,
+- and follow-up communication.
+
+LessonFlow brings those workflows into one system so teachers and admins can spend less time on operations and more time teaching.
+
+## Core Features
+
+### Scheduling and Appointments
+
+- Public booking request form for new enquiries
+- Admin booking console for reviewing and managing requests
+- Day/week/month calendar views for appointments
+- Approve/reject/cancel/move appointment workflows
+- Recurring booking support and recurring series management
+- Customer-linked booking history
+
+### Invoices and Billing
+
+- Admin invoice console with search, filters, and aging views
+- Draft, sent, paid, and void invoice lifecycle states
+- PDF invoice generation and download
+- Email sending and reminder workflows
+- Credit note support for corrections on sent/paid invoices
+- Invoice audit history for traceability
+- GST-aware invoice defaults and calculations (AU-friendly setup)
+
+### Admin Reports
+
+- Admin reports dashboard for operational and revenue visibility
+- Period-based reports (daily/weekly/monthly/yearly)
+- Invoice status and outstanding tracking
+- Email report job endpoints for scheduled summaries
+
+### Student Portal and Learning Materials
+
+- Student login + portal
+- Student-specific learning materials management
+- Materials can be assigned to a specific appointment or left unassigned (general resources)
+- Authenticated access to audio/PDF learning materials
+- Admin upload and management workflows for lesson resources
+
+### Admin Operations and Setup
+
+- First-run setup wizard (`/setup`)
+- Admin settings/config management
+- Deploy/update helper scripts for VPS/Droplet self-hosting
+- Cron/job endpoint support for scheduled automations
+
+## Who It Is For
+
+- Solo music teachers
+- Teaching studios / small music schools
+- Admin staff supporting appointment + billing workflows
+- Teams self-hosting a lesson operations platform on a VPS/VM
+
+## Technical Overview
+
+### Stack
+
+- Next.js (App Router)
+- React + TypeScript
 - Prisma ORM
 - MySQL (current Prisma datasource provider)
-- Vitest
+- Vitest (tests)
 - Nodemailer + Gmail API fallback (`googleapis`)
 - `pdf-lib` for invoice PDFs
 
-## Requirements
+### Project Structure (high level)
 
-- Node.js 20+ (recommended)
+- `src/app` - routes and API handlers
+- `src/components` - shared UI and admin client components
+- `src/lib` - domain logic, services, utilities
+- `src/styles` - global styling
+- `prisma` - Prisma schema + migrations
+- `deploy` - deployment, update, nginx, systemd, and SSL scripts/templates
+- `scripts` - local/test helper scripts
+- `Documentation` - deployment and operational docs
+- `tests` - automated tests
+
+### Important Routes
+
+Public:
+- `/`
+- `/lessons`
+- `/teacher`
+- `/vouchers`
+- `/contact`
+- `/book`
+- `/terms`
+
+Admin:
+- `/setup`
+- `/admin/login`
+- `/admin/bookings`
+- `/admin/invoices`
+- `/admin/reports`
+- `/admin/settings`
+- `/admin/manual`
+
+Student:
+- `/student/login`
+- `/student/portal`
+- `/student/materials`
+
+## Installation and Deployment (VPS / VM / DigitalOcean)
+
+This project is designed to be self-hosted. The recommended entry points for production-like installs and updates are:
+
+- `deploy/deploy.sh` (first deploy / direct deploy)
+- `deploy/update.sh` (git pull + deploy wrapper)
+
+### 1. Server prerequisites
+
+Recommended target:
+- Ubuntu/Debian VM or DigitalOcean Droplet (other Linux distros may work)
+- sudo/root access
+- domain name (optional at first, recommended for production)
+
+You will also need:
+- Git
+- a clone of this repository on the server
+
+### 2. Clone the repo on the server
+
+```bash
+git clone <your-repo-url> lessonflow
+cd lessonflow
+```
+
+### 3. Prepare the shared environment file (`.env`)
+
+Both `deploy.sh` and `update.sh` now manage a shared env file at:
+
+- `/var/www/melbourne-guitar-school/shared/.env`
+
+Behavior:
+- If the shared `.env` file does not exist, the scripts copy `.env.example` into place.
+- In interactive runs, the scripts can open the shared `.env` in a terminal editor.
+- `update.sh` and `deploy.sh` both include an explicit TUI action to edit the shared `.env` on demand.
+
+You must edit the shared `.env` with real values before production use (especially DB, secrets, email, invoice settings).
+
+### 4. Optional server bootstrap helpers (recommended)
+
+Use `update.sh` helper flags to install platform dependencies and bootstrap the local database from the shared `.env`.
+
+#### Install Nginx (if needed)
+
+```bash
+./deploy/update.sh --install-nginx --skip-pull --skip-deploy --sudo-deploy
+```
+
+#### Install local MySQL/MariaDB and create DB from `DATABASE_URL` in shared `.env`
+
+```bash
+./deploy/update.sh --setup-mysql-db-from-env --skip-pull --skip-deploy --sudo-deploy
+```
+
+Notes:
+- Reads `DATABASE_URL` from `/var/www/melbourne-guitar-school/shared/.env`
+- Only supports local DB hosts (`localhost` / `127.0.0.1`) for this helper
+- Creates the database only if it does not already exist
+- Does not create DB users/permissions (you must ensure the DB user exists and has access)
+
+#### Install PHP-FPM only if needed by Nginx config (usually skipped for this Next.js app)
+
+```bash
+./deploy/update.sh --install-php-fpm-if-needed --skip-pull --skip-deploy --sudo-deploy
+```
+
+For this project’s Next.js deployment, PHP-FPM is typically not required. The helper auto-detects whether the deploy Nginx config appears to need PHP/FastCGI and skips when it is not needed.
+
+### 5. First deploy on a VPS / VM / Droplet
+
+Interactive (recommended):
+
+```bash
+./deploy/deploy.sh --interactive
+```
+
+Or direct deploy:
+
+```bash
+./deploy/deploy.sh
+```
+
+What the deploy script handles:
+- creates a release directory under `/var/www/melbourne-guitar-school/releases`
+- links shared resources (`.env`, `.data`)
+- installs dependencies (unless skipped)
+- generates Prisma client
+- runs migrations (unless skipped / overridden)
+- builds the Next.js app
+- updates the `current` symlink atomically
+- restarts services and syncs managed cron jobs (unless skipped)
+
+### 6. Ongoing updates (recommended workflow)
+
+```bash
+./deploy/update.sh --interactive
+```
+
+Or non-interactive:
+
+```bash
+./deploy/update.sh --sudo-deploy
+```
+
+`update.sh`:
+- fetches/pulls latest git changes (ff-only)
+- can run pre-deploy helper actions (Nginx/MySQL/DB/PHP-FPM)
+- delegates the actual release deploy to `deploy.sh`
+
+### 7. SSL (optional)
+
+You can pass SSL setup options through `update.sh`/`deploy.sh` when you’re ready:
+
+```bash
+./deploy/update.sh --ssl --domain example.com --email you@example.com --sudo-deploy
+```
+
+## Local Development Setup
+
+### Requirements
+
+- Node.js 20+
 - npm
-- MySQL 8+ (local install or Docker)
+- MySQL 8+ (local or Docker)
 
-## Quick Start (Local Development)
+### Quick start
 
-This project currently uses a **MySQL Prisma schema** (`prisma/schema.prisma`).
-
-### 1. Install dependencies
+1. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Create a local env file
+2. Copy env template
 
 ```bash
 cp .env.example .env
 ```
 
-Important:
-- `.env.example` ships with a MySQL placeholder URL for local Docker usage.
-- Update it for your actual local/prod database before running Prisma/app commands.
-
-Example local MySQL URL:
+3. Start local MySQL (Docker example)
 
 ```bash
-DATABASE_URL="mysql://root:root@127.0.0.1:3306/mgs_dev"
-```
-
-At minimum for local startup, set/update:
-- `DATABASE_URL`
-- `ADMIN_SESSION_SECRET`
-- `STUDENT_SESSION_SECRET`
-- `STUDENT_PORTAL_PASSWORD_ENCRYPTION_KEY`
-- `CRON_SECRET`
-
-You can keep email settings empty for local development.
-
-### 3. Start MySQL (Docker example)
-
-```bash
-docker run --name mgs-dev-mysql \
+docker run --name lessonflow-dev-mysql \
   -e MYSQL_ROOT_PASSWORD=root \
   -e MYSQL_DATABASE=mgs_dev \
   -p 3306:3306 \
   -d mysql:8
 ```
 
-### 4. Run Prisma migrations
+4. Ensure `DATABASE_URL` in `.env` points to MySQL (example)
+
+```bash
+DATABASE_URL="mysql://root:root@127.0.0.1:3306/mgs_dev"
+```
+
+5. Run migrations
 
 ```bash
 npx prisma migrate deploy
 ```
 
-If you changed dependencies/schema and Prisma client generation is needed:
-
-```bash
-npm run prisma:generate
-```
-
-### 5. Start the app
+6. Start the app
 
 ```bash
 npm run dev
 ```
 
-Open:
-- `http://127.0.0.1:3000`
+7. Open setup wizard and create the first admin account
 
-### 6. Complete first-run setup
-
-Open the setup wizard:
 - `http://127.0.0.1:3000/setup`
 
-Use it to:
-- verify environment readiness
-- configure email/invoice settings (optional for local dev)
-- create the first admin account
+## Testing
 
-Then sign in at:
-- `http://127.0.0.1:3000/admin/login`
+Tests require a MySQL database (Prisma provider is MySQL).
 
-## Local Testing (Vitest)
-
-Tests also require a **MySQL** database because the Prisma provider is MySQL.
-
-Recommended Docker test DB:
+Recommended local test DB (Docker):
 
 ```bash
-docker run --name mgs-test-mysql \
+docker run --name lessonflow-test-mysql \
   -e MYSQL_ROOT_PASSWORD=root \
   -e MYSQL_DATABASE=mgs_test \
   -p 3307:3306 \
@@ -137,127 +323,51 @@ npm run lint
 npm run typecheck
 ```
 
-Notes:
-- `npm test` already runs `test:prepare` internally.
-- Prefer `TEST_DATABASE_URL` so tests do not target your dev database.
-- `.env.test.example` includes both `DATABASE_URL` and `TEST_DATABASE_URL` MySQL placeholders for a local Docker test DB.
-
 ## Common Commands
 
 ```bash
-npm run dev           # start local dev server
-npm run dev:clean     # clear .next and start dev server
-npm run build         # production build
-npm run start         # run production build locally
-npm run lint          # ESLint
-npm run typecheck     # TypeScript checks
-npm test              # tests (prepares DB first)
-npm run test:watch    # vitest watch (prepares DB first)
-npm run prisma:studio # Prisma Studio
+npm run dev
+npm run build
+npm run start
+npm run lint
+npm run typecheck
+npm test
+npm run prisma:studio
 ```
 
-## Project Structure
+## Environment Variables (Important Groups)
 
-- `src/app` - routes and API handlers (App Router)
-- `src/components` - shared UI and admin client components
-- `src/lib` - domain logic, services, helpers
-- `src/styles/globals.css` - global styles
-- `prisma` - Prisma schema and migrations
-- `tests` - Vitest suite
-- `scripts` - local/test utility scripts
-- `Documentation` - operational/deployment docs
-- `thoughts` - tickets, research, plans
+Use `.env.example` as the starting template.
 
-## Key Routes
-
-### Public
-
-- `/`
-- `/lessons`
-- `/teacher`
-- `/vouchers`
-- `/contact`
-- `/book`
-- `/terms`
-
-### Setup / Admin
-
-- `/setup`
-- `/admin/login`
-- `/admin/bookings`
-- `/admin/invoices`
-- `/admin/reports`
-- `/admin/settings`
-- `/admin/manual`
-
-### Student
-
-- `/student/login`
-- `/student/portal`
-- `/student/materials`
-
-## Environment Variables
-
-Use `.env.example` as the starting template, then configure values for your environment.
-
-Important groups:
-- Database: `DATABASE_URL`
+Key groups:
+- Database: `DATABASE_URL` (MySQL)
 - Sessions/security: `ADMIN_SESSION_SECRET`, `STUDENT_SESSION_SECRET`, `CRON_SECRET`
-- Student portal: `STUDENT_PORTAL_PASSWORD_ENCRYPTION_KEY`, password length/max-age settings
-- Email: SMTP vars and/or Gmail OAuth vars
-- Invoice defaults: business/bank/GST settings
+- Student portal: password encryption key + session settings
+- Email delivery: SMTP and/or Gmail OAuth settings
+- Invoice defaults: business/bank/GST configuration
 - Learning materials storage: local or S3 settings
 
-## Scheduled Jobs
+## Scheduled Jobs / Automation
 
-Protected cron endpoints require:
+Protected job endpoints use:
 - header `x-cron-secret: <CRON_SECRET>`
 
-Implemented jobs include:
+Examples include:
 - daily bookings digest
-- invoice reminders (`/api/jobs/invoice-reminders`)
+- invoice reminders
 - admin operations reports (daily/weekly/monthly/yearly)
 
-For deployment-specific scheduling examples, see:
+See:
 - `vercel.json`
 - `Documentation/digitalocean-admin-operations.md`
 
-## Deployment Notes
+## Branding Note
 
-- Run Prisma migrations on deploy:
+This repository still contains historical/internal names related to the original Melbourne Guitar School deployment (for example package/repo paths and deploy directories such as `/var/www/melbourne-guitar-school`).
 
-```bash
-npx prisma migrate deploy
-```
+The product branding presented in this README is **LessonFlow**.
 
-- Complete or verify configuration in `/setup` after first deploy.
-- For DigitalOcean Droplet operations (systemd, nginx, cron/timers), use:
-  - `deploy/deploy.sh`
-  - `deploy/update.sh`
-  - `Documentation/digitalocean-admin-operations.md`
+## License
 
-## Troubleshooting
-
-### Prisma says the DB URL is invalid for the provider
-
-The Prisma schema provider is `mysql`, so `DATABASE_URL` / `TEST_DATABASE_URL` must start with:
-
-```text
-mysql://
-```
-
-If you copied an env template, confirm the MySQL URL points to the correct database for that environment.
-
-### `npm test` fails before running tests
-
-Usually means test DB setup is missing.
-Set `TEST_DATABASE_URL` to a reachable MySQL database and run:
-
-```bash
-npm run test:prepare
-```
-
-### Emails are not sending locally
-
-This is expected if SMTP/Gmail OAuth env vars are unset.
-Core app/admin workflows can still be exercised locally without email delivery.
+LessonFlow is released under the **MIT License**.
+See `LICENSE`.
