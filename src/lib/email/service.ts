@@ -101,6 +101,25 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     return { status: "sent" };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
+
+    if (isGmailConfigured()) {
+      logError("email.smtp_failed", error, { to: input.to, subject: input.subject });
+
+      const gmailResult = await sendGmailEmail(input);
+      if (gmailResult.status === "sent") {
+        logEvent("email.smtp_failed_gmail_fallback_sent", {
+          to: input.to,
+          subject: input.subject
+        });
+        return gmailResult;
+      }
+
+      return {
+        status: "failed",
+        error: `SMTP failed: ${message}; Gmail fallback failed: ${gmailResult.error ?? "Unknown error"}`
+      };
+    }
+
     await prisma.outboundEmail.create({
       data: {
         toEmail: input.to,

@@ -88,6 +88,7 @@ Melbourne Guitar School Platform is a full-stack web application for running day
 - SQLite for local/test environments
 - MySQL for production environments
 - Nodemailer for SMTP delivery
+- Gmail API (OAuth2 via `googleapis`) for HTTPS email delivery fallback
 - pdf-lib for invoice PDF generation
 
 ## Project Structure
@@ -192,8 +193,16 @@ npm run typecheck
 - `SMTP_USER`
 - `SMTP_PASS`
 - `SMTP_FROM`
+- `GMAIL_CLIENT_ID`
+- `GMAIL_CLIENT_SECRET`
+- `GMAIL_REFRESH_TOKEN`
+- `GMAIL_USER_EMAIL`
 
-If SMTP is not configured, outbound emails are recorded in DB as `queued_no_smtp`.
+Email provider behavior:
+- If SMTP is configured and working, mail is sent via SMTP.
+- If SMTP is not configured and Gmail OAuth vars are configured, mail is sent via Gmail API over HTTPS.
+- If SMTP is configured but blocked/failing and Gmail OAuth vars are configured, the app falls back to Gmail API.
+- If neither provider is available, outbound emails are recorded as `queued_no_smtp`.
 
 ### Learning Materials Storage
 - `LEARNING_MATERIALS_STORAGE_DRIVER`: `local` or `s3` (`local` default).
