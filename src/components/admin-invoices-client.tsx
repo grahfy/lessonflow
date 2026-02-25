@@ -83,6 +83,40 @@ type CreateBookingOption = {
 
 type CreateInvoiceBasis = "lesson_based" | "standalone";
 
+type InvoiceProductPreset = {
+  id: string;
+  label: string;
+  description: string;
+  unitPriceCents: number;
+};
+
+const INVOICE_PRODUCT_PRESETS: InvoiceProductPreset[] = [
+  {
+    id: "pack_5x30",
+    label: "5 × 30 Minute Lessons ($200)",
+    description: "5 × 30 Minute Lessons",
+    unitPriceCents: 20000
+  },
+  {
+    id: "pack_10x30",
+    label: "10 × 30 Minute Lessons ($388)",
+    description: "10 × 30 Minute Lessons",
+    unitPriceCents: 38800
+  },
+  {
+    id: "pack_5x60",
+    label: "5 × 1 Hour Lessons ($375)",
+    description: "5 × 1 Hour Lessons",
+    unitPriceCents: 37500
+  },
+  {
+    id: "pack_10x60",
+    label: "10 × 1 Hour Lessons ($725)",
+    description: "10 × 1 Hour Lessons",
+    unitPriceCents: 72500
+  }
+];
+
 /**
  * Main admin invoices surface for list filters, lifecycle actions, reminders, and create flows.
  *
@@ -183,6 +217,7 @@ export function AdminInvoicesClient() {
   const [editingNotes, setEditingNotes] = useState("");
   const [editingDueAt, setEditingDueAt] = useState("");
   const [editingLineItems, setEditingLineItems] = useState<EditableLineItem[]>([]);
+  const [editingProductPresetId, setEditingProductPresetId] = useState("");
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -201,6 +236,7 @@ export function AdminInvoicesClient() {
   const [createLessonCustomPrice, setCreateLessonCustomPrice] = useState("");
   const [createStandaloneDescription, setCreateStandaloneDescription] = useState("");
   const [createStandalonePrice, setCreateStandalonePrice] = useState("");
+  const [createProductPresetId, setCreateProductPresetId] = useState("");
   const [createDueAt, setCreateDueAt] = useState(toDateInputValue(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)));
   const [createTaxMode, setCreateTaxMode] = useState<InvoiceTaxMode>("taxable");
   const safeFetch = useCallback(async (...args: Parameters<typeof globalThis.fetch>): Promise<Response> => {
@@ -304,6 +340,7 @@ export function AdminInvoicesClient() {
     setCreateLessonCustomPrice("");
     setCreateStandaloneDescription("");
     setCreateStandalonePrice("");
+    setCreateProductPresetId("");
     setCreateDueAt(toDateInputValue(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)));
     setCreateTaxMode("taxable");
   }
@@ -443,6 +480,7 @@ export function AdminInvoicesClient() {
         taxMode: lineItem.taxMode
       }))
     );
+    setEditingProductPresetId("");
     setError("");
   }
 
@@ -461,6 +499,26 @@ export function AdminInvoicesClient() {
         taxMode: selectedInvoice?.taxMode ?? "taxable"
       }
     ]);
+  }
+
+  function addInvoiceProductPresetToEditor(preset: InvoiceProductPreset) {
+    setEditingLineItems((previous) => [
+      ...previous,
+      {
+        key: `preset-${preset.id}-${Date.now()}-${previous.length}`,
+        kind: "custom",
+        description: preset.description,
+        quantity: "1",
+        unitPriceAud: toMoneyInput(preset.unitPriceCents),
+        taxMode: selectedInvoice?.taxMode ?? "taxable"
+      }
+    ]);
+  }
+
+  function applyCreateProductPreset(preset: InvoiceProductPreset) {
+    setCreateInvoiceBasis("standalone");
+    setCreateStandaloneDescription(preset.description);
+    setCreateStandalonePrice(toMoneyInput(preset.unitPriceCents));
   }
 
   /**
@@ -834,6 +892,7 @@ export function AdminInvoicesClient() {
         <h1 className="admin-console-title">Invoice Console</h1>
         <div className="booking-row">
           <button className="btn btn-secondary" onClick={() => router.push("/admin/bookings")}>Bookings</button>
+          <button className="btn btn-secondary" onClick={() => router.push("/admin/reports")}>Reports</button>
           <button className="btn btn-secondary" onClick={() => router.push("/admin/settings")}>Settings</button>
           <button className="btn btn-secondary" onClick={() => void logout()}>Sign out</button>
         </div>
@@ -1013,6 +1072,31 @@ export function AdminInvoicesClient() {
             {selectedInvoice.documentType === "invoice" ? (
               <div className="dialog-actions dialog-actions-inline">
                 <button className="btn btn-secondary" onClick={() => addEditableLineItem()}>Add line item</button>
+                <select
+                  value={editingProductPresetId}
+                  onChange={(event) => setEditingProductPresetId(event.target.value)}
+                  className="invoice-product-preset-select"
+                >
+                  <option value="">Add lesson package preset...</option>
+                  {INVOICE_PRODUCT_PRESETS.map((preset) => (
+                    <option key={preset.id} value={preset.id}>
+                      {preset.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  disabled={!editingProductPresetId}
+                  onClick={() => {
+                    const preset = INVOICE_PRODUCT_PRESETS.find((entry) => entry.id === editingProductPresetId);
+                    if (!preset) return;
+                    addInvoiceProductPresetToEditor(preset);
+                    setEditingProductPresetId("");
+                  }}
+                >
+                  Add product preset
+                </button>
               </div>
             ) : null}
 
@@ -1169,6 +1253,36 @@ export function AdminInvoicesClient() {
                   <option value="taxable">Taxable (GST)</option>
                   <option value="gst_free">GST-free</option>
                 </select>
+              </div>
+              <div className="field manual-span-2">
+                <label>Lesson package preset (quick-fill)</label>
+                <div className="booking-row">
+                  <select
+                    value={createProductPresetId}
+                    onChange={(event) => setCreateProductPresetId(event.target.value)}
+                    className="invoice-product-preset-select"
+                  >
+                    <option value="">Select package preset</option>
+                    {INVOICE_PRODUCT_PRESETS.map((preset) => (
+                      <option key={preset.id} value={preset.id}>
+                        {preset.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    disabled={!createProductPresetId}
+                    onClick={() => {
+                      const preset = INVOICE_PRODUCT_PRESETS.find((entry) => entry.id === createProductPresetId);
+                      if (!preset) return;
+                      applyCreateProductPreset(preset);
+                    }}
+                  >
+                    Use preset
+                  </button>
+                </div>
+                <p className="helper-text">Loads the selected package into standalone invoice fields. You can edit the values before creating.</p>
               </div>
               {createInvoiceBasis === "lesson_based" ? (
                 <>

@@ -2,13 +2,17 @@
 # =============================================================================
 # Melbourne Guitar School - Cron Job Script
 # =============================================================================
-# This script runs the scheduled jobs (daily bookings digest, invoice reminders)
+# This script runs the scheduled jobs (digests, reminders, owner reports)
 # It's called by the system cron and makes authenticated requests to the API
 #
 # Install: Add to crontab with `sudo crontab -e`
 # Example crontab entries:
 #   0 20 * * * /var/www/melbourne-guitar-school/current/deploy/cron.sh daily-bookings-digest
 #   30 20 * * * /var/www/melbourne-guitar-school/current/deploy/cron.sh invoice-reminders
+#   45 20 * * * /var/www/melbourne-guitar-school/current/deploy/cron.sh admin-reports-daily
+#   0 8 * * 1 /var/www/melbourne-guitar-school/current/deploy/cron.sh admin-reports-weekly
+#   15 8 1 * * /var/www/melbourne-guitar-school/current/deploy/cron.sh admin-reports-monthly
+#   30 8 1 1 * /var/www/melbourne-guitar-school/current/deploy/cron.sh admin-reports-yearly
 # =============================================================================
 
 set -euo pipefail
@@ -56,9 +60,21 @@ case "${JOB_TYPE}" in
     invoice-reminders)
         ENDPOINT="/api/jobs/invoice-reminders"
         ;;
+    admin-reports-daily)
+        ENDPOINT="/api/jobs/admin-reports/daily"
+        ;;
+    admin-reports-weekly)
+        ENDPOINT="/api/jobs/admin-reports/weekly"
+        ;;
+    admin-reports-monthly)
+        ENDPOINT="/api/jobs/admin-reports/monthly"
+        ;;
+    admin-reports-yearly)
+        ENDPOINT="/api/jobs/admin-reports/yearly"
+        ;;
     *)
         log "ERROR: Unknown job type: ${JOB_TYPE}"
-        echo "Usage: $0 {daily-bookings-digest|invoice-reminders}"
+        echo "Usage: $0 {daily-bookings-digest|invoice-reminders|admin-reports-daily|admin-reports-weekly|admin-reports-monthly|admin-reports-yearly}"
         exit 1
         ;;
 esac

@@ -658,6 +658,111 @@ restart_cron_scheduler_if_present() {
     fi
 }
 
+# Keeps a managed root crontab block in sync with the current release's cron
+# runner script. Using the `current` symlink means jobs keep working across
+# deploys while this installer ensures new/changed job definitions are applied.
+install_or_update_managed_crontab_jobs() {
+    if ! command -v crontab >/dev/null 2>&1; then
+        log_info "crontab command not available; skipping cron job install"
+        return 0
+    fi
+
+    local cron_runner="${CURRENT_LINK}/deploy/cron.sh"
+    local begin_marker="# BEGIN MELBOURNE_GUITAR_SCHOOL_MANAGED_CRON"
+    local end_marker="# END MELBOURNE_GUITAR_SCHOOL_MANAGED_CRON"
+    local existing=""
+    local stripped=""
+    local tmp_file=""
+
+    existing="$(crontab -l 2>/dev/null || true)"
+    stripped="$(printf '%s\n' "${existing}" | awk -v begin="${begin_marker}" -v end="${end_marker}" '
+        $0 == begin { skip=1; next }
+        $0 == end { skip=0; next }
+        !skip { print }
+    ')"
+
+    tmp_file="$(mktemp)"
+    {
+        if [[ -n "${stripped//[[:space:]]/}" ]]; then
+            printf '%s\n' "${stripped}"
+            echo
+        fi
+        printf '%s\n' "${begin_marker}"
+        echo "# Melbourne Guitar School managed cron jobs (updated by deploy.sh)"
+        echo "0 20 * * * ${cron_runner} daily-bookings-digest"
+        echo "30 20 * * * ${cron_runner} invoice-reminders"
+        echo "45 20 * * * ${cron_runner} admin-reports-daily"
+        echo "0 8 * * 1 ${cron_runner} admin-reports-weekly"
+        echo "15 8 1 * * ${cron_runner} admin-reports-monthly"
+        echo "30 8 1 1 * ${cron_runner} admin-reports-yearly"
+        printf '%s\n' "${end_marker}"
+        echo
+    } > "${tmp_file}"
+
+    run_step "Installing/updating managed cron jobs" crontab "${tmp_file}"
+    rm -f "${tmp_file}"
+}
+
+# Pulls the selected branch at the start of direct deploy runs and restarts the
+# script if the checked-out commit changed. This ensures new deploy script logic
+# is used immediately after a self-update (matching update.sh behavior).
+maybe_self_update_and_restart() {
+    [[ "${ROLLBACK}" == true ]] && return 0
+
+    local restart_count="${MGS_DEPLOY_SELF_RESTART_COUNT:-0}"
+    if [[ ! "${restart_count}" =~ ^[0-9]+$ ]]; then
+        restart_count=0
+    fi
+    if (( restart_count >= 2 )); then
+        log_warn "Deploy self-update restart limit reached; continuing with current script."
+        return 0
+    fi
+
+    local repo_root=""
+    if git -C "${SCRIPT_DIR}/.." rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        repo_root="$(git -C "${SCRIPT_DIR}/.." rev-parse --show-toplevel)"
+    elif git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        repo_root="$(git rev-parse --show-toplevel)"
+    else
+        log_info "No git repository detected for deploy self-update; skipping early git pull"
+        return 0
+    fi
+
+    if [[ -n "$(git -C "${repo_root}" status --porcelain --untracked-files=no 2>/dev/null)" ]]; then
+        log_warn "Source repository has local modifications; skipping early git pull in deploy.sh"
+        return 0
+    fi
+
+    local before_commit=""
+    local after_commit=""
+    local current_branch=""
+    before_commit="$(git -C "${repo_root}" rev-parse --short=12 HEAD 2>/dev/null || true)"
+    current_branch="$(git -C "${repo_root}" symbolic-ref --short HEAD 2>/dev/null || true)"
+
+    section "Git Update"
+    log_info "Deploy self-update check in ${repo_root}"
+    run_step "Fetching origin/${BRANCH}" git -C "${repo_root}" fetch origin "${BRANCH}"
+
+    if [[ -n "${current_branch}" && "${current_branch}" != "${BRANCH}" ]]; then
+        run_step "Checking out ${BRANCH}" git -C "${repo_root}" checkout "${BRANCH}"
+    fi
+
+    if [[ -z "$(git -C "${repo_root}" symbolic-ref --short HEAD 2>/dev/null || true)" ]]; then
+        log_warn "Detached HEAD detected; skipping deploy.sh self-update pull"
+        return 0
+    fi
+
+    run_step "Pulling latest origin/${BRANCH}" git -C "${repo_root}" pull --ff-only origin "${BRANCH}"
+    after_commit="$(git -C "${repo_root}" rev-parse --short=12 HEAD 2>/dev/null || true)"
+    log_info "Repository commit: $(git -C "${repo_root}" rev-parse --short HEAD)"
+
+    if [[ -n "${before_commit}" && -n "${after_commit}" && "${before_commit}" != "${after_commit}" ]]; then
+        log_warn "deploy.sh source updated (${before_commit} -> ${after_commit}); restarting script to use latest code..."
+        export MGS_DEPLOY_SELF_RESTART_COUNT=$((restart_count + 1))
+        exec "${SCRIPT_DIR}/deploy.sh" "${ORIGINAL_ARGS[@]}"
+    fi
+}
+
 cleanup_old_temp_files() {
     local removed=0
     local root=""
@@ -1064,6 +1169,7 @@ done
 
 detect_tty_capabilities
 reexec_with_sudo_if_needed
+maybe_self_update_and_restart
 
 # Auto-enable interactive prompts for local manual runs with no flags.
 if [[ "${IS_TTY}" == true && "${INTERACTIVE}" == false && "${ROLLBACK}" == false ]]; then
@@ -1439,6 +1545,10 @@ fi
 # worker state picks up the current upstream + headers/rate-limit config.
 log_info "Restarting nginx..."
 run_step "Restarting nginx" systemctl restart nginx
+
+# Install/update the managed cron entries after the `current` symlink moves so
+# cron uses the latest runner path and includes any newly introduced jobs.
+install_or_update_managed_crontab_jobs
 
 # Restart cron after the release symlink update so jobs that call
 # /var/www/.../current/deploy/cron.sh pick up the newest script/env path

@@ -5,6 +5,7 @@
  * portal, invoice, reminder, and digest workflows while still allowing route-specific content.
  */
 import { BookingRequestStatus, LessonDuration, LessonMode, SkillLevel } from "@prisma/client";
+import type { AdminReportPeriodKey, PeriodReport, TrendPoint } from "@/lib/admin-reports";
 
 import { getOwnerEmail, getPublicSiteUrl } from "@/lib/env";
 
@@ -417,4 +418,123 @@ export function ownerDailyDigestTemplate(input: {
       `
     })
   };
+}
+
+function reportPeriodTitle(period: AdminReportPeriodKey): string {
+  if (period === "daily") return "Daily";
+  if (period === "weekly") return "Weekly";
+  return "Monthly";
+}
+
+/**
+ * Owner operations report for scheduled daily/weekly/monthly summaries.
+ */
+export function ownerOperationsReportTemplate(input: {
+  period: AdminReportPeriodKey;
+  generatedAt: Date;
+  report: PeriodReport;
+  trend: TrendPoint[];
+}) {
+  const trendMaxAppointments = Math.max(1, ...input.trend.map((point) => point.appointments));
+  const trendMaxEarnings = Math.max(1, ...input.trend.map((point) => point.earningsNetCents));
+
+  const trendRows = input.trend
+    .map((point) => {
+      const appointmentsPct = Math.round((Math.max(0, point.appointments) / trendMaxAppointments) * 100);
+      const earningsPct = Math.round((Math.max(0, point.earningsNetCents) / trendMaxEarnings) * 100);
+
+      return `
+        <tr>
+          <td style="padding:8px 6px 8px 0;border-top:1px solid #edf1f8;white-space:nowrap;font-size:12px;color:#41506f;">${escapeHtml(point.label)}</td>
+          <td style="padding:8px 6px;border-top:1px solid #edf1f8;">
+            <div style="height:10px;background:#eef4ff;border-radius:999px;overflow:hidden;">
+              <div style="height:100%;width:${appointmentsPct}%;min-width:${point.appointments > 0 ? "6px" : "0"};background:#5ec8ff;"></div>
+            </div>
+          </td>
+          <td style="padding:8px 0 8px 6px;border-top:1px solid #edf1f8;font-size:12px;color:#16233d;text-align:right;">${point.appointments}</td>
+          <td style="padding:8px 6px;border-top:1px solid #edf1f8;">
+            <div style="height:10px;background:#eefaf1;border-radius:999px;overflow:hidden;">
+              <div style="height:100%;width:${earningsPct}%;min-width:${point.earningsNetCents > 0 ? "6px" : "0"};background:#7bdfa2;"></div>
+            </div>
+          </td>
+          <td style="padding:8px 0 8px 6px;border-top:1px solid #edf1f8;font-size:12px;color:#16233d;text-align:right;">${money(point.earningsNetCents)}</td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  const periodTitle = reportPeriodTitle(input.period);
+  const comparisonLabel = input.report.comparison.previousLabel;
+  const earningsDelta = money(input.report.comparison.earningsDeltaCents);
+  const earningsDeltaPct = formatPercentLabel(input.report.comparison.earningsDeltaPercent);
+  const appointmentsDelta = input.report.comparison.appointmentsDelta;
+
+  return {
+    subject: `${periodTitle} operations report - ${new Intl.DateTimeFormat("en-AU", {
+      dateStyle: "medium",
+      timeZone: "Australia/Melbourne"
+    }).format(input.generatedAt)}`,
+    html: renderEmailLayout({
+      title: `${periodTitle} operations report`,
+      previewText: `${periodTitle} appointments, invoices and earnings summary`,
+      leadHtml: `${escapeHtml(input.report.label)}. Generated ${new Intl.DateTimeFormat("en-AU", {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone: "Australia/Melbourne"
+      }).format(input.generatedAt)}.`,
+      contentHtml: `
+        <div style="display:grid;gap:12px;">
+          <div style="padding:12px;border:1px solid #e3e8f3;border-radius:10px;background:#f8fbff;">
+            <p style="margin:0 0 8px;"><strong>Appointments</strong></p>
+            <p style="margin:0 0 4px;">Confirmed: ${input.report.appointments.confirmedCount}</p>
+            <p style="margin:0;">Cancelled: ${input.report.appointments.cancelledCount}</p>
+          </div>
+
+          <div style="padding:12px;border:1px solid #e3e8f3;border-radius:10px;background:#f8fbff;">
+            <p style="margin:0 0 8px;"><strong>Outstanding invoices (current snapshot)</strong></p>
+            <p style="margin:0 0 4px;">Outstanding count: ${input.report.outstandingInvoices.count}</p>
+            <p style="margin:0 0 4px;">Outstanding total: ${money(input.report.outstandingInvoices.totalCents)}</p>
+            <p style="margin:0 0 4px;">Overdue count: ${input.report.outstandingInvoices.overdueCount}</p>
+            <p style="margin:0;">Overdue total: ${money(input.report.outstandingInvoices.overdueTotalCents)}</p>
+          </div>
+
+          <div style="padding:12px;border:1px solid #e3e8f3;border-radius:10px;background:#f8fbff;">
+            <p style="margin:0 0 8px;"><strong>Earnings (paid documents in period)</strong></p>
+            <p style="margin:0 0 4px;">Net paid: ${money(input.report.earnings.netPaidCents)}</p>
+            <p style="margin:0 0 4px;">Invoice payments: ${money(input.report.earnings.invoicePaidCents)}</p>
+            <p style="margin:0 0 4px;">Credit notes: ${money(input.report.earnings.creditNotePaidCents)}</p>
+            <p style="margin:0;">Paid documents: ${input.report.earnings.paidDocumentCount}</p>
+          </div>
+
+          <div style="padding:12px;border:1px solid #dbe4ff;border-radius:10px;background:#f4f7ff;">
+            <p style="margin:0 0 8px;"><strong>Comparison (${escapeHtml(comparisonLabel)})</strong></p>
+            <p style="margin:0 0 4px;">Appointments delta: ${appointmentsDelta > 0 ? "+" : ""}${appointmentsDelta}</p>
+            <p style="margin:0;">Earnings delta: ${earningsDelta} (${earningsDeltaPct})</p>
+          </div>
+
+          <div style="padding:12px;border:1px solid #e3e8f3;border-radius:10px;background:#ffffff;">
+            <p style="margin:0 0 10px;"><strong>Trend snapshot</strong> (appointments + earnings)</p>
+            <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;">
+              <thead>
+                <tr>
+                  <th align="left" style="padding:0 6px 6px 0;font-size:12px;color:#6b7892;">Period</th>
+                  <th align="left" style="padding:0 6px 6px;font-size:12px;color:#6b7892;">Appointments graph</th>
+                  <th align="right" style="padding:0 0 6px 6px;font-size:12px;color:#6b7892;">Appts</th>
+                  <th align="left" style="padding:0 6px 6px;font-size:12px;color:#6b7892;">Earnings graph</th>
+                  <th align="right" style="padding:0 0 6px 6px;font-size:12px;color:#6b7892;">Net paid</th>
+                </tr>
+              </thead>
+              <tbody>${trendRows || `<tr><td colspan="5" style="padding:8px 0;color:#41506f;">No trend points available.</td></tr>`}</tbody>
+            </table>
+          </div>
+        </div>
+      `
+    })
+  };
+}
+
+function formatPercentLabel(value: number | null): string {
+  if (value === null) return "n/a";
+  const rounded = Math.round(value * 10) / 10;
+  return `${rounded > 0 ? "+" : ""}${rounded}%`;
 }

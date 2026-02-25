@@ -35,6 +35,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOY_SCRIPT="${SCRIPT_DIR}/deploy.sh"
 REPO_ROOT=""
+ORIGINAL_ARGS=( "$@" )
 
 # Runtime configuration defaults. Branch defaults to the current checked-out
 # branch later so server operators can simply run ./deploy/update.sh.
@@ -183,6 +184,29 @@ section() {
   echo -e "${BOLD}${BLUE}╭${rule}╮${NC}"
   echo -e "${BOLD}${BLUE}│${NC}  ${BOLD}${title}${NC}  ${BOLD}${BLUE}│${NC}"
   echo -e "${BOLD}${BLUE}╰${rule}╯${NC}"
+}
+
+maybe_restart_after_self_update() {
+  local before_commit="$1"
+  local after_commit="$2"
+  local restart_count="${MGS_UPDATE_SELF_RESTART_COUNT:-0}"
+
+  if [[ -z "${before_commit}" || -z "${after_commit}" || "${before_commit}" == "${after_commit}" ]]; then
+    return 0
+  fi
+
+  if [[ ! "${restart_count}" =~ ^[0-9]+$ ]]; then
+    restart_count=0
+  fi
+
+  if (( restart_count >= 2 )); then
+    log_warn "Script updated (${before_commit} -> ${after_commit}) but restart limit reached; continuing current process."
+    return 0
+  fi
+
+  log_warn "update.sh changed after git pull (${before_commit} -> ${after_commit}); restarting script to use the latest code..."
+  export MGS_UPDATE_SELF_RESTART_COUNT=$((restart_count + 1))
+  exec "${SCRIPT_DIR}/update.sh" "${ORIGINAL_ARGS[@]}"
 }
 
 # Reusable prompt for yes/no interactive questions with defaults.
@@ -904,6 +928,7 @@ if [[ "${ALLOW_DIRTY}" != true ]] && git_worktree_dirty; then
 fi
 
 if [[ "${SKIP_PULL}" == false ]]; then
+  local_before_pull_commit="$(git rev-parse --short=12 HEAD 2>/dev/null || true)"
   # Fetch/pull stays in the persistent repo clone; deploy.sh then rsyncs a clean
   # release directory so runtime symlink switches remain atomic.
   run_step "Fetching ${REMOTE_NAME}/${BRANCH}" git fetch "${REMOTE_NAME}" "${BRANCH}"
@@ -914,7 +939,9 @@ if [[ "${SKIP_PULL}" == false ]]; then
 
   # Use ff-only to avoid accidental merge commits on production clones.
   run_step "Pulling latest ${REMOTE_NAME}/${BRANCH}" git pull --ff-only "${REMOTE_NAME}" "${BRANCH}"
+  local_after_pull_commit="$(git rev-parse --short=12 HEAD 2>/dev/null || true)"
   log_info "Updated to commit $(git rev-parse --short HEAD)"
+  maybe_restart_after_self_update "${local_before_pull_commit}" "${local_after_pull_commit}"
 else
   log_info "Skipping git pull"
 fi

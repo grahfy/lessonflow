@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
+import { sendCustomerInvoiceReminderEmail } from "@/lib/invoice-events";
+import { getInvoiceOverdueDays } from "@/lib/invoices/aging";
 import { getInvoiceReminderEligibility, sendInvoiceReminder } from "@/lib/invoices/reminders";
 
 type Params = {
@@ -37,31 +39,52 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
     }
 
-    const eligibility = getInvoiceReminderEligibility(invoice);
-    if (!eligibility.isEligible || !eligibility.stage) {
+    const overdueDays = getInvoiceOverdueDays(invoice.dueAt);
+    if (invoice.documentType !== "invoice" || invoice.status !== "sent") {
       return NextResponse.json(
         {
-          error:
-            invoice.status !== "sent"
-              ? "Only sent invoices can receive reminders."
-              : "Invoice is not yet eligible for the next reminder stage."
+          error: "Only sent invoices can receive reminders."
+        },
+        { status: 400 }
+      );
+    }
+    if (overdueDays < 1) {
+      return NextResponse.json(
+        {
+          error: "Invoice is not overdue yet."
         },
         { status: 400 }
       );
     }
 
-    const reminder = await sendInvoiceReminder(invoice, eligibility.overdueDays, eligibility.stage);
+    const eligibility = getInvoiceReminderEligibility(invoice);
+    const manualStage = eligibility.stage;
+
+    // Manual reminders should work for any overdue sent invoice. We still preserve the automated
+    // 7/14/30 stage helper when a stage applies so reminder metadata remains consistent with cron.
+    const reminder = manualStage
+      ? await sendInvoiceReminder(invoice, overdueDays, manualStage)
+      : (() => {
+          const sendPromise = sendCustomerInvoiceReminderEmail(invoice, overdueDays);
+          return sendPromise.then(() => ({
+            lastReminderSentAt: new Date(),
+            lastReminderStage: invoice.lastReminderStage,
+            details: `Manual overdue reminder sent (${overdueDays} days overdue)`
+          }));
+        })();
+
+    const resolvedReminder = await reminder;
     const updated = await prisma.invoice.update({
       where: { id },
       data: {
-        lastReminderSentAt: reminder.lastReminderSentAt,
-        lastReminderStage: reminder.lastReminderStage,
+        lastReminderSentAt: resolvedReminder.lastReminderSentAt,
+        lastReminderStage: resolvedReminder.lastReminderStage,
         updatedById: admin.id,
         auditLogs: {
           create: {
             action: "reminder_sent",
             actorId: admin.id,
-            details: reminder.details
+            details: resolvedReminder.details
           }
         }
       },
@@ -74,7 +97,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       }
     });
 
-    return NextResponse.json({ invoice: updated, overdueDays: eligibility.overdueDays, stage: eligibility.stage });
+    return NextResponse.json({ invoice: updated, overdueDays, stage: manualStage });
   } catch (error) {
     return jsonUnexpectedError(error, "Unable to send invoice reminder.");
   }

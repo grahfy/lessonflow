@@ -410,13 +410,14 @@ sudo certbot renew --dry-run
 
 ## Cron Jobs
 
-Add scheduled jobs to run daily:
+Deploys now install/update a managed root crontab block automatically (via `deploy/deploy.sh`),
+including digest, reminder, and admin report jobs. You can still inspect/edit the crontab manually:
 
 ```bash
 sudo crontab -e
 ```
 
-Add these lines:
+Managed entries installed by deploy:
 
 ```cron
 # Daily bookings digest at 8:00 PM UTC
@@ -424,6 +425,18 @@ Add these lines:
 
 # Invoice reminders at 8:30 PM UTC
 30 20 * * * /var/www/melbourne-guitar-school/current/deploy/cron.sh invoice-reminders
+
+# Daily owner report at 8:45 PM UTC
+45 20 * * * /var/www/melbourne-guitar-school/current/deploy/cron.sh admin-reports-daily
+
+# Weekly owner report every Monday at 8:00 AM UTC
+0 8 * * 1 /var/www/melbourne-guitar-school/current/deploy/cron.sh admin-reports-weekly
+
+# Monthly owner report on the 1st at 8:15 AM UTC
+15 8 1 * * /var/www/melbourne-guitar-school/current/deploy/cron.sh admin-reports-monthly
+
+# Yearly owner report on Jan 1 at 8:30 AM UTC
+30 8 1 1 * /var/www/melbourne-guitar-school/current/deploy/cron.sh admin-reports-yearly
 ```
 
 Adjust times as needed for your timezone (UTC 20:00 = 6:00 AM AEDT).

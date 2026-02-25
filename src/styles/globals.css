@@ -2412,3 +2412,239 @@ h1 {
     scroll-behavior: auto !important;
   }
 }
+
+/* Admin reports dashboard */
+.report-toolbar-card,
+.report-controls-card,
+.report-generated-card,
+.report-chart-card,
+.report-period-card {
+  display: grid;
+  gap: 12px;
+}
+
+.report-toolbar-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.report-controls-card {
+  grid-template-columns: 220px minmax(0, 1fr);
+  align-items: start;
+}
+
+.report-toolbar-title {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.reports-period-grid,
+.reports-chart-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.reports-period-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.reports-period-grid-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.reports-chart-grid {
+  grid-template-columns: 1fr;
+}
+
+.report-card-header-row {
+  display: grid;
+  gap: 6px;
+}
+
+.report-card-header-row h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.report-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.report-metric-cell {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px 12px;
+}
+
+.report-metric-label {
+  margin: 0;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.report-metric-value {
+  margin: 4px 0 0;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.report-comparison-panel {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(130, 151, 255, 0.24);
+  background: rgba(75, 95, 190, 0.12);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.report-comparison-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.86rem;
+}
+
+.report-comparison-label {
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.report-delta.positive {
+  color: #8ee5b5;
+}
+
+.report-delta.negative {
+  color: #ff9ea9;
+}
+
+.report-delta.neutral {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.report-trend-block {
+  display: grid;
+  gap: 8px;
+}
+
+.report-trend-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.report-trend-title-row h3 {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.report-chart-shell {
+  display: grid;
+  gap: 8px;
+}
+
+.report-chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
+    rgba(255, 255, 255, 0.01);
+}
+
+.report-chart-axis {
+  stroke: rgba(255, 255, 255, 0.18);
+  stroke-width: 1;
+}
+
+.report-chart-label {
+  fill: rgba(255, 255, 255, 0.64);
+  font-size: 10px;
+}
+
+.report-bar {
+  opacity: 0.95;
+}
+
+.report-bar-appointments {
+  fill: #67d3ff;
+}
+
+.report-bar-earnings {
+  fill: #9effbc;
+}
+
+.report-chart-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.report-chart-empty {
+  margin: 0;
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  padding: 12px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.report-compare-field {
+  display: grid;
+  gap: 8px;
+}
+
+.report-toggle-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.report-toggle-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.82rem;
+}
+
+.invoice-product-preset-select {
+  min-width: 260px;
+  max-width: 100%;
+}
+
+@media (max-width: 1180px) {
+  .reports-period-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .report-controls-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 800px) {
+  .report-toolbar-card {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .report-metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .report-comparison-row,
+  .report-chart-summary {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

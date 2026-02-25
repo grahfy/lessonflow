@@ -934,7 +934,20 @@ export async function saveAdminSettingsConfig(
   input: AdminSettingsSaveInput,
   options: { currentAdminId: string }
 ): Promise<AdminSettingsSaveResult> {
-  const errors = validateEnvConfig(input);
+  const validationInput: Record<string, string> = {};
+  for (const envVar of CONFIGURABLE_ENV_VARS) {
+    const rawValue = input[envVar.key] || "";
+    if (envVar.isSecret && !rawValue.trim()) {
+      // In the admin settings screen, blank secret inputs mean "keep current value" when a secret
+      // is already configured. Validate against the currently loaded env value so required secrets
+      // don't fail validation unnecessarily.
+      validationInput[envVar.key] = process.env[envVar.key] || "";
+      continue;
+    }
+    validationInput[envVar.key] = rawValue;
+  }
+
+  const errors = validateEnvConfig(validationInput);
   const adminPassword = typeof input.ADMIN_PASSWORD === "string" ? input.ADMIN_PASSWORD : "";
   const shouldUpdateAdminPassword = adminPassword.trim().length > 0;
 
