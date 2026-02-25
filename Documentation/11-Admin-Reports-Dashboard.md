@@ -1,62 +1,45 @@
 # 11 Admin Reports Dashboard
 
-## Overview
-Use `/admin/reports` for operational reporting across bookings and invoices.
+## What This Screen Is
+`/admin/reports` is your “health check” dashboard.
 
-The reports dashboard includes:
-- daily, weekly, monthly, and yearly periods,
-- appointments and booking-request activity summaries,
-- outstanding invoice and overdue totals,
-- earnings summaries,
-- comparisons to previous periods,
-- simple charts for quick trend review.
+Use it to quickly see:
+- how many appointments happened (or are scheduled)
+- outstanding invoices and overdue totals
+- earnings (paid invoices)
+- comparisons to the previous week/month/year
 
 ## Before You Start
-- Sign in as an admin user.
-- Open `/admin/reports`.
-- Confirm invoice statuses are reasonably up to date (`Sent`, `Paid`, etc.).
+1. Sign in as admin.
+2. Open `/admin/reports`.
+3. If you just edited invoices/bookings, click `Refresh reports`.
 
-## Step-by-Step Instructions
+## How To Read The Dashboard (Beginner-Friendly)
 
-### A) Open and Refresh Reports
-1. Go to `/admin/reports`.
-2. Wait for the dashboard to load.
-3. Click `Refresh reports` if you recently changed invoices/bookings and want the latest numbers.
+### A) Pick a Date Format You Like
+1. Find `Date format`.
+2. Choose:
+   - `Readable` (example: `25 Feb 2026`)
+   - `DD/MM/YY` (example: `25/02/26`)
 
-### B) Use Date Format Option
-1. In the controls card, open `Date format`.
-2. Choose either:
-   - `Readable` (for example `25 Feb 2026`), or
-   - `DD/MM/YY` (for example `25/02/26`).
-3. Review chart labels and period summaries in the format you prefer.
+### B) Reduce Noise (Compare Views)
+If the screen feels busy:
+1. Use the `Compare views` toggles.
+2. Turn off the periods you do not need right now.
 
-### C) Compare Period Views
-1. In `Compare views (admin)`, enable/disable period toggles:
-   - Daily
-   - Weekly
-   - Monthly
-   - Yearly
-2. Leave only the period(s) you are focusing on to reduce noise.
-3. Re-enable others for side-by-side trend comparison.
+Example:
+- Daily for today’s workload
+- Weekly for end-of-week check
+- Monthly/Yearly for owner planning
 
-### D) Read the Metric Cards
-For each period card, review:
-- appointment totals,
-- pending/rejected/cancelled request activity,
-- outstanding invoice count and balance,
-- overdue counts/totals,
-- paid earnings,
-- previous-period comparison values (increase/decrease).
-
-### E) Use Reports for Operations Follow-Up
-1. If outstanding/overdue values rise:
-   - go to `/admin/invoices`,
-   - enable `Outstanding only`,
-   - run reminder actions as needed.
-2. If booking requests spike:
-   - go to `/admin/bookings`,
-   - review pending requests and confirm response times.
-3. Use yearly report trends for planning and forecasting (owner/admin review).
+### C) Use Reports to Decide What To Do Next
+- If outstanding/overdue is high:
+  - go to `/admin/invoices`
+  - turn on `Outstanding only`
+  - send reminders
+- If pending requests are high:
+  - go to `/admin/bookings`
+  - process pending requests (approve/reject)
 
 ## Visual Reference
 ![Admin reports dashboard](assets/admin-reports-dashboard.png)
@@ -66,28 +49,19 @@ Daily/weekly/monthly/yearly report emails can be sent automatically to the owner
 
 These are technical-owner features and are configured on the server (deploy/runbook documentation).
 
-## Expected Result
-- Admin can quickly review operational health and billing position.
-- Trend comparisons help identify increases/decreases across days, weeks, months and years.
-
 ## Common Mistakes
-- Reading reports before refreshing after major invoice changes.
-- Comparing periods with too many toggles enabled and missing the main trend.
-- Treating reports as a replacement for invoice follow-up actions (reports indicate what to investigate).
+- Forgetting to click `Refresh reports` after changing invoices
+- Leaving too many compare toggles on and missing the main number you care about
 
 ## Troubleshooting
-- Reports page shows no data:
-  - refresh,
-  - confirm bookings/invoices exist in the selected periods,
-  - check admin login/session status.
-- Chart labels look unfamiliar:
-  - switch `Date format` to your preferred format.
+- Reports are empty:
+  - refresh and confirm you are signed in
+  - confirm there are bookings/invoices in the database
 - Scheduled emails not arriving:
-  - confirm cron jobs and `CRON_SECRET`,
-  - check deploy/runbook logs and email settings.
+  - scheduler (cron) may not be running
+  - check `digitalocean-admin-operations.md`
 
-## Related Guides
-- [05-Invoice-Management.md](05-Invoice-Management.md)
+## Next Guides
 - [07-Reports-Outstanding-and-Follow-Up.md](07-Reports-Outstanding-and-Follow-Up.md)
-- [10-Admin-Settings-and-System-Configuration.md](10-Admin-Settings-and-System-Configuration.md)
+- [05-Invoice-Management.md](05-Invoice-Management.md)
 - [Documentation/digitalocean-admin-operations.md](digitalocean-admin-operations.md)

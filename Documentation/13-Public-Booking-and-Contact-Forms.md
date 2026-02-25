@@ -1,71 +1,72 @@
 # 13 Public Booking and Contact Forms
 
-## Overview
-This guide explains what happens when website visitors use the public forms and how admins should handle those submissions.
+## What This Covers
+These are the two public forms on the website:
+- `/book` for booking requests
+- `/contact` for general enquiries
 
-Public routes covered:
-- `/book` (booking request form)
-- `/contact` (contact form)
+This guide explains what the visitor sees and what the admin should do next.
 
-## Before You Start
-- Confirm public site pages are loading normally.
-- Confirm admin login works (`/admin/login`) so you can review booking requests.
+## Public Booking Requests (`/book`)
 
-## Step-by-Step Instructions
+### What the Visitor Sees
+1. They fill in the booking request form.
+2. They click `Request Booking`.
+3. They should see a confirmation pop-up that says the request is pending.
 
-### A) Public Booking Request Flow (`/book`)
-1. Visitor opens `/book`.
-2. Visitor enters booking details and requested date/time.
-3. Visitor clicks `Request Booking`.
-4. The site shows a confirmation popup stating the booking submission is pending and that the school will respond within 24 hours.
+If they report it “stuck on Submitting…”:
+- tell them to refresh and try again
+- then check the admin bookings console to see if it saved anyway
 
-### B) What Admin Does Next (Booking Requests)
+### What the Admin Does Next
 1. Open `/admin/bookings`.
-2. Review pending requests in the calendar/status views.
-3. Open the booking request dialog.
-4. Choose the correct action:
-   - `Approve` (creates confirmed booking),
-   - `Reject`,
-   - `Cancel`, or
-   - `Remove request entirely` (permanent removal).
-5. Use `Notify` actions if follow-up messaging is needed.
+2. Turn on `Pending` filter.
+3. Click the request.
+4. Choose one:
+   - `Approve request` to create a confirmed booking
+   - `Reject request` to decline
+   - `Cancel` if it should not proceed
+   - `Remove request entirely` to delete it permanently
+5. Optional: message the customer using notify/email actions.
 
-### C) Public Contact Form Flow (`/contact`)
-1. Visitor opens `/contact`.
-2. Visitor submits the contact form.
-3. Admin/owner receives (or queues) the message email depending on email delivery configuration.
+## Public Contact Form (`/contact`)
 
-### D) If Email Delivery Is Degraded
-Some public form flows can still save submissions even if email sending is temporarily unavailable.
+### What the Visitor Sees
+1. They submit the form.
+2. The app shows a confirmation message.
 
-Operationally:
-- booking/contact submission may still be recorded,
-- notification email may fail/queue,
-- admin should review pending requests/messages and respond manually if needed.
+### What the Admin Does Next
+- The owner/admin receives the message email (if email delivery is configured), or it may be queued if not.
+- If needed, respond manually.
+
+## If Email Delivery Is Not Working
+Sometimes the website can still save a submission even if email sending fails.
+
+This means:
+- the booking request/contact message may exist in the system
+- but email notifications might not arrive
+
+When in doubt:
+1. Check `/admin/bookings` for pending requests.
+2. If necessary, contact the customer manually.
 
 ## Visual Reference
 ![Public booking page](assets/public-book-page.png)
 ![Public contact page](assets/public-contact-page.png)
 
-## Expected Result
-- Public users receive clear feedback after submission.
-- Admin can process requests from the booking console without losing the submission.
-
-## Common Mistakes
-- Treating a temporary email issue as a failed booking request when the request was actually saved.
-- Forgetting to review pending booking requests after public demand spikes.
+## Common Beginner Mistakes
+- Assuming the request failed just because an email did not arrive
+  - Fix: check `/admin/bookings` for the saved request
 
 ## Troubleshooting
-- Booking form stays on `Submitting...`:
-  - refresh and retry,
-  - check network/API status,
-  - verify server logs if issue persists.
-- User reports no confirmation email:
-  - check email delivery configuration,
-  - verify request exists in admin bookings,
-  - respond manually if needed.
+- Booking request stuck on `Submitting...`:
+  - refresh and retry
+  - check admin bookings for a saved request
+- Visitor did not receive an email:
+  - confirm email delivery configuration
+  - respond manually if required
 
-## Related Guides
+## Next Guides
 - [03-Booking-Management.md](03-Booking-Management.md)
 - [06-Email-and-Notifications.md](06-Email-and-Notifications.md)
 - [08-Troubleshooting-and-FAQs.md](08-Troubleshooting-and-FAQs.md)

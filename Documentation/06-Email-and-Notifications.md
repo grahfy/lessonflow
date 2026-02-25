@@ -1,62 +1,67 @@
 # 06 Email and Notifications
 
-## Overview
-This guide explains customer and owner emails, what is automatic vs manual, and how to verify delivery state.
+## What This Covers
+This guide explains:
+- what emails the app sends
+- which emails are manual vs automatic
+- what “queued” means when email delivery is not configured
 
-## Before You Start
-- Ensure you are signed in as admin.
-- Understand whether SMTP is configured in your environment.
+## Two Important Things To Know
+1. Some emails are sent to customers.
+2. Customer emails are BCC’d to the admin/owner email so you have a record.
 
-## Step-by-Step Instructions
+## Manual Emails (Buttons You Click)
 
-### A) Manual Booking Communication
-From booking dialog in `/admin/bookings`:
-1. Click `Send reminder` for standard reminder email.
-2. Click `Email customer` for custom message email.
+### A) Booking Emails (From `/admin/bookings`)
+1. Open a booking.
+2. Use:
+   - `Send reminder` for a standard reminder message
+   - `Email customer` for a custom message
 
-### B) Invoice Communication
-From invoice detail in `/admin/invoices`:
-1. Click `Send` to dispatch invoice email with PDF attachment.
-2. Click `Send reminder` for overdue reminder email.
+### B) Invoice Emails (From `/admin/invoices`)
+1. Open an invoice (`View`).
+2. Use:
+   - `Send` to email the invoice PDF to the customer
+   - `Send reminder` to email an overdue reminder
 
-### C) Automated Email Workflows
-Current automation includes:
-- Daily bookings digest job.
-- Scheduled invoice reminder job.
+## Automatic Emails (Scheduled Jobs)
+These are triggered by the server scheduler (cron/systemd timer):
+- daily bookings digest
+- invoice reminder runs
+- daily/weekly/monthly/yearly owner reports
 
-These run through secured job endpoints and cron schedule.
+If the scheduler is not configured on the droplet, automatic emails will not run.
 
-### D) Verify Email Outcomes
-If SMTP is configured:
-- Emails should be sent immediately.
+## What “Queued” Means
+If email delivery is not configured (no SMTP/Gmail send available), the app can still:
+- record that you attempted to send an email
+- show status like `queued_no_smtp` for audit/history
 
-If SMTP is not configured:
-- Emails are recorded as `queued_no_smtp` for audit tracking.
+But the customer will not receive the email until delivery is configured.
 
-Operationally, this means communication actions still log intent even when external delivery is unavailable.
-
-## Expected Result
-- Admin can send and track key customer communications.
-- Team knows difference between sent vs queued fallback behavior.
-
-## Common Mistakes
-- Assuming queued fallback means customer received email.
-- Sending reminder before checking invoice state and due status.
+## Quick Checks (When a Customer Says “I Didn’t Get It”)
+1. Confirm you clicked the action (`Send`, `Send reminder`, `Email customer`).
+2. If SMTP is not configured, assume the customer did not receive it.
+3. Re-send once email delivery is confirmed working.
 
 ## Troubleshooting
-- No email delivered to customer:
-  - Check whether SMTP is configured.
-  - Confirm action was triggered from correct screen.
-- Reminder email unavailable:
-  - confirm invoice is overdue and in `Sent` status.
+- Reminder button disabled:
+  - invoice must be `Sent` and overdue
+- Nothing is sending automatically:
+  - scheduler may not be installed on the droplet
+  - check the deploy runbook (technical owner)
 
-## Technical User Appendix (Owner/Technical Ops)
+## Technical Owner Appendix (If You Manage Hosting)
 
-### Scheduled Job Endpoints
+### Job Endpoints (Secured)
 - `POST /api/jobs/daily-bookings-digest`
 - `POST /api/jobs/invoice-reminders`
+- `POST /api/jobs/admin-reports/daily`
+- `POST /api/jobs/admin-reports/weekly`
+- `POST /api/jobs/admin-reports/monthly`
+- `POST /api/jobs/admin-reports/yearly`
 
-Required header for both:
+All require:
 - `x-cron-secret: <CRON_SECRET>`
 
 ### Invoice Reminder Job Optional Payload
@@ -69,16 +74,9 @@ Required header for both:
 }
 ```
 
-Fields:
-- `dryRun`: preview only, no sends.
-- `maxInvoices`: cap batch size.
-- `stage`: force stage filter (`7`, `14`, `30`).
-- `customerId`: target one customer.
+Use overrides for diagnostics, not daily operation.
 
-Use technical overrides for diagnostics or controlled runs, not routine daily operation.
-
-## Related Guides
-- [03-Booking-Management.md](03-Booking-Management.md)
+## Next Guides
 - [05-Invoice-Management.md](05-Invoice-Management.md)
 - [07-Reports-Outstanding-and-Follow-Up.md](07-Reports-Outstanding-and-Follow-Up.md)
-
+- [08-Troubleshooting-and-FAQs.md](08-Troubleshooting-and-FAQs.md)

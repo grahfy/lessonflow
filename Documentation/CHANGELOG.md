@@ -2,6 +2,23 @@
 
 All notable end-user documentation changes are tracked here.
 
+## [v1.2.0] - 2026-02-25
+- Rewrote the end-user documentation set for beginners with clearer “what to click next” steps.
+- Refreshed guides:
+  - `Documentation/01-Getting-Started.md`
+  - `Documentation/02-Admin-Login-and-Access.md`
+  - `Documentation/03-Booking-Management.md`
+  - `Documentation/04-Customer-Directory.md`
+  - `Documentation/05-Invoice-Management.md`
+  - `Documentation/06-Email-and-Notifications.md`
+  - `Documentation/07-Reports-Outstanding-and-Follow-Up.md`
+  - `Documentation/08-Troubleshooting-and-FAQs.md`
+  - `Documentation/09-Glossary.md`
+  - `Documentation/10-Admin-Settings-and-System-Configuration.md`
+  - `Documentation/11-Admin-Reports-Dashboard.md`
+  - `Documentation/12-Student-Portal-and-Learning-Materials.md`
+  - `Documentation/13-Public-Booking-and-Contact-Forms.md`
+
 ## [v1.1.2] - 2026-02-25
 - Expanded Playwright screenshot automation to capture dialog-level admin workflows.
 - Re-captured and synced dialog screenshots for:

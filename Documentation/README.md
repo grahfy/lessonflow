@@ -92,9 +92,10 @@ For technical operators who manage automation and support checks:
 ## In-App Admin Manual
 - Logged-in admins can open `/admin/manual` from the new `Manual` button in the admin header.
 - The in-app manual provides:
-  - quick links to Bookings / Invoices / Reports / Settings
-  - a condensed deploy/update runbook
-  - operator screenshot thumbnails for common workflows
+  - a beginner-friendly “start here” page
+  - one guide per page (so you do not scroll a huge manual)
+  - quick navigation between guides (previous/next)
+  - operator screenshots for common workflows
 - The repo markdown guides remain the source of truth for full written procedures.
 
 ## Screenshot Gallery (Key Screens)

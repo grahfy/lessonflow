@@ -1,63 +1,79 @@
 # 04 Customer Directory
 
-## Overview
-The customer directory is used to store reusable customer profiles for faster booking and billing operations.
+## What This Is
+The customer directory is a simple “address book” for the school.
 
-## Before You Start
-- Open `/admin/bookings`.
-- Click `Customers` in the action row.
+Use it to:
+- find existing customers quickly
+- avoid duplicate entries
+- keep phone/email accurate
+- jump to invoice history
+- manage student portal credentials (if needed)
 
-## Step-by-Step Instructions
+## Where To Find It
+1. Open `/admin/bookings`.
+2. Click `Customers`.
 
-### A) Search Existing Customers
+## Common Tasks (Step-by-Step)
+
+### A) Find a Customer (Always Search First)
 1. Open `Customers`.
 2. Use the `Search` field.
-3. Review matching customer rows.
+3. Try:
+   - email (best)
+   - phone number
+   - last name
+4. If you find the customer, click `Edit` to confirm details are correct.
 
 ### B) Create a New Customer
+Only create a new customer if search finds nothing.
 1. Click `Create New Customer`.
-2. Complete the form fields.
+2. Enter:
+   - full name
+   - email
+   - phone
 3. Click `Save customer`.
 
 ### C) Edit Customer Details
-1. Find the customer in the list.
+1. Find the customer row.
 2. Click `Edit`.
-3. Update relevant details.
+3. Update the fields.
 4. Click `Save customer`.
 
-### D) Delete/Archive Customer
+Tip:
+- If a customer changes email or phone, update it here. This keeps invoices and contact messages consistent.
+
+### D) Open Invoice History for a Customer
+1. In the customer row, click `Invoices`.
+2. You will be redirected to `/admin/invoices` with filters set for that customer.
+
+### E) Delete / Archive (Use Carefully)
 1. Find the customer row.
 2. Click `Delete`.
-3. Confirm action.
+3. Confirm.
 
-Important:
-- Deleting/archiving is designed to preserve history links where possible.
-- Use this only for invalid or duplicate profiles that should no longer be active.
+Use this only when:
+- the customer is a duplicate entry
+- the record is clearly incorrect/test data
 
-### E) Open Customer Invoice History
-1. In the customer row, click `Invoices`.
-2. You will be redirected to invoice console filtered by customer.
+Avoid deleting real customers unless you are sure it will not affect history you need.
 
 ## Visual Reference
 ![Customer directory list](assets/customer-directory-list.png)
 ![Create customer editor dialog](assets/customer-editor-create.png)
 
-## Expected Result
-- You maintain clean customer records.
-- Manual booking and invoicing become faster due to reusable customer details.
-
-## Common Mistakes
-- Creating duplicate profiles when a profile already exists under slight naming differences.
-- Deleting active customers instead of correcting details.
+## Common Beginner Mistakes
+- Creating duplicates (for example “Jon Smith” and “John Smith”)
+  - Fix: search by email/phone before creating
+- Deleting an active customer instead of editing
+  - Fix: use `Edit` for corrections
 
 ## Troubleshooting
-- Customer not found in search:
-  - Try email or phone fragments.
-  - Check for typo variants in name spelling.
-- Duplicate profiles discovered:
-  - Keep the most complete profile.
-  - Archive/delete incorrect duplicate after verifying history linkage.
+- Customer not found:
+  - search by email (best)
+  - search by phone digits
+  - check spelling differences
 
-## Related Guides
+## Next Guides
 - [03-Booking-Management.md](03-Booking-Management.md)
 - [05-Invoice-Management.md](05-Invoice-Management.md)

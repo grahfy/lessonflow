@@ -1,85 +1,67 @@
 # 07 Reports, Outstanding, and Follow-Up
 
-## Overview
-This guide explains how to manage outstanding invoices and run a consistent follow-up routine.
+## What This Guide Helps You Do
+This guide helps you keep invoices under control without stress:
+- see what is outstanding
+- send reminders consistently
+- keep notes so someone else can take over if needed
 
-## Before You Start
-- Open `/admin/invoices`.
-- Ensure invoice statuses are up to date.
+## Where To Work
+You will use:
+- `/admin/invoices` for the actual follow-up work (filters, reminders, status updates)
+- `/admin/reports` for a quick summary view (optional)
 
-## Step-by-Step Instructions
+## Daily Follow-Up (5–10 Minutes)
+1. Open `/admin/invoices`.
+2. Turn on `Outstanding only`.
+3. Set `Aging` to:
+   - `Overdue 1-30` (most common daily work)
+4. Open an invoice with `View`.
+5. If appropriate, click `Send reminder`.
+6. Add a short note if there is a special situation (optional).
 
-### A) Review Outstanding Invoices
-1. Enable `Outstanding only`.
-2. Set `Aging` filter as needed:
-   - `Current`
-   - `Overdue 1-30`
-   - `Overdue 31+`
-3. Sort your work list by due date urgency.
+## Weekly Follow-Up (15–30 Minutes)
+1. Open `/admin/invoices`.
+2. Click `Send Due Reminders` (bulk send).
+3. Re-check the list:
+   - focus on older overdue invoices (`Overdue 31+`)
+4. For complex cases, add notes so the next person understands what happened.
 
-### B) Follow-Up Routine (Recommended)
-1. Daily:
-   - check overdue invoices,
-   - send single reminders where needed.
-2. Weekly:
-   - run `Send Due Reminders` batch,
-   - review invoices still unpaid after reminders,
-   - escalate manually for high-priority accounts.
-3. End of week:
-   - check paid/unpaid status accuracy,
-   - issue credit notes where correction is needed,
-   - update notes for unresolved cases.
+## Monthly / Yearly
+Use `/admin/reports` to review:
+- earnings and trends
+- outstanding invoice totals
+- comparison vs previous month/year
 
-### C) Use Reminder Stages
-Reminder stages are designed around overdue thresholds:
-- 7 days
-- 14 days
-- 30 days
-
-Use these as your standard communication cadence.
-
-### D) Track Outcomes
-For each reminder cycle:
-- verify reminder actions completed,
-- verify paid updates are reflected,
-- verify unresolved invoices carry clear notes.
+If you want to export totals for accounting, coordinate with the owner/technical admin.
 
 ## Visual Reference
 ![Invoice filters with outstanding toggle](assets/invoice-filters-outstanding-aging.png)
 
-## Expected Result
-- Outstanding balances are actively managed.
-- Follow-up is consistent, auditable, and easy to hand over.
+## Reminder Timing (Simple)
+The app supports a staged cadence (7/14/30 days overdue) for automated runs.
 
-## Common Mistakes
-- Sending repeated reminders without checking stage progression.
-- Forgetting to update status after payment confirmation.
-- Mixing billing corrections into delete actions instead of credit note flow.
+Manual reminders can still be sent for any overdue invoice when needed.
+
+## Common Beginner Mistakes
+- Sending reminders for invoices that were never `Sent`
+  - Fix: open invoice and click `Send` first
+- Forgetting to mark paid
+  - Fix: open invoice and click `Mark paid`
+- Trying to delete a sent invoice
+  - Fix: use a credit note instead
 
 ## Troubleshooting
-- Outstanding list looks wrong:
-  - check whether invoice was marked `Paid` or `Void`.
-  - clear filters and reload.
-- Batch reminders sent fewer than expected:
-  - only eligible overdue `Sent` invoices are included.
+- Bulk reminders send fewer than expected:
+  - only invoices that are `Sent` and overdue are eligible
+- List looks wrong:
+  - clear filters and click `Refresh`
 
-## Technical Operations (Owner/Technical User)
+## Technical Owner Note (Scheduler)
+On a droplet, automatic jobs run only if the scheduler is installed (cron/systemd timer).
+Deploy scripts can manage crontab entries, but the cron service must be running.
 
-### Cron Schedule Reference
-Configured in `vercel.json`:
-- Daily bookings digest.
-- Daily invoice reminders.
-
-### Controlled Reminder Runs
-Technical users can run reminder job with payload overrides using:
-- `dryRun` for preview,
-- `stage` for specific threshold runs,
-- `maxInvoices` for throttling,
-- `customerId` for targeted troubleshooting.
-
-Always record why overrides were used and the results.
-
-## Related Guides
+## Next Guides
 - [05-Invoice-Management.md](05-Invoice-Management.md)
 - [06-Email-and-Notifications.md](06-Email-and-Notifications.md)
 - [08-Troubleshooting-and-FAQs.md](08-Troubleshooting-and-FAQs.md)

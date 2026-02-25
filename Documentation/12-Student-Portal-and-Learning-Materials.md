@@ -1,84 +1,75 @@
 # 12 Student Portal and Learning Materials
 
-## Overview
-This guide explains how the student portal works and how admins should support students using it.
+## What This Is
+The student portal is the student-facing area of the website.
 
-The student portal allows students to:
-- log in with generated credentials,
-- view upcoming and previous appointments,
-- preview/download learning materials (audio/PDF),
-- view general learning materials not linked to a specific appointment.
+Students can:
+- log in with their portal password
+- see upcoming and previous appointments
+- preview or download learning materials (PDF/audio)
+- view general learning materials (not linked to a specific appointment)
 
-## Before You Start
-- Student must have at least one approved booking and portal credentials generated.
-- Admin may need to reveal or regenerate portal credentials from the customer directory.
-- Learning materials should be uploaded in admin (booking-linked or general materials).
+Admins can:
+- help students log in (reveal/regenerate password)
+- upload learning materials
 
-## Step-by-Step Instructions
+## What You Need (Admin)
+- The student must exist in the customer directory.
+- The student must have at least one approved booking (for portal access to make sense).
+- You need to know how to securely share a password (avoid public channels).
 
-### A) Student Login (Support Steps)
-1. Direct the student to `/student/login`.
-2. Student enters:
-   - full name,
-   - postcode,
-   - portal password.
-3. If login succeeds, student is taken to `/student/portal`.
+## Student Login (What To Tell Them)
+1. Go to `/student/login`.
+2. Enter:
+   - full name
+   - postcode
+   - portal password
+3. After sign-in, they land on `/student/portal`.
 
-### B) First-Time Access Support (Admin)
-1. Open `/admin/bookings` and go to `Customers`.
-2. Locate the student.
-3. Use portal credential actions:
-   - `Reveal password` (read back support), or
-   - `Regenerate password` (issue a fresh password).
-4. Share credentials securely with the student.
+## If a Student Can’t Log In (Admin Steps)
+1. Open `/admin/bookings`.
+2. Click `Customers`.
+3. Find the student.
+4. Use:
+   - `Reveal password` (read the current password), or
+   - `Regenerate password` (make a new one)
+5. Share the password securely with the student.
 
-### C) Upload Learning Materials (Admin)
+Important:
+- If you regenerate, the old password stops working immediately.
+
+## Upload Learning Materials (Admin)
 1. Open `/admin/bookings`.
 2. Open `Customer Learning Materials`.
 3. Select a customer.
-4. Choose file upload.
-5. Optionally link the material to an appointment.
-6. Save/upload.
+4. Upload a file.
+5. Optional: link it to an appointment.
+6. Save.
 
-You can also upload a **general material** not connected to any appointment.
+You can also upload “general” materials not linked to any appointment.
 
-### D) Preview and Download Learning Materials
-Admins and students can preview/download supported materials:
-- PDF (inline preview in browser)
-- Audio files (browser/audio preview where supported)
-
-If preview is not supported by the browser, use `Download`.
-
-### E) Student Portal Material Layout (What Students See)
-Students will see:
-- materials attached to appointments,
-- general learning materials,
-- upcoming/previous appointments for context.
+## Preview vs Download (What Students See)
+- PDFs usually preview inside the browser.
+- Audio usually plays in the browser.
+- If preview does not work (browser limitation), use `Download`.
 
 ## Visual Reference
 ![Student portal login page](assets/student-login-page.png)
 ![Student portal dashboard page](assets/student-portal-page.png)
 
-## Expected Result
-- Students can access learning materials securely from the portal.
-- Admins can manage portal credentials and upload both appointment-linked and general materials.
-
-## Common Mistakes
-- Uploading materials before selecting the correct customer.
-- Assuming all files preview the same way in every browser.
-- Regenerating credentials without telling the student the old password stops working.
+## Common Beginner Mistakes
+- Uploading materials to the wrong customer
+  - Fix: double-check the selected customer name
+- Regenerating passwords without warning the student
+  - Fix: tell them the old password will stop working
 
 ## Troubleshooting
 - Student cannot log in:
-  - verify full name/postcode match customer record,
-  - reveal/regenerate portal password,
-  - confirm approved booking exists.
-- Preview fails but download works:
-  - browser/file type limitation; use download.
-- Upload fails with size error:
-  - file may exceed current upload limit.
+  - confirm the full name/postcode match the customer record
+  - reveal/regenerate password
+- Upload fails:
+  - file may be too large
 
-## Related Guides
+## Next Guides
 - [03-Booking-Management.md](03-Booking-Management.md)
-- [04-Customer-Directory.md](04-Customer-Directory.md)
 - [06-Email-and-Notifications.md](06-Email-and-Notifications.md)

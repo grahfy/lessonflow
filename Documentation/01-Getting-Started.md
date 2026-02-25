@@ -1,49 +1,67 @@
 # 01 Getting Started
 
-## Overview
-This guide helps you understand what the system does and where to go first.
+## What This App Is
+This web app runs Melbourne Guitar School’s day-to-day operations:
+- bookings and lesson requests
+- customers and contact details
+- invoices, reminders, and payment tracking
+- learning materials (student portal)
+- reports and owner summaries
 
-The platform has two main admin work areas:
-- `Bookings` for scheduling and customer lesson operations.
-- `Invoices` for billing, reminders, and payment tracking.
+If you are brand new, you can learn the basics in 15 minutes by following the first 4 guides in order.
+
+## Where You Work (Most Days)
+You will mainly use two admin screens:
+- `Bookings` (`/admin/bookings`): schedule, lesson requests, moving/cancelling, customer actions
+- `Invoices` (`/admin/invoices`): creating/sending invoices, reminders, recording payment, credit notes
+
+Other admin screens:
+- `Reports` (`/admin/reports`): daily/weekly/monthly/yearly summaries and comparisons
+- `Settings` (`/admin/settings`): system settings (used carefully)
+- `Manual` (`/admin/manual`): these guides (in-app)
 
 ## Before You Start
-- You need admin access to `/admin/login`.
-- You should know your business process for:
-  - approving lesson requests,
-  - handling cancellations/moves,
-  - sending invoices,
-  - recording payments.
+You need:
+- the admin login email and password
+- a basic understanding of your lesson process:
+  - when to approve requests
+  - how to handle moves/cancellations
+  - when to invoice and when to follow up
 
-## Step-by-Step Instructions
-1. Open `/admin/login`.
-2. Sign in with your admin email and password.
-3. After login, you will land on the `Bookings` console.
-4. In `Bookings`, use the main action buttons:
-   - `Add Manual Booking`
-   - `Customers`
-   - `Invoices`
-5. Use `Invoices` to manage billing lifecycle actions:
-   - create/send invoices,
-   - mark paid,
-   - send reminders,
-   - create credit notes when needed.
+## Quick Start (First Day)
+1. Log in at `/admin/login`.
+2. Open `Bookings` and click a few items on the calendar so you understand how the detail dialog works.
+3. Open `Customers` inside `Bookings` and search for a known customer.
+4. Open `Invoices` and practice:
+   - filtering by `Outstanding only`
+   - opening an invoice with `View`
+   - downloading a PDF with `Download PDF`
 
-## Expected Result
-- You can move between admin areas confidently.
-- You understand which section handles booking operations vs billing operations.
+## Daily Routine (Simple Checklist)
+1. `Bookings`:
+   - approve or reject new requests
+   - check today’s bookings
+   - move or cancel bookings as needed
+2. `Invoices`:
+   - send invoices for completed/confirmed lessons
+   - send reminders for overdue invoices
+   - mark payments as paid when received
 
-## Common Mistakes
-- Doing billing updates in `Bookings` when the invoice already exists in `Invoices`.
-- Using ad-hoc notes instead of status actions (`Send`, `Mark paid`, `Create credit note`).
+## Common Beginner Mistakes (And How To Avoid Them)
+- You edit a booking but forget the last step:
+  - After changing details, click `Save details`
+  - After changing date/time, click `Move booking`
+- You try to delete something important:
+  - Sent/paid invoices should not be deleted. Use `Create credit note` instead.
+- You assume an email was delivered:
+  - If email delivery is not configured, actions can be recorded but not delivered. See `06-Email-and-Notifications.md`.
 
-## Troubleshooting
-- If login fails, see `02-Admin-Login-and-Access.md`.
-- If you cannot find a customer, see `04-Customer-Directory.md`.
-- If you cannot find an invoice, see `05-Invoice-Management.md`.
+## If You Get Stuck
+Start here:
+- [02-Admin-Login-and-Access.md](02-Admin-Login-and-Access.md)
+- [08-Troubleshooting-and-FAQs.md](08-Troubleshooting-and-FAQs.md)
 
-## Related Guides
+## Next Guides
 - [02-Admin-Login-and-Access.md](02-Admin-Login-and-Access.md)
 - [03-Booking-Management.md](03-Booking-Management.md)
 - [05-Invoice-Management.md](05-Invoice-Management.md)
-

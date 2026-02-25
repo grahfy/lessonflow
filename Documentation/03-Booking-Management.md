@@ -1,60 +1,86 @@
 # 03 Booking Management
 
-## Overview
-Use the booking console to review lesson requests, manage confirmed bookings, and keep schedules accurate.
+## What This Screen Does
+The Bookings screen (`/admin/bookings`) is your calendar and request inbox.
+
+You use it to:
+- approve or reject new lesson requests
+- view confirmed bookings on the calendar
+- move or cancel bookings
+- message customers
+- create invoices from a booking
 
 ## Before You Start
-- Sign in at `/admin/login`.
-- Open `/admin/bookings`.
-- Understand status colors in the legend:
-  - `Confirmed`
-  - `Pending`
-  - `Rejected (48h)`
-  - `Cancelled (48h)`
+1. Sign in at `/admin/login`.
+2. Open `/admin/bookings`.
 
-## Step-by-Step Instructions
+You will see a legend/status filter row at the top:
+- `Confirmed` (confirmed lessons)
+- `Pending` (requests waiting for a decision)
+- `Rejected (48h)` (kept for a short time)
+- `Cancelled (48h)` (kept for a short time)
 
-### A) Review Calendar and Pick a View
-1. Use the view selector to switch `Day`, `Week`, or `Month`.
-2. Set `Base date` if you need a specific day or week.
-3. Click a booking or request to open the detail dialog.
+Tip:
+- If something “disappears”, check the filters and the date you are viewing.
 
-### B) Approve or Reject Pending Requests
-1. Click a pending request.
-2. Review customer details and requested lesson details.
-3. Click:
-   - `Approve request` to convert to confirmed booking, or
-   - `Reject request` to decline.
+## The Basic Pattern (How This Screen Works)
+1. Pick a view: `Day`, `Week`, or `Month`.
+2. Pick a date (`Base date`).
+3. Click an item on the calendar to open its detail dialog.
+4. Do one action, then check the notice message at the top.
 
-### C) Edit, Move, or Cancel Confirmed Bookings
+## Common Tasks (Step-by-Step)
+
+### A) Approve a Pending Request
+1. Turn on the `Pending` filter (if it is not already on).
+2. Click the pending request in the calendar list.
+3. Check the customer details and requested time.
+4. Click `Approve request`.
+5. The request becomes a confirmed booking (green/confirmed).
+
+### B) Reject a Pending Request
+1. Click the pending request.
+2. Click `Reject request`.
+3. If you need to explain why, use `Email customer` (optional).
+
+### C) Add a Manual Booking (Admin-Created)
+Use this when you are creating a booking directly (phone call, in-person, etc.).
+1. Click `Add Manual Booking`.
+2. Choose an existing customer or create a new customer.
+3. Pick the lesson time and details.
+4. Save the booking.
+
+### D) Edit Booking Details (Without Moving Time)
+Use this for notes, contact edits, lesson details, etc.
 1. Click a confirmed booking.
-2. Update details as needed (contact details, lesson details, time).
-3. Click `Save details` for profile/booking edits.
-4. Click `Move booking` if start time/date changed.
-5. Click `Cancel booking` if lesson is cancelled.
+2. Make changes in the form fields.
+3. Click `Save details`.
 
-### D) Send Booking Communications
-1. Open a booking.
-2. Use:
-   - `Send reminder` for reminder message.
-   - `Email customer` for a custom message.
+### E) Move a Booking (Change the Date/Time)
+Use this if the start time/date needs to change.
+1. Click a confirmed booking.
+2. Click `Move booking`.
+3. Choose the new date/time in the pop-up picker.
+4. Confirm the move.
 
-### E) Remove Future Recurring Series
-1. Open a booking that belongs to a recurring series.
-2. Click `Remove series`.
-3. Confirm the action.
+### F) Cancel a Booking
+1. Click a confirmed booking.
+2. Click `Cancel booking`.
+3. Confirm.
 
-### F) Create Invoice from Booking
-1. Open a confirmed booking.
+### G) Send a Reminder or Message to a Customer
+1. Click a confirmed booking.
+2. Click:
+   - `Send reminder` (standard reminder)
+   - `Email customer` (custom message)
+
+### H) Create an Invoice From a Booking
+1. Click a confirmed booking.
 2. Click `Create invoice`.
-3. Enter:
-   - lesson fee,
-   - due date,
-   - optional extras (books/digital/custom),
-   - tax mode,
-   - notes.
-4. Click `Create invoice`.
-5. Continue invoice processing in `/admin/invoices`.
+3. Fill in lesson fee and due date.
+4. Add optional extras if needed.
+5. Click `Create invoice`.
+6. Continue in `/admin/invoices` if you need to edit/send later.
 
 ## Visual Reference
 ![Booking calendar week view](assets/booking-calendar-week-view.png)
@@ -62,26 +88,31 @@ Use the booking console to review lesson requests, manage confirmed bookings, an
 ![Booking detail dialog with notes and actions](assets/booking-detail-dialog-notes-and-actions.png)
 ![Booking create invoice dialog](assets/booking-create-invoice-dialog.png)
 
-## Expected Result
-- Bookings reflect real schedule status.
-- Customers receive timely communications.
-- Billing can start directly from completed lesson operations.
+## What “Good” Looks Like
+- Pending requests are processed quickly (approve/reject).
+- The calendar matches the real lesson schedule.
+- Changes are recorded with the right action:
+  - `Save details` for edits
+  - `Move booking` for time changes
+  - `Cancel booking` for cancellations
 
-## Common Mistakes
-- Editing booking fields but forgetting `Save details`.
-- Moving a booking but skipping reminder communication.
-- Cancelling single booking when you meant to remove the full recurring series.
+## Common Beginner Mistakes
+- You change the start time but only click `Save details`
+  - Fix: use `Move booking` to change time/date
+- You cannot find a booking
+  - Fix: confirm filters and date range
+- You create a manual booking with a duplicate customer
+  - Fix: search first in `Customers`
 
 ## Troubleshooting
-- Booking not visible:
-  - Check date range/view.
-  - Confirm status filter context in legend.
-- Cannot process pending request:
-  - Re-open request and verify required fields are valid.
-- Invoice button not visible:
-  - Confirm the item is a confirmed booking, not pending request.
+- “Nothing happens” after clicking an action:
+  - wait 2–3 seconds, then check for a notice at the top
+  - refresh the page and try again
+  - if it keeps happening, see `08-Troubleshooting-and-FAQs.md`
+- Invoice button missing:
+  - you may be clicking a pending request, not a confirmed booking
 
-## Related Guides
+## Next Guides
 - [04-Customer-Directory.md](04-Customer-Directory.md)
 - [05-Invoice-Management.md](05-Invoice-Management.md)
-- [06-Email-and-Notifications.md](06-Email-and-Notifications.md)
+- [08-Troubleshooting-and-FAQs.md](08-Troubleshooting-and-FAQs.md)

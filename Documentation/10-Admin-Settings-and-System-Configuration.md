@@ -1,82 +1,77 @@
 # 10 Admin Settings and System Configuration
 
-## Overview
-Use `/admin/settings` to manage supported system configuration values without editing files directly on the server.
+## What This Screen Is
+`/admin/settings` is the “settings page” for the whole app.
 
-This screen writes approved settings to the project `.env` file and can sync the admin login email/password to the database.
+Use it to change supported settings without editing server files manually.
 
-## Before You Start
-- Sign in as an admin user.
-- Open `/admin/settings`.
-- Confirm you understand whether the change affects:
-  - day-to-day behavior (for example invoice defaults), or
-  - technical runtime behavior (for example site URL, email credentials, secrets).
+This page:
+- saves settings to the server `.env`
+- keeps the admin login credentials in sync with the database
+- may restart the service after saving (so changes take effect)
 
-## Important Safety Notes
-- Many settings require an app restart to fully apply.
-- Saving can trigger a best-effort service restart on the server.
-- Secret fields may show as already set. Leaving them blank keeps the current value.
-- Do not paste test credentials into production settings.
+## Before You Change Anything
+1. Open `/admin/settings`.
+2. Decide: is this a day-to-day change (safe), or a technical change (be careful)?
 
-## Step-by-Step Instructions
+Examples:
+- Day-to-day: invoice defaults, business details, contact info
+- Technical: site URL, email credentials, security secrets
 
-### A) Review Current Configuration Sections
-1. Open the grouped sections in the form.
-2. Read the helper text under each field.
-3. Check whether a field is marked:
-   - `required`,
-   - `secret`, or
-   - both.
+## Safety Rules (Beginner-Friendly)
+- Change one thing at a time.
+- If a secret field is already set, you can leave it blank to keep the current value.
+- After saving, you may be logged out (this is normal if you changed the owner email).
+- Many changes only fully apply after a restart. The app tries to restart automatically.
 
-### B) Update General Settings
-1. Change only the values you intend to update.
-2. For secret fields already configured:
-   - leave blank to keep the current secret,
-   - enter a new value only when rotating/updating it.
-3. Double-check `NEXT_PUBLIC_SITE_URL` before saving.
+## Common Tasks (Step-by-Step)
 
-### C) Update Owner/Admin Login Details
-1. Edit `Owner Email` to change the admin login email used by the system.
-2. To keep the current admin password:
-   - leave the new password field blank.
-3. To rotate the admin password:
-   - enter a new password and save.
+### A) Update a Normal Setting
+1. Change the field you want.
+2. Leave everything else as-is.
+3. Click `Save settings`.
+4. Test the workflow you changed (for example, send a test invoice).
 
-After save:
-- the admin database login email/password is synced,
-- the current session may be cleared if the admin email changed,
-- you may need to sign in again.
+### B) Keep Current Secret Values
+If you see a secret field that says it is already set:
+- leave it blank if you are not changing it
+
+Blank means “keep what is currently configured”.
+
+### C) Change the Admin Login Email or Password
+1. Find `Owner Email`.
+2. Change it if you want the admin login email to change.
+3. If you want to keep the current password:
+   - leave the new password field blank
+4. If you want to change the password:
+   - enter a new password and save
+
+After saving:
+- you may be logged out
+- sign in again with the new email/password
 
 ### D) Save and Confirm
 1. Click `Save settings`.
 2. Wait for the success message.
-3. If prompted/logged out, sign in again with updated credentials.
-4. Re-test the affected workflow (email, invoices, portal, etc.).
+3. If it says a restart happened (or you were logged out), that is expected.
+4. Re-test what you changed.
 
 ## Visual Reference
 ![Admin settings page](assets/admin-settings-page.png)
 
-## Expected Result
-- Supported configuration values are saved safely.
-- Admin login credentials remain synchronized with the database.
-- Runtime changes apply after restart (automatic or manual, depending on server permissions).
-
 ## Common Mistakes
-- Clearing a secret field accidentally when intending to keep it (leave blank to keep current value).
-- Changing owner email and then trying to log in with the old email.
-- Updating email settings without testing a real send path afterward.
+- Changing owner email and then trying to sign in with the old email
+- Changing email settings and not testing a real send (invoice send is the easiest test)
 
 ## Troubleshooting
-- Save says settings saved but feature still behaves the old way:
-  - restart may be required,
-  - confirm the field you changed is the correct one.
-- Save fails on a required secret left blank:
-  - check whether that secret is already configured in the current environment.
-- Login fails after admin email/password change:
-  - use the new owner email/password,
-  - if needed, use the password reset script documented in deploy/admin operations docs.
+- “Saved, but nothing changed”:
+  - refresh the page and try again
+  - a restart may be required
+- Can’t log in after changing email/password:
+  - use the new owner email/password
+  - if stuck, use the server password reset script (technical owner)
 
-## Related Guides
+## Next Guides
 - [02-Admin-Login-and-Access.md](02-Admin-Login-and-Access.md)
 - [06-Email-and-Notifications.md](06-Email-and-Notifications.md)
 - [11-Admin-Reports-Dashboard.md](11-Admin-Reports-Dashboard.md)

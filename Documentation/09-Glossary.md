@@ -1,19 +1,10 @@
 # 09 Glossary
 
-## Overview
-This glossary defines key terms used in the admin system and in this documentation set.
-
-## Before You Start
-- Use this guide when a term in another guide is unclear.
-- Check UI labels in the product when in doubt.
-
-## Step-by-Step Instructions
-1. Use `Ctrl/Cmd + F` to search this page for a term.
-2. If a term is not listed, check related guides first:
-   - `03-Booking-Management.md`
-   - `05-Invoice-Management.md`
-   - `07-Reports-Outstanding-and-Follow-Up.md`
-3. If still unclear, record the term for documentation update in `Documentation/CHANGELOG.md`.
+## How To Use This Page
+If you see a word in the app or guides that you do not understand:
+1. Press `Ctrl/Cmd + F` and search for the term here.
+2. If it is not listed, check the related guide (Bookings or Invoices).
+3. If it is still unclear, tell the owner so the docs can be improved.
 
 ## Terms
 - Admin: A signed-in operator with access to booking and invoice tools.
@@ -48,21 +39,11 @@ This glossary defines key terms used in the admin system and in this documentati
 - Tax Mode: Per-line or invoice-level tax setting used by billing workflow.
 - Void Invoice: Cancellation status for an invoice where applicable.
 
-## Expected Result
-- Operators can quickly resolve unfamiliar terms without interrupting daily work.
+## Common Confusions
+- This glossary is for app workflow words, not tax/legal advice.
+- `queued_no_smtp` means the app recorded the email action, but delivery is not configured.
 
-## Common Mistakes
-- Assuming glossary definitions replace accountant or legal advice.
-- Treating `queued_no_smtp` as confirmed external delivery.
-
-## Troubleshooting
-- Term does not match UI wording:
-  - Capture the exact UI label.
-  - Update this glossary and related guides in same change set.
-- New workflow introduces new terms:
-  - Add definitions here before releasing updated workflow docs.
-
-## Related Guides
+## Next Guides
 - [01-Getting-Started.md](01-Getting-Started.md)
+- [03-Booking-Management.md](03-Booking-Management.md)
 - [05-Invoice-Management.md](05-Invoice-Management.md)
-- [08-Troubleshooting-and-FAQs.md](08-Troubleshooting-and-FAQs.md)
