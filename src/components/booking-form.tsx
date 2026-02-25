@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 import { useNoticeTween } from "@/components/motion/use-notice-tween";
 
@@ -16,6 +16,15 @@ export function BookingForm() {
   const [durationType, setDurationType] = useState<"min30" | "min60" | "custom">("min60");
   const successNoticeRef = useNoticeTween(state.status === "success");
   const errorNoticeRef = useNoticeTween(state.status === "error");
+
+  useEffect(() => {
+    if (state.status !== "success" || !successNoticeRef.current) {
+      return;
+    }
+
+    successNoticeRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    successNoticeRef.current.focus();
+  }, [state.status, successNoticeRef]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -55,11 +64,21 @@ export function BookingForm() {
       recurrenceEndAt: isRecurring && recurrenceRaw ? new Date(recurrenceRaw).toISOString() : undefined
     };
 
-    const response = await fetch("/api/booking-requests", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+    let response: Response;
+    try {
+      response = await fetch("/api/booking-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+    } catch {
+      setLoading(false);
+      setState({
+        status: "error",
+        message: "Booking could not be submitted right now. Please try again, or contact us by phone or email."
+      });
+      return;
+    }
 
     setLoading(false);
     if (!response.ok) {
@@ -75,7 +94,8 @@ export function BookingForm() {
     setDurationType("min60");
     setState({
       status: "success",
-      message: "Booking request submitted. Your booking is pending, and we will get back to you to confirm the appointment."
+      message:
+        "Booking request submitted successfully. We will confirm your booking with you by phone call or email."
     });
   }
 
@@ -281,12 +301,19 @@ export function BookingForm() {
       </p>
 
       {state.status === "success" ? (
-        <p className="notice success" ref={successNoticeRef} data-motion-item="booking-success-notice">
+        <p
+          className="notice success"
+          ref={successNoticeRef}
+          data-motion-item="booking-success-notice"
+          role="status"
+          aria-live="polite"
+          tabIndex={-1}
+        >
           {state.message}
         </p>
       ) : null}
       {state.status === "error" ? (
-        <p className="notice error" ref={errorNoticeRef} data-motion-item="booking-error-notice">
+        <p className="notice error" ref={errorNoticeRef} data-motion-item="booking-error-notice" role="alert" aria-live="assertive">
           {state.message}
         </p>
       ) : null}
