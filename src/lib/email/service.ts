@@ -10,12 +10,14 @@ import nodemailer from "nodemailer";
 
 import { prisma } from "@/lib/db";
 import { isGmailConfigured, sendGmailEmail } from "@/lib/email/gmail-service";
+import { getOwnerEmail } from "@/lib/env";
 import { logError, logEvent } from "@/lib/observability";
 
 type SendEmailInput = {
   to: string;
   subject: string;
   html: string;
+  bcc?: string | string[];
   attachments?: Array<{
     filename: string;
     content: Buffer;
@@ -29,6 +31,50 @@ export type SendEmailResult = {
 };
 
 let transporter: nodemailer.Transporter | null = null;
+
+function normalizeAddressValue(value: string): string {
+  const trimmed = value.trim().toLowerCase();
+  const bracketMatch = trimmed.match(/<([^>]+)>/);
+  return (bracketMatch?.[1] || trimmed).trim();
+}
+
+function mergeBccValues(existing: string | string[] | undefined, extra: string): string[] {
+  const seen = new Set<string>();
+  const merged: string[] = [];
+
+  const addValue = (value: string) => {
+    const normalized = normalizeAddressValue(value);
+    if (!normalized || seen.has(normalized)) {
+      return;
+    }
+    seen.add(normalized);
+    merged.push(value);
+  };
+
+  if (Array.isArray(existing)) {
+    for (const value of existing) addValue(value);
+  } else if (typeof existing === "string" && existing.trim()) {
+    addValue(existing);
+  }
+
+  addValue(extra);
+  return merged;
+}
+
+function getCustomerAuditBccRecipient(to: string): string | null {
+  const ownerEmail = getOwnerEmail();
+  if (!ownerEmail) {
+    return null;
+  }
+
+  // Only BCC customer-facing emails. Messages already addressed to the owner/admin should not
+  // duplicate the same mailbox.
+  if (normalizeAddressValue(to) === normalizeAddressValue(ownerEmail)) {
+    return null;
+  }
+
+  return ownerEmail;
+}
 
 /**
  * Lazily creates and caches the SMTP transporter when minimum credentials exist.
@@ -64,11 +110,16 @@ function getTransporter() {
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
   const from = process.env.SMTP_FROM || "Melbourne Guitar School <no-reply@example.com>";
   const tx = getTransporter();
+  const ownerBcc = getCustomerAuditBccRecipient(input.to);
+  const bcc = ownerBcc ? mergeBccValues(input.bcc, ownerBcc) : input.bcc;
 
   if (!tx) {
     // Prefer Gmail API over queueing when available because some hosts block outbound SMTP ports.
     if (isGmailConfigured()) {
-      return sendGmailEmail(input);
+      return sendGmailEmail({
+        ...input,
+        bcc
+      });
     }
 
     // Preserve business workflows by recording the outbound email even when no live transport is
@@ -89,6 +140,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     await tx.sendMail({
       from,
       to: input.to,
+      bcc,
       subject: input.subject,
       html: input.html,
       attachments: input.attachments?.map((attachment) => ({

@@ -26,6 +26,7 @@ type SendEmailInput = {
   to: string;
   subject: string;
   html: string;
+  bcc?: string | string[];
   attachments?: Array<{
     filename: string;
     content: Buffer;
@@ -88,6 +89,7 @@ function getAuthClient() {
 function encodeEmailMessage(
   from: string,
   to: string,
+  bcc: string | string[] | undefined,
   subject: string,
   html: string,
   attachments?: Array<{
@@ -103,6 +105,13 @@ function encodeEmailMessage(
   let email = [
     `From: ${from}`,
     `To: ${to}`,
+    ...(Array.isArray(bcc)
+      ? bcc.length > 0
+        ? [`Bcc: ${bcc.join(", ")}`]
+        : []
+      : typeof bcc === "string" && bcc.trim()
+        ? [`Bcc: ${bcc}`]
+        : []),
     `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
     "MIME-Version: 1.0",
     attachments && attachments.length > 0
@@ -151,7 +160,7 @@ export async function sendGmailEmail(input: SendEmailInput): Promise<SendEmailRe
   }
 
   const from = process.env.GMAIL_USER_EMAIL!;
-  const rawMessage = encodeEmailMessage(from, input.to, input.subject, input.html, input.attachments);
+  const rawMessage = encodeEmailMessage(from, input.to, input.bcc, input.subject, input.html, input.attachments);
 
   const gmail = google.gmail({ version: "v1", auth });
 
