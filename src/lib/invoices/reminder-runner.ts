@@ -28,6 +28,8 @@ export type InvoiceReminderRunResult = {
  */
 export async function runInvoiceReminderBatch(input: RunInvoiceReminderBatchInput): Promise<InvoiceReminderRunResult> {
   const now = new Date();
+  // Candidate selection is intentionally broad and bounded; stage/idempotency filtering happens
+  // below through shared eligibility logic so manual and cron runs behave identically.
   const candidates = await prisma.invoice.findMany({
     where: {
       isDeleted: false,
@@ -58,6 +60,7 @@ export async function runInvoiceReminderBatch(input: RunInvoiceReminderBatchInpu
       };
     })
     .filter(({ eligibility }) => {
+      // Optional stage filter supports admin-triggered dry runs or one-off recovery sends.
       if (!eligibility.isEligible || !eligibility.stage) {
         return false;
       }
@@ -68,6 +71,8 @@ export async function runInvoiceReminderBatch(input: RunInvoiceReminderBatchInpu
     });
 
   if (input.dryRun) {
+    // Dry-run output shows the exact invoices/stages that would be processed without mutating DB
+    // state or dispatching customer email.
     return {
       dryRun: true,
       candidateCount: candidates.length,
@@ -96,6 +101,8 @@ export async function runInvoiceReminderBatch(input: RunInvoiceReminderBatchInpu
 
     try {
       const reminder = await sendInvoiceReminder(invoice, eligibility.overdueDays, eligibility.stage);
+      // Persist reminder metadata and audit logs per invoice so a single failure does not poison
+      // the entire batch.
       await prisma.invoice.update({
         where: { id: invoice.id },
         data: {
@@ -118,6 +125,8 @@ export async function runInvoiceReminderBatch(input: RunInvoiceReminderBatchInpu
         stage: eligibility.stage
       });
     } catch (error) {
+      // Continue collecting failures to maximize progress during cron runs and return actionable
+      // diagnostics to the admin UI/manual runner.
       failed.push({
         id: invoice.id,
         invoiceNumber: invoice.invoiceNumber,

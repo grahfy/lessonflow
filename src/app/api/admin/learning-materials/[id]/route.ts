@@ -32,6 +32,8 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Learning material not found." }, { status: 404 });
     }
 
+    // Delete DB metadata first so the admin UI reflects removal immediately even if storage cleanup
+    // later fails (cleanup errors are logged for follow-up).
     await prisma.learningMaterial.delete({
       where: {
         id
@@ -44,6 +46,8 @@ export async function DELETE(request: NextRequest, { params }: Params) {
         storageKey: existing.storageKey
       })
       .catch((error) => {
+        // Storage cleanup is best-effort because the primary user-visible action (metadata removal)
+        // has already succeeded.
         logError("learning_material.storage_delete_failed", error, {
           id: existing.id,
           storageKey: existing.storageKey

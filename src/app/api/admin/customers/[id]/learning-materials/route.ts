@@ -38,6 +38,8 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Customer not found." }, { status: 404 });
     }
 
+    // Optional booking filter lets the admin modal narrow materials to one appointment while
+    // preserving a "show all customer materials" view.
     const bookingId = request.nextUrl.searchParams.get("bookingId")?.trim() || null;
     if (bookingId) {
       const ownsBooking = await prisma.booking.findFirst({
@@ -51,6 +53,8 @@ export async function GET(request: NextRequest, { params }: Params) {
       }
     }
 
+    // Load bookings and materials together because the modal needs both datasets to drive the
+    // selector and the list.
     const [bookings, materials] = await Promise.all([
       prisma.booking.findMany({
         where: {
@@ -145,6 +149,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Selected appointment is not linked to this customer." }, { status: 400 });
     }
 
+    // File classification normalizes MIME/extension handling and enforces allowed upload types.
     const classification = classifyLearningMaterialFile({
       fileName: file.name,
       mimeType: file.type
@@ -196,6 +201,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         { status: 201 }
       );
     } catch (error) {
+      // Metadata write failed after the blob upload; best-effort cleanup avoids orphaned storage files.
       await storage.delete({ storageKey }).catch(() => null);
       return NextResponse.json(
         { error: error instanceof Error ? error.message : "Unable to save learning material metadata." },

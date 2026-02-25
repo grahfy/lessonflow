@@ -5,8 +5,15 @@ import { jsonUnexpectedError } from "@/lib/api-errors";
 import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
 import { isSetupComplete } from "@/lib/setup";
 
+/**
+ * Admin login endpoint.
+ *
+ * This route owns rate limiting, setup gating, credential verification, and session cookie issuance
+ * so the client login form can remain a thin UI wrapper.
+ */
 export async function POST(request: NextRequest) {
   try {
+    // Rate-limit by proxy-aware request IP to slow brute-force attempts.
     const rateLimit = consumeRateLimit({
       key: `admin-login:${getRequestIp(request)}`,
       limit: 12,
@@ -50,6 +57,7 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({ ok: true });
     response.cookies.set(getSessionCookieName(), token, {
       httpOnly: true,
+      // Allow local HTTP development while enforcing secure cookies in production.
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",

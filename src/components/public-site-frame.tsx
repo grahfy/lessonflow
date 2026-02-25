@@ -22,6 +22,11 @@ function isPublicRoute(pathname: string): boolean {
   return pathname in PUBLIC_FOOTER_COPY;
 }
 
+/**
+ * Wraps recognized public routes in the shared public shell and primes route/media navigation hints.
+ *
+ * Student/admin pages bypass this wrapper so they can use their own shells and motion scopes.
+ */
 export function PublicSiteFrame({ children }: PropsWithChildren) {
   const pathname = usePathname();
   const router = useRouter();
@@ -31,6 +36,7 @@ export function PublicSiteFrame({ children }: PropsWithChildren) {
       primePublicHeroImages();
     };
 
+    // Defer preload work until idle time so first paint/navigation remains responsive.
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
       const idleCallback = (window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
       idleCallback(run, { timeout: 1000 });
@@ -46,6 +52,7 @@ export function PublicSiteFrame({ children }: PropsWithChildren) {
       }
     };
 
+    // Route prefetching is also pushed to idle time to avoid competing with initial hydration.
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
       const idleCallback = (window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
       idleCallback(run, { timeout: 1200 });
@@ -55,6 +62,7 @@ export function PublicSiteFrame({ children }: PropsWithChildren) {
   }, [router]);
 
   if (!isPublicRoute(pathname)) {
+    // Allow non-public routes (admin/student/setup) to render without public chrome.
     return <>{children}</>;
   }
 

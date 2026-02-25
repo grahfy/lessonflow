@@ -40,6 +40,12 @@ const editSchema = z.object({
   notes: z.string().trim().max(1000).nullable().optional()
 });
 
+/**
+ * Admin booking mutation route used by the bookings dialog.
+ *
+ * The client sends an `action` discriminator so edit/move/cancel share a single endpoint while the
+ * server retains action-specific validation and side effects (audit logs + customer emails).
+ */
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const admin = await requireAdminFromRequest(request);
@@ -76,6 +82,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         }
       });
 
+      // Reuse the customer-facing booking status template for cancellation notices.
       await sendCustomerBookingStatusEmail({
         email: booking.email,
         name: booking.name,
@@ -111,6 +118,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         }
       });
 
+      // Send after the DB write succeeds so the customer email reflects persisted booking times.
       await sendCustomerBookingMovedEmail({
         email: existing.email,
         name: existing.name,
@@ -127,6 +135,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         return NextResponse.json({ error: "Invalid edit payload.", details: parsed.error.flatten() }, { status: 400 });
       }
 
+      // Derive the full next-state payload server-side so partial edits preserve required fields
+      // and computed values (address string, end time) stay consistent.
       const nextDuration = parsed.data.lessonDuration ?? existing.lessonDuration;
       const nextCustomDurationMinutes =
         parsed.data.customDurationMinutes === undefined
@@ -237,6 +247,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Booking not found." }, { status: 404 });
     }
 
+    // Delete dependent audit rows first to satisfy FK constraints before removing the booking.
     await prisma.bookingAuditLog.deleteMany({
       where: { bookingId: id }
     });

@@ -19,6 +19,11 @@ const manualBookingSchema = bookingRequestSchema.and(
 
 type ManualBookingInput = z.infer<typeof manualBookingSchema>;
 
+/**
+ * Creates a customer from a validated manual-booking payload.
+ *
+ * Extracted helper keeps the route's match-resolution logic readable.
+ */
 async function createCustomerFromBooking(input: ManualBookingInput) {
   return prisma.customer.create({
     data: customerSnapshotFromInput({
@@ -38,6 +43,9 @@ async function createCustomerFromBooking(input: ManualBookingInput) {
   });
 }
 
+/**
+ * Updates an existing customer from booking input when the admin explicitly chooses to sync data.
+ */
 async function updateCustomerFromBooking(id: string, input: ManualBookingInput) {
   return prisma.customer.update({
     where: { id },
@@ -74,6 +82,8 @@ export async function GET(request: NextRequest) {
     }
     const now = new Date();
     const recencyCutoff = getRecencyCutoff(now);
+    // Include recently cancelled/rejected items briefly so admins can confirm actions after reload
+    // without permanently cluttering the calendar.
 
     const rows = await prisma.booking.findMany({
       where: {
@@ -185,6 +195,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid booking payload.", details: parsed.error.flatten() }, { status: 400 });
   }
 
+  // Manual booking creation can bind to a selected customer, resolve a probable existing match,
+  // or create a new customer depending on the submitted match-resolution fields.
   let customerId: string | null = null;
   if (parsed.data.customerId) {
     const selected = await prisma.customer.findUnique({
@@ -255,6 +267,7 @@ export async function POST(request: NextRequest) {
     const endAt = new Date(parsed.data.recurrenceEndAt);
     const starts = generateRecurringStartDates({ startAt, recurrenceEndAt: endAt });
 
+    // Persist a series record for recurrence metadata, then create the operational booking rows.
     const series = await prisma.bookingSeries.create({
       data: {
         name: parsed.data.name,

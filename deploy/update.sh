@@ -530,6 +530,8 @@ print_summary() {
 }
 
 # Builds and executes the deploy.sh command, passing through compatible flags.
+# `deploy.sh` owns migrations, baseline recovery, nginx template sync, and
+# service/nginx restarts; this wrapper only prepares git state and invocation.
 run_deploy() {
   if [[ ! -x "${DEPLOY_SCRIPT}" ]]; then
     log_error "deploy.sh not found or not executable at ${DEPLOY_SCRIPT}"
@@ -555,6 +557,8 @@ run_deploy() {
   log_info "Invoking ${DEPLOY_SCRIPT} ${deploy_args[*]}"
 
   if should_use_sudo_for_deploy; then
+    # Pass through computed heap settings because `sudo` typically drops env vars
+    # and deploy.sh uses them before npm/prisma/build steps begin.
     local sudo_env_args=()
     if [[ -n "${NODE_OPTIONS:-}" ]]; then
       sudo_env_args+=( "NODE_OPTIONS=${NODE_OPTIONS}" )
@@ -673,6 +677,8 @@ if [[ "${ALLOW_DIRTY}" != true ]] && git_worktree_dirty; then
 fi
 
 if [[ "${SKIP_PULL}" == false ]]; then
+  # Fetch/pull stays in the persistent repo clone; deploy.sh then rsyncs a clean
+  # release directory so runtime symlink switches remain atomic.
   run_step "Fetching ${REMOTE_NAME}/${BRANCH}" git fetch "${REMOTE_NAME}" "${BRANCH}"
 
   if [[ "$(current_branch_name)" != "${BRANCH}" ]]; then

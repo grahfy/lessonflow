@@ -57,6 +57,12 @@ function SetupCheckRow({ check }: { check: SetupCheck }) {
   );
 }
 
+/**
+ * First-run setup wizard client for readiness checks, env configuration, and initial admin create.
+ *
+ * The browser handles UX state while the server remains the source of truth for readiness checks
+ * (DB connectivity, filesystem access, env validation) and initialization.
+ */
 export function SetupWizard({ initialReadiness }: SetupWizardProps) {
   const router = useRouter();
   const [readiness, setReadiness] = useState<SetupReadiness>(initialReadiness);
@@ -83,6 +89,7 @@ export function SetupWizard({ initialReadiness }: SetupWizardProps) {
     setError("");
 
     try {
+      // Status is server-derived because many checks cannot be safely/accurately evaluated client-side.
       const response = await fetch("/api/setup/status", {
         method: "GET"
       });
@@ -107,6 +114,8 @@ export function SetupWizard({ initialReadiness }: SetupWizardProps) {
     setEnvSaveSuccess("");
 
     try {
+      // Load env metadata lazily when the config section is expanded to keep initial setup render
+      // focused on readiness results.
       const response = await fetch("/api/setup/env", {
         method: "GET"
       });
@@ -133,6 +142,7 @@ export function SetupWizard({ initialReadiness }: SetupWizardProps) {
     setEnvFieldErrors({});
 
     const form = event.currentTarget;
+    // Flatten form inputs into the API contract used by /api/setup/configure.
     const payload: Record<string, string> = {};
 
     for (const envVar of envVars) {
@@ -190,6 +200,7 @@ export function SetupWizard({ initialReadiness }: SetupWizardProps) {
     };
 
     try {
+      // Server initialization re-checks readiness and password policy before creating the first admin.
       const response = await fetch("/api/setup/initialize", {
         method: "POST",
         headers: {

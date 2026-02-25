@@ -67,10 +67,10 @@ function getAuthClient() {
     authClient = new google.auth.OAuth2(
       GMAIL_CLIENT_ID!,
       GMAIL_CLIENT_SECRET!,
-      // No redirect URI needed for refresh token flow
+      // No redirect URI is needed at runtime because we only use the stored refresh token.
     );
 
-    // Set the refresh token - the client will automatically refresh when needed
+    // The Google client will automatically refresh short-lived access tokens from this refresh token.
     authClient.setCredentials({
       refresh_token: GMAIL_REFRESH_TOKEN!,
     });
@@ -81,6 +81,9 @@ function getAuthClient() {
 
 /**
  * Encodes an email message in RFC 2822 format for Gmail API.
+ *
+ * We build the MIME message manually so the Gmail path supports the same HTML + attachment shape
+ * used by the SMTP path without adding a second mail-composer abstraction.
  */
 function encodeEmailMessage(
   from: string,
@@ -95,7 +98,8 @@ function encodeEmailMessage(
 ): string {
   const boundary = `boundary_${Date.now()}_${Math.random().toString(36).slice(2)}`;
   
-  // Build email headers
+  // Build standards-compliant headers first; Gmail expects the final payload as a raw RFC 2822
+  // message encoded with base64url.
   let email = [
     `From: ${from}`,
     `To: ${to}`,
@@ -108,7 +112,7 @@ function encodeEmailMessage(
   ].join("\r\n");
 
   if (attachments && attachments.length > 0) {
-    // Multipart message with attachments
+    // Multipart message: HTML body first, then each attachment as a base64 part.
     email += `\r\n--${boundary}\r\n`;
     email += "Content-Type: text/html; charset=UTF-8\r\n";
     email += "Content-Transfer-Encoding: base64\r\n\r\n";
@@ -124,11 +128,11 @@ function encodeEmailMessage(
 
     email += `\r\n--${boundary}--`;
   } else {
-    // Simple HTML email
+    // Simple HTML email avoids multipart overhead when there are no attachments.
     email += "\r\n" + html;
   }
 
-  // Gmail API expects base64url encoded string
+  // Gmail API expects URL-safe base64 without padding characters.
   return Buffer.from(email)
     .toString("base64")
     .replace(/\+/g, "-")
@@ -159,7 +163,7 @@ export async function sendGmailEmail(input: SendEmailInput): Promise<SendEmailRe
       },
     });
 
-    // Log successful send to database
+    // Keep outbound email audit logging consistent with the SMTP implementation.
     await prisma.outboundEmail.create({
       data: {
         toEmail: input.to,
@@ -177,7 +181,7 @@ export async function sendGmailEmail(input: SendEmailInput): Promise<SendEmailRe
     return { status: "sent" };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown Gmail API error";
-    // Log failure to database
+    // Persist failures for admin troubleshooting and delivery audit visibility.
     await prisma.outboundEmail.create({
       data: {
         toEmail: input.to,
@@ -206,6 +210,7 @@ export async function getGmailUserProfile(): Promise<string | null> {
 
   try {
     const gmail = google.gmail({ version: "v1", auth });
+    // Lightweight support probe used to verify OAuth configuration without sending an email.
     const profile = await gmail.users.getProfile({ userId: "me" });
     return profile.data.emailAddress || null;
   } catch (error) {

@@ -16,6 +16,11 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * Public contact page wrapper with location guidance + contact form.
+ *
+ * Contact details are rendered directly here for immediate access even if the contact form is not used.
+ */
 export default function ContactPage() {
   const contactEmail = getOwnerEmail();
 

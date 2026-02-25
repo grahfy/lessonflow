@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Admin booking calendar presentation component.
+ *
+ * Rendering is isolated from data fetching/mutations so the parent admin console owns business
+ * state while this component focuses on view-specific layout and event selection.
+ */
 import {
   addDays,
   eachDayOfInterval,
@@ -54,6 +60,7 @@ function eventDay(event: AdminCalendarEvent, day: Date): boolean {
 }
 
 function monthGridDays(baseDate: Date): Date[] {
+  // Render a full Monday-starting grid so month view columns stay stable across month lengths.
   const monthStart = startOfMonth(baseDate);
   const monthEnd = endOfMonth(baseDate);
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
@@ -73,6 +80,7 @@ function DayCell(props: {
   onSelect: (event: AdminCalendarEvent) => void;
   muted?: boolean;
 }) {
+  // Cap animation markers per day to avoid excessive motion work on very busy days.
   return (
     <div className={`calendar-day ${props.muted ? "is-muted" : ""}`} data-motion-item="calendar-day">
       <div className="calendar-day-head" data-motion-item="calendar-day-head">
@@ -140,6 +148,7 @@ export function AdminBookingCalendar(props: Props) {
     );
   }
 
+  // Month view includes adjacent-month days as muted cells to keep the grid rectangular.
   const days = monthGridDays(baseDate);
   const monthStart = startOfMonth(baseDate);
   const monthEnd = endOfMonth(baseDate);

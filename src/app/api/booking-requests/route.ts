@@ -7,6 +7,12 @@ import { sendEmail } from "@/lib/email/service";
 import { getOwnerEmail } from "@/lib/env";
 import { logEvent } from "@/lib/observability";
 
+/**
+ * Public booking-request submission endpoint.
+ *
+ * `GET` is intentionally disabled so pending booking requests cannot be listed publicly. `POST`
+ * accepts and persists requests, then notifies the owner using the shared email template/service.
+ */
 export async function GET() {
   return NextResponse.json(
     { error: "Method Not Allowed" },
@@ -30,6 +36,7 @@ export async function POST(request: Request) {
     );
   }
 
+  // Persist first so the admin can review the request even if outbound email delivery is degraded.
   const created = await prisma.bookingRequest.create({
     data: {
       name: parsed.data.name,

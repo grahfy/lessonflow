@@ -83,6 +83,12 @@ type CreateBookingOption = {
 
 type CreateInvoiceBasis = "lesson_based" | "standalone";
 
+/**
+ * Main admin invoices surface for list filters, lifecycle actions, reminders, and create flows.
+ *
+ * The component intentionally reloads invoices after mutations instead of simulating every server
+ * transition locally, which keeps UI behavior aligned with route-side calculations and snapshots.
+ */
 function toCurrency(cents: number): string {
   return new Intl.NumberFormat("en-AU", {
     style: "currency",
@@ -201,6 +207,7 @@ export function AdminInvoicesClient() {
     try {
       return await globalThis.fetch(...args);
     } catch {
+      // Mirror the admin bookings pattern so network failures enter the same JSON error path.
       return new Response(JSON.stringify({ error: "Network request failed. Please try again." }), {
         status: 503,
         headers: { "Content-Type": "application/json" }
@@ -213,6 +220,7 @@ export function AdminInvoicesClient() {
     }
     authRedirectingRef.current = true;
     setError("");
+    // Full navigation avoids depending on stale client-router state after session expiry.
     window.location.assign("/admin/login");
   }, []);
 
@@ -223,6 +231,7 @@ export function AdminInvoicesClient() {
     setLoading(true);
     setError("");
 
+    // Build the query payload to match the server route filter contract exactly.
     const params = new URLSearchParams();
     if (query.trim()) {
       params.set("q", query.trim());

@@ -18,6 +18,12 @@ const notifySchema = z.object({
   message: z.string().trim().min(1).max(4000).optional()
 });
 
+/**
+ * Sends reminder/custom notifications for a booking request and records booking-audit entries.
+ *
+ * When a request has no linked booking yet, audit entries keep the `requestId` in details so the
+ * action remains traceable in admin history.
+ */
 export async function POST(request: NextRequest, { params }: Params) {
   try {
     const admin = await requireAdminFromRequest(request);
@@ -70,6 +76,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Custom notifications require subject and message." }, { status: 400 });
     }
 
+    // Custom request notifications intentionally reuse the same customer-email wrapper as bookings.
     await sendCustomerCustomEmail({
       email: bookingRequest.email,
       name: bookingRequest.name,

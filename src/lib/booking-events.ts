@@ -1,3 +1,10 @@
+/**
+ * Booking email event wrappers.
+ *
+ * Route handlers call these functions instead of coupling directly to template names. This keeps
+ * workflow code focused on domain actions while `sendEmail()` handles transport selection and
+ * outbound logging.
+ */
 import { Booking, BookingRequestStatus } from "@prisma/client";
 
 import { sendEmail } from "@/lib/email/service";
@@ -18,6 +25,8 @@ export async function sendCustomerBookingStatusEmail(input: {
     generatedPassword: string;
   } | null;
 }) {
+  // Approval emails may include one-time portal credentials. The template builder hides that
+  // branching so callers only pass `portalAccess` when credentials were generated.
   const template = customerBookingStatusTemplate({
     name: input.name,
     status: input.status,
@@ -37,6 +46,7 @@ export async function sendCustomerBookingMovedEmail(input: {
   oldWhen: Date;
   newWhen: Date;
 }) {
+  // Include both times so customers can verify the reschedule without cross-referencing older mail.
   const template = customerBookingMovedTemplate({
     name: input.name,
     oldWhen: input.oldWhen,
@@ -54,6 +64,7 @@ export async function sendCustomerReminderEmail(input: {
   name: string;
   when: Date;
 }) {
+  // Reminder sends intentionally reuse the same template/delivery path as automated reminder jobs.
   const template = customerBookingReminderTemplate({
     name: input.name,
     when: input.when
@@ -71,6 +82,8 @@ export async function sendCustomerCustomEmail(input: {
   subject: string;
   message: string;
 }) {
+  // Custom messages still go through the shared delivery service to keep audit logging and
+  // transport fallback behavior (SMTP/Gmail/queue) consistent.
   const template = customerCustomMessageTemplate({
     name: input.name,
     subject: input.subject,
@@ -83,6 +96,11 @@ export async function sendCustomerCustomEmail(input: {
   });
 }
 
+/**
+ * Minimal shape required by the daily digest email.
+ *
+ * Keeping this narrow avoids coupling digest generation to larger booking payloads used in admin UI.
+ */
 export type BookingDigestRow = Pick<
   Booking,
   "name" | "startAt" | "lessonDuration" | "customDurationMinutes" | "lessonMode" | "status"

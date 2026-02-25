@@ -55,6 +55,9 @@ type MotionContextValue = {
 
 const MotionContext = createContext<MotionContextValue | null>(null);
 
+/**
+ * Shared reduced-motion check used by animation helpers and presence controllers.
+ */
 export function prefersReducedMotion(): boolean {
   if (typeof window === "undefined" || !window.matchMedia) {
     return false;
@@ -133,6 +136,8 @@ function collectMotionItems(root: HTMLElement, scope: MotionScope, explicitItems
   const requested = explicitItems && explicitItems.length > 0
     ? explicitItems
     : (() => {
+        // Prefer explicit motion markers. Fallback selectors are only used for pages that have not
+        // opted into per-element motion annotations yet.
         const explicit = Array.from(root.querySelectorAll<HTMLElement>("[data-motion-item]"));
         if (root.hasAttribute("data-motion-item")) {
           explicit.unshift(root);
@@ -209,6 +214,8 @@ function runTimelineWithWatchdog(timeline: gsap.core.Timeline, timeoutMs: number
       resolve();
     };
 
+    // Watchdog prevents the motion system from deadlocking route transitions if GSAP timelines are
+    // interrupted or never complete due to DOM/state changes.
     const timer = window.setTimeout(() => {
       timeline.kill();
       finish();
@@ -271,6 +278,7 @@ export async function animateIn(root: HTMLElement | null, options: AnimationOpti
   }
 
   if (prefersReducedMotion()) {
+    // Clear transforms/opacity immediately so reduced-motion users still see the correct final state.
     if (directionalStage) {
       gsap.set(directionalStage, {
         clearProps: "transform"
@@ -438,6 +446,8 @@ export function MotionProvider({ children }: PropsWithChildren) {
     direction: MotionDirection = 0,
     navigate?: () => void
   ) => {
+    // Lock prevents overlapping route transitions from racing and leaving the motion state machine
+    // in an inconsistent state.
     if (lockedRef.current) {
       return false;
     }
@@ -476,6 +486,7 @@ export function MotionProvider({ children }: PropsWithChildren) {
       return getRouteDirection(previous, pathname);
     })();
 
+    // Wait one frame after pathname changes so the new page root/elements exist before animating in.
     const frame = window.requestAnimationFrame(() => {
       const root = findPrimaryMotionRoot();
       if (!root) {

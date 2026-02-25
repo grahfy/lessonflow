@@ -18,6 +18,9 @@ const notifySchema = z.object({
   message: z.string().trim().min(1).max(4000).optional()
 });
 
+/**
+ * Sends reminder/custom email notifications for a confirmed booking and records an audit log entry.
+ */
 export async function POST(request: NextRequest, { params }: Params) {
   try {
     const admin = await requireAdminFromRequest(request);
@@ -40,6 +43,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     if (parsed.data.action === "reminder") {
+      // Reminder emails use the shared booking reminder template to match automated reminder copy.
       await sendCustomerReminderEmail({
         email: booking.email,
         name: booking.name,
@@ -61,6 +65,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Custom notifications require subject and message." }, { status: 400 });
     }
 
+    // Custom emails still route through the shared booking-events wrapper so outbound logging and
+    // transport fallback behavior remain consistent.
     await sendCustomerCustomEmail({
       email: booking.email,
       name: booking.name,

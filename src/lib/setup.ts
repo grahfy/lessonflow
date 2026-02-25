@@ -465,11 +465,16 @@ export async function isSetupComplete(): Promise<boolean> {
 
 /**
  * Builds environment and dependency checks used by the first-run setup wizard.
+ *
+ * The setup UI relies on mixed `pass`/`warn`/`fail` outcomes so it can block only hard
+ * requirements while still surfacing production-readiness concerns before initialization.
  */
 export async function evaluateSetupChecks(): Promise<SetupCheck[]> {
   const checks: SetupCheck[] = [];
   const isProduction = process.env.NODE_ENV === "production";
 
+  // Check order intentionally mirrors the setup UI flow: core connectivity first, then public URL,
+  // notification identity, secrets, delivery, and storage.
   const databaseUrl = (process.env.DATABASE_URL || "").trim();
   if (!databaseUrl) {
     checks.push({

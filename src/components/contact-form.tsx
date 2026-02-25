@@ -10,6 +10,12 @@ type ContactState =
   | { status: "success"; message: string }
   | { status: "error"; message: string };
 
+/**
+ * Extracts one concise validation message from the API's Zod error payload shape.
+ *
+ * The contact form only displays one message banner, so we flatten field-level errors into the
+ * first available message for a compact UX.
+ */
 function getFieldErrorMessage(result: unknown): string | null {
   if (!result || typeof result !== "object") {
     return null;
@@ -65,6 +71,7 @@ export function ContactForm() {
       return;
     }
 
+    // CAPTCHA is checked client-side first to avoid unnecessary contact API requests.
     if (!captcha.validateAnswer()) {
       setState({ status: "error", message: "Please answer the math question correctly." });
       captcha.regenerate();
@@ -75,6 +82,7 @@ export function ContactForm() {
     setState({ status: "idle" });
 
     try {
+      // The API always returns JSON for success/failure so we can show specific UX messages.
       const response = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

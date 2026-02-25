@@ -80,7 +80,9 @@ fi
 log_info "Setting up SSL certificate for: ${DOMAIN}"
 log_info "Email: ${EMAIL}"
 
-# Ensure HTTP-only nginx config is active (no SSL refs that would fail before certs exist)
+# Ensure HTTP-only nginx config is active (no SSL refs that would fail before
+# certs exist). This lets certbot's nginx plugin validate and bootstrap the
+# first certificate even if the current site file was copied from the HTTPS template.
 NGINX_CONF="/etc/nginx/sites-available/melbourne-guitar-school"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HTTP_CONF="${SCRIPT_DIR}/nginx-http.conf"
@@ -96,7 +98,8 @@ if [[ -f "${HTTP_CONF}" ]]; then
     fi
 fi
 
-# Check if certbot is installed
+# Check if certbot is installed. This helper currently installs Debian/Ubuntu
+# packages directly because the production target is a DigitalOcean droplet.
 if ! command -v certbot &> /dev/null; then
     log_info "Installing certbot..."
     apt update
@@ -109,7 +112,8 @@ if ! systemctl is-active --quiet nginx; then
     systemctl start nginx
 fi
 
-# Check if domain resolves to this server
+# Check if domain resolves to this server before asking certbot to issue certs.
+# This catches the common DNS propagation / wrong-A-record failure early.
 log_info "Verifying DNS resolution..."
 SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || curl -s ipinfo.io/ip)
 DOMAIN_IP=$(dig +short "${DOMAIN}" | tail -1)
@@ -123,7 +127,7 @@ fi
 
 log_info "DNS verified: ${DOMAIN} -> ${SERVER_IP}"
 
-# Build certbot command
+# Build certbot command dynamically so staging/force flags only apply when set.
 CERTBOT_CMD="certbot --nginx --non-interactive --agree-tos --email ${EMAIL} -d ${DOMAIN} -d ${WWW_DOMAIN}"
 
 if [[ "${STAGING}" == true ]]; then
@@ -144,7 +148,9 @@ else
     exit 1
 fi
 
-# Update nginx config if it doesn't have SSL
+# Update nginx config if it doesn't have SSL. In the normal flow certbot's nginx
+# plugin edits the site config directly, but this fallback keeps the template
+# usable if a minimal HTTP config was active during certificate issuance.
 NGINX_CONF="/etc/nginx/sites-available/melbourne-guitar-school"
 if [[ -f "${NGINX_CONF}" ]]; then
     if ! grep -q "ssl_certificate" "${NGINX_CONF}"; then
@@ -167,7 +173,8 @@ fi
 log_info "Reloading nginx..."
 systemctl reload nginx
 
-# Set up automatic renewal
+# Set up automatic renewal. If a distro-provided certbot timer already exists we
+# reuse it; otherwise we create a small local timer/service pair with nginx reload.
 log_info "Setting up automatic certificate renewal..."
 
 # Check if renewal timer exists

@@ -80,6 +80,8 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     if (parsed.data.action === "reveal") {
+      // Reveal uses a local catch because support-style "no credential exists" errors are domain
+      // errors that should return a user-facing JSON response instead of the generic 500 wrapper.
       try {
         const result = await revealPortalPasswordForAdmin({
           customerId: customer.id,
@@ -103,6 +105,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       }
     }
 
+    // Regenerate falls through to the outer unexpected-error wrapper for normalized 500 handling.
     const result = await rotatePortalCredential({
       customerId: customer.id,
       actorId: admin.id,

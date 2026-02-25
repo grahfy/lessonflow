@@ -13,6 +13,8 @@ export async function GET(request: NextRequest) {
   }
 
   const now = new Date();
+  // Fetch bookings + pending requests together because the portal UI renders both confirmed
+  // appointments and pending requests from a single payload.
   const [bookings, pendingRequests] = await Promise.all([
     prisma.booking.findMany({
       where: {
@@ -46,6 +48,7 @@ export async function GET(request: NextRequest) {
     })
   ]);
 
+  // Split into upcoming/previous here so all student-facing clients can reuse the same route shape.
   const upcoming = bookings
     .filter((booking) => booking.startAt >= now && booking.status !== "cancelled")
     .map((booking) => ({

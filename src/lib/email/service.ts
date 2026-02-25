@@ -30,6 +30,12 @@ export type SendEmailResult = {
 
 let transporter: nodemailer.Transporter | null = null;
 
+/**
+ * Lazily creates and caches the SMTP transporter when minimum credentials exist.
+ *
+ * Returning `null` is intentional: callers then fall back to Gmail API or queue-only behavior
+ * instead of failing at module load time when SMTP is not configured.
+ */
 function getTransporter() {
   const host = process.env.SMTP_HOST;
   const port = Number(process.env.SMTP_PORT || 587);
@@ -60,10 +66,13 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   const tx = getTransporter();
 
   if (!tx) {
+    // Prefer Gmail API over queueing when available because some hosts block outbound SMTP ports.
     if (isGmailConfigured()) {
       return sendGmailEmail(input);
     }
 
+    // Preserve business workflows by recording the outbound email even when no live transport is
+    // configured (for example local development or a partially configured production host).
     await prisma.outboundEmail.create({
       data: {
         toEmail: input.to,
@@ -103,6 +112,8 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     const message = error instanceof Error ? error.message : "Unknown error";
 
     if (isGmailConfigured()) {
+      // SMTP can fail transiently (provider blocks, auth drift, TLS issues). We attempt Gmail API
+      // before reporting failure so a configured secondary path can keep operations flowing.
       logError("email.smtp_failed", error, { to: input.to, subject: input.subject });
 
       const gmailResult = await sendGmailEmail(input);
@@ -120,6 +131,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       };
     }
 
+    // No fallback path is available; record the failed attempt for support/admin visibility.
     await prisma.outboundEmail.create({
       data: {
         toEmail: input.to,

@@ -35,6 +35,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Only upcoming bookings can be cancelled." }, { status: 400 });
   }
 
+  // Student cancellation is modeled as a status transition to preserve history and auditability.
   const cancelled = await prisma.booking.update({
     where: {
       id: booking.id

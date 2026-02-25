@@ -55,6 +55,8 @@ export function StudentMaterialsClient() {
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
+    // Reuse the portal endpoint so the materials page and portal home stay consistent and no
+    // duplicate server aggregation logic is needed.
     const response = await fetch("/api/student/portal", { cache: "no-store" });
     if (response.status === 401) {
       router.push("/student/login");
@@ -80,6 +82,7 @@ export function StudentMaterialsClient() {
    */
   async function logout() {
     setLoggingOut(true);
+    // Logout is best-effort; navigation back to login is still the primary UX outcome.
     await fetch("/api/student/logout", { method: "POST" });
     router.push("/student/login");
     router.refresh();
@@ -179,6 +182,7 @@ function collectAllStudentMaterials(payload: PortalPayload): StudentMaterialEntr
       });
     }
   }
+  // Sort by material creation time so the page behaves like a "recently added" library list.
   rows.sort((left, right) => new Date(right.material.createdAt).getTime() - new Date(left.material.createdAt).getTime());
   return rows;
 }

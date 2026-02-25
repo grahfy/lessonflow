@@ -31,6 +31,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   }
 
   const storage = createMaterialStorageDriver();
+  // Storage access is authorized by the material row ownership check above.
   const blob = await storage.get({
     storageKey: material.storageKey
   });

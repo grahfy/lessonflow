@@ -75,6 +75,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Customer not found." }, { status: 404 });
     }
 
+    // Compute the full next-state customer values server-side so partial edits preserve lookup
+    // normalization fields (email/phone/name tokens) consistently.
     const nextEmail = parsed.data.email ?? existing.email;
     const nextPhone = parsed.data.phone ?? existing.phone;
     const nextFullName = parsed.data.fullName ?? existing.fullName;
@@ -83,6 +85,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const normalizedFullName = normalizeFullNameForLookup(nextFullName);
     const nameSearchTokens = buildNameSearchTokens(nextFullName);
 
+    // Prevent duplicate active customers by normalized email/phone before updating.
     const duplicate = await prisma.customer.findFirst({
       where: {
         id: {
@@ -151,6 +154,8 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Customer not found." }, { status: 404 });
     }
 
+    // Archive instead of hard-delete when historical bookings/requests/series still reference this
+    // customer so operational history and invoice links remain intact.
     const [bookingLinks, requestLinks, seriesLinks] = await prisma.$transaction([
       prisma.booking.count({ where: { customerId: id } }),
       prisma.bookingRequest.count({ where: { customerId: id } }),

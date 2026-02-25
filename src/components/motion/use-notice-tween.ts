@@ -5,6 +5,12 @@ import { useEffect, useRef } from "react";
 
 import { prefersReducedMotion } from "@/components/motion/tween-orchestrator";
 
+/**
+ * Animates transient notice banners (success/error) when they become visible.
+ *
+ * The hook is intentionally minimal so forms can opt into a consistent notice entrance animation
+ * without sharing form state logic.
+ */
 export function useNoticeTween<T extends HTMLElement = HTMLParagraphElement>(isActive: boolean) {
   const ref = useRef<T | null>(null);
 
@@ -13,6 +19,8 @@ export function useNoticeTween<T extends HTMLElement = HTMLParagraphElement>(isA
       return;
     }
 
+    // `overwrite:auto` prevents stacked notice animations from fighting each other during rapid
+    // validation changes.
     gsap.fromTo(
       ref.current,
       {

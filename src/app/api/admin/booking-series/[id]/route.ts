@@ -10,6 +10,11 @@ type Params = {
   }>;
 };
 
+/**
+ * Cancels upcoming bookings in a recurring series and marks the series inactive.
+ *
+ * Existing past bookings are preserved for history/invoicing; only upcoming bookings are cancelled.
+ */
 export async function DELETE(request: NextRequest, { params }: Params) {
   try {
     const admin = await requireAdminFromRequest(request);
@@ -20,6 +25,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     const { id } = await params;
     const now = new Date();
 
+    // Series removal is modeled as status cancellation on future bookings rather than hard delete.
     await prisma.booking.updateMany({
       where: {
         seriesId: id,

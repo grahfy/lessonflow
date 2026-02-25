@@ -7,6 +7,9 @@ const GST_RATE = 0.1;
 
 /**
  * Calculates one line item in integer cents, including optional GST based on tax mode.
+ *
+ * We clamp/truncate values here to keep persisted totals deterministic and safe even if a caller
+ * submits malformed numbers. Server-side invoice persistence should never trust UI math.
  */
 export function calculateLineItem(lineItem: InvoiceLineItemDraft): CalculatedInvoiceLineItem {
   const normalizedQuantity = Math.max(1, Math.trunc(lineItem.quantity));
@@ -26,6 +29,8 @@ export function calculateLineItem(lineItem: InvoiceLineItemDraft): CalculatedInv
 
 /**
  * Recomputes all lines and returns both line-level and aggregate totals.
+ *
+ * This is the single source of truth for totals before invoice persistence and PDF rendering.
  */
 export function calculateInvoiceTotals(lineItems: InvoiceLineItemDraft[]): {
   lineItems: CalculatedInvoiceLineItem[];
@@ -55,6 +60,9 @@ export function calculateInvoiceTotals(lineItems: InvoiceLineItemDraft[]): {
 
 /**
  * Applies a single invoice-level tax mode to all line items.
+ *
+ * Used by admin editing flows when the operator toggles a document-wide tax mode and expects all
+ * existing lines to follow that selection.
  */
 export function applyInvoiceTaxMode(lineItems: InvoiceLineItemDraft[], taxMode: InvoiceTaxMode): InvoiceLineItemDraft[] {
   return lineItems.map((lineItem) => ({

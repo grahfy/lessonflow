@@ -9,6 +9,13 @@ export type InvoiceWithLines = Invoice & {
 
 /**
  * Determines whether an invoice is currently eligible for reminder email sending.
+ *
+ * Eligibility is intentionally stricter than "overdue":
+ * - only invoice documents (not credit notes)
+ * - only non-deleted, sent invoices
+ * - only reminder stages that advance beyond `lastReminderStage`
+ *
+ * This makes repeated cron runs idempotent and prevents duplicate reminders for the same stage.
  */
 export function getInvoiceReminderEligibility(invoice: InvoiceWithLines, now: Date = new Date()) {
   const overdueDays = getInvoiceOverdueDays(invoice.dueAt, now);
@@ -30,6 +37,9 @@ export function getInvoiceReminderEligibility(invoice: InvoiceWithLines, now: Da
 
 /**
  * Sends a reminder email and returns persistence fields for reminder tracking.
+ *
+ * The caller persists the returned fields so reminder sending can be composed into a larger
+ * transaction/audit-log update without this helper owning database writes.
  */
 export async function sendInvoiceReminder(invoice: InvoiceWithLines, overdueDays: number, stage: 7 | 14 | 30) {
   await sendCustomerInvoiceReminderEmail(invoice, overdueDays);

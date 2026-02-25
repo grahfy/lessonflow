@@ -5,11 +5,16 @@ import { POST } from "@/app/api/contact/route";
 
 describe("api-contact", () => {
   beforeEach(async () => {
+    // Route tests run against a real Prisma DB, so clear persisted rows to keep
+    // assertions focused on the current request/response contract.
     await prisma.outboundEmail.deleteMany();
     await prisma.contactSubmission.deleteMany();
   });
 
   it("persists a valid contact message even when email delivery is unavailable", async () => {
+    // The current contract intentionally stores the contact request first and
+    // reports email delivery state separately (503 + queued_no_smtp) when SMTP
+    // isn't configured. This protects lead capture even during mail outages.
     const request = new Request("http://localhost/api/contact", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -15,6 +15,8 @@ StartLimitBurst=3
 Type=simple
 User=www-data
 Group=www-data
+# deploy.sh updates this symlink atomically to switch releases without editing
+# the unit file on every deploy.
 WorkingDirectory=/var/www/melbourne-guitar-school/current
 
 # Environment
@@ -23,6 +25,8 @@ Environment=NODE_ENV=production
 Environment=PORT=3000
 
 # Executable
+# The standalone Next.js output embeds server code and reads static assets from
+# the deployed release path prepared by deploy.sh.
 ExecStart=/usr/bin/node /var/www/melbourne-guitar-school/current/.next/standalone/server.js
 
 # Restart behavior
@@ -35,6 +39,8 @@ StandardError=journal
 SyslogIdentifier=melbourne-guitar-school
 
 # Security hardening
+# ReadWritePaths re-opens only the app deploy tree because ProtectSystem=strict
+# would otherwise make the filesystem read-only for runtime uploads/log needs.
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true

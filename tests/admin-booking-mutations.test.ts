@@ -7,6 +7,8 @@ import { PATCH as patchBooking } from "@/app/api/admin/bookings/[id]/route";
 import { PATCH as patchBookingRequest } from "@/app/api/admin/booking-requests/[id]/route";
 import { DELETE as deleteBookingRequest } from "@/app/api/admin/booking-requests/[id]/route";
 
+// These tests call route handlers directly (without spinning up Next.js) so they
+// can assert booking/request mutation semantics against a real Prisma DB.
 function adminRequest(url: string, body: Record<string, unknown>, token: string): NextRequest {
   return new NextRequest(url, {
     method: "PATCH",
@@ -20,6 +22,8 @@ function adminRequest(url: string, body: Record<string, unknown>, token: string)
 
 describe("admin-booking-mutations", () => {
   beforeEach(async () => {
+    // Clear dependent tables in child-to-parent order to keep each scenario
+    // focused on the mutation under test rather than leftover relational state.
     await prisma.bookingAuditLog.deleteMany();
     await prisma.booking.deleteMany();
     await prisma.bookingSeries.deleteMany();
@@ -53,6 +57,8 @@ describe("admin-booking-mutations", () => {
       }
     });
 
+    // The URL path id here is cosmetic; the route reads the Prisma id from the
+    // params object passed to the handler invocation below.
     const editReq = adminRequest("http://localhost/api/admin/bookings/id_1", {
       action: "edit",
       name: "Student Updated",
@@ -148,6 +154,7 @@ describe("admin-booking-mutations", () => {
       }
     });
 
+    // DELETE uses a raw NextRequest because adminRequest() is PATCH-specific.
     const request = new NextRequest(`http://localhost/api/admin/booking-requests/${requestRow.id}`, {
       method: "DELETE",
       headers: {

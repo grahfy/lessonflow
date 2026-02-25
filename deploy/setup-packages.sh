@@ -191,7 +191,9 @@ detect_os() {
 # PACKAGE INSTALLATION FUNCTIONS
 # =============================================================================
 
-# Run a command (or show it in dry-run mode)
+# Run a command (or print it in dry-run mode).
+# Centralizing this wrapper keeps the install functions readable while ensuring
+# every mutating command respects the same dry-run semantics.
 run_cmd() {
     if [[ "$DRY_RUN" == true ]]; then
         echo -e "${YELLOW}[DRY-RUN]${NC} $*"
@@ -220,7 +222,9 @@ update_packages() {
     esac
 }
 
-# Install packages using the detected package manager
+# Install packages using the detected package manager abstraction.
+# Package names are resolved by the caller (per OS family), while this function
+# only handles the package-manager-specific invocation syntax.
 install_packages() {
     local packages=("$@")
     
@@ -258,7 +262,8 @@ install_nodejs() {
         return
     fi
     
-    # Check if Node.js 20+ is already installed
+    # Check if Node.js 20+ is already installed. The app and deploy scripts
+    # assume modern Node features/Next.js support, so older versions are upgraded.
     if command -v node &> /dev/null; then
         local node_version=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
         if [[ $node_version -ge 20 ]]; then
@@ -320,6 +325,8 @@ install_nodejs() {
 # =============================================================================
 # DATABASE INSTALLATION
 # =============================================================================
+# Installs a local MySQL/MariaDB server for self-hosted VPS deployments. This is
+# a convenience bootstrap script; managed DB users can pass --skip-db.
 install_database() {
     if [[ "$SKIP_DB" == true ]]; then
         log_info "Skipping database installation (--skip-db)"
@@ -338,6 +345,8 @@ install_database() {
         debian)
             # Ubuntu/Debian: MySQL or MariaDB
             if [[ "$NON_INTERACTIVE" == true ]]; then
+                # Temporary root password is only for unattended package install;
+                # the summary still instructs operators to run mysql_secure_installation.
                 # Pre-configure MySQL root password for non-interactive install
                 run_cmd debconf-set-selections <<< "mysql-server mysql-server/root_password password temp_password"
                 run_cmd debconf-set-selections <<< "mysql-server mysql-server/root_password_again password temp_password"
@@ -500,6 +509,8 @@ install_build_tools() {
 # =============================================================================
 # FIREWALL CONFIGURATION
 # =============================================================================
+# Opens only SSH + HTTP(S) defaults expected by Nginx/certbot. Activation is
+# intentionally explicit on some platforms so operators can review rules first.
 configure_firewall() {
     log_step "Configuring firewall..."
     
@@ -581,7 +592,7 @@ create_app_user() {
         esac
     fi
     
-    # Create directory structure
+    # Create Capistrano-style release/shared directories used by deploy.sh.
     run_cmd mkdir -p /var/www/melbourne-guitar-school/{releases,shared,data}
     run_cmd chown -R www-data:www-data /var/www/melbourne-guitar-school
     
@@ -670,10 +681,11 @@ main() {
         fi
     fi
     
-    # Update package lists
+    # Update package lists first so later installs use current metadata.
     update_packages
     
-    # Install components
+    # Install components in dependency order: runtime, DB, proxy, SSL tooling,
+    # then build/tooling and host-level prerequisites.
     install_nodejs
     install_database
     install_nginx

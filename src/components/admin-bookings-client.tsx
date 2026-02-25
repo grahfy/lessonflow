@@ -266,6 +266,11 @@ function selectedEventKey(event: AdminCalendarEvent | null): string | null {
   return `${event.entityType}:${event.id}`;
 }
 
+/**
+ * Normalizes arbitrary state strings from persisted rows/forms to the supported AU state enum.
+ *
+ * Falling back to VIC prevents edit forms from breaking on unexpected legacy values.
+ */
 function toAuState(value: string): AuState {
   return AU_STATES.includes(value as AuState) ? (value as AuState) : "VIC";
 }
@@ -455,6 +460,8 @@ export function AdminBookingsClient() {
     try {
       return await globalThis.fetch(...args);
     } catch {
+      // Return a JSON-shaped synthetic response so action handlers can reuse the same error parsing
+      // path for network failures and server failures.
       return new Response(JSON.stringify({ error: "Network request failed. Please try again." }), {
         status: 503,
         headers: { "Content-Type": "application/json" }
@@ -473,6 +480,7 @@ export function AdminBookingsClient() {
   }, []);
   const handleApiError = useCallback(
     async (response: Response, fallback: string) => {
+      // Centralize auth-expiry and non-JSON error handling so all admin actions behave consistently.
       if (response.status === 401 || response.status === 403) {
         redirectToAdminLogin();
         return;
@@ -487,6 +495,8 @@ export function AdminBookingsClient() {
     setError("");
 
     try {
+      // Treat calendar reload as the authoritative post-mutation state refresh rather than trying
+      // to locally patch every booking/request/customer side effect.
       const bookingRes = await safeFetch(`/api/admin/bookings?view=${view}&date=${date}`, { cache: "no-store" });
       if (!bookingRes.ok) {
         if (bookingRes.status === 401 || bookingRes.status === 403) {
@@ -632,7 +642,8 @@ export function AdminBookingsClient() {
     invoiceDialogPresence.hide(undefined, { immediate: true });
     dialogPresence.show();
 
-    // Fetch customer data if this booking has a linked customer
+    // Customer fetch is best-effort so the dialog can open immediately even if the linked customer
+    // lookup is slow or fails.
     if ("customerId" in event.row && event.row.customerId) {
       safeFetch(`/api/admin/customers/${event.row.customerId}`, { credentials: "same-origin" })
         .then((res) => {
@@ -643,6 +654,7 @@ export function AdminBookingsClient() {
           return res.json();
         })
         .then((data) => {
+          // Ignore late responses if the user has already switched selections.
           if (dialogSessionRef.current !== dialogSession) {
             return;
           }
@@ -672,6 +684,7 @@ export function AdminBookingsClient() {
     }
     dialogPresence.hide(
       () => {
+        // Presence callbacks can fire after another dialog has opened; guard against stale cleanup.
         if (dialogSessionRef.current !== closingDialogSession) {
           return;
         }
@@ -1143,6 +1156,7 @@ export function AdminBookingsClient() {
     if (!selectedEvent || selectedEvent.entityType !== "booking") {
       return false;
     }
+    // Keep route/method details centralized so action buttons only manage validation + UI state.
     const response = await safeFetch(`/api/admin/bookings/${selectedEvent.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -1159,6 +1173,7 @@ export function AdminBookingsClient() {
     if (!selectedEvent || selectedEvent.entityType !== "booking_request") {
       return false;
     }
+    // Request actions mirror booking actions but intentionally hit a different route contract.
     const response = await safeFetch(`/api/admin/booking-requests/${selectedEvent.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -1182,6 +1197,7 @@ export function AdminBookingsClient() {
     }
 
     setBusyAction(action);
+    // Endpoint selection depends on entity type, but payload shape stays shared across dialogs.
     const endpoint =
       selectedEvent.entityType === "booking"
         ? `/api/admin/bookings/${selectedEvent.id}/notify`
@@ -1275,6 +1291,7 @@ export function AdminBookingsClient() {
     }
 
     setBusyAction("move");
+    // "Move" uses the editable Start field in the current dialog (no separate modal).
     const ok =
       selectedEvent.entityType === "booking"
         ? await mutateBooking("move", { newStartAt })
@@ -1300,6 +1317,7 @@ export function AdminBookingsClient() {
       return;
     }
     setBusyAction("cancel");
+    // Bookings and booking requests share the same confirm/reload UX but differ in route semantics.
     const ok =
       selectedEvent.entityType === "booking"
         ? await mutateBooking("cancel", {})
@@ -1325,6 +1343,7 @@ export function AdminBookingsClient() {
       return;
     }
     setBusyAction("delete");
+    // Delete is a hard-remove action (distinct from cancel) and should fully remove the record row.
     const endpoint =
       selectedEvent.entityType === "booking"
         ? `/api/admin/bookings/${selectedEvent.id}`

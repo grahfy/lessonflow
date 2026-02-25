@@ -44,6 +44,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   }
   const includeBookingOptions = request.nextUrl.searchParams.get("bookingOptions") === "true";
 
+  // Build the invoice filter incrementally so customer page filters mirror the global invoices UI.
   const where: Prisma.InvoiceWhereInput = {
     customerId: id,
     isDeleted: false
@@ -82,6 +83,8 @@ export async function GET(request: NextRequest, { params }: Params) {
   }
 
   const skip = (parsed.data.page - 1) * parsed.data.pageSize;
+  // Bundle list + count (+ optional booking options) in one transaction so UI pagination and
+  // selector options reflect the same snapshot.
   const [invoices, total, bookingOptions] = await prisma.$transaction([
     prisma.invoice.findMany({
       where,
@@ -194,6 +197,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   const taxMode = parsed.data.taxMode ?? getDefaultInvoiceTaxMode();
+  // Normalize request payload into the persistence-layer draft shape before transactional create.
   const lineItems: InvoiceLineItemDraft[] = parsed.data.lineItems.map((lineItem, index) => ({
     description: lineItem.description,
     quantity: lineItem.quantity,
@@ -205,6 +209,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   const issuedAt = new Date();
   const dueAt = parsed.data.dueAt ? new Date(parsed.data.dueAt) : getDefaultDueAt(issuedAt);
+  // Customer-linked invoice creation is transactional so numbering + line items + audit trail stay aligned.
   const invoice = await prisma.$transaction((tx) =>
     createInvoiceRecord({
       tx,

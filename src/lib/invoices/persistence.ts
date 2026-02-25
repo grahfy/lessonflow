@@ -44,9 +44,17 @@ type CreateInvoiceRecordInput = {
 
 /**
  * Creates an invoice and all line items atomically with deterministic totals.
+ *
+ * Key invariants:
+ * - totals are recalculated server-side (client totals are not trusted)
+ * - seller details are snapshotted from env so historical invoices remain stable
+ * - invoice number generation occurs inside the transaction to avoid duplicates
+ * - an audit log entry is written with the creating actor
  */
 export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
   const taxMode = input.taxMode ?? getDefaultInvoiceTaxMode();
+  // Normalize defaults before calculating totals so persisted ordering and tax mode assignment are
+  // deterministic even if the caller omits optional line metadata.
   const normalizedLineItems = input.lineItems.map((lineItem, index) => ({
     ...lineItem,
     taxMode: lineItem.taxMode ?? taxMode,
@@ -55,6 +63,7 @@ export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
 
   const calculation = calculateInvoiceTotals(normalizedLineItems);
   const sellerSnapshot = sellerSnapshotFromEnv();
+  // Number generation is transaction-scoped to keep invoice numbering consistent under concurrency.
   const invoiceNumber = await generateNextInvoiceNumber(input.tx, input.issuedAt);
 
   const invoice = await input.tx.invoice.create({
@@ -115,5 +124,6 @@ export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
     }
   });
 
+  // Callers often render or send the invoice immediately, so we return lines in stable sort order.
   return invoice;
 }

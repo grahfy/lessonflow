@@ -14,6 +14,12 @@ type TweenLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href" | "on
   prefetch?: boolean;
 }>;
 
+/**
+ * Link wrapper that coordinates route navigation with the motion exit transition system.
+ *
+ * It preserves default browser behavior for modified/external/hash links and only intercepts
+ * standard internal navigations.
+ */
 function isInternalHref(href: string): boolean {
   return href.startsWith("/");
 }
@@ -37,6 +43,8 @@ export function TweenLink({ href, children, ...rest }: TweenLinkProps) {
     }
 
     event.preventDefault();
+    // Ensure key hero imagery is ready before starting the exit transition to reduce perceived
+    // flicker on route entry.
     await ensurePublicHeroReady(href);
 
     const root = findClosestMotionRoot(event.currentTarget);

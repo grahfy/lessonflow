@@ -32,6 +32,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid query payload.", details: parsed.error.flatten() }, { status: 400 });
     }
 
+    // Build the filter incrementally so the admin UI can combine search + status + aging filters
+    // without exploding route branches for every permutation.
     const where: Prisma.InvoiceWhereInput = {
       isDeleted: false
     };
@@ -77,6 +79,7 @@ export async function GET(request: NextRequest) {
     }
 
     const skip = (parsed.data.page - 1) * parsed.data.pageSize;
+    // Fetch rows and total count in one transaction so pagination metadata matches the same filter snapshot.
     const [invoices, total] = await prisma.$transaction([
       prisma.invoice.findMany({
         where,
@@ -153,6 +156,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Normalize request payload into the persistence-layer draft shape before transactional create.
     const lineItems: InvoiceLineItemDraft[] = parsed.data.lineItems.map((lineItem) => ({
       description: lineItem.description,
       quantity: lineItem.quantity,
@@ -164,6 +168,7 @@ export async function POST(request: NextRequest) {
 
     const issuedAt = parsed.data.issuedAt ? new Date(parsed.data.issuedAt) : new Date();
     const dueAt = new Date(parsed.data.dueAt);
+    // Numbering, totals, line items, and audit logs must be committed atomically.
     const invoice = await prisma.$transaction((tx) =>
       createInvoiceRecord({
         tx,

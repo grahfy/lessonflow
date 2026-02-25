@@ -16,6 +16,8 @@ if (!testDatabaseUrl) {
 
 const args = process.argv.slice(2);
 
+// Vitest/test helpers usually read DATABASE_URL, so map the explicit test URL to
+// that variable only for the child process instead of mutating the parent shell.
 const result = spawnSync("npx", ["vitest", ...args], {
   stdio: "inherit",
   env: {
@@ -29,5 +31,5 @@ if (result.error) {
   process.exit(1);
 }
 
+// Preserve Vitest's exit code so CI/local shells reflect test pass/fail status.
 process.exit(result.status ?? 1);
-

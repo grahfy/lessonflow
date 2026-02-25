@@ -48,6 +48,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Student portal requests reuse the student's saved address so the owner/admin sees the same
+  // location context as the original customer profile.
   const address = formatBookingAddress({
     unitNumber: student.unitNumber ?? undefined,
     houseNumber: student.houseNumber,
@@ -58,6 +60,7 @@ export async function POST(request: NextRequest) {
     postcode: student.postcode
   });
 
+  // Student portal creates pending requests only; admin approval converts them into bookings.
   const created = await prisma.bookingRequest.create({
     data: {
       name: student.fullName,

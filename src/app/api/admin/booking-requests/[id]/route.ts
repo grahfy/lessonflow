@@ -151,6 +151,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         return NextResponse.json({ error: "Only pending requests can be approved." }, { status: 400 });
       }
 
+      // Approval spans customer resolution, booking creation, request status update, and portal
+      // credential ensure. Keeping this transactional prevents partially approved states.
       const approvalResult = await prisma.$transaction(async (tx) => {
         const customerId = await resolveCustomerIdForApproval({
           tx,
@@ -161,6 +163,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         }
 
         if (bookingRequest.isRecurring && bookingRequest.recurrenceEndAt) {
+          // Recurring approvals create a series plus one booking row per generated start date.
           const series = await tx.bookingSeries.create({
             data: {
               name: bookingRequest.name,
@@ -259,6 +262,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           }
         });
 
+        // Ensure portal credentials before the approval email so first-time approved students can
+        // log in immediately from the email payload.
         const credentialResult = await ensurePortalCredentialForCustomer({
           customerId,
           actorId: admin.id,
@@ -272,6 +277,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         };
       });
 
+      // Send customer email after transaction commit to avoid sending approvals that failed to persist.
       await sendCustomerBookingStatusEmail({
         email: approvalResult.updated.email,
         name: approvalResult.updated.name,
@@ -364,6 +370,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         return NextResponse.json({ error: "Only pending requests can be edited." }, { status: 400 });
       }
 
+      // As with booking edits, compute the full next-state payload server-side for consistency and
+      // to preserve required fields during partial updates.
       const nextUnitNumber =
         parsed.data.unitNumber === undefined
           ? bookingRequest.unitNumber
@@ -480,6 +488,8 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Request not found." }, { status: 404 });
     }
 
+    // Approved requests are represented by booking rows; deleting them should happen via the
+    // booking route to preserve clear workflow semantics.
     if (existing.status === "approved") {
       return NextResponse.json(
         {

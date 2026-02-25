@@ -14,6 +14,12 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * Public booking page wrapper.
+ *
+ * The page-level copy sets expectations (manual approval + current-year limit) while the detailed
+ * validation and submission flow live in `BookingForm`.
+ */
 export default function BookPage() {
   return (
     <PanelLayout

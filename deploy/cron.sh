@@ -19,12 +19,16 @@ DEPLOY_DIR="/var/www/${APP_NAME}"
 SHARED_DIR="${DEPLOY_DIR}/shared"
 LOG_DIR="/var/log/${APP_NAME}"
 
-# Load environment
+# Load environment from the shared deploy path so cron jobs use the same
+# `NEXT_PUBLIC_SITE_URL` and `CRON_SECRET` as the running app/service.
+# This lightweight export parser assumes simple KEY=VALUE entries.
 if [[ -f "${SHARED_DIR}/.env" ]]; then
     export $(grep -v '^#' "${SHARED_DIR}/.env" | xargs)
 fi
 
-# Default site URL
+# Default site URL falls back to localhost for single-host deployments. If the
+# production env sets an HTTPS public URL, cron will hit the same reverse proxy
+# path and exercise the same auth/headers behavior as external requests.
 SITE_URL="${NEXT_PUBLIC_SITE_URL:-http://127.0.0.1:3000}"
 CRON_SECRET="${CRON_SECRET:-}"
 
@@ -61,7 +65,8 @@ esac
 
 log "Starting job: ${JOB_TYPE}"
 
-# Make authenticated request
+# Make an authenticated POST and capture both body and status code in one call.
+# The trailing status line keeps parsing simple without requiring jq.
 RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
     -H "Content-Type: application/json" \
     -H "x-cron-secret: ${CRON_SECRET}" \

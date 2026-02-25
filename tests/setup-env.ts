@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 const currentFilePath = fileURLToPath(import.meta.url);
 const projectRoot = path.resolve(path.dirname(currentFilePath), "..");
 
+// Minimal parser for test env files. This intentionally avoids loading dotenv in
+// the test harness so bootstrap order stays explicit and dependency-free.
 const parseEnvFile = (filePath: string): Record<string, string> => {
   const values: Record<string, string> = {};
   const content = fs.readFileSync(filePath, "utf8");
@@ -37,6 +39,7 @@ const parseEnvFile = (filePath: string): Record<string, string> => {
   return values;
 };
 
+// Mirror Next.js-style precedence: test-specific files win, then local/default.
 for (const fileName of [".env.test.local", ".env.test", ".env.local", ".env"]) {
   const filePath = path.join(projectRoot, fileName);
 
@@ -53,6 +56,8 @@ for (const fileName of [".env.test.local", ".env.test", ".env.local", ".env"]) {
 }
 
 const env = process.env as Record<string, string | undefined>;
+// Provide deterministic defaults for tests that do not care about external
+// services, while still allowing CI/local overrides from env files above.
 env.NODE_ENV ??= "test";
 env.DATABASE_URL ??= "file:./test.db";
 env.NEXT_PUBLIC_SITE_URL ??= "http://127.0.0.1:3000";

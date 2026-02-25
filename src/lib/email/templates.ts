@@ -1,3 +1,9 @@
+/**
+ * Shared HTML email templates for admin and customer notifications.
+ *
+ * Centralizing template layout and branding here keeps email copy consistent across booking,
+ * portal, invoice, reminder, and digest workflows while still allowing route-specific content.
+ */
 import { BookingRequestStatus, LessonDuration, LessonMode, SkillLevel } from "@prisma/client";
 
 import { getOwnerEmail, getPublicSiteUrl } from "@/lib/env";
@@ -16,10 +22,16 @@ type BookingSummary = {
   recurrenceEndAt: Date | null;
 };
 
+/**
+ * Converts lesson mode enum values into customer-facing labels.
+ */
 function describeMode(mode: LessonMode): string {
   return mode === "in_person" ? "In-person" : "Video";
 }
 
+/**
+ * Converts the duration enum (or custom minute override) into readable copy.
+ */
 function describeDuration(duration: LessonDuration, customDurationMinutes?: number | null): string {
   if (customDurationMinutes && customDurationMinutes > 0) {
     return `${customDurationMinutes} minutes`;
@@ -27,6 +39,9 @@ function describeDuration(duration: LessonDuration, customDurationMinutes?: numb
   return duration === "min30" ? "30 minutes" : "60 minutes";
 }
 
+/**
+ * Formats dates in the business timezone for outbound communication.
+ */
 function fmt(date: Date): string {
   return new Intl.DateTimeFormat("en-AU", {
     dateStyle: "full",
@@ -35,6 +50,9 @@ function fmt(date: Date): string {
   }).format(date);
 }
 
+/**
+ * Formats integer cents for invoice emails.
+ */
 function money(cents: number): string {
   return new Intl.NumberFormat("en-AU", {
     style: "currency",
@@ -42,6 +60,9 @@ function money(cents: number): string {
   }).format(cents / 100);
 }
 
+/**
+ * Escapes user-provided values before inserting into HTML email strings.
+ */
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -51,10 +72,16 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
+/**
+ * Escapes user-provided text and preserves line breaks for display in HTML.
+ */
 function nl2br(value: string): string {
   return escapeHtml(value).replace(/\n/g, "<br/>");
 }
 
+/**
+ * Resolves branding/signature values with env overrides for deployment-specific contact details.
+ */
 function getEmailBranding() {
   const siteUrl = getPublicSiteUrl().replace(/\/+$/, "");
   return {
@@ -67,6 +94,9 @@ function getEmailBranding() {
   };
 }
 
+/**
+ * Shared signature block appended to all branded emails.
+ */
 function renderSignatureHtml() {
   const branding = getEmailBranding();
   return `
@@ -89,6 +119,12 @@ function renderSignatureHtml() {
   `;
 }
 
+/**
+ * Shared email chrome wrapper (card layout + preview text + branding signature).
+ *
+ * Individual templates only provide the subject/body content so branding and styling changes
+ * remain centralized.
+ */
 function renderEmailLayout(input: {
   title: string;
   previewText?: string;
@@ -200,6 +236,8 @@ export function customerBookingStatusTemplate(input: {
     generatedPassword: string;
   } | null;
 }) {
+  // Internal request states are intentionally simplified for customers: any non-approved outcome
+  // is communicated as "cancelled" to avoid exposing admin workflow distinctions.
   const statusText = input.status === "approved" ? "approved" : "cancelled";
   const includePortal = input.status === "approved" && !!input.portalAccess;
   const portalSection = includePortal
@@ -272,6 +310,7 @@ export function customerCustomMessageTemplate(input: {
   message: string;
 }) {
   return {
+    // Trim once and reuse the same value in the subject + title so formatting stays aligned.
     subject: input.subject.trim(),
     html: renderEmailLayout({
       title: input.subject.trim(),
@@ -349,6 +388,7 @@ export function ownerDailyDigestTemplate(input: {
     status: string;
   }>;
 }) {
+  // A plain list renders more reliably across email clients than table-heavy markup.
   const items = input.rows
     .map(
       (row) =>

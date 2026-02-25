@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Local convenience script for a "full site" smoke run. It bootstraps env files,
+# prepares a local database, runs tests, and optionally starts `next dev`.
+# Note: this helper still uses a SQLite dev DB URL for local-only workflows and
+# is not the MySQL-backed test harness used by `npm test` in CI/server checks.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
@@ -66,10 +70,14 @@ if [[ ! -f .env.test.local && -f .env.test.example ]]; then
   cp .env.test.example .env.test.local
 fi
 
+# Local developer bootstrap: uses the repo's sqlite dev database path so the
+# app can be explored quickly without provisioning MySQL.
 log "Preparing development database..."
 DATABASE_URL="file:./prisma/dev.db" npx prisma migrate deploy
 
 if [[ "$SKIP_TESTS" -eq 0 ]]; then
+  # `npm test` may use the MySQL-oriented harness if TEST_DATABASE_URL is set;
+  # otherwise this remains a convenience preflight and may fail in fresh setups.
   log "Running automated tests..."
   if ! npm test; then
     TESTS_FAILED=1

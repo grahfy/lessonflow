@@ -19,6 +19,7 @@ export function StudentLoginForm() {
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     
+    // CAPTCHA reduces trivial automated attempts before the server-side rate limit is engaged.
     if (!captcha.validateAnswer()) {
       setError("Please answer the math question correctly.");
       captcha.regenerate();
@@ -33,6 +34,7 @@ export function StudentLoginForm() {
     const postcode = String(form.get("postcode") || "").replace(/\D/g, "").slice(0, 4);
     const password = String(form.get("password") || "");
 
+    // Student login is verified server-side against normalized name/postcode plus portal password.
     const response = await fetch("/api/student/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -45,6 +47,8 @@ export function StudentLoginForm() {
       return;
     }
 
+    // Full page transition is not required here because the client router refresh will read the
+    // newly set httpOnly cookie on the next server request.
     router.push("/student/portal");
     router.refresh();
   }

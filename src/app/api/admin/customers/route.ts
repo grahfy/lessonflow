@@ -23,6 +23,9 @@ const createCustomerSchema = z.object({
   postcode: auPostcodeSchema.optional()
 });
 
+/**
+ * Lists active customers for admin search/select controls and customer directory dialogs.
+ */
 export async function GET(request: NextRequest) {
   try {
     const admin = await requireAdminFromRequest(request);
@@ -34,6 +37,8 @@ export async function GET(request: NextRequest) {
     const limitRaw = Number.parseInt(request.nextUrl.searchParams.get("limit") ?? "100", 10);
     const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 250) : 100;
 
+    // Include portal credential metadata so the admin UI can show/reveal/regenerate state without
+    // making a second request per customer row.
     const customers = await prisma.customer.findMany({
       where: {
         isArchived: false,
@@ -83,6 +88,8 @@ export async function POST(request: NextRequest) {
     const normalizedEmail = normalizeEmail(parsed.data.email);
     const normalizedPhone = normalizePhone(parsed.data.phone);
 
+    // Email/phone uniqueness is enforced at the workflow level to support a friendlier conflict
+    // response than a raw DB constraint error.
     const existing = await prisma.customer.findFirst({
       where: {
         isArchived: false,
@@ -118,6 +125,8 @@ export async function POST(request: NextRequest) {
         postcode: parsed.data.postcode ?? ""
       })
     });
+    // Pre-generate portal credentials so new admin-created customers can access the student portal
+    // immediately when support shares details later.
     await ensurePortalCredentialForCustomer({
       customerId: created.id,
       actorId: admin.id,

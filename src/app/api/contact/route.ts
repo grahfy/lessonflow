@@ -7,6 +7,12 @@ import { sendEmail } from "@/lib/email/service";
 import { getOwnerEmail } from "@/lib/env";
 import { logError, logEvent } from "@/lib/observability";
 
+/**
+ * Public contact-form submission endpoint.
+ *
+ * The route prioritizes saving the submission record first, then attempts owner notification email.
+ * This avoids losing customer messages when the email provider is temporarily unavailable.
+ */
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const parsed = contactSubmissionSchema.safeParse(body);
@@ -47,6 +53,7 @@ export async function POST(request: Request) {
       html: template.html
     });
 
+    // Report partial success so the UI can tell the user the message was saved even if delivery is delayed.
     if (emailResult.status !== "sent") {
       return NextResponse.json(
         {

@@ -12,6 +12,12 @@ type HideOptions = {
   immediate?: boolean;
 };
 
+/**
+ * Small presence controller for modal/dialog exit animations.
+ *
+ * Components use `isMounted` for DOM presence and `isVisible` for CSS/animation state. The timer
+ * allows delayed unmount after exit animations, with a reduced-motion fast path.
+ */
 export function usePresenceExit(options: PresenceOptions = {}) {
   const timeoutMs = options.timeoutMs ?? EXIT_WATCHDOG_MS;
   const [isMounted, setIsMounted] = useState(false);
@@ -28,6 +34,7 @@ export function usePresenceExit(options: PresenceOptions = {}) {
   const show = useCallback(() => {
     clearTimer();
     setIsMounted(true);
+    // Defer visibility to the next frame so enter animations can transition from a known hidden state.
     window.requestAnimationFrame(() => {
       setIsVisible(true);
     });
@@ -44,6 +51,7 @@ export function usePresenceExit(options: PresenceOptions = {}) {
         return;
       }
 
+      // Watchdog timeout guarantees unmount even if an exit animation callback never fires.
       timerRef.current = window.setTimeout(() => {
         setIsMounted(false);
         onAfterHide?.();

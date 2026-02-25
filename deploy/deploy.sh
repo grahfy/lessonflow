@@ -1027,7 +1027,10 @@ run_npm_step_with_cache_repair "Installing Prisma CLI" npm install prisma --save
 # Generate Prisma client
 run_step "Generating Prisma client" npm exec --no -- prisma generate
 
-# Run database migrations
+# Run database migrations.
+# This wrapper prefers `prisma migrate deploy` and only performs automatic
+# baseline recovery for explicitly recognized "existing schema" cases.
+# It intentionally does not execute baseline SQL against non-empty databases.
 run_migrations() {
     # Check if migrations directory exists and has migrations
     if [[ ! -d "prisma/migrations" || -z "$(ls -A prisma/migrations 2>/dev/null)" ]]; then
@@ -1163,13 +1166,17 @@ else
     log_info "Systemd service already up to date"
 fi
 
-# Ensure nginx config is installed/updated (use HTTPS template after certs exist)
+# Ensure nginx config is installed/updated (use HTTPS template after certs exist).
+# deploy.sh now re-syncs the repo template on every run so config drift in
+# /etc/nginx/sites-available does not survive future deployments.
 NGINX_SITE_AVAILABLE="/etc/nginx/sites-available/${APP_NAME}"
 NGINX_SITE_ENABLED="/etc/nginx/sites-enabled/${APP_NAME}"
 NGINX_CERT_CHAIN="/etc/letsencrypt/live/melbourneguitarschool.com.au/fullchain.pem"
 NGINX_CERT_KEY="/etc/letsencrypt/live/melbourneguitarschool.com.au/privkey.pem"
 NGINX_TEMPLATE_SOURCE="${NEW_RELEASE_DIR}/deploy/nginx-http.conf"
 if [[ -f "${NGINX_CERT_CHAIN}" && -f "${NGINX_CERT_KEY}" ]]; then
+    # Once certs exist we promote the HTTPS template on each deploy; otherwise
+    # the HTTP-only bootstrap template keeps first-time installs reachable.
     NGINX_TEMPLATE_SOURCE="${NEW_RELEASE_DIR}/deploy/nginx.conf"
 fi
 
@@ -1194,6 +1201,9 @@ else
     exit 1
 fi
 
+# Restart the app first so Nginx's upstream health check/load happens against
+# the freshly-linked release. Nginx itself is restarted after the app confirms
+# healthy so proxy errors during startup are less likely.
 # Restart the service
 log_info "Restarting service..."
 run_step "Restarting systemd service (${APP_NAME})" systemctl restart "${APP_NAME}"
@@ -1210,7 +1220,8 @@ else
     exit 1
 fi
 
-# Restart nginx after app deploy so updated config and upstream state are active.
+# Restart nginx after app deploy so the synced template is active and any proxy
+# worker state picks up the current upstream + headers/rate-limit config.
 log_info "Restarting nginx..."
 run_step "Restarting nginx" systemctl restart nginx
 

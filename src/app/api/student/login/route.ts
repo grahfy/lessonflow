@@ -25,6 +25,7 @@ const loginSchema = z.object({
  * Duplicate name/postcode matches are handled by bounded hash verification attempts.
  */
 export async function POST(request: NextRequest) {
+  // Rate-limit by proxy-aware IP before any DB lookups to reduce brute-force pressure.
   const rateLimit = consumeRateLimit({
     key: `student-login:${getRequestIp(request)}`,
     limit: 20,
@@ -52,6 +53,8 @@ export async function POST(request: NextRequest) {
 
   const normalizedFullName = normalizeFullNameForLookup(parsed.data.fullName);
   const postcode = parsed.data.postcode.trim();
+  // Multiple customers can legitimately share normalized name + postcode. We fetch a bounded
+  // candidate set and verify hashes in-process to preserve privacy and avoid unique constraints.
   const candidates = await prisma.customer.findMany({
     where: {
       isArchived: false,
@@ -105,6 +108,7 @@ export async function POST(request: NextRequest) {
     name: getStudentSessionCookieName(),
     value: createStudentSessionToken(matchedCustomerId),
     httpOnly: true,
+    // Keep local development usable over HTTP while requiring secure cookies in production.
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",

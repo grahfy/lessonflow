@@ -1,3 +1,9 @@
+// Prisma schema for the Melbourne Guitar School app.
+// Production and test workflows now target MySQL (`provider = "mysql"`), so
+// helper scripts should provide a mysql:// DATABASE_URL for Prisma commands.
+// Historical migration note: a baseline migration was added for fresh MySQL
+// databases; existing databases may need `prisma migrate resolve --applied`
+// rather than executing baseline SQL directly.
 generator client {
   provider = "prisma-client-js"
 }
@@ -88,6 +94,8 @@ enum LearningMaterialType {
   pdf
 }
 
+// Public website contact form submissions. These are stored even when email
+// delivery fails so admins can follow up later and inspect retry logs.
 model ContactSubmission {
   id        String   @id @default(cuid())
   name      String
@@ -98,6 +106,9 @@ model ContactSubmission {
   updatedAt DateTime @updatedAt
 }
 
+// Booking requests are the pre-approval records shown in the admin calendar.
+// They remain separate from confirmed Booking rows so rejected/cancelled history
+// can be tracked without polluting the confirmed bookings table.
 model BookingRequest {
   id                    String               @id @default(cuid())
   status                BookingRequestStatus @default(pending)
@@ -132,6 +143,8 @@ model BookingRequest {
   @@index([customerId])
 }
 
+// Recurring booking template metadata used to generate/track multiple concrete
+// bookings while preserving customer cadence details and an archive toggle.
 model BookingSeries {
   id                    String         @id @default(cuid())
   name                  String
@@ -164,6 +177,8 @@ model BookingSeries {
   @@index([customerId])
 }
 
+// Confirmed or cancelled lesson instances shown in admin/student calendar views.
+// A Booking can be linked back to its original request and/or recurring series.
 model Booking {
   id                    String             @id @default(cuid())
   status                BookingStatus      @default(approved)
@@ -205,6 +220,8 @@ model Booking {
   @@index([customerId])
 }
 
+// Append-only audit trail for booking/request lifecycle actions performed by an
+// admin or system workflow (approval, move, cancel, reminders, etc).
 model BookingAuditLog {
   id        String      @id @default(cuid())
   bookingId String?
@@ -219,6 +236,8 @@ model BookingAuditLog {
   @@index([bookingId])
 }
 
+// Admin console login identities. Session cookies store the email identifier,
+// and routes re-load the current admin row for authorization checks.
 model AdminUser {
   id                        String                             @id @default(cuid())
   email                     String                             @unique
@@ -237,6 +256,8 @@ model AdminUser {
   uploadedLearningMaterials LearningMaterial[]                 @relation("LearningMaterialUploadedBy")
 }
 
+// Canonical customer profile derived from booking requests/bookings. Multiple
+// bookings, portal credentials, invoices, and learning materials attach here.
 model Customer {
   id                        String                             @id @default(cuid())
   fullName                  String
@@ -272,6 +293,8 @@ model Customer {
   @@index([normalizedPhone])
 }
 
+// Portal credentials are stored as both a hash (verification) and encrypted
+// plaintext (admin reveal workflow) with a separate audit trail for access.
 model CustomerPortalCredential {
   id                String                             @id @default(cuid())
   customerId        String                             @unique
@@ -288,6 +311,8 @@ model CustomerPortalCredential {
   @@index([isActive, generatedAt])
 }
 
+// Audit trail for credential generation/rotation/reveal events so sensitive
+// credential actions remain attributable during support/admin workflows.
 model CustomerPortalCredentialAuditLog {
   id           String                      @id @default(cuid())
   customerId   String
@@ -304,6 +329,8 @@ model CustomerPortalCredentialAuditLog {
   @@index([actorId, createdAt])
 }
 
+// Uploaded lesson resources tied to both the booking and the customer for
+// portal discovery and admin traceability.
 model LearningMaterial {
   id           String               @id @default(cuid())
   customerId   String
@@ -324,6 +351,8 @@ model LearningMaterial {
   @@index([bookingId, createdAt])
 }
 
+// Email delivery/outbox tracking used by the mail service and reminder jobs to
+// record attempts, status, and provider errors.
 model OutboundEmail {
   id        String   @id @default(cuid())
   toEmail   String
@@ -334,6 +363,9 @@ model OutboundEmail {
   createdAt DateTime @default(now())
 }
 
+// Invoice and credit note domain model. Customer-facing invoice data is
+// denormalized onto the record so documents remain historically accurate even if
+// the linked customer profile changes later.
 model Invoice {
   id                 String              @id @default(cuid())
   invoiceNumber      String              @unique
@@ -388,6 +420,8 @@ model Invoice {
   @@index([lastReminderStage, dueAt])
 }
 
+// Ordered invoice rows persisted with calculated subtotal/GST/total values so
+// rendered PDFs/emails match the saved financial snapshot exactly.
 model InvoiceLineItem {
   id                String         @id @default(cuid())
   invoiceId         String
@@ -407,6 +441,8 @@ model InvoiceLineItem {
   @@index([invoiceId, sortOrder])
 }
 
+// Append-only audit trail for invoice lifecycle changes (send, paid, reminders,
+// credit notes, delete/restore, etc).
 model InvoiceAuditLog {
   id        String             @id @default(cuid())
   invoiceId String

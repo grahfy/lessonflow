@@ -10,6 +10,12 @@ type SiteShellProps = PropsWithChildren<{
   footerCopy: string;
 }>;
 
+/**
+ * Shared public-site chrome for navigation/footer around public pages.
+ *
+ * Admin and student portal pages intentionally use different shells to keep operational UI state
+ * and motion scopes isolated from public marketing pages.
+ */
 export function SiteShell({ footerCopy, children }: SiteShellProps) {
   const pathname = usePathname();
 
