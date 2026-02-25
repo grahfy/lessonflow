@@ -86,6 +86,7 @@ IS_TTY=false
 SPINNER_PID=""
 SPINNER_MSG=""
 SPINNER_FRAMES=( "⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏" )
+DEPLOY_TUI_PANEL_WIDTH=92
 TEMP_BUILD_SWAP_ACTIVE=false
 TEMP_BUILD_SWAP_CREATED_FILE=false
 DEPLOY_GIT_REPO_ROOT=""
@@ -1097,9 +1098,9 @@ print_deploy_tui_menu() {
     echo -e "  $(status_chip "Branch" "${BRANCH}")  $(status_chip "DB" "$(deploy_migration_mode_label)")"
     echo -e "  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "Cron" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")")  $(status_chip "PkgSetup" "$(bool_word "${SETUP_PACKAGES}")")  $(status_chip "EnvDB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")  $(status_chip "Spinner" "$(spinner_ui_word)")"
     echo ""
-    print_tui_panel_rule 78
+    print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     echo -e "${BOLD}  Main Options${NC}"
-    print_tui_panel_rule 78
+    print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     print_tui_option_row "1" "Branch" "${BRANCH}"
     print_tui_option_desc "Git branch archived into the release directory and deployed."
     print_tui_option_row "2" "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")"
@@ -1113,33 +1114,40 @@ print_deploy_tui_menu() {
     print_tui_option_row "6" "SSL setup" "$(bool_word "${SSL_SETUP}")"
     print_tui_option_desc "Runs certbot/nginx SSL setup after deployment completes."
     if [[ "${SSL_SETUP}" == true ]]; then
-        print_tui_panel_rule 78
+        print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
         echo -e "${BOLD}  SSL Options${NC}"
-        print_tui_panel_rule 78
+        print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
         print_tui_option_row "7" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}"
         print_tui_option_desc "Domain used in nginx config and Let's Encrypt certificate request."
         print_tui_option_row "8" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}"
         print_tui_option_desc "Receives certificate expiry notices and Let's Encrypt registration updates."
     fi
-    print_tui_panel_rule 78
+    print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     echo -e "${BOLD}  UI Options${NC}"
-    print_tui_panel_rule 78
+    print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     print_tui_option_row "9" "Spinner UI" "$(spinner_ui_word)"
     print_tui_option_desc "Animated progress spinner for long commands (disable in noisy terminals/log capture)."
     print_tui_option_row "10" "Edit shared .env" "Open editor now"
     print_tui_option_desc "Bootstraps ${SHARED_DIR}/.env from .env.example if missing, then opens it."
     print_tui_option_row "11" "MySQL + create DB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")"
     print_tui_option_desc "When ON, Start runs the shared .env MySQL/MariaDB install + local DB create helper before the release build."
+    print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
+    echo -e "${BOLD}  Bootstrap Workflow Helpers${NC}"
+    print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
+    print_tui_option_row "12" "Install cron/crond" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")"
+    print_tui_option_desc "When ON, Start installs/enables cron/crond before the release build."
+    print_tui_option_row "13" "Install Nginx" "$(bool_word "${INSTALL_NGINX_IF_NEEDED}")"
+    print_tui_option_desc "When ON, Start installs Nginx (if missing) before the release build."
     echo ""
-    print_tui_panel_rule 78
-    echo -e "  ${BOLD}C${NC}  Install cron/crond scheduler (if needed)"
-    echo -e "  ${BOLD}J${NC}  Install/update managed cron jobs now"
-    echo -e "  ${BOLD}M${NC}  Run MySQL + create DB from shared .env now"
-    echo -e "  ${BOLD}N${NC}  Install Nginx (if needed)"
-    echo -e "  ${BOLD}P${NC}  Install PHP-FPM (if needed by nginx config)"
-    echo -e "  ${BOLD}U${NC}  Install/update app systemd service"
+    print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
+    echo -e "${BOLD}  Immediate Bootstrap Actions${NC}"
+    print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
+    echo -e "  ${BOLD}M${NC}  Run MySQL + create DB now      ${BOLD}N${NC}  Install Nginx now"
+    echo -e "  ${BOLD}P${NC}  Install PHP-FPM if needed    ${BOLD}U${NC}  Install/update app service"
+    echo -e "  ${BOLD}C${NC}  Install cron/crond now       ${BOLD}J${NC}  Install/update cron jobs"
+    print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     echo -e "  ${BOLD}S${NC}  Start deploy   ${BOLD}Q${NC}  Cancel"
-    echo -e "  ${DIM}Tip: bootstrap actions run immediately; menu redraws after each step.${NC}"
+    echo -e "  ${DIM}Tip: actions above run immediately; options 11-13 are workflow toggles for Start deploy.${NC}"
 }
 
 # Ask for deploy options in a TTY using a menu-style terminal UI so one command
@@ -1149,7 +1157,7 @@ run_interactive_setup() {
 
     while true; do
         print_deploy_tui_menu
-        read -r -p "Select option [1-11, c, j, m, n, p, u, s, q]: " choice
+        read -r -p "Select option [1-13, c, j, m, n, p, u, s, q]: " choice
 
         case "${choice,,}" in
             1)
@@ -1199,6 +1207,12 @@ run_interactive_setup() {
             11)
                 SETUP_MYSQL_DB_FROM_ENV="$(toggle_bool "${SETUP_MYSQL_DB_FROM_ENV}")"
                 ;;
+            12)
+                INSTALL_CRON_IF_NEEDED="$(toggle_bool "${INSTALL_CRON_IF_NEEDED}")"
+                ;;
+            13)
+                INSTALL_NGINX_IF_NEEDED="$(toggle_bool "${INSTALL_NGINX_IF_NEEDED}")"
+                ;;
             c)
                 ensure_cron_installed_from_deploy || true
                 ;;
@@ -1236,7 +1250,7 @@ run_interactive_setup() {
 print_deploy_summary() {
     section "Deploy Summary"
     echo -e "  ${BOLD}Overview${NC}"
-    print_tui_panel_rule 54
+    print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     print_summary_row "App" "${APP_NAME}"
     print_summary_row "Branch" "${BRANCH}"
     print_summary_row "Database mode" "$(deploy_migration_mode_label)"
@@ -1244,16 +1258,18 @@ print_deploy_summary() {
     print_summary_row "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")"
     print_summary_row "Package setup" "$(bool_word "${SETUP_PACKAGES}")"
     print_summary_row "MySQL + create DB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")"
+    print_summary_row "Install cron/crond" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")"
+    print_summary_row "Install Nginx" "$(bool_word "${INSTALL_NGINX_IF_NEEDED}")"
     print_summary_row "SSL setup" "$(bool_word "${SSL_SETUP}")"
     print_summary_row "Spinner UI" "$(spinner_ui_word)"
     if [[ "${SSL_SETUP}" == true ]]; then
-        print_tui_panel_rule 54
+        print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
         echo -e "  ${BOLD}SSL${NC}"
-        print_tui_panel_rule 54
+        print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
         print_summary_row "Domain" "${SSL_DOMAIN}"
         print_summary_row "Certbot email" "${SSL_EMAIL}"
     fi
-    print_tui_panel_rule 54
+    print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
 }
 
 # Background spinner used by run_step for long-running commands while preserving command logs.

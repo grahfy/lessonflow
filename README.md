@@ -154,7 +154,7 @@ Use `update.sh` for routine server maintenance and `deploy.sh` for direct releas
 - runs from your persistent git clone on the server
 - can `fetch`/`pull` the selected branch (ff-only)
 - shows an interactive TUI for workflow + deploy pass-through settings
-- can run pre-deploy/bootstrap helpers (Nginx / MySQL+DB / PHP-FPM-if-needed / cron / systemd service / cron jobs)
+- can run pre-deploy/bootstrap helpers (Nginx / PHP-FPM-if-needed / cron / systemd service / cron jobs)
 - then calls `deploy.sh` with the selected options
 
 `deploy/deploy.sh` (release engine):
@@ -322,7 +322,10 @@ What the deploy script handles:
 
 Interactive `deploy.sh` notes:
 - Option `10` opens the shared production `.env` editor (and bootstraps the file from `.env.example` if missing).
-- Option `11` toggles `MySQL + create DB` to run automatically during `Start deploy`.
+- Options `11-13` are bootstrap workflow toggles that run during `Start deploy`:
+  - `11` MySQL + create DB
+  - `12` Install cron/crond
+  - `13` Install Nginx
 - `M` runs the MySQL+DB bootstrap helper immediately.
 - `N` runs the Nginx install helper immediately.
 - `P` runs the PHP-FPM-if-needed helper immediately.
@@ -344,14 +347,17 @@ Or non-interactive:
 
 `update.sh`:
 - fetches/pulls latest git changes (ff-only)
-- can run pre-deploy helper actions (Nginx/MySQL/DB/PHP-FPM/cron/systemd service/cron jobs)
+- can run pre-deploy helper actions (Nginx/PHP-FPM/cron/systemd service/cron jobs)
 - delegates the actual release deploy to `deploy.sh`
 
 Interactive `update.sh` notes:
 - Shows a cached remote update check alert (when the selected remote branch has a newer commit than local).
 - Option `10` opens the shared `.env` editor.
+- Options `11-15` are bootstrap workflow toggles (cron, app service, cron jobs, Nginx, PHP-FPM) that run during `Start update/deploy` when enabled.
 - `C` runs the cron/crond install helper immediately.
 - `J` installs/updates managed cron jobs immediately.
+- `N` runs the Nginx install helper immediately.
+- `P` runs the PHP-FPM-if-needed helper immediately.
 - `U` installs/updates the app systemd service immediately.
 
 Common non-interactive examples:
