@@ -1,12 +1,23 @@
 import { NextResponse } from "next/server";
 
-import { CONFIGURABLE_ENV_VARS, getCurrentEnvValues } from "@/lib/setup";
+import { CONFIGURABLE_ENV_VARS, getCurrentEnvValues, isSetupComplete } from "@/lib/setup";
 
 /**
  * Returns current env var configuration for the setup UI.
  * Secrets are masked - only indicates whether they are set.
  */
 export async function GET() {
+  if (await isSetupComplete()) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Setup is already complete.",
+        code: "SETUP_COMPLETE"
+      },
+      { status: 409 }
+    );
+  }
+
   const values = getCurrentEnvValues();
 
   const envVars = CONFIGURABLE_ENV_VARS.map((def) => ({

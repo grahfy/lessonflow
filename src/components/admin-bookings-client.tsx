@@ -293,6 +293,14 @@ function formatBytes(sizeBytes: number): string {
   return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/**
+ * Reads a concise API error message while tolerating non-JSON error responses.
+ */
+function readApiErrorMessage(payload: unknown, fallback: string): string {
+  const api = payload as { error?: string } | null | undefined;
+  return api?.error || fallback;
+}
+
 function validateDialogForm(form: DialogForm): string | null {
   const email = form.email.trim();
   const name = form.name.trim();
@@ -439,26 +447,29 @@ export function AdminBookingsClient() {
     try {
       const bookingRes = await safeFetch(`/api/admin/bookings?view=${view}&date=${date}`, { cache: "no-store" });
       if (!bookingRes.ok) {
-        if (bookingRes.status === 401) {
+        if (bookingRes.status === 401 || bookingRes.status === 403) {
           redirectToAdminLogin();
           return;
         }
 
         const payload = await bookingRes.json().catch(() => null);
-        const message = payload?.error || "Unable to load admin data. Please sign in again.";
-        setError(message);
+        const fallback =
+          bookingRes.status >= 500
+            ? "Unable to load admin data right now. Please try again shortly."
+            : "Unable to load admin data. Please refresh and try again.";
+        setError(readApiErrorMessage(payload, fallback));
         return;
       }
 
       const bookingData = (await bookingRes.json().catch(() => null)) as { events?: EventWithRow[] } | null;
       if (!bookingData || !Array.isArray(bookingData.events)) {
-        setError("Unable to load admin data. Please refresh and sign in again if needed.");
+        setError("Unable to load admin data. The server returned an unexpected response.");
         return;
       }
 
       setEvents(bookingData.events);
     } catch {
-      setError("Unable to load admin data. Please check your connection and sign in again if needed.");
+      setError("Unable to load admin data. Please check your connection and try again.");
     } finally {
       setLoading(false);
     }

@@ -1,13 +1,11 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { useNoticeTween } from "@/components/motion/use-notice-tween";
 import { useCaptcha } from "@/components/captcha";
 
 export function AdminLoginForm() {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const errorNoticeRef = useNoticeTween(Boolean(error));
@@ -15,13 +13,13 @@ export function AdminLoginForm() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    
+
     if (!captcha.validateAnswer()) {
       setError("Please answer the math question correctly.");
       captcha.regenerate();
       return;
     }
-    
+
     setLoading(true);
     setError("");
 
@@ -49,8 +47,9 @@ export function AdminLoginForm() {
       return;
     }
 
-    router.push("/admin/bookings");
-    router.refresh();
+    // Use a full navigation so the first admin page/data requests always include
+    // the newly set httpOnly session cookie.
+    window.location.assign("/admin/bookings");
   }
 
   return (

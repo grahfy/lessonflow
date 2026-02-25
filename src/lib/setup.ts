@@ -58,7 +58,7 @@ export const CONFIGURABLE_ENV_VARS = [
     validation: (v: string) => {
       if (!v.trim()) return "Database URL is required";
       if (v.startsWith("file:")) return null; // SQLite is valid
-      if (!v.match(/^(mysql|postgresql):\/\/.+/)) return "Must be a valid database URL (mysql:// or postgresql:// or file:)";
+      if (!v.match(/^mysql:\/\/.+/)) return "Must be a valid database URL (mysql://... or file:...)";
       return null;
     }
   },
@@ -484,8 +484,8 @@ export async function evaluateSetupChecks(): Promise<SetupCheck[]> {
       title: "Database URL",
       status: isProduction ? "fail" : "warn",
       detail: isProduction
-        ? "SQLite file URLs are not suitable for production hosting. Use managed Postgres."
-        : "SQLite is acceptable for local/test, but production should use managed Postgres."
+        ? "SQLite file URLs are not suitable for production hosting. Use MySQL for production deployments."
+        : "SQLite is acceptable for local/test, but production should use MySQL."
     });
   } else {
     checks.push({

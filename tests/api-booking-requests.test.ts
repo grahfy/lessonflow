@@ -2,7 +2,7 @@ import { addDays } from "date-fns";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/db";
-import { POST } from "@/app/api/booking-requests/route";
+import { GET, POST } from "@/app/api/booking-requests/route";
 
 describe("api-booking-requests", () => {
   beforeEach(async () => {
@@ -11,6 +11,15 @@ describe("api-booking-requests", () => {
     await prisma.bookingSeries.deleteMany();
     await prisma.bookingRequest.deleteMany();
     await prisma.customer.deleteMany();
+  });
+
+  it("does not expose booking request rows via public GET", async () => {
+    const response = await GET();
+    expect(response.status).toBe(405);
+    expect(response.headers.get("Allow")).toBe("POST");
+
+    const body = (await response.json()) as { error?: string };
+    expect(body.error).toBe("Method Not Allowed");
   });
 
   it("creates a pending booking request", async () => {

@@ -8,12 +8,15 @@ import { getOwnerEmail } from "@/lib/env";
 import { logEvent } from "@/lib/observability";
 
 export async function GET() {
-  const rows = await prisma.bookingRequest.findMany({
-    orderBy: {
-      createdAt: "desc"
+  return NextResponse.json(
+    { error: "Method Not Allowed" },
+    {
+      status: 405,
+      headers: {
+        Allow: "POST"
+      }
     }
-  });
-  return NextResponse.json({ rows });
+  );
 }
 
 export async function POST(request: Request) {

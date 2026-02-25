@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { auPhoneSchema, auPostcodeSchema, auStateSchema, lessonModeSchema, skillLevelSchema } from "@/lib/booking-rules";
 import { requireAdminFromRequest } from "@/lib/admin-route";
+import { jsonUnexpectedError } from "@/lib/api-errors";
 import { normalizeEmail, normalizePhone } from "@/lib/customer-match";
 import { prisma } from "@/lib/db";
 import { buildNameSearchTokens, normalizeFullNameForLookup } from "@/lib/student-portal/credentials";
@@ -33,133 +34,145 @@ const updateCustomerSchema = z.object({
  * Returns one customer record for admin detail flows.
  */
 export async function GET(request: NextRequest, { params }: Params) {
-  const admin = await requireAdminFromRequest(request);
-  if (!admin) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  try {
+    const admin = await requireAdminFromRequest(request);
+    if (!admin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-  const { id } = await params;
-  const customer = await prisma.customer.findUnique({
-    where: { id }
-  });
-  if (!customer || customer.isArchived) {
-    return NextResponse.json({ error: "Customer not found." }, { status: 404 });
-  }
+    const { id } = await params;
+    const customer = await prisma.customer.findUnique({
+      where: { id }
+    });
+    if (!customer || customer.isArchived) {
+      return NextResponse.json({ error: "Customer not found." }, { status: 404 });
+    }
 
-  return NextResponse.json({ customer });
+    return NextResponse.json({ customer });
+  } catch (error) {
+    return jsonUnexpectedError(error, "Unable to load customer.");
+  }
 }
 
 export async function PATCH(request: NextRequest, { params }: Params) {
-  const admin = await requireAdminFromRequest(request);
-  if (!admin) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const body = await request.json().catch(() => null);
-  const parsed = updateCustomerSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid customer payload.", details: parsed.error.flatten() }, { status: 400 });
-  }
-
-  const { id } = await params;
-  const existing = await prisma.customer.findUnique({
-    where: { id }
-  });
-  if (!existing) {
-    return NextResponse.json({ error: "Customer not found." }, { status: 404 });
-  }
-
-  const nextEmail = parsed.data.email ?? existing.email;
-  const nextPhone = parsed.data.phone ?? existing.phone;
-  const nextFullName = parsed.data.fullName ?? existing.fullName;
-  const normalizedEmail = normalizeEmail(nextEmail);
-  const normalizedPhone = normalizePhone(nextPhone);
-  const normalizedFullName = normalizeFullNameForLookup(nextFullName);
-  const nameSearchTokens = buildNameSearchTokens(nextFullName);
-
-  const duplicate = await prisma.customer.findFirst({
-    where: {
-      id: {
-        not: id
-      },
-      isArchived: false,
-      OR: [{ normalizedEmail }, { normalizedPhone }]
+  try {
+    const admin = await requireAdminFromRequest(request);
+    if (!admin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-  });
-  if (duplicate) {
-    return NextResponse.json(
-      {
-        error: "Another customer already uses this email or phone.",
-        customer: duplicate
-      },
-      { status: 409 }
-    );
-  }
 
-  const updated = await prisma.customer.update({
-    where: { id },
-    data: {
-      fullName: nextFullName,
-      normalizedFullName,
-      nameSearchTokens,
-      email: nextEmail,
-      phone: nextPhone,
-      normalizedEmail,
-      normalizedPhone,
-      skillLevel: parsed.data.skillLevel ?? existing.skillLevel,
-      lessonMode: parsed.data.lessonMode ?? existing.lessonMode,
-      unitNumber:
-        parsed.data.unitNumber === undefined
-          ? existing.unitNumber
-          : parsed.data.unitNumber && parsed.data.unitNumber.trim()
-            ? parsed.data.unitNumber.trim()
-            : null,
-      houseNumber: parsed.data.houseNumber ?? existing.houseNumber,
-      streetName: parsed.data.streetName ?? existing.streetName,
-      streetType: parsed.data.streetType ?? existing.streetType,
-      suburb: parsed.data.suburb ?? existing.suburb,
-      state: parsed.data.state ?? existing.state,
-      postcode: parsed.data.postcode ?? existing.postcode,
-      isArchived: parsed.data.isArchived ?? existing.isArchived
+    const body = await request.json().catch(() => null);
+    const parsed = updateCustomerSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid customer payload.", details: parsed.error.flatten() }, { status: 400 });
     }
-  });
 
-  return NextResponse.json({ customer: updated });
+    const { id } = await params;
+    const existing = await prisma.customer.findUnique({
+      where: { id }
+    });
+    if (!existing) {
+      return NextResponse.json({ error: "Customer not found." }, { status: 404 });
+    }
+
+    const nextEmail = parsed.data.email ?? existing.email;
+    const nextPhone = parsed.data.phone ?? existing.phone;
+    const nextFullName = parsed.data.fullName ?? existing.fullName;
+    const normalizedEmail = normalizeEmail(nextEmail);
+    const normalizedPhone = normalizePhone(nextPhone);
+    const normalizedFullName = normalizeFullNameForLookup(nextFullName);
+    const nameSearchTokens = buildNameSearchTokens(nextFullName);
+
+    const duplicate = await prisma.customer.findFirst({
+      where: {
+        id: {
+          not: id
+        },
+        isArchived: false,
+        OR: [{ normalizedEmail }, { normalizedPhone }]
+      }
+    });
+    if (duplicate) {
+      return NextResponse.json(
+        {
+          error: "Another customer already uses this email or phone.",
+          customer: duplicate
+        },
+        { status: 409 }
+      );
+    }
+
+    const updated = await prisma.customer.update({
+      where: { id },
+      data: {
+        fullName: nextFullName,
+        normalizedFullName,
+        nameSearchTokens,
+        email: nextEmail,
+        phone: nextPhone,
+        normalizedEmail,
+        normalizedPhone,
+        skillLevel: parsed.data.skillLevel ?? existing.skillLevel,
+        lessonMode: parsed.data.lessonMode ?? existing.lessonMode,
+        unitNumber:
+          parsed.data.unitNumber === undefined
+            ? existing.unitNumber
+            : parsed.data.unitNumber && parsed.data.unitNumber.trim()
+              ? parsed.data.unitNumber.trim()
+              : null,
+        houseNumber: parsed.data.houseNumber ?? existing.houseNumber,
+        streetName: parsed.data.streetName ?? existing.streetName,
+        streetType: parsed.data.streetType ?? existing.streetType,
+        suburb: parsed.data.suburb ?? existing.suburb,
+        state: parsed.data.state ?? existing.state,
+        postcode: parsed.data.postcode ?? existing.postcode,
+        isArchived: parsed.data.isArchived ?? existing.isArchived
+      }
+    });
+
+    return NextResponse.json({ customer: updated });
+  } catch (error) {
+    return jsonUnexpectedError(error, "Unable to update customer.");
+  }
 }
 
 export async function DELETE(request: NextRequest, { params }: Params) {
-  const admin = await requireAdminFromRequest(request);
-  if (!admin) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  try {
+    const admin = await requireAdminFromRequest(request);
+    if (!admin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-  const { id } = await params;
-  const existing = await prisma.customer.findUnique({
-    where: { id }
-  });
-  if (!existing) {
-    return NextResponse.json({ error: "Customer not found." }, { status: 404 });
-  }
-
-  const [bookingLinks, requestLinks, seriesLinks] = await prisma.$transaction([
-    prisma.booking.count({ where: { customerId: id } }),
-    prisma.bookingRequest.count({ where: { customerId: id } }),
-    prisma.bookingSeries.count({ where: { customerId: id } })
-  ]);
-  const linkedCount = bookingLinks + requestLinks + seriesLinks;
-
-  if (linkedCount > 0) {
-    const archived = await prisma.customer.update({
-      where: { id },
-      data: {
-        isArchived: true
-      }
+    const { id } = await params;
+    const existing = await prisma.customer.findUnique({
+      where: { id }
     });
-    return NextResponse.json({ ok: true, archived: true, linkedCount, customer: archived });
-  }
+    if (!existing) {
+      return NextResponse.json({ error: "Customer not found." }, { status: 404 });
+    }
 
-  await prisma.customer.delete({
-    where: { id }
-  });
-  return NextResponse.json({ ok: true, archived: false, linkedCount: 0 });
+    const [bookingLinks, requestLinks, seriesLinks] = await prisma.$transaction([
+      prisma.booking.count({ where: { customerId: id } }),
+      prisma.bookingRequest.count({ where: { customerId: id } }),
+      prisma.bookingSeries.count({ where: { customerId: id } })
+    ]);
+    const linkedCount = bookingLinks + requestLinks + seriesLinks;
+
+    if (linkedCount > 0) {
+      const archived = await prisma.customer.update({
+        where: { id },
+        data: {
+          isArchived: true
+        }
+      });
+      return NextResponse.json({ ok: true, archived: true, linkedCount, customer: archived });
+    }
+
+    await prisma.customer.delete({
+      where: { id }
+    });
+    return NextResponse.json({ ok: true, archived: false, linkedCount: 0 });
+  } catch (error) {
+    return jsonUnexpectedError(error, "Unable to delete customer.");
+  }
 }

@@ -9,7 +9,7 @@ describe("api-contact", () => {
     await prisma.contactSubmission.deleteMany();
   });
 
-  it("persists a valid contact message", async () => {
+  it("persists a valid contact message even when email delivery is unavailable", async () => {
     const request = new Request("http://localhost/api/contact", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -22,7 +22,11 @@ describe("api-contact", () => {
     });
 
     const response = await POST(request);
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(503);
+
+    const payload = await response.json();
+    expect(payload.ok).toBe(false);
+    expect(payload.deliveryStatus).toBe("queued_no_smtp");
 
     const row = await prisma.contactSubmission.findFirst();
     expect(row?.email).toBe("jordan@example.com");

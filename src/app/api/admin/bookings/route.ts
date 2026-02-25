@@ -64,97 +64,107 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const viewRaw = request.nextUrl.searchParams.get("view") || "week";
-  const date = request.nextUrl.searchParams.get("date") || undefined;
-  const view = viewRaw === "day" || viewRaw === "month" ? viewRaw : "week";
-  const range = getCalendarRange(view, date);
-  const now = new Date();
-  const recencyCutoff = getRecencyCutoff(now);
+  try {
+    const viewRaw = request.nextUrl.searchParams.get("view") || "week";
+    const date = request.nextUrl.searchParams.get("date") || undefined;
+    const view = viewRaw === "day" || viewRaw === "month" ? viewRaw : "week";
+    const range = getCalendarRange(view, date);
+    if (Number.isNaN(range.start.getTime()) || Number.isNaN(range.end.getTime())) {
+      return NextResponse.json({ error: "Invalid calendar date." }, { status: 400 });
+    }
+    const now = new Date();
+    const recencyCutoff = getRecencyCutoff(now);
 
-  const rows = await prisma.booking.findMany({
-    where: {
-      OR: [
-        {
-          status: "approved",
-          startAt: {
-            gte: range.start,
-            lte: range.end
-          }
-        },
-        {
-          status: "cancelled",
-          startAt: {
-            gte: range.start,
-            lte: range.end
+    const rows = await prisma.booking.findMany({
+      where: {
+        OR: [
+          {
+            status: "approved",
+            startAt: {
+              gte: range.start,
+              lte: range.end
+            }
           },
-          updatedAt: {
-            gte: recencyCutoff
+          {
+            status: "cancelled",
+            startAt: {
+              gte: range.start,
+              lte: range.end
+            },
+            updatedAt: {
+              gte: recencyCutoff
+            }
           }
-        }
-      ]
-    },
-    orderBy: {
-      startAt: "asc"
-    }
-  });
-
-  const requestRows = await prisma.bookingRequest.findMany({
-    where: {
-      requestedStartAt: {
-        gte: range.start,
-        lte: range.end
+        ]
       },
-      OR: [
-        {
-          status: "pending"
+      orderBy: {
+        startAt: "asc"
+      }
+    });
+
+    const requestRows = await prisma.bookingRequest.findMany({
+      where: {
+        requestedStartAt: {
+          gte: range.start,
+          lte: range.end
         },
-        {
-          status: "rejected",
-          updatedAt: {
-            gte: recencyCutoff
+        OR: [
+          {
+            status: "pending"
+          },
+          {
+            status: "rejected",
+            updatedAt: {
+              gte: recencyCutoff
+            }
           }
-        }
-      ]
-    },
-    orderBy: {
-      requestedStartAt: "asc"
-    }
-  });
+        ]
+      },
+      orderBy: {
+        requestedStartAt: "asc"
+      }
+    });
 
-  const events = [
-    ...rows.map((booking) => ({
-      entityType: "booking" as const,
-      id: booking.id,
-      startAt: booking.startAt.toISOString(),
-      endAt: booking.endAt.toISOString(),
-      status: booking.status,
-      color: bookingColor(booking.status),
-      title: booking.name,
-      row: booking
-    })),
-    ...requestRows.map((requestRow) => ({
-      entityType: "booking_request" as const,
-      id: requestRow.id,
-      startAt: requestRow.requestedStartAt.toISOString(),
-      endAt: requestRow.requestedStartAt.toISOString(),
-      status: requestRow.status,
-      color: bookingRequestColor(requestRow.status),
-      title: requestRow.name,
-      row: requestRow
-    }))
-  ].sort((a, b) => a.startAt.localeCompare(b.startAt));
+    const events = [
+      ...rows.map((booking) => ({
+        entityType: "booking" as const,
+        id: booking.id,
+        startAt: booking.startAt.toISOString(),
+        endAt: booking.endAt.toISOString(),
+        status: booking.status,
+        color: bookingColor(booking.status),
+        title: booking.name,
+        row: booking
+      })),
+      ...requestRows.map((requestRow) => ({
+        entityType: "booking_request" as const,
+        id: requestRow.id,
+        startAt: requestRow.requestedStartAt.toISOString(),
+        endAt: requestRow.requestedStartAt.toISOString(),
+        status: requestRow.status,
+        color: bookingRequestColor(requestRow.status),
+        title: requestRow.name,
+        row: requestRow
+      }))
+    ].sort((a, b) => a.startAt.localeCompare(b.startAt));
 
-  return NextResponse.json({
-    events,
-    rows,
-    requestRows,
-    range: {
-      start: range.start.toISOString(),
-      end: range.end.toISOString()
-    },
-    now: now.toISOString(),
-    recencyCutoff: recencyCutoff.toISOString()
-  });
+    return NextResponse.json({
+      events,
+      rows,
+      requestRows,
+      range: {
+        start: range.start.toISOString(),
+        end: range.end.toISOString()
+      },
+      now: now.toISOString(),
+      recencyCutoff: recencyCutoff.toISOString()
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unable to load admin booking data." },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {

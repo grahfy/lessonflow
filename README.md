@@ -161,10 +161,22 @@ HOST=0.0.0.0 PORT=3000 npm run local:full-site
 ```
 
 ## Testing
-Tests run against isolated SQLite DB `prisma/test.db`.
+Tests require a MySQL-compatible database because the Prisma schema provider is `mysql`.
 
 Env loading order for tests:
 - `.env.test.local` -> `.env.test` -> `.env.local` -> `.env`
+
+Recommended local setup without installing MySQL on the host (Docker):
+```bash
+docker run --name mgs-test-mysql \
+  -e MYSQL_ROOT_PASSWORD=root \
+  -e MYSQL_DATABASE=mgs_test \
+  -p 3307:3306 -d mysql:8
+
+export TEST_DATABASE_URL="mysql://root:root@127.0.0.1:3307/mgs_test"
+```
+
+`npm run test:prepare` uses `TEST_DATABASE_URL` (preferred) or `DATABASE_URL` and runs Prisma migrations against that database.
 
 Commands:
 ```bash
@@ -241,7 +253,9 @@ Email provider behavior:
   - `customerId` (`string`)
   - `stage` (`7 | 14 | 30`)
 
-Schedules are configured in `vercel.json`.
+If deploying on Vercel, schedules can be configured in `vercel.json`.
+For DigitalOcean Droplet deployments, configure cron jobs or `systemd` timers that `POST` these endpoints with `x-cron-secret`.
+See `Documentation/digitalocean-admin-operations.md` for examples.
 
 ## Available Routes
 - Public:
@@ -291,6 +305,9 @@ npx prisma migrate deploy
 4. Resolve all failing checks in the wizard (including `Email delivery`, using Gmail API or SMTP).
 5. Create the first admin account.
 6. Sign in at `/admin/login`.
+
+For DigitalOcean Droplet operations (systemd, Nginx headers, cron/systemd timers, restart workflow), see:
+- `Documentation/digitalocean-admin-operations.md`
 
 ### Required Environment Variables
 At minimum, production requires:

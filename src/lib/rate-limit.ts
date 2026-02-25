@@ -66,23 +66,35 @@ if (!globalStore.__rateLimitStore) {
 /**
  * Extracts client IP address from request headers.
  * 
- * Handles common proxy/load balancer header formats:
- * - X-Forwarded-For: Client, Proxy1, Proxy2 (takes first)
- * - X-Real-IP: Direct client IP
+ * Handles common proxy/load balancer header formats.
+ *
+ * DigitalOcean Droplet recommendation (Nginx/Caddy reverse proxy):
+ * - Set `X-Real-IP` from the proxy's remote address and prefer it here.
+ * - If only `X-Forwarded-For` is available and the proxy appends values,
+ *   the last entry is the most trustworthy hop added by the reverse proxy.
  * 
  * @param request - Next.js request object
  * @returns Client IP string or "unknown" as fallback
  */
 export function getRequestIp(request: NextRequest): string {
+  const realIp = request.headers.get("x-real-ip")?.trim();
+  if (realIp) {
+    return realIp;
+  }
+
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) {
-      return first;
+    const parts = forwarded
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const last = parts.at(-1);
+    if (last) {
+      return last;
     }
   }
 
-  return request.headers.get("x-real-ip")?.trim() || "unknown";
+  return "unknown";
 }
 
 /**
