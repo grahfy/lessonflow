@@ -360,9 +360,13 @@ h1 {
 
 .student-login-hero {
   background-image: url("/images/student-portal-music-books.svg");
-  background-size: contain;
+  width: min(100%, 380px);
+  aspect-ratio: 3 / 4;
+  justify-self: center;
+  align-self: center;
+  background-size: 88% auto;
   background-repeat: no-repeat;
-  background-position: center;
+  background-position: center 58%;
   background-color: rgba(255, 255, 255, 0.02);
 }
 
@@ -2098,6 +2102,13 @@ h1 {
 
   .terms-hero {
     min-height: 400px;
+  }
+
+  .student-login-hero {
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    background-size: contain;
+    background-position: center;
   }
 
   .form-grid {
