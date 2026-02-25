@@ -13,6 +13,10 @@
 #   --ssl             Run SSL setup after deployment
 #   --domain DOMAIN   Domain for SSL certificate
 #   --email EMAIL     Email for SSL certificate
+#   --interactive     Prompt for deploy options in TTY mode
+#   --no-spinner      Disable spinner UI
+#   --no-color        Disable colored output
+#   --help            Show usage
 #
 # Prerequisites (unless --setup-packages):
 #   - Node.js 20+ installed
@@ -45,24 +49,236 @@ SSL_EMAIL=""
 DB_PUSH=false
 TIMESTAMP=""
 NEW_RELEASE_DIR=""
+INTERACTIVE=false
+NO_SPINNER=false
+NO_COLOR=false
+IS_TTY=false
+SPINNER_PID=""
+SPINNER_MSG=""
+SPINNER_FRAMES=( "⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏" )
 
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+DIM='\033[2m'
 NC='\033[0m' # No Color
 
 # Helper functions
+# Print usage information for CLI and automation contexts.
+show_usage() {
+    cat <<'EOF'
+Melbourne Guitar School - Deployment Script
+
+Usage: ./deploy/deploy.sh [options]
+
+Options:
+  --skip-migrate    Skip database migrations
+  --skip-deps       Skip npm install
+  --branch BRANCH   Git branch to deploy (default: main)
+  --rollback        Rollback to previous release
+  --setup-packages  Run package installation first (requires root)
+  --ssl             Run SSL setup after deployment
+  --domain DOMAIN   Domain for SSL certificate
+  --email EMAIL     Email for SSL certificate
+  --interactive     Prompt for deploy options in TTY mode
+  --no-spinner      Disable spinner UI
+  --no-color        Disable colored output
+  --help, -h        Show usage
+EOF
+}
+
+# Detect whether we can safely render an interactive UI (spinner/prompts).
+detect_tty_capabilities() {
+    if [[ -t 0 && -t 1 ]]; then
+        IS_TTY=true
+    fi
+
+    if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then
+        RED='' GREEN='' YELLOW='' BLUE='' CYAN='' BOLD='' DIM='' NC=''
+    fi
+}
+
+# Render a lightweight banner so manual deploy runs are easier to scan.
+print_banner() {
+    echo ""
+    echo -e "${BOLD}${CYAN}╭──────────────────────────────────────────────╮${NC}"
+    echo -e "${BOLD}${CYAN}│${NC} ${BOLD}Melbourne Guitar School Deploy${NC}${DIM} (Next.js)${NC} ${BOLD}${CYAN}│${NC}"
+    echo -e "${BOLD}${CYAN}╰──────────────────────────────────────────────╯${NC}"
+}
+
+# Standardized info line for quick, readable progress output.
 log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+    echo -e "${GREEN}●${NC} $1"
 }
 
+# Standardized error line with stronger color contrast.
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    echo -e "${RED}✖${NC} $1"
 }
 
+# Standardized warning line used for recoverable issues.
 log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
+    echo -e "${YELLOW}▲${NC} $1"
+}
+
+# Emit a section heading to visually separate deploy phases.
+section() {
+    echo ""
+    echo -e "${BOLD}${BLUE}▶ $1${NC}"
+}
+
+# Prompt for a yes/no choice when running interactively.
+prompt_yes_no() {
+    local prompt="$1"
+    local default_answer="${2:-y}"
+    local answer=""
+    local suffix="[y/N]"
+
+    if [[ "${default_answer,,}" == "y" ]]; then
+        suffix="[Y/n]"
+    fi
+
+    while true; do
+        read -r -p "${prompt} ${suffix} " answer
+        answer="${answer:-$default_answer}"
+        case "${answer,,}" in
+            y|yes) return 0 ;;
+            n|no) return 1 ;;
+            *) log_warn "Please answer y or n." ;;
+        esac
+    done
+}
+
+# Prompt for a value while supporting a visible default for common deploy fields.
+prompt_value() {
+    local prompt="$1"
+    local default_value="${2:-}"
+    local value=""
+
+    if [[ -n "${default_value}" ]]; then
+        read -r -p "${prompt} [${default_value}]: " value
+        echo "${value:-$default_value}"
+        return 0
+    fi
+
+    read -r -p "${prompt}: " value
+    echo "${value}"
+}
+
+# Ask for deploy options in a TTY so one command can serve both scripted and manual deploys.
+run_interactive_setup() {
+    section "Interactive Options"
+    BRANCH="$(prompt_value "Git branch to deploy" "${BRANCH}")"
+
+    if prompt_yes_no "Skip npm install?" "n"; then
+        SKIP_DEPS=true
+    fi
+
+    if prompt_yes_no "Use prisma db push instead of migrations?" "n"; then
+        DB_PUSH=true
+        SKIP_MIGRATE=true
+    elif prompt_yes_no "Skip database migrations?" "n"; then
+        SKIP_MIGRATE=true
+    fi
+
+    local ssl_default="n"
+    [[ "${SSL_SETUP}" == true ]] && ssl_default="y"
+    if prompt_yes_no "Run SSL setup after deploy?" "${ssl_default}"; then
+        SSL_SETUP=true
+        SSL_DOMAIN="$(prompt_value "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}")"
+        SSL_EMAIL="$(prompt_value "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}")"
+    else
+        SSL_SETUP=false
+    fi
+}
+
+# Print a compact summary before executing so deploy choices are explicit.
+print_deploy_summary() {
+    section "Deploy Summary"
+    echo -e "  ${DIM}App:${NC}        ${APP_NAME}"
+    echo -e "  ${DIM}Branch:${NC}     ${BRANCH}"
+    echo -e "  ${DIM}Skip deps:${NC}  ${SKIP_DEPS}"
+    echo -e "  ${DIM}Skip migrate:${NC} ${SKIP_MIGRATE}"
+    echo -e "  ${DIM}DB push:${NC}    ${DB_PUSH}"
+    echo -e "  ${DIM}SSL setup:${NC}  ${SSL_SETUP}"
+    if [[ "${SSL_SETUP}" == true ]]; then
+        echo -e "  ${DIM}Domain:${NC}     ${SSL_DOMAIN}"
+        echo -e "  ${DIM}Email:${NC}      ${SSL_EMAIL}"
+    fi
+}
+
+# Background spinner used by run_step for long-running commands while preserving command logs.
+start_spinner() {
+    local msg="$1"
+    local i=0
+    local frame_count="${#SPINNER_FRAMES[@]}"
+
+    [[ "${NO_SPINNER}" == true || "${IS_TTY}" != true ]] && return 0
+
+    SPINNER_MSG="${msg}"
+    (
+        while true; do
+            printf "\r${CYAN}%s${NC} %s ${DIM}%s${NC}" "${SPINNER_FRAMES[$i]}" "${SPINNER_MSG}" "working..."
+            i=$(( (i + 1) % frame_count ))
+            sleep 0.08
+        done
+    ) &
+    SPINNER_PID=$!
+}
+
+# Stop the spinner and render a final status line.
+stop_spinner() {
+    local status="$1"
+    local final_icon=""
+    local final_color=""
+
+    [[ "${NO_SPINNER}" == true || "${IS_TTY}" != true ]] && return 0
+
+    if [[ -n "${SPINNER_PID}" ]] && kill -0 "${SPINNER_PID}" 2>/dev/null; then
+        kill "${SPINNER_PID}" 2>/dev/null || true
+        wait "${SPINNER_PID}" 2>/dev/null || true
+    fi
+
+    if [[ "${status}" == "ok" ]]; then
+        final_icon="✔"
+        final_color="${GREEN}"
+    else
+        final_icon="✖"
+        final_color="${RED}"
+    fi
+
+    printf "\r${final_color}%s${NC} %s%*s\n" "${final_icon}" "${SPINNER_MSG}" 10 ""
+    SPINNER_PID=""
+    SPINNER_MSG=""
+}
+
+# Run a command with captured output and a spinner; on failure, print the tail of the log.
+run_step() {
+    local message="$1"
+    shift
+
+    local log_file
+    log_file="$(mktemp)"
+
+    start_spinner "${message}"
+    if "$@" >"${log_file}" 2>&1; then
+        stop_spinner "ok"
+        [[ "${NO_SPINNER}" == true || "${IS_TTY}" != true ]] && log_info "${message}"
+        rm -f "${log_file}"
+        return 0
+    fi
+
+    stop_spinner "fail"
+    log_error "${message} failed"
+    echo -e "${DIM}--- command output (tail) ---${NC}"
+    tail -n 40 "${log_file}" || true
+    echo -e "${DIM}-----------------------------${NC}"
+    rm -f "${log_file}"
+    return 1
 }
 
 current_release_name() {
@@ -150,20 +366,55 @@ cleanup_incomplete_release_on_exit() {
 trap cleanup_incomplete_release_on_exit EXIT
 
 # Parse arguments
+ARG_COUNT=$#
 while [[ $# -gt 0 ]]; do
     case $1 in
         --branch) BRANCH="$2"; shift 2 ;;
         --ssl) SSL_SETUP=true; shift ;;
         --domain) SSL_DOMAIN="$2"; shift 2 ;;
         --email) SSL_EMAIL="$2"; shift 2 ;;
+        --interactive) INTERACTIVE=true; shift ;;
+        --no-spinner) NO_SPINNER=true; shift ;;
+        --no-color) NO_COLOR=true; shift ;;
         --skip-deps) SKIP_DEPS=true; shift ;;
         --skip-migrate) SKIP_MIGRATE=true; shift ;;
         --db-push) DB_PUSH=true; shift ;;
         --rollback) ROLLBACK=true; shift ;;
         --setup-packages) SETUP_PACKAGES=true; shift ;;
+        --help|-h)
+            show_usage
+            exit 0
+            ;;
         *) log_error "Unknown argument: $1"; exit 1 ;;
     esac
 done
+
+detect_tty_capabilities
+
+# Auto-enable interactive prompts for local manual runs with no flags.
+if [[ "${IS_TTY}" == true && "${INTERACTIVE}" == false && "${ROLLBACK}" == false ]]; then
+    if [[ "${ARG_COUNT}" -eq 0 ]]; then
+        INTERACTIVE=true
+    fi
+fi
+
+if [[ "${INTERACTIVE}" == true && "${IS_TTY}" != true ]]; then
+    log_warn "--interactive requested, but no TTY detected. Continuing non-interactively."
+    INTERACTIVE=false
+fi
+
+print_banner
+
+if [[ "${INTERACTIVE}" == true && "${ROLLBACK}" == false ]]; then
+    run_interactive_setup
+    print_deploy_summary
+    if ! prompt_yes_no "Start deployment with these settings?" "y"; then
+        log_warn "Deployment cancelled."
+        exit 0
+    fi
+elif [[ "${ROLLBACK}" == false ]]; then
+    print_deploy_summary
+fi
 
 # =============================================================================
 # ROLLBACK FUNCTION
@@ -219,13 +470,14 @@ fi
 
 # Run package setup if requested
 if [[ "${SETUP_PACKAGES}" == true ]]; then
-    log_info "Running package setup..."
-    "${SCRIPT_DIR}/setup-packages.sh" --non-interactive
+    section "Package Setup"
+    run_step "Installing system packages" "${SCRIPT_DIR}/setup-packages.sh" --non-interactive
 fi
 
 # =============================================================================
 # DEPLOYMENT
 # =============================================================================
+section "Deployment"
 log_info "Starting deployment of branch: ${BRANCH}"
 log_info "Deploy directory: ${DEPLOY_DIR}"
 
@@ -275,17 +527,14 @@ fi
 
 # Install dependencies
 if [[ "${SKIP_DEPS}" == false ]]; then
-    log_info "Installing dependencies..."
-    npm ci --omit=dev --ignore-scripts
+    run_step "Installing production dependencies (npm ci)" npm ci --omit=dev --ignore-scripts
 fi
 
 # Always install Prisma CLI (needed for generate and migrate)
-log_info "Installing Prisma CLI..."
-npm install prisma --save-dev --ignore-scripts
+run_step "Installing Prisma CLI" npm install prisma --save-dev --ignore-scripts
 
 # Generate Prisma client
-log_info "Generating Prisma client..."
-npm exec --no -- prisma generate
+run_step "Generating Prisma client" npm exec --no -- prisma generate
 
 # Run database migrations
 run_migrations() {
@@ -340,8 +589,7 @@ fi
 
 # Build the application
 ensure_build_node_options
-log_info "Building application..."
-npm run build
+run_step "Building Next.js application" npm run build
 
 # Verify build succeeded
 if [[ ! -f ".next/BUILD_ID" ]]; then
@@ -400,11 +648,10 @@ fi
 
 # Restart the service
 log_info "Restarting service..."
-systemctl restart ${APP_NAME}
+run_step "Restarting systemd service (${APP_NAME})" systemctl restart "${APP_NAME}"
 
 # Wait for service to start
-log_info "Waiting for service to start..."
-sleep 5
+run_step "Waiting for service warm-up" sleep 5
 
 # Check service status
 if systemctl is-active --quiet ${APP_NAME}; then
@@ -434,5 +681,5 @@ if [[ "${SSL_SETUP}" == true ]]; then
         exit 1
     fi
     log_info "Running SSL setup..."
-    "${SCRIPT_DIR}/setup-ssl.sh" --domain "${SSL_DOMAIN}" --email "${SSL_EMAIL}"
+    run_step "Provisioning SSL (certbot + nginx)" "${SCRIPT_DIR}/setup-ssl.sh" --domain "${SSL_DOMAIN}" --email "${SSL_EMAIL}"
 fi
