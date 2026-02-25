@@ -38,6 +38,9 @@ SHARED_DIR="${DEPLOY_DIR}/shared"
 CURRENT_LINK="${DEPLOY_DIR}/current"
 KEEP_RELEASES=5
 DEFAULT_BUILD_NODE_HEAP_MB=3072
+LOW_RAM_AUTO_HEAP_MIN_MB=900
+LOW_RAM_AUTO_HEAP_MAX_MB=1280
+TMP_CLEANUP_MAX_AGE_DAYS=3
 BRANCH="main"
 SKIP_MIGRATE=false
 SKIP_DEPS=false
@@ -325,13 +328,83 @@ cleanup_old_releases() {
     fi
 }
 
+cleanup_old_temp_files() {
+    local removed=0
+    local root=""
+    local path=""
+
+    # Reclaim disk from stale build/package-manager temp directories that are
+    # commonly left behind by interrupted deploys and failed builds.
+    for root in /tmp /var/tmp; do
+        [[ -d "${root}" ]] || continue
+
+        while IFS= read -r -d '' path; do
+            [[ -z "${path}" ]] && continue
+            rm -rf "${path}" || {
+                log_warn "Failed to remove temp path: ${path}"
+                continue
+            }
+            removed=$((removed + 1))
+            log_info "Removed old temp path: ${path}"
+        done < <(
+            find "${root}" \
+                -mindepth 1 -maxdepth 1 \
+                \( -type d -o -type f \) \
+                \( \
+                    -name 'next-*' -o \
+                    -name 'npm-*' -o \
+                    -name 'npx-*' -o \
+                    -name 'node-*' -o \
+                    -name 'corepack-*' -o \
+                    -name 'pnpm-*' -o \
+                    -name 'tsx-*' \
+                \) \
+                -mtime +"${TMP_CLEANUP_MAX_AGE_DAYS}" \
+                -print0 2>/dev/null || true
+        )
+    done
+
+    local npm_cache_tmp="${HOME:-/root}/.npm/_cacache/tmp"
+    if [[ -d "${npm_cache_tmp}" ]]; then
+        while IFS= read -r -d '' path; do
+            [[ -z "${path}" ]] && continue
+            rm -rf "${path}" || {
+                log_warn "Failed to remove npm cache tmp path: ${path}"
+                continue
+            }
+            removed=$((removed + 1))
+            log_info "Removed old npm cache tmp path: ${path}"
+        done < <(
+            find "${npm_cache_tmp}" -mindepth 1 -mtime +"${TMP_CLEANUP_MAX_AGE_DAYS}" -print0 2>/dev/null || true
+        )
+    fi
+
+    if (( removed == 0 )); then
+        log_info "No old temp files removed"
+    fi
+}
+
 ensure_build_node_options() {
     local heap_flag="--max-old-space-size=${DEFAULT_BUILD_NODE_HEAP_MB}"
+    local total_ram_mb=""
 
     # Respect an explicit heap limit if one was already provided by the caller,
     # but append a safe default when NODE_OPTIONS is unset or incomplete.
     if [[ "${NODE_OPTIONS:-}" == *"--max-old-space-size="* ]]; then
         log_info "Using existing NODE_OPTIONS heap setting"
+        return 0
+    fi
+
+    total_ram_mb="$(detect_total_ram_mb)"
+    if [[ -z "${total_ram_mb}" ]]; then
+        log_info "Could not detect system RAM; leaving NODE_OPTIONS heap limit unchanged"
+        return 0
+    fi
+
+    # Only apply the larger Node heap override on ~1GB hosts where builds are
+    # most likely to fail without the extra headroom (typically with swap).
+    if (( total_ram_mb < LOW_RAM_AUTO_HEAP_MIN_MB || total_ram_mb > LOW_RAM_AUTO_HEAP_MAX_MB )); then
+        log_info "Detected ${total_ram_mb}MB RAM; skipping auto heap override"
         return 0
     fi
 
@@ -342,6 +415,29 @@ ensure_build_node_options() {
     fi
 
     log_info "Applied build NODE_OPTIONS heap limit: ${heap_flag}"
+}
+
+detect_total_ram_mb() {
+    local mem_kb=""
+
+    if [[ -r "/proc/meminfo" ]]; then
+        mem_kb="$(awk '/^MemTotal:/ { print $2; exit }' /proc/meminfo 2>/dev/null || true)"
+        if [[ "${mem_kb}" =~ ^[0-9]+$ ]] && (( mem_kb > 0 )); then
+            echo $((mem_kb / 1024))
+            return 0
+        fi
+    fi
+
+    if command -v sysctl >/dev/null 2>&1; then
+        local mem_bytes=""
+        mem_bytes="$(sysctl -n hw.memsize 2>/dev/null || true)"
+        if [[ "${mem_bytes}" =~ ^[0-9]+$ ]] && (( mem_bytes > 0 )); then
+            echo $((mem_bytes / 1024 / 1024))
+            return 0
+        fi
+    fi
+
+    return 1
 }
 
 cleanup_incomplete_release_on_exit() {
@@ -489,6 +585,9 @@ chmod -R 775 "${SHARED_DIR}/data"
 
 # Prune old releases before creating a new one so a previous failed deploy
 # cannot block the next build with an ENOSPC error.
+log_info "Pre-deploy temp cleanup..."
+cleanup_old_temp_files
+
 log_info "Pre-deploy release cleanup..."
 cleanup_old_releases
 

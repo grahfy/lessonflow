@@ -229,12 +229,19 @@ STUDENT_PORTAL_PASSWORD_LENGTH="14"
 # Cron Secret
 CRON_SECRET="your-cron-secret"
 
-# SMTP (optional but recommended)
+# Email delivery (configure one or both)
+# SMTP (optional)
 SMTP_HOST="smtp.example.com"
 SMTP_PORT="587"
 SMTP_USER="your-smtp-user"
 SMTP_PASS="your-smtp-password"
 SMTP_FROM="Melbourne Guitar School <no-reply@melbourneguitarschool.com.au>"
+
+# Gmail API OAuth2 (recommended fallback / preferred on hosts blocking SMTP ports)
+GMAIL_CLIENT_ID=""
+GMAIL_CLIENT_SECRET=""
+GMAIL_REFRESH_TOKEN=""
+GMAIL_USER_EMAIL="melbourneguitarschool@gmail.com"
 
 # Learning Materials Storage
 LEARNING_MATERIALS_STORAGE_DRIVER="local"
@@ -272,8 +279,24 @@ git clone https://github.com/your-org/melbourne-guitar-school-website.git
 cd melbourne-guitar-school-website
 
 # Run deployment script (first time)
+# Tip: running without flags opens an interactive prompt in a TTY
 sudo ./deploy/deploy.sh --branch main
+
+# Optional: interactive mode (choose branch / migrations / SSL / cert email)
+sudo ./deploy/deploy.sh --interactive
+
+# Optional: deploy and run SSL setup in one command
+sudo ./deploy/deploy.sh --branch main --ssl --domain melbourneguitarschool.com.au --email melbourneguitarschool@gmail.com
+
+# Optional: update git + deploy in one interactive command (server clone workflow)
+sudo ./deploy/update.sh --interactive
 ```
+
+Notes:
+- The deploy script auto-applies `NODE_OPTIONS=--max-old-space-size=3072` only on ~1GB RAM hosts (unless you already set a heap limit).
+- The deploy script prunes old Node/npm temp files in `/tmp`, `/var/tmp`, and npm cache temp before builds to reduce ENOSPC failures.
+- Use `--no-spinner --no-color` for CI/log-only environments.
+- `deploy/update.sh` wraps `git fetch/pull` + `deploy.sh` with the same interactive/spinner UI.
 
 ### 2. Install Systemd Service
 
@@ -305,6 +328,7 @@ sudo -u www-data npx prisma migrate deploy
 
 Visit `https://melbourneguitarschool.com.au/setup` to:
 - Verify configuration
+- Configure Gmail API or SMTP email delivery (the wizard shows a combined `Email delivery` check)
 - Create admin account
 
 ### 6. Setup SSL Certificate
@@ -482,14 +506,17 @@ sudo ./deploy/deploy.sh --rollback
 # SSH into server
 ssh user@your-server
 
-# Navigate to repo
-cd /var/www/melbourne-guitar-school/current
+# Navigate to your persistent git clone (not the deployed current release)
+cd ~/melbourne-guitar-school
 
-# Pull latest changes
-git pull origin main
+# Update git clone + deploy (interactive)
+sudo ./deploy/update.sh
 
-# Run deployment
-sudo ./deploy/deploy.sh --branch main
+# Or specify branch + SSL in one command
+sudo ./deploy/update.sh --branch main --ssl --domain melbourneguitarschool.com.au --email melbourneguitarschool@gmail.com
+
+# Or run non-interactively with SSL setup in one step
+sudo ./deploy/deploy.sh --branch main --ssl --domain melbourneguitarschool.com.au --email melbourneguitarschool@gmail.com
 ```
 
 ### Zero-Downtime Deploys

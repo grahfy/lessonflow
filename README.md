@@ -203,6 +203,7 @@ Email provider behavior:
 - If SMTP is not configured and Gmail OAuth vars are configured, mail is sent via Gmail API over HTTPS.
 - If SMTP is configured but blocked/failing and Gmail OAuth vars are configured, the app falls back to Gmail API.
 - If neither provider is available, outbound emails are recorded as `queued_no_smtp`.
+- The setup wizard (`/setup`) exposes both SMTP and Gmail fields and shows a combined `Email delivery` readiness check.
 
 ### Learning Materials Storage
 - `LEARNING_MATERIALS_STORAGE_DRIVER`: `local` or `s3` (`local` default).
@@ -272,7 +273,7 @@ npx prisma migrate deploy
 3. Visit `/setup`.
 4. Click "Configure Environment" to add or update env vars directly in the browser:
    - Database connection (MySQL)
-   - SMTP settings
+   - Gmail API sender + OAuth credentials (recommended on hosts that block SMTP ports), or SMTP settings
    - Session secrets
    - Invoice business details
 5. Save configuration and restart the server.
@@ -287,7 +288,7 @@ npx prisma migrate deploy
 npx prisma migrate deploy
 ```
 3. Visit `/setup`.
-4. Resolve all failing checks in the wizard.
+4. Resolve all failing checks in the wizard (including `Email delivery`, using Gmail API or SMTP).
 5. Create the first admin account.
 6. Sign in at `/admin/login`.
 
