@@ -8,7 +8,7 @@ import { AdminDeployUpdatesButton } from "@/components/admin-deploy-updates-butt
 import { animateIn, animateOut } from "@/components/motion/tween-orchestrator";
 import { usePresenceExit } from "@/components/motion/use-presence-exit";
 
-type CalendarView = "day" | "week" | "month";
+type CalendarView = "day" | "week" | "month" | "year";
 type AuState = "ACT" | "NSW" | "NT" | "QLD" | "SA" | "TAS" | "VIC" | "WA";
 type DurationChoice = "min30" | "min60" | "custom";
 type ManualStep = "customer" | "lesson" | "schedule";
@@ -1623,7 +1623,7 @@ export function AdminBookingsClient() {
     <div className="admin-shell" data-motion-root="admin" data-motion-primary="true">
       <div className="admin-card booking-row admin-header-row" data-motion-item="admin-header-card">
         <h1 className="admin-console-title" data-motion-item="admin-title">
-          Owner Booking Console
+          LessonFlow Booking Console
         </h1>
         <button className="btn btn-secondary" data-motion-item="admin-logout" onClick={() => void logout()}>
           Sign out
@@ -1638,6 +1638,7 @@ export function AdminBookingsClient() {
             <option value="day">Day</option>
             <option value="week">Week</option>
             <option value="month">Month</option>
+            <option value="year">Yearly</option>
           </select>
         </label>
         <label className="admin-inline-field" data-motion-item="admin-date-select">
@@ -1667,6 +1668,12 @@ export function AdminBookingsClient() {
           <button className="btn btn-secondary" type="button" data-motion-item="legend-action-customers" onClick={openCustomersDialog}>
             Customers
           </button>
+          <button className="btn btn-secondary" type="button" data-motion-item="legend-action-invoices" onClick={() => router.push("/admin/invoices")}>
+            Invoices
+          </button>
+          <button className="btn btn-secondary" type="button" data-motion-item="legend-action-reports" onClick={() => router.push("/admin/reports")}>
+            Reports
+          </button>
           <button
             className="btn btn-secondary"
             type="button"
@@ -1675,19 +1682,13 @@ export function AdminBookingsClient() {
           >
             Customer Learning Materials
           </button>
-          <button className="btn btn-secondary" type="button" data-motion-item="legend-action-settings" onClick={() => router.push("/admin/settings")}>
-            Settings
-          </button>
           <button className="btn btn-secondary" type="button" data-motion-item="legend-action-manual" onClick={() => router.push("/admin/manual")}>
             Manual
           </button>
+          <button className="btn btn-secondary" type="button" data-motion-item="legend-action-settings" onClick={() => router.push("/admin/settings")}>
+            Settings
+          </button>
           <AdminDeployUpdatesButton />
-          <button className="btn btn-secondary" type="button" data-motion-item="legend-action-reports" onClick={() => router.push("/admin/reports")}>
-            Reports
-          </button>
-          <button className="btn btn-secondary" type="button" data-motion-item="legend-action-invoices" onClick={() => router.push("/admin/invoices")}>
-            Invoices
-          </button>
         </div>
       </div>
 

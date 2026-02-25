@@ -705,6 +705,18 @@ export function AdminInvoicesClient() {
     );
   }
 
+  function canDeleteInvoiceRecord(invoice: InvoiceRow): boolean {
+    return !(invoice.documentType === "invoice" && (invoice.status === "sent" || invoice.status === "paid"));
+  }
+
+  function handleInvoiceListDelete(invoice: InvoiceRow) {
+    if (!canDeleteInvoiceRecord(invoice)) {
+      setError("Sent or paid invoices cannot be deleted. Create a credit note instead.");
+      return;
+    }
+    void runInvoiceAction("delete", invoice);
+  }
+
   /**
    * Sends all currently eligible overdue reminders in one admin action.
    */
@@ -965,8 +977,21 @@ export function AdminInvoicesClient() {
               <div key={invoice.id} className="customer-item invoice-item">
                 <strong className="invoice-item-title">{invoice.invoiceNumber} - {invoice.customerName}</strong>
                 <div className="invoice-item-primary-actions">
-                  <button className="btn btn-secondary" onClick={() => openInvoice(invoice)}>View</button>
-                  <button className="btn btn-secondary" onClick={() => downloadInvoicePdf(invoice.id)}>Download PDF</button>
+                  <button type="button" className="btn btn-secondary" onClick={() => openInvoice(invoice)}>View</button>
+                  <button type="button" className="btn btn-secondary" onClick={() => downloadInvoicePdf(invoice.id)}>Download PDF</button>
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    disabled={!!busyAction}
+                    title={
+                      canDeleteInvoiceRecord(invoice)
+                        ? "Delete invoice record"
+                        : "Sent/paid invoices cannot be deleted. Create a credit note instead."
+                    }
+                    onClick={() => handleInvoiceListDelete(invoice)}
+                  >
+                    Delete
+                  </button>
                 </div>
                 <div className="invoice-item-summary">
                   <span className="invoice-item-chip">{invoice.documentType === "credit_note" ? "Credit note" : "Invoice"}</span>
@@ -979,15 +1004,6 @@ export function AdminInvoicesClient() {
                   <span className="invoice-item-chip">
                     Due {new Date(invoice.dueAt).toLocaleDateString("en-AU", { timeZone: "Australia/Melbourne" })}
                   </span>
-                </div>
-                <div className="invoice-item-delete-action">
-                  <button
-                    className="btn btn-danger"
-                    disabled={!!busyAction || (invoice.documentType === "invoice" && (invoice.status === "sent" || invoice.status === "paid"))}
-                    onClick={() => void runInvoiceAction("delete", invoice)}
-                  >
-                    Delete
-                  </button>
                 </div>
               </div>
             ))

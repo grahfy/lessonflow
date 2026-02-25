@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
   try {
     const viewRaw = request.nextUrl.searchParams.get("view") || "week";
     const date = request.nextUrl.searchParams.get("date") || undefined;
-    const view = viewRaw === "day" || viewRaw === "month" ? viewRaw : "week";
+    const view = viewRaw === "day" || viewRaw === "month" || viewRaw === "year" ? viewRaw : "week";
     const range = getCalendarRange(view, date);
     if (Number.isNaN(range.start.getTime()) || Number.isNaN(range.end.getTime())) {
       return NextResponse.json({ error: "Invalid calendar date." }, { status: 400 });

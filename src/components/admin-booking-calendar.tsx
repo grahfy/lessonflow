@@ -8,14 +8,18 @@
  */
 import {
   addDays,
+  addMonths,
   eachDayOfInterval,
   endOfMonth,
   endOfWeek,
+  endOfYear,
   format,
   isSameDay,
+  isSameMonth,
   parseISO,
   startOfMonth,
-  startOfWeek
+  startOfWeek,
+  startOfYear
 } from "date-fns";
 
 export type CalendarEventColor = "green" | "yellow" | "red" | "slate";
@@ -35,7 +39,7 @@ export type AdminCalendarEvent = {
 const MAX_ANIMATED_EVENTS_PER_DAY = 6;
 
 type Props = {
-  view: "day" | "week" | "month";
+  view: "day" | "week" | "month" | "year";
   date: string;
   events: AdminCalendarEvent[];
   selectedEventId: string | null;
@@ -71,6 +75,24 @@ function monthGridDays(baseDate: Date): Date[] {
 function weekDays(baseDate: Date): Date[] {
   const weekStart = startOfWeek(baseDate, { weekStartsOn: 1 });
   return Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
+}
+
+function yearMonths(baseDate: Date): Date[] {
+  const yearStart = startOfYear(baseDate);
+  const yearEnd = endOfYear(baseDate);
+  const months: Date[] = [];
+  let cursor = yearStart;
+
+  while (cursor <= yearEnd) {
+    months.push(cursor);
+    cursor = addMonths(cursor, 1);
+  }
+
+  return months;
+}
+
+function eventMonth(event: AdminCalendarEvent, monthStart: Date): boolean {
+  return isSameMonth(parseISO(event.startAt), monthStart);
 }
 
 function DayCell(props: {
@@ -109,6 +131,44 @@ function DayCell(props: {
   );
 }
 
+function YearMonthCell(props: {
+  monthStart: Date;
+  events: AdminCalendarEvent[];
+  selectedEventId: string | null;
+  onSelect: (event: AdminCalendarEvent) => void;
+}) {
+  const visibleEvents = props.events.slice(0, 4);
+  const remaining = Math.max(0, props.events.length - visibleEvents.length);
+
+  return (
+    <section className="calendar-year-month" data-motion-item="calendar-year-month">
+      <header className="calendar-year-month-head" data-motion-item="calendar-year-month-head">
+        <h4>{format(props.monthStart, "MMMM")}</h4>
+        <span className="calendar-year-month-count">{props.events.length}</span>
+      </header>
+      <div className="calendar-event-list">
+        {visibleEvents.map((event, index) => (
+          <button
+            type="button"
+            key={`${event.entityType}-${event.id}`}
+            onClick={() => props.onSelect(event)}
+            className={`calendar-event event-${event.color} ${
+              props.selectedEventId === `${event.entityType}:${event.id}` ? "is-selected" : ""
+            }`}
+            data-motion-item={index < MAX_ANIMATED_EVENTS_PER_DAY ? "calendar-event" : undefined}
+            data-motion-skip={index < MAX_ANIMATED_EVENTS_PER_DAY ? undefined : "true"}
+          >
+            <span>{format(parseISO(event.startAt), "d MMM")} · {eventTime(event.startAt)}</span>
+            <strong>{event.title}</strong>
+          </button>
+        ))}
+        {!props.events.length ? <p className="helper-text">No events</p> : null}
+        {remaining > 0 ? <p className="helper-text">+{remaining} more</p> : null}
+      </div>
+    </section>
+  );
+}
+
 export function AdminBookingCalendar(props: Props) {
   const baseDate = parseISO(`${props.date}T00:00:00`);
 
@@ -139,6 +199,28 @@ export function AdminBookingCalendar(props: Props) {
               key={day.toISOString()}
               day={day}
               events={props.events.filter((event) => eventDay(event, day))}
+              selectedEventId={props.selectedEventId}
+              onSelect={props.onSelect}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (props.view === "year") {
+    const months = yearMonths(baseDate);
+    return (
+      <div className="calendar-wrap is-year" data-motion-item="calendar-wrap-year">
+        <header className="calendar-header-row" data-motion-item="calendar-header">
+          <h3>{format(baseDate, "yyyy")}</h3>
+        </header>
+        <div className="calendar-grid is-year">
+          {months.map((monthStart) => (
+            <YearMonthCell
+              key={monthStart.toISOString()}
+              monthStart={monthStart}
+              events={props.events.filter((event) => eventMonth(event, monthStart))}
               selectedEventId={props.selectedEventId}
               onSelect={props.onSelect}
             />
