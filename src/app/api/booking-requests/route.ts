@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { ownerPendingBookingTemplate } from "@/lib/email/templates";
 import { sendEmail } from "@/lib/email/service";
 import { getOwnerEmail } from "@/lib/env";
-import { logEvent } from "@/lib/observability";
+import { logError, logEvent } from "@/lib/observability";
 
 /**
  * Public booking-request submission endpoint.
@@ -36,51 +36,93 @@ export async function POST(request: Request) {
     );
   }
 
-  // Persist first so the admin can review the request even if outbound email delivery is degraded.
-  const created = await prisma.bookingRequest.create({
-    data: {
-      name: parsed.data.name,
-      email: parsed.data.email,
-      phone: parsed.data.phone,
-      address: formatBookingAddress(parsed.data),
-      unitNumber: parsed.data.unitNumber,
-      houseNumber: parsed.data.houseNumber,
-      streetName: parsed.data.streetName,
-      streetType: parsed.data.streetType,
-      suburb: parsed.data.suburb,
-      state: parsed.data.state,
-      postcode: parsed.data.postcode,
-      lessonMode: parsed.data.lessonMode,
-      skillLevel: parsed.data.skillLevel,
-      lessonDuration: parsed.data.lessonDuration,
-      customDurationMinutes: parsed.data.customDurationMinutes ?? null,
-      requestedStartAt: new Date(parsed.data.requestedStartAt),
-      notes: parsed.data.notes,
-      isRecurring: parsed.data.isRecurring,
-      recurrenceEndAt: parsed.data.recurrenceEndAt ? new Date(parsed.data.recurrenceEndAt) : null
+  let createdId: string | null = null;
+
+  try {
+    // Persist first so the admin can review the request even if outbound email delivery is degraded.
+    const created = await prisma.bookingRequest.create({
+      data: {
+        name: parsed.data.name,
+        email: parsed.data.email,
+        phone: parsed.data.phone,
+        address: formatBookingAddress(parsed.data),
+        unitNumber: parsed.data.unitNumber,
+        houseNumber: parsed.data.houseNumber,
+        streetName: parsed.data.streetName,
+        streetType: parsed.data.streetType,
+        suburb: parsed.data.suburb,
+        state: parsed.data.state,
+        postcode: parsed.data.postcode,
+        lessonMode: parsed.data.lessonMode,
+        skillLevel: parsed.data.skillLevel,
+        lessonDuration: parsed.data.lessonDuration,
+        customDurationMinutes: parsed.data.customDurationMinutes ?? null,
+        requestedStartAt: new Date(parsed.data.requestedStartAt),
+        notes: parsed.data.notes,
+        isRecurring: parsed.data.isRecurring,
+        recurrenceEndAt: parsed.data.recurrenceEndAt ? new Date(parsed.data.recurrenceEndAt) : null
+      }
+    });
+    createdId = created.id;
+    logEvent("booking_request.created", { id: created.id, email: created.email, recurring: created.isRecurring });
+
+    const template = ownerPendingBookingTemplate({
+      name: created.name,
+      email: created.email,
+      phone: created.phone,
+      address: created.address,
+      lessonMode: created.lessonMode,
+      skillLevel: created.skillLevel,
+      lessonDuration: created.lessonDuration,
+      customDurationMinutes: created.customDurationMinutes,
+      requestedStartAt: created.requestedStartAt,
+      isRecurring: created.isRecurring,
+      recurrenceEndAt: created.recurrenceEndAt
+    });
+
+    const emailResult = await sendEmail({
+      to: getOwnerEmail(),
+      subject: template.subject,
+      html: template.html
+    });
+
+    // Mirror the contact route behavior: the request was saved, but owner notification delivery
+    // may be delayed if SMTP/Gmail is unavailable.
+    if (emailResult.status !== "sent") {
+      return NextResponse.json(
+        {
+          ok: false,
+          id: created.id,
+          error: "Your booking request was saved, but we could not deliver the owner notification email right now.",
+          deliveryStatus: emailResult.status
+        },
+        { status: 503 }
+      );
     }
-  });
-  logEvent("booking_request.created", { id: created.id, email: created.email, recurring: created.isRecurring });
 
-  const template = ownerPendingBookingTemplate({
-    name: created.name,
-    email: created.email,
-    phone: created.phone,
-    address: created.address,
-    lessonMode: created.lessonMode,
-    skillLevel: created.skillLevel,
-    lessonDuration: created.lessonDuration,
-    customDurationMinutes: created.customDurationMinutes,
-    requestedStartAt: created.requestedStartAt,
-    isRecurring: created.isRecurring,
-    recurrenceEndAt: created.recurrenceEndAt
-  });
+    return NextResponse.json({ ok: true, id: created.id });
+  } catch (error) {
+    logError("booking_request.submit_failed", error, {
+      savedBookingRequestId: createdId ?? undefined
+    });
 
-  await sendEmail({
-    to: getOwnerEmail(),
-    subject: template.subject,
-    html: template.html
-  });
+    if (createdId) {
+      return NextResponse.json(
+        {
+          ok: false,
+          id: createdId,
+          error: "Your booking request was saved, but we could not finish the owner notification right now."
+        },
+        { status: 503 }
+      );
+    }
 
-  return NextResponse.json({ ok: true, id: created.id });
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "We could not process your booking request right now. Please try again."
+      },
+      { status: 500 }
+    );
+  }
 }

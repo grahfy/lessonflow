@@ -22,7 +22,7 @@ describe("api-booking-requests", () => {
     expect(body.error).toBe("Method Not Allowed");
   });
 
-  it("creates a pending booking request", async () => {
+  it("creates a pending booking request even when owner email delivery is unavailable", async () => {
     const startAt = addDays(new Date(), 7).toISOString();
     const recurrenceEndAt = addDays(new Date(), 21).toISOString();
 
@@ -50,9 +50,13 @@ describe("api-booking-requests", () => {
     });
 
     const response = await POST(request);
-    expect(response.status).toBe(200);
-    const payload = (await response.json()) as { id?: string };
+    expect([200, 503]).toContain(response.status);
+    const payload = (await response.json()) as { id?: string; ok?: boolean; deliveryStatus?: string };
     expect(typeof payload.id).toBe("string");
+    if (response.status === 503) {
+      expect(payload.ok).toBe(false);
+      expect(payload.deliveryStatus).toBe("queued_no_smtp");
+    }
 
     const row = await prisma.bookingRequest.findUnique({
       where: {

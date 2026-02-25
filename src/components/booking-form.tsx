@@ -2,8 +2,6 @@
 
 import { FormEvent, useEffect, useState } from "react";
 
-import { useNoticeTween } from "@/components/motion/use-notice-tween";
-
 type BookingState =
   | { status: "idle" }
   | { status: "success"; message: string }
@@ -20,18 +18,21 @@ export function BookingForm() {
   const [loading, setLoading] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
   const [durationType, setDurationType] = useState<"min30" | "min60" | "custom">("min60");
-  const successNoticeRef = useNoticeTween(state.status === "success");
-  const errorNoticeRef = useNoticeTween(state.status === "error");
 
   useEffect(() => {
-    if (state.status !== "success" || !successNoticeRef.current) {
+    if (state.status === "idle") {
       return;
     }
 
-    // Bring the success message into view on long/mobile forms after a successful submission.
-    successNoticeRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    successNoticeRef.current.focus();
-  }, [state.status, successNoticeRef]);
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setState({ status: "idle" });
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [state.status]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -51,7 +52,7 @@ export function BookingForm() {
       durationType === "custom" && customDurationRaw ? Number.parseInt(customDurationRaw, 10) : undefined;
 
     // Build the API payload in the same shape used by `/api/booking-requests`.
-    const payload = {
+    const requestPayload = {
       name: fullName,
       email: String(form.get("email") || ""),
       phone: phoneDigits,
@@ -78,7 +79,7 @@ export function BookingForm() {
       response = await fetch("/api/booking-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(requestPayload)
       });
     } catch {
       setLoading(false);
@@ -89,11 +90,20 @@ export function BookingForm() {
       return;
     }
 
-    setLoading(false);
-    if (!response.ok) {
+    let responsePayload: { id?: string; error?: string; deliveryStatus?: string } | null = null;
+    try {
+      responsePayload = (await response.json()) as { id?: string; error?: string; deliveryStatus?: string };
+    } catch {
+      responsePayload = null;
+    }
+
+    // Saved-request responses can still be returned as 503 when owner notification delivery is
+    // degraded. Treat those as a user-visible success so the requester gets confirmation.
+    if (!response.ok && !(response.status === 503 && typeof responsePayload?.id === "string")) {
+      setLoading(false);
       setState({
         status: "error",
-        message: "Booking could not be submitted. Check required fields and selected date."
+        message: responsePayload?.error || "Booking could not be submitted. Check required fields and selected date."
       });
       return;
     }
@@ -101,6 +111,7 @@ export function BookingForm() {
     event.currentTarget.reset();
     setIsRecurring(false);
     setDurationType("min60");
+    setLoading(false);
     setState({
       status: "success",
       message:
@@ -309,22 +320,39 @@ export function BookingForm() {
         * Required fields
       </p>
 
-      {state.status === "success" ? (
-        <p
-          className="notice success"
-          ref={successNoticeRef}
-          data-motion-item="booking-success-notice"
-          role="status"
-          aria-live="polite"
-          tabIndex={-1}
+      {state.status !== "idle" ? (
+        <div
+          className="dialog-backdrop is-secondary"
+          role="presentation"
+          onClick={() => setState({ status: "idle" })}
         >
-          {state.message}
-        </p>
-      ) : null}
-      {state.status === "error" ? (
-        <p className="notice error" ref={errorNoticeRef} data-motion-item="booking-error-notice" role="alert" aria-live="assertive">
-          {state.message}
-        </p>
+          <div
+            className="dialog-panel dialog-panel-compact"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="book-submit-status-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="dialog-head">
+              <h3 id="book-submit-status-title">
+                {state.status === "success" ? "Booking Request Submitted" : "Booking Request Error"}
+              </h3>
+            </div>
+            <p
+              className={`dialog-status notice ${state.status === "success" ? "success" : "error"}`}
+              data-motion-item={state.status === "success" ? "booking-success-notice" : "booking-error-notice"}
+              role={state.status === "success" ? "status" : "alert"}
+              aria-live={state.status === "success" ? "polite" : "assertive"}
+            >
+              {state.message}
+            </p>
+            <div className="dialog-actions dialog-actions-secondary">
+              <button className="btn btn-primary" type="button" onClick={() => setState({ status: "idle" })}>
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </form>
   );
