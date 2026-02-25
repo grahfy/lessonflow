@@ -10,6 +10,30 @@ type ContactState =
   | { status: "success"; message: string }
   | { status: "error"; message: string };
 
+function getFieldErrorMessage(result: unknown): string | null {
+  if (!result || typeof result !== "object") {
+    return null;
+  }
+
+  const details = (result as { details?: unknown }).details;
+  if (!details || typeof details !== "object") {
+    return null;
+  }
+
+  const fieldErrors = (details as { fieldErrors?: unknown }).fieldErrors;
+  if (!fieldErrors || typeof fieldErrors !== "object") {
+    return null;
+  }
+
+  for (const [field, messages] of Object.entries(fieldErrors)) {
+    if (Array.isArray(messages) && typeof messages[0] === "string") {
+      return `${field}: ${messages[0]}`;
+    }
+  }
+
+  return null;
+}
+
 export function ContactForm() {
   const [state, setState] = useState<ContactState>({ status: "idle" });
   const [loading, setLoading] = useState(false);
@@ -46,10 +70,10 @@ export function ContactForm() {
 
       const result = await response.json().catch(() => null);
       if (!response.ok) {
+        const fieldError = getFieldErrorMessage(result);
+        const apiError = result && typeof result.error === "string" ? result.error : null;
         const message =
-          result && typeof result.error === "string"
-            ? result.error
-            : "We could not send your message. Please check fields and try again.";
+          fieldError ?? apiError ?? "We could not send your message. Please check fields and try again.";
         setState({ status: "error", message });
         return;
       }
@@ -73,22 +97,22 @@ export function ContactForm() {
     <form className="form-grid" onSubmit={onSubmit} data-motion-item="contact-form">
       <div className="field" data-motion-item="contact-name-field">
         <label htmlFor="contact-name">Name</label>
-        <input id="contact-name" name="name" required />
+        <input id="contact-name" name="name" minLength={2} maxLength={120} required />
       </div>
 
       <div className="field" data-motion-item="contact-email-field">
         <label htmlFor="contact-email">Email</label>
-        <input id="contact-email" type="email" name="email" required />
+        <input id="contact-email" type="email" name="email" maxLength={200} required />
       </div>
 
       <div className="field full" data-motion-item="contact-phone-field">
         <label htmlFor="contact-phone">Phone (optional)</label>
-        <input id="contact-phone" name="phone" />
+        <input id="contact-phone" name="phone" maxLength={40} />
       </div>
 
       <div className="field full" data-motion-item="contact-message-field">
         <label htmlFor="contact-message">Message</label>
-        <textarea id="contact-message" name="message" required />
+        <textarea id="contact-message" name="message" minLength={10} maxLength={2000} required />
       </div>
 
       <div className="field full" data-motion-item="contact-captcha-field">
