@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { NextRequest, NextResponse } from "next/server";
 
 import { getSessionCookieName } from "@/lib/admin-auth";
@@ -9,6 +10,42 @@ import {
   saveAdminSettingsConfig,
   type AdminSettingsSaveInput
 } from "@/lib/setup";
+
+const DEFAULT_SYSTEMD_SERVICE_NAME = "melbourne-guitar-school";
+
+/**
+ * Queues a delayed systemd restart so the current HTTP response can complete before the app process
+ * is bounced. The command is best-effort because many deployments require sudoers permission for the
+ * runtime user (for example `www-data`) to restart the service.
+ */
+function queueSystemdServiceRestart(): { queued: boolean; warning?: string } {
+  const serviceName = (process.env.SYSTEMD_SERVICE_NAME || DEFAULT_SYSTEMD_SERVICE_NAME).trim();
+  if (!serviceName) {
+    return { queued: false, warning: "Restart skipped: service name is not configured." };
+  }
+  if (!/^[a-zA-Z0-9_.@-]+$/.test(serviceName)) {
+    return { queued: false, warning: "Restart skipped: service name contains unsupported characters." };
+  }
+
+  try {
+    // Try direct systemctl first (works if the runtime user has permission), then passwordless sudo.
+    // `sleep` gives the API time to flush the JSON response before the app process is restarted.
+    const command = [
+      "sleep 2",
+      `systemctl restart '${serviceName}' >/dev/null 2>&1 || sudo -n systemctl restart '${serviceName}' >/dev/null 2>&1`
+    ].join("; ");
+
+    const child = spawn("bash", ["-lc", command], {
+      detached: true,
+      stdio: "ignore"
+    });
+    child.unref();
+
+    return { queued: true };
+  } catch {
+    return { queued: false, warning: "Restart could not be queued. Restart the service manually." };
+  }
+}
 
 /**
  * Returns admin-editable environment settings plus the current authenticated admin profile.
@@ -87,11 +124,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const restart = queueSystemdServiceRestart();
+
     const response = NextResponse.json({
       ok: true,
-      message: result.message,
+      message: restart.queued
+        ? `${result.message} Restarting the systemd service now.`
+        : `${result.message} ${restart.warning || "Restart the service manually."}`,
       requiresReauth: result.requiresReauth,
-      nextPath: result.requiresReauth ? "/admin/login" : undefined
+      nextPath: result.requiresReauth ? "/admin/login" : undefined,
+      restartQueued: restart.queued
     });
 
     if (result.requiresReauth) {
