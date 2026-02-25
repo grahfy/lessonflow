@@ -626,6 +626,38 @@ cleanup_old_releases() {
     fi
 }
 
+# Restarts the host cron scheduler (cron/crond) when available so updated
+# `current/deploy/cron.sh` paths and env-linked behavior are picked up
+# immediately after deployment. This is best-effort and does not fail deploys on
+# hosts that use a different scheduler or have cron disabled.
+restart_cron_scheduler_if_present() {
+    if ! command -v systemctl >/dev/null 2>&1; then
+        log_info "systemctl not available; skipping cron scheduler restart"
+        return 0
+    fi
+
+    local cron_service=""
+    if systemctl list-unit-files --type=service 2>/dev/null | grep -q '^cron\.service'; then
+        cron_service="cron"
+    elif systemctl list-unit-files --type=service 2>/dev/null | grep -q '^crond\.service'; then
+        cron_service="crond"
+    elif systemctl status cron >/dev/null 2>&1; then
+        cron_service="cron"
+    elif systemctl status crond >/dev/null 2>&1; then
+        cron_service="crond"
+    fi
+
+    if [[ -z "${cron_service}" ]]; then
+        log_info "Cron scheduler service not detected (cron/crond); skipping restart"
+        return 0
+    fi
+
+    log_info "Restarting cron scheduler (${cron_service})..."
+    if ! run_step "Restarting cron scheduler (${cron_service})" systemctl restart "${cron_service}"; then
+        log_warn "Cron scheduler restart failed; continuing deployment"
+    fi
+}
+
 cleanup_old_temp_files() {
     local removed=0
     local root=""
@@ -1407,6 +1439,11 @@ fi
 # worker state picks up the current upstream + headers/rate-limit config.
 log_info "Restarting nginx..."
 run_step "Restarting nginx" systemctl restart nginx
+
+# Restart cron after the release symlink update so jobs that call
+# /var/www/.../current/deploy/cron.sh pick up the newest script/env path
+# behavior immediately on systems where cron service reload/restart is used.
+restart_cron_scheduler_if_present
 
 # Cleanup old releases
 log_info "Cleaning up old releases..."
