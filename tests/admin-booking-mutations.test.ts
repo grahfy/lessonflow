@@ -77,7 +77,7 @@ describe("admin-booking-mutations", () => {
     expect(updated.endAt.toISOString()).toBe("2026-06-01T11:30:00.000Z");
   });
 
-  it("edits and rejects pending requests via cancel mapping", async () => {
+  it("edits and cancels pending requests via cancel action", async () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);
 
@@ -120,6 +120,6 @@ describe("admin-booking-mutations", () => {
     });
     expect(updated.phone).toBe("0411-111-111");
     expect(updated.requestedStartAt.toISOString()).toBe("2026-06-04T12:00:00.000Z");
-    expect(updated.status).toBe("rejected");
+    expect(updated.status).toBe("cancelled");
   });
 });

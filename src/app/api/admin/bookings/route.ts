@@ -117,6 +117,12 @@ export async function GET(request: NextRequest) {
             updatedAt: {
               gte: recencyCutoff
             }
+          },
+          {
+            status: "cancelled",
+            updatedAt: {
+              gte: recencyCutoff
+            }
           }
         ]
       },

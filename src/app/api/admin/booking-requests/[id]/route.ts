@@ -16,6 +16,7 @@ import {
 import { sendCustomerBookingStatusEmail } from "@/lib/booking-events";
 import { customerSnapshotFromInput, normalizeEmail, normalizePhone } from "@/lib/customer-match";
 import { requireAdminFromRequest } from "@/lib/admin-route";
+import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
 import { getStudentPortalLoginUrl } from "@/lib/env";
 import { ensurePortalCredentialForCustomer } from "@/lib/student-portal/credentials";
@@ -127,257 +128,266 @@ async function resolveCustomerIdForApproval(input: {
 }
 
 export async function PATCH(request: NextRequest, { params }: Params) {
-  const admin = await requireAdminFromRequest(request);
-  if (!admin) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const body = await request.json().catch(() => null);
-  const action = String(body?.action || "");
-  const { id } = await params;
-
-  const bookingRequest = await prisma.bookingRequest.findUnique({
-    where: { id }
-  });
-
-  if (!bookingRequest) {
-    return NextResponse.json({ error: "Request not found." }, { status: 404 });
-  }
-
-  if (action === "approve") {
-    if (bookingRequest.status !== "pending") {
-      return NextResponse.json({ error: "Only pending requests can be approved." }, { status: 400 });
+  try {
+    const admin = await requireAdminFromRequest(request);
+    if (!admin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const approvalResult = await prisma.$transaction(async (tx) => {
-      const customerId = await resolveCustomerIdForApproval({
-        tx,
-        bookingRequest
-      });
-      if (!customerId) {
-        throw new Error("Unable to resolve customer before approval.");
+    const body = await request.json().catch(() => null);
+    const action = String(body?.action || "");
+    const { id } = await params;
+
+    const bookingRequest = await prisma.bookingRequest.findUnique({
+      where: { id }
+    });
+
+    if (!bookingRequest) {
+      return NextResponse.json({ error: "Request not found." }, { status: 404 });
+    }
+
+    if (action === "approve") {
+      if (bookingRequest.status !== "pending") {
+        return NextResponse.json({ error: "Only pending requests can be approved." }, { status: 400 });
       }
 
-      if (bookingRequest.isRecurring && bookingRequest.recurrenceEndAt) {
-        const series = await tx.bookingSeries.create({
+      const approvalResult = await prisma.$transaction(async (tx) => {
+        const customerId = await resolveCustomerIdForApproval({
+          tx,
+          bookingRequest
+        });
+        if (!customerId) {
+          throw new Error("Unable to resolve customer before approval.");
+        }
+
+        if (bookingRequest.isRecurring && bookingRequest.recurrenceEndAt) {
+          const series = await tx.bookingSeries.create({
+            data: {
+              name: bookingRequest.name,
+              email: bookingRequest.email,
+              phone: bookingRequest.phone,
+              address: bookingRequest.address,
+              unitNumber: bookingRequest.unitNumber,
+              houseNumber: bookingRequest.houseNumber,
+              streetName: bookingRequest.streetName,
+              streetType: bookingRequest.streetType,
+              suburb: bookingRequest.suburb,
+              state: bookingRequest.state,
+              postcode: bookingRequest.postcode,
+              lessonMode: bookingRequest.lessonMode,
+              skillLevel: bookingRequest.skillLevel,
+              lessonDuration: bookingRequest.lessonDuration,
+              customDurationMinutes: bookingRequest.customDurationMinutes,
+              dayOfWeek: bookingRequest.requestedStartAt.getDay(),
+              startTimeLocal: localTime(bookingRequest.requestedStartAt),
+              startDate: bookingRequest.requestedStartAt,
+              recurrenceEndAt: bookingRequest.recurrenceEndAt,
+              timezone: "Australia/Melbourne",
+              customerId
+            }
+          });
+
+          const starts = generateRecurringStartDates({
+            startAt: bookingRequest.requestedStartAt,
+            recurrenceEndAt: bookingRequest.recurrenceEndAt
+          });
+
+          await tx.booking.createMany({
+            data: starts.map((startAt) => ({
+              name: bookingRequest.name,
+              email: bookingRequest.email,
+              phone: bookingRequest.phone,
+              address: bookingRequest.address,
+              unitNumber: bookingRequest.unitNumber,
+              houseNumber: bookingRequest.houseNumber,
+              streetName: bookingRequest.streetName,
+              streetType: bookingRequest.streetType,
+              suburb: bookingRequest.suburb,
+              state: bookingRequest.state,
+              postcode: bookingRequest.postcode,
+              lessonMode: bookingRequest.lessonMode,
+              skillLevel: bookingRequest.skillLevel,
+              lessonDuration: bookingRequest.lessonDuration,
+              customDurationMinutes: bookingRequest.customDurationMinutes,
+              startAt,
+              endAt: getBookingEnd(startAt, bookingRequest.lessonDuration, bookingRequest.customDurationMinutes),
+              timezone: "Australia/Melbourne",
+              requestId: bookingRequest.id,
+              seriesId: series.id,
+              customerId,
+              modifiedById: admin.id
+            }))
+          });
+        } else {
+          await tx.booking.create({
+            data: {
+              name: bookingRequest.name,
+              email: bookingRequest.email,
+              phone: bookingRequest.phone,
+              address: bookingRequest.address,
+              unitNumber: bookingRequest.unitNumber,
+              houseNumber: bookingRequest.houseNumber,
+              streetName: bookingRequest.streetName,
+              streetType: bookingRequest.streetType,
+              suburb: bookingRequest.suburb,
+              state: bookingRequest.state,
+              postcode: bookingRequest.postcode,
+              lessonMode: bookingRequest.lessonMode,
+              skillLevel: bookingRequest.skillLevel,
+              lessonDuration: bookingRequest.lessonDuration,
+              customDurationMinutes: bookingRequest.customDurationMinutes,
+              startAt: bookingRequest.requestedStartAt,
+              endAt: getBookingEnd(
+                bookingRequest.requestedStartAt,
+                bookingRequest.lessonDuration,
+                bookingRequest.customDurationMinutes
+              ),
+              timezone: "Australia/Melbourne",
+              requestId: bookingRequest.id,
+              customerId,
+              modifiedById: admin.id
+            }
+          });
+        }
+
+        const updated = await tx.bookingRequest.update({
+          where: { id },
           data: {
-            name: bookingRequest.name,
-            email: bookingRequest.email,
-            phone: bookingRequest.phone,
-            address: bookingRequest.address,
-            unitNumber: bookingRequest.unitNumber,
-            houseNumber: bookingRequest.houseNumber,
-            streetName: bookingRequest.streetName,
-            streetType: bookingRequest.streetType,
-            suburb: bookingRequest.suburb,
-            state: bookingRequest.state,
-            postcode: bookingRequest.postcode,
-            lessonMode: bookingRequest.lessonMode,
-            skillLevel: bookingRequest.skillLevel,
-            lessonDuration: bookingRequest.lessonDuration,
-            customDurationMinutes: bookingRequest.customDurationMinutes,
-            dayOfWeek: bookingRequest.requestedStartAt.getDay(),
-            startTimeLocal: localTime(bookingRequest.requestedStartAt),
-            startDate: bookingRequest.requestedStartAt,
-            recurrenceEndAt: bookingRequest.recurrenceEndAt,
-            timezone: "Australia/Melbourne",
+            status: "approved",
+            approvedById: admin.id,
             customerId
           }
         });
 
-        const starts = generateRecurringStartDates({
-          startAt: bookingRequest.requestedStartAt,
-          recurrenceEndAt: bookingRequest.recurrenceEndAt
+        const credentialResult = await ensurePortalCredentialForCustomer({
+          customerId,
+          actorId: admin.id,
+          tx,
+          details: `Portal credential ensured during booking request approval (${id}).`
         });
 
-        await tx.booking.createMany({
-          data: starts.map((startAt) => ({
-            name: bookingRequest.name,
-            email: bookingRequest.email,
-            phone: bookingRequest.phone,
-            address: bookingRequest.address,
-            unitNumber: bookingRequest.unitNumber,
-            houseNumber: bookingRequest.houseNumber,
-            streetName: bookingRequest.streetName,
-            streetType: bookingRequest.streetType,
-            suburb: bookingRequest.suburb,
-            state: bookingRequest.state,
-            postcode: bookingRequest.postcode,
-            lessonMode: bookingRequest.lessonMode,
-            skillLevel: bookingRequest.skillLevel,
-            lessonDuration: bookingRequest.lessonDuration,
-            customDurationMinutes: bookingRequest.customDurationMinutes,
-            startAt,
-            endAt: getBookingEnd(startAt, bookingRequest.lessonDuration, bookingRequest.customDurationMinutes),
-            timezone: "Australia/Melbourne",
-            requestId: bookingRequest.id,
-            seriesId: series.id,
-            customerId,
-            modifiedById: admin.id
-          }))
-        });
-      } else {
-        await tx.booking.create({
-          data: {
-            name: bookingRequest.name,
-            email: bookingRequest.email,
-            phone: bookingRequest.phone,
-            address: bookingRequest.address,
-            unitNumber: bookingRequest.unitNumber,
-            houseNumber: bookingRequest.houseNumber,
-            streetName: bookingRequest.streetName,
-            streetType: bookingRequest.streetType,
-            suburb: bookingRequest.suburb,
-            state: bookingRequest.state,
-            postcode: bookingRequest.postcode,
-            lessonMode: bookingRequest.lessonMode,
-            skillLevel: bookingRequest.skillLevel,
-            lessonDuration: bookingRequest.lessonDuration,
-            customDurationMinutes: bookingRequest.customDurationMinutes,
-            startAt: bookingRequest.requestedStartAt,
-            endAt: getBookingEnd(
-              bookingRequest.requestedStartAt,
-              bookingRequest.lessonDuration,
-              bookingRequest.customDurationMinutes
-            ),
-            timezone: "Australia/Melbourne",
-            requestId: bookingRequest.id,
-            customerId,
-            modifiedById: admin.id
-          }
-        });
+        return {
+          updated,
+          generatedPassword: credentialResult.generatedPassword
+        };
+      });
+
+      await sendCustomerBookingStatusEmail({
+        email: approvalResult.updated.email,
+        name: approvalResult.updated.name,
+        status: approvalResult.updated.status,
+        when: approvalResult.updated.requestedStartAt,
+        portalAccess: approvalResult.generatedPassword
+          ? {
+              loginUrl: getStudentPortalLoginUrl(),
+              generatedPassword: approvalResult.generatedPassword
+            }
+          : null
+      });
+
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "reject") {
+      if (bookingRequest.status !== "pending") {
+        return NextResponse.json({ error: "Only pending requests can be rejected." }, { status: 400 });
       }
 
-      const updated = await tx.bookingRequest.update({
+      const updated = await prisma.bookingRequest.update({
         where: { id },
         data: {
-          status: "approved",
-          approvedById: admin.id,
-          customerId
+          status: "rejected",
+          approvedById: admin.id
         }
       });
 
-      const credentialResult = await ensurePortalCredentialForCustomer({
-        customerId,
-        actorId: admin.id,
-        tx,
-        details: `Portal credential ensured during booking request approval (${id}).`
+      await sendCustomerBookingStatusEmail({
+        email: updated.email,
+        name: updated.name,
+        status: "cancelled",
+        when: updated.requestedStartAt
       });
 
-      return {
-        updated,
-        generatedPassword: credentialResult.generatedPassword
-      };
-    });
+      return NextResponse.json({ ok: true });
+    }
 
-    await sendCustomerBookingStatusEmail({
-      email: approvalResult.updated.email,
-      name: approvalResult.updated.name,
-      status: approvalResult.updated.status,
-      when: approvalResult.updated.requestedStartAt,
-      portalAccess: approvalResult.generatedPassword
-        ? {
-            loginUrl: getStudentPortalLoginUrl(),
-            generatedPassword: approvalResult.generatedPassword
-          }
-        : null
-    });
-
-    return NextResponse.json({ ok: true });
-  }
-
-  if (action === "reject") {
-    const updated = await prisma.bookingRequest.update({
-      where: { id },
-      data: {
-        status: "rejected",
-        approvedById: admin.id
+    if (action === "cancel") {
+      if (bookingRequest.status !== "pending") {
+        return NextResponse.json({ error: "Only pending requests can be cancelled." }, { status: 400 });
       }
-    });
 
-    await sendCustomerBookingStatusEmail({
-      email: updated.email,
-      name: updated.name,
-      status: "cancelled",
-      when: updated.requestedStartAt
-    });
+      const updated = await prisma.bookingRequest.update({
+        where: { id },
+        data: {
+          status: "cancelled",
+          approvedById: admin.id
+        }
+      });
 
-    return NextResponse.json({ ok: true });
-  }
+      await sendCustomerBookingStatusEmail({
+        email: updated.email,
+        name: updated.name,
+        status: "cancelled",
+        when: updated.requestedStartAt
+      });
 
-  if (action === "cancel") {
-    const updated = await prisma.bookingRequest.update({
-      where: { id },
-      data: {
-        status: "rejected",
-        approvedById: admin.id
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "move") {
+      if (bookingRequest.status !== "pending") {
+        return NextResponse.json({ error: "Only pending requests can be moved." }, { status: 400 });
       }
-    });
 
-    await sendCustomerBookingStatusEmail({
-      email: updated.email,
-      name: updated.name,
-      status: "cancelled",
-      when: updated.requestedStartAt
-    });
-
-    return NextResponse.json({ ok: true });
-  }
-
-  if (action === "move") {
-    if (bookingRequest.status !== "pending") {
-      return NextResponse.json({ error: "Only pending requests can be moved." }, { status: 400 });
-    }
-
-    const newStart = new Date(String(body?.newStartAt || ""));
-    if (Number.isNaN(newStart.getTime())) {
-      return NextResponse.json({ error: "Invalid new start date." }, { status: 400 });
-    }
-
-    await prisma.bookingRequest.update({
-      where: { id },
-      data: {
-        requestedStartAt: newStart
+      const newStart = new Date(String(body?.newStartAt || ""));
+      if (Number.isNaN(newStart.getTime())) {
+        return NextResponse.json({ error: "Invalid new start date." }, { status: 400 });
       }
-    });
 
-    return NextResponse.json({ ok: true });
-  }
+      await prisma.bookingRequest.update({
+        where: { id },
+        data: {
+          requestedStartAt: newStart
+        }
+      });
 
-  if (action === "edit") {
-    const parsed = requestEditSchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid edit payload.", details: parsed.error.flatten() }, { status: 400 });
+      return NextResponse.json({ ok: true });
     }
 
-    if (bookingRequest.status !== "pending") {
-      return NextResponse.json({ error: "Only pending requests can be edited." }, { status: 400 });
-    }
+    if (action === "edit") {
+      const parsed = requestEditSchema.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json({ error: "Invalid edit payload.", details: parsed.error.flatten() }, { status: 400 });
+      }
 
-    const nextUnitNumber =
-      parsed.data.unitNumber === undefined
-        ? bookingRequest.unitNumber
-        : parsed.data.unitNumber && parsed.data.unitNumber.trim()
-          ? parsed.data.unitNumber.trim()
-          : null;
-    const nextName = parsed.data.name ?? bookingRequest.name;
-    const nextEmail = parsed.data.email ?? bookingRequest.email;
-    const nextPhone = parsed.data.phone ?? bookingRequest.phone;
-    const nextHouseNumber = parsed.data.houseNumber ?? bookingRequest.houseNumber;
-    const nextStreetName = parsed.data.streetName ?? bookingRequest.streetName;
-    const nextStreetType = parsed.data.streetType ?? bookingRequest.streetType;
-    const nextSuburb = parsed.data.suburb ?? bookingRequest.suburb;
-    const nextState = parsed.data.state ?? bookingRequest.state;
-    const nextPostcode = parsed.data.postcode ?? bookingRequest.postcode;
-    const nextAddress = formatBookingAddress({
-      unitNumber: nextUnitNumber ?? undefined,
-      houseNumber: nextHouseNumber,
-      streetName: nextStreetName,
-      streetType: nextStreetType,
-      suburb: nextSuburb,
-      state: nextState,
-      postcode: nextPostcode
-    });
+      if (bookingRequest.status !== "pending") {
+        return NextResponse.json({ error: "Only pending requests can be edited." }, { status: 400 });
+      }
+
+      const nextUnitNumber =
+        parsed.data.unitNumber === undefined
+          ? bookingRequest.unitNumber
+          : parsed.data.unitNumber && parsed.data.unitNumber.trim()
+            ? parsed.data.unitNumber.trim()
+            : null;
+      const nextName = parsed.data.name ?? bookingRequest.name;
+      const nextEmail = parsed.data.email ?? bookingRequest.email;
+      const nextPhone = parsed.data.phone ?? bookingRequest.phone;
+      const nextHouseNumber = parsed.data.houseNumber ?? bookingRequest.houseNumber;
+      const nextStreetName = parsed.data.streetName ?? bookingRequest.streetName;
+      const nextStreetType = parsed.data.streetType ?? bookingRequest.streetType;
+      const nextSuburb = parsed.data.suburb ?? bookingRequest.suburb;
+      const nextState = parsed.data.state ?? bookingRequest.state;
+      const nextPostcode = parsed.data.postcode ?? bookingRequest.postcode;
+      const nextAddress = formatBookingAddress({
+        unitNumber: nextUnitNumber ?? undefined,
+        houseNumber: nextHouseNumber,
+        streetName: nextStreetName,
+        streetType: nextStreetType,
+        suburb: nextSuburb,
+        state: nextState,
+        postcode: nextPostcode
+      });
     const hasMandatory =
       !!nextName.trim() &&
       !!nextEmail.trim() &&
@@ -398,46 +408,49 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       );
     }
 
-    await prisma.bookingRequest.update({
-      where: { id },
-      data: {
-        name: nextName,
-        email: nextEmail,
-        phone: nextPhone,
-        address: nextAddress,
-        unitNumber: nextUnitNumber,
-        houseNumber: nextHouseNumber,
-        streetName: nextStreetName,
-        streetType: nextStreetType,
-        suburb: nextSuburb,
-        state: nextState,
-        postcode: nextPostcode,
-        lessonMode: parsed.data.lessonMode ?? bookingRequest.lessonMode,
-        skillLevel: parsed.data.skillLevel ?? bookingRequest.skillLevel,
-        lessonDuration: parsed.data.lessonDuration ?? bookingRequest.lessonDuration,
-        customDurationMinutes:
-          parsed.data.customDurationMinutes === undefined
-            ? bookingRequest.customDurationMinutes
-            : parsed.data.customDurationMinutes,
-        requestedStartAt: parsed.data.requestedStartAt ? new Date(parsed.data.requestedStartAt) : bookingRequest.requestedStartAt,
-        notes:
-          parsed.data.notes === undefined
-            ? bookingRequest.notes
-            : parsed.data.notes === null
-              ? null
-              : parsed.data.notes,
-        isRecurring: parsed.data.isRecurring ?? bookingRequest.isRecurring,
-        recurrenceEndAt:
-          parsed.data.recurrenceEndAt === undefined
-            ? bookingRequest.recurrenceEndAt
-            : parsed.data.recurrenceEndAt === null
-              ? null
-              : new Date(parsed.data.recurrenceEndAt)
-      }
-    });
+      await prisma.bookingRequest.update({
+        where: { id },
+        data: {
+          name: nextName,
+          email: nextEmail,
+          phone: nextPhone,
+          address: nextAddress,
+          unitNumber: nextUnitNumber,
+          houseNumber: nextHouseNumber,
+          streetName: nextStreetName,
+          streetType: nextStreetType,
+          suburb: nextSuburb,
+          state: nextState,
+          postcode: nextPostcode,
+          lessonMode: parsed.data.lessonMode ?? bookingRequest.lessonMode,
+          skillLevel: parsed.data.skillLevel ?? bookingRequest.skillLevel,
+          lessonDuration: parsed.data.lessonDuration ?? bookingRequest.lessonDuration,
+          customDurationMinutes:
+            parsed.data.customDurationMinutes === undefined
+              ? bookingRequest.customDurationMinutes
+              : parsed.data.customDurationMinutes,
+          requestedStartAt: parsed.data.requestedStartAt ? new Date(parsed.data.requestedStartAt) : bookingRequest.requestedStartAt,
+          notes:
+            parsed.data.notes === undefined
+              ? bookingRequest.notes
+              : parsed.data.notes === null
+                ? null
+                : parsed.data.notes,
+          isRecurring: parsed.data.isRecurring ?? bookingRequest.isRecurring,
+          recurrenceEndAt:
+            parsed.data.recurrenceEndAt === undefined
+              ? bookingRequest.recurrenceEndAt
+              : parsed.data.recurrenceEndAt === null
+                ? null
+                : new Date(parsed.data.recurrenceEndAt)
+        }
+      });
 
-    return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true });
+    }
+
+    return NextResponse.json({ error: "Unsupported action." }, { status: 400 });
+  } catch (error) {
+    return jsonUnexpectedError(error, "Unable to update booking request.");
   }
-
-  return NextResponse.json({ error: "Unsupported action." }, { status: 400 });
 }
