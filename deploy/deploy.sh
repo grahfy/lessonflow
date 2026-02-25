@@ -38,7 +38,7 @@ DEPLOY_DIR="/var/www/${APP_NAME}"
 RELEASES_DIR="${DEPLOY_DIR}/releases"
 SHARED_DIR="${DEPLOY_DIR}/shared"
 CURRENT_LINK="${DEPLOY_DIR}/current"
-KEEP_RELEASES=5
+KEEP_RELEASES=2
 DEFAULT_BUILD_NODE_HEAP_MB="${DEFAULT_BUILD_NODE_HEAP_MB:-6144}"
 LOW_RAM_1GB_AUTO_HEAP_MB="${LOW_RAM_1GB_AUTO_HEAP_MB:-3072}"
 LOW_RAM_2GB_AUTO_HEAP_MB="${LOW_RAM_2GB_AUTO_HEAP_MB:-2048}"
@@ -1089,11 +1089,18 @@ chmod -R 755 "${NEW_RELEASE_DIR}"
 
 # Ensure systemd service is installed
 SERVICE_FILE="/etc/systemd/system/${APP_NAME}.service"
+SERVICE_SOURCE="${NEW_RELEASE_DIR}/deploy/${APP_NAME}.service"
 if [[ ! -f "${SERVICE_FILE}" ]]; then
     log_info "Installing systemd service..."
-    cp "${NEW_RELEASE_DIR}/deploy/${APP_NAME}.service" "${SERVICE_FILE}"
+    cp "${SERVICE_SOURCE}" "${SERVICE_FILE}"
     systemctl daemon-reload
     systemctl enable ${APP_NAME}
+elif ! cmp -s "${SERVICE_SOURCE}" "${SERVICE_FILE}"; then
+    log_info "Updating systemd service..."
+    cp "${SERVICE_SOURCE}" "${SERVICE_FILE}"
+    systemctl daemon-reload
+else
+    log_info "Systemd service already up to date"
 fi
 
 # Ensure nginx config is installed (HTTP-only initially, certbot will upgrade to HTTPS)

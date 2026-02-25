@@ -32,7 +32,8 @@ export default async function StudentLoginPage() {
       title="Access your lessons and materials."
       lead="Use your full name, postcode, and generated password from your approval email."
       leadJustified
-      hideVisual
+      visualLabel="Student portal materials"
+      visualClassName="student-login-hero"
     >
       <StudentLoginForm />
     </PanelLayout>

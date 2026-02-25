@@ -8,6 +8,8 @@ Description=Melbourne Guitar School Next.js Application
 Documentation=https://github.com/your-org/melbourne-guitar-school-website
 After=network.target mysql.service
 Wants=mysql.service
+StartLimitIntervalSec=300
+StartLimitBurst=3
 
 [Service]
 Type=simple
@@ -24,7 +26,7 @@ Environment=PORT=3000
 ExecStart=/usr/bin/node /var/www/melbourne-guitar-school/current/.next/standalone/server.js
 
 # Restart behavior
-Restart=always
+Restart=on-failure
 RestartSec=10
 
 # Logging
