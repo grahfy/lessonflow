@@ -17,7 +17,7 @@ export default async function AdminLoginPage() {
           <p className="kicker" data-motion-item="admin-login-kicker">
             Admin
           </p>
-          <h1 data-motion-item="admin-login-title">Owner Booking Console Login</h1>
+          <h1 data-motion-item="admin-login-title">LessonFlow Admin Login</h1>
           <p className="lead copy-justify" data-motion-item="admin-login-lead">
             Sign in to approve pending bookings, manage recurring schedules, and review day/week/month calendar views.
           </p>

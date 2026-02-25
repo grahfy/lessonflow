@@ -3,16 +3,17 @@ import { redirect } from "next/navigation";
 
 import { PanelLayout } from "@/components/panel-layout";
 import { StudentLoginForm } from "@/components/student-login-form";
+import { STUDENT_PORTAL_PLATFORM_NAME } from "@/lib/branding";
 import { getCurrentStudent } from "@/lib/student-portal/session";
 
 export const metadata: Metadata = {
-  title: "Student Portal Login",
+  title: `${STUDENT_PORTAL_PLATFORM_NAME} Login`,
   description:
-    "Access your Melbourne Guitar School student portal to view upcoming lessons, past appointments, and download lesson materials.",
+    "Access your LessonFlow student portal to view upcoming lessons, past appointments, and download lesson materials.",
   openGraph: {
-    title: "Student Portal Login",
+    title: `${STUDENT_PORTAL_PLATFORM_NAME} Login`,
     description:
-      "Access your Melbourne Guitar School student portal to view upcoming lessons, past appointments, and download lesson materials.",
+      "Access your LessonFlow student portal to view upcoming lessons, past appointments, and download lesson materials.",
   },
   robots: {
     index: true,

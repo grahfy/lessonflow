@@ -20,7 +20,7 @@ export default async function SetupPage() {
           <p className="kicker" data-motion-item="setup-kicker">
             Setup
           </p>
-          <h1 data-motion-item="setup-title">Production Setup Wizard</h1>
+          <h1 data-motion-item="setup-title">LessonFlow Setup Wizard</h1>
           <p className="lead copy-justify" data-motion-item="setup-lead">
             Complete one-time initialization by passing environment checks and creating the first admin account.
           </p>
