@@ -268,6 +268,9 @@ export function AdminSettingsClient() {
           <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/invoices")}>
             Invoices
           </button>
+          <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/manual")}>
+            Manual
+          </button>
           <AdminDeployUpdatesButton />
           <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/reports")}>
             Reports

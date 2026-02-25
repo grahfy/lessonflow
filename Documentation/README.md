@@ -60,6 +60,41 @@ For technical operators who manage automation and support checks:
 ## Screenshot Assets
 - Folder: `Documentation/assets/`
 - Capture plan and naming conventions: `Documentation/assets/README.md`
+- In-app admin manual thumbnails (served by the app): `public/documentation/screenshots/`
+
+## In-App Admin Manual
+- Logged-in admins can open `/admin/manual` from the new `Manual` button in the admin header.
+- The in-app manual provides:
+  - quick links to Bookings / Invoices / Reports / Settings
+  - a condensed deploy/update runbook
+  - operator screenshot thumbnails for common workflows
+- The repo markdown guides remain the source of truth for full written procedures.
+
+## Screenshot Gallery (Key Screens)
+
+### Admin Login
+![Admin Login](assets/admin-login-page.png)
+
+### Bookings Calendar
+![Bookings Calendar Week View](assets/booking-calendar-week-view.png)
+
+### Booking Detail Actions
+![Booking Detail Dialog Notes and Actions](assets/booking-detail-dialog-notes-and-actions.png)
+
+### Invoice Console
+![Invoice Console List and Filters](assets/invoice-console-list-and-filters.png)
+
+### Invoice Create Dialog
+![Invoice Create Dialog](assets/invoice-create-dialog.png)
+
+### Invoice Send / PDF Actions
+![Invoice Detail Send and Download PDF](assets/invoice-detail-send-and-download-pdf.png)
+
+## Deploy Runbook
+- Droplet production operations runbook:
+  - `Documentation/digitalocean-admin-operations.md`
+- Deploy/update script reference (TUI options, managed cron, self-update behavior):
+  - `deploy/README.md`
 
 ## Update and Versioning
 - Documentation change history: `Documentation/CHANGELOG.md`

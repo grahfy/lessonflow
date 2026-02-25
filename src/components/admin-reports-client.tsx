@@ -416,6 +416,7 @@ export function AdminReportsClient() {
         <div className="booking-row">
           <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/bookings")}>Bookings</button>
           <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/invoices")}>Invoices</button>
+          <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/manual")}>Manual</button>
           <AdminDeployUpdatesButton />
           <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/settings")}>Settings</button>
           <button className="btn btn-secondary" type="button" onClick={() => void logout()}>Sign out</button>

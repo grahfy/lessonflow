@@ -1678,6 +1678,9 @@ export function AdminBookingsClient() {
           <button className="btn btn-secondary" type="button" data-motion-item="legend-action-settings" onClick={() => router.push("/admin/settings")}>
             Settings
           </button>
+          <button className="btn btn-secondary" type="button" data-motion-item="legend-action-manual" onClick={() => router.push("/admin/manual")}>
+            Manual
+          </button>
           <AdminDeployUpdatesButton />
           <button className="btn btn-secondary" type="button" data-motion-item="legend-action-reports" onClick={() => router.push("/admin/reports")}>
             Reports

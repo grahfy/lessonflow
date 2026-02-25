@@ -7,6 +7,15 @@ This runbook covers production operation of the admin system on a DigitalOcean D
 - MySQL for the application database
 - Local persistent filesystem storage for learning materials
 
+## Admin-facing documentation location
+
+Logged-in admins can open `/admin/manual` from the `Manual` button in the admin header to view:
+- operator quick links
+- deploy/update quick runbook
+- screenshot thumbnails for common workflows
+
+The full documentation set is still maintained in the repository `Documentation/` folder.
+
 ## 1. Process Management (`systemd`)
 
 Example unit file (`/etc/systemd/system/mgs-web.service`):
@@ -70,6 +79,12 @@ Notes:
 The app exposes HTTP endpoints protected by `x-cron-secret`:
 - `POST /api/jobs/daily-bookings-digest`
 - `POST /api/jobs/invoice-reminders`
+- `POST /api/jobs/admin-reports/daily`
+- `POST /api/jobs/admin-reports/weekly`
+- `POST /api/jobs/admin-reports/monthly`
+- `POST /api/jobs/admin-reports/yearly`
+
+If you deploy with this repo's `deploy/deploy.sh` or `deploy/update.sh`, a managed root crontab block is now installed/updated automatically (unless `--skip-cron` is used).
 
 ### Option A: `cron`
 
@@ -128,6 +143,7 @@ sudo systemctl list-timers | grep mgs-
 ```
 
 Repeat for daily bookings digest at `20:00`.
+Repeat for weekly/monthly/yearly admin reports if managing timers manually.
 
 ## 4. Restart After Setup/Env Changes
 
@@ -140,6 +156,37 @@ sudo systemctl status mgs-web
 ```
 
 Then re-run setup checks and verify admin login.
+
+## 4b. Deploy / Update Runbook (Recommended Daily Use)
+
+Normal production release:
+
+```bash
+cd /var/www/melbourne-guitar-school/current
+sudo ./deploy/update.sh --branch main
+```
+
+What the script now does:
+- shows a TUI menu (Dependencies, Cron jobs sync, DB mode, SSL options)
+- runs early `git pull` checks
+- if the deploy script itself changed, shows pulled commit details, waits for a keypress, and returns to the main menu
+- deploys a new release, runs migrations (unless skipped), syncs Nginx config, and restarts the app service
+- installs/updates the managed cron block by default (unless `--skip-cron`)
+
+Common fast-path variants:
+
+```bash
+# Skip npm install and DB migrations when code-only changes are known-safe
+sudo ./deploy/update.sh --branch main --skip-deps --skip-migrate
+
+# Preserve a temporary manual crontab while still deploying
+sudo ./deploy/update.sh --branch main --skip-cron
+```
+
+After each release:
+- verify `/admin/login`, `/admin/bookings`, `/admin/invoices`, `/admin/reports`
+- open `Latest Updates` in admin to confirm the expected commits were deployed
+- review logs if any API action reports HTML/proxy errors
 
 ## 5. Learning Materials Local Storage (Persistent Filesystem)
 
@@ -167,7 +214,9 @@ LEARNING_MATERIALS_LOCAL_ROOT="/srv/mgs-data/learning-materials"
 
 After deploy/restart:
 1. Open `/admin/login` and confirm login works over HTTPS.
-2. Load `/admin/bookings` and `/admin/invoices`.
-3. Trigger each scheduled job endpoint manually with `curl` + `x-cron-secret`.
-4. Confirm learning-material upload/download/delete works if enabled.
-5. Review service logs (`journalctl`) and Nginx logs for errors.
+2. Confirm the admin `Latest Updates` popup/button loads the latest deployed commit notes (shown once per newly deployed commit).
+3. Load `/admin/bookings` and `/admin/invoices`.
+4. Load `/admin/reports` and confirm daily/weekly/monthly/yearly charts render.
+5. Trigger each scheduled job endpoint manually with `curl` + `x-cron-secret`.
+6. Confirm learning-material upload/preview/download/delete works if enabled.
+7. Review service logs (`journalctl`) and Nginx logs for errors.

@@ -893,6 +893,7 @@ export function AdminInvoicesClient() {
         <h1 className="admin-console-title">Invoice Console</h1>
         <div className="booking-row">
           <button className="btn btn-secondary" onClick={() => router.push("/admin/bookings")}>Bookings</button>
+          <button className="btn btn-secondary" onClick={() => router.push("/admin/manual")}>Manual</button>
           <AdminDeployUpdatesButton />
           <button className="btn btn-secondary" onClick={() => router.push("/admin/reports")}>Reports</button>
           <button className="btn btn-secondary" onClick={() => router.push("/admin/settings")}>Settings</button>

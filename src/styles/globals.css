@@ -2729,3 +2729,78 @@ h1 {
     grid-template-columns: 1fr;
   }
 }
+
+/* Admin manual */
+.admin-manual-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-manual-panel {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.admin-manual-panel.full {
+  grid-column: 1 / -1;
+}
+
+.admin-manual-panel h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.admin-manual-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-manual-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 6px;
+}
+
+.admin-manual-screenshot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-manual-shot {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.admin-manual-shot-frame {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.admin-manual-shot-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.admin-manual-shot figcaption {
+  display: grid;
+  gap: 4px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.84rem;
+}
+
+@media (max-width: 920px) {
+  .admin-manual-screenshot-grid {
+    grid-template-columns: 1fr;
+  }
+}

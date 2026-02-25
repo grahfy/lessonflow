@@ -37,6 +37,9 @@ Melbourne Guitar School Platform is a full-stack web application for running day
 ### Booking & Admin Operations
 - Admin login at `/admin/login`.
 - Booking console at `/admin/bookings`.
+- Admin settings/config screen at `/admin/settings` (edits supported `.env` values and syncs admin login credentials to DB).
+- Admin reports console at `/admin/reports` (daily/weekly/monthly/yearly reporting with comparisons + charts).
+- Admin manual at `/admin/manual` (operator documentation hub with quick links, deploy runbook summary, and screenshots).
 - Day/week/month visual calendar.
 - Click-to-open booking dialogs with full details.
 - Approve/reject pending requests.
@@ -51,7 +54,9 @@ Melbourne Guitar School Platform is a full-stack web application for running day
 - Duplicate protection during manual booking flows.
 - Customer-to-booking linkage preserved for history.
 - Portal credential reveal/regenerate controls with audit logging.
-- Customer learning-material management tied to selected appointments.
+- Customer learning-material management tied to selected appointments or uploaded as general (not-linked) materials.
+- Admin learning materials support inline preview/download for PDF and audio files.
+- Admin header includes `Latest Updates` popup showing deployed commit notes (shown once per newly deployed commit, can be reopened manually).
 
 ### Student Portal
 - Student login via full name + postcode + generated password.
@@ -59,12 +64,18 @@ Melbourne Guitar School Platform is a full-stack web application for running day
 - Approval email includes student portal login instructions and initial password.
 - Student dashboard at `/student/portal`:
   - upcoming and previous appointments,
-  - assigned lesson materials (audio/PDF) with authenticated downloads.
+  - assigned lesson materials (audio/PDF) with authenticated preview/download,
+  - general learning materials not linked to a specific appointment.
 
 ### Invoicing & Billing
 - Invoice console at `/admin/invoices`.
 - Create invoice from confirmed appointment.
 - Create invoice from customer context.
+- Invoice create/edit supports lesson package product presets via dropdown:
+  - `5 × 30 Minute Lessons ($200)`
+  - `10 × 30 Minute Lessons ($388)`
+  - `5 × 1 Hour Lessons ($375)`
+  - `10 × 1 Hour Lessons ($725)`
 - Temporary line-item options:
   - lesson fee,
   - educational books,
@@ -73,12 +84,14 @@ Melbourne Guitar School Platform is a full-stack web application for running day
 - Line-item editing in invoice detail.
 - GST-aware calculations with configurable defaults.
 - Download invoice as PDF.
+- Invoice PDF download is cache-busted/no-store after edits so regenerated PDFs reflect latest changes.
 - Send invoice via email with PDF attached.
 - Mark paid / mark unpaid.
 - Outstanding invoice view and aging filters.
 - 7/14/30-day overdue reminder workflow:
   - single invoice reminder,
   - bulk reminder run.
+- Manual single-invoice reminder supports any overdue sent invoice (not only 7/14/30-day stages).
 - Credit note creation for sent/paid invoices.
 - Invoice audit/history data retained for traceability.
 
@@ -89,6 +102,7 @@ Melbourne Guitar School Platform is a full-stack web application for running day
 - Nodemailer for SMTP delivery
 - Gmail API (OAuth2 via `googleapis`) for HTTPS email delivery fallback
 - pdf-lib for invoice PDF generation
+- Next.js metadata API (`robots.ts`, `sitemap.ts`) for SEO/indexing controls
 
 ## Project Structure
 - `src/app`: routes and API handlers
@@ -261,9 +275,36 @@ Email provider behavior:
   - `customerId` (`string`)
   - `stage` (`7 | 14 | 30`)
 
+### Admin Operations Reports (Owner Email)
+- Endpoints:
+  - `POST /api/jobs/admin-reports/daily`
+  - `POST /api/jobs/admin-reports/weekly`
+  - `POST /api/jobs/admin-reports/monthly`
+  - `POST /api/jobs/admin-reports/yearly`
+- Header: `x-cron-secret: <CRON_SECRET>`
+- Sends branded owner report emails including:
+  - appointments snapshot
+  - outstanding / overdue invoices
+  - earnings
+  - previous-period comparison
+  - trend summary
+
 If deploying on Vercel, schedules can be configured in `vercel.json`.
-For DigitalOcean Droplet deployments, configure cron jobs or `systemd` timers that `POST` these endpoints with `x-cron-secret`.
+For DigitalOcean Droplet deployments, use `deploy/deploy.sh` / `deploy/update.sh` (managed crontab sync is now built in by default) or configure cron/systemd timers manually to `POST` these endpoints with `x-cron-secret`.
 See `Documentation/digitalocean-admin-operations.md` for examples.
+
+## SEO & Indexing
+- Public marketing pages are indexed and included in `sitemap.xml`:
+  - `/`, `/lessons`, `/teacher`, `/vouchers`, `/contact`, `/book`, `/terms`
+- Internal routes are excluded from indexing:
+  - `/admin/*`
+  - `/student/*`
+  - `/setup`
+  - `/api/*`
+- The app uses:
+  - `src/app/sitemap.ts` for public-only sitemap entries
+  - `src/app/robots.ts` for crawler rules
+  - route-segment noindex metadata for admin/student/setup surfaces
 
 ## Available Routes
 - Public:
@@ -281,7 +322,9 @@ See `Documentation/digitalocean-admin-operations.md` for examples.
 - Admin:
   - `/admin/login`
   - `/admin/bookings`
+  - `/admin/settings`
   - `/admin/invoices`
+  - `/admin/reports`
 
 ## First-Run Production Setup
 Run this once after deploying to hosting:
@@ -327,4 +370,7 @@ At minimum, production requires:
 - Booking constraints and validation are server-side enforced.
 - Invoice records are designed to preserve historical context.
 - Sent/paid invoices use credit notes for correction workflows.
-- Additional user-facing docs planning lives in `Documentation/`.
+- `/admin/settings` saves supported config values to `.env`, syncs admin login credentials to the DB, and queues a best-effort `systemd` app restart.
+- `deploy/deploy.sh` and `deploy/update.sh` provide interactive TUI menus and managed cron job installation for the supported scheduled jobs.
+- Successful deploys record commit metadata for the admin `Latest Updates` popup (`.data/deploy/latest-deploy-update.json`).
+- Documentation (including screenshot assets and the droplet deploy runbook) lives in `Documentation/`.

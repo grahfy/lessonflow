@@ -75,6 +75,23 @@ sudo ./deploy/setup-packages.sh --dry-run --skip-nginx
 
 After running the script, continue with [Database Setup](#database-setup).
 
+### Daily Deploy / Update Runbook (Operators)
+
+For day-to-day releases on a configured droplet:
+
+```bash
+cd /var/www/melbourne-guitar-school/current
+sudo ./deploy/update.sh --branch main
+```
+
+Recommended defaults:
+- `Dependencies`: ON for normal releases (turn OFF only when you know lockfiles/deps did not change)
+- `Cron jobs sync`: ON so the managed cron block stays aligned with supported jobs
+
+Notes:
+- `update.sh` / `deploy.sh` now show pulled commit details and pause for a keypress if a `git pull` updates the deploy script itself, then they return to the TUI main menu.
+- Admins can confirm deployed commits in the app using the `Latest Updates` popup after login.
+
 ---
 
 ## Manual Server Setup
@@ -297,8 +314,11 @@ Notes:
 - The deploy script prunes old Node/npm temp files in `/tmp`, `/var/tmp`, and npm cache temp before builds to reduce ENOSPC failures.
 - Use `--no-spinner --no-color` for CI/log-only environments.
 - `deploy/update.sh` wraps `git fetch/pull` + `deploy.sh` with the same interactive/spinner UI.
+- Both scripts now expose `Dependencies` and `Cron jobs sync` as first-class TUI main-menu options.
+- `deploy.sh` / `update.sh` self-update at startup via `git pull` (when applicable), show detailed commit changes, wait for a keypress in TTY mode, and restart back to the main menu if the script code changed.
 - `deploy.sh` and `update.sh` banners now render dynamically and include the app version from `package.json`, so longer titles do not break the right border.
 - `deploy/deploy.sh` (and therefore `deploy/update.sh`) now re-syncs the repo Nginx site config on every deploy, runs `nginx -t`, and restarts Nginx after a successful deploy.
+- `deploy/deploy.sh` now writes deploy commit metadata to shared data so admins can view post-deploy commit notes in the in-app `Latest Updates` popup.
 - Keep production Nginx changes in `deploy/nginx.conf` / `deploy/nginx-http.conf`; local edits under `/etc/nginx/sites-available/` will be overwritten by the next deploy/update.
 - Admin/student login endpoints are rate-limited strictly, but general `/admin` and `/api/admin` console traffic now uses a higher limit to avoid intermittent operator-facing `503` errors during normal use.
 
@@ -441,6 +461,11 @@ Managed entries installed by deploy:
 
 Adjust times as needed for your timezone (UTC 20:00 = 6:00 AM AEDT).
 
+Cron management notes:
+- The deploy TUI `Cron jobs sync` option is **ON** by default.
+- Use `--skip-cron` (or set `Cron jobs sync` to OFF in the TUI) if you need to preserve a manually managed crontab temporarily.
+- Deploys still restart the cron service (`cron`/`crond`) best-effort after a successful release.
+
 ---
 
 ## Monitoring & Logs
@@ -467,6 +492,16 @@ tail -f /var/log/nginx/melbourne-guitar-school.error.log
 ```bash
 tail -f /var/log/melbourne-guitar-school/cron-$(date +%Y%m%d).log
 ```
+
+### Deploy Update Metadata (Admin "Latest Updates")
+
+Successful deploys write a JSON summary of the applied commit(s) here:
+
+```bash
+/var/www/melbourne-guitar-school/shared/data/deploy/latest-deploy-update.json
+```
+
+That file is surfaced in the admin UI via the `Latest Updates` button and is auto-shown once after login when a new deployed commit is detected in the browser.
 
 ### Service Status
 
@@ -558,6 +593,9 @@ cd ~/melbourne-guitar-school
 
 # Update git clone + deploy (interactive)
 sudo ./deploy/update.sh
+
+# Skip managed cron sync for this run (rare/manual maintenance case)
+sudo ./deploy/update.sh --skip-cron
 
 # Or specify branch + SSL in one command
 sudo ./deploy/update.sh --branch main --ssl --domain melbourneguitarschool.com.au --email melbourneguitarschool@gmail.com
