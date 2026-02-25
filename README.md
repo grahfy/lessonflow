@@ -158,23 +158,34 @@ Behavior:
 - If the shared `.env` file does not exist, the scripts copy `.env.example` into place.
 - In interactive runs, the scripts can open the shared `.env` in a terminal editor.
 - `update.sh` and `deploy.sh` both include an explicit TUI action to edit the shared `.env` on demand.
+- `deploy.sh` also includes direct TUI bootstrap actions for MySQL+DB (`M`), Nginx (`N`), and PHP-FPM-if-needed (`P`).
 
 You must edit the shared `.env` with real values before production use (especially DB, secrets, email, invoice settings).
 
 ### 4. Optional server bootstrap helpers (recommended)
 
-Use `update.sh` helper flags to install platform dependencies and bootstrap the local database from the shared `.env`.
+Use either `update.sh` (wrapper) or `deploy.sh` (direct deploy) helper flags to install platform dependencies and bootstrap the local database from the shared `.env`.
+
+`update.sh` is usually the best day-to-day entry point because it handles `git fetch/pull` before invoking `deploy.sh`, but the bootstrap helpers are available on both scripts now.
 
 #### Install Nginx (if needed)
 
 ```bash
+# Wrapper workflow (recommended when using update.sh)
 ./deploy/update.sh --install-nginx --skip-pull --skip-deploy --sudo-deploy
+
+# Direct deploy script (same helper available)
+./deploy/deploy.sh --install-nginx
 ```
 
 #### Install local MySQL/MariaDB and create DB from `DATABASE_URL` in shared `.env`
 
 ```bash
+# Wrapper workflow (recommended when using update.sh)
 ./deploy/update.sh --setup-mysql-db-from-env --skip-pull --skip-deploy --sudo-deploy
+
+# Direct deploy script (same helper available)
+./deploy/deploy.sh --setup-mysql-db-from-env
 ```
 
 Notes:
@@ -186,7 +197,11 @@ Notes:
 #### Install PHP-FPM only if needed by Nginx config (usually skipped for this Next.js app)
 
 ```bash
+# Wrapper workflow (recommended when using update.sh)
 ./deploy/update.sh --install-php-fpm-if-needed --skip-pull --skip-deploy --sudo-deploy
+
+# Direct deploy script (same helper available)
+./deploy/deploy.sh --install-php-fpm-if-needed
 ```
 
 For this project’s Next.js deployment, PHP-FPM is typically not required. The helper auto-detects whether the deploy Nginx config appears to need PHP/FastCGI and skips when it is not needed.
