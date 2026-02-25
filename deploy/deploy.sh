@@ -43,6 +43,11 @@ LOW_RAM_1GB_AUTO_HEAP_MB="${LOW_RAM_1GB_AUTO_HEAP_MB:-3072}"
 LOW_RAM_2GB_AUTO_HEAP_MB="${LOW_RAM_2GB_AUTO_HEAP_MB:-1024}"
 LOW_RAM_1GB_NEXT_BUILD_HEAP_MB="${LOW_RAM_1GB_NEXT_BUILD_HEAP_MB:-768}"
 LOW_RAM_2GB_NEXT_BUILD_HEAP_MB="${LOW_RAM_2GB_NEXT_BUILD_HEAP_MB:-768}"
+TEMP_BUILD_SWAP_AUTO_ENABLED="${TEMP_BUILD_SWAP_AUTO_ENABLED:-true}"
+LOW_RAM_1GB_TEMP_BUILD_SWAP_MB="${LOW_RAM_1GB_TEMP_BUILD_SWAP_MB:-2048}"
+LOW_RAM_2GB_TEMP_BUILD_SWAP_MB="${LOW_RAM_2GB_TEMP_BUILD_SWAP_MB:-1024}"
+TEMP_BUILD_SWAP_MIN_EXISTING_MB="${TEMP_BUILD_SWAP_MIN_EXISTING_MB:-512}"
+TEMP_BUILD_SWAP_PATH="${TEMP_BUILD_SWAP_PATH:-/var/tmp/${APP_NAME}-build.swap}"
 LOW_RAM_1GB_AUTO_HEAP_MIN_MB=900
 LOW_RAM_1GB_AUTO_HEAP_MAX_MB=1280
 LOW_RAM_2GB_AUTO_HEAP_MIN_MB=1700
@@ -66,6 +71,8 @@ IS_TTY=false
 SPINNER_PID=""
 SPINNER_MSG=""
 SPINNER_FRAMES=( "⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏" )
+TEMP_BUILD_SWAP_ACTIVE=false
+TEMP_BUILD_SWAP_CREATED_FILE=false
 
 # Colors for output
 RED='\033[0;31m'
@@ -456,6 +463,128 @@ cleanup_install_and_build_caches() {
     fi
 }
 
+# Detects total configured swap in MB on Linux hosts. Returns empty when the
+# platform does not expose the Linux /proc interface used here.
+detect_total_swap_mb() {
+    local swap_kb=""
+
+    if [[ -r "/proc/meminfo" ]]; then
+        swap_kb="$(awk '/^SwapTotal:/ { print $2; exit }' /proc/meminfo 2>/dev/null || true)"
+        if [[ "${swap_kb}" =~ ^[0-9]+$ ]]; then
+            echo $((swap_kb / 1024))
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+# Creates temporary swap during the Next.js build on low-memory Linux hosts.
+# The function is best-effort and safely skips setup when prerequisites are
+# missing or when sufficient swap already exists on the machine.
+ensure_temporary_build_swap() {
+    local total_ram_mb=""
+    local total_swap_mb="0"
+    local swap_mb=""
+
+    if [[ "${TEMP_BUILD_SWAP_AUTO_ENABLED}" != "true" ]]; then
+        log_info "Temporary build swap disabled by TEMP_BUILD_SWAP_AUTO_ENABLED=${TEMP_BUILD_SWAP_AUTO_ENABLED}"
+        return 0
+    fi
+
+    if [[ "${OSTYPE:-}" != linux* ]]; then
+        log_info "Temporary build swap is only supported on Linux hosts"
+        return 0
+    fi
+
+    if [[ ${EUID} -ne 0 ]]; then
+        log_warn "Cannot create temporary build swap without root privileges"
+        return 0
+    fi
+
+    if ! command -v mkswap >/dev/null 2>&1 || ! command -v swapon >/dev/null 2>&1 || ! command -v swapoff >/dev/null 2>&1; then
+        log_warn "Swap tools not available (mkswap/swapon/swapoff); skipping temporary build swap"
+        return 0
+    fi
+
+    total_ram_mb="$(detect_total_ram_mb || true)"
+    if [[ -z "${total_ram_mb}" ]]; then
+        log_info "Could not detect system RAM; skipping temporary build swap auto setup"
+        return 0
+    fi
+
+    if (( total_ram_mb >= LOW_RAM_1GB_AUTO_HEAP_MIN_MB && total_ram_mb <= LOW_RAM_1GB_AUTO_HEAP_MAX_MB )); then
+        swap_mb="${LOW_RAM_1GB_TEMP_BUILD_SWAP_MB}"
+    elif (( total_ram_mb >= LOW_RAM_2GB_AUTO_HEAP_MIN_MB && total_ram_mb <= LOW_RAM_2GB_AUTO_HEAP_MAX_MB )); then
+        swap_mb="${LOW_RAM_2GB_TEMP_BUILD_SWAP_MB}"
+    else
+        log_info "Detected ${total_ram_mb}MB RAM; skipping temporary build swap"
+        return 0
+    fi
+
+    total_swap_mb="$(detect_total_swap_mb || echo 0)"
+    if [[ "${total_swap_mb}" =~ ^[0-9]+$ ]] && (( total_swap_mb >= TEMP_BUILD_SWAP_MIN_EXISTING_MB )); then
+        log_info "Detected ${total_swap_mb}MB existing swap; skipping temporary build swap"
+        return 0
+    fi
+
+    if grep -qE "[[:space:]]${TEMP_BUILD_SWAP_PATH//\//\\/}([[:space:]]|$)" /proc/swaps 2>/dev/null; then
+        TEMP_BUILD_SWAP_ACTIVE=true
+        log_info "Temporary build swap already active: ${TEMP_BUILD_SWAP_PATH}"
+        return 0
+    fi
+
+    if [[ -e "${TEMP_BUILD_SWAP_PATH}" ]]; then
+        log_warn "Removing stale temporary swap file: ${TEMP_BUILD_SWAP_PATH}"
+        rm -f "${TEMP_BUILD_SWAP_PATH}" || {
+            log_warn "Failed to remove stale temporary swap file; skipping temporary build swap"
+            return 0
+        }
+    fi
+
+    log_warn "Creating temporary build swap (${swap_mb}MB) at ${TEMP_BUILD_SWAP_PATH}"
+    if command -v fallocate >/dev/null 2>&1; then
+        fallocate -l "${swap_mb}M" "${TEMP_BUILD_SWAP_PATH}" 2>/dev/null || dd if=/dev/zero of="${TEMP_BUILD_SWAP_PATH}" bs=1M count="${swap_mb}" status=none
+    else
+        dd if=/dev/zero of="${TEMP_BUILD_SWAP_PATH}" bs=1M count="${swap_mb}" status=none
+    fi
+
+    chmod 600 "${TEMP_BUILD_SWAP_PATH}"
+    mkswap "${TEMP_BUILD_SWAP_PATH}" >/dev/null
+    swapon "${TEMP_BUILD_SWAP_PATH}"
+
+    TEMP_BUILD_SWAP_ACTIVE=true
+    TEMP_BUILD_SWAP_CREATED_FILE=true
+    log_warn "Enabled temporary build swap (${swap_mb}MB)"
+}
+
+# Removes the temporary build swap file created by this script. The function is
+# idempotent so it can run both after a successful build and from the EXIT trap.
+cleanup_temporary_build_swap() {
+    if [[ "${TEMP_BUILD_SWAP_ACTIVE}" != true ]]; then
+        return 0
+    fi
+
+    if [[ "${OSTYPE:-}" == linux* ]] && grep -qE "[[:space:]]${TEMP_BUILD_SWAP_PATH//\//\\/}([[:space:]]|$)" /proc/swaps 2>/dev/null; then
+        if swapoff "${TEMP_BUILD_SWAP_PATH}" >/dev/null 2>&1; then
+            log_info "Disabled temporary build swap"
+        else
+            log_warn "Failed to disable temporary build swap: ${TEMP_BUILD_SWAP_PATH}"
+        fi
+    fi
+
+    if [[ "${TEMP_BUILD_SWAP_CREATED_FILE}" == true && -e "${TEMP_BUILD_SWAP_PATH}" ]]; then
+        if rm -f "${TEMP_BUILD_SWAP_PATH}"; then
+            log_info "Removed temporary build swap file"
+        else
+            log_warn "Failed to remove temporary build swap file: ${TEMP_BUILD_SWAP_PATH}"
+        fi
+    fi
+
+    TEMP_BUILD_SWAP_ACTIVE=false
+    TEMP_BUILD_SWAP_CREATED_FILE=false
+}
+
 # Replaces or appends the Node heap cap in NODE_OPTIONS while preserving any
 # other existing Node flags that may have been provided by the operator.
 set_node_heap_limit_mb() {
@@ -585,6 +714,9 @@ detect_total_ram_mb() {
 cleanup_incomplete_release_on_exit() {
     local exit_code=$?
     trap - EXIT
+
+    # Always clean up temporary build swap if this deploy enabled it.
+    cleanup_temporary_build_swap
 
     # If deployment failed after creating a release directory but before it was
     # promoted to current, remove it so failed builds do not fill the disk.
@@ -863,6 +995,7 @@ cleanup_install_and_build_caches
 
 # Build the application
 prepare_next_build_environment
+ensure_temporary_build_swap
 run_step "Building Next.js application" npm run build
 
 # Verify build succeeded
@@ -885,6 +1018,7 @@ fi
 # Remove transient build caches from the release after assets are copied. The
 # runtime service does not need these caches, and deleting them reduces disk use.
 cleanup_install_and_build_caches
+cleanup_temporary_build_swap
 
 # Update symlink atomically
 log_info "Updating current symlink..."
