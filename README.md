@@ -154,7 +154,7 @@ Use `update.sh` for routine server maintenance and `deploy.sh` for direct releas
 - runs from your persistent git clone on the server
 - can `fetch`/`pull` the selected branch (ff-only)
 - shows an interactive TUI for workflow + deploy pass-through settings
-- can run pre-deploy bootstrap helpers (Nginx / MySQL+DB / PHP-FPM-if-needed)
+- can run pre-deploy/bootstrap helpers (Nginx / MySQL+DB / PHP-FPM-if-needed / cron / systemd service / cron jobs)
 - then calls `deploy.sh` with the selected options
 
 `deploy/deploy.sh` (release engine):
@@ -167,7 +167,7 @@ Use `update.sh` for routine server maintenance and `deploy.sh` for direct releas
 Interactive TUI notes:
 - `update.sh` includes a remote update alert line (above “Update Workflow Options”) that highlights a newer remote commit hash + one-line subject when available.
 - `update.sh` supports both a workflow toggle (`MySQL + create DB`) and an immediate one-off action (`M`) for DB bootstrap from shared `.env`.
-- `deploy.sh` supports immediate bootstrap actions `M` (MySQL+DB), `N` (Nginx), `P` (PHP-FPM-if-needed), plus a workflow toggle for `MySQL + create DB` before the release build.
+- `deploy.sh` supports immediate bootstrap actions `C` (cron), `J` (managed cron jobs), `M` (MySQL+DB), `N` (Nginx), `P` (PHP-FPM-if-needed), `U` (app systemd service), plus a workflow toggle for `MySQL + create DB` before the release build.
 
 ### 1. Server prerequisites
 
@@ -203,16 +203,33 @@ You must edit the shared `.env` with real values before production use (especial
 
 ### 4. Optional server bootstrap helpers (recommended)
 
-Use either `update.sh` (wrapper) or `deploy.sh` (direct deploy) helper flags to install platform dependencies and bootstrap the local database from the shared `.env`.
+Use either `update.sh` (wrapper) or `deploy.sh` (direct deploy) helper flags to install platform dependencies and bootstrap the server runtime pieces from the shared `.env`.
 
 `update.sh` is usually the best day-to-day entry point because it handles `git fetch/pull` before invoking `deploy.sh`, but the bootstrap helpers are available on both scripts now.
 
 Recommended order on a fresh VPS/Droplet:
 1. Edit shared `.env` (`./deploy/update.sh --interactive` or `./deploy/deploy.sh --interactive`)
-2. Install Nginx (if missing)
-3. Install local MySQL/MariaDB and create the app database from `DATABASE_URL`
-4. Run first deploy (`deploy.sh`)
-5. Configure SSL once DNS is pointing at the server
+2. Install cron/crond scheduler (if missing)
+3. Install Nginx (if missing)
+4. Install local MySQL/MariaDB and create the app database from `DATABASE_URL`
+5. Run first deploy (`deploy.sh`)
+6. Install/update app systemd service (optional before first deploy, required before starting the app as a service)
+7. Install/update managed cron jobs (after the first successful deploy)
+8. Configure SSL once DNS is pointing at the server
+
+#### Install cron/crond scheduler (if needed)
+
+```bash
+# Wrapper workflow (recommended when using update.sh)
+./deploy/update.sh --install-cron --skip-pull --skip-deploy --sudo-deploy
+
+# Direct deploy script (same helper available)
+./deploy/deploy.sh --install-cron
+```
+
+Notes:
+- Installs `cron` or `cronie` depending on the Linux distribution
+- Enables + starts `cron` / `crond` (best effort)
 
 #### Install Nginx (if needed)
 
@@ -252,6 +269,36 @@ Notes:
 
 For this project’s Next.js deployment, PHP-FPM is typically not required. The helper auto-detects whether the deploy Nginx config appears to need PHP/FastCGI and skips when it is not needed.
 
+#### Install/update app systemd service (if needed)
+
+```bash
+# Wrapper workflow (recommended when using update.sh)
+./deploy/update.sh --install-app-service --skip-pull --skip-deploy --sudo-deploy
+
+# Direct deploy script (same helper available)
+./deploy/deploy.sh --install-app-service
+```
+
+Notes:
+- Installs/updates `/etc/systemd/system/melbourne-guitar-school.service`
+- Runs `systemctl daemon-reload`
+- Enables the service and attempts to start it if `/var/www/melbourne-guitar-school/current` exists
+
+#### Install/update managed cron jobs (if needed)
+
+```bash
+# Wrapper workflow (recommended when using update.sh)
+./deploy/update.sh --install-cron-jobs --skip-pull --skip-deploy --sudo-deploy
+
+# Direct deploy script (same helper available)
+./deploy/deploy.sh --install-cron-jobs
+```
+
+Notes:
+- Installs/updates the managed root crontab block used by LessonFlow scheduled jobs
+- Restarts `cron` / `crond` (best effort)
+- Can be run before the first deploy, but jobs will only execute successfully once `current/deploy/cron.sh` exists
+
 ### 5. First deploy on a VPS / VM / Droplet
 
 Interactive (recommended):
@@ -282,6 +329,9 @@ Interactive `deploy.sh` notes:
 - `M` runs the MySQL+DB bootstrap helper immediately.
 - `N` runs the Nginx install helper immediately.
 - `P` runs the PHP-FPM-if-needed helper immediately.
+- `C` runs the cron/crond install helper immediately.
+- `J` installs/updates managed cron jobs immediately.
+- `U` installs/updates the app systemd service immediately.
 
 ### 6. Ongoing updates (recommended workflow)
 
@@ -297,7 +347,7 @@ Or non-interactive:
 
 `update.sh`:
 - fetches/pulls latest git changes (ff-only)
-- can run pre-deploy helper actions (Nginx/MySQL/DB/PHP-FPM)
+- can run pre-deploy helper actions (Nginx/MySQL/DB/PHP-FPM/cron/systemd service/cron jobs)
 - delegates the actual release deploy to `deploy.sh`
 
 Interactive `update.sh` notes:
@@ -305,6 +355,9 @@ Interactive `update.sh` notes:
 - Option `10` opens the shared `.env` editor.
 - Option `11` toggles `MySQL + create DB` so the helper runs automatically during `Start update/deploy`.
 - `M` runs the same MySQL+DB bootstrap helper immediately without starting the full workflow.
+- `C` runs the cron/crond install helper immediately.
+- `J` installs/updates managed cron jobs immediately.
+- `U` installs/updates the app systemd service immediately.
 
 Common non-interactive examples:
 
@@ -320,6 +373,9 @@ Common non-interactive examples:
 
 # Bootstrap DB from shared .env, then perform full update+deploy
 ./deploy/update.sh --setup-mysql-db-from-env --sudo-deploy
+
+# Bootstrap cron scheduler + app service + managed cron jobs (no git pull/deploy)
+./deploy/update.sh --install-cron --install-app-service --install-cron-jobs --skip-pull --skip-deploy --sudo-deploy
 ```
 
 ### 7. SSL (optional)
@@ -441,6 +497,8 @@ Key groups:
 
 Protected job endpoints use:
 - header `x-cron-secret: <CRON_SECRET>`
+
+`deploy/cron.sh` reads `NEXT_PUBLIC_SITE_URL` and `CRON_SECRET` from the shared deploy `.env` file (`/var/www/melbourne-guitar-school/shared/.env`) so cron jobs use the same URL/secret as the running app.
 
 Examples include:
 - daily bookings digest

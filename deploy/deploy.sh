@@ -14,6 +14,9 @@
 #   --setup-mysql-db-from-env  Install local MySQL/MariaDB (if needed) and create DB from shared .env DATABASE_URL
 #   --install-nginx   Install Nginx (if needed) using setup-packages.sh in non-interactive mode
 #   --install-php-fpm-if-needed  Install PHP-FPM only if deploy nginx config indicates a PHP upstream is required
+#   --install-cron    Install cron/crond scheduler (if needed) and enable/start service
+#   --install-app-service  Install/update the app systemd unit and enable service
+#   --install-cron-jobs  Install/update managed cron jobs and restart cron (best effort)
 #   --ssl             Run SSL setup after deployment
 #   --domain DOMAIN   Domain for SSL certificate
 #   --email EMAIL     Email for SSL certificate
@@ -67,6 +70,9 @@ SETUP_PACKAGES=false
 SETUP_MYSQL_DB_FROM_ENV=false
 INSTALL_NGINX_IF_NEEDED=false
 INSTALL_PHP_FPM_IF_NEEDED=false
+INSTALL_CRON_IF_NEEDED=false
+INSTALL_APP_SERVICE_IF_NEEDED=false
+INSTALL_CRON_JOBS_IF_NEEDED=false
 SSL_SETUP=false
 SSL_DOMAIN=""
 SSL_EMAIL=""
@@ -114,6 +120,9 @@ Options:
   --setup-mysql-db-from-env  Install local MySQL/MariaDB (if needed) and create DB from shared .env DATABASE_URL
   --install-nginx   Install Nginx (if needed) using setup-packages.sh in non-interactive mode
   --install-php-fpm-if-needed  Install PHP-FPM only when deploy nginx config uses PHP upstreams
+  --install-cron    Install cron/crond scheduler (if needed) and enable/start service
+  --install-app-service  Install/update the app systemd unit and enable service
+  --install-cron-jobs  Install/update managed cron jobs and restart cron (best effort)
   --ssl             Run SSL setup after deployment
   --domain DOMAIN   Domain for SSL certificate
   --email EMAIL     Email for SSL certificate
@@ -772,6 +781,204 @@ ensure_php_fpm_installed_if_needed_from_deploy() {
     return 0
 }
 
+# Detects whether the host uses `cron` or `crond` as the scheduler service.
+# We keep this in one place so both install and repair helpers can reuse it.
+cron_scheduler_service_name() {
+    if ! command -v systemctl >/dev/null 2>&1; then
+        return 1
+    fi
+
+    if systemctl list-unit-files --type=service 2>/dev/null | grep -q '^cron\.service'; then
+        echo "cron"
+        return 0
+    fi
+    if systemctl list-unit-files --type=service 2>/dev/null | grep -q '^crond\.service'; then
+        echo "crond"
+        return 0
+    fi
+    if systemctl status cron >/dev/null 2>&1; then
+        echo "cron"
+        return 0
+    fi
+    if systemctl status crond >/dev/null 2>&1; then
+        echo "crond"
+        return 0
+    fi
+
+    return 1
+}
+
+# Enables and starts the cron scheduler after installation (or during repair
+# runs) so managed crontab entries will actually execute.
+ensure_cron_scheduler_running_enabled() {
+    local service_name=""
+
+    if ! command -v systemctl >/dev/null 2>&1; then
+        log_warn "systemctl not available; install/start cron manually if needed."
+        return 0
+    fi
+
+    if ! service_name="$(cron_scheduler_service_name)"; then
+        log_warn "Cron scheduler service (cron/crond) not detected."
+        return 0
+    fi
+
+    systemctl enable "${service_name}" >/dev/null 2>&1 || true
+    if systemctl start "${service_name}" >/dev/null 2>&1; then
+        log_info "Cron scheduler ready: ${service_name}"
+    else
+        log_warn "Could not start cron scheduler service: ${service_name}"
+    fi
+    return 0
+}
+
+# Installs cron/crond using the host package manager. Package names differ by
+# distro, so this helper resolves both the manager and package name.
+ensure_cron_installed_from_deploy() {
+    local os_id=""
+    local pkg_manager=""
+    local cron_pkg=""
+
+    section "Cron Scheduler Install"
+
+    if command -v crontab >/dev/null 2>&1; then
+        log_info "crontab already installed"
+        ensure_cron_scheduler_running_enabled
+        return 0
+    fi
+
+    if [[ ${EUID} -ne 0 ]]; then
+        log_error "Cron installation helper requires root (deploy.sh should have re-execed with sudo already)."
+        return 1
+    fi
+
+    if [[ -r /etc/os-release ]]; then
+        # shellcheck disable=SC1091
+        source /etc/os-release
+        os_id="${ID:-}"
+    fi
+
+    case "${os_id}" in
+        ubuntu|debian|linuxmint|pop|elementary)
+            pkg_manager="apt"
+            cron_pkg="cron"
+            ;;
+        fedora|rhel|centos|rocky|almalinux|ol|scientific)
+            if command -v dnf >/dev/null 2>&1; then
+                pkg_manager="dnf"
+            else
+                pkg_manager="yum"
+            fi
+            cron_pkg="cronie"
+            ;;
+        opensuse*|sles|suse)
+            pkg_manager="zypper"
+            cron_pkg="cron"
+            ;;
+        arch|manjaro|endeavouros|garuda)
+            pkg_manager="pacman"
+            cron_pkg="cronie"
+            ;;
+        *)
+            log_error "Unsupported OS for cron scheduler auto-install in deploy.sh (ID='${os_id:-unknown}')."
+            log_error "Install cron/crond manually and rerun the helper if needed."
+            return 1
+            ;;
+    esac
+
+    case "${pkg_manager}" in
+        apt)
+            run_step "Installing cron scheduler package" apt install -y "${cron_pkg}" || return 1
+            ;;
+        dnf)
+            run_step "Installing cron scheduler package" dnf install -y "${cron_pkg}" || return 1
+            ;;
+        yum)
+            run_step "Installing cron scheduler package" yum install -y "${cron_pkg}" || return 1
+            ;;
+        zypper)
+            run_step "Installing cron scheduler package" zypper install -y "${cron_pkg}" || return 1
+            ;;
+        pacman)
+            run_step "Installing cron scheduler package" pacman -S --noconfirm "${cron_pkg}" || return 1
+            ;;
+    esac
+
+    ensure_cron_scheduler_running_enabled
+    return 0
+}
+
+# Installs or updates the app's systemd unit using the repository template in
+# deploy/. This allows first-time server bootstrap before a full deploy.
+install_app_systemd_service_from_deploy() {
+    local service_file="/etc/systemd/system/${APP_NAME}.service"
+    local service_source="${SCRIPT_DIR}/${APP_NAME}.service"
+
+    section "App Systemd Service Install"
+
+    if [[ ${EUID} -ne 0 ]]; then
+        log_error "Systemd service helper requires root (deploy.sh should have re-execed with sudo already)."
+        return 1
+    fi
+
+    if ! command -v systemctl >/dev/null 2>&1; then
+        log_error "systemctl not available on this host."
+        return 1
+    fi
+
+    if [[ ! -f "${service_source}" ]]; then
+        log_error "Service template not found: ${service_source}"
+        return 1
+    fi
+
+    if [[ ! -f "${service_file}" ]]; then
+        log_info "Installing systemd service..."
+        cp "${service_source}" "${service_file}"
+        systemctl daemon-reload
+    elif ! cmp -s "${service_source}" "${service_file}"; then
+        log_info "Updating systemd service..."
+        cp "${service_source}" "${service_file}"
+        systemctl daemon-reload
+    else
+        log_info "Systemd service already up to date"
+    fi
+
+    systemctl enable "${APP_NAME}" >/dev/null 2>&1 || true
+
+    if [[ -L "${CURRENT_LINK}" || -d "${CURRENT_LINK}" ]]; then
+        if systemctl start "${APP_NAME}" >/dev/null 2>&1; then
+            log_info "Systemd service ready: ${APP_NAME}"
+        else
+            log_warn "Systemd service installed but not started (check current release/env): ${APP_NAME}"
+        fi
+    else
+        log_info "Current release not present yet; service installed/enabled but not started."
+    fi
+
+    return 0
+}
+
+# Installs/updates the managed root crontab block and restarts cron so the
+# latest current/deploy/cron.sh path is picked up immediately.
+ensure_managed_cron_jobs_installed_from_deploy() {
+    local cron_runner="${CURRENT_LINK}/deploy/cron.sh"
+
+    section "Managed Cron Jobs Install"
+
+    if ! command -v crontab >/dev/null 2>&1; then
+        ensure_cron_installed_from_deploy || return 1
+    fi
+
+    if [[ ! -x "${cron_runner}" ]]; then
+        log_warn "Cron runner not found yet: ${cron_runner}"
+        log_warn "Installing cron entries anyway; they will work after the first successful deploy creates current/."
+    fi
+
+    install_or_update_managed_crontab_jobs
+    restart_cron_scheduler_if_present
+    return 0
+}
+
 # Prompt for a value while supporting a visible default for common deploy fields.
 prompt_value() {
     local prompt="$1"
@@ -925,9 +1132,12 @@ print_deploy_tui_menu() {
     print_tui_option_desc "When ON, Start runs the shared .env MySQL/MariaDB install + local DB create helper before the release build."
     echo ""
     print_tui_panel_rule 78
+    echo -e "  ${BOLD}C${NC}  Install cron/crond scheduler (if needed)"
+    echo -e "  ${BOLD}J${NC}  Install/update managed cron jobs now"
     echo -e "  ${BOLD}M${NC}  Run MySQL + create DB from shared .env now"
     echo -e "  ${BOLD}N${NC}  Install Nginx (if needed)"
     echo -e "  ${BOLD}P${NC}  Install PHP-FPM (if needed by nginx config)"
+    echo -e "  ${BOLD}U${NC}  Install/update app systemd service"
     echo -e "  ${BOLD}S${NC}  Start deploy   ${BOLD}Q${NC}  Cancel"
     echo -e "  ${DIM}Tip: bootstrap actions run immediately; menu redraws after each step.${NC}"
 }
@@ -939,7 +1149,7 @@ run_interactive_setup() {
 
     while true; do
         print_deploy_tui_menu
-        read -r -p "Select option [1-11, m, n, p, s, q]: " choice
+        read -r -p "Select option [1-11, c, j, m, n, p, u, s, q]: " choice
 
         case "${choice,,}" in
             1)
@@ -989,6 +1199,12 @@ run_interactive_setup() {
             11)
                 SETUP_MYSQL_DB_FROM_ENV="$(toggle_bool "${SETUP_MYSQL_DB_FROM_ENV}")"
                 ;;
+            c)
+                ensure_cron_installed_from_deploy || true
+                ;;
+            j)
+                ensure_managed_cron_jobs_installed_from_deploy || true
+                ;;
             m)
                 ensure_shared_env_file "${SCRIPT_DIR}/../.env.example" || true
                 setup_mysql_and_database_from_shared_env || true
@@ -999,6 +1215,9 @@ run_interactive_setup() {
             p)
                 ensure_php_fpm_installed_if_needed_from_deploy || true
                 ;;
+            u)
+                install_app_systemd_service_from_deploy || true
+                ;;
             s)
                 break
                 ;;
@@ -1007,7 +1226,7 @@ run_interactive_setup() {
                 exit 0
                 ;;
             *)
-                log_warn "Unknown selection. Choose a menu number, M/N/P, S, or Q."
+                log_warn "Unknown selection. Choose a menu number, C/J/M/N/P/U, S, or Q."
                 ;;
         esac
     done
@@ -1822,6 +2041,9 @@ while [[ $# -gt 0 ]]; do
         --setup-mysql-db-from-env) SETUP_MYSQL_DB_FROM_ENV=true; shift ;;
         --install-nginx) INSTALL_NGINX_IF_NEEDED=true; shift ;;
         --install-php-fpm-if-needed) INSTALL_PHP_FPM_IF_NEEDED=true; shift ;;
+        --install-cron) INSTALL_CRON_IF_NEEDED=true; shift ;;
+        --install-app-service) INSTALL_APP_SERVICE_IF_NEEDED=true; shift ;;
+        --install-cron-jobs) INSTALL_CRON_JOBS_IF_NEEDED=true; shift ;;
         --help|-h)
             show_usage
             exit 0
@@ -1969,6 +2191,18 @@ fi
 
 if [[ "${INSTALL_PHP_FPM_IF_NEEDED}" == true ]]; then
     ensure_php_fpm_installed_if_needed_from_deploy
+fi
+
+if [[ "${INSTALL_CRON_IF_NEEDED}" == true ]]; then
+    ensure_cron_installed_from_deploy
+fi
+
+if [[ "${INSTALL_APP_SERVICE_IF_NEEDED}" == true ]]; then
+    install_app_systemd_service_from_deploy
+fi
+
+if [[ "${INSTALL_CRON_JOBS_IF_NEEDED}" == true ]]; then
+    ensure_managed_cron_jobs_installed_from_deploy
 fi
 
 if [[ "${SETUP_MYSQL_DB_FROM_ENV}" == true ]]; then

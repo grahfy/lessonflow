@@ -23,11 +23,40 @@ DEPLOY_DIR="/var/www/${APP_NAME}"
 SHARED_DIR="${DEPLOY_DIR}/shared"
 LOG_DIR="/var/log/${APP_NAME}"
 
-# Load environment from the shared deploy path so cron jobs use the same
-# `NEXT_PUBLIC_SITE_URL` and `CRON_SECRET` as the running app/service.
-# This lightweight export parser assumes simple KEY=VALUE entries.
-if [[ -f "${SHARED_DIR}/.env" ]]; then
-    export $(grep -v '^#' "${SHARED_DIR}/.env" | xargs)
+# Read a single KEY=value assignment from a .env file without sourcing it.
+# This avoids executing arbitrary shell content and handles quoted values
+# safely enough for the runtime settings used by cron (URL + secret).
+read_env_file_value() {
+    local env_file="$1"
+    local key="$2"
+    local line=""
+    local value=""
+
+    [[ -f "${env_file}" ]] || return 1
+
+    line="$(grep -m1 -E "^[[:space:]]*${key}=" "${env_file}" 2>/dev/null || true)"
+    [[ -n "${line}" ]] || return 1
+
+    value="${line#*=}"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+
+    if [[ ${#value} -ge 2 && "${value:0:1}" == '"' && "${value: -1}" == '"' ]]; then
+        value="${value:1:${#value}-2}"
+    elif [[ ${#value} -ge 2 && "${value:0:1}" == "'" && "${value: -1}" == "'" ]]; then
+        value="${value:1:${#value}-2}"
+    fi
+
+    printf '%s\n' "${value}"
+}
+
+# Load only the env keys cron needs from the shared deploy env file so values
+# containing spaces/placeholders do not break shell parsing (for example
+# "Owner Name <email@example.com>" in unrelated variables).
+SHARED_ENV_FILE="${SHARED_DIR}/.env"
+if [[ -f "${SHARED_ENV_FILE}" ]]; then
+    NEXT_PUBLIC_SITE_URL="$(read_env_file_value "${SHARED_ENV_FILE}" "NEXT_PUBLIC_SITE_URL" || true)"
+    CRON_SECRET="$(read_env_file_value "${SHARED_ENV_FILE}" "CRON_SECRET" || true)"
 fi
 
 # Default site URL falls back to localhost for single-host deployments. If the

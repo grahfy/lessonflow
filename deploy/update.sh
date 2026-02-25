@@ -27,6 +27,9 @@
 #   --setup-mysql-db-from-env  Install local MySQL/MariaDB (if needed) and create DB from shared .env DATABASE_URL
 #   --install-nginx      Install Nginx (if needed) using setup-packages.sh in non-interactive mode
 #   --install-php-fpm-if-needed  Install PHP-FPM only if deploy nginx config indicates a PHP upstream is required
+#   --install-cron       Install cron/crond scheduler (if needed) and enable/start service
+#   --install-app-service  Install/update the app systemd unit and enable service
+#   --install-cron-jobs  Install/update managed cron jobs and restart cron (best effort)
 #   --no-spinner         Disable spinner UI
 #   --no-color           Disable colored output
 #   --help, -h           Show usage
@@ -46,6 +49,7 @@ ORIGINAL_ARGS=( "$@" )
 APP_NAME="melbourne-guitar-school"
 DEPLOY_DIR="/var/www/${APP_NAME}"
 SHARED_DIR="${DEPLOY_DIR}/shared"
+CURRENT_LINK="${DEPLOY_DIR}/current"
 REMOTE_NAME="origin"
 BRANCH=""
 SKIP_PULL=false
@@ -64,6 +68,9 @@ INTERACTIVE=false
 SETUP_MYSQL_DB_FROM_ENV=false
 INSTALL_NGINX_IF_NEEDED=false
 INSTALL_PHP_FPM_IF_NEEDED=false
+INSTALL_CRON_IF_NEEDED=false
+INSTALL_APP_SERVICE_IF_NEEDED=false
+INSTALL_CRON_JOBS_IF_NEEDED=false
 NO_SPINNER=false
 NO_COLOR=false
 IS_TTY=false
@@ -124,6 +131,9 @@ Options:
   --setup-mysql-db-from-env  Install local MySQL/MariaDB (if needed) and create DB from shared .env DATABASE_URL
   --install-nginx      Install Nginx (if needed) using setup-packages.sh in non-interactive mode
   --install-php-fpm-if-needed  Install PHP-FPM only when deploy nginx config uses PHP upstreams
+  --install-cron       Install cron/crond scheduler (if needed) and enable/start service
+  --install-app-service  Install/update the app systemd unit and enable service
+  --install-cron-jobs  Install/update managed cron jobs and restart cron (best effort)
   --no-spinner         Disable spinner UI
   --no-color           Disable colored output
   --help, -h           Show usage
@@ -837,6 +847,264 @@ ensure_php_fpm_installed_if_needed_from_update() {
   return 0
 }
 
+# Detects the scheduler service name used by the host (`cron` vs `crond`) so
+# install and repair helpers can share the same restart/enable logic.
+cron_scheduler_service_name_from_update() {
+  if ! command -v systemctl >/dev/null 2>&1; then
+    return 1
+  fi
+
+  if systemctl list-unit-files --type=service 2>/dev/null | grep -q '^cron\.service'; then
+    echo "cron"
+    return 0
+  fi
+  if systemctl list-unit-files --type=service 2>/dev/null | grep -q '^crond\.service'; then
+    echo "crond"
+    return 0
+  fi
+  if systemctl status cron >/dev/null 2>&1; then
+    echo "cron"
+    return 0
+  fi
+  if systemctl status crond >/dev/null 2>&1; then
+    echo "crond"
+    return 0
+  fi
+
+  return 1
+}
+
+# Enables and starts cron/crond after package installation or during repair
+# runs. This is best-effort and does not fail when systemd is unavailable.
+ensure_cron_scheduler_running_enabled_from_update() {
+  local service_name=""
+
+  if ! command -v systemctl >/dev/null 2>&1; then
+    log_warn "systemctl not available; install/start cron manually if needed."
+    return 0
+  fi
+
+  if ! service_name="$(cron_scheduler_service_name_from_update)"; then
+    log_warn "Cron scheduler service (cron/crond) not detected."
+    return 0
+  fi
+
+  run_server_setup_cmd systemctl enable "${service_name}" >/dev/null 2>&1 || true
+  if run_server_setup_cmd systemctl start "${service_name}" >/dev/null 2>&1; then
+    log_info "Cron scheduler ready: ${service_name}"
+  else
+    log_warn "Could not start cron scheduler service: ${service_name}"
+  fi
+
+  return 0
+}
+
+# Installs cron/crond using the OS package manager. Package names vary by
+# distro (`cron` vs `cronie`), so we resolve both the package and manager.
+ensure_cron_installed_from_update() {
+  local os_id=""
+  local pkg_manager=""
+  local cron_pkg=""
+
+  section "Cron Scheduler Install"
+
+  if command -v crontab >/dev/null 2>&1; then
+    log_info "crontab already installed"
+    ensure_cron_scheduler_running_enabled_from_update
+    return 0
+  fi
+
+  if [[ -r /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    source /etc/os-release
+    os_id="${ID:-}"
+  fi
+
+  case "${os_id}" in
+    ubuntu|debian|linuxmint|pop|elementary)
+      pkg_manager="apt"
+      cron_pkg="cron"
+      ;;
+    fedora|rhel|centos|rocky|almalinux|ol|scientific)
+      if command -v dnf >/dev/null 2>&1; then
+        pkg_manager="dnf"
+      else
+        pkg_manager="yum"
+      fi
+      cron_pkg="cronie"
+      ;;
+    opensuse*|sles|suse)
+      pkg_manager="zypper"
+      cron_pkg="cron"
+      ;;
+    arch|manjaro|endeavouros|garuda)
+      pkg_manager="pacman"
+      cron_pkg="cronie"
+      ;;
+    *)
+      log_error "Unsupported OS for cron scheduler auto-install in update.sh (ID='${os_id:-unknown}')."
+      log_error "Install cron/crond manually and rerun the helper if needed."
+      return 1
+      ;;
+  esac
+
+  case "${pkg_manager}" in
+    apt)
+      run_step "Installing cron scheduler package" run_server_setup_cmd apt install -y "${cron_pkg}" || return 1
+      ;;
+    dnf)
+      run_step "Installing cron scheduler package" run_server_setup_cmd dnf install -y "${cron_pkg}" || return 1
+      ;;
+    yum)
+      run_step "Installing cron scheduler package" run_server_setup_cmd yum install -y "${cron_pkg}" || return 1
+      ;;
+    zypper)
+      run_step "Installing cron scheduler package" run_server_setup_cmd zypper install -y "${cron_pkg}" || return 1
+      ;;
+    pacman)
+      run_step "Installing cron scheduler package" run_server_setup_cmd pacman -S --noconfirm "${cron_pkg}" || return 1
+      ;;
+  esac
+
+  ensure_cron_scheduler_running_enabled_from_update
+  return 0
+}
+
+# Installs or updates the app's systemd unit from deploy/<app>.service and
+# enables it. If a current release exists, the helper also attempts to start it.
+install_app_systemd_service_from_update() {
+  local service_file="/etc/systemd/system/${APP_NAME}.service"
+  local service_source="${SCRIPT_DIR}/${APP_NAME}.service"
+
+  section "App Systemd Service Install"
+
+  if ! command -v systemctl >/dev/null 2>&1; then
+    log_error "systemctl not available on this host."
+    return 1
+  fi
+
+  if [[ ! -f "${service_source}" ]]; then
+    log_error "Service template not found: ${service_source}"
+    return 1
+  fi
+
+  if [[ ! -f "${service_file}" ]]; then
+    log_info "Installing systemd service..."
+    run_server_setup_cmd cp "${service_source}" "${service_file}" || return 1
+    run_server_setup_cmd systemctl daemon-reload || return 1
+  elif ! cmp -s "${service_source}" "${service_file}"; then
+    log_info "Updating systemd service..."
+    run_server_setup_cmd cp "${service_source}" "${service_file}" || return 1
+    run_server_setup_cmd systemctl daemon-reload || return 1
+  else
+    log_info "Systemd service already up to date"
+  fi
+
+  run_server_setup_cmd systemctl enable "${APP_NAME}" >/dev/null 2>&1 || true
+
+  if [[ -L "${CURRENT_LINK}" || -d "${CURRENT_LINK}" ]]; then
+    if run_server_setup_cmd systemctl start "${APP_NAME}" >/dev/null 2>&1; then
+      log_info "Systemd service ready: ${APP_NAME}"
+    else
+      log_warn "Systemd service installed but not started (check current release/env): ${APP_NAME}"
+    fi
+  else
+    log_info "Current release not present yet; service installed/enabled but not started."
+  fi
+
+  return 0
+}
+
+# Mirrors deploy.sh's managed root crontab block so operators can repair or
+# bootstrap cron jobs directly from update.sh without running a full deploy.
+install_or_update_managed_crontab_jobs_from_update() {
+  local cron_runner="${CURRENT_LINK}/deploy/cron.sh"
+  local begin_marker="# BEGIN MELBOURNE_GUITAR_SCHOOL_MANAGED_CRON"
+  local end_marker="# END MELBOURNE_GUITAR_SCHOOL_MANAGED_CRON"
+  local existing=""
+  local stripped=""
+  local tmp_file=""
+
+  if ! command -v crontab >/dev/null 2>&1; then
+    log_info "crontab command not available; skipping cron job install"
+    return 1
+  fi
+
+  existing="$(run_server_setup_cmd crontab -l 2>/dev/null || true)"
+  stripped="$(printf '%s\n' "${existing}" | awk -v begin="${begin_marker}" -v end="${end_marker}" '
+    $0 == begin { skip=1; next }
+    $0 == end { skip=0; next }
+    !skip { print }
+  ')"
+
+  tmp_file="$(mktemp)"
+  {
+    if [[ -n "${stripped//[[:space:]]/}" ]]; then
+      printf '%s\n' "${stripped}"
+      echo
+    fi
+    printf '%s\n' "${begin_marker}"
+    echo "# Melbourne Guitar School managed cron jobs (updated by update.sh)"
+    echo "0 20 * * * ${cron_runner} daily-bookings-digest"
+    echo "30 20 * * * ${cron_runner} invoice-reminders"
+    echo "45 20 * * * ${cron_runner} admin-reports-daily"
+    echo "0 8 * * 1 ${cron_runner} admin-reports-weekly"
+    echo "15 8 1 * * ${cron_runner} admin-reports-monthly"
+    echo "30 8 1 1 * ${cron_runner} admin-reports-yearly"
+    printf '%s\n' "${end_marker}"
+    echo
+  } > "${tmp_file}"
+
+  run_step "Installing/updating managed cron jobs" run_server_setup_cmd crontab "${tmp_file}" || {
+    rm -f "${tmp_file}"
+    return 1
+  }
+  rm -f "${tmp_file}"
+  return 0
+}
+
+# Restarts cron/crond after crontab changes so hosts that rely on service
+# reload/restart pick up the latest runner path and env-linked behavior quickly.
+restart_cron_scheduler_if_present_from_update() {
+  local service_name=""
+
+  if ! command -v systemctl >/dev/null 2>&1; then
+    log_info "systemctl not available; skipping cron scheduler restart"
+    return 0
+  fi
+
+  if ! service_name="$(cron_scheduler_service_name_from_update)"; then
+    log_info "Cron scheduler service not detected (cron/crond); skipping restart"
+    return 0
+  fi
+
+  if ! run_step "Restarting cron scheduler (${service_name})" run_server_setup_cmd systemctl restart "${service_name}"; then
+    log_warn "Cron scheduler restart failed; continuing workflow"
+  fi
+  return 0
+}
+
+# Installs/updates the managed crontab block and ensures the scheduler is
+# installed/running. This is useful for first-time bootstrap and cron repairs.
+ensure_managed_cron_jobs_installed_from_update() {
+  local cron_runner="${CURRENT_LINK}/deploy/cron.sh"
+
+  section "Managed Cron Jobs Install"
+
+  if ! command -v crontab >/dev/null 2>&1; then
+    ensure_cron_installed_from_update || return 1
+  fi
+
+  if [[ ! -x "${cron_runner}" ]]; then
+    log_warn "Cron runner not found yet: ${cron_runner}"
+    log_warn "Installing cron entries anyway; they will work after the first successful deploy creates current/."
+  fi
+
+  install_or_update_managed_crontab_jobs_from_update || return 1
+  restart_cron_scheduler_if_present_from_update
+  return 0
+}
+
 bool_word() {
   if [[ "$1" == true ]]; then
     echo "ON"
@@ -1114,7 +1382,10 @@ print_update_tui_menu() {
   fi
   echo ""
   print_tui_panel_rule 92
+  echo -e "  ${BOLD}C${NC}  Install cron/crond scheduler (if needed)"
+  echo -e "  ${BOLD}J${NC}  Install/update managed cron jobs now"
   echo -e "  ${BOLD}M${NC}  Run MySQL + create DB from shared .env now"
+  echo -e "  ${BOLD}U${NC}  Install/update app systemd service"
   echo -e "  ${BOLD}S${NC}  Start update/deploy    ${BOLD}Q${NC}  Cancel"
   echo -e "${DIM}Tip: deploy.sh handles migrations/nginx sync/restarts; this menu configures the wrapper + pass-through flags.${NC}"
 }
@@ -1363,7 +1634,7 @@ run_interactive_setup() {
 
   while true; do
     print_update_tui_menu
-    read -r -p "Select option [1-15, m, s, q]: " choice
+    read -r -p "Select option [1-15, c, j, m, u, s, q]: " choice
 
     case "${choice,,}" in
       1)
@@ -1444,9 +1715,18 @@ run_interactive_setup() {
           log_warn "Enable deploy + SSL setup first to edit Certbot email."
         fi
         ;;
+      c)
+        ensure_cron_installed_from_update || true
+        ;;
+      j)
+        ensure_managed_cron_jobs_installed_from_update || true
+        ;;
       m)
         ensure_shared_env_file "${REPO_ROOT}/.env.example" || true
         setup_mysql_and_database_from_shared_env || true
+        ;;
+      u)
+        install_app_systemd_service_from_update || true
         ;;
       s)
         break
@@ -1456,7 +1736,7 @@ run_interactive_setup() {
         exit 0
         ;;
       *)
-        log_warn "Unknown selection. Choose a menu number, M, S, or Q."
+        log_warn "Unknown selection. Choose a menu number, C/J/M/U, S, or Q."
         ;;
     esac
   done
@@ -1581,6 +1861,9 @@ while [[ $# -gt 0 ]]; do
     --setup-mysql-db-from-env) SETUP_MYSQL_DB_FROM_ENV=true; shift ;;
     --install-nginx) INSTALL_NGINX_IF_NEEDED=true; shift ;;
     --install-php-fpm-if-needed) INSTALL_PHP_FPM_IF_NEEDED=true; shift ;;
+    --install-cron) INSTALL_CRON_IF_NEEDED=true; shift ;;
+    --install-app-service) INSTALL_APP_SERVICE_IF_NEEDED=true; shift ;;
+    --install-cron-jobs) INSTALL_CRON_JOBS_IF_NEEDED=true; shift ;;
     --no-spinner) NO_SPINNER=true; shift ;;
     --no-color) NO_COLOR=true; shift ;;
     --help|-h) show_usage; exit 0 ;;
@@ -1661,6 +1944,18 @@ fi
 
 if [[ "${INSTALL_PHP_FPM_IF_NEEDED}" == true ]]; then
   ensure_php_fpm_installed_if_needed_from_update
+fi
+
+if [[ "${INSTALL_CRON_IF_NEEDED}" == true ]]; then
+  ensure_cron_installed_from_update
+fi
+
+if [[ "${INSTALL_APP_SERVICE_IF_NEEDED}" == true ]]; then
+  install_app_systemd_service_from_update
+fi
+
+if [[ "${INSTALL_CRON_JOBS_IF_NEEDED}" == true ]]; then
+  ensure_managed_cron_jobs_installed_from_update
 fi
 
 if [[ "${SETUP_MYSQL_DB_FROM_ENV}" == true ]]; then
