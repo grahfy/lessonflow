@@ -321,6 +321,42 @@ ensure_build_node_options() {
   log_info "Applied auto NODE_OPTIONS heap limit for ${total_ram_mb}MB RAM: ${heap_flag}"
 }
 
+# Removes local wrapper-side caches (repo build caches and the invoking user's
+# npm cache) before/after delegating to deploy.sh. This keeps the persistent git
+# clone from growing over time and reclaims space consumed during failed runs.
+cleanup_local_install_and_build_caches() {
+  local removed=0
+  local path=""
+  local npm_cache_root="${HOME:-/root}/.npm"
+
+  for path in \
+    "${REPO_ROOT:-$(pwd)}/.next/cache" \
+    "${REPO_ROOT:-$(pwd)}/node_modules/.cache" \
+    "${npm_cache_root}/_cacache" \
+    "${npm_cache_root}/_logs"
+  do
+    [[ -e "${path}" ]] || continue
+    rm -rf "${path}" || {
+      log_warn "Failed to remove cache path: ${path}"
+      continue
+    }
+    removed=$((removed + 1))
+    log_info "Removed cache path: ${path}"
+  done
+
+  if command -v npm >/dev/null 2>&1; then
+    if npm cache clean --force >/dev/null 2>&1; then
+      log_info "Cleared npm cache metadata"
+    else
+      log_warn "npm cache clean failed; continuing update workflow"
+    fi
+  fi
+
+  if (( removed == 0 )); then
+    log_info "No local install/build caches removed"
+  fi
+}
+
 # Returns 0 if the git working tree has tracked or staged changes.
 git_worktree_dirty() {
   ! git diff --quiet || ! git diff --cached --quiet
@@ -440,17 +476,30 @@ run_deploy() {
 
   section "Deploy"
   ensure_build_node_options
+  log_info "Pre-deploy cache cleanup..."
+  cleanup_local_install_and_build_caches
   log_info "Invoking ${DEPLOY_SCRIPT} ${deploy_args[*]}"
 
   if should_use_sudo_for_deploy; then
+    local sudo_env_args=()
     if [[ -n "${NODE_OPTIONS:-}" ]]; then
-      sudo env "NODE_OPTIONS=${NODE_OPTIONS}" "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
+      sudo_env_args+=( "NODE_OPTIONS=${NODE_OPTIONS}" )
+    fi
+    if [[ -n "${NEXT_LOW_MEMORY_BUILD:-}" ]]; then
+      sudo_env_args+=( "NEXT_LOW_MEMORY_BUILD=${NEXT_LOW_MEMORY_BUILD}" )
+    fi
+
+    if (( ${#sudo_env_args[@]} > 0 )); then
+      sudo env "${sudo_env_args[@]}" "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
     else
       sudo "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
     fi
   else
     "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
   fi
+
+  log_info "Post-deploy cache cleanup..."
+  cleanup_local_install_and_build_caches
 }
 
 # Parse CLI arguments before interactive setup/validation.

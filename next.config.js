@@ -1,5 +1,6 @@
 const path = require("path");
 const isProduction = process.env.NODE_ENV === "production";
+const isLowMemoryDeployBuild = process.env.NEXT_LOW_MEMORY_BUILD === "1";
 
 const baseSecurityHeaders = [
   {
@@ -44,6 +45,14 @@ const nextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.join(__dirname),
   poweredByHeader: false,
+  // Low-memory deploy builds can skip duplicate validation work because the
+  // project already exposes dedicated lint/typecheck commands for CI/manual use.
+  eslint: {
+    ignoreDuringBuilds: isLowMemoryDeployBuild
+  },
+  typescript: {
+    ignoreBuildErrors: isLowMemoryDeployBuild
+  },
   async headers() {
     return [
       {

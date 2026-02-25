@@ -416,6 +416,72 @@ cleanup_old_temp_files() {
     fi
 }
 
+# Removes install/build caches that can grow significantly during deployment.
+# This runs as a best-effort cleanup so disk pressure from npm cache writes and
+# Next.js build caches does not accumulate across releases or block later steps.
+cleanup_install_and_build_caches() {
+    local removed=0
+    local path=""
+    local npm_cache_root="${HOME:-/root}/.npm"
+
+    for path in \
+        ".next/cache" \
+        "node_modules/.cache" \
+        "${npm_cache_root}/_cacache" \
+        "${npm_cache_root}/_logs"
+    do
+        [[ -e "${path}" ]] || continue
+        rm -rf "${path}" || {
+            log_warn "Failed to remove cache path: ${path}"
+            continue
+        }
+        removed=$((removed + 1))
+        log_info "Removed cache path: ${path}"
+    done
+
+    # npm's cache metadata can persist after manual directory cleanup depending
+    # on the npm version, so run an explicit clean as a non-fatal final pass.
+    if command -v npm >/dev/null 2>&1; then
+        if npm cache clean --force >/dev/null 2>&1; then
+            log_info "Cleared npm cache metadata"
+        else
+            log_warn "npm cache clean failed; continuing deployment"
+        fi
+    fi
+
+    if (( removed == 0 )); then
+        log_info "No install/build caches removed"
+    fi
+}
+
+# Exports deploy-only Next.js build flags for low-memory hosts to reduce peak
+# RAM usage during `next build`. Lint/type-check still run in CI/local workflows.
+prepare_next_build_environment() {
+    export NEXT_TELEMETRY_DISABLED=1
+
+    if [[ "${NEXT_LOW_MEMORY_BUILD:-}" == "1" ]]; then
+        log_info "Using existing NEXT_LOW_MEMORY_BUILD=1 override"
+        return 0
+    fi
+
+    local total_ram_mb=""
+    total_ram_mb="$(detect_total_ram_mb || true)"
+    if [[ -z "${total_ram_mb}" ]]; then
+        log_info "Could not detect system RAM; leaving Next.js build validation enabled"
+        return 0
+    fi
+
+    if (( total_ram_mb >= LOW_RAM_1GB_AUTO_HEAP_MIN_MB && total_ram_mb <= LOW_RAM_1GB_AUTO_HEAP_MAX_MB )); then
+        export NEXT_LOW_MEMORY_BUILD=1
+    elif (( total_ram_mb >= LOW_RAM_2GB_AUTO_HEAP_MIN_MB && total_ram_mb <= LOW_RAM_2GB_AUTO_HEAP_MAX_MB )); then
+        export NEXT_LOW_MEMORY_BUILD=1
+    fi
+
+    if [[ "${NEXT_LOW_MEMORY_BUILD:-}" == "1" ]]; then
+        log_warn "Enabled low-memory Next.js build mode (skip build lint/type-check) for ${total_ram_mb}MB RAM host"
+    fi
+}
+
 ensure_build_node_options() {
     local heap_mb="${DEFAULT_BUILD_NODE_HEAP_MB}"
     local heap_flag=""
@@ -760,7 +826,12 @@ else
     log_info "Skipping database migrations"
 fi
 
+# Reclaim package-manager cache before the build phase so the build has more
+# free disk space available on small VPS hosts.
+cleanup_install_and_build_caches
+
 # Build the application
+prepare_next_build_environment
 run_step "Building Next.js application" npm run build
 
 # Verify build succeeded
@@ -779,6 +850,10 @@ if [[ -d ".next/standalone" ]]; then
     mkdir -p ".next/standalone/.next"
     cp -r ".next/static" ".next/standalone/.next/"
 fi
+
+# Remove transient build caches from the release after assets are copied. The
+# runtime service does not need these caches, and deleting them reduces disk use.
+cleanup_install_and_build_caches
 
 # Update symlink atomically
 log_info "Updating current symlink..."
