@@ -4,6 +4,7 @@ type PanelLayoutProps = PropsWithChildren<{
   kicker: string;
   title: string;
   lead: string;
+  viewClassName?: string;
   visualLabel?: string;
   visualClassName?: string;
   leadJustified?: boolean;
@@ -17,6 +18,7 @@ export function PanelLayout({
   kicker,
   title,
   lead,
+  viewClassName,
   visualLabel = "Section",
   visualClassName,
   leadJustified = false,
@@ -27,7 +29,7 @@ export function PanelLayout({
   children
 }: PanelLayoutProps) {
   return (
-    <main className="view" aria-label="Page Content">
+    <main className={viewClassName ? `view ${viewClassName}` : "view"} aria-label="Page Content">
       <div className="view-stage" data-motion-stage="true">
         <section className="panel-copy" data-motion-item="copy">
           <p className="kicker" data-motion-item="kicker">

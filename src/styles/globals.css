@@ -177,6 +177,40 @@ a {
   gap: clamp(10px, 1.6vw, 18px);
 }
 
+/* Booking form panel is substantially taller than other marketing-page content.
+   On desktop, keep the page shell fixed-height and allow only the left copy/form
+   column to scroll so the user does not need to scroll the entire page. */
+@media (min-width: 1101px) {
+  .view-book-page .view-stage {
+    min-height: 0;
+  }
+
+  .view-book-page .panel-copy {
+    min-height: 0;
+    overflow-y: auto;
+    justify-content: flex-start;
+    align-content: start;
+    scrollbar-gutter: stable;
+    padding: clamp(16px, 2.2vw, 28px);
+    gap: 10px;
+  }
+
+  .view-book-page h1 {
+    font-size: clamp(1.8rem, 2.8vw, 3.3rem);
+    line-height: 1.04;
+  }
+
+  .view-book-page .lead {
+    font-size: clamp(0.92rem, 1.05vw, 1.03rem);
+    line-height: 1.32;
+    max-width: 52ch;
+  }
+
+  .view-book-page .helper-text {
+    font-size: 0.72rem;
+  }
+}
+
 .kicker {
   margin: 0;
   font-size: 0.76rem;
@@ -2099,17 +2133,21 @@ h1 {
   }
 
   .student-portal-header {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     min-height: 0;
     padding-top: 4px;
     padding-bottom: 4px;
   }
 
   .student-portal-header-visual {
-    display: none;
+    display: block;
+    width: clamp(84px, 24vw, 116px);
+    align-self: start;
+    justify-self: end;
   }
 
   .student-portal-header-actions {
+    grid-column: 1 / -1;
     width: 100%;
     margin-left: 0;
     justify-content: flex-end;

@@ -20,6 +20,7 @@ export default function BookPage() {
       kicker="Book Lesson"
       title="Request a lesson and get owner approval."
       lead="Submit your preferred lesson time and details. Requests are reviewed and confirmed by the owner."
+      viewClassName="view-book-page"
       visualLabel="Booking"
       visualClassName="contact-hero"
       leadJustified
