@@ -9,6 +9,12 @@ type BookingState =
   | { status: "success"; message: string }
   | { status: "error"; message: string };
 
+/**
+ * Public booking-request form.
+ *
+ * Submissions create pending booking requests that are manually approved by the owner/admin before
+ * becoming confirmed bookings. The UI therefore focuses on validation and expectation-setting.
+ */
 export function BookingForm() {
   const [state, setState] = useState<BookingState>({ status: "idle" });
   const [loading, setLoading] = useState(false);
@@ -22,6 +28,7 @@ export function BookingForm() {
       return;
     }
 
+    // Bring the success message into view on long/mobile forms after a successful submission.
     successNoticeRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
     successNoticeRef.current.focus();
   }, [state.status, successNoticeRef]);
@@ -43,6 +50,7 @@ export function BookingForm() {
     const customDurationMinutes =
       durationType === "custom" && customDurationRaw ? Number.parseInt(customDurationRaw, 10) : undefined;
 
+    // Build the API payload in the same shape used by `/api/booking-requests`.
     const payload = {
       name: fullName,
       email: String(form.get("email") || ""),
@@ -66,6 +74,7 @@ export function BookingForm() {
 
     let response: Response;
     try {
+      // The booking request endpoint persists the request and then notifies the owner by email.
       response = await fetch("/api/booking-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -95,7 +104,7 @@ export function BookingForm() {
     setState({
       status: "success",
       message:
-        "Booking request submitted successfully. We will confirm your booking with you by phone call or email."
+        "Booking submission is pending. We will get back to you via email or phone within 24 hours regarding booking confirmation."
     });
   }
 

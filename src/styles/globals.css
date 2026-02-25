@@ -515,6 +515,21 @@ h1 {
   resize: vertical;
 }
 
+.password-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.password-input-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.password-visibility-toggle {
+  white-space: nowrap;
+}
+
 .helper-text {
   color: var(--ink-1);
   font-size: 0.8rem;
@@ -1343,7 +1358,7 @@ h1 {
 
 .student-portal-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   justify-content: unset;
   min-height: 66px;
@@ -1354,14 +1369,17 @@ h1 {
 }
 
 .student-portal-header-copy {
+  display: grid;
+  gap: 2px;
   min-width: 0;
 }
 
 .student-portal-header-visual {
   width: clamp(132px, 17vw, 196px);
-  align-self: center;
-  justify-self: end;
+  align-self: start;
+  justify-self: start;
   opacity: 0.96;
+  margin-bottom: 3px;
 }
 
 .student-portal-header-illustration {
@@ -2162,7 +2180,7 @@ h1 {
     display: block;
     width: clamp(84px, 24vw, 116px);
     align-self: start;
-    justify-self: end;
+    justify-self: start;
   }
 
   .student-portal-header-actions {

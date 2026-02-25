@@ -72,6 +72,8 @@ export function StudentPortalClient() {
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
+    // Portal and materials pages intentionally share the same aggregated payload route so booking
+    // lists, pending requests, and materials stay consistent.
     const response = await fetch("/api/student/portal", { cache: "no-store" });
     if (response.status === 401) {
       router.push("/student/login");
@@ -97,6 +99,7 @@ export function StudentPortalClient() {
    */
   async function logout() {
     setLoggingOut(true);
+    // Logout is best-effort; the important user outcome is returning to the login screen.
     await fetch("/api/student/logout", { method: "POST" });
     router.push("/student/login");
     router.refresh();
@@ -118,6 +121,7 @@ export function StudentPortalClient() {
       return;
     }
 
+    // Student booking requests remain pending until owner approval.
     const response = await fetch("/api/student/bookings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -140,6 +144,7 @@ export function StudentPortalClient() {
     setRequestLessonMode("in_person");
     setRequestLessonDuration("min60");
     setRequestNotes("");
+    // Reload to refresh the pending request list and any concurrent owner-side changes.
     await load();
   }
 
@@ -176,6 +181,8 @@ export function StudentPortalClient() {
       ...prev,
       [bookingId]: true
     }));
+    // Optimistically mark the booking as cancelled for immediate feedback, then reconcile with a
+    // delayed reload to pick up any server-side updates.
     setData((prev) => {
       if (!prev) {
         return prev;
@@ -202,21 +209,21 @@ export function StudentPortalClient() {
     <div className="student-portal-shell" data-motion-root="student-portal">
       <div className="admin-card booking-row student-portal-header">
         <div className="student-portal-header-copy">
+          <div className="student-portal-header-visual">
+            {/* Lightweight local SVG keeps the portal header visual fast to load. */}
+            <img
+              className="student-portal-header-illustration"
+              src="/images/student-portal-music-books.svg"
+              alt="Illustration of music study books and notes"
+              width={360}
+              height={220}
+              loading="eager"
+              decoding="async"
+            />
+          </div>
           <p className="kicker">Student Portal</p>
           <h1>{data?.student.fullName || "Portal"}</h1>
           <p className="helper-text">Appointments and assigned learning materials.</p>
-        </div>
-        <div className="student-portal-header-visual">
-          {/* Lightweight local SVG keeps the portal header visual fast to load. */}
-          <img
-            className="student-portal-header-illustration"
-            src="/images/student-portal-music-books.svg"
-            alt="Illustration of music study books and notes"
-            width={360}
-            height={220}
-            loading="eager"
-            decoding="async"
-          />
         </div>
         <div className="student-portal-header-actions">
           <Link className="btn btn-secondary" href="/student/materials">
