@@ -60,6 +60,9 @@ DB_PUSH=false
 SSL_SETUP=false
 SSL_DOMAIN=""
 SSL_EMAIL=""
+CLI_SSL_FLAG_SET=false
+CLI_SSL_DOMAIN_SET=false
+CLI_SSL_EMAIL_SET=false
 ALLOW_DIRTY=false
 FORCE_SUDO_DEPLOY=false
 FORCE_NO_SUDO_DEPLOY=false
@@ -223,6 +226,107 @@ print_banner() {
   local app_version
   app_version="$(get_app_version)"
   print_box_banner "Melbourne Guitar School Update (+ deploy) v${app_version}"
+}
+
+# Extracts the first useful server_name token from an nginx site config so the
+# wrapper can prefill SSL domain values from an existing production host.
+read_first_nginx_server_name_domain() {
+  local nginx_conf="$1"
+
+  [[ -r "${nginx_conf}" ]] || return 1
+
+  awk '
+    /^[[:space:]]*server_name[[:space:]]+/ {
+      for (i = 2; i <= NF; i++) {
+        gsub(/;/, "", $i)
+        if ($i == "" || $i == "_" || $i == "localhost" || $i ~ /^\$/) {
+          continue
+        }
+        print $i
+        exit
+      }
+    }
+  ' "${nginx_conf}" 2>/dev/null
+}
+
+# Reads the domain segment from a LetsEncrypt ssl_certificate path in nginx
+# config, e.g. /etc/letsencrypt/live/example.com/fullchain.pem -> example.com.
+read_letsencrypt_domain_from_nginx_config() {
+  local nginx_conf="$1"
+
+  [[ -r "${nginx_conf}" ]] || return 1
+
+  awk '
+    match($0, /ssl_certificate[[:space:]]+\/etc\/letsencrypt\/live\/([^/]+)\/fullchain\.pem/, m) {
+      print m[1]
+      exit
+    }
+  ' "${nginx_conf}" 2>/dev/null
+}
+
+# Best-effort host config discovery for update.sh defaults. It infers whether
+# SSL is already configured on the server and pre-fills domain/email where
+# readable, so operators do not need to re-toggle SSL settings every run.
+detect_previous_deploy_defaults_from_host() {
+  local nginx_conf=""
+  local nginx_candidates=(
+    "/etc/nginx/sites-available/${APP_NAME}"
+    "/etc/nginx/sites-enabled/${APP_NAME}"
+  )
+  local ssl_detected=false
+  local detected_domain=""
+  local detected_email=""
+  local cli_ini="/etc/letsencrypt/cli.ini"
+  local changed=false
+  local candidate=""
+
+  for candidate in "${nginx_candidates[@]}"; do
+    if [[ -r "${candidate}" ]]; then
+      nginx_conf="${candidate}"
+      break
+    fi
+  done
+
+  if [[ -n "${nginx_conf}" ]]; then
+    if grep -E -q '^[[:space:]]*listen[[:space:]].*443|^[[:space:]]*ssl_certificate[[:space:]]+' "${nginx_conf}" 2>/dev/null; then
+      ssl_detected=true
+    fi
+
+    detected_domain="$(read_first_nginx_server_name_domain "${nginx_conf}" || true)"
+    if [[ -z "${detected_domain}" ]]; then
+      detected_domain="$(read_letsencrypt_domain_from_nginx_config "${nginx_conf}" || true)"
+    fi
+  fi
+
+  if [[ -z "${detected_email}" && -r "${cli_ini}" ]]; then
+    detected_email="$(awk -F'=' '
+      /^[[:space:]]*email[[:space:]]*=/ {
+        v=$2
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+        print v
+        exit
+      }
+    ' "${cli_ini}" 2>/dev/null || true)"
+  fi
+
+  if [[ "${ssl_detected}" == true && "${CLI_SSL_FLAG_SET}" != true && "${SSL_SETUP}" != true ]]; then
+    SSL_SETUP=true
+    changed=true
+  fi
+
+  if [[ -n "${detected_domain}" && "${CLI_SSL_DOMAIN_SET}" != true && -z "${SSL_DOMAIN}" ]]; then
+    SSL_DOMAIN="${detected_domain}"
+    changed=true
+  fi
+
+  if [[ -n "${detected_email}" && "${CLI_SSL_EMAIL_SET}" != true && -z "${SSL_EMAIL}" ]]; then
+    SSL_EMAIL="${detected_email}"
+    changed=true
+  fi
+
+  if [[ "${changed}" == true ]]; then
+    log_info "Loaded previous host SSL defaults (SSL=$(bool_word "${SSL_SETUP}"), domain=${SSL_DOMAIN:-n/a}, email=${SSL_EMAIL:-n/a})"
+  fi
 }
 
 # Informational line used for low-noise status updates.
@@ -1707,9 +1811,9 @@ run_deploy() {
   [[ "${SSL_SETUP}" == true ]] && deploy_args+=( "--ssl" "--domain" "${SSL_DOMAIN}" "--email" "${SSL_EMAIL}" )
   [[ "${INSTALL_NGINX_IF_NEEDED}" == true ]] && deploy_args+=( "--install-nginx" )
   [[ "${INSTALL_PHP_FPM_IF_NEEDED}" == true ]] && deploy_args+=( "--install-php-fpm-if-needed" )
-  if [[ "${INSTALL_CRON_IF_NEEDED}" == true && "${SKIP_CRON_SETUP}" == true ]]; then
-    deploy_args+=( "--install-cron" )
-  fi
+  [[ "${INSTALL_CRON_IF_NEEDED}" == true ]] && deploy_args+=( "--install-cron" )
+  [[ "${INSTALL_APP_SERVICE_IF_NEEDED}" == true ]] && deploy_args+=( "--install-app-service" )
+  [[ "${INSTALL_CRON_JOBS_IF_NEEDED}" == true ]] && deploy_args+=( "--install-cron-jobs" )
   [[ "${NO_SPINNER}" == true ]] && deploy_args+=( "--no-spinner" )
   [[ "${NO_COLOR}" == true ]] && deploy_args+=( "--no-color" )
 
@@ -1795,9 +1899,9 @@ while [[ $# -gt 0 ]]; do
     --skip-cron) SKIP_CRON_SETUP=true; shift ;;
     --skip-migrate) SKIP_MIGRATE=true; shift ;;
     --db-push) DB_PUSH=true; shift ;;
-    --ssl) SSL_SETUP=true; shift ;;
-    --domain) SSL_DOMAIN="$2"; shift 2 ;;
-    --email) SSL_EMAIL="$2"; shift 2 ;;
+    --ssl) SSL_SETUP=true; CLI_SSL_FLAG_SET=true; shift ;;
+    --domain) SSL_DOMAIN="$2"; CLI_SSL_DOMAIN_SET=true; shift 2 ;;
+    --email) SSL_EMAIL="$2"; CLI_SSL_EMAIL_SET=true; shift 2 ;;
     --allow-dirty) ALLOW_DIRTY=true; shift ;;
     --sudo-deploy) FORCE_SUDO_DEPLOY=true; shift ;;
     --no-sudo-deploy) FORCE_NO_SUDO_DEPLOY=true; shift ;;
@@ -1855,6 +1959,8 @@ if [[ -z "${BRANCH}" ]]; then
   log_warn "Could not determine current branch (detached HEAD). Defaulting to ${BRANCH}."
 fi
 
+detect_previous_deploy_defaults_from_host
+
 if [[ "${DB_PUSH}" == true ]]; then
   SKIP_MIGRATE=true
 fi
@@ -1879,18 +1985,6 @@ fi
 
 if [[ "${SKIP_DEPLOY}" == false ]]; then
   ensure_sudo_for_deploy_ready
-
-  if [[ "${INSTALL_APP_SERVICE_IF_NEEDED}" == true ]]; then
-    log_info "Wrapper 'Install app service' helper is skipped during deploy; deploy.sh updates the service by default."
-  fi
-
-  if [[ "${INSTALL_CRON_JOBS_IF_NEEDED}" == true && "${SKIP_CRON_SETUP}" == false ]]; then
-    log_info "Wrapper 'Install cron jobs' helper is skipped during deploy; deploy.sh syncs cron jobs by default."
-  fi
-
-  if [[ "${INSTALL_CRON_IF_NEEDED}" == true && "${SKIP_CRON_SETUP}" == false ]]; then
-    log_info "Wrapper 'Install cron' helper is skipped during deploy; deploy.sh cron sync installs scheduler if needed."
-  fi
 fi
 
 if [[ "${SKIP_DEPLOY}" == true ]]; then
