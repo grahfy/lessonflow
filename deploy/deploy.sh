@@ -1163,23 +1163,35 @@ else
     log_info "Systemd service already up to date"
 fi
 
-# Ensure nginx config is installed (HTTP-only initially, certbot will upgrade to HTTPS)
+# Ensure nginx config is installed/updated (use HTTPS template after certs exist)
 NGINX_SITE_AVAILABLE="/etc/nginx/sites-available/${APP_NAME}"
 NGINX_SITE_ENABLED="/etc/nginx/sites-enabled/${APP_NAME}"
-if [[ ! -f "${NGINX_SITE_AVAILABLE}" ]]; then
-    log_info "Installing nginx configuration..."
-    cp "${NEW_RELEASE_DIR}/deploy/nginx-http.conf" "${NGINX_SITE_AVAILABLE}"
-    ln -sf "${NGINX_SITE_AVAILABLE}" "${NGINX_SITE_ENABLED}"
-    # Remove default site if it exists
-    rm -f /etc/nginx/sites-enabled/default
-    # Test and reload nginx
-    if nginx -t; then
-        systemctl reload nginx
-        log_info "Nginx configuration installed and reloaded"
-    else
-        log_error "Nginx configuration test failed"
-        exit 1
+NGINX_CERT_CHAIN="/etc/letsencrypt/live/melbourneguitarschool.com.au/fullchain.pem"
+NGINX_CERT_KEY="/etc/letsencrypt/live/melbourneguitarschool.com.au/privkey.pem"
+NGINX_TEMPLATE_SOURCE="${NEW_RELEASE_DIR}/deploy/nginx-http.conf"
+if [[ -f "${NGINX_CERT_CHAIN}" && -f "${NGINX_CERT_KEY}" ]]; then
+    NGINX_TEMPLATE_SOURCE="${NEW_RELEASE_DIR}/deploy/nginx.conf"
+fi
+
+log_info "Syncing nginx configuration from $(basename "${NGINX_TEMPLATE_SOURCE}")..."
+mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
+if [[ -f "${NGINX_SITE_AVAILABLE}" ]]; then
+    cp "${NGINX_SITE_AVAILABLE}" "${NGINX_SITE_AVAILABLE}.bak"
+fi
+cp "${NGINX_TEMPLATE_SOURCE}" "${NGINX_SITE_AVAILABLE}"
+ln -sf "${NGINX_SITE_AVAILABLE}" "${NGINX_SITE_ENABLED}"
+rm -f /etc/nginx/sites-enabled/default
+
+if nginx -t; then
+    log_info "Nginx configuration test passed"
+else
+    log_error "Nginx configuration test failed"
+    if [[ -f "${NGINX_SITE_AVAILABLE}.bak" ]]; then
+        log_warn "Restoring previous nginx configuration backup..."
+        cp "${NGINX_SITE_AVAILABLE}.bak" "${NGINX_SITE_AVAILABLE}"
+        nginx -t >/dev/null 2>&1 || true
     fi
+    exit 1
 fi
 
 # Restart the service
@@ -1197,6 +1209,10 @@ else
     systemctl status ${APP_NAME} --no-pager
     exit 1
 fi
+
+# Restart nginx after app deploy so updated config and upstream state are active.
+log_info "Restarting nginx..."
+run_step "Restarting nginx" systemctl restart nginx
 
 # Cleanup old releases
 log_info "Cleaning up old releases..."
