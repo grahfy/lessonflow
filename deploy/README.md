@@ -297,6 +297,7 @@ Notes:
 - The deploy script prunes old Node/npm temp files in `/tmp`, `/var/tmp`, and npm cache temp before builds to reduce ENOSPC failures.
 - Use `--no-spinner --no-color` for CI/log-only environments.
 - `deploy/update.sh` wraps `git fetch/pull` + `deploy.sh` with the same interactive/spinner UI.
+- `deploy.sh` and `update.sh` banners now render dynamically and include the app version from `package.json`, so longer titles do not break the right border.
 
 ### 2. Install Systemd Service
 
@@ -323,6 +324,17 @@ sudo systemctl reload nginx
 cd /var/www/melbourne-guitar-school/current
 sudo -u www-data npx prisma migrate deploy
 ```
+
+If this is an existing database and you added the new baseline migration (`20260222_initial_schema`) after the database was already initialized, Prisma may fail with `P3018` / MySQL `1050` (`Table ... already exists`) on that first migration.
+
+Safe recovery (baseline metadata only, do not execute baseline SQL on an existing DB):
+```bash
+cd /var/www/melbourne-guitar-school/current
+sudo -u www-data npx prisma migrate resolve --applied 20260222_initial_schema
+sudo -u www-data npx prisma migrate deploy
+```
+
+`deploy/deploy.sh` (and therefore `deploy/update.sh`) now handles this baseline case automatically.
 
 ### 5. Complete Setup Wizard
 
@@ -489,6 +501,25 @@ sudo nginx -t
 # Check error logs
 tail -f /var/log/nginx/melbourne-guitar-school.error.log
 ```
+
+### Prisma Migration Baseline Error (`P3018` / MySQL `1050`)
+
+If Prisma reports that the first baseline migration failed because tables already exist:
+
+```text
+Applying migration `20260222_initial_schema`
+Error: P3018 ... Database error code: 1050 ... already exists
+```
+
+Do this (safe on existing databases):
+
+```bash
+cd /var/www/melbourne-guitar-school/current
+sudo -u www-data npx prisma migrate resolve --applied 20260222_initial_schema
+sudo -u www-data npx prisma migrate deploy
+```
+
+Do **not** run `prisma db execute` for the baseline migration SQL on a non-empty production database.
 
 ### Rollback to Previous Release
 

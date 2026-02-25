@@ -85,8 +85,7 @@ Melbourne Guitar School Platform is a full-stack web application for running day
 ## Tech Stack
 - Next.js App Router + TypeScript
 - Prisma ORM
-- SQLite for local/test environments
-- MySQL for production environments
+- MySQL (Prisma datasource provider for app, tests, and production)
 - Nodemailer for SMTP delivery
 - Gmail API (OAuth2 via `googleapis`) for HTTPS email delivery fallback
 - pdf-lib for invoice PDF generation
@@ -114,21 +113,28 @@ npm install
 ```bash
 cp .env.example .env
 ```
-3. Apply local migrations (SQLite):
+3. Start a local MySQL database (Docker example, no host MySQL install required):
 ```bash
-DATABASE_URL="file:./prisma/dev.db" npx prisma migrate deploy
+docker run --name mgs-dev-mysql \
+  -e MYSQL_ROOT_PASSWORD=root \
+  -e MYSQL_DATABASE=mgs_dev \
+  -p 3306:3306 -d mysql:8
 ```
-4. Start dev server:
+4. Apply local migrations (MySQL):
+```bash
+DATABASE_URL="mysql://root:root@127.0.0.1:3306/mgs_dev" npx prisma migrate deploy
+```
+5. Start dev server:
 ```bash
 npm run dev
 ```
-5. Open setup wizard and create first admin account:
+6. Open setup wizard and create first admin account:
 ```bash
 http://127.0.0.1:3000/setup
 ```
 
 ### MySQL Setup (Production)
-For production, use MySQL instead of SQLite:
+Use MySQL in production:
 ```bash
 # Create MySQL database first
 DATABASE_URL="mysql://user:password@host:3306/database_name" npx prisma migrate deploy
@@ -145,6 +151,8 @@ Run dependency install, local DB prep, tests, and then launch the site:
 ```bash
 npm run local:full-site
 ```
+
+Note: `scripts/test-full-site-local.sh` is still SQLite-oriented and should be updated before relying on it with the current MySQL Prisma schema. Prefer the Docker MySQL flow in the Testing section below for now.
 
 By default this script binds to `0.0.0.0` so it can be reached:
 - locally via `http://127.0.0.1:3000`,
@@ -189,7 +197,7 @@ npm run typecheck
 ## Environment Variables
 
 ### Core
-- `DATABASE_URL`: Prisma DB URL (`file:./prisma/dev.db` locally).
+- `DATABASE_URL`: Prisma MySQL URL (`mysql://user:password@host:3306/database_name`).
 - `ADMIN_EMAIL`: admin login and owner notification email.
 - `ADMIN_PASSWORD`: legacy bootstrap password (kept for tests/local scripts).
 - `ADMIN_SESSION_SECRET`: admin session signing secret.
