@@ -69,11 +69,11 @@ LessonFlow brings those workflows into one system so teachers and admins can spe
 
 ## Admin Screenshots
 
-Tracked admin screenshots already exist in the repository (Playwright generation not needed for this README update).
+Tracked admin screenshots already exist in the repository (including a Playwright-generated admin dashboard/bookings console capture).
 
-### Admin Manual
+### Admin Dashboard (Bookings Console)
 
-![LessonFlow admin manual page](public/documentation/screenshots/admin-manual-page.png)
+![LessonFlow admin dashboard bookings console](public/documentation/screenshots/booking-calendar-week-view.png)
 
 ### Admin Reports Dashboard
 
