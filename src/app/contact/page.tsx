@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { ContactForm } from "@/components/contact-form";
 import { ImageModal } from "@/components/image-modal";
 import { PanelLayout } from "@/components/panel-layout";
+import { getOwnerEmail } from "@/lib/env";
 
 export const metadata: Metadata = {
   title: "Contact Us",
@@ -16,6 +17,8 @@ export const metadata: Metadata = {
 };
 
 export default function ContactPage() {
+  const contactEmail = getOwnerEmail();
+
   return (
     <PanelLayout
       kicker="Inquiries"
@@ -44,7 +47,7 @@ export default function ContactPage() {
           />
         </li>
         <li data-motion-item="contact-phone">Phone: 0401 489 437</li>
-        <li data-motion-item="contact-email">Email: contact@melbourneguitarschool.com.au</li>
+        <li data-motion-item="contact-email">Email: {contactEmail}</li>
         <li data-motion-item="contact-studio">Studio: Rear 66/68 High St, Northcote VIC 3070</li>
         <li data-motion-item="contact-formats">Lesson formats: In-person and online</li>
       </ul>
