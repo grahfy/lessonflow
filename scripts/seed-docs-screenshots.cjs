@@ -1,0 +1,646 @@
+#!/usr/bin/env node
+const crypto = require("node:crypto");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const bcrypt = require("bcryptjs");
+const { PrismaClient } = require("@prisma/client");
+
+const projectRoot = process.cwd();
+const checklistPath = path.join(projectRoot, "Documentation", "assets", "SCREENSHOT_SEED_CHECKLIST.md");
+
+function normalizeName(value) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function buildNameTokens(value) {
+  const normalized = normalizeName(value);
+  if (!normalized) return null;
+  return [...new Set(normalized.split(" ").filter(Boolean))].join(" ");
+}
+
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizePhone(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function deriveEncryptionKey(secret) {
+  const trimmed = String(secret || "").trim();
+  if (!trimmed) throw new Error("Missing encryption secret");
+  return crypto.createHash("sha256").update(trimmed, "utf8").digest();
+}
+
+function encryptPortalSecret(plaintext) {
+  const explicit = process.env.STUDENT_PORTAL_PASSWORD_ENCRYPTION_KEY?.trim();
+  const fallback = process.env.ADMIN_SESSION_SECRET || "dev-student-portal-encryption-key";
+  const key = deriveEncryptionKey(explicit || fallback);
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const encrypted = Buffer.concat([cipher.update(String(plaintext), "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return ["v1", iv.toString("base64url"), encrypted.toString("base64url"), tag.toString("base64url")].join(".");
+}
+
+function writeChecklist() {
+  const checklist = `# Screenshot Seed Checklist
+
+This project includes a deterministic screenshot seeder.
+
+## Recommended Flow
+1. Start a disposable MySQL database.
+2. Run Prisma migrations against that DB.
+3. Run \`npm run docs:screenshots:seed\` with the same \`DATABASE_URL\`.
+4. Start the app with the same DB URL and screenshot admin credentials.
+5. Run \`npm run docs:screenshots\` and then \`npm run docs:screenshots:sync\`.
+
+## Required Environment (seed command)
+- \`DATABASE_URL\` (must be \`mysql://...\`)
+
+## Optional Environment (defaults provided)
+- \`DOCS_SCREENSHOTS_ADMIN_EMAIL\`
+- \`DOCS_SCREENSHOTS_ADMIN_PASSWORD\`
+- \`DOCS_SCREENSHOTS_STUDENT_PASSWORD\`
+`;
+  fs.writeFileSync(checklistPath, checklist, "utf8");
+  console.log(`Wrote screenshot seed checklist to ${path.relative(projectRoot, checklistPath)}`);
+}
+
+function cents(amount) {
+  return Math.round(amount * 100);
+}
+
+function makeAddress(input) {
+  const unit = input.unitNumber ? `${input.unitNumber}/` : "";
+  return `${unit}${input.houseNumber} ${input.streetName} ${input.streetType}, ${input.suburb} ${input.state} ${input.postcode}`.trim();
+}
+
+function lineCalc(quantity, unitPriceCents, taxMode) {
+  const subtotal = quantity * unitPriceCents;
+  const gst = taxMode === "taxable" ? Math.round(subtotal / 11) : 0;
+  return {
+    lineSubtotalCents: subtotal,
+    lineGstCents: gst,
+    lineTotalCents: subtotal + gst
+  };
+}
+
+function addMinutes(date, minutes) {
+  return new Date(date.getTime() + minutes * 60_000);
+}
+
+function daysFromNow(days, hour, minute = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  d.setHours(hour, minute, 0, 0);
+  return d;
+}
+
+async function seed() {
+  const dbUrl = process.env.DATABASE_URL || "";
+  if (!dbUrl.startsWith("mysql://")) {
+    throw new Error("DATABASE_URL must be a mysql:// URL for docs screenshot seeding.");
+  }
+
+  const adminEmail = normalizeEmail(process.env.DOCS_SCREENSHOTS_ADMIN_EMAIL || "owner@example.com");
+  const adminPassword = process.env.DOCS_SCREENSHOTS_ADMIN_PASSWORD || "DocsDemoAdmin!23";
+  const studentPassword = process.env.DOCS_SCREENSHOTS_STUDENT_PASSWORD || "StudentDemo!23";
+  const now = new Date();
+
+  const prisma = new PrismaClient();
+
+  try {
+    console.log("Resetting docs demo data...");
+    await prisma.$transaction([
+      prisma.invoiceAuditLog.deleteMany({}),
+      prisma.invoiceLineItem.deleteMany({}),
+      prisma.invoice.deleteMany({}),
+      prisma.outboundEmail.deleteMany({}),
+      prisma.learningMaterial.deleteMany({}),
+      prisma.customerPortalCredentialAuditLog.deleteMany({}),
+      prisma.customerPortalCredential.deleteMany({}),
+      prisma.bookingAuditLog.deleteMany({}),
+      prisma.booking.deleteMany({}),
+      prisma.bookingSeries.deleteMany({}),
+      prisma.bookingRequest.deleteMany({}),
+      prisma.contactSubmission.deleteMany({}),
+      prisma.customer.deleteMany({}),
+      prisma.adminUser.deleteMany({})
+    ]);
+
+    const admin = await prisma.adminUser.create({
+      data: {
+        email: adminEmail,
+        displayName: "Docs Demo Admin",
+        passwordHash: await bcrypt.hash(adminPassword, 12),
+        isActive: true
+      }
+    });
+
+    const customer1 = await prisma.customer.create({
+      data: {
+        fullName: "Alex Student",
+        normalizedFullName: normalizeName("Alex Student"),
+        nameSearchTokens: buildNameTokens("Alex Student"),
+        email: "alex.student@example.com",
+        normalizedEmail: normalizeEmail("alex.student@example.com"),
+        phone: "0412345678",
+        normalizedPhone: normalizePhone("0412345678"),
+        skillLevel: "beginner",
+        lessonMode: "in_person",
+        houseNumber: "12",
+        streetName: "King",
+        streetType: "Street",
+        suburb: "Melbourne",
+        state: "VIC",
+        postcode: "3000"
+      }
+    });
+
+    const customer2 = await prisma.customer.create({
+      data: {
+        fullName: "Jamie Guitar",
+        normalizedFullName: normalizeName("Jamie Guitar"),
+        nameSearchTokens: buildNameTokens("Jamie Guitar"),
+        email: "jamie.guitar@example.com",
+        normalizedEmail: normalizeEmail("jamie.guitar@example.com"),
+        phone: "0498765432",
+        normalizedPhone: normalizePhone("0498765432"),
+        skillLevel: "intermediate",
+        lessonMode: "video",
+        houseNumber: "88",
+        streetName: "Lygon",
+        streetType: "Street",
+        suburb: "Carlton",
+        state: "VIC",
+        postcode: "3053"
+      }
+    });
+
+    const pendingRequest = await prisma.bookingRequest.create({
+      data: {
+        status: "pending",
+        name: customer1.fullName,
+        email: customer1.email,
+        phone: customer1.phone,
+        address: makeAddress(customer1),
+        houseNumber: customer1.houseNumber,
+        streetName: customer1.streetName,
+        streetType: customer1.streetType,
+        suburb: customer1.suburb,
+        state: customer1.state,
+        postcode: customer1.postcode,
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min30",
+        requestedStartAt: daysFromNow(2, 16, 0),
+        notes: "After-school lesson request",
+        customerId: customer1.id
+      }
+    });
+
+    await prisma.bookingRequest.create({
+      data: {
+        status: "rejected",
+        name: customer2.fullName,
+        email: customer2.email,
+        phone: customer2.phone,
+        address: makeAddress(customer2),
+        houseNumber: customer2.houseNumber,
+        streetName: customer2.streetName,
+        streetType: customer2.streetType,
+        suburb: customer2.suburb,
+        state: customer2.state,
+        postcode: customer2.postcode,
+        lessonMode: "video",
+        skillLevel: "intermediate",
+        lessonDuration: "min60",
+        requestedStartAt: daysFromNow(-1, 18, 30),
+        notes: "Rejected due to availability",
+        customerId: customer2.id
+      }
+    });
+
+    await prisma.bookingRequest.create({
+      data: {
+        status: "cancelled",
+        name: "Taylor Parent",
+        email: "taylor.parent@example.com",
+        phone: "0400111222",
+        address: "10 Collins Street, Melbourne VIC 3000",
+        houseNumber: "10",
+        streetName: "Collins",
+        streetType: "Street",
+        suburb: "Melbourne",
+        state: "VIC",
+        postcode: "3000",
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min30",
+        requestedStartAt: daysFromNow(-1, 15, 0),
+        notes: "Cancelled by family"
+      }
+    });
+
+    const approvedRequest = await prisma.bookingRequest.create({
+      data: {
+        status: "approved",
+        name: customer1.fullName,
+        email: customer1.email,
+        phone: customer1.phone,
+        address: makeAddress(customer1),
+        houseNumber: customer1.houseNumber,
+        streetName: customer1.streetName,
+        streetType: customer1.streetType,
+        suburb: customer1.suburb,
+        state: customer1.state,
+        postcode: customer1.postcode,
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min60",
+        requestedStartAt: daysFromNow(-10, 17, 0),
+        approvedById: admin.id,
+        customerId: customer1.id
+      }
+    });
+
+    const upcomingBooking = await prisma.booking.create({
+      data: {
+        status: "approved",
+        name: customer1.fullName,
+        email: customer1.email,
+        phone: customer1.phone,
+        address: makeAddress(customer1),
+        houseNumber: customer1.houseNumber,
+        streetName: customer1.streetName,
+        streetType: customer1.streetType,
+        suburb: customer1.suburb,
+        state: customer1.state,
+        postcode: customer1.postcode,
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min60",
+        startAt: daysFromNow(1, 16, 0),
+        endAt: addMinutes(daysFromNow(1, 16, 0), 60),
+        timezone: "Australia/Melbourne",
+        notes: "Bring practice notebook",
+        customerId: customer1.id,
+        modifiedById: admin.id,
+        requestId: pendingRequest.id
+      }
+    });
+
+    const pastBooking = await prisma.booking.create({
+      data: {
+        status: "approved",
+        name: customer2.fullName,
+        email: customer2.email,
+        phone: customer2.phone,
+        address: makeAddress(customer2),
+        houseNumber: customer2.houseNumber,
+        streetName: customer2.streetName,
+        streetType: customer2.streetType,
+        suburb: customer2.suburb,
+        state: customer2.state,
+        postcode: customer2.postcode,
+        lessonMode: "video",
+        skillLevel: "intermediate",
+        lessonDuration: "min30",
+        startAt: daysFromNow(-5, 18, 0),
+        endAt: addMinutes(daysFromNow(-5, 18, 0), 30),
+        timezone: "Australia/Melbourne",
+        notes: "Focus on chord transitions",
+        customerId: customer2.id,
+        modifiedById: admin.id,
+        requestId: approvedRequest.id
+      }
+    });
+
+    await prisma.booking.create({
+      data: {
+        status: "cancelled",
+        name: customer1.fullName,
+        email: customer1.email,
+        phone: customer1.phone,
+        address: makeAddress(customer1),
+        houseNumber: customer1.houseNumber,
+        streetName: customer1.streetName,
+        streetType: customer1.streetType,
+        suburb: customer1.suburb,
+        state: customer1.state,
+        postcode: customer1.postcode,
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min30",
+        startAt: daysFromNow(-2, 16, 30),
+        endAt: addMinutes(daysFromNow(-2, 16, 30), 30),
+        timezone: "Australia/Melbourne",
+        cancelledAt: daysFromNow(-2, 10, 0),
+        customerId: customer1.id,
+        modifiedById: admin.id
+      }
+    });
+
+    // Add previous-month and previous-year paid bookings to strengthen report comparisons.
+    await prisma.booking.create({
+      data: {
+        status: "approved",
+        name: customer2.fullName,
+        email: customer2.email,
+        phone: customer2.phone,
+        address: makeAddress(customer2),
+        houseNumber: customer2.houseNumber,
+        streetName: customer2.streetName,
+        streetType: customer2.streetType,
+        suburb: customer2.suburb,
+        state: customer2.state,
+        postcode: customer2.postcode,
+        lessonMode: "video",
+        skillLevel: "intermediate",
+        lessonDuration: "min60",
+        startAt: new Date(now.getFullYear(), now.getMonth() - 1, 10, 17, 0, 0, 0),
+        endAt: new Date(now.getFullYear(), now.getMonth() - 1, 10, 18, 0, 0, 0),
+        timezone: "Australia/Melbourne",
+        customerId: customer2.id,
+        modifiedById: admin.id
+      }
+    });
+
+    await prisma.booking.create({
+      data: {
+        status: "approved",
+        name: customer1.fullName,
+        email: customer1.email,
+        phone: customer1.phone,
+        address: makeAddress(customer1),
+        houseNumber: customer1.houseNumber,
+        streetName: customer1.streetName,
+        streetType: customer1.streetType,
+        suburb: customer1.suburb,
+        state: customer1.state,
+        postcode: customer1.postcode,
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min30",
+        startAt: new Date(now.getFullYear() - 1, 6, 14, 15, 30, 0, 0),
+        endAt: new Date(now.getFullYear() - 1, 6, 14, 16, 0, 0, 0),
+        timezone: "Australia/Melbourne",
+        customerId: customer1.id,
+        modifiedById: admin.id
+      }
+    });
+
+    await prisma.bookingAuditLog.createMany({
+      data: [
+        { bookingId: upcomingBooking.id, action: "edited", actorId: admin.id, details: "Demo seed booking" },
+        { bookingId: pastBooking.id, action: "approved", actorId: admin.id, details: "Demo seed approved booking" }
+      ]
+    });
+
+    const studentPasswordHash = await bcrypt.hash(studentPassword, 10);
+    const studentPasswordEncrypted = encryptPortalSecret(studentPassword);
+    const customer1Credential = await prisma.customerPortalCredential.create({
+      data: {
+        customerId: customer1.id,
+        passwordHash: studentPasswordHash,
+        passwordEncrypted: studentPasswordEncrypted,
+        isActive: true
+      }
+    });
+    await prisma.customerPortalCredentialAuditLog.create({
+      data: {
+        customerId: customer1.id,
+        credentialId: customer1Credential.id,
+        actorId: admin.id,
+        action: "generated",
+        details: "Docs screenshot demo credential"
+      }
+    });
+
+    await prisma.learningMaterial.createMany({
+      data: [
+        {
+          customerId: customer1.id,
+          bookingId: upcomingBooking.id,
+          uploadedById: admin.id,
+          title: "Warm-up Exercise Sheet",
+          materialType: "pdf",
+          storageKey: "docs-demo/alex/warmup-sheet.pdf",
+          mimeType: "application/pdf",
+          sizeBytes: 48213
+        },
+        {
+          customerId: customer1.id,
+          bookingId: null,
+          uploadedById: admin.id,
+          title: "Practice Backing Track",
+          materialType: "audio",
+          storageKey: "docs-demo/alex/backing-track.mp3",
+          mimeType: "audio/mpeg",
+          sizeBytes: 1250043
+        }
+      ]
+    });
+
+    const sellerBusinessName = process.env.INVOICE_BUSINESS_NAME || "Melbourne Guitar School";
+    const sellerAbn = process.env.INVOICE_BUSINESS_ABN || "12345678901";
+    const sellerEmail = process.env.SMTP_FROM || "Melbourne Guitar School <no-reply@example.com>";
+    const bankName = process.env.INVOICE_BANK_NAME || "ANZ";
+    const bankBsb = process.env.INVOICE_BANK_BSB || "013001";
+    const bankAccountName = process.env.INVOICE_BANK_ACCOUNT_NAME || "Melbourne Guitar School";
+    const bankAccountNumber = process.env.INVOICE_BANK_ACCOUNT_NUMBER || "12345678";
+
+    async function createInvoice({
+      invoiceNumber,
+      status,
+      customer,
+      bookingId,
+      issuedAt,
+      dueAt,
+      sentAt,
+      paidAt,
+      lessonDescription,
+      quantity,
+      unitPrice,
+      taxMode,
+      notes,
+      lastReminderStage
+    }) {
+      const unitPriceCents = cents(unitPrice);
+      const calc = lineCalc(quantity, unitPriceCents, taxMode);
+      return prisma.invoice.create({
+        data: {
+          invoiceNumber,
+          status,
+          documentType: "invoice",
+          taxMode,
+          currency: "AUD",
+          customerId: customer.id,
+          bookingId: bookingId || null,
+          customerName: customer.fullName,
+          customerEmail: customer.email,
+          customerPhone: customer.phone,
+          customerAddress: makeAddress(customer),
+          sellerBusinessName,
+          sellerAbn,
+          sellerEmail,
+          bankName,
+          bankBsb,
+          bankAccountName,
+          bankAccountNumber,
+          subtotalCents: calc.lineSubtotalCents,
+          gstCents: calc.lineGstCents,
+          totalCents: calc.lineTotalCents,
+          notes: notes || null,
+          issuedAt,
+          dueAt,
+          sentAt: sentAt || null,
+          paidAt: paidAt || null,
+          lastReminderSentAt: sentAt || null,
+          lastReminderStage: lastReminderStage ?? null,
+          createdById: admin.id,
+          updatedById: admin.id,
+          lineItems: {
+            create: [
+              {
+                kind: "lesson",
+                description: lessonDescription,
+                quantity,
+                unitPriceCents,
+                taxMode,
+                lineSubtotalCents: calc.lineSubtotalCents,
+                lineGstCents: calc.lineGstCents,
+                lineTotalCents: calc.lineTotalCents,
+                sortOrder: 0
+              }
+            ]
+          }
+        }
+      });
+    }
+
+    await createInvoice({
+      invoiceNumber: "MGS-2026-0001",
+      status: "draft",
+      customer: customer1,
+      bookingId: upcomingBooking.id,
+      issuedAt: daysFromNow(0, 9, 0),
+      dueAt: daysFromNow(14, 17, 0),
+      lessonDescription: "5 × 30 Minute Lessons",
+      quantity: 1,
+      unitPrice: 200,
+      taxMode: "gst_free",
+      notes: "Draft demo invoice with package preset"
+    });
+
+    await createInvoice({
+      invoiceNumber: "MGS-2026-0002",
+      status: "sent",
+      customer: customer2,
+      bookingId: pastBooking.id,
+      issuedAt: daysFromNow(-21, 9, 0),
+      dueAt: daysFromNow(-7, 17, 0),
+      sentAt: daysFromNow(-21, 10, 0),
+      lessonDescription: "10 × 30 Minute Lessons",
+      quantity: 1,
+      unitPrice: 388,
+      taxMode: "gst_free",
+      notes: "Overdue invoice for reminders/reporting",
+      lastReminderStage: 7
+    });
+
+    await createInvoice({
+      invoiceNumber: "MGS-2026-0003",
+      status: "paid",
+      customer: customer1,
+      bookingId: null,
+      issuedAt: daysFromNow(-9, 9, 0),
+      dueAt: daysFromNow(5, 17, 0),
+      sentAt: daysFromNow(-9, 10, 0),
+      paidAt: daysFromNow(-1, 11, 30),
+      lessonDescription: "5 × 1 Hour Lessons",
+      quantity: 1,
+      unitPrice: 375,
+      taxMode: "gst_free",
+      notes: "Paid invoice for current-week/current-month earnings"
+    });
+
+    await createInvoice({
+      invoiceNumber: "MGS-2026-0004",
+      status: "paid",
+      customer: customer2,
+      bookingId: null,
+      issuedAt: new Date(now.getFullYear(), now.getMonth() - 1, 5, 9, 0, 0, 0),
+      dueAt: new Date(now.getFullYear(), now.getMonth() - 1, 19, 17, 0, 0, 0),
+      sentAt: new Date(now.getFullYear(), now.getMonth() - 1, 5, 10, 0, 0, 0),
+      paidAt: new Date(now.getFullYear(), now.getMonth() - 1, 15, 12, 0, 0, 0),
+      lessonDescription: "10 × 1 Hour Lessons",
+      quantity: 1,
+      unitPrice: 725,
+      taxMode: "gst_free",
+      notes: "Previous month earnings comparison"
+    });
+
+    await createInvoice({
+      invoiceNumber: "MGS-2025-0048",
+      status: "paid",
+      customer: customer1,
+      bookingId: null,
+      issuedAt: new Date(now.getFullYear() - 1, 6, 1, 9, 0, 0, 0),
+      dueAt: new Date(now.getFullYear() - 1, 6, 15, 17, 0, 0, 0),
+      sentAt: new Date(now.getFullYear() - 1, 6, 1, 10, 0, 0, 0),
+      paidAt: new Date(now.getFullYear() - 1, 6, 10, 13, 0, 0, 0),
+      lessonDescription: "Archived lesson package (year comparison)",
+      quantity: 1,
+      unitPrice: 450,
+      taxMode: "gst_free",
+      notes: "Previous year earnings comparison"
+    });
+
+    await prisma.contactSubmission.create({
+      data: {
+        name: "Casey Parent",
+        email: "casey.parent@example.com",
+        phone: "0400777888",
+        message: "Interested in beginner lessons for my child."
+      }
+    });
+
+    await prisma.outboundEmail.create({
+      data: {
+        toEmail: adminEmail,
+        subject: "Docs demo seeded",
+        htmlBody: "<p>Docs screenshot demo dataset created.</p>",
+        status: "sent"
+      }
+    });
+
+    fs.writeFileSync(
+      checklistPath,
+      `# Screenshot Seed Checklist\n\nLast seeded: ${new Date().toISOString()}\n\n## Demo Credentials\n- Admin email: \`${adminEmail}\`\n- Admin password: \`${adminPassword}\`\n- Student login name: \`${customer1.fullName}\`\n- Student postcode: \`${customer1.postcode}\`\n- Student password: \`${studentPassword}\`\n\n## Dataset Summary\n- Customers: 2\n- Booking requests: 4 (pending/approved/rejected/cancelled)\n- Bookings: 5 (approved + cancelled, cross-period)\n- Invoices: 5 (draft/sent/paid + comparisons)\n- Learning materials: 2 (booking-linked + general)\n`,
+      "utf8"
+    );
+
+    console.log("Seeded docs screenshot demo data successfully.");
+    console.log(`Admin login: ${adminEmail} / ${adminPassword}`);
+    console.log(`Student login (for portal screenshots): ${customer1.fullName} / ${customer1.postcode} / ${studentPassword}`);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+async function main() {
+  if (process.argv.includes("--checklist")) {
+    writeChecklist();
+    return;
+  }
+  await seed();
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+

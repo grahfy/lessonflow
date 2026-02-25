@@ -14,7 +14,11 @@
     "test:prepare": "node ./scripts/prepare-test-db.cjs",
     "test": "npm run test:prepare && node ./scripts/run-vitest-with-test-db.cjs run",
     "test:watch": "npm run test:prepare && node ./scripts/run-vitest-with-test-db.cjs",
-    "test:e2e": "echo \"E2E tests are not configured yet\"",
+    "test:e2e": "playwright test",
+    "docs:screenshots:seed": "node ./scripts/seed-docs-screenshots.cjs",
+    "docs:screenshots": "playwright test tests/e2e/docs-screenshots.spec.ts",
+    "docs:screenshots:sync": "node ./scripts/sync-manual-screenshots.cjs",
+    "docs:screenshots:update": "npm run docs:screenshots && npm run docs:screenshots:sync",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio"
@@ -25,6 +29,7 @@
     "date-fns": "^4.1.0",
     "googleapis": "^171.4.0",
     "gsap": "^3.14.2",
+    "marked": "^17.0.3",
     "next": "^15.2.0",
     "nodemailer": "^7.0.5",
     "pdf-lib": "^1.17.1",
@@ -34,6 +39,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/node": "^22.13.10",
     "@types/nodemailer": "^6.4.17",
     "@types/react": "^19.0.10",

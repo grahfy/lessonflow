@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { AdminManualClient } from "@/components/admin-manual-client";
 import { getCurrentAdmin } from "@/lib/admin-auth";
+import { getAdminManualContent } from "@/lib/manual/content";
 import { isSetupComplete } from "@/lib/setup";
 
 export const metadata = {
@@ -22,5 +23,7 @@ export default async function AdminManualPage() {
     redirect("/admin/login");
   }
 
-  return <AdminManualClient />;
+  const manualContent = await getAdminManualContent();
+
+  return <AdminManualClient content={manualContent} />;
 }

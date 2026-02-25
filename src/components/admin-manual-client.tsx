@@ -2,55 +2,23 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 
 import { AdminDeployUpdatesButton } from "@/components/admin-deploy-updates-button";
+import type { AdminManualContent, AdminManualSection, ManualScreenshot } from "@/lib/manual/content";
 
-type ManualScreenshot = {
-  src: string;
-  alt: string;
-  title: string;
-  caption: string;
+type AdminManualClientProps = {
+  content: AdminManualContent;
 };
 
-const SCREENSHOTS: ManualScreenshot[] = [
-  {
-    src: "/documentation/screenshots/admin-login-page.png",
-    alt: "Admin login page",
-    title: "Admin login",
-    caption: "Sign in to the booking console with the owner/admin account."
-  },
-  {
-    src: "/documentation/screenshots/booking-calendar-week-view.png",
-    alt: "Booking calendar week view",
-    title: "Bookings calendar",
-    caption: "Weekly calendar view for confirmed bookings and pending requests."
-  },
-  {
-    src: "/documentation/screenshots/booking-detail-dialog-notes-and-actions.png",
-    alt: "Booking detail dialog actions",
-    title: "Booking detail actions",
-    caption: "Edit, move, cancel, notify and invoice actions live in the booking dialog."
-  },
-  {
-    src: "/documentation/screenshots/invoice-console-list-and-filters.png",
-    alt: "Invoice console list and filters",
-    title: "Invoice console",
-    caption: "Filter invoices by status, aging and outstanding balances."
-  },
-  {
-    src: "/documentation/screenshots/invoice-create-dialog.png",
-    alt: "Invoice create dialog",
-    title: "Invoice create dialog",
-    caption: "Create invoices manually or use product preset packages from the dropdown."
-  },
-  {
-    src: "/documentation/screenshots/invoice-detail-send-and-download-pdf.png",
-    alt: "Invoice detail send and download PDF dialog",
-    title: "Invoice send / PDF actions",
-    caption: "Send invoices and download the PDF directly from the invoice detail dialog."
-  }
-];
+function formatDate(value: string): string {
+  return new Intl.DateTimeFormat("en-AU", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Australia/Melbourne"
+  }).format(new Date(value));
+}
 
 async function logout(router: ReturnType<typeof useRouter>) {
   await fetch("/api/admin/logout", { method: "POST" }).catch(() => null);
@@ -58,12 +26,65 @@ async function logout(router: ReturnType<typeof useRouter>) {
   router.refresh();
 }
 
+function renderSectionRoutePills(section: AdminManualSection) {
+  if (!section.relatedRoutes.length) {
+    return null;
+  }
+
+  return (
+    <div className="admin-manual-route-pills">
+      {section.relatedRoutes.map((route) => (
+        <span key={`${section.id}-${route}`} className="admin-manual-pill">
+          {route}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function renderSectionScreenshots(screenshots: ManualScreenshot[]) {
+  if (!screenshots.length) {
+    return null;
+  }
+
+  return (
+    <div className="admin-manual-inline-shot-grid">
+      {screenshots.map((shot) => (
+        <figure key={shot.id} className="admin-manual-shot">
+          <div className="admin-manual-shot-frame">
+            <Image src={shot.publicPath} alt={shot.alt} width={960} height={600} />
+          </div>
+          <figcaption>
+            <strong>{shot.alt}</strong>
+            <span>{shot.caption}</span>
+          </figcaption>
+        </figure>
+      ))}
+    </div>
+  );
+}
+
 /**
- * In-app admin documentation hub. Keeps the most important operational guides
- * in the console so admins do not need shell/repo access for day-to-day work.
+ * In-app admin documentation hub + manual viewer. The content is prepared on the
+ * server from a whitelisted set of repo docs so the admin can read detailed
+ * guides without shell or repository access.
  */
-export function AdminManualClient() {
+export function AdminManualClient({ content }: AdminManualClientProps) {
   const router = useRouter();
+
+  const sectionScreenshots = useMemo(() => {
+    const screenshotById = new Map(content.screenshots.map((screenshot) => [screenshot.id, screenshot] as const));
+    const entries = content.sections.map((section) => [
+      section.id,
+      section.screenshotIds
+        .map((id) => screenshotById.get(id))
+        .filter((screenshot): screenshot is ManualScreenshot => Boolean(screenshot))
+    ] as const);
+    return new Map(entries);
+  }, [content.screenshots, content.sections]);
+
+  const allAdminSections = content.sections.filter((section) => section.audience === "all_admins");
+  const technicalSections = content.sections.filter((section) => section.audience === "technical_owner");
 
   return (
     <div className="admin-shell" data-motion-root="admin" data-motion-primary="true">
@@ -89,68 +110,131 @@ export function AdminManualClient() {
         </div>
       </div>
 
-      <div className="admin-card admin-manual-grid">
-        <section className="admin-manual-panel">
-          <h2>Quick links</h2>
-          <p className="helper-text">
-            Use these guides for the most common operator tasks. The markdown documentation in the repo is the source of truth, and this page mirrors the key steps.
-          </p>
-          <div className="admin-manual-links">
-            <Link className="btn btn-secondary" href="/admin/bookings">Bookings Console</Link>
-            <Link className="btn btn-secondary" href="/admin/invoices">Invoice Console</Link>
-            <Link className="btn btn-secondary" href="/admin/reports">Reports Console</Link>
-            <Link className="btn btn-secondary" href="/admin/settings">Admin Settings</Link>
+      <div className="admin-card admin-manual-layout">
+        <aside className="admin-manual-toc">
+          <div className="admin-manual-toc-panel">
+            <h2>Manual Contents</h2>
+            <p className="helper-text">
+              Detailed end-user guides for all main workflows, plus a technical owner runbook section.
+            </p>
+            <div className="admin-manual-links">
+              <a className="btn btn-secondary" href="#manual-overview">Overview</a>
+              <a className="btn btn-secondary" href="#manual-coverage-matrix">Coverage</a>
+            </div>
+            <h3>Daily admin work</h3>
+            <ol className="admin-manual-list compact">
+              {allAdminSections.map((section) => (
+                <li key={`toc-${section.id}`}>
+                  <a href={`#manual-section-${section.id}`}>{section.title}</a>
+                </li>
+              ))}
+            </ol>
+            <h3>Technical owner</h3>
+            <ol className="admin-manual-list compact">
+              {technicalSections.map((section) => (
+                <li key={`toc-tech-${section.id}`}>
+                  <a href={`#manual-section-${section.id}`}>{section.title}</a>
+                </li>
+              ))}
+            </ol>
+            <div className="admin-manual-meta-note">
+              <p className="helper-text">
+                Generated from repo docs: <code>Documentation/*.md</code>
+              </p>
+              <p className="helper-text">
+                Manual content loaded: <strong>{content.sections.length}</strong> guide sections
+              </p>
+              <p className="helper-text">
+                Last generated: {formatDate(content.generatedAt)}
+              </p>
+            </div>
           </div>
-          <ul className="admin-manual-list">
-            <li>
-              End-user guides index: <code>Documentation/README.md</code>
-            </li>
-            <li>
-              Deploy runbook (droplet): <code>Documentation/digitalocean-admin-operations.md</code>
-            </li>
-            <li>
-              Deploy script reference: <code>deploy/README.md</code>
-            </li>
-            <li>
-              Full PDF handbook: <code>Documentation/Melbourne-Guitar-School-End-User-Documentation.pdf</code>
-            </li>
-          </ul>
-        </section>
+        </aside>
 
-        <section className="admin-manual-panel">
-          <h2>Deploy / update runbook (quick)</h2>
-          <ol className="admin-manual-list">
-            <li>SSH to the droplet and go to <code>/var/www/melbourne-guitar-school/current</code>.</li>
-            <li>Run <code>sudo ./deploy/update.sh --branch main</code> for a normal release.</li>
-            <li>Use the TUI menu to confirm Dependencies and Cron jobs sync options before starting.</li>
-            <li>If the script pulls a newer commit for itself, it will show commit details, wait for a key, and return to the main menu.</li>
-            <li>After deploy, confirm admin login, bookings, invoices, reports and uploads.</li>
-            <li>Open <strong>Latest Updates</strong> in admin to review the commit list that was deployed.</li>
-          </ol>
-          <p className="helper-text">
-            The deploy script now syncs Nginx, manages a cron block (unless disabled), runs <code>nginx -t</code>, and restarts the app service after deploy.
-          </p>
-        </section>
+        <div className="admin-manual-content-column">
+          <section id="manual-overview" className="admin-manual-panel">
+            <h2>Overview</h2>
+            <p className="helper-text">
+              This in-app manual mirrors the repository end-user documentation so admins can read detailed procedures while working in the console. The markdown guides remain the source of truth.
+            </p>
+            <div className="admin-manual-links">
+              <Link className="btn btn-secondary" href="/admin/bookings">Bookings Console</Link>
+              <Link className="btn btn-secondary" href="/admin/invoices">Invoice Console</Link>
+              <Link className="btn btn-secondary" href="/admin/reports">Reports Console</Link>
+              <Link className="btn btn-secondary" href="/admin/settings">Admin Settings</Link>
+            </div>
+            <ul className="admin-manual-list">
+              <li>Repo docs index: <code>Documentation/README.md</code></li>
+              <li>Droplet runbook: <code>Documentation/digitalocean-admin-operations.md</code></li>
+              <li>Deploy script reference: <code>deploy/README.md</code></li>
+              <li>Screenshot assets: <code>Documentation/assets/</code> (served in-app from <code>public/documentation/screenshots/</code>)</li>
+            </ul>
+          </section>
 
-        <section className="admin-manual-panel full">
-          <h2>Screenshot guide</h2>
-          <p className="helper-text">
-            Screenshot references are also stored under <code>Documentation/assets/</code>. The thumbnails below are for quick operator orientation in the admin console.
-          </p>
-          <div className="admin-manual-screenshot-grid">
-            {SCREENSHOTS.map((shot) => (
-              <figure key={shot.src} className="admin-manual-shot">
-                <div className="admin-manual-shot-frame">
-                  <Image src={shot.src} alt={shot.alt} width={960} height={600} />
+          <section id="manual-coverage-matrix" className="admin-manual-panel">
+            <h2>Coverage Matrix (What this manual includes)</h2>
+            <div className="admin-manual-table-wrap">
+              <table className="admin-manual-table">
+                <thead>
+                  <tr>
+                    <th>Feature area</th>
+                    <th>Guide section</th>
+                    <th>Routes</th>
+                    <th>Audience</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {content.sections.map((section) => (
+                    <tr key={`matrix-${section.id}`}>
+                      <td>{section.summary}</td>
+                      <td>
+                        <a href={`#manual-section-${section.id}`}>{section.title}</a>
+                      </td>
+                      <td>
+                        {section.relatedRoutes.length ? section.relatedRoutes.join(", ") : "-"}
+                      </td>
+                      <td>{section.audience === "technical_owner" ? "Technical owner" : "All admins"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {content.sections.map((section) => {
+            const screenshots = sectionScreenshots.get(section.id) || [];
+
+            return (
+              <section key={section.id} id={`manual-section-${section.id}`} className="admin-manual-panel admin-manual-doc-section">
+                <div className="admin-manual-doc-head">
+                  <div>
+                    <div className="admin-manual-doc-kicker">
+                      <span className={`admin-manual-audience-badge ${section.audience === "technical_owner" ? "technical" : ""}`}>
+                        {section.audience === "technical_owner" ? "Technical owner" : "Admin guide"}
+                      </span>
+                    </div>
+                    <h2>{section.title}</h2>
+                    <p className="helper-text">{section.summary}</p>
+                    {renderSectionRoutePills(section)}
+                  </div>
+                  <div className="admin-manual-doc-meta">
+                    <p className="helper-text">
+                      Source: <code>{section.sourcePath}</code>
+                    </p>
+                    <p className="helper-text">Updated: {formatDate(section.updatedAt)}</p>
+                  </div>
                 </div>
-                <figcaption>
-                  <strong>{shot.title}</strong>
-                  <span>{shot.caption}</span>
-                </figcaption>
-              </figure>
-            ))}
-          </div>
-        </section>
+
+                {renderSectionScreenshots(screenshots)}
+
+                <article
+                  className="admin-manual-markdown"
+                  dangerouslySetInnerHTML={{ __html: section.html }}
+                />
+              </section>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

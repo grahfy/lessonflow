@@ -2846,6 +2846,38 @@ h1 {
   gap: 12px;
 }
 
+.admin-manual-layout {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  align-items: start;
+}
+
+.admin-manual-toc {
+  position: sticky;
+  top: 12px;
+  align-self: start;
+}
+
+.admin-manual-toc-panel {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.admin-manual-toc-panel h2,
+.admin-manual-toc-panel h3 {
+  margin: 0;
+}
+
+.admin-manual-content-column {
+  display: grid;
+  gap: 12px;
+}
+
 .admin-manual-panel {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 14px;
@@ -2875,6 +2907,118 @@ h1 {
   padding-left: 1.1rem;
   display: grid;
   gap: 6px;
+}
+
+.admin-manual-list.compact {
+  font-size: 0.9rem;
+}
+
+.admin-manual-list.compact li + li {
+  margin-top: 2px;
+}
+
+.admin-manual-meta-note {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 8px;
+}
+
+.admin-manual-table-wrap {
+  overflow: auto;
+}
+
+.admin-manual-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+
+.admin-manual-table th,
+.admin-manual-table td {
+  padding: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  vertical-align: top;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.admin-manual-table th {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 700;
+}
+
+.admin-manual-doc-section {
+  gap: 12px;
+}
+
+.admin-manual-doc-head {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.admin-manual-doc-head h2 {
+  margin: 4px 0 0;
+}
+
+.admin-manual-doc-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-manual-audience-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: rgba(22, 163, 74, 0.18);
+  border: 1px solid rgba(22, 163, 74, 0.3);
+  color: rgba(220, 252, 231, 0.95);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.admin-manual-audience-badge.technical {
+  background: rgba(234, 179, 8, 0.14);
+  border-color: rgba(234, 179, 8, 0.28);
+  color: rgba(254, 249, 195, 0.95);
+}
+
+.admin-manual-doc-meta {
+  display: grid;
+  gap: 4px;
+  text-align: right;
+}
+
+.admin-manual-doc-meta .helper-text {
+  margin: 0;
+}
+
+.admin-manual-route-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.admin-manual-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.78rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.admin-manual-inline-shot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .admin-manual-screenshot-grid {
@@ -2909,7 +3053,103 @@ h1 {
   font-size: 0.84rem;
 }
 
+.admin-manual-markdown {
+  color: rgba(255, 255, 255, 0.93);
+  line-height: 1.55;
+}
+
+.admin-manual-markdown > :first-child {
+  margin-top: 0;
+}
+
+.admin-manual-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.admin-manual-markdown h1,
+.admin-manual-markdown h2,
+.admin-manual-markdown h3,
+.admin-manual-markdown h4 {
+  margin: 1rem 0 0.55rem;
+  line-height: 1.25;
+}
+
+.admin-manual-markdown p,
+.admin-manual-markdown ul,
+.admin-manual-markdown ol {
+  margin: 0.45rem 0;
+}
+
+.admin-manual-markdown ul,
+.admin-manual-markdown ol {
+  padding-left: 1.15rem;
+}
+
+.admin-manual-markdown li + li {
+  margin-top: 0.2rem;
+}
+
+.admin-manual-markdown code {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 1px 5px;
+}
+
+.admin-manual-markdown pre {
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.admin-manual-markdown pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+.admin-manual-markdown img {
+  display: block;
+  width: min(100%, 860px);
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 10px 0;
+}
+
+.admin-manual-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+}
+
+.admin-manual-markdown th,
+.admin-manual-markdown td {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px 10px;
+  vertical-align: top;
+}
+
 @media (max-width: 920px) {
+  .admin-manual-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-manual-toc {
+    position: static;
+  }
+
+  .admin-manual-doc-head {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-manual-doc-meta {
+    text-align: left;
+  }
+
+  .admin-manual-inline-shot-grid,
   .admin-manual-screenshot-grid {
     grid-template-columns: 1fr;
   }
