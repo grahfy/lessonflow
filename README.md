@@ -166,7 +166,7 @@ Use `update.sh` for routine server maintenance and `deploy.sh` for direct releas
 
 Interactive TUI notes:
 - `update.sh` includes a remote update alert line (above “Update Workflow Options”) that highlights a newer remote commit hash + one-line subject when available.
-- `update.sh` supports both a workflow toggle (`MySQL + create DB`) and an immediate one-off action (`M`) for DB bootstrap from shared `.env`.
+- `update.sh` handles update/deploy orchestration and lightweight server bootstrap actions (cron/systemd/nginx/PHP-FPM/cron jobs), while MySQL+DB bootstrap is handled directly in `deploy.sh`.
 - `deploy.sh` supports immediate bootstrap actions `C` (cron), `J` (managed cron jobs), `M` (MySQL+DB), `N` (Nginx), `P` (PHP-FPM-if-needed), `U` (app systemd service), plus a workflow toggle for `MySQL + create DB` before the release build.
 
 ### 1. Server prerequisites
@@ -203,7 +203,7 @@ You must edit the shared `.env` with real values before production use (especial
 
 ### 4. Optional server bootstrap helpers (recommended)
 
-Use either `update.sh` (wrapper) or `deploy.sh` (direct deploy) helper flags to install platform dependencies and bootstrap the server runtime pieces from the shared `.env`.
+Use `update.sh` (wrapper) for most server bootstrap tasks and `deploy.sh` (direct deploy) for MySQL+DB bootstrap from the shared `.env`.
 
 `update.sh` is usually the best day-to-day entry point because it handles `git fetch/pull` before invoking `deploy.sh`, but the bootstrap helpers are available on both scripts now.
 
@@ -244,10 +244,7 @@ Notes:
 #### Install local MySQL/MariaDB and create DB from `DATABASE_URL` in shared `.env`
 
 ```bash
-# Wrapper workflow (recommended when using update.sh)
-./deploy/update.sh --setup-mysql-db-from-env --skip-pull --skip-deploy --sudo-deploy
-
-# Direct deploy script (same helper available)
+# Direct deploy script (MySQL+DB bootstrap lives here)
 ./deploy/deploy.sh --setup-mysql-db-from-env
 ```
 
@@ -353,8 +350,6 @@ Or non-interactive:
 Interactive `update.sh` notes:
 - Shows a cached remote update check alert (when the selected remote branch has a newer commit than local).
 - Option `10` opens the shared `.env` editor.
-- Option `11` toggles `MySQL + create DB` so the helper runs automatically during `Start update/deploy`.
-- `M` runs the same MySQL+DB bootstrap helper immediately without starting the full workflow.
 - `C` runs the cron/crond install helper immediately.
 - `J` installs/updates managed cron jobs immediately.
 - `U` installs/updates the app systemd service immediately.
@@ -370,9 +365,6 @@ Common non-interactive examples:
 
 # Pull only (no deploy)
 ./deploy/update.sh --skip-deploy
-
-# Bootstrap DB from shared .env, then perform full update+deploy
-./deploy/update.sh --setup-mysql-db-from-env --sudo-deploy
 
 # Bootstrap cron scheduler + app service + managed cron jobs (no git pull/deploy)
 ./deploy/update.sh --install-cron --install-app-service --install-cron-jobs --skip-pull --skip-deploy --sudo-deploy

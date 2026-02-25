@@ -24,7 +24,6 @@
 #   --sudo-deploy        Force sudo when invoking deploy.sh
 #   --no-sudo-deploy     Do not use sudo when invoking deploy.sh
 #   --interactive        Prompt for update/deploy options in TTY mode
-#   --setup-mysql-db-from-env  Install local MySQL/MariaDB (if needed) and create DB from shared .env DATABASE_URL
 #   --install-nginx      Install Nginx (if needed) using setup-packages.sh in non-interactive mode
 #   --install-php-fpm-if-needed  Install PHP-FPM only if deploy nginx config indicates a PHP upstream is required
 #   --install-cron       Install cron/crond scheduler (if needed) and enable/start service
@@ -65,7 +64,6 @@ ALLOW_DIRTY=false
 FORCE_SUDO_DEPLOY=false
 FORCE_NO_SUDO_DEPLOY=false
 INTERACTIVE=false
-SETUP_MYSQL_DB_FROM_ENV=false
 INSTALL_NGINX_IF_NEEDED=false
 INSTALL_PHP_FPM_IF_NEEDED=false
 INSTALL_CRON_IF_NEEDED=false
@@ -128,7 +126,6 @@ Options:
   --sudo-deploy        Force sudo when invoking deploy.sh
   --no-sudo-deploy     Do not use sudo when invoking deploy.sh
   --interactive        Prompt for update/deploy options in TTY mode
-  --setup-mysql-db-from-env  Install local MySQL/MariaDB (if needed) and create DB from shared .env DATABASE_URL
   --install-nginx      Install Nginx (if needed) using setup-packages.sh in non-interactive mode
   --install-php-fpm-if-needed  Install PHP-FPM only when deploy nginx config uses PHP upstreams
   --install-cron       Install cron/crond scheduler (if needed) and enable/start service
@@ -1331,7 +1328,7 @@ print_update_tui_menu() {
   echo -e "${DIM}btop-style menu: configure git update + deploy handoff, then run.${NC}"
   echo ""
   echo -e "  $(status_chip "Branch" "${BRANCH}")  $(status_chip "Remote" "${REMOTE_NAME}")  $(status_chip "Pull" "$(bool_word "$(toggle_bool "${SKIP_PULL}")")")  $(status_chip "Deploy" "$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")")"
-  echo -e "  $(status_chip "DirtyOK" "$(bool_word "${ALLOW_DIRTY}")")  $(status_chip "Sudo" "$(update_sudo_mode_label)")  $(status_chip "EnvDB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")")  $(status_chip "Spinner" "$(spinner_ui_word)")"
+  echo -e "  $(status_chip "DirtyOK" "$(bool_word "${ALLOW_DIRTY}")")  $(status_chip "Sudo" "$(update_sudo_mode_label)")  $(status_chip "Spinner" "$(spinner_ui_word)")"
   if [[ "${SKIP_DEPLOY}" == false ]]; then
     echo -e "  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "Cron" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")")  $(status_chip "DB" "$(update_migration_mode_label)")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")"
   fi
@@ -1363,20 +1360,18 @@ print_update_tui_menu() {
   print_tui_option_desc "Animated progress spinner for git/deploy wrapper steps."
   print_tui_option_row "10" "Edit shared .env" "Open editor now"
   print_tui_option_desc "Bootstraps ${SHARED_DIR}/.env from .env.example if missing, then opens it."
-  print_tui_option_row "11" "MySQL + create DB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")"
-  print_tui_option_desc "When ON, Start runs the shared .env MySQL/MariaDB install + local DB create helper before git update."
   if [[ "${SKIP_DEPLOY}" == false ]]; then
     print_tui_panel_rule 92
     echo -e "${BOLD}  Deploy Pass-through Options${NC}"
     print_tui_panel_rule 92
-    print_tui_option_row "12" "Database mode" "$(update_migration_mode_label)"
+    print_tui_option_row "11" "Database mode" "$(update_migration_mode_label)"
     print_tui_option_desc "Cycles deploy DB behavior: migrate deploy / skip migrations / db push."
-    print_tui_option_row "13" "SSL setup" "$(bool_word "${SSL_SETUP}")"
+    print_tui_option_row "12" "SSL setup" "$(bool_word "${SSL_SETUP}")"
     print_tui_option_desc "Passes SSL setup flags to deploy.sh to run certbot + nginx config."
     if [[ "${SSL_SETUP}" == true ]]; then
-      print_tui_option_row "14" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}"
+      print_tui_option_row "13" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}"
       print_tui_option_desc "Domain used for certificate request and nginx server_name config."
-      print_tui_option_row "15" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}"
+      print_tui_option_row "14" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}"
       print_tui_option_desc "Email for Let's Encrypt registration and renewal alerts."
     fi
   fi
@@ -1384,7 +1379,6 @@ print_update_tui_menu() {
   print_tui_panel_rule 92
   echo -e "  ${BOLD}C${NC}  Install cron/crond scheduler (if needed)"
   echo -e "  ${BOLD}J${NC}  Install/update managed cron jobs now"
-  echo -e "  ${BOLD}M${NC}  Run MySQL + create DB from shared .env now"
   echo -e "  ${BOLD}U${NC}  Install/update app systemd service"
   echo -e "  ${BOLD}S${NC}  Start update/deploy    ${BOLD}Q${NC}  Cancel"
   echo -e "${DIM}Tip: deploy.sh handles migrations/nginx sync/restarts; this menu configures the wrapper + pass-through flags.${NC}"
@@ -1634,7 +1628,7 @@ run_interactive_setup() {
 
   while true; do
     print_update_tui_menu
-    read -r -p "Select option [1-15, c, j, m, u, s, q]: " choice
+    read -r -p "Select option [1-14, c, j, u, s, q]: " choice
 
     case "${choice,,}" in
       1)
@@ -1681,16 +1675,13 @@ run_interactive_setup() {
         edit_shared_env_now || true
         ;;
       11)
-        SETUP_MYSQL_DB_FROM_ENV="$(toggle_bool "${SETUP_MYSQL_DB_FROM_ENV}")"
-        ;;
-      12)
         if [[ "${SKIP_DEPLOY}" == false ]]; then
           cycle_update_migration_mode
         else
           log_warn "Enable deploy first to change deploy pass-through options."
         fi
         ;;
-      13)
+      12)
         if [[ "${SKIP_DEPLOY}" == false ]]; then
           SSL_SETUP="$(toggle_bool "${SSL_SETUP}")"
           if [[ "${SSL_SETUP}" == true ]]; then
@@ -1701,14 +1692,14 @@ run_interactive_setup() {
           log_warn "Enable deploy first to configure SSL options."
         fi
         ;;
-      14)
+      13)
         if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true ]]; then
           SSL_DOMAIN="$(prompt_value "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}")"
         else
           log_warn "Enable deploy + SSL setup first to edit SSL domain."
         fi
         ;;
-      15)
+      14)
         if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true ]]; then
           SSL_EMAIL="$(prompt_value "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}")"
         else
@@ -1721,10 +1712,6 @@ run_interactive_setup() {
       j)
         ensure_managed_cron_jobs_installed_from_update || true
         ;;
-      m)
-        ensure_shared_env_file "${REPO_ROOT}/.env.example" || true
-        setup_mysql_and_database_from_shared_env || true
-        ;;
       u)
         install_app_systemd_service_from_update || true
         ;;
@@ -1736,7 +1723,7 @@ run_interactive_setup() {
         exit 0
         ;;
       *)
-        log_warn "Unknown selection. Choose a menu number, C/J/M/U, S, or Q."
+        log_warn "Unknown selection. Choose a menu number, C/J/U, S, or Q."
         ;;
     esac
   done
@@ -1767,7 +1754,6 @@ print_summary() {
   print_summary_row "Run deploy" "${will_deploy}"
   print_summary_row "Allow dirty" "$(bool_word "${ALLOW_DIRTY}")"
   print_summary_row "Sudo mode" "$(update_sudo_mode_label)"
-  print_summary_row "MySQL + create DB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")"
   print_summary_row "Spinner UI" "$(spinner_ui_word)"
   if [[ "${SKIP_DEPLOY}" == false ]]; then
     print_tui_panel_rule 62
@@ -1858,7 +1844,6 @@ while [[ $# -gt 0 ]]; do
     --sudo-deploy) FORCE_SUDO_DEPLOY=true; shift ;;
     --no-sudo-deploy) FORCE_NO_SUDO_DEPLOY=true; shift ;;
     --interactive) INTERACTIVE=true; shift ;;
-    --setup-mysql-db-from-env) SETUP_MYSQL_DB_FROM_ENV=true; shift ;;
     --install-nginx) INSTALL_NGINX_IF_NEEDED=true; shift ;;
     --install-php-fpm-if-needed) INSTALL_PHP_FPM_IF_NEEDED=true; shift ;;
     --install-cron) INSTALL_CRON_IF_NEEDED=true; shift ;;
@@ -1956,11 +1941,6 @@ fi
 
 if [[ "${INSTALL_CRON_JOBS_IF_NEEDED}" == true ]]; then
   ensure_managed_cron_jobs_installed_from_update
-fi
-
-if [[ "${SETUP_MYSQL_DB_FROM_ENV}" == true ]]; then
-  ensure_shared_env_file "${REPO_ROOT}/.env.example" || true
-  setup_mysql_and_database_from_shared_env
 fi
 
 section "Git Update"
