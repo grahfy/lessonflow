@@ -285,6 +285,33 @@ run_step() {
     return 1
 }
 
+# Repair a corrupted npm cache (common after interrupted deploys/reboots) so a
+# transient cache ENOENT does not require manual operator intervention.
+repair_npm_cache() {
+    log_warn "Attempting npm cache repair..."
+
+    if run_step "Verifying npm cache" npm cache verify; then
+        return 0
+    fi
+
+    log_warn "npm cache verify failed; forcing cache clean..."
+    run_step "Cleaning npm cache" npm cache clean --force
+}
+
+# Run an npm command and retry once after repairing the npm cache if it fails.
+run_npm_step_with_cache_repair() {
+    local message="$1"
+    shift
+
+    if run_step "${message}" "$@"; then
+        return 0
+    fi
+
+    log_warn "${message} failed. Retrying once after npm cache repair."
+    repair_npm_cache
+    run_step "${message} (retry)" "$@"
+}
+
 current_release_name() {
     if [[ -L "${CURRENT_LINK}" ]]; then
         readlink -f "${CURRENT_LINK}" 2>/dev/null | xargs basename
@@ -652,11 +679,11 @@ fi
 
 # Install dependencies
 if [[ "${SKIP_DEPS}" == false ]]; then
-    run_step "Installing production dependencies (npm ci)" npm ci --omit=dev --ignore-scripts
+    run_npm_step_with_cache_repair "Installing production dependencies (npm ci)" npm ci --omit=dev --ignore-scripts
 fi
 
 # Always install Prisma CLI (needed for generate and migrate)
-run_step "Installing Prisma CLI" npm install prisma --save-dev --ignore-scripts
+run_npm_step_with_cache_repair "Installing Prisma CLI" npm install prisma --save-dev --ignore-scripts
 
 # Generate Prisma client
 run_step "Generating Prisma client" npm exec --no -- prisma generate
