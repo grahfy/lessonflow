@@ -1924,11 +1924,107 @@ h1 {
 }
 
 .invoice-list-card {
-  min-height: 160px;
+  min-height: max(260px, calc(100dvh - 360px));
+  display: grid;
+  grid-template-rows: min-content minmax(0, 1fr);
+}
+
+.invoice-list-card .customers-list {
+  max-height: none;
+  min-height: 0;
+  height: 100%;
 }
 
 .invoice-item {
   background: rgba(255, 255, 255, 0.035);
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "title primary-actions"
+    "summary delete-action";
+  column-gap: 12px;
+  row-gap: 6px;
+  align-items: center;
+}
+
+.invoice-item-title {
+  grid-area: title;
+  min-width: 0;
+  font-family: "Space Grotesk", "Sora", sans-serif;
+}
+
+.invoice-item-primary-actions {
+  grid-area: primary-actions;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.invoice-item-summary {
+  grid-area: summary;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.invoice-item-summary span {
+  color: var(--ink-1);
+  font-size: 0.82rem;
+}
+
+.invoice-item-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
+}
+
+.invoice-item-chip-status {
+  text-transform: capitalize;
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--ink-0);
+}
+
+.invoice-item-chip-status-draft {
+  border-color: rgba(196, 205, 222, 0.28);
+  background: rgba(196, 205, 222, 0.08);
+  color: #edf2ff;
+}
+
+.invoice-item-chip-status-sent {
+  border-color: rgba(122, 189, 255, 0.34);
+  background: rgba(122, 189, 255, 0.1);
+  color: #d7ebff;
+}
+
+.invoice-item-chip-status-paid {
+  border-color: rgba(107, 224, 158, 0.34);
+  background: rgba(107, 224, 158, 0.12);
+  color: #d9ffe8;
+}
+
+.invoice-item-chip-status-void {
+  border-color: rgba(255, 147, 147, 0.32);
+  background: rgba(255, 147, 147, 0.1);
+  color: #ffe0e0;
+}
+
+.invoice-item-chip-total {
+  border-color: rgba(149, 222, 170, 0.35);
+  background: rgba(149, 222, 170, 0.08);
+  color: #dfffe9;
+}
+
+.invoice-item-delete-action {
+  grid-area: delete-action;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .invoice-line-list {
@@ -2302,6 +2398,20 @@ h1 {
 
   .invoice-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .invoice-item {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "title"
+      "summary"
+      "primary-actions"
+      "delete-action";
+  }
+
+  .invoice-item-primary-actions,
+  .invoice-item-delete-action {
+    justify-content: flex-start;
   }
 
   .invoice-line-item {

@@ -616,8 +616,12 @@ export function AdminInvoicesClient() {
   /**
    * Applies lifecycle and communication actions on selected invoice.
    */
-  async function runInvoiceAction(action: "mark_paid" | "mark_unpaid" | "void" | "send" | "delete" | "remind" | "create_credit_note") {
-    if (!selectedInvoice) {
+  async function runInvoiceAction(
+    action: "mark_paid" | "mark_unpaid" | "void" | "send" | "delete" | "remind" | "create_credit_note",
+    invoiceOverride?: InvoiceRow
+  ) {
+    const invoice = invoiceOverride ?? selectedInvoice;
+    if (!invoice) {
       return;
     }
 
@@ -637,14 +641,14 @@ export function AdminInvoicesClient() {
 
     const endpoint =
       action === "send"
-        ? `/api/admin/invoices/${selectedInvoice.id}/send`
+        ? `/api/admin/invoices/${invoice.id}/send`
         : action === "delete"
-          ? `/api/admin/invoices/${selectedInvoice.id}`
+          ? `/api/admin/invoices/${invoice.id}`
           : action === "remind"
-            ? `/api/admin/invoices/${selectedInvoice.id}/remind`
+            ? `/api/admin/invoices/${invoice.id}/remind`
             : action === "create_credit_note"
-              ? `/api/admin/invoices/${selectedInvoice.id}/credit-note`
-              : `/api/admin/invoices/${selectedInvoice.id}`;
+              ? `/api/admin/invoices/${invoice.id}/credit-note`
+              : `/api/admin/invoices/${invoice.id}`;
 
     const method = action === "send" || action === "remind" || action === "create_credit_note" ? "POST" : action === "delete" ? "DELETE" : "PATCH";
 
@@ -672,11 +676,13 @@ export function AdminInvoicesClient() {
     const refreshedRows = await loadInvoices();
 
     if (action === "delete") {
-      setSelectedInvoice(null);
+      if (selectedInvoice?.id === invoice.id) {
+        setSelectedInvoice(null);
+      }
     } else if (action === "create_credit_note" && payload?.invoice) {
       openInvoice(payload.invoice);
     } else {
-      const refreshed = refreshedRows.find((invoice) => invoice.id === selectedInvoice.id);
+      const refreshed = refreshedRows.find((row) => row.id === invoice.id);
       if (refreshed) {
         openInvoice(refreshed);
       }
@@ -957,17 +963,31 @@ export function AdminInvoicesClient() {
           {invoices.length ? (
             invoices.map((invoice) => (
               <div key={invoice.id} className="customer-item invoice-item">
-                <div className="customer-item-meta">
-                  <strong>{invoice.invoiceNumber} - {invoice.customerName}</strong>
-                  <span><small>Type</small> {invoice.documentType === "credit_note" ? "Credit note" : "Invoice"}</span>
-                  <span><small>Status</small> {invoice.status}</span>
-                  <span><small>Total</small> {toCurrency(invoice.totalCents)}</span>
-                  <span><small>Aging</small> {describeAging(invoice.agingBucket)}{invoice.overdueDays ? ` (${invoice.overdueDays}d)` : ""}</span>
-                  <span><small>Due</small> {new Date(invoice.dueAt).toLocaleDateString("en-AU", { timeZone: "Australia/Melbourne" })}</span>
-                </div>
-                <div className="customer-item-actions">
+                <strong className="invoice-item-title">{invoice.invoiceNumber} - {invoice.customerName}</strong>
+                <div className="invoice-item-primary-actions">
                   <button className="btn btn-secondary" onClick={() => openInvoice(invoice)}>View</button>
                   <button className="btn btn-secondary" onClick={() => downloadInvoicePdf(invoice.id)}>Download PDF</button>
+                </div>
+                <div className="invoice-item-summary">
+                  <span className="invoice-item-chip">{invoice.documentType === "credit_note" ? "Credit note" : "Invoice"}</span>
+                  <span className={`invoice-item-chip invoice-item-chip-status invoice-item-chip-status-${invoice.status}`}>{invoice.status}</span>
+                  <span className="invoice-item-chip invoice-item-chip-total">{toCurrency(invoice.totalCents)}</span>
+                  <span className="invoice-item-chip">
+                    {describeAging(invoice.agingBucket)}
+                    {invoice.overdueDays ? ` (${invoice.overdueDays}d)` : ""}
+                  </span>
+                  <span className="invoice-item-chip">
+                    Due {new Date(invoice.dueAt).toLocaleDateString("en-AU", { timeZone: "Australia/Melbourne" })}
+                  </span>
+                </div>
+                <div className="invoice-item-delete-action">
+                  <button
+                    className="btn btn-danger"
+                    disabled={!!busyAction || (invoice.documentType === "invoice" && (invoice.status === "sent" || invoice.status === "paid"))}
+                    onClick={() => void runInvoiceAction("delete", invoice)}
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
             ))
