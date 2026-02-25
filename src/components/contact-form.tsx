@@ -43,6 +43,9 @@ export function ContactForm() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    // Capture the form element synchronously before any awaits. React event
+    // objects do not guarantee `currentTarget` remains usable later.
+    const formElement = event.currentTarget;
     
     if (!captcha.validateAnswer()) {
       setState({ status: "error", message: "Please answer the math question correctly." });
@@ -53,7 +56,7 @@ export function ContactForm() {
     setLoading(true);
     setState({ status: "idle" });
 
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formElement);
     const payload = {
       name: String(form.get("name") || ""),
       email: String(form.get("email") || ""),
@@ -78,7 +81,7 @@ export function ContactForm() {
         return;
       }
 
-      event.currentTarget.reset();
+      formElement.reset();
       setState({
         status: "success",
         message: "Thanks. Your message has been sent and the studio owner has been notified."

@@ -33,6 +33,7 @@ RELEASES_DIR="${DEPLOY_DIR}/releases"
 SHARED_DIR="${DEPLOY_DIR}/shared"
 CURRENT_LINK="${DEPLOY_DIR}/current"
 KEEP_RELEASES=5
+DEFAULT_BUILD_NODE_HEAP_MB=3072
 BRANCH="main"
 SKIP_MIGRATE=false
 SKIP_DEPS=false
@@ -42,6 +43,8 @@ SSL_SETUP=false
 SSL_DOMAIN=""
 SSL_EMAIL=""
 DB_PUSH=false
+TIMESTAMP=""
+NEW_RELEASE_DIR=""
 
 # Colors for output
 RED='\033[0;31m'
@@ -61,6 +64,90 @@ log_error() {
 log_warn() {
     echo -e "${YELLOW}[WARN]${NC} $1"
 }
+
+current_release_name() {
+    if [[ -L "${CURRENT_LINK}" ]]; then
+        readlink -f "${CURRENT_LINK}" 2>/dev/null | xargs basename
+        return 0
+    fi
+
+    return 1
+}
+
+cleanup_old_releases() {
+    if [[ ! -d "${RELEASES_DIR}" ]]; then
+        return 0
+    fi
+
+    local current_release=""
+    current_release="$(current_release_name 2>/dev/null || true)"
+    local kept=0
+    local removed=0
+
+    while IFS= read -r release; do
+        [[ -z "${release}" ]] && continue
+
+        # Keep the newest N releases, but also preserve the active release even
+        # if it is older (for example immediately after a rollback).
+        if (( kept < KEEP_RELEASES )); then
+            kept=$((kept + 1))
+            continue
+        fi
+
+        if [[ -n "${current_release}" && "${release}" == "${current_release}" ]]; then
+            log_info "Preserving active release outside keep window: ${release}"
+            continue
+        fi
+
+        rm -rf "${RELEASES_DIR:?}/${release}"
+        removed=$((removed + 1))
+        log_info "Removed old release: ${release}"
+    done < <(ls -1t "${RELEASES_DIR}" 2>/dev/null || true)
+
+    if (( removed == 0 )); then
+        log_info "No old releases removed"
+    fi
+}
+
+ensure_build_node_options() {
+    local heap_flag="--max-old-space-size=${DEFAULT_BUILD_NODE_HEAP_MB}"
+
+    # Respect an explicit heap limit if one was already provided by the caller,
+    # but append a safe default when NODE_OPTIONS is unset or incomplete.
+    if [[ "${NODE_OPTIONS:-}" == *"--max-old-space-size="* ]]; then
+        log_info "Using existing NODE_OPTIONS heap setting"
+        return 0
+    fi
+
+    if [[ -n "${NODE_OPTIONS:-}" ]]; then
+        export NODE_OPTIONS="${NODE_OPTIONS} ${heap_flag}"
+    else
+        export NODE_OPTIONS="${heap_flag}"
+    fi
+
+    log_info "Applied build NODE_OPTIONS heap limit: ${heap_flag}"
+}
+
+cleanup_incomplete_release_on_exit() {
+    local exit_code=$?
+    trap - EXIT
+
+    # If deployment failed after creating a release directory but before it was
+    # promoted to current, remove it so failed builds do not fill the disk.
+    if [[ ${exit_code} -ne 0 && -n "${NEW_RELEASE_DIR:-}" && -d "${NEW_RELEASE_DIR}" ]]; then
+        local current_target=""
+        current_target="$(readlink -f "${CURRENT_LINK}" 2>/dev/null || true)"
+
+        if [[ "${current_target}" != "${NEW_RELEASE_DIR}" ]]; then
+            log_warn "Removing incomplete release after failure: ${NEW_RELEASE_DIR}"
+            rm -rf "${NEW_RELEASE_DIR}" || log_warn "Failed to remove incomplete release directory"
+        fi
+    fi
+
+    exit "${exit_code}"
+}
+
+trap cleanup_incomplete_release_on_exit EXIT
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -147,6 +234,11 @@ mkdir -p "${RELEASES_DIR}"
 mkdir -p "${SHARED_DIR}/data"
 chown -R www-data:www-data "${DEPLOY_DIR}"
 chmod -R 775 "${SHARED_DIR}/data"
+
+# Prune old releases before creating a new one so a previous failed deploy
+# cannot block the next build with an ENOSPC error.
+log_info "Pre-deploy release cleanup..."
+cleanup_old_releases
 
 # Create release directory with timestamp
 TIMESTAMP=$(date +%Y%m%d%H%M%S)
@@ -247,6 +339,7 @@ else
 fi
 
 # Build the application
+ensure_build_node_options
 log_info "Building application..."
 npm run build
 
@@ -324,8 +417,7 @@ fi
 
 # Cleanup old releases
 log_info "Cleaning up old releases..."
-cd "${RELEASES_DIR}"
-ls -1t | tail -n +$((KEEP_RELEASES + 1)) | xargs -r rm -rf
+cleanup_old_releases
 
 log_info "Deployment complete!"
 log_info "Current release: ${TIMESTAMP}"
