@@ -219,7 +219,14 @@ log_warn() {
 # Emit a section heading to visually separate deploy phases.
 section() {
     echo ""
-    echo -e "${BOLD}${BLUE}▶ $1${NC}"
+    local title="$1"
+    local width=$(( ${#title} + 6 ))
+    local rule=""
+    printf -v rule '%*s' "${width}" ''
+    rule="${rule// /─}"
+    echo -e "${BOLD}${BLUE}╭${rule}╮${NC}"
+    echo -e "${BOLD}${BLUE}│${NC}  ${BOLD}${title}${NC}  ${BOLD}${BLUE}│${NC}"
+    echo -e "${BOLD}${BLUE}╰${rule}╯${NC}"
 }
 
 # Prompt for a yes/no choice when running interactively.
@@ -312,6 +319,24 @@ print_tui_panel_rule() {
     echo -e "${DIM}${rule}${NC}"
 }
 
+print_tui_option_row() {
+    local key="$1"
+    local label="$2"
+    local value="$3"
+    printf "  %b[%2s]%b %-22s %b%s%b\n" "${BOLD}" "${key}" "${NC}" "${label}" "${CYAN}" "${value}" "${NC}"
+}
+
+print_tui_option_desc() {
+    local text="$1"
+    echo -e "       ${DIM}${text}${NC}"
+}
+
+print_summary_row() {
+    local label="$1"
+    local value="$2"
+    printf "  %-16b %b%s%b\n" "${DIM}${label}:${NC}" "${CYAN}" "${value}" "${NC}"
+}
+
 deploy_migration_mode_label() {
     if [[ "${DB_PUSH}" == true ]]; then
         echo "db-push (skip migrations)"
@@ -340,34 +365,41 @@ print_deploy_tui_menu() {
     print_box_banner "Deploy TUI • ${APP_NAME}"
     echo -e "${DIM}btop-style menu: edit values, review live status, then start.${NC}"
     echo ""
-    echo -e "  $(status_chip "Branch" "${BRANCH}")  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")  $(status_chip "Spinner" "$(spinner_ui_word)")"
-    echo -e "  $(status_chip "DB" "$(deploy_migration_mode_label)")  $(status_chip "PkgSetup" "$(bool_word "${SETUP_PACKAGES}")")"
+    echo -e "  ${BOLD}Live Status${NC}"
+    echo -e "  $(status_chip "Branch" "${BRANCH}")  $(status_chip "DB" "$(deploy_migration_mode_label)")"
+    echo -e "  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "PkgSetup" "$(bool_word "${SETUP_PACKAGES}")")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")  $(status_chip "Spinner" "$(spinner_ui_word)")"
     echo ""
     print_tui_panel_rule 78
-    echo -e "${BOLD}  Configuration Options${NC}"
+    echo -e "${BOLD}  Main Options${NC}"
     print_tui_panel_rule 78
-    echo -e "  ${BOLD}1${NC}  Branch                ${CYAN}${BRANCH}${NC}"
-    echo -e "     ${DIM}Git branch archived into the release directory and deployed.${NC}"
-    echo -e "  ${BOLD}2${NC}  Skip npm install      ${CYAN}$(bool_word "${SKIP_DEPS}")${NC}"
-    echo -e "     ${DIM}ON skips 'npm install' in the new release (faster, but risky after dependency changes).${NC}"
-    echo -e "  ${BOLD}3${NC}  Database mode         ${CYAN}$(deploy_migration_mode_label)${NC}"
-    echo -e "     ${DIM}Cycles: migrate deploy -> skip migrations -> prisma db push (test/dev fallback).${NC}"
-    echo -e "  ${BOLD}4${NC}  Package setup         ${CYAN}$(bool_word "${SETUP_PACKAGES}")${NC}"
-    echo -e "     ${DIM}Runs deploy/setup-packages.sh before deploy (Node/Nginx/system deps bootstrap).${NC}"
-    echo -e "  ${BOLD}5${NC}  SSL setup             ${CYAN}$(bool_word "${SSL_SETUP}")${NC}"
-    echo -e "     ${DIM}Runs certbot/nginx SSL setup after deployment completes.${NC}"
+    print_tui_option_row "1" "Branch" "${BRANCH}"
+    print_tui_option_desc "Git branch archived into the release directory and deployed."
+    print_tui_option_row "2" "Skip npm install" "$(bool_word "${SKIP_DEPS}")"
+    print_tui_option_desc "ON skips 'npm install' in the new release (faster, but risky after package changes)."
+    print_tui_option_row "3" "Database mode" "$(deploy_migration_mode_label)"
+    print_tui_option_desc "Cycles: migrate deploy -> skip migrations -> prisma db push (test/dev fallback)."
+    print_tui_option_row "4" "Package setup" "$(bool_word "${SETUP_PACKAGES}")"
+    print_tui_option_desc "Runs deploy/setup-packages.sh before deploy (Node/Nginx/system package bootstrap)."
+    print_tui_option_row "5" "SSL setup" "$(bool_word "${SSL_SETUP}")"
+    print_tui_option_desc "Runs certbot/nginx SSL setup after deployment completes."
     if [[ "${SSL_SETUP}" == true ]]; then
-        echo -e "  ${BOLD}6${NC}  SSL domain            ${CYAN}${SSL_DOMAIN:-melbourneguitarschool.com.au}${NC}"
-        echo -e "     ${DIM}Domain used in nginx config and Let's Encrypt certificate request.${NC}"
-        echo -e "  ${BOLD}7${NC}  Certbot email         ${CYAN}${SSL_EMAIL:-melbourneguitarschool@gmail.com}${NC}"
-        echo -e "     ${DIM}Receives certificate expiry notices and Let's Encrypt registration updates.${NC}"
+        print_tui_panel_rule 78
+        echo -e "${BOLD}  SSL Options${NC}"
+        print_tui_panel_rule 78
+        print_tui_option_row "6" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}"
+        print_tui_option_desc "Domain used in nginx config and Let's Encrypt certificate request."
+        print_tui_option_row "7" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}"
+        print_tui_option_desc "Receives certificate expiry notices and Let's Encrypt registration updates."
     fi
-    echo -e "  ${BOLD}8${NC}  Spinner UI            ${CYAN}$(spinner_ui_word)${NC}"
-    echo -e "     ${DIM}Animated progress spinner for long commands (disable in noisy terminals/log capture).${NC}"
+    print_tui_panel_rule 78
+    echo -e "${BOLD}  UI Options${NC}"
+    print_tui_panel_rule 78
+    print_tui_option_row "8" "Spinner UI" "$(spinner_ui_word)"
+    print_tui_option_desc "Animated progress spinner for long commands (disable in noisy terminals/log capture)."
     echo ""
     print_tui_panel_rule 78
-    echo -e "  ${BOLD}S${NC}  Start deploy      ${BOLD}Q${NC}  Cancel"
-    echo -e "${DIM}Tip: Press Enter after each selection. Values redraw immediately.${NC}"
+    echo -e "  ${BOLD}Actions${NC}:  ${BOLD}S${NC} Start deploy   ${BOLD}Q${NC} Cancel"
+    echo -e "  ${DIM}Tip: press Enter after each selection. Screen redraws with updated values.${NC}"
 }
 
 # Ask for deploy options in a TTY using a menu-style terminal UI so one command
@@ -433,16 +465,23 @@ run_interactive_setup() {
 # Print a compact summary before executing so deploy choices are explicit.
 print_deploy_summary() {
     section "Deploy Summary"
-    echo -e "  ${DIM}App:${NC}        ${APP_NAME}"
-    echo -e "  ${DIM}Branch:${NC}     ${BRANCH}"
-    echo -e "  ${DIM}Skip deps:${NC}  ${SKIP_DEPS}"
-    echo -e "  ${DIM}Skip migrate:${NC} ${SKIP_MIGRATE}"
-    echo -e "  ${DIM}DB push:${NC}    ${DB_PUSH}"
-    echo -e "  ${DIM}SSL setup:${NC}  ${SSL_SETUP}"
+    echo -e "  ${BOLD}Overview${NC}"
+    print_tui_panel_rule 54
+    print_summary_row "App" "${APP_NAME}"
+    print_summary_row "Branch" "${BRANCH}"
+    print_summary_row "Database mode" "$(deploy_migration_mode_label)"
+    print_summary_row "Skip npm install" "$(bool_word "${SKIP_DEPS}")"
+    print_summary_row "Package setup" "$(bool_word "${SETUP_PACKAGES}")"
+    print_summary_row "SSL setup" "$(bool_word "${SSL_SETUP}")"
+    print_summary_row "Spinner UI" "$(spinner_ui_word)"
     if [[ "${SSL_SETUP}" == true ]]; then
-        echo -e "  ${DIM}Domain:${NC}     ${SSL_DOMAIN}"
-        echo -e "  ${DIM}Email:${NC}      ${SSL_EMAIL}"
+        print_tui_panel_rule 54
+        echo -e "  ${BOLD}SSL${NC}"
+        print_tui_panel_rule 54
+        print_summary_row "Domain" "${SSL_DOMAIN}"
+        print_summary_row "Certbot email" "${SSL_EMAIL}"
     fi
+    print_tui_panel_rule 54
 }
 
 # Background spinner used by run_step for long-running commands while preserving command logs.

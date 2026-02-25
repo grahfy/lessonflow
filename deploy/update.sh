@@ -174,7 +174,14 @@ log_error() {
 # Visual section markers make long update runs easier to scan.
 section() {
   echo ""
-  echo -e "${BOLD}${BLUE}▶ $1${NC}"
+  local title="$1"
+  local width=$(( ${#title} + 6 ))
+  local rule=""
+  printf -v rule '%*s' "${width}" ''
+  rule="${rule// /─}"
+  echo -e "${BOLD}${BLUE}╭${rule}╮${NC}"
+  echo -e "${BOLD}${BLUE}│${NC}  ${BOLD}${title}${NC}  ${BOLD}${BLUE}│${NC}"
+  echo -e "${BOLD}${BLUE}╰${rule}╯${NC}"
 }
 
 # Reusable prompt for yes/no interactive questions with defaults.
@@ -267,6 +274,24 @@ print_tui_panel_rule() {
   echo -e "${DIM}${rule}${NC}"
 }
 
+print_tui_option_row() {
+  local key="$1"
+  local label="$2"
+  local value="$3"
+  printf "  %b[%2s]%b %-22s %b%s%b\n" "${BOLD}" "${key}" "${NC}" "${label}" "${CYAN}" "${value}" "${NC}"
+}
+
+print_tui_option_desc() {
+  local text="$1"
+  echo -e "       ${DIM}${text}${NC}"
+}
+
+print_summary_row() {
+  local label="$1"
+  local value="$2"
+  printf "  %-18b %b%s%b\n" "${DIM}${label}:${NC}" "${CYAN}" "${value}" "${NC}"
+}
+
 update_migration_mode_label() {
   if [[ "${DB_PUSH}" == true ]]; then
     echo "db-push (skip migrations)"
@@ -327,32 +352,35 @@ print_update_tui_menu() {
   print_tui_panel_rule 92
   echo -e "${BOLD}  Update Workflow Options${NC}"
   print_tui_panel_rule 92
-  echo -e "  ${BOLD}1${NC}  Branch                ${CYAN}${BRANCH}${NC}"
-  echo -e "     ${DIM}Branch to fetch/pull and pass through to deploy.sh.${NC}"
-  echo -e "  ${BOLD}2${NC}  Remote                ${CYAN}${REMOTE_NAME}${NC}"
-  echo -e "     ${DIM}Git remote used for fetch/pull (usually origin).${NC}"
-  echo -e "  ${BOLD}3${NC}  Pull latest changes    ${CYAN}$(bool_word "$(toggle_bool "${SKIP_PULL}")")${NC}"
-  echo -e "     ${DIM}ON performs git fetch + ff-only pull before deployment.${NC}"
-  echo -e "  ${BOLD}4${NC}  Run deploy after pull  ${CYAN}$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")${NC}"
-  echo -e "     ${DIM}ON runs deploy.sh after git update; OFF only updates the repo checkout.${NC}"
-  echo -e "  ${BOLD}5${NC}  Allow dirty worktree   ${CYAN}$(bool_word "${ALLOW_DIRTY}")${NC}"
-  echo -e "     ${DIM}ON allows update/deploy even if tracked files are modified locally.${NC}"
-  echo -e "  ${BOLD}6${NC}  Sudo deploy mode      ${CYAN}$(update_sudo_mode_label)${NC}"
-  echo -e "     ${DIM}Cycles deploy invocation between auto, forced sudo, and forced no-sudo.${NC}"
-  echo -e "  ${BOLD}7${NC}  Spinner UI            ${CYAN}$(spinner_ui_word)${NC}"
-  echo -e "     ${DIM}Animated progress spinner for git/deploy wrapper steps.${NC}"
+  print_tui_option_row "1" "Branch" "${BRANCH}"
+  print_tui_option_desc "Branch to fetch/pull and pass through to deploy.sh."
+  print_tui_option_row "2" "Remote" "${REMOTE_NAME}"
+  print_tui_option_desc "Git remote used for fetch/pull (usually origin)."
+  print_tui_option_row "3" "Pull latest changes" "$(bool_word "$(toggle_bool "${SKIP_PULL}")")"
+  print_tui_option_desc "ON performs git fetch + ff-only pull before deployment."
+  print_tui_option_row "4" "Run deploy after pull" "$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")"
+  print_tui_option_desc "ON runs deploy.sh after git update; OFF only updates the repo checkout."
+  print_tui_option_row "5" "Allow dirty worktree" "$(bool_word "${ALLOW_DIRTY}")"
+  print_tui_option_desc "ON allows update/deploy even if tracked files are modified locally."
+  print_tui_option_row "6" "Sudo deploy mode" "$(update_sudo_mode_label)"
+  print_tui_option_desc "Cycles deploy invocation between auto, forced sudo, and forced no-sudo."
+  print_tui_option_row "7" "Spinner UI" "$(spinner_ui_word)"
+  print_tui_option_desc "Animated progress spinner for git/deploy wrapper steps."
   if [[ "${SKIP_DEPLOY}" == false ]]; then
-    echo -e "  ${BOLD}8${NC}  Skip npm install      ${CYAN}$(bool_word "${SKIP_DEPS}")${NC}"
-    echo -e "     ${DIM}Passes --skip-deps to deploy.sh (faster, but unsafe after package changes).${NC}"
-    echo -e "  ${BOLD}9${NC}  Database mode         ${CYAN}$(update_migration_mode_label)${NC}"
-    echo -e "     ${DIM}Cycles deploy DB behavior: migrate deploy / skip migrations / db push.${NC}"
-    echo -e "  ${BOLD}10${NC} SSL setup             ${CYAN}$(bool_word "${SSL_SETUP}")${NC}"
-    echo -e "     ${DIM}Passes SSL setup flags to deploy.sh to run certbot + nginx config.${NC}"
+    print_tui_panel_rule 92
+    echo -e "${BOLD}  Deploy Pass-through Options${NC}"
+    print_tui_panel_rule 92
+    print_tui_option_row "8" "Skip npm install" "$(bool_word "${SKIP_DEPS}")"
+    print_tui_option_desc "Passes --skip-deps to deploy.sh (faster, but unsafe after package changes)."
+    print_tui_option_row "9" "Database mode" "$(update_migration_mode_label)"
+    print_tui_option_desc "Cycles deploy DB behavior: migrate deploy / skip migrations / db push."
+    print_tui_option_row "10" "SSL setup" "$(bool_word "${SSL_SETUP}")"
+    print_tui_option_desc "Passes SSL setup flags to deploy.sh to run certbot + nginx config."
     if [[ "${SSL_SETUP}" == true ]]; then
-      echo -e "  ${BOLD}11${NC} SSL domain            ${CYAN}${SSL_DOMAIN:-melbourneguitarschool.com.au}${NC}"
-      echo -e "     ${DIM}Domain used for certificate request and nginx server_name config.${NC}"
-      echo -e "  ${BOLD}12${NC} Certbot email         ${CYAN}${SSL_EMAIL:-melbourneguitarschool@gmail.com}${NC}"
-      echo -e "     ${DIM}Email for Let's Encrypt registration and renewal alerts.${NC}"
+      print_tui_option_row "11" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}"
+      print_tui_option_desc "Domain used for certificate request and nginx server_name config."
+      print_tui_option_row "12" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}"
+      print_tui_option_desc "Email for Let's Encrypt registration and renewal alerts."
     fi
   fi
   echo ""
@@ -701,22 +729,30 @@ print_summary() {
   fi
 
   section "Update Summary"
-  echo -e "  ${DIM}Repo:${NC}        $(pwd)"
-  echo -e "  ${DIM}Remote:${NC}      ${REMOTE_NAME}"
-  echo -e "  ${DIM}Branch:${NC}      ${BRANCH}"
-  echo -e "  ${DIM}Git pull:${NC}    ${will_pull}"
-  echo -e "  ${DIM}Deploy:${NC}      ${will_deploy}"
+  echo -e "  ${BOLD}Workflow${NC}"
+  print_tui_panel_rule 62
+  print_summary_row "Repo" "$(pwd)"
+  print_summary_row "Remote" "${REMOTE_NAME}"
+  print_summary_row "Branch" "${BRANCH}"
+  print_summary_row "Git pull" "${will_pull}"
+  print_summary_row "Run deploy" "${will_deploy}"
+  print_summary_row "Allow dirty" "$(bool_word "${ALLOW_DIRTY}")"
+  print_summary_row "Sudo mode" "$(update_sudo_mode_label)"
+  print_summary_row "Spinner UI" "$(spinner_ui_word)"
   if [[ "${SKIP_DEPLOY}" == false ]]; then
-    echo -e "  ${DIM}Use sudo:${NC}    ${sudo_mode}"
-    echo -e "  ${DIM}Skip deps:${NC}   ${SKIP_DEPS}"
-    echo -e "  ${DIM}Skip migrate:${NC} ${SKIP_MIGRATE}"
-    echo -e "  ${DIM}DB push:${NC}     ${DB_PUSH}"
-    echo -e "  ${DIM}SSL setup:${NC}   ${SSL_SETUP}"
+    print_tui_panel_rule 62
+    echo -e "  ${BOLD}Deploy Pass-through${NC}"
+    print_tui_panel_rule 62
+    print_summary_row "Effective sudo" "${sudo_mode}"
+    print_summary_row "Skip npm install" "$(bool_word "${SKIP_DEPS}")"
+    print_summary_row "Database mode" "$(update_migration_mode_label)"
+    print_summary_row "SSL setup" "$(bool_word "${SSL_SETUP}")"
     if [[ "${SSL_SETUP}" == true ]]; then
-      echo -e "  ${DIM}Domain:${NC}      ${SSL_DOMAIN}"
-      echo -e "  ${DIM}Email:${NC}       ${SSL_EMAIL}"
+      print_summary_row "SSL domain" "${SSL_DOMAIN}"
+      print_summary_row "Certbot email" "${SSL_EMAIL}"
     fi
   fi
+  print_tui_panel_rule 62
 }
 
 # Builds and executes the deploy.sh command, passing through compatible flags.
