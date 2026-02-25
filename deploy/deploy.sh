@@ -87,6 +87,7 @@ SPINNER_PID=""
 SPINNER_MSG=""
 SPINNER_FRAMES=( "⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏" )
 DEPLOY_TUI_PANEL_WIDTH=92
+DEPLOY_TUI_PANEL_WIDTH_MAX=120
 TEMP_BUILD_SWAP_ACTIVE=false
 TEMP_BUILD_SWAP_CREATED_FILE=false
 DEPLOY_GIT_REPO_ROOT=""
@@ -99,6 +100,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m' # No Color
@@ -140,9 +142,43 @@ detect_tty_capabilities() {
         IS_TTY=true
     fi
 
-    if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then
-        RED='' GREEN='' YELLOW='' BLUE='' CYAN='' BOLD='' DIM='' NC=''
+    if [[ "${IS_TTY}" == true ]]; then
+        auto_size_tui_panel_width
     fi
+
+    if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then
+        RED='' GREEN='' YELLOW='' BLUE='' CYAN='' MAGENTA='' BOLD='' DIM='' NC=''
+    fi
+}
+
+# Sizes the TUI panel to the active terminal width while keeping a readable max
+# width on very wide terminals. This lets the deploy menu adapt to SSH windows
+# and split panes without manually editing script constants.
+auto_size_tui_panel_width() {
+    local cols=""
+    local target_width=""
+
+    if command -v tput >/dev/null 2>&1; then
+        cols="$(tput cols 2>/dev/null || true)"
+    fi
+
+    if [[ -z "${cols}" && -n "${COLUMNS:-}" ]]; then
+        cols="${COLUMNS}"
+    fi
+
+    if [[ ! "${cols}" =~ ^[0-9]+$ ]]; then
+        return 0
+    fi
+
+    target_width="${cols}"
+    if (( target_width < 48 )); then
+        target_width=48
+    fi
+    if (( target_width > DEPLOY_TUI_PANEL_WIDTH_MAX )); then
+        target_width="${DEPLOY_TUI_PANEL_WIDTH_MAX}"
+    fi
+
+    DEPLOY_TUI_PANEL_WIDTH="${target_width}"
 }
 
 # Re-runs the deploy script with sudo when root privileges are required but the
@@ -1054,14 +1090,14 @@ print_tui_panel_rule() {
     local rule=""
     printf -v rule '%*s' "${width}" ''
     rule="${rule// /─}"
-    echo -e "${DIM}${rule}${NC}"
+    echo -e "${DIM}${BLUE}${rule}${NC}"
 }
 
 print_tui_option_row() {
     local key="$1"
     local label="$2"
     local value="$3"
-    printf "  %b[%2s]%b %-22s %b%s%b\n" "${BOLD}" "${key}" "${NC}" "${label}" "${CYAN}" "${value}" "${NC}"
+    printf "  %b[%2s]%b %b%-22s%b %b%s%b\n" "${BOLD}${MAGENTA}" "${key}" "${NC}" "${CYAN}" "${label}" "${NC}" "${GREEN}" "${value}" "${NC}"
 }
 
 print_tui_option_desc() {
@@ -1137,8 +1173,8 @@ print_tui_option_pair() {
         right_desc_text="$(tui_truncate_text "${right_desc}" "${col_width}")"
     fi
 
-    printf "  %-*s  %-*s\n" "${col_width}" "${left_cell}" "${col_width}" "${right_cell}"
-    printf "  %b%-*s%b  %b%-*s%b\n" "${DIM}" "${col_width}" "${left_desc_text}" "${NC}" "${DIM}" "${col_width}" "${right_desc_text}" "${NC}"
+    printf "  %b%-*s%b  %b%-*s%b\n" "${CYAN}" "${col_width}" "${left_cell}" "${NC}" "${GREEN}" "${col_width}" "${right_cell}" "${NC}"
+    printf "  %b%-*s%b  %b%-*s%b\n" "${DIM}${BLUE}" "${col_width}" "${left_desc_text}" "${NC}" "${DIM}${BLUE}" "${col_width}" "${right_desc_text}" "${NC}"
 }
 
 print_tui_action_pair() {
@@ -1155,7 +1191,7 @@ print_tui_action_pair() {
         right_cell="$(tui_truncate_text "${right_key}  ${right_label}" "${col_width}")"
     fi
 
-    printf "  %-*s  %-*s\n" "${col_width}" "${left_cell}" "${col_width}" "${right_cell}"
+    printf "  %b%-*s%b  %b%-*s%b\n" "${YELLOW}" "${col_width}" "${left_cell}" "${NC}" "${MAGENTA}" "${col_width}" "${right_cell}" "${NC}"
 }
 
 print_tui_hint_line() {
@@ -1164,7 +1200,7 @@ print_tui_hint_line() {
     local clipped=""
 
     clipped="$(tui_truncate_text "${text}" "${max_width}")"
-    echo -e "  ${DIM}${clipped}${NC}"
+    echo -e "  ${DIM}${CYAN}${clipped}${NC}"
 }
 
 print_summary_row() {
@@ -1205,13 +1241,13 @@ print_deploy_tui_menu() {
     print_box_banner "Deploy TUI • ${APP_NAME}"
     echo -e "${DIM}btop-style menu: edit values, review live status, then start.${NC}"
     echo ""
-    echo -e "  ${BOLD}Live Status${NC}"
+    echo -e "  ${BOLD}${CYAN}Live Status${NC}"
     echo -e "  $(status_chip "Branch" "$(tui_truncate_text "${BRANCH}" 18)")  $(status_chip "DB" "$(deploy_migration_mode_label)")"
     echo -e "  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "Cron" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")")  $(status_chip "Pkg" "$(bool_word "${SETUP_PACKAGES}")")"
     echo -e "  $(status_chip "EnvDB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")  $(status_chip "Spin" "$(spinner_ui_word)")"
     echo ""
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
-    echo -e "${BOLD}  Main Options${NC}"
+    echo -e "${BOLD}${BLUE}  Main Options${NC}"
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     print_tui_option_pair "1" "Branch" "${BRANCH}" "Git branch archived into the release directory and deployed." \
         "2" "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")" "ON runs npm install in the new release. OFF skips it (faster, riskier)."
@@ -1221,25 +1257,25 @@ print_deploy_tui_menu() {
         "6" "SSL setup" "$(bool_word "${SSL_SETUP}")" "Runs certbot/nginx SSL setup after deployment completes."
     if [[ "${SSL_SETUP}" == true ]]; then
         print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
-        echo -e "${BOLD}  SSL Options${NC}"
+        echo -e "${BOLD}${MAGENTA}  SSL Options${NC}"
         print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
         print_tui_option_pair "7" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}" "Domain used in nginx config and Let's Encrypt certificate request." \
             "8" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}" "Receives certificate expiry notices and Let's Encrypt registration updates."
     fi
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
-    echo -e "${BOLD}  UI Options${NC}"
+    echo -e "${BOLD}${YELLOW}  UI Options${NC}"
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     print_tui_option_pair "9" "Spinner UI" "$(spinner_ui_word)" "Animated progress spinner for long commands (disable in noisy terminals/log capture)." \
         "10" "Edit shared .env" "Open editor now" "Bootstraps ${SHARED_DIR}/.env from .env.example if missing, then opens it."
     print_tui_option_pair "11" "MySQL + create DB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")" "When ON, Start runs MySQL install + local DB create from shared .env."
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
-    echo -e "${BOLD}  Bootstrap Workflow Helpers${NC}"
+    echo -e "${BOLD}${GREEN}  Bootstrap Workflow Helpers${NC}"
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     print_tui_option_pair "12" "Install cron/crond" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")" "When ON, Start installs/enables cron/crond before the release build." \
         "13" "Install Nginx" "$(bool_word "${INSTALL_NGINX_IF_NEEDED}")" "When ON, Start installs Nginx (if missing) before the release build."
     echo ""
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
-    echo -e "${BOLD}  Immediate Bootstrap Actions${NC}"
+    echo -e "${BOLD}${MAGENTA}  Immediate Bootstrap Actions${NC}"
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     print_tui_action_pair "M" "Run MySQL + create DB now" "N" "Install Nginx now"
     print_tui_action_pair "P" "Install PHP-FPM if needed" "U" "Install/update app service"

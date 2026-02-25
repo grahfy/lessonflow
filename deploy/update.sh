@@ -76,6 +76,7 @@ SPINNER_PID=""
 SPINNER_MSG=""
 SPINNER_FRAMES=( "⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏" )
 UPDATE_TUI_PANEL_WIDTH=92
+UPDATE_TUI_PANEL_WIDTH_MAX=120
 SUDO_DEPLOY_AUTH_READY=false
 DEFAULT_BUILD_NODE_HEAP_MB="${DEFAULT_BUILD_NODE_HEAP_MB:-6144}"
 LOW_RAM_1GB_AUTO_HEAP_MB="${LOW_RAM_1GB_AUTO_HEAP_MB:-3072}"
@@ -99,6 +100,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 BLINK='\033[5m'
 DIM='\033[2m'
@@ -144,9 +146,43 @@ detect_tty_capabilities() {
     IS_TTY=true
   fi
 
-  if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then
-    RED='' GREEN='' YELLOW='' BLUE='' CYAN='' BOLD='' BLINK='' DIM='' NC=''
+  if [[ "${IS_TTY}" == true ]]; then
+    auto_size_tui_panel_width
   fi
+
+  if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then
+    RED='' GREEN='' YELLOW='' BLUE='' CYAN='' MAGENTA='' BOLD='' BLINK='' DIM='' NC=''
+  fi
+}
+
+# Sizes the TUI panel to the active terminal width while keeping a readable max
+# width on wide terminals. This helps the update wrapper fit split panes and
+# smaller SSH windows without manual width tweaks.
+auto_size_tui_panel_width() {
+  local cols=""
+  local target_width=""
+
+  if command -v tput >/dev/null 2>&1; then
+    cols="$(tput cols 2>/dev/null || true)"
+  fi
+
+  if [[ -z "${cols}" && -n "${COLUMNS:-}" ]]; then
+    cols="${COLUMNS}"
+  fi
+
+  if [[ ! "${cols}" =~ ^[0-9]+$ ]]; then
+    return 0
+  fi
+
+  target_width="${cols}"
+  if (( target_width < 48 )); then
+    target_width=48
+  fi
+  if (( target_width > UPDATE_TUI_PANEL_WIDTH_MAX )); then
+    target_width="${UPDATE_TUI_PANEL_WIDTH_MAX}"
+  fi
+
+  UPDATE_TUI_PANEL_WIDTH="${target_width}"
 }
 
 # Returns the application version from package.json (or "unknown" if unreadable).
@@ -920,14 +956,14 @@ print_tui_panel_rule() {
   local rule=""
   printf -v rule '%*s' "${width}" ''
   rule="${rule// /─}"
-  echo -e "${DIM}${rule}${NC}"
+  echo -e "${DIM}${BLUE}${rule}${NC}"
 }
 
 print_tui_option_row() {
   local key="$1"
   local label="$2"
   local value="$3"
-  printf "  %b[%2s]%b %-22s %b%s%b\n" "${BOLD}" "${key}" "${NC}" "${label}" "${CYAN}" "${value}" "${NC}"
+  printf "  %b[%2s]%b %b%-22s%b %b%s%b\n" "${BOLD}${MAGENTA}" "${key}" "${NC}" "${CYAN}" "${label}" "${NC}" "${GREEN}" "${value}" "${NC}"
 }
 
 print_tui_option_desc() {
@@ -991,8 +1027,8 @@ print_tui_option_pair() {
     right_desc_text="$(tui_truncate_text "${right_desc}" "${col_width}")"
   fi
 
-  printf "  %-*s  %-*s\n" "${col_width}" "${left_cell}" "${col_width}" "${right_cell}"
-  printf "  %b%-*s%b  %b%-*s%b\n" "${DIM}" "${col_width}" "${left_desc_text}" "${NC}" "${DIM}" "${col_width}" "${right_desc_text}" "${NC}"
+  printf "  %b%-*s%b  %b%-*s%b\n" "${CYAN}" "${col_width}" "${left_cell}" "${NC}" "${GREEN}" "${col_width}" "${right_cell}" "${NC}"
+  printf "  %b%-*s%b  %b%-*s%b\n" "${DIM}${BLUE}" "${col_width}" "${left_desc_text}" "${NC}" "${DIM}${BLUE}" "${col_width}" "${right_desc_text}" "${NC}"
 }
 
 print_tui_action_pair() {
@@ -1009,7 +1045,7 @@ print_tui_action_pair() {
     right_cell="$(tui_truncate_text "${right_key}  ${right_label}" "${col_width}")"
   fi
 
-  printf "  %-*s  %-*s\n" "${col_width}" "${left_cell}" "${col_width}" "${right_cell}"
+  printf "  %b%-*s%b  %b%-*s%b\n" "${YELLOW}" "${col_width}" "${left_cell}" "${NC}" "${MAGENTA}" "${col_width}" "${right_cell}" "${NC}"
 }
 
 print_tui_hint_line() {
@@ -1018,7 +1054,7 @@ print_tui_hint_line() {
   local clipped=""
 
   clipped="$(tui_truncate_text "${text}" "${max_width}")"
-  echo -e "  ${DIM}${clipped}${NC}"
+  echo -e "  ${DIM}${CYAN}${clipped}${NC}"
 }
 
 print_summary_row() {
@@ -1200,7 +1236,7 @@ print_update_tui_menu() {
   if [[ "${TUI_REMOTE_UPDATE_STATUS}" == "update-available" ]]; then
     echo ""
   fi
-  echo -e "${BOLD}  Update Workflow Options${NC}"
+  echo -e "${BOLD}${BLUE}  Update Workflow Options${NC}"
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
   print_tui_option_pair "1" "Branch" "${BRANCH}" "Branch to fetch/pull and pass through to deploy.sh." \
     "2" "Remote" "${REMOTE_NAME}" "Git remote used for fetch/pull (usually origin)."
@@ -1213,7 +1249,7 @@ print_update_tui_menu() {
   print_tui_option_pair "9" "Spinner UI" "$(spinner_ui_word)" "Animated progress spinner for git/deploy wrapper steps." \
     "10" "Edit shared .env" "Open editor now" "Bootstraps ${SHARED_DIR}/.env from .env.example if missing, then opens it."
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
-  echo -e "${BOLD}  Bootstrap Workflow Helpers${NC}"
+  echo -e "${BOLD}${GREEN}  Bootstrap Workflow Helpers${NC}"
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
   print_tui_option_pair "11" "Install cron/crond" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")" "When ON, Start installs/enables cron/crond before the update/deploy flow." \
     "12" "Install app service" "$(bool_word "${INSTALL_APP_SERVICE_IF_NEEDED}")" "When ON, Start installs/updates the app systemd unit before the flow."
@@ -1222,7 +1258,7 @@ print_update_tui_menu() {
   print_tui_option_pair "15" "Install PHP-FPM" "$(bool_word "${INSTALL_PHP_FPM_IF_NEEDED}")" "When ON, Start installs PHP-FPM only if deploy nginx config needs it."
   if [[ "${SKIP_DEPLOY}" == false ]]; then
     print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
-    echo -e "${BOLD}  Deploy Pass-through Options${NC}"
+    echo -e "${BOLD}${MAGENTA}  Deploy Pass-through Options${NC}"
     print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
     print_tui_option_pair "16" "Database mode" "$(update_migration_mode_label)" "Cycles deploy DB behavior: migrate deploy / skip migrations / db push." \
       "17" "SSL setup" "$(bool_word "${SSL_SETUP}")" "Passes SSL setup flags to deploy.sh to run certbot + nginx config."
@@ -1233,7 +1269,7 @@ print_update_tui_menu() {
   fi
   echo ""
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
-  echo -e "${BOLD}  Immediate Bootstrap Actions${NC}"
+  echo -e "${BOLD}${MAGENTA}  Immediate Bootstrap Actions${NC}"
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
   print_tui_action_pair "J" "Install/update cron jobs now" "N" "Install Nginx now"
   print_tui_action_pair "P" "Install PHP-FPM if needed now" "U" "Install/update app service"
