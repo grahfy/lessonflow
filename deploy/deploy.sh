@@ -2396,11 +2396,15 @@ fi
 
 log_info "Build successful: $(cat .next/BUILD_ID)"
 
-# Setup standalone build (copy public and static assets)
-# This is required for next/image and other static assets to work in standalone mode
+# Setup standalone build (copy public, static assets, and runtime docs)
+# This is required for next/image/static assets and for /admin/manual, which
+# reads Markdown files from the filesystem at runtime in standalone mode.
 if [[ -d ".next/standalone" ]]; then
     log_info "Setting up standalone build assets..."
     cp -r public ".next/standalone/"
+    if [[ -d "Documentation" ]]; then
+        cp -r Documentation ".next/standalone/"
+    fi
     mkdir -p ".next/standalone/.next"
     cp -r ".next/static" ".next/standalone/.next/"
 fi

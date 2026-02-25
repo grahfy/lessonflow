@@ -358,6 +358,24 @@ run_server_setup_cmd() {
   sudo "$@"
 }
 
+# Runs a command that touches deployed release files/paths, using sudo when the
+# deploy workflow is configured for elevation but allowing direct execution when
+# the current user already has access.
+run_deploy_path_cmd() {
+  if [[ ${EUID} -eq 0 ]]; then
+    "$@"
+    return $?
+  fi
+
+  if should_use_sudo_for_deploy; then
+    ensure_sudo_for_deploy_ready
+    sudo "$@"
+    return $?
+  fi
+
+  "$@"
+}
+
 # Ensures /var/www/.../shared/.env exists, copying the repo .env.example on
 # first-run servers so operators have a file to review before deployment.
 ensure_shared_env_file() {
@@ -1617,6 +1635,34 @@ run_deploy() {
   cleanup_local_install_and_build_caches
 }
 
+# Ensures the deployed standalone runtime has the Documentation markdown files
+# used by /admin/manual, even when the wrapper is driving deploy.sh. deploy.sh
+# now performs this copy itself, but this post-deploy sync keeps wrapper runs
+# resilient and makes the behavior explicit in both scripts.
+sync_manual_docs_into_current_standalone_from_update() {
+  local docs_src="${REPO_ROOT}/Documentation"
+  local standalone_dir="${CURRENT_LINK}/.next/standalone"
+  local docs_dst="${standalone_dir}/Documentation"
+
+  if [[ ! -d "${docs_src}" ]]; then
+    log_warn "Documentation source not found at ${docs_src}; skipping manual docs sync."
+    return 0
+  fi
+
+  if [[ ! -d "${standalone_dir}" ]]; then
+    log_warn "Standalone runtime not found at ${standalone_dir}; skipping manual docs sync."
+    return 0
+  fi
+
+  section "Manual Docs"
+  log_info "Syncing Documentation markdown files into standalone runtime..."
+
+  run_deploy_path_cmd rm -rf "${docs_dst}"
+  run_deploy_path_cmd cp -r "${docs_src}" "${standalone_dir}/"
+
+  log_info "Manual docs synced to ${docs_dst}"
+}
+
 # Parse CLI arguments before interactive setup/validation.
 ARG_COUNT=$#
 while [[ $# -gt 0 ]]; do
@@ -1768,6 +1814,7 @@ if [[ "${SKIP_DEPLOY}" == false ]]; then
   ensure_shared_env_file "${REPO_ROOT}/.env.example" || true
   maybe_edit_shared_env_before_deploy "${REPO_ROOT}"
   run_deploy
+  sync_manual_docs_into_current_standalone_from_update
 else
   section "Deploy"
   log_info "Skipping deployment"
