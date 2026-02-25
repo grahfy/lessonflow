@@ -205,7 +205,7 @@ You must edit the shared `.env` with real values before production use (especial
 
 Use `update.sh` (wrapper) for most server bootstrap tasks and `deploy.sh` (direct deploy) for MySQL+DB bootstrap from the shared `.env`.
 
-`update.sh` is usually the best day-to-day entry point because it handles `git fetch/pull` before invoking `deploy.sh`, but the bootstrap helpers are available on both scripts now.
+`update.sh` is usually the best day-to-day entry point because it handles `git fetch/pull` before invoking `deploy.sh`, while `deploy.sh` remains the place for MySQL+DB bootstrap from the shared `.env`.
 
 Recommended order on a fresh VPS/Droplet:
 1. Edit shared `.env` (`./deploy/update.sh --interactive` or `./deploy/deploy.sh --interactive`)
