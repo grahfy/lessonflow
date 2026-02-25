@@ -1,206 +1,135 @@
 # Melbourne Guitar School Platform
 
-Turn enquiries into confirmed lessons and paid invoices in one system.
+A Next.js application for running Melbourne Guitar School operations end to end:
+public website, booking intake, admin scheduling, customer records, invoicing, reminders, and student portal access.
 
-This software combines:
-- public marketing pages,
-- contact and booking intake,
-- admin scheduling and customer management,
-- invoice generation, reminders, and payment tracking.
+## What It Includes
 
-It is built for a real-world teaching business that needs fast admin operations, clean customer communication, and a reliable billing workflow.
-
-## What This Software Does
-Melbourne Guitar School Platform is a full-stack web application for running day-to-day operations:
-- Capture leads and lesson requests from the public website.
-- Manage bookings in an owner/admin calendar workflow.
-- Maintain a customer directory linked to bookings.
-- Generate and send professional invoices with PDF attachments.
-- Track outstanding balances, payment status, reminders, and credit notes.
-
-## Why It’s Valuable
-- One workflow from enquiry to payment.
-- Fewer manual handoffs between calendar, email, and invoicing tools.
-- Better data integrity with audit trails and invoice history.
-- Built-in communication flows for reminders and updates.
-- Supports AU-friendly invoice fields and GST-aware defaults.
-
-## Feature Summary
-
-### Public Website
-- Marketing pages: `/`, `/lessons`, `/teacher`, `/vouchers`, `/terms`.
-- Contact form at `/contact`.
-- Booking request form at `/book`.
-- Student portal entry at `/student/login`.
-- Smooth page transitions and reduced-motion support.
-
-### Booking & Admin Operations
-- Admin login at `/admin/login`.
-- Booking console at `/admin/bookings`.
-- Admin settings/config screen at `/admin/settings` (edits supported `.env` values and syncs admin login credentials to DB).
-- Admin reports console at `/admin/reports` (daily/weekly/monthly/yearly reporting with comparisons + charts).
-- Admin manual at `/admin/manual` (operator documentation hub with quick links, deploy runbook summary, and screenshots).
-- Day/week/month visual calendar.
-- Click-to-open booking dialogs with full details.
-- Approve/reject pending requests.
-- Edit/move/cancel confirmed bookings.
-- Recurring booking support and series cancellation.
-- Manual reminder/custom email actions from admin.
-- Automatic booking move email to customer.
-
-### Customer Management
-- Customer directory with search/filter workflows.
-- Create/edit/archive customer records.
-- Duplicate protection during manual booking flows.
-- Customer-to-booking linkage preserved for history.
-- Portal credential reveal/regenerate controls with audit logging.
-- Customer learning-material management tied to selected appointments or uploaded as general (not-linked) materials.
-- Admin learning materials support inline preview/download for PDF and audio files.
-- Admin header includes `Latest Updates` popup showing deployed commit notes (shown once per newly deployed commit, can be reopened manually).
-
-### Student Portal
-- Student login via full name + postcode + generated password.
-- Automatic credential generation when first appointment is approved.
-- Approval email includes student portal login instructions and initial password.
-- Student dashboard at `/student/portal`:
-  - upcoming and previous appointments,
-  - assigned lesson materials (audio/PDF) with authenticated preview/download,
-  - general learning materials not linked to a specific appointment.
-
-### Invoicing & Billing
-- Invoice console at `/admin/invoices`.
-- Create invoice from confirmed appointment.
-- Create invoice from customer context.
-- Invoice create/edit supports lesson package product presets via dropdown:
-  - `5 × 30 Minute Lessons ($200)`
-  - `10 × 30 Minute Lessons ($388)`
-  - `5 × 1 Hour Lessons ($375)`
-  - `10 × 1 Hour Lessons ($725)`
-- Temporary line-item options:
-  - lesson fee,
-  - educational books,
-  - digital guitar lessons,
-  - custom product/charge.
-- Line-item editing in invoice detail.
-- GST-aware calculations with configurable defaults.
-- Download invoice as PDF.
-- Invoice PDF download is cache-busted/no-store after edits so regenerated PDFs reflect latest changes.
-- Send invoice via email with PDF attached.
-- Mark paid / mark unpaid.
-- Outstanding invoice view and aging filters.
-- 7/14/30-day overdue reminder workflow:
-  - single invoice reminder,
-  - bulk reminder run.
-- Manual single-invoice reminder supports any overdue sent invoice (not only 7/14/30-day stages).
-- Credit note creation for sent/paid invoices.
-- Invoice audit/history data retained for traceability.
+- Public marketing pages and enquiry/booking forms
+- Admin booking console (`/admin/bookings`)
+- Admin invoice console (`/admin/invoices`)
+- Admin reports (`/admin/reports`) and settings (`/admin/settings`)
+- Admin manual/docs hub (`/admin/manual`)
+- Student login + portal (`/student/login`, `/student/portal`)
+- Invoice PDFs, reminders, credit notes, and payment status tracking
+- Learning materials upload/preview/download for students
 
 ## Tech Stack
-- Next.js App Router + TypeScript
+
+- Next.js (App Router) + React + TypeScript
 - Prisma ORM
-- MySQL (Prisma datasource provider for app, tests, and production)
-- Nodemailer for SMTP delivery
-- Gmail API (OAuth2 via `googleapis`) for HTTPS email delivery fallback
-- pdf-lib for invoice PDF generation
-- Next.js metadata API (`robots.ts`, `sitemap.ts`) for SEO/indexing controls
+- MySQL (current Prisma datasource provider)
+- Vitest
+- Nodemailer + Gmail API fallback (`googleapis`)
+- `pdf-lib` for invoice PDFs
 
-## Project Structure
-- `src/app`: routes and API handlers
-- `src/components`: reusable UI and admin clients
-- `src/lib`: business logic, services, utilities
-- `prisma`: schema and migrations
-- `tests`: automated test suite
-- `thoughts`: tickets, research, implementation plans
+## Requirements
 
-## Installation
-
-### Prerequisites
-- Node.js 20+ recommended
+- Node.js 20+ (recommended)
 - npm
+- MySQL 8+ (local install or Docker)
 
-### Quick Start
-1. Install dependencies:
+## Quick Start (Local Development)
+
+This project currently uses a **MySQL Prisma schema** (`prisma/schema.prisma`).
+
+### 1. Install dependencies
+
 ```bash
 npm install
 ```
-2. Create environment file:
+
+### 2. Create a local env file
+
 ```bash
 cp .env.example .env
 ```
-3. Start a local MySQL database (Docker example, no host MySQL install required):
+
+Important:
+- `.env.example` ships with a MySQL placeholder URL for local Docker usage.
+- Update it for your actual local/prod database before running Prisma/app commands.
+
+Example local MySQL URL:
+
+```bash
+DATABASE_URL="mysql://root:root@127.0.0.1:3306/mgs_dev"
+```
+
+At minimum for local startup, set/update:
+- `DATABASE_URL`
+- `ADMIN_SESSION_SECRET`
+- `STUDENT_SESSION_SECRET`
+- `STUDENT_PORTAL_PASSWORD_ENCRYPTION_KEY`
+- `CRON_SECRET`
+
+You can keep email settings empty for local development.
+
+### 3. Start MySQL (Docker example)
+
 ```bash
 docker run --name mgs-dev-mysql \
   -e MYSQL_ROOT_PASSWORD=root \
   -e MYSQL_DATABASE=mgs_dev \
-  -p 3306:3306 -d mysql:8
+  -p 3306:3306 \
+  -d mysql:8
 ```
-4. Apply local migrations (MySQL):
+
+### 4. Run Prisma migrations
+
 ```bash
-DATABASE_URL="mysql://root:root@127.0.0.1:3306/mgs_dev" npx prisma migrate deploy
+npx prisma migrate deploy
 ```
-5. Start dev server:
+
+If you changed dependencies/schema and Prisma client generation is needed:
+
+```bash
+npm run prisma:generate
+```
+
+### 5. Start the app
+
 ```bash
 npm run dev
 ```
-6. Open setup wizard and create first admin account:
-```bash
-http://127.0.0.1:3000/setup
-```
 
-### MySQL Setup (Production)
-Use MySQL in production:
-```bash
-# Create MySQL database first
-DATABASE_URL="mysql://user:password@host:3306/database_name" npx prisma migrate deploy
-```
-
-Alternatively, configure the database connection through the setup wizard at `/setup` after starting the server.
-
-Default local app URL:
+Open:
 - `http://127.0.0.1:3000`
 
-## Full Local Verification Flow
-Run dependency install, local DB prep, tests, and then launch the site:
+### 6. Complete first-run setup
 
-```bash
-npm run local:full-site
-```
+Open the setup wizard:
+- `http://127.0.0.1:3000/setup`
 
-Note: `scripts/test-full-site-local.sh` is still SQLite-oriented and should be updated before relying on it with the current MySQL Prisma schema. Prefer the Docker MySQL flow in the Testing section below for now.
+Use it to:
+- verify environment readiness
+- configure email/invoice settings (optional for local dev)
+- create the first admin account
 
-By default this script binds to `0.0.0.0` so it can be reached:
-- locally via `http://127.0.0.1:3000`,
-- from another device via your machine’s LAN IP.
+Then sign in at:
+- `http://127.0.0.1:3000/admin/login`
 
-Optional flags:
-- `npm run local:full-site -- --no-start`
-- `npm run local:full-site -- --skip-install`
-- `npm run local:full-site -- --skip-tests`
+## Local Testing (Vitest)
 
-Host/port override:
-```bash
-HOST=0.0.0.0 PORT=3000 npm run local:full-site
-```
+Tests also require a **MySQL** database because the Prisma provider is MySQL.
 
-## Testing
-Tests require a MySQL-compatible database because the Prisma schema provider is `mysql`.
+Recommended Docker test DB:
 
-Env loading order for tests:
-- `.env.test.local` -> `.env.test` -> `.env.local` -> `.env`
-
-Recommended local setup without installing MySQL on the host (Docker):
 ```bash
 docker run --name mgs-test-mysql \
   -e MYSQL_ROOT_PASSWORD=root \
   -e MYSQL_DATABASE=mgs_test \
-  -p 3307:3306 -d mysql:8
+  -p 3307:3306 \
+  -d mysql:8
+```
 
+Set a dedicated test DB URL:
+
+```bash
 export TEST_DATABASE_URL="mysql://root:root@127.0.0.1:3307/mgs_test"
 ```
 
-`npm run test:prepare` uses `TEST_DATABASE_URL` (preferred) or `DATABASE_URL` and runs Prisma migrations against that database.
+Run checks:
 
-Commands:
 ```bash
 npm run test:prepare
 npm test
@@ -208,169 +137,127 @@ npm run lint
 npm run typecheck
 ```
 
+Notes:
+- `npm test` already runs `test:prepare` internally.
+- Prefer `TEST_DATABASE_URL` so tests do not target your dev database.
+- `.env.test.example` includes both `DATABASE_URL` and `TEST_DATABASE_URL` MySQL placeholders for a local Docker test DB.
+
+## Common Commands
+
+```bash
+npm run dev           # start local dev server
+npm run dev:clean     # clear .next and start dev server
+npm run build         # production build
+npm run start         # run production build locally
+npm run lint          # ESLint
+npm run typecheck     # TypeScript checks
+npm test              # tests (prepares DB first)
+npm run test:watch    # vitest watch (prepares DB first)
+npm run prisma:studio # Prisma Studio
+```
+
+## Project Structure
+
+- `src/app` - routes and API handlers (App Router)
+- `src/components` - shared UI and admin client components
+- `src/lib` - domain logic, services, helpers
+- `src/styles/globals.css` - global styles
+- `prisma` - Prisma schema and migrations
+- `tests` - Vitest suite
+- `scripts` - local/test utility scripts
+- `Documentation` - operational/deployment docs
+- `thoughts` - tickets, research, plans
+
+## Key Routes
+
+### Public
+
+- `/`
+- `/lessons`
+- `/teacher`
+- `/vouchers`
+- `/contact`
+- `/book`
+- `/terms`
+
+### Setup / Admin
+
+- `/setup`
+- `/admin/login`
+- `/admin/bookings`
+- `/admin/invoices`
+- `/admin/reports`
+- `/admin/settings`
+- `/admin/manual`
+
+### Student
+
+- `/student/login`
+- `/student/portal`
+- `/student/materials`
+
 ## Environment Variables
 
-### Core
-- `DATABASE_URL`: Prisma MySQL URL (`mysql://user:password@host:3306/database_name`).
-- `ADMIN_EMAIL`: admin login and owner notification email.
-- `ADMIN_PASSWORD`: legacy bootstrap password (kept for tests/local scripts).
-- `ADMIN_SESSION_SECRET`: admin session signing secret.
-- `STUDENT_SESSION_SECRET`: student portal session signing secret.
-- `STUDENT_SESSION_MAX_AGE_SECONDS`: student session TTL in seconds.
-- `STUDENT_PORTAL_PASSWORD_ENCRYPTION_KEY`: at-rest encryption key for revealable portal passwords.
-- `STUDENT_PORTAL_PASSWORD_LENGTH`: generated portal password length (bounded).
-- `CRON_SECRET`: shared secret for scheduled job endpoints.
+Use `.env.example` as the starting template, then configure values for your environment.
 
-### SMTP / Email
-- `SMTP_HOST`
-- `SMTP_PORT`
-- `SMTP_USER`
-- `SMTP_PASS`
-- `SMTP_FROM`
-- `GMAIL_CLIENT_ID`
-- `GMAIL_CLIENT_SECRET`
-- `GMAIL_REFRESH_TOKEN`
-- `GMAIL_USER_EMAIL`
-
-Email provider behavior:
-- If SMTP is configured and working, mail is sent via SMTP.
-- If SMTP is not configured and Gmail OAuth vars are configured, mail is sent via Gmail API over HTTPS.
-- If SMTP is configured but blocked/failing and Gmail OAuth vars are configured, the app falls back to Gmail API.
-- If neither provider is available, outbound emails are recorded as `queued_no_smtp`.
-- The setup wizard (`/setup`) exposes both SMTP and Gmail fields and shows a combined `Email delivery` readiness check.
-
-### Learning Materials Storage
-- `LEARNING_MATERIALS_STORAGE_DRIVER`: `local` or `s3` (`local` default).
-- `LEARNING_MATERIALS_LOCAL_ROOT`: local filesystem root when using `local`.
-- `LEARNING_MATERIALS_S3_BUCKET`
-- `LEARNING_MATERIALS_S3_REGION`
-- `LEARNING_MATERIALS_S3_ACCESS_KEY_ID`
-- `LEARNING_MATERIALS_S3_SECRET_ACCESS_KEY`
-- `LEARNING_MATERIALS_S3_PUBLIC_BASE_URL` (optional).
-
-### Invoice Configuration
-- `INVOICE_BUSINESS_NAME`
-- `INVOICE_BUSINESS_ABN`
-- `INVOICE_BANK_NAME`
-- `INVOICE_BANK_BSB`
-- `INVOICE_BANK_ACCOUNT_NAME`
-- `INVOICE_BANK_ACCOUNT_NUMBER`
-- `INVOICE_PAYMENT_TERMS_DAYS`
-- `INVOICE_GST_REGISTERED`
-- `INVOICE_DEFAULT_TAX_MODE`
-- `INVOICE_CREDIT_NOTE_PREFIX`
+Important groups:
+- Database: `DATABASE_URL`
+- Sessions/security: `ADMIN_SESSION_SECRET`, `STUDENT_SESSION_SECRET`, `CRON_SECRET`
+- Student portal: `STUDENT_PORTAL_PASSWORD_ENCRYPTION_KEY`, password length/max-age settings
+- Email: SMTP vars and/or Gmail OAuth vars
+- Invoice defaults: business/bank/GST settings
+- Learning materials storage: local or S3 settings
 
 ## Scheduled Jobs
 
-### Daily Bookings Digest
-- Endpoint: `POST /api/jobs/daily-bookings-digest`
-- Header: `x-cron-secret: <CRON_SECRET>`
+Protected cron endpoints require:
+- header `x-cron-secret: <CRON_SECRET>`
 
-### Invoice Reminders
-- Endpoint: `POST /api/jobs/invoice-reminders`
-- Header: `x-cron-secret: <CRON_SECRET>`
-- Optional JSON payload:
-  - `dryRun` (`boolean`)
-  - `maxInvoices` (`number`, default `100`)
-  - `customerId` (`string`)
-  - `stage` (`7 | 14 | 30`)
+Implemented jobs include:
+- daily bookings digest
+- invoice reminders (`/api/jobs/invoice-reminders`)
+- admin operations reports (daily/weekly/monthly/yearly)
 
-### Admin Operations Reports (Owner Email)
-- Endpoints:
-  - `POST /api/jobs/admin-reports/daily`
-  - `POST /api/jobs/admin-reports/weekly`
-  - `POST /api/jobs/admin-reports/monthly`
-  - `POST /api/jobs/admin-reports/yearly`
-- Header: `x-cron-secret: <CRON_SECRET>`
-- Sends branded owner report emails including:
-  - appointments snapshot
-  - outstanding / overdue invoices
-  - earnings
-  - previous-period comparison
-  - trend summary
-
-If deploying on Vercel, schedules can be configured in `vercel.json`.
-For DigitalOcean Droplet deployments, use `deploy/deploy.sh` / `deploy/update.sh` (managed crontab sync is now built in by default) or configure cron/systemd timers manually to `POST` these endpoints with `x-cron-secret`.
-See `Documentation/digitalocean-admin-operations.md` for examples.
-
-## SEO & Indexing
-- Public marketing pages are indexed and included in `sitemap.xml`:
-  - `/`, `/lessons`, `/teacher`, `/vouchers`, `/contact`, `/book`, `/terms`
-- Internal routes are excluded from indexing:
-  - `/admin/*`
-  - `/student/*`
-  - `/setup`
-  - `/api/*`
-- The app uses:
-  - `src/app/sitemap.ts` for public-only sitemap entries
-  - `src/app/robots.ts` for crawler rules
-  - route-segment noindex metadata for admin/student/setup surfaces
-
-## Available Routes
-- Public:
-  - `/`
-  - `/lessons`
-  - `/teacher`
-  - `/vouchers`
-  - `/contact`
-  - `/book`
-  - `/terms`
-  - `/student/login`
-  - `/student/portal`
-- Setup:
-  - `/setup` (first-run initialization)
-- Admin:
-  - `/admin/login`
-  - `/admin/bookings`
-  - `/admin/settings`
-  - `/admin/invoices`
-  - `/admin/reports`
-
-## First-Run Production Setup
-Run this once after deploying to hosting:
-
-### Option 1: Configure via Setup Wizard (Recommended)
-1. Set initial production env vars (at minimum, `DATABASE_URL` pointing to MySQL)
-2. Deploy and run database migrations:
-```bash
-npx prisma migrate deploy
-```
-3. Visit `/setup`.
-4. Click "Configure Environment" to add or update env vars directly in the browser:
-   - Database connection (MySQL)
-   - Gmail API sender + OAuth credentials (recommended on hosts that block SMTP ports), or SMTP settings
-   - Session secrets
-   - Invoice business details
-5. Save configuration and restart the server.
-6. Resolve any remaining failing checks in the wizard.
-7. Create the first admin account.
-8. Sign in at `/admin/login`.
-
-### Option 2: Manual Environment Setup
-1. Set all required production env vars in `.env` before deploying.
-2. Deploy and run database migrations:
-```bash
-npx prisma migrate deploy
-```
-3. Visit `/setup`.
-4. Resolve all failing checks in the wizard (including `Email delivery`, using Gmail API or SMTP).
-5. Create the first admin account.
-6. Sign in at `/admin/login`.
-
-For DigitalOcean Droplet operations (systemd, Nginx headers, cron/systemd timers, restart workflow), see:
+For deployment-specific scheduling examples, see:
+- `vercel.json`
 - `Documentation/digitalocean-admin-operations.md`
 
-### Required Environment Variables
-At minimum, production requires:
-- `DATABASE_URL` - MySQL connection string
-- `ADMIN_SESSION_SECRET` - Secure random string for admin sessions
-- `STUDENT_SESSION_SECRET` - Secure random string for student portal sessions
+## Deployment Notes
 
-## Operational Notes
-- Booking constraints and validation are server-side enforced.
-- Invoice records are designed to preserve historical context.
-- Sent/paid invoices use credit notes for correction workflows.
-- `/admin/settings` saves supported config values to `.env`, syncs admin login credentials to the DB, and queues a best-effort `systemd` app restart.
-- `deploy/deploy.sh` and `deploy/update.sh` provide interactive TUI menus and managed cron job installation for the supported scheduled jobs.
-- Successful deploys record commit metadata for the admin `Latest Updates` popup (`.data/deploy/latest-deploy-update.json`).
-- Documentation (including screenshot assets and the droplet deploy runbook) lives in `Documentation/`.
+- Run Prisma migrations on deploy:
+
+```bash
+npx prisma migrate deploy
+```
+
+- Complete or verify configuration in `/setup` after first deploy.
+- For DigitalOcean Droplet operations (systemd, nginx, cron/timers), use:
+  - `deploy/deploy.sh`
+  - `deploy/update.sh`
+  - `Documentation/digitalocean-admin-operations.md`
+
+## Troubleshooting
+
+### Prisma says the DB URL is invalid for the provider
+
+The Prisma schema provider is `mysql`, so `DATABASE_URL` / `TEST_DATABASE_URL` must start with:
+
+```text
+mysql://
+```
+
+If you copied an env template, confirm the MySQL URL points to the correct database for that environment.
+
+### `npm test` fails before running tests
+
+Usually means test DB setup is missing.
+Set `TEST_DATABASE_URL` to a reachable MySQL database and run:
+
+```bash
+npm run test:prepare
+```
+
+### Emails are not sending locally
+
+This is expected if SMTP/Gmail OAuth env vars are unset.
+Core app/admin workflows can still be exercised locally without email delivery.
