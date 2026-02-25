@@ -935,10 +935,100 @@ print_tui_option_desc() {
   echo -e "       ${DIM}${text}${NC}"
 }
 
+# Truncates plain text to a fixed width so menu rows stay inside the panel.
+tui_truncate_text() {
+  local text="$1"
+  local max_width="$2"
+
+  if [[ -z "${max_width}" || "${max_width}" -le 0 ]]; then
+    printf '%s' ""
+    return 0
+  fi
+
+  if (( ${#text} <= max_width )); then
+    printf '%s' "${text}"
+    return 0
+  fi
+
+  if (( max_width <= 3 )); then
+    printf '%.*s' "${max_width}" "..."
+    return 0
+  fi
+
+  printf '%s...' "${text:0:max_width-3}"
+}
+
+build_tui_option_cell_text() {
+  local key="$1"
+  local label="$2"
+  local value="$3"
+  local cell_width="$4"
+  local raw="[${key}] ${label}: ${value}"
+
+  tui_truncate_text "${raw}" "${cell_width}"
+}
+
+print_tui_option_pair() {
+  local left_key="$1"
+  local left_label="$2"
+  local left_value="$3"
+  local left_desc="$4"
+  local right_key="${5:-}"
+  local right_label="${6:-}"
+  local right_value="${7:-}"
+  local right_desc="${8:-}"
+  local col_width=$(( (UPDATE_TUI_PANEL_WIDTH - 4) / 2 ))
+  local left_cell=""
+  local right_cell=""
+  local left_desc_text=""
+  local right_desc_text=""
+
+  left_cell="$(build_tui_option_cell_text "${left_key}" "${left_label}" "${left_value}" "${col_width}")"
+  left_desc_text="$(tui_truncate_text "${left_desc}" "${col_width}")"
+
+  if [[ -n "${right_key}" ]]; then
+    right_cell="$(build_tui_option_cell_text "${right_key}" "${right_label}" "${right_value}" "${col_width}")"
+    right_desc_text="$(tui_truncate_text "${right_desc}" "${col_width}")"
+  fi
+
+  printf "  %-*s  %-*s\n" "${col_width}" "${left_cell}" "${col_width}" "${right_cell}"
+  printf "  %b%-*s%b  %b%-*s%b\n" "${DIM}" "${col_width}" "${left_desc_text}" "${NC}" "${DIM}" "${col_width}" "${right_desc_text}" "${NC}"
+}
+
+print_tui_action_pair() {
+  local left_key="$1"
+  local left_label="$2"
+  local right_key="${3:-}"
+  local right_label="${4:-}"
+  local col_width=$(( (UPDATE_TUI_PANEL_WIDTH - 4) / 2 ))
+  local left_cell=""
+  local right_cell=""
+
+  left_cell="$(tui_truncate_text "${left_key}  ${left_label}" "${col_width}")"
+  if [[ -n "${right_key}" ]]; then
+    right_cell="$(tui_truncate_text "${right_key}  ${right_label}" "${col_width}")"
+  fi
+
+  printf "  %-*s  %-*s\n" "${col_width}" "${left_cell}" "${col_width}" "${right_cell}"
+}
+
+print_tui_hint_line() {
+  local text="$1"
+  local max_width=$(( UPDATE_TUI_PANEL_WIDTH - 2 ))
+  local clipped=""
+
+  clipped="$(tui_truncate_text "${text}" "${max_width}")"
+  echo -e "  ${DIM}${clipped}${NC}"
+}
+
 print_summary_row() {
   local label="$1"
   local value="$2"
-  printf "  %-18b %b%s%b\n" "${DIM}${label}:${NC}" "${CYAN}" "${value}" "${NC}"
+  local value_max=$(( UPDATE_TUI_PANEL_WIDTH - 24 ))
+  local clipped_value=""
+
+  clipped_value="$(tui_truncate_text "${value}" "${value_max}")"
+  printf "  %-18b %b%s%b\n" "${DIM}${label}:${NC}" "${CYAN}" "${clipped_value}" "${NC}"
 }
 
 update_migration_mode_label() {
@@ -1088,7 +1178,9 @@ print_tui_remote_update_alert() {
     local_part=" (local ${TUI_REMOTE_UPDATE_LOCAL_SHORT})"
   fi
 
-  echo -e "  ${prefix}${YELLOW}▲ Update available:${NC} ${BOLD}${TUI_REMOTE_UPDATE_REMOTE_SHORT}${NC}${local_part} ${DIM}${TUI_REMOTE_UPDATE_REMOTE_SUBJECT}${NC}"
+  local subject_text=""
+  subject_text="$(tui_truncate_text "${TUI_REMOTE_UPDATE_REMOTE_SUBJECT}" 42)"
+  echo -e "  ${prefix}${YELLOW}▲ Update:${NC} ${BOLD}${TUI_REMOTE_UPDATE_REMOTE_SHORT}${NC}${local_part} ${DIM}${subject_text}${NC}"
 }
 
 print_update_tui_menu() {
@@ -1096,10 +1188,11 @@ print_update_tui_menu() {
   print_box_banner "Update + Deploy TUI"
   echo -e "${DIM}btop-style menu: configure git update + deploy handoff, then run.${NC}"
   echo ""
-  echo -e "  $(status_chip "Branch" "${BRANCH}")  $(status_chip "Remote" "${REMOTE_NAME}")  $(status_chip "Pull" "$(bool_word "$(toggle_bool "${SKIP_PULL}")")")  $(status_chip "Deploy" "$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")")"
-  echo -e "  $(status_chip "DirtyOK" "$(bool_word "${ALLOW_DIRTY}")")  $(status_chip "Sudo" "$(update_sudo_mode_label)")  $(status_chip "Spinner" "$(spinner_ui_word)")"
+  echo -e "  $(status_chip "Branch" "$(tui_truncate_text "${BRANCH}" 16)")  $(status_chip "Remote" "$(tui_truncate_text "${REMOTE_NAME}" 12)")  $(status_chip "Pull" "$(bool_word "$(toggle_bool "${SKIP_PULL}")")")"
+  echo -e "  $(status_chip "Deploy" "$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")")  $(status_chip "DirtyOK" "$(bool_word "${ALLOW_DIRTY}")")  $(status_chip "Sudo" "$(update_sudo_mode_label)")  $(status_chip "Spin" "$(spinner_ui_word)")"
   if [[ "${SKIP_DEPLOY}" == false ]]; then
-    echo -e "  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "Cron" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")")  $(status_chip "DB" "$(update_migration_mode_label)")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")"
+    echo -e "  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "Cron" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")")  $(status_chip "DB" "$(update_migration_mode_label)")"
+    echo -e "  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")"
   fi
   echo ""
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
@@ -1109,63 +1202,44 @@ print_update_tui_menu() {
   fi
   echo -e "${BOLD}  Update Workflow Options${NC}"
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
-  print_tui_option_row "1" "Branch" "${BRANCH}"
-  print_tui_option_desc "Branch to fetch/pull and pass through to deploy.sh."
-  print_tui_option_row "2" "Remote" "${REMOTE_NAME}"
-  print_tui_option_desc "Git remote used for fetch/pull (usually origin)."
-  print_tui_option_row "3" "Pull latest changes" "$(bool_word "$(toggle_bool "${SKIP_PULL}")")"
-  print_tui_option_desc "ON performs git fetch + ff-only pull before deployment."
-  print_tui_option_row "4" "Run deploy after pull" "$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")"
-  print_tui_option_desc "ON runs deploy.sh after git update; OFF only updates the repo checkout."
-  print_tui_option_row "5" "Allow dirty worktree" "$(bool_word "${ALLOW_DIRTY}")"
-  print_tui_option_desc "ON allows update/deploy even if tracked files are modified locally."
-  print_tui_option_row "6" "Sudo deploy mode" "$(update_sudo_mode_label)"
-  print_tui_option_desc "Cycles deploy invocation between auto, forced sudo, and forced no-sudo."
-  print_tui_option_row "7" "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")"
-  print_tui_option_desc "ON runs npm install in deploy.sh. OFF passes --skip-deps."
-  print_tui_option_row "8" "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")"
-  print_tui_option_desc "ON lets deploy.sh install/update managed crontab jobs. OFF passes --skip-cron."
-  print_tui_option_row "9" "Spinner UI" "$(spinner_ui_word)"
-  print_tui_option_desc "Animated progress spinner for git/deploy wrapper steps."
-  print_tui_option_row "10" "Edit shared .env" "Open editor now"
-  print_tui_option_desc "Bootstraps ${SHARED_DIR}/.env from .env.example if missing, then opens it."
+  print_tui_option_pair "1" "Branch" "${BRANCH}" "Branch to fetch/pull and pass through to deploy.sh." \
+    "2" "Remote" "${REMOTE_NAME}" "Git remote used for fetch/pull (usually origin)."
+  print_tui_option_pair "3" "Pull latest changes" "$(bool_word "$(toggle_bool "${SKIP_PULL}")")" "ON performs git fetch + ff-only pull before deployment." \
+    "4" "Run deploy after pull" "$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")" "ON runs deploy.sh after git update; OFF only updates the repo checkout."
+  print_tui_option_pair "5" "Allow dirty worktree" "$(bool_word "${ALLOW_DIRTY}")" "ON allows update/deploy even if tracked files are modified locally." \
+    "6" "Sudo deploy mode" "$(update_sudo_mode_label)" "Cycles deploy invocation between auto, forced sudo, and forced no-sudo."
+  print_tui_option_pair "7" "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")" "ON runs npm install in deploy.sh. OFF passes --skip-deps." \
+    "8" "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")" "ON lets deploy.sh install/update managed crontab jobs. OFF passes --skip-cron."
+  print_tui_option_pair "9" "Spinner UI" "$(spinner_ui_word)" "Animated progress spinner for git/deploy wrapper steps." \
+    "10" "Edit shared .env" "Open editor now" "Bootstraps ${SHARED_DIR}/.env from .env.example if missing, then opens it."
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
   echo -e "${BOLD}  Bootstrap Workflow Helpers${NC}"
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
-  print_tui_option_row "11" "Install cron/crond" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")"
-  print_tui_option_desc "When ON, Start installs/enables cron/crond before the update/deploy flow."
-  print_tui_option_row "12" "Install app service" "$(bool_word "${INSTALL_APP_SERVICE_IF_NEEDED}")"
-  print_tui_option_desc "When ON, Start installs/updates the app systemd unit before the update/deploy flow."
-  print_tui_option_row "13" "Install cron jobs" "$(bool_word "${INSTALL_CRON_JOBS_IF_NEEDED}")"
-  print_tui_option_desc "When ON, Start installs/updates managed cron jobs before update/deploy."
-  print_tui_option_row "14" "Install Nginx" "$(bool_word "${INSTALL_NGINX_IF_NEEDED}")"
-  print_tui_option_desc "When ON, Start installs Nginx (if missing) before the update/deploy flow."
-  print_tui_option_row "15" "Install PHP-FPM" "$(bool_word "${INSTALL_PHP_FPM_IF_NEEDED}")"
-  print_tui_option_desc "When ON, Start installs PHP-FPM only if deploy nginx config needs it."
+  print_tui_option_pair "11" "Install cron/crond" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")" "When ON, Start installs/enables cron/crond before the update/deploy flow." \
+    "12" "Install app service" "$(bool_word "${INSTALL_APP_SERVICE_IF_NEEDED}")" "When ON, Start installs/updates the app systemd unit before the flow."
+  print_tui_option_pair "13" "Install cron jobs" "$(bool_word "${INSTALL_CRON_JOBS_IF_NEEDED}")" "When ON, Start installs/updates managed cron jobs before update/deploy." \
+    "14" "Install Nginx" "$(bool_word "${INSTALL_NGINX_IF_NEEDED}")" "When ON, Start installs Nginx (if missing) before the update/deploy flow."
+  print_tui_option_pair "15" "Install PHP-FPM" "$(bool_word "${INSTALL_PHP_FPM_IF_NEEDED}")" "When ON, Start installs PHP-FPM only if deploy nginx config needs it."
   if [[ "${SKIP_DEPLOY}" == false ]]; then
     print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
     echo -e "${BOLD}  Deploy Pass-through Options${NC}"
     print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
-    print_tui_option_row "16" "Database mode" "$(update_migration_mode_label)"
-    print_tui_option_desc "Cycles deploy DB behavior: migrate deploy / skip migrations / db push."
-    print_tui_option_row "17" "SSL setup" "$(bool_word "${SSL_SETUP}")"
-    print_tui_option_desc "Passes SSL setup flags to deploy.sh to run certbot + nginx config."
+    print_tui_option_pair "16" "Database mode" "$(update_migration_mode_label)" "Cycles deploy DB behavior: migrate deploy / skip migrations / db push." \
+      "17" "SSL setup" "$(bool_word "${SSL_SETUP}")" "Passes SSL setup flags to deploy.sh to run certbot + nginx config."
     if [[ "${SSL_SETUP}" == true ]]; then
-      print_tui_option_row "18" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}"
-      print_tui_option_desc "Domain used for certificate request and nginx server_name config."
-      print_tui_option_row "19" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}"
-      print_tui_option_desc "Email for Let's Encrypt registration and renewal alerts."
+      print_tui_option_pair "18" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}" "Domain used for certificate request and nginx server_name config." \
+        "19" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}" "Email for Let's Encrypt registration and renewal alerts."
     fi
   fi
   echo ""
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
-  echo -e "  ${BOLD}C${NC}  Install cron/crond scheduler (if needed)"
-  echo -e "  ${BOLD}J${NC}  Install/update managed cron jobs now"
-  echo -e "  ${BOLD}N${NC}  Install Nginx (if needed) now"
-  echo -e "  ${BOLD}P${NC}  Install PHP-FPM (if needed by nginx config) now"
-  echo -e "  ${BOLD}U${NC}  Install/update app systemd service"
-  echo -e "  ${BOLD}S${NC}  Start update/deploy    ${BOLD}Q${NC}  Cancel"
-  echo -e "${DIM}Tip: deploy.sh handles migrations/nginx sync/restarts; this menu configures the wrapper + pass-through flags.${NC}"
+  echo -e "${BOLD}  Immediate Bootstrap Actions${NC}"
+  print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
+  print_tui_action_pair "J" "Install/update cron jobs now" "N" "Install Nginx now"
+  print_tui_action_pair "P" "Install PHP-FPM if needed now" "U" "Install/update app service"
+  print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
+  print_tui_action_pair "S" "Start update/deploy" "Q" "Cancel"
+  print_tui_hint_line "Tip: deploy.sh handles migrations/nginx sync/restarts; this menu configures wrapper + pass-through flags."
 }
 
 # Spinner start routine used by run_step for long-running git commands.
@@ -1412,7 +1486,7 @@ run_interactive_setup() {
 
   while true; do
     print_update_tui_menu
-    read -r -p "Select option [1-19, c, j, n, p, u, s, q]: " choice
+    read -r -p "Select option [1-19, j, n, p, u, s, q]: " choice
 
     case "${choice,,}" in
       1)
@@ -1505,9 +1579,6 @@ run_interactive_setup() {
           log_warn "Enable deploy + SSL setup first to edit Certbot email."
         fi
         ;;
-      c)
-        ensure_cron_installed_from_update || true
-        ;;
       j)
         ensure_managed_cron_jobs_installed_from_update || true
         ;;
@@ -1528,7 +1599,7 @@ run_interactive_setup() {
         exit 0
         ;;
       *)
-        log_warn "Unknown selection. Choose a menu number, C/J/N/P/U, S, or Q."
+        log_warn "Unknown selection. Choose a menu number, J/N/P/U, S, or Q."
         ;;
     esac
   done
@@ -1598,6 +1669,11 @@ run_deploy() {
   [[ "${SKIP_MIGRATE}" == true ]] && deploy_args+=( "--skip-migrate" )
   [[ "${DB_PUSH}" == true ]] && deploy_args+=( "--db-push" )
   [[ "${SSL_SETUP}" == true ]] && deploy_args+=( "--ssl" "--domain" "${SSL_DOMAIN}" "--email" "${SSL_EMAIL}" )
+  [[ "${INSTALL_NGINX_IF_NEEDED}" == true ]] && deploy_args+=( "--install-nginx" )
+  [[ "${INSTALL_PHP_FPM_IF_NEEDED}" == true ]] && deploy_args+=( "--install-php-fpm-if-needed" )
+  if [[ "${INSTALL_CRON_IF_NEEDED}" == true && "${SKIP_CRON_SETUP}" == true ]]; then
+    deploy_args+=( "--install-cron" )
+  fi
   [[ "${NO_SPINNER}" == true ]] && deploy_args+=( "--no-spinner" )
   [[ "${NO_COLOR}" == true ]] && deploy_args+=( "--no-color" )
 
@@ -1651,6 +1727,14 @@ sync_manual_docs_into_current_standalone_from_update() {
 
   if [[ ! -d "${standalone_dir}" ]]; then
     log_warn "Standalone runtime not found at ${standalone_dir}; skipping manual docs sync."
+    return 0
+  fi
+
+  # deploy.sh now copies Documentation into the standalone runtime directly.
+  # Keep this wrapper helper as a fallback only, and avoid re-copying files
+  # when the target docs already exist after deploy.sh completes.
+  if [[ -d "${docs_dst}" ]] && compgen -G "${docs_dst}/*.md" >/dev/null 2>&1; then
+    log_info "Manual docs already present in standalone runtime; skipping wrapper sync."
     return 0
   fi
 
@@ -1759,26 +1843,40 @@ fi
 
 if [[ "${SKIP_DEPLOY}" == false ]]; then
   ensure_sudo_for_deploy_ready
+
+  if [[ "${INSTALL_APP_SERVICE_IF_NEEDED}" == true ]]; then
+    log_info "Wrapper 'Install app service' helper is skipped during deploy; deploy.sh updates the service by default."
+  fi
+
+  if [[ "${INSTALL_CRON_JOBS_IF_NEEDED}" == true && "${SKIP_CRON_SETUP}" == false ]]; then
+    log_info "Wrapper 'Install cron jobs' helper is skipped during deploy; deploy.sh syncs cron jobs by default."
+  fi
+
+  if [[ "${INSTALL_CRON_IF_NEEDED}" == true && "${SKIP_CRON_SETUP}" == false ]]; then
+    log_info "Wrapper 'Install cron' helper is skipped during deploy; deploy.sh cron sync installs scheduler if needed."
+  fi
 fi
 
-if [[ "${INSTALL_NGINX_IF_NEEDED}" == true ]]; then
-  ensure_nginx_installed_from_update
-fi
+if [[ "${SKIP_DEPLOY}" == true ]]; then
+  if [[ "${INSTALL_NGINX_IF_NEEDED}" == true ]]; then
+    ensure_nginx_installed_from_update
+  fi
 
-if [[ "${INSTALL_PHP_FPM_IF_NEEDED}" == true ]]; then
-  ensure_php_fpm_installed_if_needed_from_update
-fi
+  if [[ "${INSTALL_PHP_FPM_IF_NEEDED}" == true ]]; then
+    ensure_php_fpm_installed_if_needed_from_update
+  fi
 
-if [[ "${INSTALL_CRON_IF_NEEDED}" == true ]]; then
-  ensure_cron_installed_from_update
-fi
+  if [[ "${INSTALL_CRON_IF_NEEDED}" == true && "${INSTALL_CRON_JOBS_IF_NEEDED}" != true ]]; then
+    ensure_cron_installed_from_update
+  fi
 
-if [[ "${INSTALL_APP_SERVICE_IF_NEEDED}" == true ]]; then
-  install_app_systemd_service_from_update
-fi
+  if [[ "${INSTALL_APP_SERVICE_IF_NEEDED}" == true ]]; then
+    install_app_systemd_service_from_update
+  fi
 
-if [[ "${INSTALL_CRON_JOBS_IF_NEEDED}" == true ]]; then
-  ensure_managed_cron_jobs_installed_from_update
+  if [[ "${INSTALL_CRON_JOBS_IF_NEEDED}" == true ]]; then
+    ensure_managed_cron_jobs_installed_from_update
+  fi
 fi
 
 section "Git Update"

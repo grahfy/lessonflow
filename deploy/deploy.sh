@@ -963,8 +963,17 @@ install_app_systemd_service_from_deploy() {
 # latest current/deploy/cron.sh path is picked up immediately.
 ensure_managed_cron_jobs_installed_from_deploy() {
     local cron_runner="${CURRENT_LINK}/deploy/cron.sh"
+    local cron_service_name=""
 
     section "Managed Cron Jobs Install"
+
+    # Match update.sh behavior: if a scheduler unit is missing but crontab is
+    # present, install/enable cron/crond before writing managed jobs.
+    if command -v systemctl >/dev/null 2>&1; then
+        if ! cron_service_name="$(cron_scheduler_service_name)"; then
+            ensure_cron_installed_from_deploy || return 1
+        fi
+    fi
 
     if ! command -v crontab >/dev/null 2>&1; then
         ensure_cron_installed_from_deploy || return 1
@@ -1060,10 +1069,112 @@ print_tui_option_desc() {
     echo -e "       ${DIM}${text}${NC}"
 }
 
+# Truncates plain text to a fixed width so menu cells stay within the panel.
+# This keeps long labels/descriptions from spilling past the horizontal rule.
+tui_truncate_text() {
+    local text="$1"
+    local max_width="$2"
+
+    if [[ -z "${max_width}" || "${max_width}" -le 0 ]]; then
+        printf '%s' ""
+        return 0
+    fi
+
+    if (( ${#text} <= max_width )); then
+        printf '%s' "${text}"
+        return 0
+    fi
+
+    if (( max_width == 1 )); then
+        printf '.'
+        return 0
+    fi
+
+    if (( max_width == 2 )); then
+        printf '..'
+        return 0
+    fi
+
+    printf '%s...' "${text:0:max_width-3}"
+}
+
+# Builds a compact one-line option cell used by the two-column TUI renderer.
+# The text is intentionally plain (no inline ANSI colors) so width alignment is
+# stable when we place two cells on the same line.
+build_tui_option_cell_text() {
+    local key="$1"
+    local label="$2"
+    local value="$3"
+    local cell_width="$4"
+    local raw="[${key}] ${label}: ${value}"
+
+    tui_truncate_text "${raw}" "${cell_width}"
+}
+
+# Prints a pair of options and their descriptions in two columns. Descriptions
+# are truncated per column to preserve panel width and avoid wrap-induced drift.
+print_tui_option_pair() {
+    local left_key="$1"
+    local left_label="$2"
+    local left_value="$3"
+    local left_desc="$4"
+    local right_key="${5:-}"
+    local right_label="${6:-}"
+    local right_value="${7:-}"
+    local right_desc="${8:-}"
+
+    local col_width=$(( (DEPLOY_TUI_PANEL_WIDTH - 4) / 2 ))
+    local left_cell=""
+    local right_cell=""
+    local left_desc_text=""
+    local right_desc_text=""
+
+    left_cell="$(build_tui_option_cell_text "${left_key}" "${left_label}" "${left_value}" "${col_width}")"
+    left_desc_text="$(tui_truncate_text "${left_desc}" "${col_width}")"
+
+    if [[ -n "${right_key}" ]]; then
+        right_cell="$(build_tui_option_cell_text "${right_key}" "${right_label}" "${right_value}" "${col_width}")"
+        right_desc_text="$(tui_truncate_text "${right_desc}" "${col_width}")"
+    fi
+
+    printf "  %-*s  %-*s\n" "${col_width}" "${left_cell}" "${col_width}" "${right_cell}"
+    printf "  %b%-*s%b  %b%-*s%b\n" "${DIM}" "${col_width}" "${left_desc_text}" "${NC}" "${DIM}" "${col_width}" "${right_desc_text}" "${NC}"
+}
+
+print_tui_action_pair() {
+    local left_key="$1"
+    local left_label="$2"
+    local right_key="${3:-}"
+    local right_label="${4:-}"
+    local col_width=$(( (DEPLOY_TUI_PANEL_WIDTH - 4) / 2 ))
+    local left_cell=""
+    local right_cell=""
+
+    left_cell="$(tui_truncate_text "${left_key}  ${left_label}" "${col_width}")"
+    if [[ -n "${right_key}" ]]; then
+        right_cell="$(tui_truncate_text "${right_key}  ${right_label}" "${col_width}")"
+    fi
+
+    printf "  %-*s  %-*s\n" "${col_width}" "${left_cell}" "${col_width}" "${right_cell}"
+}
+
+print_tui_hint_line() {
+    local text="$1"
+    local max_width=$(( DEPLOY_TUI_PANEL_WIDTH - 2 ))
+    local clipped=""
+
+    clipped="$(tui_truncate_text "${text}" "${max_width}")"
+    echo -e "  ${DIM}${clipped}${NC}"
+}
+
 print_summary_row() {
     local label="$1"
     local value="$2"
-    printf "  %-16b %b%s%b\n" "${DIM}${label}:${NC}" "${CYAN}" "${value}" "${NC}"
+    local value_max=$(( DEPLOY_TUI_PANEL_WIDTH - 22 ))
+    local clipped_value=""
+
+    clipped_value="$(tui_truncate_text "${value}" "${value_max}")"
+    printf "  %-16b %b%s%b\n" "${DIM}${label}:${NC}" "${CYAN}" "${clipped_value}" "${NC}"
 }
 
 deploy_migration_mode_label() {
@@ -1095,59 +1206,47 @@ print_deploy_tui_menu() {
     echo -e "${DIM}btop-style menu: edit values, review live status, then start.${NC}"
     echo ""
     echo -e "  ${BOLD}Live Status${NC}"
-    echo -e "  $(status_chip "Branch" "${BRANCH}")  $(status_chip "DB" "$(deploy_migration_mode_label)")"
-    echo -e "  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "Cron" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")")  $(status_chip "PkgSetup" "$(bool_word "${SETUP_PACKAGES}")")  $(status_chip "EnvDB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")  $(status_chip "Spinner" "$(spinner_ui_word)")"
+    echo -e "  $(status_chip "Branch" "$(tui_truncate_text "${BRANCH}" 18)")  $(status_chip "DB" "$(deploy_migration_mode_label)")"
+    echo -e "  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "Cron" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")")  $(status_chip "Pkg" "$(bool_word "${SETUP_PACKAGES}")")"
+    echo -e "  $(status_chip "EnvDB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")  $(status_chip "Spin" "$(spinner_ui_word)")"
     echo ""
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     echo -e "${BOLD}  Main Options${NC}"
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
-    print_tui_option_row "1" "Branch" "${BRANCH}"
-    print_tui_option_desc "Git branch archived into the release directory and deployed."
-    print_tui_option_row "2" "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")"
-    print_tui_option_desc "ON runs npm install in the new release. OFF skips it (faster, riskier)."
-    print_tui_option_row "3" "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")"
-    print_tui_option_desc "ON installs/updates managed crontab jobs. OFF skips crontab sync during deploy."
-    print_tui_option_row "4" "Database mode" "$(deploy_migration_mode_label)"
-    print_tui_option_desc "Cycles: migrate deploy -> skip migrations -> prisma db push (test/dev fallback)."
-    print_tui_option_row "5" "Package setup" "$(bool_word "${SETUP_PACKAGES}")"
-    print_tui_option_desc "Runs deploy/setup-packages.sh before deploy (Node/Nginx/system package bootstrap)."
-    print_tui_option_row "6" "SSL setup" "$(bool_word "${SSL_SETUP}")"
-    print_tui_option_desc "Runs certbot/nginx SSL setup after deployment completes."
+    print_tui_option_pair "1" "Branch" "${BRANCH}" "Git branch archived into the release directory and deployed." \
+        "2" "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")" "ON runs npm install in the new release. OFF skips it (faster, riskier)."
+    print_tui_option_pair "3" "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")" "ON installs/updates managed crontab jobs. OFF skips crontab sync during deploy." \
+        "4" "Database mode" "$(deploy_migration_mode_label)" "Cycles: migrate deploy -> skip migrations -> prisma db push (test/dev fallback)."
+    print_tui_option_pair "5" "Package setup" "$(bool_word "${SETUP_PACKAGES}")" "Runs deploy/setup-packages.sh before deploy (Node/Nginx/system package bootstrap)." \
+        "6" "SSL setup" "$(bool_word "${SSL_SETUP}")" "Runs certbot/nginx SSL setup after deployment completes."
     if [[ "${SSL_SETUP}" == true ]]; then
         print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
         echo -e "${BOLD}  SSL Options${NC}"
         print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
-        print_tui_option_row "7" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}"
-        print_tui_option_desc "Domain used in nginx config and Let's Encrypt certificate request."
-        print_tui_option_row "8" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}"
-        print_tui_option_desc "Receives certificate expiry notices and Let's Encrypt registration updates."
+        print_tui_option_pair "7" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}" "Domain used in nginx config and Let's Encrypt certificate request." \
+            "8" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}" "Receives certificate expiry notices and Let's Encrypt registration updates."
     fi
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     echo -e "${BOLD}  UI Options${NC}"
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
-    print_tui_option_row "9" "Spinner UI" "$(spinner_ui_word)"
-    print_tui_option_desc "Animated progress spinner for long commands (disable in noisy terminals/log capture)."
-    print_tui_option_row "10" "Edit shared .env" "Open editor now"
-    print_tui_option_desc "Bootstraps ${SHARED_DIR}/.env from .env.example if missing, then opens it."
-    print_tui_option_row "11" "MySQL + create DB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")"
-    print_tui_option_desc "When ON, Start runs MySQL install + local DB create from shared .env."
+    print_tui_option_pair "9" "Spinner UI" "$(spinner_ui_word)" "Animated progress spinner for long commands (disable in noisy terminals/log capture)." \
+        "10" "Edit shared .env" "Open editor now" "Bootstraps ${SHARED_DIR}/.env from .env.example if missing, then opens it."
+    print_tui_option_pair "11" "MySQL + create DB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")" "When ON, Start runs MySQL install + local DB create from shared .env."
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     echo -e "${BOLD}  Bootstrap Workflow Helpers${NC}"
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
-    print_tui_option_row "12" "Install cron/crond" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")"
-    print_tui_option_desc "When ON, Start installs/enables cron/crond before the release build."
-    print_tui_option_row "13" "Install Nginx" "$(bool_word "${INSTALL_NGINX_IF_NEEDED}")"
-    print_tui_option_desc "When ON, Start installs Nginx (if missing) before the release build."
+    print_tui_option_pair "12" "Install cron/crond" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")" "When ON, Start installs/enables cron/crond before the release build." \
+        "13" "Install Nginx" "$(bool_word "${INSTALL_NGINX_IF_NEEDED}")" "When ON, Start installs Nginx (if missing) before the release build."
     echo ""
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     echo -e "${BOLD}  Immediate Bootstrap Actions${NC}"
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
-    echo -e "  ${BOLD}M${NC}  Run MySQL + create DB now      ${BOLD}N${NC}  Install Nginx now"
-    echo -e "  ${BOLD}P${NC}  Install PHP-FPM if needed    ${BOLD}U${NC}  Install/update app service"
-    echo -e "  ${BOLD}C${NC}  Install cron/crond now       ${BOLD}J${NC}  Install/update cron jobs"
+    print_tui_action_pair "M" "Run MySQL + create DB now" "N" "Install Nginx now"
+    print_tui_action_pair "P" "Install PHP-FPM if needed" "U" "Install/update app service"
+    print_tui_action_pair "J" "Install/update cron jobs now"
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
-    echo -e "  ${BOLD}S${NC}  Start deploy   ${BOLD}Q${NC}  Cancel"
-    echo -e "  ${DIM}Tip: actions above run immediately; options 11-13 are workflow toggles for Start deploy.${NC}"
+    print_tui_action_pair "S" "Start deploy" "Q" "Cancel"
+    print_tui_hint_line "Tip: immediate actions run now; options 11-13 are workflow toggles for Start deploy."
 }
 
 # Ask for deploy options in a TTY using a menu-style terminal UI so one command
@@ -1157,7 +1256,7 @@ run_interactive_setup() {
 
     while true; do
         print_deploy_tui_menu
-        read -r -p "Select option [1-13, c, j, m, n, p, u, s, q]: " choice
+        read -r -p "Select option [1-13, j, m, n, p, u, s, q]: " choice
 
         case "${choice,,}" in
             1)
@@ -1213,9 +1312,6 @@ run_interactive_setup() {
             13)
                 INSTALL_NGINX_IF_NEEDED="$(toggle_bool "${INSTALL_NGINX_IF_NEEDED}")"
                 ;;
-            c)
-                ensure_cron_installed_from_deploy || true
-                ;;
             j)
                 ensure_managed_cron_jobs_installed_from_deploy || true
                 ;;
@@ -1240,7 +1336,7 @@ run_interactive_setup() {
                 exit 0
                 ;;
             *)
-                log_warn "Unknown selection. Choose a menu number, C/J/M/N/P/U, S, or Q."
+                log_warn "Unknown selection. Choose a menu number, J/M/N/P/U, S, or Q."
                 ;;
         esac
     done
@@ -2209,7 +2305,7 @@ if [[ "${INSTALL_PHP_FPM_IF_NEEDED}" == true ]]; then
     ensure_php_fpm_installed_if_needed_from_deploy
 fi
 
-if [[ "${INSTALL_CRON_IF_NEEDED}" == true ]]; then
+if [[ "${INSTALL_CRON_IF_NEEDED}" == true && "${INSTALL_CRON_JOBS_IF_NEEDED}" != true ]]; then
     ensure_cron_installed_from_deploy
 fi
 

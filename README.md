@@ -153,8 +153,9 @@ Use `update.sh` for routine server maintenance and `deploy.sh` for direct releas
 `deploy/update.sh` (wrapper):
 - runs from your persistent git clone on the server
 - can `fetch`/`pull` the selected branch (ff-only)
-- shows an interactive TUI for workflow + deploy pass-through settings
-- can run pre-deploy/bootstrap helpers (Nginx / PHP-FPM-if-needed / cron / systemd service / cron jobs)
+- shows an interactive two-column TUI for workflow + deploy pass-through settings
+- can run immediate helper actions (Nginx / PHP-FPM-if-needed / systemd service / cron jobs)
+- passes selected bootstrap workflow helper toggles through to `deploy.sh` during `Start update/deploy`
 - then calls `deploy.sh` with the selected options
 
 `deploy/deploy.sh` (release engine):
@@ -166,8 +167,8 @@ Use `update.sh` for routine server maintenance and `deploy.sh` for direct releas
 
 Interactive TUI notes:
 - `update.sh` includes a remote update alert line (above “Update Workflow Options”) that highlights a newer remote commit hash + one-line subject when available.
-- `update.sh` handles update/deploy orchestration and lightweight server bootstrap actions (cron/systemd/nginx/PHP-FPM/cron jobs), while MySQL+DB bootstrap is handled directly in `deploy.sh`.
-- `deploy.sh` supports immediate bootstrap actions `C` (cron), `J` (managed cron jobs), `M` (MySQL+DB), `N` (Nginx), `P` (PHP-FPM-if-needed), `U` (app systemd service), plus a workflow toggle for `MySQL + create DB` before the release build.
+- `update.sh` handles update/deploy orchestration and wrapper-level helper actions, while MySQL+DB bootstrap is handled directly in `deploy.sh`.
+- `deploy.sh` supports immediate bootstrap actions `J` (managed cron jobs), `M` (MySQL+DB), `N` (Nginx), `P` (PHP-FPM-if-needed), `U` (app systemd service), plus workflow toggles for `MySQL + create DB`, `Install cron/crond`, and `Install Nginx`.
 
 ### 1. Server prerequisites
 
@@ -197,7 +198,7 @@ Behavior:
 - If the shared `.env` file does not exist, the scripts copy `.env.example` into place.
 - In interactive runs, the scripts can open the shared `.env` in a terminal editor.
 - `update.sh` and `deploy.sh` both include an explicit TUI action to edit the shared `.env` on demand.
-- `deploy.sh` also includes direct TUI bootstrap actions for MySQL+DB (`M`), Nginx (`N`), and PHP-FPM-if-needed (`P`).
+- `deploy.sh` also includes direct TUI bootstrap actions for MySQL+DB (`M`), Nginx (`N`), PHP-FPM-if-needed (`P`), app service (`U`), and cron jobs (`J`).
 
 You must edit the shared `.env` with real values before production use (especially DB, secrets, email, invoice settings).
 
@@ -329,7 +330,6 @@ Interactive `deploy.sh` notes:
 - `M` runs the MySQL+DB bootstrap helper immediately.
 - `N` runs the Nginx install helper immediately.
 - `P` runs the PHP-FPM-if-needed helper immediately.
-- `C` runs the cron/crond install helper immediately.
 - `J` installs/updates managed cron jobs immediately.
 - `U` installs/updates the app systemd service immediately.
 
@@ -347,14 +347,14 @@ Or non-interactive:
 
 `update.sh`:
 - fetches/pulls latest git changes (ff-only)
-- can run pre-deploy helper actions (Nginx/PHP-FPM/cron/systemd service/cron jobs)
+- provides immediate helper actions (Nginx/PHP-FPM/systemd service/cron jobs)
+- passes selected bootstrap workflow toggles through to `deploy.sh` during deploy runs (to avoid duplicate setup routines)
 - delegates the actual release deploy to `deploy.sh`
 
 Interactive `update.sh` notes:
 - Shows a cached remote update check alert (when the selected remote branch has a newer commit than local).
 - Option `10` opens the shared `.env` editor.
 - Options `11-15` are bootstrap workflow toggles (cron, app service, cron jobs, Nginx, PHP-FPM) that run during `Start update/deploy` when enabled.
-- `C` runs the cron/crond install helper immediately.
 - `J` installs/updates managed cron jobs immediately.
 - `N` runs the Nginx install helper immediately.
 - `P` runs the PHP-FPM-if-needed helper immediately.
