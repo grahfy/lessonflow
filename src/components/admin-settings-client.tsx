@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { AdminDeployUpdatesButton } from "@/components/admin-deploy-updates-button";
+
 type EnvVarField = {
   key: string;
   title: string;
@@ -266,6 +268,7 @@ export function AdminSettingsClient() {
           <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/invoices")}>
             Invoices
           </button>
+          <AdminDeployUpdatesButton />
           <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/reports")}>
             Reports
           </button>

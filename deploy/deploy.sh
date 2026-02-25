@@ -7,6 +7,7 @@
 # Options:
 #   --skip-migrate    Skip database migrations
 #   --skip-deps       Skip npm install
+#   --skip-cron       Skip managed cron jobs sync
 #   --branch BRANCH   Git branch to deploy (default: main)
 #   --rollback        Rollback to previous release
 #   --setup-packages  Run package installation first (requires root)
@@ -57,6 +58,7 @@ TMP_CLEANUP_MAX_AGE_DAYS=3
 BRANCH="main"
 SKIP_MIGRATE=false
 SKIP_DEPS=false
+SKIP_CRON_SETUP=false
 ROLLBACK=false
 SETUP_PACKAGES=false
 SSL_SETUP=false
@@ -74,6 +76,9 @@ SPINNER_MSG=""
 SPINNER_FRAMES=( "⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏" )
 TEMP_BUILD_SWAP_ACTIVE=false
 TEMP_BUILD_SWAP_CREATED_FILE=false
+DEPLOY_GIT_REPO_ROOT=""
+DEPLOY_PREVIOUS_COMMIT_HASH=""
+DEPLOY_TARGET_COMMIT_HASH=""
 
 # Colors for output
 RED='\033[0;31m'
@@ -96,6 +101,7 @@ Usage: ./deploy/deploy.sh [options]
 Options:
   --skip-migrate    Skip database migrations
   --skip-deps       Skip npm install
+  --skip-cron       Skip managed cron jobs sync
   --branch BRANCH   Git branch to deploy (default: main)
   --rollback        Rollback to previous release
   --setup-packages  Run package installation first (requires root)
@@ -368,34 +374,36 @@ print_deploy_tui_menu() {
     echo ""
     echo -e "  ${BOLD}Live Status${NC}"
     echo -e "  $(status_chip "Branch" "${BRANCH}")  $(status_chip "DB" "$(deploy_migration_mode_label)")"
-    echo -e "  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "PkgSetup" "$(bool_word "${SETUP_PACKAGES}")")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")  $(status_chip "Spinner" "$(spinner_ui_word)")"
+    echo -e "  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "Cron" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")")  $(status_chip "PkgSetup" "$(bool_word "${SETUP_PACKAGES}")")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")  $(status_chip "Spinner" "$(spinner_ui_word)")"
     echo ""
     print_tui_panel_rule 78
     echo -e "${BOLD}  Main Options${NC}"
     print_tui_panel_rule 78
     print_tui_option_row "1" "Branch" "${BRANCH}"
     print_tui_option_desc "Git branch archived into the release directory and deployed."
-    print_tui_option_row "2" "Skip npm install" "$(bool_word "${SKIP_DEPS}")"
-    print_tui_option_desc "ON skips 'npm install' in the new release (faster, but risky after package changes)."
-    print_tui_option_row "3" "Database mode" "$(deploy_migration_mode_label)"
+    print_tui_option_row "2" "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")"
+    print_tui_option_desc "ON runs normal npm install in the new release. OFF skips npm install (faster, riskier)."
+    print_tui_option_row "3" "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")"
+    print_tui_option_desc "ON installs/updates managed crontab jobs. OFF skips crontab sync during deploy."
+    print_tui_option_row "4" "Database mode" "$(deploy_migration_mode_label)"
     print_tui_option_desc "Cycles: migrate deploy -> skip migrations -> prisma db push (test/dev fallback)."
-    print_tui_option_row "4" "Package setup" "$(bool_word "${SETUP_PACKAGES}")"
+    print_tui_option_row "5" "Package setup" "$(bool_word "${SETUP_PACKAGES}")"
     print_tui_option_desc "Runs deploy/setup-packages.sh before deploy (Node/Nginx/system package bootstrap)."
-    print_tui_option_row "5" "SSL setup" "$(bool_word "${SSL_SETUP}")"
+    print_tui_option_row "6" "SSL setup" "$(bool_word "${SSL_SETUP}")"
     print_tui_option_desc "Runs certbot/nginx SSL setup after deployment completes."
     if [[ "${SSL_SETUP}" == true ]]; then
         print_tui_panel_rule 78
         echo -e "${BOLD}  SSL Options${NC}"
         print_tui_panel_rule 78
-        print_tui_option_row "6" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}"
+        print_tui_option_row "7" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}"
         print_tui_option_desc "Domain used in nginx config and Let's Encrypt certificate request."
-        print_tui_option_row "7" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}"
+        print_tui_option_row "8" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}"
         print_tui_option_desc "Receives certificate expiry notices and Let's Encrypt registration updates."
     fi
     print_tui_panel_rule 78
     echo -e "${BOLD}  UI Options${NC}"
     print_tui_panel_rule 78
-    print_tui_option_row "8" "Spinner UI" "$(spinner_ui_word)"
+    print_tui_option_row "9" "Spinner UI" "$(spinner_ui_word)"
     print_tui_option_desc "Animated progress spinner for long commands (disable in noisy terminals/log capture)."
     echo ""
     print_tui_panel_rule 78
@@ -410,7 +418,7 @@ run_interactive_setup() {
 
     while true; do
         print_deploy_tui_menu
-        read -r -p "Select option [1-8, s, q]: " choice
+        read -r -p "Select option [1-9, s, q]: " choice
 
         case "${choice,,}" in
             1)
@@ -420,33 +428,36 @@ run_interactive_setup() {
                 SKIP_DEPS="$(toggle_bool "${SKIP_DEPS}")"
                 ;;
             3)
-                deploy_cycle_migration_mode
+                SKIP_CRON_SETUP="$(toggle_bool "${SKIP_CRON_SETUP}")"
                 ;;
             4)
-                SETUP_PACKAGES="$(toggle_bool "${SETUP_PACKAGES}")"
+                deploy_cycle_migration_mode
                 ;;
             5)
+                SETUP_PACKAGES="$(toggle_bool "${SETUP_PACKAGES}")"
+                ;;
+            6)
                 SSL_SETUP="$(toggle_bool "${SSL_SETUP}")"
                 if [[ "${SSL_SETUP}" == true ]]; then
                     [[ -n "${SSL_DOMAIN}" ]] || SSL_DOMAIN="melbourneguitarschool.com.au"
                     [[ -n "${SSL_EMAIL}" ]] || SSL_EMAIL="melbourneguitarschool@gmail.com"
                 fi
                 ;;
-            6)
+            7)
                 if [[ "${SSL_SETUP}" == true ]]; then
                     SSL_DOMAIN="$(prompt_value "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}")"
                 else
                     log_warn "Enable SSL setup first to configure domain/email."
                 fi
                 ;;
-            7)
+            8)
                 if [[ "${SSL_SETUP}" == true ]]; then
                     SSL_EMAIL="$(prompt_value "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}")"
                 else
                     log_warn "Enable SSL setup first to configure domain/email."
                 fi
                 ;;
-            8)
+            9)
                 NO_SPINNER="$(toggle_bool "${NO_SPINNER}")"
                 ;;
             s)
@@ -471,7 +482,8 @@ print_deploy_summary() {
     print_summary_row "App" "${APP_NAME}"
     print_summary_row "Branch" "${BRANCH}"
     print_summary_row "Database mode" "$(deploy_migration_mode_label)"
-    print_summary_row "Skip npm install" "$(bool_word "${SKIP_DEPS}")"
+    print_summary_row "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")"
+    print_summary_row "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")"
     print_summary_row "Package setup" "$(bool_word "${SETUP_PACKAGES}")"
     print_summary_row "SSL setup" "$(bool_word "${SSL_SETUP}")"
     print_summary_row "Spinner UI" "$(spinner_ui_word)"
@@ -703,6 +715,101 @@ install_or_update_managed_crontab_jobs() {
     rm -f "${tmp_file}"
 }
 
+write_latest_deploy_update_metadata() {
+    local repo_root="$1"
+    local output_file="$2"
+    local commit_hash="$3"
+    local previous_commit="$4"
+    local release_id="$5"
+    local branch_name="$6"
+
+    [[ -n "${repo_root}" && -d "${repo_root}" && -n "${commit_hash}" && -n "${output_file}" ]] || return 0
+
+    mkdir -p "$(dirname "${output_file}")"
+
+    DEPLOY_UPDATE_REPO_ROOT="${repo_root}" \
+    DEPLOY_UPDATE_OUTPUT_FILE="${output_file}" \
+    DEPLOY_UPDATE_COMMIT="${commit_hash}" \
+    DEPLOY_UPDATE_PREVIOUS_COMMIT="${previous_commit}" \
+    DEPLOY_UPDATE_RELEASE="${release_id}" \
+    DEPLOY_UPDATE_BRANCH="${branch_name}" \
+    node <<'NODE'
+const fs = require("node:fs");
+const path = require("node:path");
+const { execFileSync } = require("node:child_process");
+
+const repoRoot = process.env.DEPLOY_UPDATE_REPO_ROOT || "";
+const outputFile = process.env.DEPLOY_UPDATE_OUTPUT_FILE || "";
+const commit = process.env.DEPLOY_UPDATE_COMMIT || "";
+const previousCommit = process.env.DEPLOY_UPDATE_PREVIOUS_COMMIT || "";
+const release = process.env.DEPLOY_UPDATE_RELEASE || "";
+const branch = process.env.DEPLOY_UPDATE_BRANCH || "main";
+
+if (!repoRoot || !outputFile || !commit) process.exit(0);
+
+function safeGit(args) {
+  return execFileSync("git", ["-C", repoRoot, ...args], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"]
+  }).trimEnd();
+}
+
+function getCommits() {
+  let range = "";
+  if (previousCommit) {
+    try {
+      safeGit(["cat-file", "-e", `${previousCommit}^{commit}`]);
+      range = `${previousCommit}..${commit}`;
+    } catch {}
+  }
+
+  const format = "%H%x1f%h%x1f%an%x1f%aI%x1f%s%x1f%b%x1e";
+  const args = ["log", "--reverse", `--pretty=format:${format}`];
+  if (range) {
+    args.push(range);
+  } else {
+    args.push("-n", "10", commit);
+  }
+
+  const raw = safeGit(args);
+  const entries = raw
+    .split("\x1e")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((row) => {
+      const [hash, shortHash, authorName, authoredAt, subject, body] = row.split("\x1f");
+      return {
+        hash,
+        shortHash,
+        authorName,
+        authoredAt,
+        subject,
+        body: (body || "").trim()
+      };
+    });
+
+  if (range) {
+    return entries.filter((entry) => entry.hash !== previousCommit);
+  }
+  return entries;
+}
+
+const payload = {
+  app: "melbourne-guitar-school",
+  branch,
+  release,
+  appliedAt: new Date().toISOString(),
+  commit,
+  shortCommit: safeGit(["rev-parse", "--short", commit]),
+  previousCommit: previousCommit || null,
+  commits: getCommits()
+};
+
+fs.mkdirSync(path.dirname(outputFile), { recursive: true });
+fs.writeFileSync(outputFile, JSON.stringify(payload, null, 2) + "\n", "utf8");
+NODE
+}
+
 # Pulls the selected branch at the start of direct deploy runs and restarts the
 # script if the checked-out commit changed. This ensures new deploy script logic
 # is used immediately after a self-update (matching update.sh behavior).
@@ -757,7 +864,19 @@ maybe_self_update_and_restart() {
     log_info "Repository commit: $(git -C "${repo_root}" rev-parse --short HEAD)"
 
     if [[ -n "${before_commit}" && -n "${after_commit}" && "${before_commit}" != "${after_commit}" ]]; then
-        log_warn "deploy.sh source updated (${before_commit} -> ${after_commit}); restarting script to use latest code..."
+        local commit_details=""
+        commit_details="$(git -C "${repo_root}" log --reverse --date=local --pretty=format:'%C(yellow)%h%Creset %ad %C(cyan)%an%Creset%n  %s%n%+b' "${before_commit}..${after_commit}" 2>/dev/null || true)"
+        if [[ -n "${commit_details}" ]]; then
+            section "Git Changes"
+            echo "${commit_details}"
+            if [[ "${IS_TTY}" == true ]]; then
+                echo ""
+                read -r -n 1 -s -p "Press any key to reload deploy menu with the new script..." _
+                echo ""
+            fi
+        fi
+        log_warn "deploy.sh source updated (${before_commit} -> ${after_commit}); restarting script and returning to the main menu..."
+        export MGS_RETURN_TO_MENU_AFTER_SELF_UPDATE=1
         export MGS_DEPLOY_SELF_RESTART_COUNT=$((restart_count + 1))
         exec "${SCRIPT_DIR}/deploy.sh" "${ORIGINAL_ARGS[@]}"
     fi
@@ -1155,6 +1274,7 @@ while [[ $# -gt 0 ]]; do
         --no-spinner) NO_SPINNER=true; shift ;;
         --no-color) NO_COLOR=true; shift ;;
         --skip-deps) SKIP_DEPS=true; shift ;;
+        --skip-cron) SKIP_CRON_SETUP=true; shift ;;
         --skip-migrate) SKIP_MIGRATE=true; shift ;;
         --db-push) DB_PUSH=true; shift ;;
         --rollback) ROLLBACK=true; shift ;;
@@ -1170,6 +1290,11 @@ done
 detect_tty_capabilities
 reexec_with_sudo_if_needed
 maybe_self_update_and_restart
+
+if [[ "${MGS_RETURN_TO_MENU_AFTER_SELF_UPDATE:-}" == "1" && "${IS_TTY}" == true && "${ROLLBACK}" == false ]]; then
+    INTERACTIVE=true
+    unset MGS_RETURN_TO_MENU_AFTER_SELF_UPDATE
+fi
 
 # Auto-enable interactive prompts for local manual runs with no flags.
 if [[ "${IS_TTY}" == true && "${INTERACTIVE}" == false && "${ROLLBACK}" == false ]]; then
@@ -1274,6 +1399,17 @@ fi
 
 log_info "Source directory: ${SOURCE_DIR}"
 
+# Track deployed git commit metadata so the admin UI can show "latest updates"
+# after a successful deploy. This is best-effort and skipped for non-git source
+# deployments.
+if [[ -d "${SOURCE_DIR}/.git" ]]; then
+    DEPLOY_GIT_REPO_ROOT="${SOURCE_DIR}"
+    DEPLOY_TARGET_COMMIT_HASH="$(git -C "${SOURCE_DIR}" rev-parse "${BRANCH}" 2>/dev/null || true)"
+    if [[ -L "${CURRENT_LINK}" && -f "${CURRENT_LINK}/.deploy-version" ]]; then
+        DEPLOY_PREVIOUS_COMMIT_HASH="$(tr -d '[:space:]' < "${CURRENT_LINK}/.deploy-version" 2>/dev/null || true)"
+    fi
+fi
+
 # Create directories if they don't exist
 mkdir -p "${RELEASES_DIR}"
 mkdir -p "${SHARED_DIR}/data"
@@ -1303,6 +1439,10 @@ else
     rsync -a --exclude='node_modules' --exclude='.next' --exclude='.git' \
           --exclude='*.log' --exclude='prisma/*.db' \
           "${SOURCE_DIR}/" "${NEW_RELEASE_DIR}/"
+fi
+
+if [[ -n "${DEPLOY_TARGET_COMMIT_HASH}" ]]; then
+    printf '%s\n' "${DEPLOY_TARGET_COMMIT_HASH}" > "${NEW_RELEASE_DIR}/.deploy-version"
 fi
 
 cd "${NEW_RELEASE_DIR}"
@@ -1548,12 +1688,27 @@ run_step "Restarting nginx" systemctl restart nginx
 
 # Install/update the managed cron entries after the `current` symlink moves so
 # cron uses the latest runner path and includes any newly introduced jobs.
-install_or_update_managed_crontab_jobs
+if [[ "${SKIP_CRON_SETUP}" == true ]]; then
+    log_info "Skipping managed cron jobs sync"
+else
+    install_or_update_managed_crontab_jobs
+fi
 
 # Restart cron after the release symlink update so jobs that call
 # /var/www/.../current/deploy/cron.sh pick up the newest script/env path
 # behavior immediately on systems where cron service reload/restart is used.
 restart_cron_scheduler_if_present
+
+# Persist deploy commit/change metadata for the admin "Latest Updates" popup.
+if [[ -n "${DEPLOY_GIT_REPO_ROOT}" && -n "${DEPLOY_TARGET_COMMIT_HASH}" ]]; then
+    write_latest_deploy_update_metadata \
+        "${DEPLOY_GIT_REPO_ROOT}" \
+        "${SHARED_DIR}/data/deploy/latest-deploy-update.json" \
+        "${DEPLOY_TARGET_COMMIT_HASH}" \
+        "${DEPLOY_PREVIOUS_COMMIT_HASH}" \
+        "${TIMESTAMP}" \
+        "${BRANCH}" || log_warn "Failed to write deploy update metadata; continuing deployment"
+fi
 
 # Cleanup old releases
 log_info "Cleaning up old releases..."

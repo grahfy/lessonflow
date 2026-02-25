@@ -14,6 +14,7 @@
 #   --skip-pull          Skip git fetch/pull and run deploy only
 #   --skip-deploy        Skip deployment after updating git
 #   --skip-deps          Pass through to deploy.sh (skip npm install)
+#   --skip-cron          Pass through to deploy.sh (skip managed cron jobs sync)
 #   --skip-migrate       Pass through to deploy.sh (skip database migrations)
 #   --db-push            Pass through to deploy.sh (use prisma db push)
 #   --ssl                Pass through to deploy.sh (run SSL setup post-deploy)
@@ -44,6 +45,7 @@ BRANCH=""
 SKIP_PULL=false
 SKIP_DEPLOY=false
 SKIP_DEPS=false
+SKIP_CRON_SETUP=false
 SKIP_MIGRATE=false
 DB_PUSH=false
 SSL_SETUP=false
@@ -91,6 +93,7 @@ Options:
   --skip-pull          Skip git fetch/pull and run deploy only
   --skip-deploy        Skip deployment after updating git
   --skip-deps          Pass through to deploy.sh (skip npm install)
+  --skip-cron          Pass through to deploy.sh (skip managed cron jobs sync)
   --skip-migrate       Pass through to deploy.sh (skip database migrations)
   --db-push            Pass through to deploy.sh (use prisma db push)
   --ssl                Pass through to deploy.sh (run SSL setup post-deploy)
@@ -204,7 +207,20 @@ maybe_restart_after_self_update() {
     return 0
   fi
 
-  log_warn "update.sh changed after git pull (${before_commit} -> ${after_commit}); restarting script to use the latest code..."
+  local commit_details=""
+  commit_details="$(git log --reverse --date=local --pretty=format:'%C(yellow)%h%Creset %ad %C(cyan)%an%Creset%n  %s%n%+b' "${before_commit}..${after_commit}" 2>/dev/null || true)"
+  if [[ -n "${commit_details}" ]]; then
+    section "Git Changes"
+    echo "${commit_details}"
+    if [[ "${IS_TTY}" == true ]]; then
+      echo ""
+      read -r -n 1 -s -p "Press any key to reload update menu with the new script..." _
+      echo ""
+    fi
+  fi
+
+  log_warn "update.sh changed after git pull (${before_commit} -> ${after_commit}); restarting script and returning to the main menu..."
+  export MGS_RETURN_TO_MENU_AFTER_SELF_UPDATE=1
   export MGS_UPDATE_SELF_RESTART_COUNT=$((restart_count + 1))
   exec "${SCRIPT_DIR}/update.sh" "${ORIGINAL_ARGS[@]}"
 }
@@ -371,7 +387,7 @@ print_update_tui_menu() {
   echo -e "  $(status_chip "Branch" "${BRANCH}")  $(status_chip "Remote" "${REMOTE_NAME}")  $(status_chip "Pull" "$(bool_word "$(toggle_bool "${SKIP_PULL}")")")  $(status_chip "Deploy" "$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")")"
   echo -e "  $(status_chip "DirtyOK" "$(bool_word "${ALLOW_DIRTY}")")  $(status_chip "Sudo" "$(update_sudo_mode_label)")  $(status_chip "Spinner" "$(spinner_ui_word)")"
   if [[ "${SKIP_DEPLOY}" == false ]]; then
-    echo -e "  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "DB" "$(update_migration_mode_label)")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")"
+    echo -e "  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "Cron" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")")  $(status_chip "DB" "$(update_migration_mode_label)")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")"
   fi
   echo ""
   print_tui_panel_rule 92
@@ -389,22 +405,24 @@ print_update_tui_menu() {
   print_tui_option_desc "ON allows update/deploy even if tracked files are modified locally."
   print_tui_option_row "6" "Sudo deploy mode" "$(update_sudo_mode_label)"
   print_tui_option_desc "Cycles deploy invocation between auto, forced sudo, and forced no-sudo."
-  print_tui_option_row "7" "Spinner UI" "$(spinner_ui_word)"
+  print_tui_option_row "7" "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")"
+  print_tui_option_desc "ON runs normal npm install in deploy.sh. OFF passes --skip-deps (faster, riskier after package changes)."
+  print_tui_option_row "8" "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")"
+  print_tui_option_desc "ON lets deploy.sh install/update managed crontab jobs. OFF passes --skip-cron."
+  print_tui_option_row "9" "Spinner UI" "$(spinner_ui_word)"
   print_tui_option_desc "Animated progress spinner for git/deploy wrapper steps."
   if [[ "${SKIP_DEPLOY}" == false ]]; then
     print_tui_panel_rule 92
     echo -e "${BOLD}  Deploy Pass-through Options${NC}"
     print_tui_panel_rule 92
-    print_tui_option_row "8" "Skip npm install" "$(bool_word "${SKIP_DEPS}")"
-    print_tui_option_desc "Passes --skip-deps to deploy.sh (faster, but unsafe after package changes)."
-    print_tui_option_row "9" "Database mode" "$(update_migration_mode_label)"
+    print_tui_option_row "10" "Database mode" "$(update_migration_mode_label)"
     print_tui_option_desc "Cycles deploy DB behavior: migrate deploy / skip migrations / db push."
-    print_tui_option_row "10" "SSL setup" "$(bool_word "${SSL_SETUP}")"
+    print_tui_option_row "11" "SSL setup" "$(bool_word "${SSL_SETUP}")"
     print_tui_option_desc "Passes SSL setup flags to deploy.sh to run certbot + nginx config."
     if [[ "${SSL_SETUP}" == true ]]; then
-      print_tui_option_row "11" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}"
+      print_tui_option_row "12" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}"
       print_tui_option_desc "Domain used for certificate request and nginx server_name config."
-      print_tui_option_row "12" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}"
+      print_tui_option_row "13" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}"
       print_tui_option_desc "Email for Let's Encrypt registration and renewal alerts."
     fi
   fi
@@ -658,7 +676,7 @@ run_interactive_setup() {
 
   while true; do
     print_update_tui_menu
-    read -r -p "Select option [1-12, s, q]: " choice
+    read -r -p "Select option [1-13, s, q]: " choice
 
     case "${choice,,}" in
       1)
@@ -683,23 +701,30 @@ run_interactive_setup() {
         cycle_update_sudo_mode
         ;;
       7)
-        NO_SPINNER="$(toggle_bool "${NO_SPINNER}")"
-        ;;
-      8)
         if [[ "${SKIP_DEPLOY}" == false ]]; then
           SKIP_DEPS="$(toggle_bool "${SKIP_DEPS}")"
         else
           log_warn "Enable deploy first to change deploy pass-through options."
         fi
         ;;
+      8)
+        if [[ "${SKIP_DEPLOY}" == false ]]; then
+          SKIP_CRON_SETUP="$(toggle_bool "${SKIP_CRON_SETUP}")"
+        else
+          log_warn "Enable deploy first to change deploy pass-through options."
+        fi
+        ;;
       9)
+        NO_SPINNER="$(toggle_bool "${NO_SPINNER}")"
+        ;;
+      10)
         if [[ "${SKIP_DEPLOY}" == false ]]; then
           cycle_update_migration_mode
         else
           log_warn "Enable deploy first to change deploy pass-through options."
         fi
         ;;
-      10)
+      11)
         if [[ "${SKIP_DEPLOY}" == false ]]; then
           SSL_SETUP="$(toggle_bool "${SSL_SETUP}")"
           if [[ "${SSL_SETUP}" == true ]]; then
@@ -710,14 +735,14 @@ run_interactive_setup() {
           log_warn "Enable deploy first to configure SSL options."
         fi
         ;;
-      11)
+      12)
         if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true ]]; then
           SSL_DOMAIN="$(prompt_value "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}")"
         else
           log_warn "Enable deploy + SSL setup first to edit SSL domain."
         fi
         ;;
-      12)
+      13)
         if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true ]]; then
           SSL_EMAIL="$(prompt_value "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}")"
         else
@@ -769,7 +794,8 @@ print_summary() {
     echo -e "  ${BOLD}Deploy Pass-through${NC}"
     print_tui_panel_rule 62
     print_summary_row "Effective sudo" "${sudo_mode}"
-    print_summary_row "Skip npm install" "$(bool_word "${SKIP_DEPS}")"
+    print_summary_row "Install deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")"
+    print_summary_row "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")"
     print_summary_row "Database mode" "$(update_migration_mode_label)"
     print_summary_row "SSL setup" "$(bool_word "${SSL_SETUP}")"
     if [[ "${SSL_SETUP}" == true ]]; then
@@ -792,6 +818,7 @@ run_deploy() {
   local deploy_args=()
   deploy_args+=( "--branch" "${BRANCH}" )
   [[ "${SKIP_DEPS}" == true ]] && deploy_args+=( "--skip-deps" )
+  [[ "${SKIP_CRON_SETUP}" == true ]] && deploy_args+=( "--skip-cron" )
   [[ "${SKIP_MIGRATE}" == true ]] && deploy_args+=( "--skip-migrate" )
   [[ "${DB_PUSH}" == true ]] && deploy_args+=( "--db-push" )
   [[ "${SSL_SETUP}" == true ]] && deploy_args+=( "--ssl" "--domain" "${SSL_DOMAIN}" "--email" "${SSL_EMAIL}" )
@@ -840,6 +867,7 @@ while [[ $# -gt 0 ]]; do
     --skip-pull) SKIP_PULL=true; shift ;;
     --skip-deploy) SKIP_DEPLOY=true; shift ;;
     --skip-deps) SKIP_DEPS=true; shift ;;
+    --skip-cron) SKIP_CRON_SETUP=true; shift ;;
     --skip-migrate) SKIP_MIGRATE=true; shift ;;
     --db-push) DB_PUSH=true; shift ;;
     --ssl) SSL_SETUP=true; shift ;;
@@ -857,6 +885,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 detect_tty_capabilities
+
+if [[ "${MGS_RETURN_TO_MENU_AFTER_SELF_UPDATE:-}" == "1" && "${IS_TTY}" == true ]]; then
+  INTERACTIVE=true
+  unset MGS_RETURN_TO_MENU_AFTER_SELF_UPDATE
+fi
 
 # Default to interactive mode for local operator runs with no flags.
 if [[ "${IS_TTY}" == true && "${INTERACTIVE}" == false ]]; then

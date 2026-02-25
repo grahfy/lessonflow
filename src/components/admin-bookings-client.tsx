@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AdminBookingCalendar, AdminCalendarEvent } from "@/components/admin-booking-calendar";
+import { AdminDeployUpdatesButton } from "@/components/admin-deploy-updates-button";
 import { animateIn, animateOut } from "@/components/motion/tween-orchestrator";
 import { usePresenceExit } from "@/components/motion/use-presence-exit";
 
@@ -1677,6 +1678,7 @@ export function AdminBookingsClient() {
           <button className="btn btn-secondary" type="button" data-motion-item="legend-action-settings" onClick={() => router.push("/admin/settings")}>
             Settings
           </button>
+          <AdminDeployUpdatesButton />
           <button className="btn btn-secondary" type="button" data-motion-item="legend-action-reports" onClick={() => router.push("/admin/reports")}>
             Reports
           </button>

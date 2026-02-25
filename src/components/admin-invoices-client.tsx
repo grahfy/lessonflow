@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+import { AdminDeployUpdatesButton } from "@/components/admin-deploy-updates-button";
 import { parseAudInputToCents } from "@/lib/invoices/currency";
 
 type InvoiceStatus = "draft" | "sent" | "paid" | "void";
@@ -892,6 +893,7 @@ export function AdminInvoicesClient() {
         <h1 className="admin-console-title">Invoice Console</h1>
         <div className="booking-row">
           <button className="btn btn-secondary" onClick={() => router.push("/admin/bookings")}>Bookings</button>
+          <AdminDeployUpdatesButton />
           <button className="btn btn-secondary" onClick={() => router.push("/admin/reports")}>Reports</button>
           <button className="btn btn-secondary" onClick={() => router.push("/admin/settings")}>Settings</button>
           <button className="btn btn-secondary" onClick={() => void logout()}>Sign out</button>

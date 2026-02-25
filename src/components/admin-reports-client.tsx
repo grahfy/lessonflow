@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { AdminDeployUpdatesButton } from "@/components/admin-deploy-updates-button";
+
 type ReportPeriodKey = "daily" | "weekly" | "monthly" | "yearly";
 type TrendGrainKey = "daily" | "weekly" | "monthly" | "yearly";
 type ReportDateFormat = "readable" | "ddmmyy";
@@ -414,6 +416,7 @@ export function AdminReportsClient() {
         <div className="booking-row">
           <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/bookings")}>Bookings</button>
           <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/invoices")}>Invoices</button>
+          <AdminDeployUpdatesButton />
           <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/settings")}>Settings</button>
           <button className="btn btn-secondary" type="button" onClick={() => void logout()}>Sign out</button>
         </div>

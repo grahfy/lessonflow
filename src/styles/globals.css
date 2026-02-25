@@ -2648,3 +2648,84 @@ h1 {
     align-items: flex-start;
   }
 }
+
+/* Admin deploy updates popup */
+.deploy-updates-dialog {
+  max-width: min(980px, calc(100vw - 2rem));
+}
+
+.deploy-updates-content {
+  display: grid;
+  gap: 12px;
+}
+
+.deploy-updates-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.deploy-updates-meta-card {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px 12px;
+}
+
+.deploy-updates-meta-label {
+  margin: 0;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.deploy-updates-meta-value {
+  margin: 4px 0 0;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.deploy-updates-list {
+  display: grid;
+  gap: 10px;
+  max-height: min(52vh, 560px);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.deploy-updates-item {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.deploy-updates-item-head {
+  display: grid;
+  gap: 4px;
+}
+
+.deploy-updates-item-head > span {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.8rem;
+}
+
+.deploy-updates-body {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+@media (max-width: 900px) {
+  .deploy-updates-meta-grid {
+    grid-template-columns: 1fr;
+  }
+}
