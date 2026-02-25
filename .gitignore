@@ -4,6 +4,12 @@ coverage
 dist
 .DS_Store
 *.log
+.data/
+.serena/
+.next_cache_errfix_*/
+test-results/
+invoice_template.png
+test.db
 .env
 .env.local
 .env.development.local
