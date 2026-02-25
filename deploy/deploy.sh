@@ -30,6 +30,7 @@ set -euo pipefail
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_DIR="$(pwd)"
+ORIGINAL_ARGS=( "$@" )
 
 # Configuration
 APP_NAME="melbourne-guitar-school"
@@ -117,6 +118,47 @@ detect_tty_capabilities() {
     if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then
         RED='' GREEN='' YELLOW='' BLUE='' CYAN='' BOLD='' DIM='' NC=''
     fi
+}
+
+# Re-runs the deploy script with sudo when root privileges are required but the
+# operator started it without sudo on the command line.
+reexec_with_sudo_if_needed() {
+    if [[ ${EUID} -eq 0 ]]; then
+        return 0
+    fi
+
+    if ! command -v sudo >/dev/null 2>&1; then
+        log_error "This deployment script requires root privileges and sudo is not available."
+        exit 1
+    fi
+
+    local sudo_env_args=()
+    local env_name=""
+    for env_name in \
+        NODE_OPTIONS \
+        NEXT_LOW_MEMORY_BUILD \
+        DEFAULT_BUILD_NODE_HEAP_MB \
+        LOW_RAM_1GB_AUTO_HEAP_MB \
+        LOW_RAM_2GB_AUTO_HEAP_MB \
+        LOW_RAM_1GB_NEXT_BUILD_HEAP_MB \
+        LOW_RAM_2GB_NEXT_BUILD_HEAP_MB \
+        TEMP_BUILD_SWAP_AUTO_ENABLED \
+        LOW_RAM_1GB_TARGET_TOTAL_SWAP_MB \
+        LOW_RAM_2GB_TARGET_TOTAL_SWAP_MB \
+        TEMP_BUILD_SWAP_MIN_CREATE_MB \
+        TEMP_BUILD_SWAP_PATH
+    do
+        if [[ -v "${env_name}" ]]; then
+            sudo_env_args+=( "${env_name}=${!env_name}" )
+        fi
+    done
+
+    log_info "Root privileges required. Re-running deployment with sudo..."
+    if (( ${#sudo_env_args[@]} > 0 )); then
+        exec sudo env "${sudo_env_args[@]}" "${SCRIPT_DIR}/deploy.sh" "${ORIGINAL_ARGS[@]}"
+    fi
+
+    exec sudo "${SCRIPT_DIR}/deploy.sh" "${ORIGINAL_ARGS[@]}"
 }
 
 # Render a lightweight banner so manual deploy runs are easier to scan.
@@ -774,6 +816,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 detect_tty_capabilities
+reexec_with_sudo_if_needed
 
 # Auto-enable interactive prompts for local manual runs with no flags.
 if [[ "${IS_TTY}" == true && "${INTERACTIVE}" == false && "${ROLLBACK}" == false ]]; then

@@ -58,6 +58,7 @@ IS_TTY=false
 SPINNER_PID=""
 SPINNER_MSG=""
 SPINNER_FRAMES=( "⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏" )
+SUDO_DEPLOY_AUTH_READY=false
 DEFAULT_BUILD_NODE_HEAP_MB="${DEFAULT_BUILD_NODE_HEAP_MB:-6144}"
 LOW_RAM_1GB_AUTO_HEAP_MB="${LOW_RAM_1GB_AUTO_HEAP_MB:-3072}"
 LOW_RAM_2GB_AUTO_HEAP_MB="${LOW_RAM_2GB_AUTO_HEAP_MB:-2048}"
@@ -336,10 +337,21 @@ cleanup_local_install_and_build_caches() {
     "${npm_cache_root}/_logs"
   do
     [[ -e "${path}" ]] || continue
-    rm -rf "${path}" || {
+    if ! rm -rf "${path}"; then
+      # When previous deploys ran with sudo, repo-local caches can become
+      # root-owned. If sudo deploy is enabled and auth is already primed, retry
+      # repo-path cleanup via sudo without prompting again.
+      if [[ -n "${REPO_ROOT:-}" && "${path}" == "${REPO_ROOT}"/* ]] && should_use_sudo_for_deploy; then
+        if sudo -n rm -rf "${path}" 2>/dev/null; then
+          removed=$((removed + 1))
+          log_info "Removed cache path via sudo: ${path}"
+          continue
+        fi
+      fi
+
       log_warn "Failed to remove cache path: ${path}"
       continue
-    }
+    fi
     removed=$((removed + 1))
     log_info "Removed cache path: ${path}"
   done
@@ -379,6 +391,33 @@ should_use_sudo_for_deploy() {
     return 1
   fi
   command -v sudo >/dev/null 2>&1
+}
+
+# Prompts for sudo once (or verifies cached auth in non-interactive runs) so the
+# workflow fails early and subsequent sudo calls can run without extra prompts.
+ensure_sudo_for_deploy_ready() {
+  if ! should_use_sudo_for_deploy; then
+    return 0
+  fi
+
+  if [[ "${SUDO_DEPLOY_AUTH_READY}" == true ]]; then
+    return 0
+  fi
+
+  if [[ "${IS_TTY}" == true ]]; then
+    log_info "Authenticating sudo for deployment..."
+    if ! sudo -v; then
+      log_error "Sudo authentication failed. Deployment cannot continue."
+      exit 1
+    fi
+  else
+    if ! sudo -n true 2>/dev/null; then
+      log_error "Sudo access is required for deployment. Re-run interactively or configure passwordless sudo for deploy commands."
+      exit 1
+    fi
+  fi
+
+  SUDO_DEPLOY_AUTH_READY=true
 }
 
 # Interactive prompt flow for the update wrapper. It mirrors deploy.sh options
@@ -476,6 +515,9 @@ run_deploy() {
 
   section "Deploy"
   ensure_build_node_options
+  if should_use_sudo_for_deploy; then
+    ensure_sudo_for_deploy_ready
+  fi
   log_info "Pre-deploy cache cleanup..."
   cleanup_local_install_and_build_caches
   log_info "Invoking ${DEPLOY_SCRIPT} ${deploy_args[*]}"
@@ -583,6 +625,10 @@ if [[ "${INTERACTIVE}" == true ]]; then
     log_warn "Update cancelled."
     exit 0
   fi
+fi
+
+if [[ "${SKIP_DEPLOY}" == false ]]; then
+  ensure_sudo_for_deploy_ready
 fi
 
 section "Git Update"
