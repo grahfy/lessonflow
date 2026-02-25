@@ -2,17 +2,14 @@ import type { Metadata } from "next";
 
 import { TweenLink } from "@/components/motion/tween-link";
 import { PanelLayout } from "@/components/panel-layout";
+import { buildPublicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPublicPageMetadata({
   title: "Guitar Lessons - Beginner to Advanced",
+  path: "/lessons",
   description:
-    "Custom guitar lessons for all levels. Build technique, learn songs, develop rhythm and fretboard understanding with personalised lesson paths.",
-  openGraph: {
-    title: "Guitar Lessons - Beginner to Advanced",
-    description:
-      "Custom guitar lessons for all levels. Build technique, learn songs, develop rhythm and fretboard understanding with personalised lesson paths.",
-  },
-};
+    "Custom guitar lessons for all levels. Build technique, learn songs, develop rhythm and fretboard understanding with personalised lesson paths."
+});
 
 export default function LessonsPage() {
   return (

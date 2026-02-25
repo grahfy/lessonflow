@@ -4,17 +4,14 @@ import { ContactForm } from "@/components/contact-form";
 import { ImageModal } from "@/components/image-modal";
 import { PanelLayout } from "@/components/panel-layout";
 import { getOwnerEmail } from "@/lib/env";
+import { buildPublicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPublicPageMetadata({
   title: "Contact Us",
+  path: "/contact",
   description:
-    "Get in touch with Melbourne Guitar School. Call, text, or email to book lessons or ask questions. Located in Northcote, Melbourne.",
-  openGraph: {
-    title: "Contact Us",
-    description:
-      "Get in touch with Melbourne Guitar School. Call, text, or email to book lessons or ask questions. Located in Northcote, Melbourne.",
-  },
-};
+    "Get in touch with Melbourne Guitar School. Call, text, or email to book lessons or ask questions. Located in Northcote, Melbourne."
+});
 
 /**
  * Public contact page wrapper with location guidance + contact form.

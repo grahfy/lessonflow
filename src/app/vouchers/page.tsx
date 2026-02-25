@@ -2,17 +2,14 @@ import type { Metadata } from "next";
 
 import { TweenLink } from "@/components/motion/tween-link";
 import { PanelLayout } from "@/components/panel-layout";
+import { buildPublicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPublicPageMetadata({
   title: "Gift Vouchers - Guitar Lesson Gift Cards",
+  path: "/vouchers",
   description:
-    "Give the gift of guitar lessons. Digital gift vouchers for beginners and returning players. Perfect for kids, teens, and adults of any experience level.",
-  openGraph: {
-    title: "Gift Vouchers - Guitar Lesson Gift Cards",
-    description:
-      "Give the gift of guitar lessons. Digital gift vouchers for beginners and returning players. Perfect for kids, teens, and adults of any experience level.",
-  },
-};
+    "Give the gift of guitar lessons. Digital gift vouchers for beginners and returning players. Perfect for kids, teens, and adults of any experience level."
+});
 
 export default function VouchersPage() {
   return (

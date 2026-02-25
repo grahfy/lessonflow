@@ -2,17 +2,14 @@ import type { Metadata } from "next";
 
 import { TweenLink } from "@/components/motion/tween-link";
 import { PanelLayout } from "@/components/panel-layout";
+import { buildPublicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPublicPageMetadata({
   title: "Your Teacher - Jon",
+  path: "/teacher",
   description:
-    "Learn guitar with Jon, an experienced guitarist with 30+ years playing, music production background, and endorsements from Ernie Ball Musicman Guitars Australia.",
-  openGraph: {
-    title: "Your Teacher - Jon",
-    description:
-      "Learn guitar with Jon, an experienced guitarist with 30+ years playing, music production background, and endorsements from Ernie Ball Musicman Guitars Australia.",
-  },
-};
+    "Learn guitar with Jon, an experienced guitarist with 30+ years playing, music production background, and endorsements from Ernie Ball Musicman Guitars Australia."
+});
 
 export default function TeacherPage() {
   return (

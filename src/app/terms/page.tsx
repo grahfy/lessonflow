@@ -2,17 +2,14 @@ import type { Metadata } from "next";
 
 import { TweenLink } from "@/components/motion/tween-link";
 import { PanelLayout } from "@/components/panel-layout";
+import { buildPublicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPublicPageMetadata({
   title: "Terms and Policies",
+  path: "/terms",
   description:
-    "Melbourne Guitar School lesson policies covering cancellations, make-up lessons, payment terms, and gift voucher conditions.",
-  openGraph: {
-    title: "Terms and Policies",
-    description:
-      "Melbourne Guitar School lesson policies covering cancellations, make-up lessons, payment terms, and gift voucher conditions.",
-  },
-};
+    "Melbourne Guitar School lesson policies covering cancellations, make-up lessons, payment terms, and gift voucher conditions."
+});
 
 export default function TermsPage() {
   return (

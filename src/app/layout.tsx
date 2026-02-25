@@ -28,6 +28,10 @@ export const metadata: Metadata = {
   authors: [{ name: "Melbourne Guitar School" }],
   creator: "Melbourne Guitar School",
   publisher: "Melbourne Guitar School",
+  applicationName: "Melbourne Guitar School",
+  alternates: {
+    canonical: "/"
+  },
   formatDetection: {
     email: false,
     address: false,
@@ -42,12 +46,19 @@ export const metadata: Metadata = {
     description:
       "Modern guitar lessons in Northcote for beginners through advanced players. Learn with an experienced teacher offering personalised lessons in-person and online.",
     countryName: "Australia",
+    images: [
+      {
+        url: "/images/mgs-logo.png",
+        alt: "Melbourne Guitar School"
+      }
+    ]
   },
   twitter: {
     card: "summary_large_image",
     title: "Melbourne Guitar School",
     description:
       "Modern guitar lessons in Northcote for beginners through advanced players.",
+    images: ["/images/mgs-logo.png"]
   },
   robots: {
     index: true,

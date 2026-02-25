@@ -16,8 +16,8 @@ export const metadata: Metadata = {
       "Access your LessonFlow student portal to view upcoming lessons, past appointments, and download lesson materials.",
   },
   robots: {
-    index: true,
-    follow: true,
+    index: false,
+    follow: false,
   },
 };
 

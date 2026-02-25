@@ -2,17 +2,14 @@ import type { Metadata } from "next";
 
 import { BookingForm } from "@/components/booking-form";
 import { PanelLayout } from "@/components/panel-layout";
+import { buildPublicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPublicPageMetadata({
   title: "Book a Lesson",
+  path: "/book",
   description:
-    "Request a guitar lesson with Melbourne Guitar School. Submit your preferred time and details for approval. In-person and online lessons available.",
-  openGraph: {
-    title: "Book a Lesson",
-    description:
-      "Request a guitar lesson with Melbourne Guitar School. Submit your preferred time and details for approval. In-person and online lessons available.",
-  },
-};
+    "Request a guitar lesson with Melbourne Guitar School. Submit your preferred time and details for approval. In-person and online lessons available."
+});
 
 /**
  * Public booking page wrapper.
