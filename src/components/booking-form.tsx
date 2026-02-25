@@ -75,7 +75,7 @@ export function BookingForm() {
     setDurationType("min60");
     setState({
       status: "success",
-      message: "Booking request submitted. The owner has been emailed and will approve your request."
+      message: "Booking request submitted. Your booking is pending, and we will get back to you to confirm the appointment."
     });
   }
 

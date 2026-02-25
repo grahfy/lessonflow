@@ -6,11 +6,11 @@ import { PanelLayout } from "@/components/panel-layout";
 export const metadata: Metadata = {
   title: "Terms and Policies",
   description:
-    "Melbourne Guitar School lesson policies including cancellation notice, refund policy, and gift voucher terms. Valid for six months from purchase.",
+    "Melbourne Guitar School lesson policies covering cancellations, make-up lessons, payment terms, and gift voucher conditions.",
   openGraph: {
     title: "Terms and Policies",
     description:
-      "Melbourne Guitar School lesson policies including cancellation notice, refund policy, and gift voucher terms. Valid for six months from purchase.",
+      "Melbourne Guitar School lesson policies covering cancellations, make-up lessons, payment terms, and gift voucher conditions.",
   },
 };
 
@@ -18,19 +18,24 @@ export default function TermsPage() {
   return (
     <PanelLayout
       kicker="Policies"
-      title="Simple terms for smooth weekly progress."
-      lead="These summaries reflect the current policy structure. Final wording should always be confirmed before launch."
+      title="Clear terms for lessons, cancellations, and vouchers."
+      lead="These terms are designed to keep weekly lesson progress consistent and make scheduling expectations clear for students and families."
       visualLabel="Terms photo"
       visualClassName="terms-hero"
       leadJustified
     >
       <ul className="list" data-motion-item="terms-list">
-        <li data-motion-item="terms-item-notice">24 hours notice is required for lesson changes where possible.</li>
-        <li data-motion-item="terms-item-refund">No refund policy once lesson payments are completed.</li>
-        <li data-motion-item="terms-item-voucher-rules">
-          Gift vouchers are non-refundable and follow standard cancellation rules.
+        <li data-motion-item="terms-item-notice">
+          If less than 24 hours notice is given for a cancellation or change, the full lesson fee is still payable.
         </li>
-        <li data-motion-item="terms-item-validity">Gift vouchers are valid for six months from purchase date.</li>
+        <li data-motion-item="terms-item-makeup">
+          If more than 24 hours notice is given, a make-up lesson will be provided within the same week.
+        </li>
+        <li data-motion-item="terms-item-refund">Lesson payments are non-refundable once payment has been made.</li>
+        <li data-motion-item="terms-item-voucher-rules">
+          Gift vouchers are non-refundable and are subject to the same cancellation and make-up lesson rules.
+        </li>
+        <li data-motion-item="terms-item-validity">Gift vouchers are valid for six months from the purchase date.</li>
       </ul>
 
       <div className="button-row" data-motion-item="terms-actions">

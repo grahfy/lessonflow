@@ -153,7 +153,7 @@ export function StudentPortalClient() {
     }
 
     const confirmed = window.confirm(
-      "Cancel this lesson?\n\nIf the lesson is within 24 hours, you will still be charged the full lesson rate."
+      "Cancel this lesson?\n\nIf less than 24 hours notice is given, the full lesson fee is still payable. If more than 24 hours notice is given, a make-up lesson will be provided within the same week."
     );
     if (!confirmed) {
       return;
@@ -201,10 +201,22 @@ export function StudentPortalClient() {
   return (
     <div className="student-portal-shell" data-motion-root="student-portal">
       <div className="admin-card booking-row student-portal-header">
-        <div>
+        <div className="student-portal-header-copy">
           <p className="kicker">Student Portal</p>
           <h1>{data?.student.fullName || "Portal"}</h1>
           <p className="helper-text">Appointments and assigned learning materials.</p>
+        </div>
+        <div className="student-portal-header-visual">
+          {/* Lightweight local SVG keeps the portal header visual fast to load. */}
+          <img
+            className="student-portal-header-illustration"
+            src="/images/student-portal-music-books.svg"
+            alt="Illustration of music study books and notes"
+            width={360}
+            height={220}
+            loading="eager"
+            decoding="async"
+          />
         </div>
         <div className="student-portal-header-actions">
           <Link className="btn btn-secondary" href="/student/materials">
@@ -282,7 +294,7 @@ export function StudentPortalClient() {
 
               <aside className="student-actions-side" aria-label="Cancellation policy and pending requests">
                 <p className="student-policy-warning" role="note">
-                  If a cancellation is made within 24 hours of lesson start, you will still be charged the full lesson rate.
+                  If less than 24 hours notice is given, the full lesson fee is still payable. If more than 24 hours notice is given, a make-up lesson will be provided within the same week.
                 </p>
 
                 <div className="student-pending-list">

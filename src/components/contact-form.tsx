@@ -47,6 +47,24 @@ export function ContactForm() {
     // objects do not guarantee `currentTarget` remains usable later.
     const formElement = event.currentTarget;
     
+    const form = new FormData(formElement);
+    const payload = {
+      name: String(form.get("name") || "").trim(),
+      email: String(form.get("email") || "").trim(),
+      phone: String(form.get("phone") || "").trim(),
+      message: String(form.get("message") || "").trim()
+    };
+
+    // Enforce trimmed required fields before sending to avoid whitespace-only
+    // submissions passing browser `required` checks.
+    if (!payload.name || !payload.email || !payload.message) {
+      setState({
+        status: "error",
+        message: "Name, email, and message are required before sending."
+      });
+      return;
+    }
+
     if (!captcha.validateAnswer()) {
       setState({ status: "error", message: "Please answer the math question correctly." });
       captcha.regenerate();
@@ -55,14 +73,6 @@ export function ContactForm() {
     
     setLoading(true);
     setState({ status: "idle" });
-
-    const form = new FormData(formElement);
-    const payload = {
-      name: String(form.get("name") || ""),
-      email: String(form.get("email") || ""),
-      phone: String(form.get("phone") || ""),
-      message: String(form.get("message") || "")
-    };
 
     try {
       const response = await fetch("/api/contact", {
