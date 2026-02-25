@@ -34,6 +34,7 @@ set -euo pipefail
 # script is called from another working directory.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOY_SCRIPT="${SCRIPT_DIR}/deploy.sh"
+REPO_ROOT=""
 
 # Runtime configuration defaults. Branch defaults to the current checked-out
 # branch later so server operators can simply run ./deploy/update.sh.
@@ -417,6 +418,12 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   log_error "This script must be run from inside the application git repository."
   exit 1
 fi
+
+# Normalize to the repository root so git commands and the deploy script run from
+# a stable source directory even when the operator starts this script in ./deploy.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "${REPO_ROOT}"
+log_info "Repository root: ${REPO_ROOT}"
 
 if [[ -z "${BRANCH}" ]]; then
   BRANCH="$(current_branch_name)"
