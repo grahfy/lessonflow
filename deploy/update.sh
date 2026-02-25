@@ -175,7 +175,8 @@ log_error() {
 section() {
   echo ""
   local title="$1"
-  local width=$(( ${#title} + 6 ))
+  # Inner content is: two spaces + title + two spaces => title length + 4.
+  local width=$(( ${#title} + 4 ))
   local rule=""
   printf -v rule '%*s' "${width}" ''
   rule="${rule// /─}"
