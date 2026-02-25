@@ -67,6 +67,22 @@ LessonFlow brings those workflows into one system so teachers and admins can spe
 - Deploy/update helper scripts for VPS/Droplet self-hosting
 - Cron/job endpoint support for scheduled automations
 
+## Admin Screenshots
+
+Tracked admin screenshots already exist in the repository (Playwright generation not needed for this README update).
+
+### Admin Manual
+
+![LessonFlow admin manual page](public/documentation/screenshots/admin-manual-page.png)
+
+### Admin Reports Dashboard
+
+![LessonFlow admin reports dashboard](public/documentation/screenshots/admin-reports-dashboard.png)
+
+### Admin Settings
+
+![LessonFlow admin settings page](public/documentation/screenshots/admin-settings-page.png)
+
 ## Who It Is For
 
 - Solo music teachers
@@ -130,6 +146,29 @@ This project is designed to be self-hosted. The recommended entry points for pro
 - `deploy/deploy.sh` (first deploy / direct deploy)
 - `deploy/update.sh` (git pull + deploy wrapper)
 
+### Script roles (`update.sh` vs `deploy.sh`)
+
+Use `update.sh` for routine server maintenance and `deploy.sh` for direct release execution.
+
+`deploy/update.sh` (wrapper):
+- runs from your persistent git clone on the server
+- can `fetch`/`pull` the selected branch (ff-only)
+- shows an interactive TUI for workflow + deploy pass-through settings
+- can run pre-deploy bootstrap helpers (Nginx / MySQL+DB / PHP-FPM-if-needed)
+- then calls `deploy.sh` with the selected options
+
+`deploy/deploy.sh` (release engine):
+- builds a timestamped release under `/var/www/melbourne-guitar-school/releases`
+- links shared files/dirs (`shared/.env`, `shared/data`)
+- runs dependency install, Prisma generate, migrations, build, and service restarts
+- updates the `current` symlink atomically
+- can be run directly for first installs or advanced/manual workflows
+
+Interactive TUI notes:
+- `update.sh` includes a remote update alert line (above “Update Workflow Options”) that highlights a newer remote commit hash + one-line subject when available.
+- `update.sh` supports both a workflow toggle (`MySQL + create DB`) and an immediate one-off action (`M`) for DB bootstrap from shared `.env`.
+- `deploy.sh` supports immediate bootstrap actions `M` (MySQL+DB), `N` (Nginx), `P` (PHP-FPM-if-needed), plus a workflow toggle for `MySQL + create DB` before the release build.
+
 ### 1. Server prerequisites
 
 Recommended target:
@@ -167,6 +206,13 @@ You must edit the shared `.env` with real values before production use (especial
 Use either `update.sh` (wrapper) or `deploy.sh` (direct deploy) helper flags to install platform dependencies and bootstrap the local database from the shared `.env`.
 
 `update.sh` is usually the best day-to-day entry point because it handles `git fetch/pull` before invoking `deploy.sh`, but the bootstrap helpers are available on both scripts now.
+
+Recommended order on a fresh VPS/Droplet:
+1. Edit shared `.env` (`./deploy/update.sh --interactive` or `./deploy/deploy.sh --interactive`)
+2. Install Nginx (if missing)
+3. Install local MySQL/MariaDB and create the app database from `DATABASE_URL`
+4. Run first deploy (`deploy.sh`)
+5. Configure SSL once DNS is pointing at the server
 
 #### Install Nginx (if needed)
 
@@ -230,6 +276,13 @@ What the deploy script handles:
 - updates the `current` symlink atomically
 - restarts services and syncs managed cron jobs (unless skipped)
 
+Interactive `deploy.sh` notes:
+- Option `10` opens the shared production `.env` editor (and bootstraps the file from `.env.example` if missing).
+- Option `11` toggles `MySQL + create DB` to run automatically during `Start deploy`.
+- `M` runs the MySQL+DB bootstrap helper immediately.
+- `N` runs the Nginx install helper immediately.
+- `P` runs the PHP-FPM-if-needed helper immediately.
+
 ### 6. Ongoing updates (recommended workflow)
 
 ```bash
@@ -246,6 +299,28 @@ Or non-interactive:
 - fetches/pulls latest git changes (ff-only)
 - can run pre-deploy helper actions (Nginx/MySQL/DB/PHP-FPM)
 - delegates the actual release deploy to `deploy.sh`
+
+Interactive `update.sh` notes:
+- Shows a cached remote update check alert (when the selected remote branch has a newer commit than local).
+- Option `10` opens the shared `.env` editor.
+- Option `11` toggles `MySQL + create DB` so the helper runs automatically during `Start update/deploy`.
+- `M` runs the same MySQL+DB bootstrap helper immediately without starting the full workflow.
+
+Common non-interactive examples:
+
+```bash
+# Routine update + deploy with sudo auto-escalation forced on
+./deploy/update.sh --sudo-deploy
+
+# Deploy without pulling (for a known local checkout state)
+./deploy/update.sh --skip-pull --sudo-deploy
+
+# Pull only (no deploy)
+./deploy/update.sh --skip-deploy
+
+# Bootstrap DB from shared .env, then perform full update+deploy
+./deploy/update.sh --setup-mysql-db-from-env --sudo-deploy
+```
 
 ### 7. SSL (optional)
 
