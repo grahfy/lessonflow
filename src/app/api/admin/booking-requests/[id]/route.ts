@@ -454,3 +454,47 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return jsonUnexpectedError(error, "Unable to update booking request.");
   }
 }
+
+/**
+ * DELETE /api/admin/booking-requests/[id]
+ * Permanently deletes a booking request row so it no longer appears in the
+ * admin calendar/history recency window.
+ */
+export async function DELETE(request: NextRequest, { params }: Params) {
+  try {
+    const admin = await requireAdminFromRequest(request);
+    if (!admin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+
+    const existing = await prisma.bookingRequest.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        status: true
+      }
+    });
+    if (!existing) {
+      return NextResponse.json({ error: "Request not found." }, { status: 404 });
+    }
+
+    if (existing.status === "approved") {
+      return NextResponse.json(
+        {
+          error: "Approved requests cannot be deleted from this screen. Delete the booking record instead."
+        },
+        { status: 400 }
+      );
+    }
+
+    await prisma.bookingRequest.delete({
+      where: { id }
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return jsonUnexpectedError(error, "Unable to delete booking request.");
+  }
+}

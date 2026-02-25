@@ -1272,23 +1272,29 @@ export function AdminBookingsClient() {
   }
 
   async function deleteSelected() {
-    if (!selectedEvent || selectedEvent.entityType !== "booking") {
+    if (!selectedEvent) {
       return;
     }
     const confirmed = window.confirm(
-      "Permanently delete this booking? This cannot be undone and will remove the record entirely."
+      selectedEvent.entityType === "booking_request"
+        ? "Permanently delete this booking request? This cannot be undone and will remove it from the calendar/history."
+        : "Permanently delete this booking? This cannot be undone and will remove the record entirely."
     );
     if (!confirmed) {
       return;
     }
     setBusyAction("delete");
-    const response = await safeFetch(`/api/admin/bookings/${selectedEvent.id}`, {
+    const endpoint =
+      selectedEvent.entityType === "booking"
+        ? `/api/admin/bookings/${selectedEvent.id}`
+        : `/api/admin/booking-requests/${selectedEvent.id}`;
+    const response = await safeFetch(endpoint, {
       method: "DELETE"
     });
     setBusyAction(null);
     if (!response.ok) {
       const payload = await response.json().catch(() => null);
-      setError(payload?.error || "Unable to delete booking.");
+      setError(payload?.error || (selectedEvent.entityType === "booking" ? "Unable to delete booking." : "Unable to delete booking request."));
       return;
     }
     await closeDialog();
@@ -2754,16 +2760,18 @@ export function AdminBookingsClient() {
                 <button className="btn btn-danger" type="button" disabled={!!busyAction} onClick={() => void cancelSelected()}>
                   {busyAction === "cancel" ? "Cancelling..." : selectedIsPending ? "Cancel request" : "Cancel booking"}
                 </button>
-                {!selectedIsPending ? (
-                  <button
-                    className="btn btn-danger"
-                    type="button"
-                    disabled={!!busyAction}
-                    onClick={() => void deleteSelected()}
-                  >
-                    {busyAction === "delete" ? "Deleting..." : "Delete booking"}
-                  </button>
-                ) : null}
+                <button
+                  className="btn btn-danger"
+                  type="button"
+                  disabled={!!busyAction}
+                  onClick={() => void deleteSelected()}
+                >
+                  {busyAction === "delete"
+                    ? "Deleting..."
+                    : selectedIsPending
+                      ? "Remove request entirely"
+                      : "Delete booking"}
+                </button>
                 {selectedIsPending ? (
                   <button
                     className="btn btn-danger"

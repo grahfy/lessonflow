@@ -5,6 +5,7 @@ import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/li
 import { prisma } from "@/lib/db";
 import { PATCH as patchBooking } from "@/app/api/admin/bookings/[id]/route";
 import { PATCH as patchBookingRequest } from "@/app/api/admin/booking-requests/[id]/route";
+import { DELETE as deleteBookingRequest } from "@/app/api/admin/booking-requests/[id]/route";
 
 function adminRequest(url: string, body: Record<string, unknown>, token: string): NextRequest {
   return new NextRequest(url, {
@@ -121,5 +122,42 @@ describe("admin-booking-mutations", () => {
     expect(updated.phone).toBe("0411-111-111");
     expect(updated.requestedStartAt.toISOString()).toBe("2026-06-04T12:00:00.000Z");
     expect(updated.status).toBe("cancelled");
+  });
+
+  it("permanently deletes non-approved booking requests", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const requestRow = await prisma.bookingRequest.create({
+      data: {
+        name: "Delete Me",
+        email: "deleteme@example.com",
+        phone: "0400-000-099",
+        address: "12 Street",
+        houseNumber: "12",
+        streetName: "Street",
+        streetType: "St",
+        suburb: "Coburg",
+        state: "VIC",
+        postcode: "3058",
+        lessonMode: "video",
+        skillLevel: "beginner",
+        lessonDuration: "min30",
+        requestedStartAt: new Date("2026-06-10T09:00:00.000Z"),
+        status: "cancelled"
+      }
+    });
+
+    const request = new NextRequest(`http://localhost/api/admin/booking-requests/${requestRow.id}`, {
+      method: "DELETE",
+      headers: {
+        cookie: `${getSessionCookieName()}=${token}`
+      }
+    });
+    const response = await deleteBookingRequest(request, { params: Promise.resolve({ id: requestRow.id }) });
+    expect(response.status).toBe(200);
+
+    const deleted = await prisma.bookingRequest.findUnique({ where: { id: requestRow.id } });
+    expect(deleted).toBeNull();
   });
 });
