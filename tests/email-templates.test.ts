@@ -29,6 +29,19 @@ describe("email-templates", () => {
     expect(template.html).toContain("Alex");
   });
 
+  it("includes Melbourne Guitar School branded signature details", () => {
+    const template = customerBookingReminderTemplate({
+      name: "Alex",
+      when: new Date("2026-07-03T10:00:00.000Z")
+    });
+
+    expect(template.html).toContain("Melbourne Guitar School");
+    expect(template.html).toContain("mgs-logo.png");
+    expect(template.html).toContain("Call or text:");
+    expect(template.html).toContain("Email:");
+    expect(template.html).toContain("Studio:");
+  });
+
   it("renders daily digest with fallback content", () => {
     const template = ownerDailyDigestTemplate({
       date: new Date("2026-07-01T00:00:00.000Z"),
