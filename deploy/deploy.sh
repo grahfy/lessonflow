@@ -39,6 +39,8 @@ SHARED_DIR="${DEPLOY_DIR}/shared"
 CURRENT_LINK="${DEPLOY_DIR}/current"
 KEEP_RELEASES=5
 DEFAULT_BUILD_NODE_HEAP_MB=3072
+LOW_RAM_1GB_AUTO_HEAP_MB=3072
+LOW_RAM_2GB_AUTO_HEAP_MB=1536
 LOW_RAM_1GB_AUTO_HEAP_MIN_MB=900
 LOW_RAM_1GB_AUTO_HEAP_MAX_MB=1280
 LOW_RAM_2GB_AUTO_HEAP_MIN_MB=1700
@@ -415,7 +417,8 @@ cleanup_old_temp_files() {
 }
 
 ensure_build_node_options() {
-    local heap_flag="--max-old-space-size=${DEFAULT_BUILD_NODE_HEAP_MB}"
+    local heap_mb="${DEFAULT_BUILD_NODE_HEAP_MB}"
+    local heap_flag=""
     local total_ram_mb=""
     local should_auto_override=false
 
@@ -437,8 +440,10 @@ ensure_build_node_options() {
     # headroom, especially when swap is available.
     if (( total_ram_mb >= LOW_RAM_1GB_AUTO_HEAP_MIN_MB && total_ram_mb <= LOW_RAM_1GB_AUTO_HEAP_MAX_MB )); then
         should_auto_override=true
+        heap_mb="${LOW_RAM_1GB_AUTO_HEAP_MB}"
     elif (( total_ram_mb >= LOW_RAM_2GB_AUTO_HEAP_MIN_MB && total_ram_mb <= LOW_RAM_2GB_AUTO_HEAP_MAX_MB )); then
         should_auto_override=true
+        heap_mb="${LOW_RAM_2GB_AUTO_HEAP_MB}"
     fi
 
     if [[ "${should_auto_override}" != true ]]; then
@@ -446,13 +451,15 @@ ensure_build_node_options() {
         return 0
     fi
 
+    heap_flag="--max-old-space-size=${heap_mb}"
+
     if [[ -n "${NODE_OPTIONS:-}" ]]; then
         export NODE_OPTIONS="${NODE_OPTIONS} ${heap_flag}"
     else
         export NODE_OPTIONS="${heap_flag}"
     fi
 
-    log_info "Applied build NODE_OPTIONS heap limit: ${heap_flag}"
+    log_info "Applied auto NODE_OPTIONS heap limit for ${total_ram_mb}MB RAM: ${heap_flag}"
 }
 
 detect_total_ram_mb() {
