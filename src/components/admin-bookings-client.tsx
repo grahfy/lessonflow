@@ -408,6 +408,7 @@ export function AdminBookingsClient() {
   const calendarRootRef = useRef<HTMLDivElement | null>(null);
   const manualFormRef = useRef<HTMLFormElement | null>(null);
   const materialsUploadFormRef = useRef<HTMLFormElement | null>(null);
+  const authRedirectingRef = useRef(false);
 
   const rangeLabel = useMemo(() => `${view.toUpperCase()} VIEW`, [view]);
   const safeFetch = useCallback(async (...args: Parameters<typeof globalThis.fetch>): Promise<Response> => {
@@ -420,6 +421,16 @@ export function AdminBookingsClient() {
       });
     }
   }, []);
+  const redirectToAdminLogin = useCallback(() => {
+    if (authRedirectingRef.current) {
+      return;
+    }
+    authRedirectingRef.current = true;
+    setError("");
+    // Use a full navigation so logout/session-expiry redirects don't depend on
+    // client router state after the current admin page becomes unauthorized.
+    window.location.assign("/admin/login");
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -428,15 +439,14 @@ export function AdminBookingsClient() {
     try {
       const bookingRes = await safeFetch(`/api/admin/bookings?view=${view}&date=${date}`, { cache: "no-store" });
       if (!bookingRes.ok) {
-        // Preserve server-provided auth/error messages when available, but keep
-        // a stable fallback so approval actions don't crash the admin screen on
-        // session expiry or non-JSON error responses.
+        if (bookingRes.status === 401) {
+          redirectToAdminLogin();
+          return;
+        }
+
         const payload = await bookingRes.json().catch(() => null);
         const message = payload?.error || "Unable to load admin data. Please sign in again.";
         setError(message);
-        if (bookingRes.status === 401) {
-          router.push("/admin/login");
-        }
         return;
       }
 
@@ -452,7 +462,7 @@ export function AdminBookingsClient() {
     } finally {
       setLoading(false);
     }
-  }, [date, router, safeFetch, view]);
+  }, [date, redirectToAdminLogin, safeFetch, view]);
 
   const loadCustomers = useCallback(async (query?: string) => {
     setLoadingCustomers(true);
@@ -461,6 +471,11 @@ export function AdminBookingsClient() {
       cache: "no-store"
     });
     if (!response.ok) {
+      if (response.status === 401) {
+        setLoadingCustomers(false);
+        redirectToAdminLogin();
+        return;
+      }
       setLoadingCustomers(false);
       const payload = await response.json().catch(() => null);
       setError(payload?.error || "Unable to load customers.");
@@ -469,7 +484,7 @@ export function AdminBookingsClient() {
     const data = await response.json();
     setCustomers(data.customers || []);
     setLoadingCustomers(false);
-  }, [safeFetch]);
+  }, [redirectToAdminLogin, safeFetch]);
 
   const visibleCustomers = useMemo(() => {
     const query = customerQuery.trim().toLowerCase();
@@ -1481,8 +1496,7 @@ export function AdminBookingsClient() {
 
   async function logout() {
     await safeFetch("/api/admin/logout", { method: "POST" });
-    router.push("/admin/login");
-    router.refresh();
+    redirectToAdminLogin();
   }
 
   const selectedKey = selectedEventKey(selectedEvent);

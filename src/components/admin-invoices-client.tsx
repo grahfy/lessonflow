@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { parseAudInputToCents } from "@/lib/invoices/currency";
@@ -163,6 +163,7 @@ export function AdminInvoicesClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const customerFilter = searchParams.get("customerId") || "";
+  const authRedirectingRef = useRef(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -206,6 +207,14 @@ export function AdminInvoicesClient() {
       });
     }
   }, []);
+  const redirectToAdminLogin = useCallback(() => {
+    if (authRedirectingRef.current) {
+      return;
+    }
+    authRedirectingRef.current = true;
+    setError("");
+    window.location.assign("/admin/login");
+  }, []);
 
   /**
    * Loads invoices for the current filter set and returns rows for follow-up state sync.
@@ -235,6 +244,10 @@ export function AdminInvoicesClient() {
     const response = await safeFetch(`/api/admin/invoices?${params.toString()}`, { cache: "no-store" });
     setLoading(false);
     if (!response.ok) {
+      if (response.status === 401) {
+        redirectToAdminLogin();
+        return [];
+      }
       const payload = await response.json().catch(() => null);
       setError(readApiErrorMessage(payload, "Unable to load invoices."));
       return [];
@@ -244,7 +257,7 @@ export function AdminInvoicesClient() {
     const rows = payload.invoices || [];
     setInvoices(rows);
     return rows;
-  }, [agingFilter, customerFilter, outstandingOnly, query, safeFetch, statusFilter]);
+  }, [agingFilter, customerFilter, outstandingOnly, query, redirectToAdminLogin, safeFetch, statusFilter]);
 
   useEffect(() => {
     loadInvoices().catch((cause) => setError(cause instanceof Error ? cause.message : "Load failed"));
@@ -395,8 +408,7 @@ export function AdminInvoicesClient() {
    */
   async function logout() {
     await safeFetch("/api/admin/logout", { method: "POST" });
-    router.push("/admin/login");
-    router.refresh();
+    redirectToAdminLogin();
   }
 
   /**
