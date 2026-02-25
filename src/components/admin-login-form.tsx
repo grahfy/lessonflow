@@ -29,11 +29,18 @@ export function AdminLoginForm() {
     const email = String(form.get("email") || "");
     const password = String(form.get("password") || "");
 
-    const response = await fetch("/api/admin/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
-    });
+    let response: Response;
+    try {
+      response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+    } catch {
+      setLoading(false);
+      setError("Login failed. Please check your connection and try again.");
+      return;
+    }
 
     setLoading(false);
     if (!response.ok) {

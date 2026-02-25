@@ -410,25 +410,54 @@ export function AdminBookingsClient() {
   const materialsUploadFormRef = useRef<HTMLFormElement | null>(null);
 
   const rangeLabel = useMemo(() => `${view.toUpperCase()} VIEW`, [view]);
+  const safeFetch = useCallback(async (...args: Parameters<typeof globalThis.fetch>): Promise<Response> => {
+    try {
+      return await globalThis.fetch(...args);
+    } catch {
+      return new Response(JSON.stringify({ error: "Network request failed. Please try again." }), {
+        status: 503,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
-    const bookingRes = await fetch(`/api/admin/bookings?view=${view}&date=${date}`, { cache: "no-store" });
-    if (!bookingRes.ok) {
+
+    try {
+      const bookingRes = await safeFetch(`/api/admin/bookings?view=${view}&date=${date}`, { cache: "no-store" });
+      if (!bookingRes.ok) {
+        // Preserve server-provided auth/error messages when available, but keep
+        // a stable fallback so approval actions don't crash the admin screen on
+        // session expiry or non-JSON error responses.
+        const payload = await bookingRes.json().catch(() => null);
+        const message = payload?.error || "Unable to load admin data. Please sign in again.";
+        setError(message);
+        if (bookingRes.status === 401) {
+          router.push("/admin/login");
+        }
+        return;
+      }
+
+      const bookingData = (await bookingRes.json().catch(() => null)) as { events?: EventWithRow[] } | null;
+      if (!bookingData || !Array.isArray(bookingData.events)) {
+        setError("Unable to load admin data. Please refresh and sign in again if needed.");
+        return;
+      }
+
+      setEvents(bookingData.events);
+    } catch {
+      setError("Unable to load admin data. Please check your connection and sign in again if needed.");
+    } finally {
       setLoading(false);
-      setError("Unable to load admin data. Please sign in again.");
-      return;
     }
-    const bookingData = await bookingRes.json();
-    setEvents(bookingData.events || []);
-    setLoading(false);
-  }, [date, view]);
+  }, [date, router, safeFetch, view]);
 
   const loadCustomers = useCallback(async (query?: string) => {
     setLoadingCustomers(true);
     const search = (query ?? "").trim();
-    const response = await fetch(`/api/admin/customers?limit=250&q=${encodeURIComponent(search)}`, {
+    const response = await safeFetch(`/api/admin/customers?limit=250&q=${encodeURIComponent(search)}`, {
       cache: "no-store"
     });
     if (!response.ok) {
@@ -440,7 +469,7 @@ export function AdminBookingsClient() {
     const data = await response.json();
     setCustomers(data.customers || []);
     setLoadingCustomers(false);
-  }, []);
+  }, [safeFetch]);
 
   const visibleCustomers = useMemo(() => {
     const query = customerQuery.trim().toLowerCase();
@@ -537,7 +566,7 @@ export function AdminBookingsClient() {
 
     // Fetch customer data if this booking has a linked customer
     if ("customerId" in event.row && event.row.customerId) {
-      fetch(`/api/admin/customers/${event.row.customerId}`, { credentials: "same-origin" })
+      safeFetch(`/api/admin/customers/${event.row.customerId}`, { credentials: "same-origin" })
         .then((res) => {
           if (!res.ok) {
             console.error("Customer fetch failed:", res.status, res.statusText);
@@ -636,7 +665,7 @@ export function AdminBookingsClient() {
 
     setBusyAction("create_invoice");
     setError("");
-    const response = await fetch(`/api/admin/bookings/${selectedEvent.id}/invoice`, {
+    const response = await safeFetch(`/api/admin/bookings/${selectedEvent.id}/invoice`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -866,7 +895,7 @@ export function AdminBookingsClient() {
   async function mutatePortalCredential(customerId: string, action: "reveal" | "regenerate") {
     setPortalCredentialBusyCustomerId(customerId);
     setError("");
-    const response = await fetch(`/api/admin/customers/${customerId}/portal-credential`, {
+    const response = await safeFetch(`/api/admin/customers/${customerId}/portal-credential`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action })
@@ -919,7 +948,7 @@ export function AdminBookingsClient() {
       params.set("bookingId", bookingId);
     }
     const query = params.toString();
-    const response = await fetch(
+    const response = await safeFetch(
       `/api/admin/customers/${customerId}/learning-materials${query ? `?${query}` : ""}`,
       {
         cache: "no-store"
@@ -997,7 +1026,7 @@ export function AdminBookingsClient() {
 
     setMaterialsUploading(true);
     setError("");
-    const response = await fetch(`/api/admin/customers/${materialsCustomerId}/learning-materials`, {
+    const response = await safeFetch(`/api/admin/customers/${materialsCustomerId}/learning-materials`, {
       method: "POST",
       body: form
     });
@@ -1024,7 +1053,7 @@ export function AdminBookingsClient() {
 
     setMaterialsDeletingId(material.id);
     setError("");
-    const response = await fetch(`/api/admin/learning-materials/${material.id}`, {
+    const response = await safeFetch(`/api/admin/learning-materials/${material.id}`, {
       method: "DELETE"
     });
     setMaterialsDeletingId(null);
@@ -1044,7 +1073,7 @@ export function AdminBookingsClient() {
     if (!selectedEvent || selectedEvent.entityType !== "booking") {
       return false;
     }
-    const response = await fetch(`/api/admin/bookings/${selectedEvent.id}`, {
+    const response = await safeFetch(`/api/admin/bookings/${selectedEvent.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, ...body })
@@ -1061,7 +1090,7 @@ export function AdminBookingsClient() {
     if (!selectedEvent || selectedEvent.entityType !== "booking_request") {
       return false;
     }
-    const response = await fetch(`/api/admin/booking-requests/${selectedEvent.id}`, {
+    const response = await safeFetch(`/api/admin/booking-requests/${selectedEvent.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, ...body })
@@ -1089,7 +1118,7 @@ export function AdminBookingsClient() {
       selectedEvent.entityType === "booking"
         ? `/api/admin/bookings/${selectedEvent.id}/notify`
         : `/api/admin/booking-requests/${selectedEvent.id}/notify`;
-    const response = await fetch(endpoint, {
+    const response = await safeFetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1227,7 +1256,7 @@ export function AdminBookingsClient() {
       return;
     }
     setBusyAction("delete");
-    const response = await fetch(`/api/admin/bookings/${selectedEvent.id}`, {
+    const response = await safeFetch(`/api/admin/bookings/${selectedEvent.id}`, {
       method: "DELETE"
     });
     setBusyAction(null);
@@ -1265,7 +1294,7 @@ export function AdminBookingsClient() {
     if (!confirmed) {
       return;
     }
-    const response = await fetch(`/api/admin/booking-series/${seriesId}`, {
+    const response = await safeFetch(`/api/admin/booking-series/${seriesId}`, {
       method: "DELETE"
     });
     if (!response.ok) {
@@ -1327,7 +1356,7 @@ export function AdminBookingsClient() {
       updateCustomerFromBooking: manualUpdateCustomerFromBooking || undefined
     };
 
-    const response = await fetch("/api/admin/bookings", {
+    const response = await safeFetch("/api/admin/bookings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -1396,7 +1425,7 @@ export function AdminBookingsClient() {
     const endpoint =
       customerEditorMode === "create" ? "/api/admin/customers" : `/api/admin/customers/${String(customerEditorId || "")}`;
     const method = customerEditorMode === "create" ? "POST" : "PATCH";
-    const response = await fetch(endpoint, {
+    const response = await safeFetch(endpoint, {
       method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -1413,7 +1442,7 @@ export function AdminBookingsClient() {
 
     // Refresh selected customer if we were editing the currently selected customer
     if (customerEditorMode === "edit" && customerEditorId && selectedCustomer && customerEditorId === selectedCustomer.id) {
-      const customerResponse = await fetch(`/api/admin/customers/${customerEditorId}`);
+      const customerResponse = await safeFetch(`/api/admin/customers/${customerEditorId}`);
       if (customerResponse.ok) {
         const data = await customerResponse.json();
         if (data.customer) {
@@ -1433,7 +1462,7 @@ export function AdminBookingsClient() {
 
     setDeletingCustomerId(customer.id);
     setError("");
-    const response = await fetch(`/api/admin/customers/${customer.id}`, { method: "DELETE" });
+    const response = await safeFetch(`/api/admin/customers/${customer.id}`, { method: "DELETE" });
     setDeletingCustomerId(null);
     if (!response.ok) {
       const payloadResponse = await response.json().catch(() => null);
@@ -1451,7 +1480,7 @@ export function AdminBookingsClient() {
   }
 
   async function logout() {
-    await fetch("/api/admin/logout", { method: "POST" });
+    await safeFetch("/api/admin/logout", { method: "POST" });
     router.push("/admin/login");
     router.refresh();
   }

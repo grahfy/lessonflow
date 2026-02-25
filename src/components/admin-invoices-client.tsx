@@ -196,6 +196,16 @@ export function AdminInvoicesClient() {
   const [createStandalonePrice, setCreateStandalonePrice] = useState("");
   const [createDueAt, setCreateDueAt] = useState(toDateInputValue(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)));
   const [createTaxMode, setCreateTaxMode] = useState<InvoiceTaxMode>("taxable");
+  const safeFetch = useCallback(async (...args: Parameters<typeof globalThis.fetch>): Promise<Response> => {
+    try {
+      return await globalThis.fetch(...args);
+    } catch {
+      return new Response(JSON.stringify({ error: "Network request failed. Please try again." }), {
+        status: 503,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+  }, []);
 
   /**
    * Loads invoices for the current filter set and returns rows for follow-up state sync.
@@ -222,7 +232,7 @@ export function AdminInvoicesClient() {
     }
     params.set("pageSize", "100");
 
-    const response = await fetch(`/api/admin/invoices?${params.toString()}`, { cache: "no-store" });
+    const response = await safeFetch(`/api/admin/invoices?${params.toString()}`, { cache: "no-store" });
     setLoading(false);
     if (!response.ok) {
       const payload = await response.json().catch(() => null);
@@ -234,7 +244,7 @@ export function AdminInvoicesClient() {
     const rows = payload.invoices || [];
     setInvoices(rows);
     return rows;
-  }, [agingFilter, customerFilter, outstandingOnly, query, statusFilter]);
+  }, [agingFilter, customerFilter, outstandingOnly, query, safeFetch, statusFilter]);
 
   useEffect(() => {
     loadInvoices().catch((cause) => setError(cause instanceof Error ? cause.message : "Load failed"));
@@ -299,7 +309,7 @@ export function AdminInvoicesClient() {
       if (createCustomerQuery.trim()) {
         params.set("q", createCustomerQuery.trim());
       }
-      const response = await fetch(`/api/admin/customers?${params.toString()}`, {
+      const response = await safeFetch(`/api/admin/customers?${params.toString()}`, {
         cache: "no-store"
       });
       setCreateCustomerLoading(false);
@@ -320,7 +330,7 @@ export function AdminInvoicesClient() {
       });
     }, 220);
     return () => window.clearTimeout(timer);
-  }, [createCustomerQuery, createOpen]);
+  }, [createCustomerQuery, createOpen, safeFetch]);
 
   /**
    * Ensures a selected customer from URL context is loaded into picker options.
@@ -333,7 +343,7 @@ export function AdminInvoicesClient() {
       return;
     }
     void (async () => {
-      const response = await fetch(`/api/admin/customers/${createSelectedCustomerId}`, {
+      const response = await safeFetch(`/api/admin/customers/${createSelectedCustomerId}`, {
         cache: "no-store"
       });
       if (!response.ok) {
@@ -350,7 +360,7 @@ export function AdminInvoicesClient() {
         return [payload.customer, ...previous];
       });
     })();
-  }, [createCustomerOptions, createOpen, createSelectedCustomerId]);
+  }, [createCustomerOptions, createOpen, createSelectedCustomerId, safeFetch]);
 
   /**
    * Loads appointment options for optional invoice-booking linking.
@@ -363,7 +373,7 @@ export function AdminInvoicesClient() {
     }
     void (async () => {
       setCreateBookingLoading(true);
-      const response = await fetch(
+      const response = await safeFetch(
         `/api/admin/customers/${createSelectedCustomerId}/invoices?bookingOptions=true&page=1&pageSize=1`,
         { cache: "no-store" }
       );
@@ -378,13 +388,13 @@ export function AdminInvoicesClient() {
       setCreateBookingOptions(options);
       setCreateSelectedBookingId((previous) => (previous && options.some((option) => option.id === previous) ? previous : ""));
     })();
-  }, [createOpen, createSelectedCustomerId]);
+  }, [createOpen, createSelectedCustomerId, safeFetch]);
 
   /**
    * Signs out current admin from invoices screen.
    */
   async function logout() {
-    await fetch("/api/admin/logout", { method: "POST" });
+    await safeFetch("/api/admin/logout", { method: "POST" });
     router.push("/admin/login");
     router.refresh();
   }
@@ -497,7 +507,7 @@ export function AdminInvoicesClient() {
     }
 
     setBusyAction("save");
-    const response = await fetch(`/api/admin/invoices/${selectedInvoice.id}`, {
+    const response = await safeFetch(`/api/admin/invoices/${selectedInvoice.id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -565,7 +575,7 @@ export function AdminInvoicesClient() {
           ? JSON.stringify({ reason: creditNoteReason || undefined })
           : undefined;
 
-    const response = await fetch(endpoint, {
+    const response = await safeFetch(endpoint, {
       method,
       headers: body ? { "content-type": "application/json" } : undefined,
       body
@@ -614,7 +624,7 @@ export function AdminInvoicesClient() {
    */
   async function sendBulkReminders() {
     setBusyAction("bulk_reminders");
-    const response = await fetch("/api/admin/invoices/reminders", {
+    const response = await safeFetch("/api/admin/invoices/reminders", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -771,7 +781,7 @@ export function AdminInvoicesClient() {
     }
 
     setBusyAction("create");
-    const response = await fetch(`/api/admin/customers/${createSelectedCustomerId}/invoices`, {
+    const response = await safeFetch(`/api/admin/customers/${createSelectedCustomerId}/invoices`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
