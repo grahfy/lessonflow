@@ -886,7 +886,7 @@ print_deploy_tui_menu() {
     echo ""
     echo -e "  ${BOLD}Live Status${NC}"
     echo -e "  $(status_chip "Branch" "${BRANCH}")  $(status_chip "DB" "$(deploy_migration_mode_label)")"
-    echo -e "  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "Cron" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")")  $(status_chip "PkgSetup" "$(bool_word "${SETUP_PACKAGES}")")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")  $(status_chip "Spinner" "$(spinner_ui_word)")"
+    echo -e "  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "Cron" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")")  $(status_chip "PkgSetup" "$(bool_word "${SETUP_PACKAGES}")")  $(status_chip "EnvDB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")  $(status_chip "Spinner" "$(spinner_ui_word)")"
     echo ""
     print_tui_panel_rule 78
     echo -e "${BOLD}  Main Options${NC}"
@@ -919,9 +919,11 @@ print_deploy_tui_menu() {
     print_tui_option_desc "Animated progress spinner for long commands (disable in noisy terminals/log capture)."
     print_tui_option_row "10" "Edit shared .env" "Open editor now"
     print_tui_option_desc "Bootstraps ${SHARED_DIR}/.env from .env.example if missing, then opens it."
+    print_tui_option_row "11" "MySQL + create DB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")"
+    print_tui_option_desc "When ON, Start runs the shared .env MySQL/MariaDB install + local DB create helper before the release build."
     echo ""
     print_tui_panel_rule 78
-    echo -e "  ${BOLD}M${NC}  Install MySQL + create DB from shared .env"
+    echo -e "  ${BOLD}M${NC}  Run MySQL + create DB from shared .env now"
     echo -e "  ${BOLD}N${NC}  Install Nginx (if needed)"
     echo -e "  ${BOLD}P${NC}  Install PHP-FPM (if needed by nginx config)"
     echo -e "  ${BOLD}S${NC}  Start deploy   ${BOLD}Q${NC}  Cancel"
@@ -935,7 +937,7 @@ run_interactive_setup() {
 
     while true; do
         print_deploy_tui_menu
-        read -r -p "Select option [1-10, m, n, p, s, q]: " choice
+        read -r -p "Select option [1-11, m, n, p, s, q]: " choice
 
         case "${choice,,}" in
             1)
@@ -982,6 +984,9 @@ run_interactive_setup() {
                 ensure_shared_env_file "${SCRIPT_DIR}/../.env.example" || true
                 edit_shared_env_now || true
                 ;;
+            11)
+                SETUP_MYSQL_DB_FROM_ENV="$(toggle_bool "${SETUP_MYSQL_DB_FROM_ENV}")"
+                ;;
             m)
                 ensure_shared_env_file "${SCRIPT_DIR}/../.env.example" || true
                 setup_mysql_and_database_from_shared_env || true
@@ -1017,6 +1022,7 @@ print_deploy_summary() {
     print_summary_row "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")"
     print_summary_row "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")"
     print_summary_row "Package setup" "$(bool_word "${SETUP_PACKAGES}")"
+    print_summary_row "MySQL + create DB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")"
     print_summary_row "SSL setup" "$(bool_word "${SSL_SETUP}")"
     print_summary_row "Spinner UI" "$(spinner_ui_word)"
     if [[ "${SSL_SETUP}" == true ]]; then

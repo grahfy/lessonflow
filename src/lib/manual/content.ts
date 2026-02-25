@@ -24,15 +24,19 @@ export type ManualSectionManifest = {
   screenshotIds: string[];
 };
 
+export type AdminManualSectionIndex = ManualSectionManifest & {
+  updatedAt: string;
+};
+
 export type AdminManualSection = ManualSectionManifest & {
   markdown: string;
   html: string;
   updatedAt: string;
 };
 
-export type AdminManualContent = {
+export type AdminManualIndex = {
   generatedAt: string;
-  sections: AdminManualSection[];
+  sections: AdminManualSectionIndex[];
   screenshots: ManualScreenshot[];
 };
 
@@ -192,7 +196,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "getting-started",
     title: "Getting Started",
-    summary: "Platform orientation, where to start, and first-day admin expectations.",
+    summary: "Start here if you are new. Learn what each admin screen is for and what to do first.",
     audience: "all_admins",
     sourcePath: "Documentation/01-Getting-Started.md",
     relatedRoutes: ["/admin/login", "/admin/bookings", "/admin/invoices"],
@@ -201,7 +205,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "admin-login-access",
     title: "Admin Login and Access",
-    summary: "Login workflow, session expectations, and recovery steps.",
+    summary: "How to sign in/out, what to do when login fails, and why sessions can expire.",
     audience: "all_admins",
     sourcePath: "Documentation/02-Admin-Login-and-Access.md",
     relatedRoutes: ["/admin/login"],
@@ -210,7 +214,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "booking-management",
     title: "Booking Management",
-    summary: "Calendar workflows, booking requests, manual bookings, move/cancel, and booking actions.",
+    summary: "Your calendar screen. Approve requests, move/cancel lessons, message customers, and create invoices.",
     audience: "all_admins",
     sourcePath: "Documentation/03-Booking-Management.md",
     relatedRoutes: ["/admin/bookings", "/book"],
@@ -224,7 +228,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "customer-directory",
     title: "Customer Directory",
-    summary: "Search, create, edit, archive and portal credential workflows.",
+    summary: "Find customers fast, avoid duplicates, update details, and jump to invoice history.",
     audience: "all_admins",
     sourcePath: "Documentation/04-Customer-Directory.md",
     relatedRoutes: ["/admin/bookings"],
@@ -233,7 +237,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "invoice-management",
     title: "Invoice Management",
-    summary: "Invoice creation, editing, sending, reminders, payments and credit notes.",
+    summary: "Create invoices, send PDFs, follow up overdue accounts, mark paid, and use credit notes safely.",
     audience: "all_admins",
     sourcePath: "Documentation/05-Invoice-Management.md",
     relatedRoutes: ["/admin/invoices", "/admin/bookings"],
@@ -242,7 +246,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "email-notifications",
     title: "Email and Notifications",
-    summary: "Automatic and manual email actions, fallback behavior, and verification checks.",
+    summary: "What emails are sent, what is automatic vs manual, and what “queued” means when delivery is not configured.",
     audience: "all_admins",
     sourcePath: "Documentation/06-Email-and-Notifications.md",
     relatedRoutes: ["/admin/bookings", "/admin/invoices"],
@@ -251,7 +255,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "reports-outstanding-followup",
     title: "Outstanding and Follow-Up Routines",
-    summary: "Overdue invoice follow-up process and reminder cadence.",
+    summary: "Simple daily and weekly steps to keep overdue invoices under control.",
     audience: "all_admins",
     sourcePath: "Documentation/07-Reports-Outstanding-and-Follow-Up.md",
     relatedRoutes: ["/admin/invoices", "/admin/reports"],
@@ -260,7 +264,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "admin-settings-system-configuration",
     title: "Admin Settings and System Configuration",
-    summary: "How to use the settings console safely, including credential sync and restart behavior.",
+    summary: "How to change settings safely, keep secrets, and update admin login details.",
     audience: "all_admins",
     sourcePath: "Documentation/10-Admin-Settings-and-System-Configuration.md",
     relatedRoutes: ["/admin/settings"],
@@ -269,7 +273,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "admin-reports-dashboard",
     title: "Admin Reports Dashboard",
-    summary: "Daily/weekly/monthly/yearly reports, comparisons and date-format controls.",
+    summary: "A quick dashboard for appointments, outstanding invoices, earnings, and comparisons.",
     audience: "all_admins",
     sourcePath: "Documentation/11-Admin-Reports-Dashboard.md",
     relatedRoutes: ["/admin/reports"],
@@ -278,7 +282,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "student-portal-learning-materials",
     title: "Student Portal and Learning Materials",
-    summary: "Student login, portal usage, and preview/download workflows for learning materials.",
+    summary: "How students log in, where materials live, and how to help when a student is stuck.",
     audience: "all_admins",
     sourcePath: "Documentation/12-Student-Portal-and-Learning-Materials.md",
     relatedRoutes: ["/student/login", "/student/portal", "/admin/bookings"],
@@ -287,7 +291,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "public-booking-and-contact-forms",
     title: "Public Booking and Contact Forms",
-    summary: "How public booking/contact submissions appear in admin and what confirmations users see.",
+    summary: "What visitors see after submitting a form, and what you do next inside the admin console.",
     audience: "all_admins",
     sourcePath: "Documentation/13-Public-Booking-and-Contact-Forms.md",
     relatedRoutes: ["/book", "/contact", "/admin/bookings"],
@@ -296,7 +300,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "troubleshooting-faq",
     title: "Troubleshooting and FAQs",
-    summary: "Common issues and recovery steps for admin workflows.",
+    summary: "Quick fixes for the most common problems (login, bookings, invoices, emails).",
     audience: "all_admins",
     sourcePath: "Documentation/08-Troubleshooting-and-FAQs.md",
     relatedRoutes: ["/admin/login", "/admin/bookings", "/admin/invoices", "/admin/reports"],
@@ -305,7 +309,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "glossary",
     title: "Glossary",
-    summary: "Definitions for booking, billing and operational terms used across the app.",
+    summary: "Simple definitions for words used in the app (so you can keep working without guessing).",
     audience: "all_admins",
     sourcePath: "Documentation/09-Glossary.md",
     relatedRoutes: [],
@@ -314,7 +318,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "deploy-update-runbook",
     title: "Deploy / Update Runbook (Technical Owner)",
-    summary: "Droplet deployment, cron jobs and service operations for the technical owner.",
+    summary: "For the person managing hosting: deploys, cron jobs, and service checks on the droplet.",
     audience: "technical_owner",
     sourcePath: "Documentation/digitalocean-admin-operations.md",
     relatedRoutes: ["/admin/settings", "/admin/reports"],
@@ -334,8 +338,8 @@ function rewriteDocAssetImagePaths(markdown: string): string {
   // "assets/foo.png" must be rewritten to the public path served by Next.js.
   const withImages = markdown.replace(/\((?:\.\/)?assets\/([^)]+)\)/g, "(/documentation/screenshots/$1)");
 
-  // Local markdown cross-links should navigate to the in-app manual section
-  // anchors instead of broken /admin/manual-relative file URLs.
+  // Local markdown cross-links should navigate to the in-app manual pages
+  // instead of broken repo-relative file URLs.
   return withImages.replace(/\(((?:Documentation\/)?[^)]+\.md)\)/g, (fullMatch, target) => {
     const fileName = path.basename(String(target));
     const sectionId = DOC_BASENAME_TO_SECTION_ID.get(fileName);
@@ -343,7 +347,7 @@ function rewriteDocAssetImagePaths(markdown: string): string {
       return fullMatch;
     }
 
-    return `(#manual-section-${sectionId})`;
+    return `(/admin/manual/${sectionId})`;
   });
 }
 
@@ -363,33 +367,57 @@ async function readWhitelistedDocMarkdown(relativeDocPath: string): Promise<{ ma
 }
 
 /**
- * Reads the whitelisted end-user docs and prepares a serializable data model
- * for the admin manual route. Rendering stays in the UI layer; this loader only
- * handles source-of-truth selection, asset metadata and markdown conversion.
+ * Reads whitelisted doc file timestamps and prepares the in-app manual index
+ * data. This intentionally avoids loading/parsing all markdown so the manual
+ * landing page stays fast.
  */
-export async function getAdminManualContent(): Promise<AdminManualContent> {
-  const sections: AdminManualSection[] = [];
+export async function getAdminManualIndex(): Promise<AdminManualIndex> {
+  const updatedAtEntries = await Promise.all(
+    MANUAL_SECTION_MANIFEST.map(async (section) => {
+      const normalized = path.normalize(section.sourcePath);
+      if (!WHITELISTED_DOC_PATHS.has(normalized)) {
+        throw new Error(`Manual doc path not whitelisted: ${section.sourcePath}`);
+      }
 
-  for (const sectionManifest of MANUAL_SECTION_MANIFEST) {
-    const doc = await readWhitelistedDocMarkdown(sectionManifest.sourcePath);
-    const html = await marked.parse(doc.markdown, {
-      gfm: true,
-      breaks: false,
-      async: false
-    });
-
-    sections.push({
-      ...sectionManifest,
-      markdown: doc.markdown,
-      html,
-      updatedAt: doc.updatedAt
-    });
-  }
+      const absolutePath = path.resolve(process.cwd(), normalized);
+      const stats = await fs.stat(absolutePath);
+      return [section.id, stats.mtime.toISOString()] as const;
+    })
+  );
+  const updatedAtById = new Map(updatedAtEntries);
 
   return {
     generatedAt: new Date().toISOString(),
-    sections,
+    sections: MANUAL_SECTION_MANIFEST.map((section) => ({
+      ...section,
+      updatedAt: updatedAtById.get(section.id) || new Date().toISOString()
+    })),
     screenshots: MANUAL_SCREENSHOTS
+  };
+}
+
+/**
+ * Loads and renders a single manual section. This is used by `/admin/manual/[id]`
+ * so the UI only parses the doc the admin is currently viewing.
+ */
+export async function getAdminManualSection(sectionId: string): Promise<AdminManualSection | null> {
+  const sectionManifest = MANIFEST_BY_ID.get(sectionId);
+  if (!sectionManifest) {
+    return null;
+  }
+
+  const doc = await readWhitelistedDocMarkdown(sectionManifest.sourcePath);
+  const html = await marked.parse(doc.markdown, {
+    gfm: true,
+    breaks: false,
+    async: false
+  });
+
+  return {
+    ...sectionManifest,
+    markdown: doc.markdown,
+    html,
+    updatedAt: doc.updatedAt
   };
 }
 

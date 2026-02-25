@@ -159,7 +159,7 @@ test.describe("documentation screenshots", () => {
     }
 
     const adminCaptures: Array<{ path: string; file: string; waitFor?: string }> = [
-      { path: "/admin/manual", file: "admin-manual-page.png", waitFor: "Admin Manual" },
+      { path: "/admin/manual", file: "admin-manual-page.png", waitFor: "Start Here" },
       { path: "/admin/reports", file: "admin-reports-dashboard.png", waitFor: "Reports Console" },
       { path: "/admin/settings", file: "admin-settings-page.png", waitFor: "Admin Configuration" },
       { path: "/admin/invoices", file: "invoice-console-list-and-filters.png", waitFor: "Invoice Console" },
