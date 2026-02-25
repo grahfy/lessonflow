@@ -825,8 +825,18 @@ restart_cron_scheduler_if_present_from_update() {
 # installed/running. This is useful for first-time bootstrap and cron repairs.
 ensure_managed_cron_jobs_installed_from_update() {
   local cron_runner="${CURRENT_LINK}/deploy/cron.sh"
+  local cron_service_name=""
 
   section "Managed Cron Jobs Install"
+
+  # Some hosts may have `crontab` available but no active/installed scheduler
+  # service unit yet. Ensure the scheduler package/service exists before we
+  # install the managed crontab block so jobs can actually run.
+  if command -v systemctl >/dev/null 2>&1; then
+    if ! cron_service_name="$(cron_scheduler_service_name_from_update)"; then
+      ensure_cron_installed_from_update || return 1
+    fi
+  fi
 
   if ! command -v crontab >/dev/null 2>&1; then
     ensure_cron_installed_from_update || return 1
