@@ -29,6 +29,7 @@ set -euo pipefail
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SOURCE_DIR="$(pwd)"
 
 # Configuration
 APP_NAME="melbourne-guitar-school"
@@ -577,6 +578,19 @@ section "Deployment"
 log_info "Starting deployment of branch: ${BRANCH}"
 log_info "Deploy directory: ${DEPLOY_DIR}"
 
+# Resolve the application source directory independently from the caller's cwd.
+# This allows operators to run ./deploy/update.sh from inside ./deploy without
+# accidentally deploying only the deploy scripts directory.
+if git -C "${SOURCE_DIR}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    SOURCE_DIR="$(git -C "${SOURCE_DIR}" rev-parse --show-toplevel)"
+elif git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    SOURCE_DIR="$(git rev-parse --show-toplevel)"
+elif [[ -f "${SCRIPT_DIR}/../package.json" ]]; then
+    SOURCE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+fi
+
+log_info "Source directory: ${SOURCE_DIR}"
+
 # Create directories if they don't exist
 mkdir -p "${RELEASES_DIR}"
 mkdir -p "${SHARED_DIR}/data"
@@ -597,18 +611,30 @@ NEW_RELEASE_DIR="${RELEASES_DIR}/${TIMESTAMP}"
 mkdir -p "${NEW_RELEASE_DIR}"
 log_info "Created release directory: ${NEW_RELEASE_DIR}"
 
-# Clone/copy repository
-if [[ -d ".git" ]]; then
+# Clone/copy repository from the resolved source dir (not the caller's cwd).
+if [[ -d "${SOURCE_DIR}/.git" ]]; then
     # Running from git repository
-    git archive --format=tar "${BRANCH}" | tar -x -C "${NEW_RELEASE_DIR}"
+    git -C "${SOURCE_DIR}" archive --format=tar "${BRANCH}" | tar -x -C "${NEW_RELEASE_DIR}"
 else
     # Copy current directory
     rsync -a --exclude='node_modules' --exclude='.next' --exclude='.git' \
           --exclude='*.log' --exclude='prisma/*.db' \
-          ./ "${NEW_RELEASE_DIR}/"
+          "${SOURCE_DIR}/" "${NEW_RELEASE_DIR}/"
 fi
 
 cd "${NEW_RELEASE_DIR}"
+
+if [[ ! -f package.json ]]; then
+    log_error "Release source copy is missing package.json (source dir: ${SOURCE_DIR})."
+    log_error "Run deploy from the app repository root, or use deploy/update.sh from within the repo."
+    exit 1
+fi
+
+if [[ "${SKIP_DEPS}" == false && ! -f package-lock.json ]]; then
+    log_error "Release source copy is missing package-lock.json (source dir: ${SOURCE_DIR})."
+    log_error "npm ci requires a lockfile; verify the deploy source directory and git archive step."
+    exit 1
+fi
 
 # Link shared environment file
 if [[ -f "${SHARED_DIR}/.env" ]]; then
