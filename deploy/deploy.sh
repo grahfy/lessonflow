@@ -39,8 +39,10 @@ SHARED_DIR="${DEPLOY_DIR}/shared"
 CURRENT_LINK="${DEPLOY_DIR}/current"
 KEEP_RELEASES=5
 DEFAULT_BUILD_NODE_HEAP_MB=3072
-LOW_RAM_AUTO_HEAP_MIN_MB=900
-LOW_RAM_AUTO_HEAP_MAX_MB=1280
+LOW_RAM_1GB_AUTO_HEAP_MIN_MB=900
+LOW_RAM_1GB_AUTO_HEAP_MAX_MB=1280
+LOW_RAM_2GB_AUTO_HEAP_MIN_MB=1700
+LOW_RAM_2GB_AUTO_HEAP_MAX_MB=2560
 TMP_CLEANUP_MAX_AGE_DAYS=3
 BRANCH="main"
 SKIP_MIGRATE=false
@@ -415,6 +417,7 @@ cleanup_old_temp_files() {
 ensure_build_node_options() {
     local heap_flag="--max-old-space-size=${DEFAULT_BUILD_NODE_HEAP_MB}"
     local total_ram_mb=""
+    local should_auto_override=false
 
     # Respect an explicit heap limit if one was already provided by the caller,
     # but append a safe default when NODE_OPTIONS is unset or incomplete.
@@ -429,9 +432,16 @@ ensure_build_node_options() {
         return 0
     fi
 
-    # Only apply the larger Node heap override on ~1GB hosts where builds are
-    # most likely to fail without the extra headroom (typically with swap).
-    if (( total_ram_mb < LOW_RAM_AUTO_HEAP_MIN_MB || total_ram_mb > LOW_RAM_AUTO_HEAP_MAX_MB )); then
+    # Apply the larger Node heap override on low-memory hosts (commonly ~1GB or
+    # ~2GB VPS plans) where Next.js builds are most likely to fail without extra
+    # headroom, especially when swap is available.
+    if (( total_ram_mb >= LOW_RAM_1GB_AUTO_HEAP_MIN_MB && total_ram_mb <= LOW_RAM_1GB_AUTO_HEAP_MAX_MB )); then
+        should_auto_override=true
+    elif (( total_ram_mb >= LOW_RAM_2GB_AUTO_HEAP_MIN_MB && total_ram_mb <= LOW_RAM_2GB_AUTO_HEAP_MAX_MB )); then
+        should_auto_override=true
+    fi
+
+    if [[ "${should_auto_override}" != true ]]; then
         log_info "Detected ${total_ram_mb}MB RAM; skipping auto heap override"
         return 0
     fi
@@ -663,6 +673,10 @@ if [[ "${SKIP_DEPS}" == false && ! -f package-lock.json ]]; then
     exit 1
 fi
 
+# Apply the Node heap override before any npm/npm exec commands so installs,
+# Prisma operations, and the build all share the same memory configuration.
+ensure_build_node_options
+
 # Link shared environment file
 if [[ -f "${SHARED_DIR}/.env" ]]; then
     ln -sf "${SHARED_DIR}/.env" "${NEW_RELEASE_DIR}/.env"
@@ -740,7 +754,6 @@ else
 fi
 
 # Build the application
-ensure_build_node_options
 run_step "Building Next.js application" npm run build
 
 # Verify build succeeded

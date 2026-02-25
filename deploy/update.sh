@@ -58,6 +58,11 @@ IS_TTY=false
 SPINNER_PID=""
 SPINNER_MSG=""
 SPINNER_FRAMES=( "⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏" )
+DEFAULT_BUILD_NODE_HEAP_MB=3072
+LOW_RAM_1GB_AUTO_HEAP_MIN_MB=900
+LOW_RAM_1GB_AUTO_HEAP_MAX_MB=1280
+LOW_RAM_2GB_AUTO_HEAP_MIN_MB=1700
+LOW_RAM_2GB_AUTO_HEAP_MAX_MB=2560
 
 # ANSI color palette shared with deploy.sh for consistent terminal UX.
 RED='\033[0;31m'
@@ -245,6 +250,70 @@ run_step() {
   return 1
 }
 
+# Detects total system RAM in MB using Linux or macOS system interfaces. The
+# update wrapper uses this to mirror deploy.sh's build-memory safety behavior
+# and to pass NODE_OPTIONS through sudo when needed.
+detect_total_ram_mb() {
+  local mem_kb=""
+
+  if [[ -r "/proc/meminfo" ]]; then
+    mem_kb="$(awk '/^MemTotal:/ { print $2; exit }' /proc/meminfo 2>/dev/null || true)"
+    if [[ "${mem_kb}" =~ ^[0-9]+$ ]] && (( mem_kb > 0 )); then
+      echo $((mem_kb / 1024))
+      return 0
+    fi
+  fi
+
+  if command -v sysctl >/dev/null 2>&1; then
+    local mem_bytes=""
+    mem_bytes="$(sysctl -n hw.memsize 2>/dev/null || true)"
+    if [[ "${mem_bytes}" =~ ^[0-9]+$ ]] && (( mem_bytes > 0 )); then
+      echo $((mem_bytes / 1024 / 1024))
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+# Mirrors deploy.sh's auto heap override so update.sh can preserve the computed
+# NODE_OPTIONS value when invoking deploy.sh via sudo (which may drop env vars).
+ensure_build_node_options() {
+  local heap_flag="--max-old-space-size=${DEFAULT_BUILD_NODE_HEAP_MB}"
+  local total_ram_mb=""
+  local should_auto_override=false
+
+  if [[ "${NODE_OPTIONS:-}" == *"--max-old-space-size="* ]]; then
+    log_info "Using existing NODE_OPTIONS heap setting"
+    return 0
+  fi
+
+  total_ram_mb="$(detect_total_ram_mb)"
+  if [[ -z "${total_ram_mb}" ]]; then
+    log_info "Could not detect system RAM; leaving NODE_OPTIONS heap limit unchanged"
+    return 0
+  fi
+
+  if (( total_ram_mb >= LOW_RAM_1GB_AUTO_HEAP_MIN_MB && total_ram_mb <= LOW_RAM_1GB_AUTO_HEAP_MAX_MB )); then
+    should_auto_override=true
+  elif (( total_ram_mb >= LOW_RAM_2GB_AUTO_HEAP_MIN_MB && total_ram_mb <= LOW_RAM_2GB_AUTO_HEAP_MAX_MB )); then
+    should_auto_override=true
+  fi
+
+  if [[ "${should_auto_override}" != true ]]; then
+    log_info "Detected ${total_ram_mb}MB RAM; skipping auto heap override"
+    return 0
+  fi
+
+  if [[ -n "${NODE_OPTIONS:-}" ]]; then
+    export NODE_OPTIONS="${NODE_OPTIONS} ${heap_flag}"
+  else
+    export NODE_OPTIONS="${heap_flag}"
+  fi
+
+  log_info "Applied build NODE_OPTIONS heap limit: ${heap_flag}"
+}
+
 # Returns 0 if the git working tree has tracked or staged changes.
 git_worktree_dirty() {
   ! git diff --quiet || ! git diff --cached --quiet
@@ -363,10 +432,15 @@ run_deploy() {
   [[ "${NO_COLOR}" == true ]] && deploy_args+=( "--no-color" )
 
   section "Deploy"
+  ensure_build_node_options
   log_info "Invoking ${DEPLOY_SCRIPT} ${deploy_args[*]}"
 
   if should_use_sudo_for_deploy; then
-    sudo "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
+    if [[ -n "${NODE_OPTIONS:-}" ]]; then
+      sudo env "NODE_OPTIONS=${NODE_OPTIONS}" "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
+    else
+      sudo "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
+    fi
   else
     "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
   fi
