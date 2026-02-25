@@ -875,13 +875,18 @@ ensure_cron_installed_from_deploy() {
     local os_id=""
     local pkg_manager=""
     local cron_pkg=""
+    local existing_service_name=""
 
     section "Cron Scheduler Install"
 
     if command -v crontab >/dev/null 2>&1; then
-        log_info "crontab already installed"
-        ensure_cron_scheduler_running_enabled
-        return 0
+        if existing_service_name="$(cron_scheduler_service_name 2>/dev/null)"; then
+            log_info "crontab already installed"
+            ensure_cron_scheduler_running_enabled
+            return 0
+        fi
+
+        log_warn "crontab is installed, but cron/crond service is missing. Attempting package repair/install..."
     fi
 
     if [[ ${EUID} -ne 0 ]]; then
