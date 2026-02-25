@@ -24,6 +24,9 @@
 #   --sudo-deploy        Force sudo when invoking deploy.sh
 #   --no-sudo-deploy     Do not use sudo when invoking deploy.sh
 #   --interactive        Prompt for update/deploy options in TTY mode
+#   --setup-mysql-db-from-env  Install local MySQL/MariaDB (if needed) and create DB from shared .env DATABASE_URL
+#   --install-nginx      Install Nginx (if needed) using setup-packages.sh in non-interactive mode
+#   --install-php-fpm-if-needed  Install PHP-FPM only if deploy nginx config indicates a PHP upstream is required
 #   --no-spinner         Disable spinner UI
 #   --no-color           Disable colored output
 #   --help, -h           Show usage
@@ -58,6 +61,9 @@ ALLOW_DIRTY=false
 FORCE_SUDO_DEPLOY=false
 FORCE_NO_SUDO_DEPLOY=false
 INTERACTIVE=false
+SETUP_MYSQL_DB_FROM_ENV=false
+INSTALL_NGINX_IF_NEEDED=false
+INSTALL_PHP_FPM_IF_NEEDED=false
 NO_SPINNER=false
 NO_COLOR=false
 IS_TTY=false
@@ -106,6 +112,9 @@ Options:
   --sudo-deploy        Force sudo when invoking deploy.sh
   --no-sudo-deploy     Do not use sudo when invoking deploy.sh
   --interactive        Prompt for update/deploy options in TTY mode
+  --setup-mysql-db-from-env  Install local MySQL/MariaDB (if needed) and create DB from shared .env DATABASE_URL
+  --install-nginx      Install Nginx (if needed) using setup-packages.sh in non-interactive mode
+  --install-php-fpm-if-needed  Install PHP-FPM only when deploy nginx config uses PHP upstreams
   --no-spinner         Disable spinner UI
   --no-color           Disable colored output
   --help, -h           Show usage
@@ -315,6 +324,23 @@ run_shared_env_cmd() {
   sudo "$@"
 }
 
+# Runs a privileged server-setup command (package install/systemctl) and fails
+# clearly when neither root nor sudo deploy mode is available.
+run_server_setup_cmd() {
+  if [[ ${EUID} -eq 0 ]]; then
+    "$@"
+    return $?
+  fi
+
+  if ! should_use_sudo_for_deploy; then
+    log_error "This action requires root or sudo deploy mode."
+    return 1
+  fi
+
+  ensure_sudo_for_deploy_ready
+  sudo "$@"
+}
+
 # Ensures /var/www/.../shared/.env exists, copying the repo .env.example on
 # first-run servers so operators have a file to review before deployment.
 ensure_shared_env_file() {
@@ -412,6 +438,394 @@ maybe_edit_shared_env_before_deploy() {
   fi
 
   edit_shared_env_now || true
+}
+
+# Reads a single KEY=value assignment from an env file without sourcing it.
+# Supports common quoted values used in .env files and ignores commented lines.
+read_env_file_value() {
+  local env_file="$1"
+  local key="$2"
+  local line=""
+  local value=""
+
+  if [[ ! -f "${env_file}" ]]; then
+    return 1
+  fi
+
+  line="$(grep -m1 -E "^[[:space:]]*${key}=" "${env_file}" 2>/dev/null || true)"
+  [[ -n "${line}" ]] || return 1
+
+  value="${line#*=}"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+
+  if [[ ${#value} -ge 2 && "${value:0:1}" == '"' && "${value: -1}" == '"' ]]; then
+    value="${value:1:${#value}-2}"
+  elif [[ ${#value} -ge 2 && "${value:0:1}" == "'" && "${value: -1}" == "'" ]]; then
+    value="${value:1:${#value}-2}"
+  fi
+
+  printf '%s\n' "${value}"
+}
+
+# Parses a mysql:// DATABASE_URL into shell variables used for local DB setup.
+# Supported format: mysql://user:pass@host:port/database?params (IPv4/hostname).
+parse_mysql_database_url() {
+  local url="$1"
+  local rest=""
+  local authority=""
+  local path_and_query=""
+  local credentials=""
+  local host_port=""
+
+  DB_URL_USER=""
+  DB_URL_PASS=""
+  DB_URL_HOST=""
+  DB_URL_PORT="3306"
+  DB_URL_NAME=""
+
+  if [[ -z "${url}" || "${url}" != mysql://* ]]; then
+    log_error "DATABASE_URL must start with mysql://"
+    return 1
+  fi
+
+  rest="${url#mysql://}"
+  if [[ "${rest}" != */* ]]; then
+    log_error "DATABASE_URL is missing the database name path."
+    return 1
+  fi
+
+  authority="${rest%%/*}"
+  path_and_query="${rest#*/}"
+  DB_URL_NAME="${path_and_query%%\?*}"
+
+  if [[ -z "${DB_URL_NAME}" ]]; then
+    log_error "DATABASE_URL database name is empty."
+    return 1
+  fi
+
+  if [[ "${authority}" != *@* ]]; then
+    log_error "DATABASE_URL is missing user/host credentials (expected user[:pass]@host[:port])."
+    return 1
+  fi
+
+  credentials="${authority%@*}"
+  host_port="${authority#*@}"
+
+  if [[ "${credentials}" == *:* ]]; then
+    DB_URL_USER="${credentials%%:*}"
+    DB_URL_PASS="${credentials#*:}"
+  else
+    DB_URL_USER="${credentials}"
+    DB_URL_PASS=""
+  fi
+
+  if [[ -z "${DB_URL_USER}" ]]; then
+    log_error "DATABASE_URL username is empty."
+    return 1
+  fi
+
+  # Keep parsing strict and predictable for local VPS bootstrap use-cases.
+  if [[ "${host_port}" == *"["* || "${host_port}" == *"]"* ]]; then
+    log_error "IPv6 DATABASE_URL hosts are not supported by this helper yet. Edit the DB manually."
+    return 1
+  fi
+
+  if [[ "${host_port}" == *:* ]]; then
+    DB_URL_HOST="${host_port%%:*}"
+    DB_URL_PORT="${host_port#*:}"
+  else
+    DB_URL_HOST="${host_port}"
+  fi
+
+  if [[ -z "${DB_URL_HOST}" ]]; then
+    log_error "DATABASE_URL host is empty."
+    return 1
+  fi
+
+  if [[ -n "${DB_URL_PORT}" && ! "${DB_URL_PORT}" =~ ^[0-9]+$ ]]; then
+    log_error "DATABASE_URL port must be numeric."
+    return 1
+  fi
+
+  return 0
+}
+
+# Returns the preferred MySQL CLI command name available on the system.
+mysql_cli_bin() {
+  if command -v mysql >/dev/null 2>&1; then
+    echo "mysql"
+    return 0
+  fi
+  if command -v mariadb >/dev/null 2>&1; then
+    echo "mariadb"
+    return 0
+  fi
+  return 1
+}
+
+# Runs the package setup helper in DB-only mode if MySQL/MariaDB CLI is missing.
+ensure_mysql_installed_for_env_db_setup() {
+  if mysql_cli_bin >/dev/null 2>&1; then
+    log_info "MySQL/MariaDB CLI already installed: $(mysql_cli_bin)"
+    return 0
+  fi
+
+  if [[ ! -x "${SCRIPT_DIR}/setup-packages.sh" ]]; then
+    log_error "setup-packages.sh not found or not executable at ${SCRIPT_DIR}/setup-packages.sh"
+    return 1
+  fi
+
+  if [[ ${EUID} -eq 0 ]]; then
+    run_step "Installing MySQL/MariaDB packages" "${SCRIPT_DIR}/setup-packages.sh" --skip-node --skip-nginx --skip-certbot --non-interactive
+    return $?
+  fi
+
+  if ! should_use_sudo_for_deploy; then
+    log_error "MySQL installation requires root or sudo deploy mode. Re-run as root or enable sudo deploy mode."
+    return 1
+  fi
+
+  ensure_sudo_for_deploy_ready
+  run_step "Installing MySQL/MariaDB packages" sudo "${SCRIPT_DIR}/setup-packages.sh" --skip-node --skip-nginx --skip-certbot --non-interactive
+}
+
+# Best-effort start/enable of common MySQL/MariaDB systemd service names.
+ensure_mysql_service_running_for_env_db_setup() {
+  local service_name=""
+  local started=false
+
+  for service_name in mysql mariadb mysqld; do
+    if run_shared_env_cmd systemctl start "${service_name}" >/dev/null 2>&1; then
+      run_shared_env_cmd systemctl enable "${service_name}" >/dev/null 2>&1 || true
+      log_info "Database service ready: ${service_name}"
+      started=true
+      break
+    fi
+  done
+
+  if [[ "${started}" != true ]]; then
+    log_warn "Could not start a mysql/mariadb systemd service automatically."
+    log_warn "If the database server is already running, continuing anyway."
+  fi
+}
+
+# Executes SQL as the local DB admin via root/sudo for local-server bootstrap.
+mysql_admin_exec_local() {
+  local sql="$1"
+  local mysql_bin=""
+
+  if ! mysql_bin="$(mysql_cli_bin)"; then
+    log_error "MySQL/MariaDB CLI is not installed."
+    return 1
+  fi
+
+  if [[ ${EUID} -eq 0 ]]; then
+    "${mysql_bin}" --batch --skip-column-names -e "${sql}"
+    return $?
+  fi
+
+  if ! should_use_sudo_for_deploy; then
+    log_error "Local database bootstrap requires root or sudo deploy mode to run ${mysql_bin} as admin."
+    return 1
+  fi
+
+  ensure_sudo_for_deploy_ready
+  sudo "${mysql_bin}" --batch --skip-column-names -e "${sql}"
+}
+
+# Creates the local MySQL database referenced by shared/.env DATABASE_URL if it
+# does not already exist. Intended for VPS installs after the operator fills in
+# the shared env file with real DB settings.
+setup_mysql_and_database_from_shared_env() {
+  local shared_env_path="${SHARED_DIR}/.env"
+  local database_url=""
+  local escaped_db_name=""
+  local db_identifier=""
+  local existing_db=""
+  local exists_sql=""
+  local create_sql=""
+
+  section "MySQL Install + DB Create (shared .env)"
+
+  if [[ ! -f "${shared_env_path}" ]]; then
+    log_error "Shared .env not found at ${shared_env_path}"
+    log_error "Use the shared .env editor action first."
+    return 1
+  fi
+
+  database_url="$(read_env_file_value "${shared_env_path}" "DATABASE_URL" || true)"
+  if [[ -z "${database_url}" ]]; then
+    log_error "DATABASE_URL is missing in ${shared_env_path}"
+    log_error "Edit the shared .env file and set a mysql:// URL first."
+    return 1
+  fi
+
+  if ! parse_mysql_database_url "${database_url}"; then
+    log_error "Unable to parse DATABASE_URL from ${shared_env_path}."
+    return 1
+  fi
+
+  case "${DB_URL_HOST}" in
+    localhost|127.0.0.1)
+      ;;
+    *)
+      log_error "DATABASE_URL host is '${DB_URL_HOST}', which is not a local MySQL host."
+      log_error "This helper only installs a local MySQL server and creates a local database."
+      return 1
+      ;;
+  esac
+
+  log_info "DATABASE_URL host: ${DB_URL_HOST}:${DB_URL_PORT}"
+  log_info "DATABASE_URL database: ${DB_URL_NAME}"
+  log_info "DATABASE_URL user: ${DB_URL_USER}"
+
+  ensure_mysql_installed_for_env_db_setup
+  ensure_mysql_service_running_for_env_db_setup
+
+  escaped_db_name="${DB_URL_NAME//\'/\'\'}"
+  db_identifier="${DB_URL_NAME//\`/\`\`}"
+  exists_sql="SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '${escaped_db_name}' LIMIT 1;"
+  existing_db="$(mysql_admin_exec_local "${exists_sql}" 2>/dev/null || true)"
+
+  if [[ "${existing_db}" == "${DB_URL_NAME}" ]]; then
+    log_info "Database already exists. Skipping create: ${DB_URL_NAME}"
+    return 0
+  fi
+
+  create_sql="CREATE DATABASE \`${db_identifier}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+  mysql_admin_exec_local "${create_sql}"
+  log_info "Database created: ${DB_URL_NAME}"
+  log_warn "Database user/permissions are not created by this helper. Ensure '${DB_URL_USER}' has access."
+  return 0
+}
+
+# Installs Nginx using the shared package installer in a minimal mode suitable
+# for server bootstrap actions triggered from update.sh.
+ensure_nginx_installed_from_update() {
+  section "Nginx Install"
+
+  if command -v nginx >/dev/null 2>&1; then
+    log_info "Nginx already installed: $(nginx -v 2>&1)"
+    return 0
+  fi
+
+  if [[ ! -x "${SCRIPT_DIR}/setup-packages.sh" ]]; then
+    log_error "setup-packages.sh not found or not executable at ${SCRIPT_DIR}/setup-packages.sh"
+    return 1
+  fi
+
+  if [[ ${EUID} -eq 0 ]]; then
+    run_step "Installing Nginx packages" "${SCRIPT_DIR}/setup-packages.sh" --skip-node --skip-db --skip-certbot --non-interactive
+    return $?
+  fi
+
+  if ! should_use_sudo_for_deploy; then
+    log_error "Nginx installation requires root or sudo deploy mode. Re-run as root or enable sudo deploy mode."
+    return 1
+  fi
+
+  ensure_sudo_for_deploy_ready
+  run_step "Installing Nginx packages" sudo "${SCRIPT_DIR}/setup-packages.sh" --skip-node --skip-db --skip-certbot --non-interactive
+}
+
+# Detects whether the deploy nginx configs appear to require PHP/FastCGI.
+php_fpm_needed_for_stack() {
+  if grep -R -E -q 'fastcgi_pass|php-fpm|\.php' "${SCRIPT_DIR}"/nginx*.conf 2>/dev/null; then
+    return 0
+  fi
+  return 1
+}
+
+# Returns a PHP-FPM binary or service-like command if present.
+php_fpm_cli_bin() {
+  local bin=""
+  for bin in php-fpm php-fpm8.3 php-fpm8.2 php-fpm8.1 php-fpm8.0 php-fpm7.4; do
+    if command -v "${bin}" >/dev/null 2>&1; then
+      echo "${bin}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Installs PHP-FPM only when nginx config indicates it is needed (currently not
+# expected for this Next.js app, but included for mixed-stack servers).
+ensure_php_fpm_installed_if_needed_from_update() {
+  local os_id=""
+  local pkg_manager=""
+  local service_name=""
+
+  section "PHP-FPM Install (if needed)"
+
+  if ! php_fpm_needed_for_stack; then
+    log_info "PHP-FPM not required by deploy nginx config for this Next.js app. Skipping."
+    return 0
+  fi
+
+  if php_fpm_cli_bin >/dev/null 2>&1; then
+    log_info "PHP-FPM already installed: $(php_fpm_cli_bin)"
+    return 0
+  fi
+
+  if [[ -r /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    source /etc/os-release
+    os_id="${ID:-}"
+  fi
+
+  case "${os_id}" in
+    ubuntu|debian|linuxmint|pop|elementary)
+      pkg_manager="apt"
+      ;;
+    fedora|rhel|centos|rocky|almalinux|ol|scientific)
+      if command -v dnf >/dev/null 2>&1; then
+        pkg_manager="dnf"
+      else
+        pkg_manager="yum"
+      fi
+      ;;
+    opensuse*|sles|suse)
+      pkg_manager="zypper"
+      ;;
+    arch|manjaro|endeavouros|garuda)
+      pkg_manager="pacman"
+      ;;
+    *)
+      log_error "Unsupported OS for PHP-FPM auto-install in update.sh (ID='${os_id:-unknown}')."
+      log_error "Install PHP-FPM manually if your nginx config actually requires it."
+      return 1
+      ;;
+  esac
+
+  case "${pkg_manager}" in
+    apt)
+      run_step "Installing PHP-FPM packages" run_server_setup_cmd apt install -y php-fpm || return 1
+      ;;
+    dnf)
+      run_step "Installing PHP-FPM packages" run_server_setup_cmd dnf install -y php-fpm || return 1
+      ;;
+    yum)
+      run_step "Installing PHP-FPM packages" run_server_setup_cmd yum install -y php-fpm || return 1
+      ;;
+    zypper)
+      run_step "Installing PHP-FPM packages" run_server_setup_cmd zypper install -y php-fpm || return 1
+      ;;
+    pacman)
+      run_step "Installing PHP-FPM packages" run_server_setup_cmd pacman -S --noconfirm php-fpm || return 1
+      ;;
+  esac
+
+  for service_name in php-fpm php8.3-fpm php8.2-fpm php8.1-fpm php8.0-fpm php7.4-fpm; do
+    if run_server_setup_cmd systemctl start "${service_name}" >/dev/null 2>&1; then
+      run_server_setup_cmd systemctl enable "${service_name}" >/dev/null 2>&1 || true
+      log_info "PHP-FPM service ready: ${service_name}"
+      break
+    fi
+  done
+
+  log_info "PHP-FPM install step complete"
+  return 0
 }
 
 bool_word() {
@@ -581,6 +995,7 @@ print_update_tui_menu() {
   fi
   echo ""
   print_tui_panel_rule 92
+  echo -e "  ${BOLD}M${NC}  Install MySQL + create DB from shared .env"
   echo -e "  ${BOLD}S${NC}  Start update/deploy    ${BOLD}Q${NC}  Cancel"
   echo -e "${DIM}Tip: deploy.sh handles migrations/nginx sync/restarts; this menu configures the wrapper + pass-through flags.${NC}"
 }
@@ -829,7 +1244,7 @@ run_interactive_setup() {
 
   while true; do
     print_update_tui_menu
-    read -r -p "Select option [1-14, s, q]: " choice
+    read -r -p "Select option [1-14, m, s, q]: " choice
 
     case "${choice,,}" in
       1)
@@ -906,6 +1321,10 @@ run_interactive_setup() {
         else
           log_warn "Enable deploy + SSL setup first to edit Certbot email."
         fi
+        ;;
+      m)
+        ensure_shared_env_file "${REPO_ROOT}/.env.example" || true
+        setup_mysql_and_database_from_shared_env || true
         ;;
       s)
         break
@@ -1035,6 +1454,9 @@ while [[ $# -gt 0 ]]; do
     --sudo-deploy) FORCE_SUDO_DEPLOY=true; shift ;;
     --no-sudo-deploy) FORCE_NO_SUDO_DEPLOY=true; shift ;;
     --interactive) INTERACTIVE=true; shift ;;
+    --setup-mysql-db-from-env) SETUP_MYSQL_DB_FROM_ENV=true; shift ;;
+    --install-nginx) INSTALL_NGINX_IF_NEEDED=true; shift ;;
+    --install-php-fpm-if-needed) INSTALL_PHP_FPM_IF_NEEDED=true; shift ;;
     --no-spinner) NO_SPINNER=true; shift ;;
     --no-color) NO_COLOR=true; shift ;;
     --help|-h) show_usage; exit 0 ;;
@@ -1107,6 +1529,19 @@ fi
 
 if [[ "${SKIP_DEPLOY}" == false ]]; then
   ensure_sudo_for_deploy_ready
+fi
+
+if [[ "${INSTALL_NGINX_IF_NEEDED}" == true ]]; then
+  ensure_nginx_installed_from_update
+fi
+
+if [[ "${INSTALL_PHP_FPM_IF_NEEDED}" == true ]]; then
+  ensure_php_fpm_installed_if_needed_from_update
+fi
+
+if [[ "${SETUP_MYSQL_DB_FROM_ENV}" == true ]]; then
+  ensure_shared_env_file "${REPO_ROOT}/.env.example" || true
+  setup_mysql_and_database_from_shared_env
 fi
 
 section "Git Update"
