@@ -78,6 +78,14 @@ LOW_RAM_1GB_AUTO_HEAP_MIN_MB=900
 LOW_RAM_1GB_AUTO_HEAP_MAX_MB=1280
 LOW_RAM_2GB_AUTO_HEAP_MIN_MB=1700
 LOW_RAM_2GB_AUTO_HEAP_MAX_MB=2560
+REMOTE_UPDATE_CHECK_TTL_SECONDS=15
+TUI_REMOTE_UPDATE_CACHE_KEY=""
+TUI_REMOTE_UPDATE_CACHE_AT=0
+TUI_REMOTE_UPDATE_STATUS="unknown"
+TUI_REMOTE_UPDATE_REMOTE_SHORT=""
+TUI_REMOTE_UPDATE_REMOTE_SUBJECT=""
+TUI_REMOTE_UPDATE_LOCAL_SHORT=""
+TUI_REMOTE_UPDATE_ERROR=""
 
 # ANSI color palette shared with deploy.sh for consistent terminal UX.
 RED='\033[0;31m'
@@ -86,6 +94,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 BOLD='\033[1m'
+BLINK='\033[5m'
 DIM='\033[2m'
 NC='\033[0m'
 
@@ -128,7 +137,7 @@ detect_tty_capabilities() {
   fi
 
   if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then
-    RED='' GREEN='' YELLOW='' BLUE='' CYAN='' BOLD='' DIM='' NC=''
+    RED='' GREEN='' YELLOW='' BLUE='' CYAN='' BOLD='' BLINK='' DIM='' NC=''
   fi
 }
 
@@ -944,18 +953,126 @@ cycle_update_sudo_mode() {
   fi
 }
 
+# Best-effort remote update check for the TUI. It fetches the selected branch
+# quietly (non-interactive) and caches the result so menu redraws stay fast.
+# The goal is to show operators when a newer remote commit exists before they
+# start the update workflow.
+refresh_tui_remote_update_cache() {
+  local cache_key="${REMOTE_NAME}:${BRANCH}"
+  local now_epoch=0
+  local remote_ref=""
+  local local_ref=""
+  local local_commit=""
+  local remote_commit=""
+
+  [[ "${IS_TTY}" == true ]] || return 0
+  [[ -n "${BRANCH}" && -n "${REMOTE_NAME}" ]] || return 0
+  [[ -d "${REPO_ROOT}/.git" || -d .git ]] || return 0
+
+  now_epoch="$(date +%s 2>/dev/null || echo 0)"
+
+  if [[ "${TUI_REMOTE_UPDATE_CACHE_KEY}" == "${cache_key}" && "${TUI_REMOTE_UPDATE_CACHE_AT}" =~ ^[0-9]+$ ]]; then
+    if (( now_epoch > 0 )) && (( now_epoch - TUI_REMOTE_UPDATE_CACHE_AT < REMOTE_UPDATE_CHECK_TTL_SECONDS )); then
+      return 0
+    fi
+  fi
+
+  TUI_REMOTE_UPDATE_CACHE_KEY="${cache_key}"
+  TUI_REMOTE_UPDATE_CACHE_AT="${now_epoch}"
+  TUI_REMOTE_UPDATE_STATUS="unknown"
+  TUI_REMOTE_UPDATE_REMOTE_SHORT=""
+  TUI_REMOTE_UPDATE_REMOTE_SUBJECT=""
+  TUI_REMOTE_UPDATE_LOCAL_SHORT=""
+  TUI_REMOTE_UPDATE_ERROR=""
+
+  if ! command -v git >/dev/null 2>&1; then
+    TUI_REMOTE_UPDATE_STATUS="error"
+    TUI_REMOTE_UPDATE_ERROR="git not installed"
+    return 0
+  fi
+
+  # Never prompt for credentials from inside the TUI refresh loop.
+  if command -v timeout >/dev/null 2>&1; then
+    if ! timeout 8s env GIT_TERMINAL_PROMPT=0 git fetch --quiet --no-tags "${REMOTE_NAME}" "${BRANCH}" >/dev/null 2>&1; then
+      TUI_REMOTE_UPDATE_STATUS="error"
+      TUI_REMOTE_UPDATE_ERROR="remote check failed or timed out"
+      return 0
+    fi
+  else
+    if ! env GIT_TERMINAL_PROMPT=0 git fetch --quiet --no-tags "${REMOTE_NAME}" "${BRANCH}" >/dev/null 2>&1; then
+      TUI_REMOTE_UPDATE_STATUS="error"
+      TUI_REMOTE_UPDATE_ERROR="remote check failed"
+      return 0
+    fi
+  fi
+
+  remote_ref="refs/remotes/${REMOTE_NAME}/${BRANCH}"
+  remote_commit="$(git rev-parse --verify "${remote_ref}" 2>/dev/null || true)"
+  if [[ -z "${remote_commit}" ]]; then
+    TUI_REMOTE_UPDATE_STATUS="error"
+    TUI_REMOTE_UPDATE_ERROR="missing remote ref ${REMOTE_NAME}/${BRANCH}"
+    return 0
+  fi
+
+  local_ref="${BRANCH}"
+  local_commit="$(git rev-parse --verify "${local_ref}" 2>/dev/null || true)"
+  if [[ -z "${local_commit}" ]]; then
+    local_commit="$(git rev-parse --verify HEAD 2>/dev/null || true)"
+  fi
+
+  TUI_REMOTE_UPDATE_REMOTE_SHORT="$(git rev-parse --short "${remote_commit}" 2>/dev/null || printf '%s' "${remote_commit:0:12}")"
+  TUI_REMOTE_UPDATE_REMOTE_SUBJECT="$(git log -1 --format=%s "${remote_ref}" 2>/dev/null || true)"
+
+  if [[ -n "${local_commit}" ]]; then
+    TUI_REMOTE_UPDATE_LOCAL_SHORT="$(git rev-parse --short "${local_commit}" 2>/dev/null || printf '%s' "${local_commit:0:12}")"
+  fi
+
+  if [[ -n "${local_commit}" && "${local_commit}" == "${remote_commit}" ]]; then
+    TUI_REMOTE_UPDATE_STATUS="up-to-date"
+    return 0
+  fi
+
+  TUI_REMOTE_UPDATE_STATUS="update-available"
+  return 0
+}
+
+# Renders a blinking alert line above the workflow options when the selected
+# remote/branch has a newer commit than the local branch/HEAD.
+print_tui_remote_update_alert() {
+  local prefix=""
+  local local_part=""
+
+  refresh_tui_remote_update_cache
+
+  [[ "${TUI_REMOTE_UPDATE_STATUS}" == "update-available" ]] || return 0
+
+  if [[ -n "${BLINK}" ]]; then
+    prefix="${BLINK}"
+  fi
+
+  if [[ -n "${TUI_REMOTE_UPDATE_LOCAL_SHORT}" ]]; then
+    local_part=" (local ${TUI_REMOTE_UPDATE_LOCAL_SHORT})"
+  fi
+
+  echo -e "  ${prefix}${YELLOW}▲ Update available:${NC} ${BOLD}${TUI_REMOTE_UPDATE_REMOTE_SHORT}${NC}${local_part} ${DIM}${TUI_REMOTE_UPDATE_REMOTE_SUBJECT}${NC}"
+}
+
 print_update_tui_menu() {
   tui_clear_screen
   print_box_banner "Update + Deploy TUI"
   echo -e "${DIM}btop-style menu: configure git update + deploy handoff, then run.${NC}"
   echo ""
   echo -e "  $(status_chip "Branch" "${BRANCH}")  $(status_chip "Remote" "${REMOTE_NAME}")  $(status_chip "Pull" "$(bool_word "$(toggle_bool "${SKIP_PULL}")")")  $(status_chip "Deploy" "$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")")"
-  echo -e "  $(status_chip "DirtyOK" "$(bool_word "${ALLOW_DIRTY}")")  $(status_chip "Sudo" "$(update_sudo_mode_label)")  $(status_chip "Spinner" "$(spinner_ui_word)")"
+  echo -e "  $(status_chip "DirtyOK" "$(bool_word "${ALLOW_DIRTY}")")  $(status_chip "Sudo" "$(update_sudo_mode_label)")  $(status_chip "EnvDB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")")  $(status_chip "Spinner" "$(spinner_ui_word)")"
   if [[ "${SKIP_DEPLOY}" == false ]]; then
     echo -e "  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "Cron" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")")  $(status_chip "DB" "$(update_migration_mode_label)")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")"
   fi
   echo ""
   print_tui_panel_rule 92
+  print_tui_remote_update_alert
+  if [[ "${TUI_REMOTE_UPDATE_STATUS}" == "update-available" ]]; then
+    echo ""
+  fi
   echo -e "${BOLD}  Update Workflow Options${NC}"
   print_tui_panel_rule 92
   print_tui_option_row "1" "Branch" "${BRANCH}"
@@ -978,24 +1095,26 @@ print_update_tui_menu() {
   print_tui_option_desc "Animated progress spinner for git/deploy wrapper steps."
   print_tui_option_row "10" "Edit shared .env" "Open editor now"
   print_tui_option_desc "Bootstraps ${SHARED_DIR}/.env from .env.example if missing, then opens it."
+  print_tui_option_row "11" "MySQL + create DB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")"
+  print_tui_option_desc "When ON, Start runs the shared .env MySQL/MariaDB install + local DB create helper before git update."
   if [[ "${SKIP_DEPLOY}" == false ]]; then
     print_tui_panel_rule 92
     echo -e "${BOLD}  Deploy Pass-through Options${NC}"
     print_tui_panel_rule 92
-    print_tui_option_row "11" "Database mode" "$(update_migration_mode_label)"
+    print_tui_option_row "12" "Database mode" "$(update_migration_mode_label)"
     print_tui_option_desc "Cycles deploy DB behavior: migrate deploy / skip migrations / db push."
-    print_tui_option_row "12" "SSL setup" "$(bool_word "${SSL_SETUP}")"
+    print_tui_option_row "13" "SSL setup" "$(bool_word "${SSL_SETUP}")"
     print_tui_option_desc "Passes SSL setup flags to deploy.sh to run certbot + nginx config."
     if [[ "${SSL_SETUP}" == true ]]; then
-      print_tui_option_row "13" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}"
+      print_tui_option_row "14" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}"
       print_tui_option_desc "Domain used for certificate request and nginx server_name config."
-      print_tui_option_row "14" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}"
+      print_tui_option_row "15" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}"
       print_tui_option_desc "Email for Let's Encrypt registration and renewal alerts."
     fi
   fi
   echo ""
   print_tui_panel_rule 92
-  echo -e "  ${BOLD}M${NC}  Install MySQL + create DB from shared .env"
+  echo -e "  ${BOLD}M${NC}  Run MySQL + create DB from shared .env now"
   echo -e "  ${BOLD}S${NC}  Start update/deploy    ${BOLD}Q${NC}  Cancel"
   echo -e "${DIM}Tip: deploy.sh handles migrations/nginx sync/restarts; this menu configures the wrapper + pass-through flags.${NC}"
 }
@@ -1244,7 +1363,7 @@ run_interactive_setup() {
 
   while true; do
     print_update_tui_menu
-    read -r -p "Select option [1-14, m, s, q]: " choice
+    read -r -p "Select option [1-15, m, s, q]: " choice
 
     case "${choice,,}" in
       1)
@@ -1291,13 +1410,16 @@ run_interactive_setup() {
         edit_shared_env_now || true
         ;;
       11)
+        SETUP_MYSQL_DB_FROM_ENV="$(toggle_bool "${SETUP_MYSQL_DB_FROM_ENV}")"
+        ;;
+      12)
         if [[ "${SKIP_DEPLOY}" == false ]]; then
           cycle_update_migration_mode
         else
           log_warn "Enable deploy first to change deploy pass-through options."
         fi
         ;;
-      12)
+      13)
         if [[ "${SKIP_DEPLOY}" == false ]]; then
           SSL_SETUP="$(toggle_bool "${SSL_SETUP}")"
           if [[ "${SSL_SETUP}" == true ]]; then
@@ -1308,14 +1430,14 @@ run_interactive_setup() {
           log_warn "Enable deploy first to configure SSL options."
         fi
         ;;
-      13)
+      14)
         if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true ]]; then
           SSL_DOMAIN="$(prompt_value "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}")"
         else
           log_warn "Enable deploy + SSL setup first to edit SSL domain."
         fi
         ;;
-      14)
+      15)
         if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true ]]; then
           SSL_EMAIL="$(prompt_value "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}")"
         else
@@ -1334,7 +1456,7 @@ run_interactive_setup() {
         exit 0
         ;;
       *)
-        log_warn "Unknown selection. Choose a menu number, S, or Q."
+        log_warn "Unknown selection. Choose a menu number, M, S, or Q."
         ;;
     esac
   done
@@ -1365,6 +1487,7 @@ print_summary() {
   print_summary_row "Run deploy" "${will_deploy}"
   print_summary_row "Allow dirty" "$(bool_word "${ALLOW_DIRTY}")"
   print_summary_row "Sudo mode" "$(update_sudo_mode_label)"
+  print_summary_row "MySQL + create DB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")"
   print_summary_row "Spinner UI" "$(spinner_ui_word)"
   if [[ "${SKIP_DEPLOY}" == false ]]; then
     print_tui_panel_rule 62
