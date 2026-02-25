@@ -9,6 +9,7 @@
 import nodemailer from "nodemailer";
 
 import { prisma } from "@/lib/db";
+import { isGmailConfigured, sendGmailEmail } from "@/lib/email/gmail-service";
 import { logError, logEvent } from "@/lib/observability";
 
 type SendEmailInput = {
@@ -20,6 +21,11 @@ type SendEmailInput = {
     content: Buffer;
     contentType?: string;
   }>;
+};
+
+export type SendEmailResult = {
+  status: "sent" | "queued_no_smtp" | "failed";
+  error?: string;
 };
 
 let transporter: nodemailer.Transporter | null = null;
@@ -49,11 +55,15 @@ function getTransporter() {
   return transporter;
 }
 
-export async function sendEmail(input: SendEmailInput): Promise<void> {
+export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
   const from = process.env.SMTP_FROM || "Melbourne Guitar School <no-reply@example.com>";
   const tx = getTransporter();
 
   if (!tx) {
+    if (isGmailConfigured()) {
+      return sendGmailEmail(input);
+    }
+
     await prisma.outboundEmail.create({
       data: {
         toEmail: input.to,
@@ -63,7 +73,7 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
       }
     });
     logEvent("email.queued_no_smtp", { to: input.to, subject: input.subject });
-    return;
+    return { status: "queued_no_smtp" };
   }
 
   try {
@@ -88,17 +98,19 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
       }
     });
     logEvent("email.sent", { to: input.to, subject: input.subject });
+    return { status: "sent" };
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
     await prisma.outboundEmail.create({
       data: {
         toEmail: input.to,
         subject: input.subject,
         htmlBody: input.html,
         status: "failed",
-        error: error instanceof Error ? error.message : "Unknown error"
+        error: message
       }
     });
     logError("email.failed", error, { to: input.to, subject: input.subject });
-    return;
+    return { status: "failed", error: message };
   }
 }
