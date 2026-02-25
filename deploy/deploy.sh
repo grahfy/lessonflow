@@ -41,6 +41,8 @@ KEEP_RELEASES=5
 DEFAULT_BUILD_NODE_HEAP_MB="${DEFAULT_BUILD_NODE_HEAP_MB:-3072}"
 LOW_RAM_1GB_AUTO_HEAP_MB="${LOW_RAM_1GB_AUTO_HEAP_MB:-3072}"
 LOW_RAM_2GB_AUTO_HEAP_MB="${LOW_RAM_2GB_AUTO_HEAP_MB:-1024}"
+LOW_RAM_1GB_NEXT_BUILD_HEAP_MB="${LOW_RAM_1GB_NEXT_BUILD_HEAP_MB:-768}"
+LOW_RAM_2GB_NEXT_BUILD_HEAP_MB="${LOW_RAM_2GB_NEXT_BUILD_HEAP_MB:-768}"
 LOW_RAM_1GB_AUTO_HEAP_MIN_MB=900
 LOW_RAM_1GB_AUTO_HEAP_MAX_MB=1280
 LOW_RAM_2GB_AUTO_HEAP_MIN_MB=1700
@@ -454,6 +456,28 @@ cleanup_install_and_build_caches() {
     fi
 }
 
+# Replaces or appends the Node heap cap in NODE_OPTIONS while preserving any
+# other existing Node flags that may have been provided by the operator.
+set_node_heap_limit_mb() {
+    local heap_mb="$1"
+    local heap_flag="--max-old-space-size=${heap_mb}"
+    local part=""
+    local updated_node_options=""
+
+    for part in ${NODE_OPTIONS:-}; do
+        if [[ "${part}" == --max-old-space-size=* ]]; then
+            continue
+        fi
+        updated_node_options+="${updated_node_options:+ }${part}"
+    done
+
+    if [[ -n "${updated_node_options}" ]]; then
+        export NODE_OPTIONS="${updated_node_options} ${heap_flag}"
+    else
+        export NODE_OPTIONS="${heap_flag}"
+    fi
+}
+
 # Exports deploy-only Next.js build flags for low-memory hosts to reduce peak
 # RAM usage during `next build`. Lint/type-check still run in CI/local workflows.
 prepare_next_build_environment() {
@@ -471,13 +495,20 @@ prepare_next_build_environment() {
         return 0
     fi
 
+    local build_heap_mb=""
     if (( total_ram_mb >= LOW_RAM_1GB_AUTO_HEAP_MIN_MB && total_ram_mb <= LOW_RAM_1GB_AUTO_HEAP_MAX_MB )); then
         export NEXT_LOW_MEMORY_BUILD=1
+        build_heap_mb="${LOW_RAM_1GB_NEXT_BUILD_HEAP_MB}"
     elif (( total_ram_mb >= LOW_RAM_2GB_AUTO_HEAP_MIN_MB && total_ram_mb <= LOW_RAM_2GB_AUTO_HEAP_MAX_MB )); then
         export NEXT_LOW_MEMORY_BUILD=1
+        build_heap_mb="${LOW_RAM_2GB_NEXT_BUILD_HEAP_MB}"
     fi
 
     if [[ "${NEXT_LOW_MEMORY_BUILD:-}" == "1" ]]; then
+        if [[ -n "${build_heap_mb}" ]]; then
+            set_node_heap_limit_mb "${build_heap_mb}"
+            log_warn "Applied low-memory Next.js build heap cap for ${total_ram_mb}MB RAM host: --max-old-space-size=${build_heap_mb}"
+        fi
         log_warn "Enabled low-memory Next.js build mode (skip build lint/type-check) for ${total_ram_mb}MB RAM host"
     fi
 }
