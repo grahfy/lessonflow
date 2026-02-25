@@ -161,12 +161,44 @@ reexec_with_sudo_if_needed() {
     exec sudo "${SCRIPT_DIR}/deploy.sh" "${ORIGINAL_ARGS[@]}"
 }
 
+# Returns the application version from package.json (or "unknown" if unreadable).
+get_app_version() {
+    local package_json="${SCRIPT_DIR}/../package.json"
+    if [[ -f "${package_json}" ]]; then
+        local version_line=""
+        version_line="$(grep -m1 '"version"' "${package_json}" 2>/dev/null || true)"
+        if [[ -n "${version_line}" ]]; then
+            local version=""
+            version="$(printf '%s' "${version_line}" | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')"
+            if [[ -n "${version}" && "${version}" != "${version_line}" ]]; then
+                echo "${version}"
+                return 0
+            fi
+        fi
+    fi
+    echo "unknown"
+}
+
+# Draws a dynamic-width box banner so longer titles (for example with version)
+# do not break the right-hand border.
+print_box_banner() {
+    local content="$1"
+    local inner_width=$(( ${#content} + 2 ))
+    local rule=""
+    printf -v rule '%*s' "${inner_width}" ''
+    rule="${rule// /─}"
+
+    echo ""
+    echo -e "${BOLD}${CYAN}╭${rule}╮${NC}"
+    echo -e "${BOLD}${CYAN}│${NC} ${BOLD}${content}${NC} ${BOLD}${CYAN}│${NC}"
+    echo -e "${BOLD}${CYAN}╰${rule}╯${NC}"
+}
+
 # Render a lightweight banner so manual deploy runs are easier to scan.
 print_banner() {
-    echo ""
-    echo -e "${BOLD}${CYAN}╭──────────────────────────────────────────────╮${NC}"
-    echo -e "${BOLD}${CYAN}│${NC} ${BOLD}Melbourne Guitar School Deploy${NC}${DIM} (Next.js)${NC} ${BOLD}${CYAN}│${NC}"
-    echo -e "${BOLD}${CYAN}╰──────────────────────────────────────────────╯${NC}"
+    local app_version
+    app_version="$(get_app_version)"
+    print_box_banner "Melbourne Guitar School Deploy (Next.js) v${app_version}"
 }
 
 # Standardized info line for quick, readable progress output.
