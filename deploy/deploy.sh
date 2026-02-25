@@ -44,9 +44,9 @@ LOW_RAM_2GB_AUTO_HEAP_MB="${LOW_RAM_2GB_AUTO_HEAP_MB:-1024}"
 LOW_RAM_1GB_NEXT_BUILD_HEAP_MB="${LOW_RAM_1GB_NEXT_BUILD_HEAP_MB:-768}"
 LOW_RAM_2GB_NEXT_BUILD_HEAP_MB="${LOW_RAM_2GB_NEXT_BUILD_HEAP_MB:-768}"
 TEMP_BUILD_SWAP_AUTO_ENABLED="${TEMP_BUILD_SWAP_AUTO_ENABLED:-true}"
-LOW_RAM_1GB_TEMP_BUILD_SWAP_MB="${LOW_RAM_1GB_TEMP_BUILD_SWAP_MB:-2048}"
-LOW_RAM_2GB_TEMP_BUILD_SWAP_MB="${LOW_RAM_2GB_TEMP_BUILD_SWAP_MB:-1024}"
-TEMP_BUILD_SWAP_MIN_EXISTING_MB="${TEMP_BUILD_SWAP_MIN_EXISTING_MB:-512}"
+LOW_RAM_1GB_TARGET_TOTAL_SWAP_MB="${LOW_RAM_1GB_TARGET_TOTAL_SWAP_MB:-2048}"
+LOW_RAM_2GB_TARGET_TOTAL_SWAP_MB="${LOW_RAM_2GB_TARGET_TOTAL_SWAP_MB:-1024}"
+TEMP_BUILD_SWAP_MIN_CREATE_MB="${TEMP_BUILD_SWAP_MIN_CREATE_MB:-128}"
 TEMP_BUILD_SWAP_PATH="${TEMP_BUILD_SWAP_PATH:-/var/tmp/${APP_NAME}-build.swap}"
 LOW_RAM_1GB_AUTO_HEAP_MIN_MB=900
 LOW_RAM_1GB_AUTO_HEAP_MAX_MB=1280
@@ -485,6 +485,7 @@ detect_total_swap_mb() {
 ensure_temporary_build_swap() {
     local total_ram_mb=""
     local total_swap_mb="0"
+    local target_total_swap_mb=""
     local swap_mb=""
 
     if [[ "${TEMP_BUILD_SWAP_AUTO_ENABLED}" != "true" ]]; then
@@ -514,17 +515,30 @@ ensure_temporary_build_swap() {
     fi
 
     if (( total_ram_mb >= LOW_RAM_1GB_AUTO_HEAP_MIN_MB && total_ram_mb <= LOW_RAM_1GB_AUTO_HEAP_MAX_MB )); then
-        swap_mb="${LOW_RAM_1GB_TEMP_BUILD_SWAP_MB}"
+        target_total_swap_mb="${LOW_RAM_1GB_TARGET_TOTAL_SWAP_MB}"
     elif (( total_ram_mb >= LOW_RAM_2GB_AUTO_HEAP_MIN_MB && total_ram_mb <= LOW_RAM_2GB_AUTO_HEAP_MAX_MB )); then
-        swap_mb="${LOW_RAM_2GB_TEMP_BUILD_SWAP_MB}"
+        target_total_swap_mb="${LOW_RAM_2GB_TARGET_TOTAL_SWAP_MB}"
     else
         log_info "Detected ${total_ram_mb}MB RAM; skipping temporary build swap"
         return 0
     fi
 
     total_swap_mb="$(detect_total_swap_mb || echo 0)"
-    if [[ "${total_swap_mb}" =~ ^[0-9]+$ ]] && (( total_swap_mb >= TEMP_BUILD_SWAP_MIN_EXISTING_MB )); then
-        log_info "Detected ${total_swap_mb}MB existing swap; skipping temporary build swap"
+    if ! [[ "${total_swap_mb}" =~ ^[0-9]+$ ]]; then
+        total_swap_mb="0"
+    fi
+
+    if [[ -n "${target_total_swap_mb}" && "${target_total_swap_mb}" =~ ^[0-9]+$ ]]; then
+        swap_mb=$(( target_total_swap_mb - total_swap_mb ))
+    fi
+
+    if [[ -z "${swap_mb}" || "${swap_mb}" -le 0 ]]; then
+        log_info "Detected ${total_swap_mb}MB existing swap; target is ${target_total_swap_mb}MB, skipping temporary build swap"
+        return 0
+    fi
+
+    if (( swap_mb < TEMP_BUILD_SWAP_MIN_CREATE_MB )); then
+        log_info "Only ${swap_mb}MB additional swap needed (< ${TEMP_BUILD_SWAP_MIN_CREATE_MB}MB minimum); skipping temporary build swap"
         return 0
     fi
 
@@ -542,7 +556,7 @@ ensure_temporary_build_swap() {
         }
     fi
 
-    log_warn "Creating temporary build swap (${swap_mb}MB) at ${TEMP_BUILD_SWAP_PATH}"
+    log_warn "Creating temporary build swap (${swap_mb}MB) at ${TEMP_BUILD_SWAP_PATH} to reach ~${target_total_swap_mb}MB total swap"
     if command -v fallocate >/dev/null 2>&1; then
         fallocate -l "${swap_mb}M" "${TEMP_BUILD_SWAP_PATH}" 2>/dev/null || dd if=/dev/zero of="${TEMP_BUILD_SWAP_PATH}" bs=1M count="${swap_mb}" status=none
     else
