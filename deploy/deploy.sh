@@ -1005,35 +1005,63 @@ run_migrations() {
     fi
     
     log_info "Running database migrations..."
-    
-    # Try migrate deploy first
-    if npm exec --no -- prisma migrate deploy 2>&1; then
-        return 0
-    fi
-    
-    # If failed with P3005 (database not empty, needs baseline), handle it
-    log_warn "Migration failed, attempting to baseline existing database..."
-    
-    # Get the first migration name (for baselining)
-    local first_migration=$(ls -1 prisma/migrations | head -1)
-    
+
+    # Determine the first migration directory for safe baseline recovery on
+    # already-initialized databases.
+    local first_migration=""
+    local migration_dir=""
+    for migration_dir in prisma/migrations/*; do
+        [[ -d "${migration_dir}" ]] || continue
+        first_migration="$(basename "${migration_dir}")"
+        break
+    done
+
     if [[ -z "${first_migration}" ]]; then
-        log_error "No migrations found to baseline"
+        log_error "No migration directories found to baseline"
         return 1
     fi
-    
+
+    # Try migrate deploy first and capture output so we can detect safe baseline
+    # recovery cases precisely instead of baselining on every migration failure.
+    local migrate_output=""
+    if migrate_output="$(npm exec --no -- prisma migrate deploy 2>&1)"; then
+        [[ -n "${migrate_output}" ]] && echo "${migrate_output}"
+        return 0
+    fi
+    local migrate_status=$?
+
+    [[ -n "${migrate_output}" ]] && echo "${migrate_output}"
+
+    local should_baseline=false
+
+    # Prisma P3005: database schema is not empty and needs baselining.
+    if printf '%s' "${migrate_output}" | grep -q "P3005"; then
+        should_baseline=true
+    fi
+
+    # Prisma P3018 + MySQL 1050/\"already exists\" for the first migration is also
+    # a safe baseline case (existing schema, newly-added baseline migration).
+    if [[ "${should_baseline}" == false ]] \
+        && printf '%s' "${migrate_output}" | grep -q "P3018" \
+        && printf '%s' "${migrate_output}" | grep -q "Migration name: ${first_migration}" \
+        && (printf '%s' "${migrate_output}" | grep -q "Database error code: 1050" \
+            || printf '%s' "${migrate_output}" | grep -q "already exists"); then
+        should_baseline=true
+    fi
+
+    if [[ "${should_baseline}" == false ]]; then
+        log_error "Migration failed for a non-baseline reason. Aborting automatic recovery."
+        return "${migrate_status}"
+    fi
+
+    log_warn "Migration failed, attempting to baseline existing database..."
     log_info "Resolving migration as baseline: ${first_migration}"
     npm exec --no -- prisma migrate resolve --applied "${first_migration}"
-    
-    # Execute the baseline migration SQL manually (resolve --applied doesn't run SQL)
-    local migration_sql="prisma/migrations/${first_migration}/migration.sql"
-    if [[ -f "${migration_sql}" ]]; then
-        log_info "Applying baseline migration SQL via prisma db execute..."
-        npm exec --no -- prisma db execute --file "${migration_sql}" --schema prisma/schema.prisma 2>&1 || log_warn "Migration SQL may have already been applied"
-    fi
-    
-    # Apply any remaining migrations
-    log_info "Applying remaining migrations..."
+
+    # IMPORTANT: Do not execute baseline SQL on an existing database. Baseline
+    # recovery only records the migration as applied, then Prisma applies any
+    # later migrations that are still pending.
+    log_info "Baseline marked as applied. Re-running prisma migrate deploy for remaining migrations..."
     npm exec --no -- prisma migrate deploy
 }
 
