@@ -76,6 +76,7 @@ Do not delete sent/paid invoices. Use credit note instead.
 ![Invoice console list and filters](assets/invoice-console-list-and-filters.png)
 ![Invoice create dialog](assets/invoice-create-dialog.png)
 ![Invoice detail actions including send and download PDF](assets/invoice-detail-send-and-download-pdf.png)
+![Invoice filters with outstanding-only and aging applied](assets/invoice-filters-outstanding-aging.png)
 
 ## GST Guidance (Operational)
 - Use configured tax mode according to your business setup.

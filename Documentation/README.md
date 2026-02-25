@@ -31,6 +31,10 @@ If you are an admin user, this set teaches you how to:
 - [07-Reports-Outstanding-and-Follow-Up.md](07-Reports-Outstanding-and-Follow-Up.md): Outstanding invoice routines and reminder cadence.
 - [08-Troubleshooting-and-FAQs.md](08-Troubleshooting-and-FAQs.md): Fast issue resolution paths for common operations problems.
 - [09-Glossary.md](09-Glossary.md): Plain-language definitions for operational and billing terminology.
+- [10-Admin-Settings-and-System-Configuration.md](10-Admin-Settings-and-System-Configuration.md): Admin settings screen usage, credential sync, and restart expectations.
+- [11-Admin-Reports-Dashboard.md](11-Admin-Reports-Dashboard.md): Reports console usage (daily/weekly/monthly/yearly + comparisons).
+- [12-Student-Portal-and-Learning-Materials.md](12-Student-Portal-and-Learning-Materials.md): Student portal login support and learning materials workflows.
+- [13-Public-Booking-and-Contact-Forms.md](13-Public-Booking-and-Contact-Forms.md): Public form behavior and admin follow-up path.
 
 ## Recommended Learning Path
 
@@ -57,10 +61,33 @@ For technical operators who manage automation and support checks:
 - Email delivery fallback behavior (`queued_no_smtp`) is documented in:
   - `06-Email-and-Notifications.md`.
 
+## Manual Coverage Matrix
+
+| App Function / Area | Primary Guide | Notes |
+| --- | --- | --- |
+| Admin login and access | `02-Admin-Login-and-Access.md` | Includes sign-in and access recovery basics |
+| Bookings calendar and request handling | `03-Booking-Management.md` | Covers approve/reject/move/cancel/manual booking |
+| Customer directory and portal credentials | `04-Customer-Directory.md` | Includes archive and customer maintenance |
+| Invoice create/edit/send/reminders/credit notes | `05-Invoice-Management.md` | Includes package presets and PDF/send actions |
+| Outstanding follow-up routines | `07-Reports-Outstanding-and-Follow-Up.md` | Daily/weekly reminder cadence |
+| Admin reports dashboard | `11-Admin-Reports-Dashboard.md` | Daily/weekly/monthly/yearly + compare views |
+| Admin settings system config | `10-Admin-Settings-and-System-Configuration.md` | `.env`-backed settings, credential sync, restart behavior |
+| Student portal and learning materials | `12-Student-Portal-and-Learning-Materials.md` | Login support + previews/downloads + general materials |
+| Public booking/contact flows | `13-Public-Booking-and-Contact-Forms.md` | Front-end submission behavior + admin follow-up |
+| Email/notification behavior | `06-Email-and-Notifications.md` | Manual + automatic sends and fallback behavior |
+| Troubleshooting and FAQs | `08-Troubleshooting-and-FAQs.md` | Cross-feature issue recovery |
+| Glossary | `09-Glossary.md` | Shared terminology |
+| Technical owner deploy/update runbook | `Documentation/digitalocean-admin-operations.md` + `deploy/README.md` | Server operations, cron, deploy/update TUI |
+
 ## Screenshot Assets
 - Folder: `Documentation/assets/`
 - Capture plan and naming conventions: `Documentation/assets/README.md`
 - In-app admin manual thumbnails (served by the app): `public/documentation/screenshots/`
+- Automated screenshot workflow:
+  - `npm run docs:screenshots:seed`
+  - `npm run docs:screenshots`
+  - `npm run docs:screenshots:sync`
+  - `npm run docs:screenshots:update`
 
 ## In-App Admin Manual
 - Logged-in admins can open `/admin/manual` from the new `Manual` button in the admin header.
@@ -78,17 +105,39 @@ For technical operators who manage automation and support checks:
 ### Bookings Calendar
 ![Bookings Calendar Week View](assets/booking-calendar-week-view.png)
 
+### Manual Booking Dialog
+![Manual Booking Dialog Customer Step](assets/manual-booking-dialog-customer-step.png)
+
 ### Booking Detail Actions
 ![Booking Detail Dialog Notes and Actions](assets/booking-detail-dialog-notes-and-actions.png)
 
+### Customer Directory
+![Customer Directory List](assets/customer-directory-list.png)
+
 ### Invoice Console
 ![Invoice Console List and Filters](assets/invoice-console-list-and-filters.png)
+
+### Invoice Filters (Outstanding + Aging)
+![Invoice Filters Outstanding Aging](assets/invoice-filters-outstanding-aging.png)
 
 ### Invoice Create Dialog
 ![Invoice Create Dialog](assets/invoice-create-dialog.png)
 
 ### Invoice Send / PDF Actions
 ![Invoice Detail Send and Download PDF](assets/invoice-detail-send-and-download-pdf.png)
+
+### Admin Reports Dashboard
+![Admin Reports Dashboard](assets/admin-reports-dashboard.png)
+
+### Admin Settings
+![Admin Settings Page](assets/admin-settings-page.png)
+
+### Student Portal
+![Student Portal Page](assets/student-portal-page.png)
+
+### Public Booking and Contact
+![Public Booking Page](assets/public-book-page.png)
+![Public Contact Page](assets/public-contact-page.png)
 
 ## Deploy Runbook
 - Droplet production operations runbook:
