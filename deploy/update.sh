@@ -215,6 +215,152 @@ prompt_value() {
   echo "${value}"
 }
 
+bool_word() {
+  if [[ "$1" == true ]]; then
+    echo "ON"
+  else
+    echo "OFF"
+  fi
+}
+
+toggle_bool() {
+  if [[ "$1" == true ]]; then
+    echo false
+  else
+    echo true
+  fi
+}
+
+spinner_ui_word() {
+  if [[ "${NO_SPINNER}" == true ]]; then
+    echo "OFF"
+  else
+    echo "ON"
+  fi
+}
+
+status_chip() {
+  local label="$1"
+  local state="$2"
+  local color="${DIM}"
+
+  if [[ "${state}" == "ON" || "${state}" == "enabled" || "${state}" == "migrate deploy" ]]; then
+    color="${GREEN}"
+  elif [[ "${state}" == "OFF" || "${state}" == "disabled" || "${state}" == "skip migrations" ]]; then
+    color="${YELLOW}"
+  elif [[ "${state}" == *"db-push"* ]]; then
+    color="${CYAN}"
+  fi
+
+  printf "%b[%s: %s]%b" "${color}" "${label}" "${state}" "${NC}"
+}
+
+tui_clear_screen() {
+  [[ "${IS_TTY}" == true ]] && clear
+}
+
+print_tui_panel_rule() {
+  local width="${1:-84}"
+  local rule=""
+  printf -v rule '%*s' "${width}" ''
+  rule="${rule// /─}"
+  echo -e "${DIM}${rule}${NC}"
+}
+
+update_migration_mode_label() {
+  if [[ "${DB_PUSH}" == true ]]; then
+    echo "db-push (skip migrations)"
+  elif [[ "${SKIP_MIGRATE}" == true ]]; then
+    echo "skip migrations"
+  else
+    echo "migrate deploy"
+  fi
+}
+
+cycle_update_migration_mode() {
+  if [[ "${DB_PUSH}" == true ]]; then
+    DB_PUSH=false
+    SKIP_MIGRATE=false
+  elif [[ "${SKIP_MIGRATE}" == true ]]; then
+    DB_PUSH=true
+    SKIP_MIGRATE=true
+  else
+    DB_PUSH=false
+    SKIP_MIGRATE=true
+  fi
+}
+
+update_sudo_mode_label() {
+  if [[ "${FORCE_NO_SUDO_DEPLOY}" == true ]]; then
+    echo "forced off"
+  elif [[ "${FORCE_SUDO_DEPLOY}" == true ]]; then
+    echo "forced on"
+  else
+    echo "auto"
+  fi
+}
+
+cycle_update_sudo_mode() {
+  if [[ "${FORCE_NO_SUDO_DEPLOY}" == true ]]; then
+    FORCE_NO_SUDO_DEPLOY=false
+    FORCE_SUDO_DEPLOY=false
+  elif [[ "${FORCE_SUDO_DEPLOY}" == true ]]; then
+    FORCE_SUDO_DEPLOY=false
+    FORCE_NO_SUDO_DEPLOY=true
+  else
+    FORCE_SUDO_DEPLOY=true
+    FORCE_NO_SUDO_DEPLOY=false
+  fi
+}
+
+print_update_tui_menu() {
+  tui_clear_screen
+  print_box_banner "Update + Deploy TUI"
+  echo -e "${DIM}btop-style menu: configure git update + deploy handoff, then run.${NC}"
+  echo ""
+  echo -e "  $(status_chip "Branch" "${BRANCH}")  $(status_chip "Remote" "${REMOTE_NAME}")  $(status_chip "Pull" "$(bool_word "$(toggle_bool "${SKIP_PULL}")")")  $(status_chip "Deploy" "$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")")"
+  echo -e "  $(status_chip "DirtyOK" "$(bool_word "${ALLOW_DIRTY}")")  $(status_chip "Sudo" "$(update_sudo_mode_label)")  $(status_chip "Spinner" "$(spinner_ui_word)")"
+  if [[ "${SKIP_DEPLOY}" == false ]]; then
+    echo -e "  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "DB" "$(update_migration_mode_label)")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")"
+  fi
+  echo ""
+  print_tui_panel_rule 92
+  echo -e "${BOLD}  Update Workflow Options${NC}"
+  print_tui_panel_rule 92
+  echo -e "  ${BOLD}1${NC}  Branch                ${CYAN}${BRANCH}${NC}"
+  echo -e "     ${DIM}Branch to fetch/pull and pass through to deploy.sh.${NC}"
+  echo -e "  ${BOLD}2${NC}  Remote                ${CYAN}${REMOTE_NAME}${NC}"
+  echo -e "     ${DIM}Git remote used for fetch/pull (usually origin).${NC}"
+  echo -e "  ${BOLD}3${NC}  Pull latest changes    ${CYAN}$(bool_word "$(toggle_bool "${SKIP_PULL}")")${NC}"
+  echo -e "     ${DIM}ON performs git fetch + ff-only pull before deployment.${NC}"
+  echo -e "  ${BOLD}4${NC}  Run deploy after pull  ${CYAN}$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")${NC}"
+  echo -e "     ${DIM}ON runs deploy.sh after git update; OFF only updates the repo checkout.${NC}"
+  echo -e "  ${BOLD}5${NC}  Allow dirty worktree   ${CYAN}$(bool_word "${ALLOW_DIRTY}")${NC}"
+  echo -e "     ${DIM}ON allows update/deploy even if tracked files are modified locally.${NC}"
+  echo -e "  ${BOLD}6${NC}  Sudo deploy mode      ${CYAN}$(update_sudo_mode_label)${NC}"
+  echo -e "     ${DIM}Cycles deploy invocation between auto, forced sudo, and forced no-sudo.${NC}"
+  echo -e "  ${BOLD}7${NC}  Spinner UI            ${CYAN}$(spinner_ui_word)${NC}"
+  echo -e "     ${DIM}Animated progress spinner for git/deploy wrapper steps.${NC}"
+  if [[ "${SKIP_DEPLOY}" == false ]]; then
+    echo -e "  ${BOLD}8${NC}  Skip npm install      ${CYAN}$(bool_word "${SKIP_DEPS}")${NC}"
+    echo -e "     ${DIM}Passes --skip-deps to deploy.sh (faster, but unsafe after package changes).${NC}"
+    echo -e "  ${BOLD}9${NC}  Database mode         ${CYAN}$(update_migration_mode_label)${NC}"
+    echo -e "     ${DIM}Cycles deploy DB behavior: migrate deploy / skip migrations / db push.${NC}"
+    echo -e "  ${BOLD}10${NC} SSL setup             ${CYAN}$(bool_word "${SSL_SETUP}")${NC}"
+    echo -e "     ${DIM}Passes SSL setup flags to deploy.sh to run certbot + nginx config.${NC}"
+    if [[ "${SSL_SETUP}" == true ]]; then
+      echo -e "  ${BOLD}11${NC} SSL domain            ${CYAN}${SSL_DOMAIN:-melbourneguitarschool.com.au}${NC}"
+      echo -e "     ${DIM}Domain used for certificate request and nginx server_name config.${NC}"
+      echo -e "  ${BOLD}12${NC} Certbot email         ${CYAN}${SSL_EMAIL:-melbourneguitarschool@gmail.com}${NC}"
+      echo -e "     ${DIM}Email for Let's Encrypt registration and renewal alerts.${NC}"
+    fi
+  fi
+  echo ""
+  print_tui_panel_rule 92
+  echo -e "  ${BOLD}S${NC}  Start update/deploy    ${BOLD}Q${NC}  Cancel"
+  echo -e "${DIM}Tip: deploy.sh handles migrations/nginx sync/restarts; this menu configures the wrapper + pass-through flags.${NC}"
+}
+
 # Spinner start routine used by run_step for long-running git commands.
 start_spinner() {
   local msg="$1"
@@ -452,47 +598,91 @@ ensure_sudo_for_deploy_ready() {
   SUDO_DEPLOY_AUTH_READY=true
 }
 
-# Interactive prompt flow for the update wrapper. It mirrors deploy.sh options
+# Interactive menu flow for the update wrapper. It mirrors deploy.sh options
 # and adds git update controls so operators can run one command end-to-end.
 run_interactive_setup() {
-  section "Interactive Options"
-  BRANCH="$(prompt_value "Git branch to update/deploy" "${BRANCH}")"
-  REMOTE_NAME="$(prompt_value "Git remote" "${REMOTE_NAME}")"
+  local choice=""
 
-  if prompt_yes_no "Pull latest changes from git before deploy?" "y"; then
-    SKIP_PULL=false
-  else
-    SKIP_PULL=true
-  fi
+  while true; do
+    print_update_tui_menu
+    read -r -p "Select option [1-12, s, q]: " choice
 
-  if prompt_yes_no "Run deployment after update?" "y"; then
-    SKIP_DEPLOY=false
-  else
-    SKIP_DEPLOY=true
-  fi
-
-  if [[ "${SKIP_DEPLOY}" == false ]]; then
-    if prompt_yes_no "Skip npm install?" "n"; then
-      SKIP_DEPS=true
-    fi
-
-    if prompt_yes_no "Use prisma db push instead of migrations?" "n"; then
-      DB_PUSH=true
-      SKIP_MIGRATE=true
-    elif prompt_yes_no "Skip database migrations?" "n"; then
-      SKIP_MIGRATE=true
-    fi
-
-    local ssl_default="n"
-    [[ "${SSL_SETUP}" == true ]] && ssl_default="y"
-    if prompt_yes_no "Run SSL setup after deploy?" "${ssl_default}"; then
-      SSL_SETUP=true
-      SSL_DOMAIN="$(prompt_value "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}")"
-      SSL_EMAIL="$(prompt_value "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}")"
-    else
-      SSL_SETUP=false
-    fi
-  fi
+    case "${choice,,}" in
+      1)
+        BRANCH="$(prompt_value "Git branch to update/deploy" "${BRANCH}")"
+        ;;
+      2)
+        REMOTE_NAME="$(prompt_value "Git remote" "${REMOTE_NAME}")"
+        ;;
+      3)
+        SKIP_PULL="$(toggle_bool "${SKIP_PULL}")"
+        ;;
+      4)
+        SKIP_DEPLOY="$(toggle_bool "${SKIP_DEPLOY}")"
+        if [[ "${SKIP_DEPLOY}" == true ]]; then
+          SSL_SETUP=false
+        fi
+        ;;
+      5)
+        ALLOW_DIRTY="$(toggle_bool "${ALLOW_DIRTY}")"
+        ;;
+      6)
+        cycle_update_sudo_mode
+        ;;
+      7)
+        NO_SPINNER="$(toggle_bool "${NO_SPINNER}")"
+        ;;
+      8)
+        if [[ "${SKIP_DEPLOY}" == false ]]; then
+          SKIP_DEPS="$(toggle_bool "${SKIP_DEPS}")"
+        else
+          log_warn "Enable deploy first to change deploy pass-through options."
+        fi
+        ;;
+      9)
+        if [[ "${SKIP_DEPLOY}" == false ]]; then
+          cycle_update_migration_mode
+        else
+          log_warn "Enable deploy first to change deploy pass-through options."
+        fi
+        ;;
+      10)
+        if [[ "${SKIP_DEPLOY}" == false ]]; then
+          SSL_SETUP="$(toggle_bool "${SSL_SETUP}")"
+          if [[ "${SSL_SETUP}" == true ]]; then
+            [[ -n "${SSL_DOMAIN}" ]] || SSL_DOMAIN="melbourneguitarschool.com.au"
+            [[ -n "${SSL_EMAIL}" ]] || SSL_EMAIL="melbourneguitarschool@gmail.com"
+          fi
+        else
+          log_warn "Enable deploy first to configure SSL options."
+        fi
+        ;;
+      11)
+        if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true ]]; then
+          SSL_DOMAIN="$(prompt_value "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}")"
+        else
+          log_warn "Enable deploy + SSL setup first to edit SSL domain."
+        fi
+        ;;
+      12)
+        if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true ]]; then
+          SSL_EMAIL="$(prompt_value "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}")"
+        else
+          log_warn "Enable deploy + SSL setup first to edit Certbot email."
+        fi
+        ;;
+      s)
+        break
+        ;;
+      q)
+        log_warn "Update cancelled."
+        exit 0
+        ;;
+      *)
+        log_warn "Unknown selection. Choose a menu number, S, or Q."
+        ;;
+    esac
+  done
 }
 
 # Prints a compact summary before execution to make operator intent explicit.

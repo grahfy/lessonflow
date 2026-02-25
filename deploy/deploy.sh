@@ -260,31 +260,174 @@ prompt_value() {
     echo "${value}"
 }
 
-# Ask for deploy options in a TTY so one command can serve both scripted and manual deploys.
-run_interactive_setup() {
-    section "Interactive Options"
-    BRANCH="$(prompt_value "Git branch to deploy" "${BRANCH}")"
+bool_word() {
+    if [[ "$1" == true ]]; then
+        echo "ON"
+    else
+        echo "OFF"
+    fi
+}
 
-    if prompt_yes_no "Skip npm install?" "n"; then
-        SKIP_DEPS=true
+toggle_bool() {
+    if [[ "$1" == true ]]; then
+        echo false
+    else
+        echo true
+    fi
+}
+
+spinner_ui_word() {
+    if [[ "${NO_SPINNER}" == true ]]; then
+        echo "OFF"
+    else
+        echo "ON"
+    fi
+}
+
+status_chip() {
+    local label="$1"
+    local state="$2"
+    local color="${DIM}"
+
+    if [[ "${state}" == "ON" || "${state}" == "enabled" || "${state}" == "migrate deploy" ]]; then
+        color="${GREEN}"
+    elif [[ "${state}" == "OFF" || "${state}" == "disabled" || "${state}" == "skip migrations" ]]; then
+        color="${YELLOW}"
+    elif [[ "${state}" == *"db-push"* ]]; then
+        color="${CYAN}"
     fi
 
-    if prompt_yes_no "Use prisma db push instead of migrations?" "n"; then
+    printf "%b[%s: %s]%b" "${color}" "${label}" "${state}" "${NC}"
+}
+
+tui_clear_screen() {
+    [[ "${IS_TTY}" == true ]] && clear
+}
+
+print_tui_panel_rule() {
+    local width="${1:-72}"
+    local rule=""
+    printf -v rule '%*s' "${width}" ''
+    rule="${rule// /─}"
+    echo -e "${DIM}${rule}${NC}"
+}
+
+deploy_migration_mode_label() {
+    if [[ "${DB_PUSH}" == true ]]; then
+        echo "db-push (skip migrations)"
+    elif [[ "${SKIP_MIGRATE}" == true ]]; then
+        echo "skip migrations"
+    else
+        echo "migrate deploy"
+    fi
+}
+
+deploy_cycle_migration_mode() {
+    if [[ "${DB_PUSH}" == true ]]; then
+        DB_PUSH=false
+        SKIP_MIGRATE=false
+    elif [[ "${SKIP_MIGRATE}" == true ]]; then
         DB_PUSH=true
         SKIP_MIGRATE=true
-    elif prompt_yes_no "Skip database migrations?" "n"; then
+    else
+        DB_PUSH=false
         SKIP_MIGRATE=true
     fi
+}
 
-    local ssl_default="n"
-    [[ "${SSL_SETUP}" == true ]] && ssl_default="y"
-    if prompt_yes_no "Run SSL setup after deploy?" "${ssl_default}"; then
-        SSL_SETUP=true
-        SSL_DOMAIN="$(prompt_value "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}")"
-        SSL_EMAIL="$(prompt_value "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}")"
-    else
-        SSL_SETUP=false
+print_deploy_tui_menu() {
+    tui_clear_screen
+    print_box_banner "Deploy TUI • ${APP_NAME}"
+    echo -e "${DIM}btop-style menu: edit values, review live status, then start.${NC}"
+    echo ""
+    echo -e "  $(status_chip "Branch" "${BRANCH}")  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")  $(status_chip "Spinner" "$(spinner_ui_word)")"
+    echo -e "  $(status_chip "DB" "$(deploy_migration_mode_label)")  $(status_chip "PkgSetup" "$(bool_word "${SETUP_PACKAGES}")")"
+    echo ""
+    print_tui_panel_rule 78
+    echo -e "${BOLD}  Configuration Options${NC}"
+    print_tui_panel_rule 78
+    echo -e "  ${BOLD}1${NC}  Branch                ${CYAN}${BRANCH}${NC}"
+    echo -e "     ${DIM}Git branch archived into the release directory and deployed.${NC}"
+    echo -e "  ${BOLD}2${NC}  Skip npm install      ${CYAN}$(bool_word "${SKIP_DEPS}")${NC}"
+    echo -e "     ${DIM}ON skips 'npm install' in the new release (faster, but risky after dependency changes).${NC}"
+    echo -e "  ${BOLD}3${NC}  Database mode         ${CYAN}$(deploy_migration_mode_label)${NC}"
+    echo -e "     ${DIM}Cycles: migrate deploy -> skip migrations -> prisma db push (test/dev fallback).${NC}"
+    echo -e "  ${BOLD}4${NC}  Package setup         ${CYAN}$(bool_word "${SETUP_PACKAGES}")${NC}"
+    echo -e "     ${DIM}Runs deploy/setup-packages.sh before deploy (Node/Nginx/system deps bootstrap).${NC}"
+    echo -e "  ${BOLD}5${NC}  SSL setup             ${CYAN}$(bool_word "${SSL_SETUP}")${NC}"
+    echo -e "     ${DIM}Runs certbot/nginx SSL setup after deployment completes.${NC}"
+    if [[ "${SSL_SETUP}" == true ]]; then
+        echo -e "  ${BOLD}6${NC}  SSL domain            ${CYAN}${SSL_DOMAIN:-melbourneguitarschool.com.au}${NC}"
+        echo -e "     ${DIM}Domain used in nginx config and Let's Encrypt certificate request.${NC}"
+        echo -e "  ${BOLD}7${NC}  Certbot email         ${CYAN}${SSL_EMAIL:-melbourneguitarschool@gmail.com}${NC}"
+        echo -e "     ${DIM}Receives certificate expiry notices and Let's Encrypt registration updates.${NC}"
     fi
+    echo -e "  ${BOLD}8${NC}  Spinner UI            ${CYAN}$(spinner_ui_word)${NC}"
+    echo -e "     ${DIM}Animated progress spinner for long commands (disable in noisy terminals/log capture).${NC}"
+    echo ""
+    print_tui_panel_rule 78
+    echo -e "  ${BOLD}S${NC}  Start deploy      ${BOLD}Q${NC}  Cancel"
+    echo -e "${DIM}Tip: Press Enter after each selection. Values redraw immediately.${NC}"
+}
+
+# Ask for deploy options in a TTY using a menu-style terminal UI so one command
+# can serve both scripted and manual deploys.
+run_interactive_setup() {
+    local choice=""
+
+    while true; do
+        print_deploy_tui_menu
+        read -r -p "Select option [1-8, s, q]: " choice
+
+        case "${choice,,}" in
+            1)
+                BRANCH="$(prompt_value "Git branch to deploy" "${BRANCH}")"
+                ;;
+            2)
+                SKIP_DEPS="$(toggle_bool "${SKIP_DEPS}")"
+                ;;
+            3)
+                deploy_cycle_migration_mode
+                ;;
+            4)
+                SETUP_PACKAGES="$(toggle_bool "${SETUP_PACKAGES}")"
+                ;;
+            5)
+                SSL_SETUP="$(toggle_bool "${SSL_SETUP}")"
+                if [[ "${SSL_SETUP}" == true ]]; then
+                    [[ -n "${SSL_DOMAIN}" ]] || SSL_DOMAIN="melbourneguitarschool.com.au"
+                    [[ -n "${SSL_EMAIL}" ]] || SSL_EMAIL="melbourneguitarschool@gmail.com"
+                fi
+                ;;
+            6)
+                if [[ "${SSL_SETUP}" == true ]]; then
+                    SSL_DOMAIN="$(prompt_value "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}")"
+                else
+                    log_warn "Enable SSL setup first to configure domain/email."
+                fi
+                ;;
+            7)
+                if [[ "${SSL_SETUP}" == true ]]; then
+                    SSL_EMAIL="$(prompt_value "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}")"
+                else
+                    log_warn "Enable SSL setup first to configure domain/email."
+                fi
+                ;;
+            8)
+                NO_SPINNER="$(toggle_bool "${NO_SPINNER}")"
+                ;;
+            s)
+                break
+                ;;
+            q)
+                log_warn "Deployment cancelled."
+                exit 0
+                ;;
+            *)
+                log_warn "Unknown selection. Choose a menu number, S, or Q."
+                ;;
+        esac
+    done
 }
 
 # Print a compact summary before executing so deploy choices are explicit.
