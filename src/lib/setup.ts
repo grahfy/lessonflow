@@ -393,6 +393,22 @@ export const envVarUpdateSchema = z.object({
 
 export type EnvVarUpdate = z.infer<typeof envVarUpdateSchema>;
 
+export type AdminSettingsSaveInput = Record<string, string> & {
+  ADMIN_PASSWORD?: string;
+};
+
+export type AdminSettingsSaveResult =
+  | {
+      success: true;
+      message: string;
+      requiresReauth: boolean;
+    }
+  | {
+      success: false;
+      errors: Record<string, string>;
+      error?: string;
+    };
+
 const DEFAULT_LOCAL_MATERIAL_ROOT = path.resolve(process.cwd(), ".data/learning-materials");
 
 /**
@@ -765,9 +781,10 @@ function getEnvFilePath(): string {
 /**
  * Writes all env vars to the .env file (preserves comments and unknown vars).
  */
-async function writeEnvFile(vars: Map<string, string>): Promise<void> {
+async function writeEnvFile(vars: Map<string, string>, managedKeys?: Set<string>): Promise<void> {
   const envPath = getEnvFilePath();
   const lines: string[] = [];
+  const keysToManage = managedKeys ?? new Set(CONFIGURABLE_ENV_VARS.map((v) => v.key));
 
   // Try to preserve existing file structure
   try {
@@ -793,7 +810,7 @@ async function writeEnvFile(vars: Map<string, string>): Promise<void> {
       const key = trimmed.substring(0, eqIndex).trim();
 
       // If this is a configurable var, use the new value
-      if (CONFIGURABLE_ENV_VARS.some((v) => v.key === key)) {
+      if (keysToManage.has(key)) {
         const newValue = vars.get(key);
         if (newValue !== undefined) {
           lines.push(`${key}="${newValue}"`);
@@ -907,4 +924,111 @@ export async function saveEnvConfig(input: Record<string, string>): Promise<{ su
   await writeEnvFile(vars);
 
   return { success: true };
+}
+
+/**
+ * Saves admin-editable environment config and syncs legacy admin credential env vars into the
+ * authenticated admin database record so login stays aligned after env changes.
+ */
+export async function saveAdminSettingsConfig(
+  input: AdminSettingsSaveInput,
+  options: { currentAdminId: string }
+): Promise<AdminSettingsSaveResult> {
+  const errors = validateEnvConfig(input);
+  const adminPassword = typeof input.ADMIN_PASSWORD === "string" ? input.ADMIN_PASSWORD : "";
+  const shouldUpdateAdminPassword = adminPassword.trim().length > 0;
+
+  if (shouldUpdateAdminPassword) {
+    const passwordIssues = validateStrongPassword(adminPassword);
+    if (passwordIssues.length > 0) {
+      errors.ADMIN_PASSWORD = passwordIssues.join(" ");
+    }
+  }
+
+  const nextAdminEmail = (input.ADMIN_EMAIL || "").trim().toLowerCase();
+  if (!nextAdminEmail) {
+    errors.ADMIN_EMAIL = "Owner email is required";
+  }
+
+  const currentAdmin = await prisma.adminUser.findUnique({
+    where: { id: options.currentAdminId },
+    select: {
+      id: true,
+      email: true
+    }
+  });
+
+  if (!currentAdmin) {
+    return {
+      success: false,
+      errors: {},
+      error: "Signed-in admin account was not found."
+    };
+  }
+
+  if (nextAdminEmail && nextAdminEmail !== currentAdmin.email) {
+    const conflicting = await prisma.adminUser.findUnique({
+      where: { email: nextAdminEmail },
+      select: { id: true }
+    });
+    if (conflicting && conflicting.id !== currentAdmin.id) {
+      errors.ADMIN_EMAIL = "Another admin account already uses that email.";
+    }
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return { success: false, errors };
+  }
+
+  const vars = new Map<string, string>();
+  const managedKeys = new Set<string>(CONFIGURABLE_ENV_VARS.map((v) => v.key));
+  managedKeys.add("ADMIN_PASSWORD");
+
+  for (const envVar of CONFIGURABLE_ENV_VARS) {
+    const value = input[envVar.key] || "";
+    if (value && value !== "***SET***") {
+      vars.set(envVar.key, value);
+    } else {
+      const existingValue = process.env[envVar.key];
+      if (existingValue) {
+        vars.set(envVar.key, existingValue);
+      }
+    }
+  }
+
+  if (shouldUpdateAdminPassword) {
+    vars.set("ADMIN_PASSWORD", adminPassword);
+  } else if (process.env.ADMIN_PASSWORD) {
+    vars.set("ADMIN_PASSWORD", process.env.ADMIN_PASSWORD);
+  }
+
+  await writeEnvFile(vars, managedKeys);
+
+  const adminUpdate: {
+    email?: string;
+    passwordHash?: string;
+  } = {};
+
+  let requiresReauth = false;
+
+  if (nextAdminEmail && nextAdminEmail !== currentAdmin.email) {
+    adminUpdate.email = nextAdminEmail;
+    requiresReauth = true;
+  }
+  if (shouldUpdateAdminPassword) {
+    adminUpdate.passwordHash = await bcrypt.hash(adminPassword, 12);
+  }
+
+  if (Object.keys(adminUpdate).length > 0) {
+    await prisma.adminUser.update({
+      where: { id: currentAdmin.id },
+      data: adminUpdate
+    });
+  }
+
+  return {
+    success: true,
+    message: "Settings saved to .env. Restart the server to apply runtime changes.",
+    requiresReauth
+  };
 }

@@ -47,6 +47,15 @@ export async function GET(request: NextRequest) {
       }
     })
   ]);
+  const standaloneMaterials = await prisma.learningMaterial.findMany({
+    where: {
+      customerId: student.id,
+      bookingId: null
+    },
+    orderBy: {
+      createdAt: "desc"
+    }
+  });
 
   // Split into upcoming/previous here so all student-facing clients can reuse the same route shape.
   const upcoming = bookings
@@ -68,7 +77,8 @@ export async function GET(request: NextRequest) {
         mimeType: material.mimeType,
         sizeBytes: material.sizeBytes,
         createdAt: material.createdAt.toISOString(),
-        downloadUrl: `/api/student/learning-materials/${material.id}/download`
+        downloadUrl: `/api/student/learning-materials/${material.id}/download`,
+        previewUrl: `/api/student/learning-materials/${material.id}/download?disposition=inline`
       }))
     }));
 
@@ -92,7 +102,8 @@ export async function GET(request: NextRequest) {
         mimeType: material.mimeType,
         sizeBytes: material.sizeBytes,
         createdAt: material.createdAt.toISOString(),
-        downloadUrl: `/api/student/learning-materials/${material.id}/download`
+        downloadUrl: `/api/student/learning-materials/${material.id}/download`,
+        previewUrl: `/api/student/learning-materials/${material.id}/download?disposition=inline`
       }))
     }));
 
@@ -105,6 +116,16 @@ export async function GET(request: NextRequest) {
     now: now.toISOString(),
     upcoming,
     previous,
+    standaloneMaterials: standaloneMaterials.map((material) => ({
+      id: material.id,
+      title: material.title,
+      materialType: material.materialType,
+      mimeType: material.mimeType,
+      sizeBytes: material.sizeBytes,
+      createdAt: material.createdAt.toISOString(),
+      downloadUrl: `/api/student/learning-materials/${material.id}/download`,
+      previewUrl: `/api/student/learning-materials/${material.id}/download?disposition=inline`
+    })),
     pendingRequests: pendingRequests.map((requestRow) => ({
       id: requestRow.id,
       requestedStartAt: requestRow.requestedStartAt.toISOString(),

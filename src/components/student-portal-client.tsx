@@ -12,6 +12,7 @@ type PortalMaterial = {
   sizeBytes: number;
   createdAt: string;
   downloadUrl: string;
+  previewUrl: string;
 };
 
 type PortalBooking = {
@@ -45,6 +46,7 @@ type PortalPayload = {
   now: string;
   upcoming: PortalBooking[];
   previous: PortalBooking[];
+  standaloneMaterials?: PortalMaterial[];
   pendingRequests: PortalPendingRequest[];
 };
 
@@ -343,7 +345,12 @@ export function StudentPortalClient() {
             </section>
             <section className="admin-card student-previous-panel">
               <h2>Previous appointments</h2>
-              <BookingList bookings={data.previous} emptyMessage="No previous appointments." variant="previous" />
+              <BookingList
+                bookings={data.previous}
+                standaloneMaterials={data.standaloneMaterials || []}
+                emptyMessage="No previous appointments."
+                variant="previous"
+              />
             </section>
           </div>
         </>
@@ -357,6 +364,7 @@ export function StudentPortalClient() {
  */
 type BookingListProps = {
   bookings: PortalBooking[];
+  standaloneMaterials?: PortalMaterial[];
   emptyMessage: string;
   variant: "upcoming" | "previous";
   cancellingBookingId?: string | null;
@@ -365,7 +373,8 @@ type BookingListProps = {
 };
 
 function BookingList(input: BookingListProps) {
-  if (!input.bookings.length) {
+  const standaloneMaterials = input.standaloneMaterials || [];
+  if (!input.bookings.length && !(input.variant === "previous" && standaloneMaterials.length)) {
     return <p className="helper-text">{input.emptyMessage}</p>;
   }
 
@@ -422,9 +431,14 @@ function BookingList(input: BookingListProps) {
                     <span>
                       {material.title} ({material.materialType.toUpperCase()})
                     </span>
-                    <a className="btn btn-secondary" href={material.downloadUrl}>
-                      Download
-                    </a>
+                    <span className="dialog-actions-inline">
+                      <a className="btn btn-secondary" href={material.previewUrl} target="_blank" rel="noreferrer">
+                        Preview
+                      </a>
+                      <a className="btn btn-secondary" href={material.downloadUrl}>
+                        Download
+                      </a>
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -434,6 +448,36 @@ function BookingList(input: BookingListProps) {
           </div>
         </article>
       ))}
+      {input.variant === "previous" ? (
+        <article className="booking-item student-portal-booking-item">
+          <div className="student-booking-head">
+            <strong>General learning materials</strong>
+          </div>
+          <div className="student-materials-group">
+            {standaloneMaterials.length ? (
+              <ul className="student-material-list">
+                {standaloneMaterials.map((material) => (
+                  <li key={`general-${material.id}`}>
+                    <span>
+                      {material.title} ({material.materialType.toUpperCase()})
+                    </span>
+                    <span className="dialog-actions-inline">
+                      <a className="btn btn-secondary" href={material.previewUrl} target="_blank" rel="noreferrer">
+                        Preview
+                      </a>
+                      <a className="btn btn-secondary" href={material.downloadUrl}>
+                        Download
+                      </a>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <span className="student-chip">No general materials</span>
+            )}
+          </div>
+        </article>
+      ) : null}
     </div>
   );
 }

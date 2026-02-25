@@ -12,6 +12,7 @@ type PortalMaterial = {
   sizeBytes: number;
   createdAt: string;
   downloadUrl: string;
+  previewUrl: string;
 };
 
 type PortalBooking = {
@@ -29,12 +30,13 @@ type PortalPayload = {
   };
   upcoming: PortalBooking[];
   previous: PortalBooking[];
+  standaloneMaterials?: PortalMaterial[];
 };
 
 type StudentMaterialEntry = {
-  bookingId: string;
-  bookingStartAt: string;
-  lessonMode: "in_person" | "video";
+  bookingId: string | null;
+  bookingStartAt: string | null;
+  lessonMode: "in_person" | "video" | null;
   material: PortalMaterial;
 };
 
@@ -145,9 +147,16 @@ export function StudentMaterialsClient() {
                         </div>
                       </td>
                       <td>{entry.material.materialType.toUpperCase()}</td>
-                      <td>{formatWhen(entry.bookingStartAt)} · {entry.lessonMode === "in_person" ? "In-person" : "Video"}</td>
+                      <td>
+                        {entry.bookingStartAt
+                          ? `${formatWhen(entry.bookingStartAt)} · ${entry.lessonMode === "in_person" ? "In-person" : "Video"}`
+                          : "General material"}
+                      </td>
                       <td>{formatWhen(entry.material.createdAt)}</td>
                       <td className="student-drive-action-cell">
+                        <a className="btn btn-secondary" href={entry.material.previewUrl} target="_blank" rel="noreferrer">
+                          Preview
+                        </a>
                         <a className="btn btn-secondary" href={entry.material.downloadUrl}>
                           Download
                         </a>
@@ -181,6 +190,14 @@ function collectAllStudentMaterials(payload: PortalPayload): StudentMaterialEntr
         material
       });
     }
+  }
+  for (const material of payload.standaloneMaterials || []) {
+    rows.push({
+      bookingId: null,
+      bookingStartAt: null,
+      lessonMode: null,
+      material
+    });
   }
   // Sort by material creation time so the page behaves like a "recently added" library list.
   rows.sort((left, right) => new Date(right.material.createdAt).getTime() - new Date(left.material.createdAt).getTime());

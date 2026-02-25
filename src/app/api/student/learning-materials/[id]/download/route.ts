@@ -40,11 +40,12 @@ export async function GET(request: NextRequest, { params }: Params) {
     status: 200,
     headers: {
       "content-type": material.mimeType,
-      "content-disposition": `attachment; filename="${buildLearningMaterialDownloadFilename({
+      "content-disposition": `${request.nextUrl.searchParams.get("disposition") === "inline" ? "inline" : "attachment"}; filename="${buildLearningMaterialDownloadFilename({
         title: material.title,
         materialType: material.materialType,
         mimeType: material.mimeType
-      })}"`
+      })}"`,
+      "x-content-type-options": "nosniff"
     }
   });
 }

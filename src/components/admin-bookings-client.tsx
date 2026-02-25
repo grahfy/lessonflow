@@ -116,11 +116,13 @@ type LearningMaterialBooking = {
 type LearningMaterialRow = {
   id: string;
   title: string;
-  bookingId: string;
+  bookingId: string | null;
   materialType: "audio" | "pdf";
   mimeType: string;
   sizeBytes: number;
   createdAt: string;
+  previewUrl?: string;
+  downloadUrl?: string;
 };
 
 type CustomerForm = {
@@ -1672,6 +1674,9 @@ export function AdminBookingsClient() {
           >
             Customer Learning Materials
           </button>
+          <button className="btn btn-secondary" type="button" data-motion-item="legend-action-settings" onClick={() => router.push("/admin/settings")}>
+            Settings
+          </button>
           <button className="btn btn-secondary" type="button" data-motion-item="legend-action-invoices" onClick={() => router.push("/admin/invoices")}>
             Invoices
           </button>
@@ -2094,7 +2099,7 @@ export function AdminBookingsClient() {
               </button>
             </div>
             <p className="helper-text dialog-status">
-              Select a customer and one of their appointments before uploading lesson materials.
+              Select a customer, then optionally choose an appointment before uploading lesson materials.
             </p>
 
             <div className="customers-toolbar">
@@ -2153,8 +2158,8 @@ export function AdminBookingsClient() {
                 <option value="">
                   {materialsCustomerId
                     ? materialsBookings.length
-                      ? "Choose appointment"
-                      : "No appointments found for customer"
+                      ? "All appointments (or choose one to link/filter)"
+                      : "No appointments found (uploads will be general materials)"
                     : "Select customer first"}
                 </option>
                 {materialsBookings.map((booking) => (
@@ -2184,7 +2189,7 @@ export function AdminBookingsClient() {
                 </div>
               </div>
               <div className="dialog-actions">
-                <button className="btn btn-primary" type="submit" disabled={!materialsBookingId || materialsUploading}>
+                <button className="btn btn-primary" type="submit" disabled={!materialsCustomerId || materialsUploading}>
                   {materialsUploading ? "Uploading..." : "Upload material"}
                 </button>
               </div>
@@ -2213,9 +2218,27 @@ export function AdminBookingsClient() {
                           <span>
                             <small>Appointment</small> {formatDateTime(booking.startAt)}
                           </span>
-                        ) : null}
+                        ) : (
+                          <span>
+                            <small>Appointment</small> General material (not linked)
+                          </span>
+                        )}
                       </div>
                       <div className="customer-item-actions">
+                        <a
+                          className="btn btn-secondary"
+                          href={material.previewUrl || `/api/admin/learning-materials/${material.id}?disposition=inline`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Preview
+                        </a>
+                        <a
+                          className="btn btn-secondary"
+                          href={material.downloadUrl || `/api/admin/learning-materials/${material.id}?disposition=attachment`}
+                        >
+                          Download
+                        </a>
                         <button
                           className="btn btn-danger"
                           type="button"

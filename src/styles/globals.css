@@ -515,6 +515,34 @@ h1 {
   resize: vertical;
 }
 
+.field-description {
+  color: var(--ink-1);
+  font-size: 0.74rem;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.required-mark {
+  color: rgba(255, 188, 188, 0.95);
+  margin-left: 4px;
+}
+
+.secret-mark {
+  color: var(--ink-1);
+  opacity: 0.9;
+}
+
+.input-error {
+  border-color: rgba(235, 87, 87, 0.75) !important;
+  box-shadow: 0 0 0 1px rgba(235, 87, 87, 0.18);
+}
+
+.field-error {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #ffc0c0;
+}
+
 .password-input-row {
   display: flex;
   align-items: center;
@@ -848,6 +876,21 @@ h1 {
   padding: 14px;
   min-height: 0;
   width: 100%;
+}
+
+.admin-settings-section {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.admin-settings-section-title {
+  margin: 0;
+  font-size: 0.96rem;
+  letter-spacing: 0.02em;
 }
 
 .admin-grid {

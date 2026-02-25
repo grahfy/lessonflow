@@ -92,7 +92,9 @@ export async function GET(request: NextRequest, { params }: Params) {
         materialType: material.materialType,
         mimeType: material.mimeType,
         sizeBytes: material.sizeBytes,
-        createdAt: material.createdAt.toISOString()
+        createdAt: material.createdAt.toISOString(),
+        previewUrl: `/api/admin/learning-materials/${material.id}?disposition=inline`,
+        downloadUrl: `/api/admin/learning-materials/${material.id}?disposition=attachment`
       }))
     });
   } catch (error) {
@@ -101,7 +103,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 }
 
 /**
- * Uploads one material file for a customer-owned appointment.
+ * Uploads one material file for a customer, optionally linking it to an appointment.
  */
 export async function POST(request: NextRequest, { params }: Params) {
   try {
@@ -129,9 +131,6 @@ export async function POST(request: NextRequest, { params }: Params) {
     const title = sanitizeLearningMaterialTitle(String(form.get("title") || ""));
     const file = form.get("file");
 
-    if (!bookingId) {
-      return NextResponse.json({ error: "Appointment selection is required." }, { status: 400 });
-    }
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "Learning material file is required." }, { status: 400 });
     }
@@ -139,14 +138,18 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "File must be between 1 byte and 100MB." }, { status: 400 });
     }
 
-    const booking = await prisma.booking.findFirst({
-      where: {
-        id: bookingId,
-        customerId: customer.id
+    let linkedBookingId: string | null = null;
+    if (bookingId) {
+      const booking = await prisma.booking.findFirst({
+        where: {
+          id: bookingId,
+          customerId: customer.id
+        }
+      });
+      if (!booking) {
+        return NextResponse.json({ error: "Selected appointment is not linked to this customer." }, { status: 400 });
       }
-    });
-    if (!booking) {
-      return NextResponse.json({ error: "Selected appointment is not linked to this customer." }, { status: 400 });
+      linkedBookingId = booking.id;
     }
 
     // File classification normalizes MIME/extension handling and enforces allowed upload types.
@@ -160,7 +163,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const storageKey = buildLearningMaterialStorageKey({
       customerId: customer.id,
-      bookingId: booking.id,
+      bookingId: linkedBookingId,
       extension: classification.extension
     });
 
@@ -176,7 +179,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       const material = await prisma.learningMaterial.create({
         data: {
           customerId: customer.id,
-          bookingId: booking.id,
+          bookingId: linkedBookingId,
           uploadedById: admin.id,
           title,
           materialType: classification.materialType,
@@ -195,7 +198,9 @@ export async function POST(request: NextRequest, { params }: Params) {
             materialType: material.materialType,
             mimeType: material.mimeType,
             sizeBytes: material.sizeBytes,
-            createdAt: material.createdAt.toISOString()
+            createdAt: material.createdAt.toISOString(),
+            previewUrl: `/api/admin/learning-materials/${material.id}?disposition=inline`,
+            downloadUrl: `/api/admin/learning-materials/${material.id}?disposition=attachment`
           }
         },
         { status: 201 }

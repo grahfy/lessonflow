@@ -105,11 +105,12 @@ export function classifyLearningMaterialFile(input: {
  */
 export function buildLearningMaterialStorageKey(input: {
   customerId: string;
-  bookingId: string;
+  bookingId?: string | null;
   extension: string;
 }): string {
   const suffix = `${Date.now()}-${crypto.randomUUID()}`;
-  return `${input.customerId}/${input.bookingId}/${suffix}${input.extension}`;
+  const bookingScope = input.bookingId?.trim() ? input.bookingId : "general";
+  return `${input.customerId}/${bookingScope}/${suffix}${input.extension}`;
 }
 
 /**

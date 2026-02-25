@@ -329,14 +329,15 @@ model CustomerPortalCredentialAuditLog {
   @@index([actorId, createdAt])
 }
 
-// Uploaded lesson resources tied to both the booking and the customer for
-// portal discovery and admin traceability.
+// Uploaded lesson resources tied to the customer and optionally to a booking.
+// `bookingId` is nullable so admins can upload general resources not linked to
+// one appointment (for example practice packs or reference PDFs).
 model LearningMaterial {
   id           String               @id @default(cuid())
   customerId   String
   customer     Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  bookingId    String
-  booking      Booking              @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId    String?
+  booking      Booking?             @relation(fields: [bookingId], references: [id], onDelete: SetNull)
   uploadedById String?
   uploadedBy   AdminUser?           @relation("LearningMaterialUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
   title        String
