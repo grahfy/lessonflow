@@ -7,6 +7,22 @@ import { sendEmail } from "@/lib/email/service";
 import { getOwnerEmail } from "@/lib/env";
 import { logError, logEvent } from "@/lib/observability";
 
+const OWNER_BOOKING_EMAIL_TIMEOUT_MS = 12000;
+
+async function sendOwnerBookingEmailWithTimeout(input: Parameters<typeof sendEmail>[0]) {
+  return Promise.race([
+    sendEmail(input),
+    new Promise<Awaited<ReturnType<typeof sendEmail>>>((resolve) => {
+      setTimeout(() => {
+        resolve({
+          status: "failed",
+          error: `Owner notification email timed out after ${OWNER_BOOKING_EMAIL_TIMEOUT_MS}ms`
+        });
+      }, OWNER_BOOKING_EMAIL_TIMEOUT_MS);
+    })
+  ]);
+}
+
 /**
  * Public booking-request submission endpoint.
  *
@@ -80,7 +96,7 @@ export async function POST(request: Request) {
       recurrenceEndAt: created.recurrenceEndAt
     });
 
-    const emailResult = await sendEmail({
+    const emailResult = await sendOwnerBookingEmailWithTimeout({
       to: getOwnerEmail(),
       subject: template.subject,
       html: template.html

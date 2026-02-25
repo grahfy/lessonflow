@@ -674,7 +674,8 @@ export function AdminInvoicesClient() {
    * Opens the server PDF endpoint in a separate tab to trigger download.
    */
   function downloadInvoicePdf(invoiceId: string) {
-    window.open(`/api/admin/invoices/${invoiceId}/pdf`, "_blank", "noopener,noreferrer");
+    const cacheBust = Date.now();
+    window.open(`/api/admin/invoices/${invoiceId}/pdf?t=${cacheBust}`, "_blank", "noopener,noreferrer");
   }
 
   /**

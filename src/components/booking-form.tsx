@@ -38,85 +38,111 @@ export function BookingForm() {
     event.preventDefault();
     setLoading(true);
     setState({ status: "idle" });
+    const formElement = event.currentTarget;
 
-    const form = new FormData(event.currentTarget);
-    const firstName = String(form.get("firstName") || "").trim();
-    const middleName = String(form.get("middleName") || "").trim();
-    const lastName = String(form.get("lastName") || "").trim();
-    const fullName = [firstName, middleName, lastName].filter(Boolean).join(" ");
-    const startRaw = String(form.get("requestedStartAt") || "");
-    const recurrenceRaw = String(form.get("recurrenceEndAt") || "");
-    const phoneDigits = String(form.get("phone") || "").replace(/\D/g, "").slice(0, 10);
-    const customDurationRaw = String(form.get("customDurationMinutes") || "");
-    const customDurationMinutes =
-      durationType === "custom" && customDurationRaw ? Number.parseInt(customDurationRaw, 10) : undefined;
-
-    // Build the API payload in the same shape used by `/api/booking-requests`.
-    const requestPayload = {
-      name: fullName,
-      email: String(form.get("email") || ""),
-      phone: phoneDigits,
-      unitNumber: String(form.get("unitNumber") || ""),
-      houseNumber: String(form.get("houseNumber") || ""),
-      streetName: String(form.get("streetName") || ""),
-      streetType: String(form.get("streetType") || ""),
-      suburb: String(form.get("suburb") || ""),
-      state: String(form.get("state") || ""),
-      postcode: String(form.get("postcode") || ""),
-      lessonMode: String(form.get("lessonMode") || ""),
-      skillLevel: String(form.get("skillLevel") || ""),
-      lessonDuration: durationType === "min30" ? "min30" : "min60",
-      customDurationMinutes,
-      requestedStartAt: new Date(startRaw).toISOString(),
-      notes: String(form.get("notes") || ""),
-      isRecurring,
-      recurrenceEndAt: isRecurring && recurrenceRaw ? new Date(recurrenceRaw).toISOString() : undefined
-    };
-
-    let response: Response;
     try {
-      // The booking request endpoint persists the request and then notifies the owner by email.
-      response = await fetch("/api/booking-requests", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestPayload)
+      const form = new FormData(formElement);
+      const firstName = String(form.get("firstName") || "").trim();
+      const middleName = String(form.get("middleName") || "").trim();
+      const lastName = String(form.get("lastName") || "").trim();
+      const fullName = [firstName, middleName, lastName].filter(Boolean).join(" ");
+      const startRaw = String(form.get("requestedStartAt") || "");
+      const recurrenceRaw = String(form.get("recurrenceEndAt") || "");
+      const phoneDigits = String(form.get("phone") || "").replace(/\D/g, "").slice(0, 10);
+      const customDurationRaw = String(form.get("customDurationMinutes") || "");
+      const customDurationMinutes =
+        durationType === "custom" && customDurationRaw ? Number.parseInt(customDurationRaw, 10) : undefined;
+
+      const requestedStartAtDate = new Date(startRaw);
+      if (Number.isNaN(requestedStartAtDate.getTime())) {
+        setState({
+          status: "error",
+          message: "Please choose a valid booking start date and time."
+        });
+        return;
+      }
+
+      const recurrenceEndAtDate =
+        isRecurring && recurrenceRaw ? new Date(recurrenceRaw) : null;
+      if (isRecurring && recurrenceRaw && recurrenceEndAtDate && Number.isNaN(recurrenceEndAtDate.getTime())) {
+        setState({
+          status: "error",
+          message: "Please choose a valid recurrence end date and time."
+        });
+        return;
+      }
+
+      // Build the API payload in the same shape used by `/api/booking-requests`.
+      const requestPayload = {
+        name: fullName,
+        email: String(form.get("email") || ""),
+        phone: phoneDigits,
+        unitNumber: String(form.get("unitNumber") || ""),
+        houseNumber: String(form.get("houseNumber") || ""),
+        streetName: String(form.get("streetName") || ""),
+        streetType: String(form.get("streetType") || ""),
+        suburb: String(form.get("suburb") || ""),
+        state: String(form.get("state") || ""),
+        postcode: String(form.get("postcode") || ""),
+        lessonMode: String(form.get("lessonMode") || ""),
+        skillLevel: String(form.get("skillLevel") || ""),
+        lessonDuration: durationType === "min30" ? "min30" : "min60",
+        customDurationMinutes,
+        requestedStartAt: requestedStartAtDate.toISOString(),
+        notes: String(form.get("notes") || ""),
+        isRecurring,
+        recurrenceEndAt: recurrenceEndAtDate ? recurrenceEndAtDate.toISOString() : undefined
+      };
+
+      let response: Response;
+      try {
+        // The booking request endpoint persists the request and then notifies the owner by email.
+        response = await fetch("/api/booking-requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestPayload)
+        });
+      } catch {
+        setState({
+          status: "error",
+          message: "Booking could not be submitted right now. Please try again, or contact us by phone or email."
+        });
+        return;
+      }
+
+      let responsePayload: { id?: string; error?: string; deliveryStatus?: string } | null = null;
+      try {
+        responsePayload = (await response.json()) as { id?: string; error?: string; deliveryStatus?: string };
+      } catch {
+        responsePayload = null;
+      }
+
+      // Saved-request responses can still be returned as 503 when owner notification delivery is
+      // degraded. Treat those as a user-visible success so the requester gets confirmation.
+      if (!response.ok && !(response.status === 503 && typeof responsePayload?.id === "string")) {
+        setState({
+          status: "error",
+          message: responsePayload?.error || "Booking could not be submitted. Check required fields and selected date."
+        });
+        return;
+      }
+
+      formElement.reset();
+      setIsRecurring(false);
+      setDurationType("min60");
+      setState({
+        status: "success",
+        message:
+          "Booking submission is pending. We will get back to you via email or phone within 24 hours regarding booking confirmation."
       });
     } catch {
-      setLoading(false);
       setState({
         status: "error",
         message: "Booking could not be submitted right now. Please try again, or contact us by phone or email."
       });
-      return;
-    }
-
-    let responsePayload: { id?: string; error?: string; deliveryStatus?: string } | null = null;
-    try {
-      responsePayload = (await response.json()) as { id?: string; error?: string; deliveryStatus?: string };
-    } catch {
-      responsePayload = null;
-    }
-
-    // Saved-request responses can still be returned as 503 when owner notification delivery is
-    // degraded. Treat those as a user-visible success so the requester gets confirmation.
-    if (!response.ok && !(response.status === 503 && typeof responsePayload?.id === "string")) {
+    } finally {
       setLoading(false);
-      setState({
-        status: "error",
-        message: responsePayload?.error || "Booking could not be submitted. Check required fields and selected date."
-      });
-      return;
     }
-
-    event.currentTarget.reset();
-    setIsRecurring(false);
-    setDurationType("min60");
-    setLoading(false);
-    setState({
-      status: "success",
-      message:
-        "Booking submission is pending. We will get back to you via email or phone within 24 hours regarding booking confirmation."
-    });
   }
 
   return (

@@ -41,7 +41,12 @@ export async function GET(request: NextRequest, { params }: Params) {
       status: 200,
       headers: {
         "content-type": "application/pdf",
-        "content-disposition": `attachment; filename="${invoice.invoiceNumber}.pdf"`
+        "content-disposition": `attachment; filename="${invoice.invoiceNumber}.pdf"`,
+        // Prevent browsers/proxies from serving a cached pre-edit PDF when an admin
+        // downloads the same invoice again after saving changes.
+        "cache-control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        pragma: "no-cache",
+        expires: "0"
       }
     });
   } catch (error) {

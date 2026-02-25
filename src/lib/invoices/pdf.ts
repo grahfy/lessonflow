@@ -218,6 +218,11 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord): Promise<
     page.drawText(value, { x: rightMargin - valWidth, y: currentY, size: 11, font: vFont, color: rgb(0, 0, 0) });
   };
 
+  // Always show GST explicitly so taxable invoices surface the tax amount and
+  // GST-free invoices still display a clear $0.00 line item before the total.
+  drawTotalPair("GST:", aud(invoice.gstCents), y);
+  y -= 18;
+
   drawTotalPair("Total:", aud(invoice.totalCents), y);
   y -= 14;
   
