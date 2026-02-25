@@ -37,26 +37,36 @@ export function ContactForm() {
       message: String(form.get("message") || "")
     };
 
-    const response = await fetch("/api/contact", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
 
-    setLoading(false);
-    if (!response.ok) {
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        const message =
+          result && typeof result.error === "string"
+            ? result.error
+            : "We could not send your message. Please check fields and try again.";
+        setState({ status: "error", message });
+        return;
+      }
+
+      event.currentTarget.reset();
+      setState({
+        status: "success",
+        message: "Thanks. Your message has been sent and the studio owner has been notified."
+      });
+    } catch {
       setState({
         status: "error",
-        message: "We could not send your message. Please check fields and try again."
+        message: "We could not send your message due to a network error. Please try again."
       });
-      return;
+    } finally {
+      setLoading(false);
     }
-
-    event.currentTarget.reset();
-    setState({
-      status: "success",
-      message: "Thanks. Your message has been sent and the studio owner has been notified."
-    });
   }
 
   return (

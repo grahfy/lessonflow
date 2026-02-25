@@ -35,11 +35,23 @@ export async function POST(request: Request) {
     message: created.message
   });
 
-  await sendEmail({
+  const emailResult = await sendEmail({
     to: getOwnerEmail(),
     subject: template.subject,
     html: template.html
   });
+
+  if (emailResult.status !== "sent") {
+    return NextResponse.json(
+      {
+        ok: false,
+        id: created.id,
+        error: "Your message was saved, but we could not deliver the email notification right now.",
+        deliveryStatus: emailResult.status
+      },
+      { status: 503 }
+    );
+  }
 
   return NextResponse.json({ ok: true, id: created.id });
 }
