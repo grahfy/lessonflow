@@ -1538,6 +1538,7 @@ run_deploy() {
     # Pass through computed heap settings because `sudo` typically drops env vars
     # and deploy.sh uses them before npm/prisma/build steps begin.
     local sudo_env_args=()
+    sudo_env_args+=( "MGS_SKIP_DEPLOY_SHARED_ENV_REVIEW_PROMPT=1" )
     if [[ -n "${NODE_OPTIONS:-}" ]]; then
       sudo_env_args+=( "NODE_OPTIONS=${NODE_OPTIONS}" )
     fi
@@ -1551,7 +1552,7 @@ run_deploy() {
       sudo "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
     fi
   else
-    "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
+    MGS_SKIP_DEPLOY_SHARED_ENV_REVIEW_PROMPT=1 "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
   fi
 
   log_info "Post-deploy cache cleanup..."

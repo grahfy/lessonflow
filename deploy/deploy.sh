@@ -152,6 +152,7 @@ reexec_with_sudo_if_needed() {
     for env_name in \
         NODE_OPTIONS \
         NEXT_LOW_MEMORY_BUILD \
+        MGS_SKIP_DEPLOY_SHARED_ENV_REVIEW_PROMPT \
         DEFAULT_BUILD_NODE_HEAP_MB \
         LOW_RAM_1GB_AUTO_HEAP_MB \
         LOW_RAM_2GB_AUTO_HEAP_MB \
@@ -365,6 +366,7 @@ maybe_edit_shared_env_before_deploy() {
 
     [[ "${IS_TTY}" == true ]] || return 0
     [[ -f "${shared_env_path}" ]] || return 0
+    [[ "${MGS_SKIP_DEPLOY_SHARED_ENV_REVIEW_PROMPT:-}" == "1" ]] && return 0
 
     if path_is_within_deploy_dir "${source_path}"; then
         return 0
