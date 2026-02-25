@@ -16,7 +16,7 @@ type Params = {
   }>;
 };
 
-const MAX_MATERIAL_SIZE_BYTES = 25 * 1024 * 1024;
+const MAX_MATERIAL_SIZE_BYTES = 100 * 1024 * 1024;
 
 /**
  * Lists customer-owned appointments and learning materials for the selected booking scope.
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Learning material file is required." }, { status: 400 });
     }
     if (file.size <= 0 || file.size > MAX_MATERIAL_SIZE_BYTES) {
-      return NextResponse.json({ error: "File must be between 1 byte and 25MB." }, { status: 400 });
+      return NextResponse.json({ error: "File must be between 1 byte and 100MB." }, { status: 400 });
     }
 
     const booking = await prisma.booking.findFirst({

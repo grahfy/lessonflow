@@ -322,7 +322,7 @@ async function readApiErrorFromResponse(response: Response, fallback: string): P
   }
 
   if (response.status === 413) {
-    return `${fallback} The file is too large for the server upload limit. Try a smaller file (app limit: 25MB), or increase nginx client_max_body_size.`;
+    return `${fallback} The file is too large for the server upload limit. Try a smaller file (app limit: 100MB), or increase nginx client_max_body_size.`;
   }
 
   if (contentType.includes("text/html")) {
