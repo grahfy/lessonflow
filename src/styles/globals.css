@@ -94,9 +94,16 @@ a {
 .brand-mark {
   width: 34px;
   height: 34px;
-  border-radius: 50%;
-  background: linear-gradient(140deg, var(--brand-0), var(--brand-1));
-  box-shadow: 0 10px 28px rgba(106, 133, 255, 0.45);
+  display: block;
+  flex-shrink: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background-color: #efd55a;
+  background-image: url("/images/mgs-logo.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  box-shadow: 0 10px 24px rgba(10, 15, 40, 0.35);
 }
 
 .brand-text {

@@ -12,6 +12,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 
 import { prisma } from "@/lib/db";
+import { isGmailConfigured } from "@/lib/email/gmail-service";
 import { getOwnerEmail } from "@/lib/env";
 import { getMaterialStorageDriverName } from "@/lib/student-portal/material-storage";
 
@@ -88,6 +89,46 @@ export const CONFIGURABLE_ENV_VARS = [
     isSecret: false,
     validation: (v: string) => {
       if (!v.trim()) return "Owner email is required";
+      const result = z.string().email().safeParse(v);
+      return result.success ? null : "Must be a valid email";
+    }
+  },
+  {
+    key: "GMAIL_CLIENT_ID",
+    title: "Gmail Client ID",
+    description: "Google Cloud OAuth2 client ID used for Gmail API delivery (preferred on hosts that block SMTP ports).",
+    placeholder: "1234567890-abc123.apps.googleusercontent.com",
+    isRequired: false,
+    isSecret: false,
+    validation: () => null
+  },
+  {
+    key: "GMAIL_CLIENT_SECRET",
+    title: "Gmail Client Secret",
+    description: "Google Cloud OAuth2 client secret for the Gmail API app.",
+    placeholder: "GOCSPX-...",
+    isRequired: false,
+    isSecret: true,
+    validation: () => null
+  },
+  {
+    key: "GMAIL_REFRESH_TOKEN",
+    title: "Gmail Refresh Token",
+    description: "Refresh token generated for the Gmail API sender account.",
+    placeholder: "1//0g...",
+    isRequired: false,
+    isSecret: true,
+    validation: () => null
+  },
+  {
+    key: "GMAIL_USER_EMAIL",
+    title: "Gmail Sender Address",
+    description: "Gmail address used as the sender for outbound emails (for example melbourneguitarschool@gmail.com).",
+    placeholder: "melbourneguitarschool@gmail.com",
+    isRequired: false,
+    isSecret: false,
+    validation: (v: string) => {
+      if (!v.trim()) return null;
       const result = z.string().email().safeParse(v);
       return result.success ? null : "Must be a valid email";
     }
@@ -554,18 +595,34 @@ export async function evaluateSetupChecks(): Promise<SetupCheck[]> {
       : "Set CRON_SECRET to a random value at least 24 characters long."
   });
 
+  const gmailConfigured = isGmailConfigured();
+  const gmailSender = (process.env.GMAIL_USER_EMAIL || "").trim();
+  const gmailSenderValid = gmailSender ? z.string().email().safeParse(gmailSender).success : false;
   const smtpConfigured =
     Boolean((process.env.SMTP_HOST || "").trim()) &&
     Boolean((process.env.SMTP_USER || "").trim()) &&
     Boolean((process.env.SMTP_PASS || "").trim()) &&
     Boolean((process.env.SMTP_FROM || "").trim());
+
+  const hasAnyGmailField =
+    Boolean((process.env.GMAIL_CLIENT_ID || "").trim()) ||
+    Boolean((process.env.GMAIL_CLIENT_SECRET || "").trim()) ||
+    Boolean((process.env.GMAIL_REFRESH_TOKEN || "").trim()) ||
+    Boolean(gmailSender);
+
   checks.push({
-    id: "smtp",
-    title: "SMTP delivery",
-    status: smtpConfigured ? "pass" : "warn",
-    detail: smtpConfigured
-      ? "SMTP credentials are configured for outbound email delivery."
-      : "SMTP is incomplete. Emails will be queued without delivery until SMTP is configured."
+    id: "email-delivery",
+    title: "Email delivery",
+    status: gmailConfigured || smtpConfigured ? "pass" : "warn",
+    detail: gmailConfigured
+      ? gmailSenderValid
+        ? `Gmail API delivery is configured with sender ${gmailSender}.`
+        : "Gmail API delivery is configured."
+      : smtpConfigured
+        ? "SMTP credentials are configured for outbound email delivery."
+        : hasAnyGmailField
+          ? "Gmail delivery is partially configured. Complete GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, and GMAIL_USER_EMAIL (or configure SMTP)."
+          : "Email delivery is not configured. Add Gmail API credentials (recommended) or SMTP credentials for outbound email delivery."
   });
 
   const storageDriver = getMaterialStorageDriverName();
