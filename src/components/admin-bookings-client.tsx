@@ -301,6 +301,37 @@ function readApiErrorMessage(payload: unknown, fallback: string): string {
   return api?.error || fallback;
 }
 
+/**
+ * Reads an API error body across JSON and non-JSON responses so proxy/login
+ * redirects are surfaced as actionable messages.
+ */
+async function readApiErrorFromResponse(response: Response, fallback: string): Promise<string> {
+  const contentType = (response.headers.get("content-type") || "").toLowerCase();
+  if (contentType.includes("application/json")) {
+    const payload = await response.json().catch(() => null);
+    return readApiErrorMessage(payload, fallback);
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    return "Your admin session has expired. Please sign in again.";
+  }
+
+  if (contentType.includes("text/html")) {
+    return `${fallback} The server returned HTML instead of JSON. Check login status or proxy redirects.`;
+  }
+
+  const text = (await response.text().catch(() => "")).replace(/\s+/g, " ").trim();
+  if (text) {
+    return `${fallback} (${text.slice(0, 140)})`;
+  }
+
+  if (response.status > 0) {
+    return `${fallback} (HTTP ${response.status})`;
+  }
+
+  return fallback;
+}
+
 function validateDialogForm(form: DialogForm): string | null {
   const email = form.email.trim();
   const name = form.name.trim();
@@ -417,6 +448,7 @@ export function AdminBookingsClient() {
   const manualFormRef = useRef<HTMLFormElement | null>(null);
   const materialsUploadFormRef = useRef<HTMLFormElement | null>(null);
   const authRedirectingRef = useRef(false);
+  const dialogSessionRef = useRef(0);
 
   const rangeLabel = useMemo(() => `${view.toUpperCase()} VIEW`, [view]);
   const safeFetch = useCallback(async (...args: Parameters<typeof globalThis.fetch>): Promise<Response> => {
@@ -439,6 +471,16 @@ export function AdminBookingsClient() {
     // client router state after the current admin page becomes unauthorized.
     window.location.assign("/admin/login");
   }, []);
+  const handleApiError = useCallback(
+    async (response: Response, fallback: string) => {
+      if (response.status === 401 || response.status === 403) {
+        redirectToAdminLogin();
+        return;
+      }
+      setError(await readApiErrorFromResponse(response, fallback));
+    },
+    [redirectToAdminLogin]
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -452,12 +494,11 @@ export function AdminBookingsClient() {
           return;
         }
 
-        const payload = await bookingRes.json().catch(() => null);
         const fallback =
           bookingRes.status >= 500
             ? "Unable to load admin data right now. Please try again shortly."
             : "Unable to load admin data. Please refresh and try again.";
-        setError(readApiErrorMessage(payload, fallback));
+        setError(await readApiErrorFromResponse(bookingRes, fallback));
         return;
       }
 
@@ -488,14 +529,13 @@ export function AdminBookingsClient() {
         return;
       }
       setLoadingCustomers(false);
-      const payload = await response.json().catch(() => null);
-      setError(payload?.error || "Unable to load customers.");
+      await handleApiError(response, "Unable to load customers.");
       return;
     }
     const data = await response.json();
     setCustomers(data.customers || []);
     setLoadingCustomers(false);
-  }, [redirectToAdminLogin, safeFetch]);
+  }, [handleApiError, redirectToAdminLogin, safeFetch]);
 
   const visibleCustomers = useMemo(() => {
     const query = customerQuery.trim().toLowerCase();
@@ -578,6 +618,8 @@ export function AdminBookingsClient() {
   }, [customersDialogPresence.isMounted, loadCustomers, manualDialogPresence.isMounted, materialsDialogPresence.isMounted]);
 
   function openDialog(event: EventWithRow) {
+    const dialogSession = dialogSessionRef.current + 1;
+    dialogSessionRef.current = dialogSession;
     setNotice("");
     setSelectedEvent(event);
     setDialogForm(defaultFormFromEvent(event));
@@ -601,6 +643,9 @@ export function AdminBookingsClient() {
           return res.json();
         })
         .then((data) => {
+          if (dialogSessionRef.current !== dialogSession) {
+            return;
+          }
           if (data?.customer) {
             setSelectedCustomer(data.customer);
           }
@@ -613,6 +658,7 @@ export function AdminBookingsClient() {
   }
 
   async function closeDialog() {
+    const closingDialogSession = dialogSessionRef.current;
     if (emailDialogPresence.isMounted) {
       await closeEmailDialog();
     }
@@ -626,6 +672,9 @@ export function AdminBookingsClient() {
     }
     dialogPresence.hide(
       () => {
+        if (dialogSessionRef.current !== closingDialogSession) {
+          return;
+        }
         setSelectedEvent(null);
         setDialogForm(null);
         setSelectedCustomer(null);
@@ -710,8 +759,7 @@ export function AdminBookingsClient() {
     });
     setBusyAction(null);
     if (!response.ok) {
-      const payload = await response.json().catch(() => null);
-      setError(payload?.error || "Unable to create invoice.");
+      await handleApiError(response, "Unable to create invoice.");
       return;
     }
 
@@ -928,8 +976,7 @@ export function AdminBookingsClient() {
     });
     setPortalCredentialBusyCustomerId(null);
     if (!response.ok) {
-      const payload = await response.json().catch(() => null);
-      setError(payload?.error || "Unable to manage portal credential.");
+      await handleApiError(response, "Unable to manage portal credential.");
       return;
     }
 
@@ -982,8 +1029,7 @@ export function AdminBookingsClient() {
     );
     setMaterialsLoading(false);
     if (!response.ok) {
-      const payload = await response.json().catch(() => null);
-      setError(payload?.error || "Unable to load learning materials.");
+      await handleApiError(response, "Unable to load learning materials.");
       return;
     }
 
@@ -1058,8 +1104,7 @@ export function AdminBookingsClient() {
     });
     setMaterialsUploading(false);
     if (!response.ok) {
-      const payload = await response.json().catch(() => null);
-      setError(payload?.error || "Upload failed.");
+      await handleApiError(response, "Upload failed.");
       return;
     }
 
@@ -1084,8 +1129,7 @@ export function AdminBookingsClient() {
     });
     setMaterialsDeletingId(null);
     if (!response.ok) {
-      const payload = await response.json().catch(() => null);
-      setError(payload?.error || "Unable to delete learning material.");
+      await handleApiError(response, "Unable to delete learning material.");
       return;
     }
 
@@ -1105,8 +1149,7 @@ export function AdminBookingsClient() {
       body: JSON.stringify({ action, ...body })
     });
     if (!response.ok) {
-      const payload = await response.json().catch(() => null);
-      setError(payload?.error || "Booking update failed.");
+      await handleApiError(response, "Booking update failed.");
       return false;
     }
     return true;
@@ -1122,8 +1165,7 @@ export function AdminBookingsClient() {
       body: JSON.stringify({ action, ...body })
     });
     if (!response.ok) {
-      const payload = await response.json().catch(() => null);
-      setError(payload?.error || "Pending request update failed.");
+      await handleApiError(response, "Pending request update failed.");
       return false;
     }
     return true;
@@ -1155,8 +1197,7 @@ export function AdminBookingsClient() {
     });
     setBusyAction(null);
     if (!response.ok) {
-      const payload = await response.json().catch(() => null);
-      setError(payload?.error || "Notification failed.");
+      await handleApiError(response, "Notification failed.");
       return;
     }
     setNotice(action === "reminder" ? "Reminder sent." : "Custom email sent.");
@@ -1293,8 +1334,10 @@ export function AdminBookingsClient() {
     });
     setBusyAction(null);
     if (!response.ok) {
-      const payload = await response.json().catch(() => null);
-      setError(payload?.error || (selectedEvent.entityType === "booking" ? "Unable to delete booking." : "Unable to delete booking request."));
+      await handleApiError(
+        response,
+        selectedEvent.entityType === "booking" ? "Unable to delete booking." : "Unable to delete booking request."
+      );
       return;
     }
     await closeDialog();
@@ -1330,8 +1373,7 @@ export function AdminBookingsClient() {
       method: "DELETE"
     });
     if (!response.ok) {
-      const payload = await response.json().catch(() => null);
-      setError(payload?.error || "Unable to remove series.");
+      await handleApiError(response, "Unable to remove series.");
       return;
     }
     await closeDialog();
@@ -1404,8 +1446,7 @@ export function AdminBookingsClient() {
       }
     }
     if (!response.ok) {
-      const payloadResponse = await response.json().catch(() => null);
-      setError(payloadResponse?.error || "Manual booking create failed.");
+      await handleApiError(response, "Manual booking create failed.");
       return;
     }
     formElement.reset();
@@ -1464,8 +1505,7 @@ export function AdminBookingsClient() {
     });
     setSavingCustomer(false);
     if (!response.ok) {
-      const responsePayload = await response.json().catch(() => null);
-      setError(responsePayload?.error || "Unable to save customer.");
+      await handleApiError(response, "Unable to save customer.");
       return;
     }
 
@@ -1497,8 +1537,7 @@ export function AdminBookingsClient() {
     const response = await safeFetch(`/api/admin/customers/${customer.id}`, { method: "DELETE" });
     setDeletingCustomerId(null);
     if (!response.ok) {
-      const payloadResponse = await response.json().catch(() => null);
-      setError(payloadResponse?.error || "Unable to delete customer.");
+      await handleApiError(response, "Unable to delete customer.");
       return;
     }
 
@@ -2447,6 +2486,7 @@ export function AdminBookingsClient() {
           onClick={() => void closeDialog()}
         >
           <div
+            key={selectedKey ?? "none"}
             className="dialog-panel booking-dialog-panel"
             data-motion-item="booking-dialog-panel"
             role="dialog"
@@ -2700,7 +2740,7 @@ export function AdminBookingsClient() {
                         </div>
                       ) : null}
                       <div className="field">
-                        <label>Start</label>
+                        <label>Start (edit this field to move)</label>
                         <input
                           type="datetime-local"
                           value={dialogForm.startAtLocal}

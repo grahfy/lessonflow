@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 import { GET, POST } from "@/app/api/admin/customers/[id]/portal-credential/route";
@@ -9,6 +9,7 @@ import {
   ensurePortalCredentialForCustomer,
   verifyPortalPassword
 } from "@/lib/student-portal/credentials";
+import * as portalCredentialLib from "@/lib/student-portal/credentials";
 
 describe("admin-portal-credential", () => {
   beforeEach(async () => {
@@ -122,5 +123,54 @@ describe("admin-portal-credential", () => {
     expect(auditLogs.map((log) => log.action)).toContain("generated");
     expect(auditLogs.map((log) => log.action)).toContain("revealed");
     expect(auditLogs.map((log) => log.action)).toContain("rotated");
+  });
+
+  it("returns a JSON 500 when regenerate throws unexpectedly", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+    const cookie = `${getSessionCookieName()}=${token}`;
+
+    const customer = await prisma.customer.create({
+      data: customerSnapshotFromInput({
+        name: "Broken Rotate",
+        email: "broken.rotate@example.com",
+        phone: "0400111222",
+        lessonMode: "video",
+        skillLevel: "beginner",
+        unitNumber: undefined,
+        houseNumber: "10",
+        streetName: "Broken",
+        streetType: "Street",
+        suburb: "Brunswick",
+        state: "VIC",
+        postcode: "3056"
+      })
+    });
+
+    const rotateSpy = vi
+      .spyOn(portalCredentialLib, "rotatePortalCredential")
+      .mockRejectedValueOnce(new Error("Simulated rotate failure"));
+
+    const regenerateRequest = new NextRequest(`http://localhost/api/admin/customers/${customer.id}/portal-credential`, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "regenerate"
+      }),
+      headers: {
+        "content-type": "application/json",
+        cookie
+      }
+    });
+
+    const regenerateResponse = await POST(regenerateRequest, {
+      params: Promise.resolve({ id: customer.id })
+    });
+    const payload = (await regenerateResponse.json()) as { error?: string };
+
+    expect(regenerateResponse.status).toBe(500);
+    expect(regenerateResponse.headers.get("content-type")).toContain("application/json");
+    expect(payload.error).toBe("Simulated rotate failure");
+
+    rotateSpy.mockRestore();
   });
 });
