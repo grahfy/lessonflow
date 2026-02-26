@@ -19,17 +19,22 @@ export default function HomePage() {
       lead="Melbourne Guitar School offers artist-minded one-on-one coaching and guitar tuition shaped around your musical identity, goals, and pace. Whether you are starting from scratch, returning to the instrument, or chasing a sharper and more expressive sound, each lesson is built to create progress you can hear in real music, not just practice-room exercises."
       visualLabel="Guitar performance"
       visualClassName="home-hero"
+      leadJustified={true}
       actions={
-        <div className="button-row" data-motion-item="home-actions">
-          <TweenLink className="btn btn-primary" href="/book" data-motion-item="home-action-book">
-            Start With a First Guitar Tuition Session
-          </TweenLink>
-          <TweenLink className="btn btn-secondary" href="/videos" data-motion-item="home-action-videos">
-            Watch Jon King
-          </TweenLink>
-          <TweenLink className="btn btn-secondary" href="/lessons" data-motion-item="home-action-lessons">
-            Explore Lesson Paths
-          </TweenLink>
+        <div className="home-actions" data-motion-item="home-actions">
+          <div className="home-actions-primary" data-motion-item="home-action-book">
+            <TweenLink className="btn btn-primary" href="/book">
+              Start With a First Guitar Tuition Session
+            </TweenLink>
+          </div>
+          <div className="home-actions-secondary">
+            <TweenLink className="btn btn-secondary" href="/videos" data-motion-item="home-action-videos">
+              Watch Jon King
+            </TweenLink>
+            <TweenLink className="btn btn-secondary" href="/lessons" data-motion-item="home-action-lessons">
+              Explore Lesson Paths
+            </TweenLink>
+          </div>
         </div>
       }
     >

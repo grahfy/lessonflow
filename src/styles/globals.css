@@ -386,6 +386,23 @@ h1 {
   padding-top: 4px;
 }
 
+.home-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.home-actions-primary {
+  display: flex;
+}
+
+.home-actions-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
