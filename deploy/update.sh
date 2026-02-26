@@ -225,7 +225,7 @@ print_box_banner() {
 print_banner() {
   local app_version
   app_version="$(get_app_version)"
-  print_box_banner "Melbourne Guitar School Update (+ deploy) v${app_version}"
+  print_box_banner "LessonFlow Update v1.0"
 }
 
 # Extracts the first useful server_name token from an nginx site config so the
@@ -1330,19 +1330,20 @@ print_tui_remote_update_alert() {
 
 print_update_tui_menu() {
   tui_clear_screen
-  print_box_banner "Update + Deploy TUI"
+  print_box_banner "LessonFlow Update v1.0"
   echo -e "${DIM}btop-style menu: configure git update + deploy handoff, then run.${NC}"
   echo ""
-  echo -e "  $(status_chip "Branch" "$(tui_truncate_text "${BRANCH}" 16)")  $(status_chip "Remote" "$(tui_truncate_text "${REMOTE_NAME}" 12)")  $(status_chip "Pull" "$(bool_word "$(toggle_bool "${SKIP_PULL}")")")"
-  echo -e "  $(status_chip "Deploy" "$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")")  $(status_chip "DirtyOK" "$(bool_word "${ALLOW_DIRTY}")")  $(status_chip "Sudo" "$(update_sudo_mode_label)")  $(status_chip "Spin" "$(spinner_ui_word)")"
+  echo -e "  $(status_chip "Branch" "$(tui_truncate_text "${BRANCH}" 16)")  $(status_chip "Remote" "$(tui_truncate_text "${REMOTE_NAME}" 12)")  $(status_chip "Pull" "$(bool_word "$(toggle_bool "${SKIP_PULL}")")")  $(status_chip "Deploy" "$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")")"
   if [[ "${SKIP_DEPLOY}" == false ]]; then
-    echo -e "  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "Cron" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")")  $(status_chip "DB" "$(update_migration_mode_label)")"
-    echo -e "  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")"
+    echo -e "  $(status_chip "Dirty" "$(bool_word "${ALLOW_DIRTY}")")  $(status_chip "Sudo" "$(update_sudo_mode_label)")  $(status_chip "Spin" "$(spinner_ui_word)")  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "Cron" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")")  $(status_chip "DB" "$(update_migration_mode_label)")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")"
+  else
+    echo -e "  $(status_chip "Dirty" "$(bool_word "${ALLOW_DIRTY}")")  $(status_chip "Sudo" "$(update_sudo_mode_label)")  $(status_chip "Spin" "$(spinner_ui_word)")"
   fi
   echo ""
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
   print_tui_remote_update_alert
   if [[ "${TUI_REMOTE_UPDATE_STATUS}" == "update-available" ]]; then
+    print_tui_action_pair "R" "Grab update + reload script"
     echo ""
   fi
   echo -e "${BOLD}${BLUE}  Update Workflow Options${NC}"
@@ -1356,7 +1357,7 @@ print_update_tui_menu() {
   print_tui_option_pair "7" "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")" "ON runs npm install in deploy.sh. OFF passes --skip-deps." \
     "8" "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")" "ON lets deploy.sh sync managed cron jobs."
   print_tui_option_pair "9" "Spinner UI" "$(spinner_ui_word)" "Animated progress spinner for update/deploy steps." \
-    "10" "Edit shared .env" "Open editor now" "Create shared .env from .env.example if missing, then edit."
+    "10" "Edit shared .env" "Open editor" "Create shared .env if missing, then edit."
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
   echo -e "${BOLD}${GREEN}  Bootstrap Workflow Helpers${NC}"
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
@@ -1385,6 +1386,39 @@ print_update_tui_menu() {
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
   print_tui_action_pair "S" "Start update + deploy" "Q" "Cancel"
   print_tui_hint_line "Tip: deploy.sh runs migrations/nginx/restarts; this menu sets wrapper + pass-through flags."
+}
+
+# Pulls the selected branch immediately from the TUI and reloads update.sh
+# without running deploy. Useful when the remote-update banner shows a newer
+# script version and the operator wants the new script/menu first.
+run_tui_script_update_and_reload() {
+  section "Script Update"
+
+  if [[ "${SKIP_PULL}" == true ]]; then
+    log_warn "Enable Pull latest changes first to grab and reload the script."
+    return 0
+  fi
+
+  if [[ "${ALLOW_DIRTY}" != true ]] && git_worktree_dirty; then
+    log_warn "Working tree is dirty. Commit/stash changes or enable Allow dirty worktree."
+    return 0
+  fi
+
+  local before_commit=""
+  local after_commit=""
+  before_commit="$(git rev-parse --short=12 HEAD 2>/dev/null || true)"
+
+  run_step "Fetching ${REMOTE_NAME}/${BRANCH}" git fetch "${REMOTE_NAME}" "${BRANCH}" || return 0
+
+  if [[ "$(current_branch_name)" != "${BRANCH}" ]]; then
+    run_step "Checking out ${BRANCH}" git checkout "${BRANCH}" || return 0
+  fi
+
+  run_step "Pulling latest ${REMOTE_NAME}/${BRANCH}" git pull --ff-only "${REMOTE_NAME}" "${BRANCH}" || return 0
+  after_commit="$(git rev-parse --short=12 HEAD 2>/dev/null || true)"
+  log_info "Repository commit: $(git rev-parse --short HEAD)"
+  maybe_restart_after_self_update "${before_commit}" "${after_commit}"
+  log_info "No script update applied."
 }
 
 # Spinner start routine used by run_step for long-running git commands.
@@ -1631,7 +1665,7 @@ run_interactive_setup() {
 
   while true; do
     print_update_tui_menu
-    read -r -p "Select option [1-19, j, n, p, u, s, q]: " choice
+    read -r -p "Select option [1-19, j, n, p, r, u, s, q]: " choice
 
     case "${choice,,}" in
       1)
@@ -1733,6 +1767,9 @@ run_interactive_setup() {
       p)
         ensure_php_fpm_installed_if_needed_from_update || true
         ;;
+      r)
+        run_tui_script_update_and_reload
+        ;;
       u)
         install_app_systemd_service_from_update || true
         ;;
@@ -1744,7 +1781,7 @@ run_interactive_setup() {
         exit 0
         ;;
       *)
-        log_warn "Unknown selection. Choose a menu number, J/N/P/U, S, or Q."
+        log_warn "Unknown selection. Choose a menu number, J/N/P/R/U, S, or Q."
         ;;
     esac
   done

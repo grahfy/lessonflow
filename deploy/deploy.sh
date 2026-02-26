@@ -260,7 +260,7 @@ print_box_banner() {
 print_banner() {
     local app_version
     app_version="$(get_app_version)"
-    print_box_banner "Melbourne Guitar School Deploy (Next.js) v${app_version}"
+    print_box_banner "LessonFlow Deploy v1.0"
 }
 
 # Standardized info line for quick, readable progress output.
@@ -1243,13 +1243,11 @@ deploy_cycle_migration_mode() {
 
 print_deploy_tui_menu() {
     tui_clear_screen
-    print_box_banner "Deploy TUI • ${APP_NAME}"
+    print_box_banner "LessonFlow Deploy v1.0"
     echo -e "${DIM}btop-style menu: edit values, review live status, then start.${NC}"
     echo ""
-    echo -e "  ${BOLD}${CYAN}Live Status${NC}"
-    echo -e "  $(status_chip "Branch" "$(tui_truncate_text "${BRANCH}" 18)")  $(status_chip "DB" "$(deploy_migration_mode_label)")"
-    echo -e "  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "Cron" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")")  $(status_chip "Pkg" "$(bool_word "${SETUP_PACKAGES}")")"
-    echo -e "  $(status_chip "EnvDB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")  $(status_chip "Spin" "$(spinner_ui_word)")"
+    echo -e "  $(status_chip "Branch" "$(tui_truncate_text "${BRANCH}" 18)")  $(status_chip "DB" "$(deploy_migration_mode_label)")  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "Cron" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")")"
+    echo -e "  $(status_chip "Pkg" "$(bool_word "${SETUP_PACKAGES}")")  $(status_chip "EnvDB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")  $(status_chip "Spin" "$(spinner_ui_word)")"
     echo ""
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     echo -e "${BOLD}${BLUE}  Main Options${NC}"
@@ -1271,7 +1269,7 @@ print_deploy_tui_menu() {
     echo -e "${BOLD}${YELLOW}  UI Options${NC}"
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     print_tui_option_pair "9" "Spinner UI" "$(spinner_ui_word)" "Animated progress spinner for long-running commands." \
-        "10" "Edit shared .env" "Open editor now" "Create shared .env from .env.example if missing, then edit."
+        "10" "Edit shared .env" "Open editor" "Create shared .env if missing, then edit."
     print_tui_option_pair "11" "MySQL + create DB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")" "ON: Start installs MySQL and creates DB from shared .env."
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     echo -e "${BOLD}${GREEN}  Bootstrap Workflow Helpers${NC}"
@@ -1285,9 +1283,10 @@ print_deploy_tui_menu() {
     print_tui_action_pair "M" "Run MySQL + create DB" "N" "Install Nginx"
     print_tui_action_pair "P" "Install PHP-FPM (if needed)" "U" "Install/update app service"
     print_tui_action_pair "J" "Install/update cron jobs"
+    print_tui_action_pair "R" "Grab update + reload script"
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     print_tui_action_pair "S" "Start deploy" "Q" "Cancel"
-    print_tui_hint_line "Tip: actions run now; options 11-13 are Start deploy toggles."
+    print_tui_hint_line "Tip: R checks for deploy.sh updates now; 11-13 are Start deploy toggles."
 }
 
 # Ask for deploy options in a TTY using a menu-style terminal UI so one command
@@ -1297,7 +1296,7 @@ run_interactive_setup() {
 
     while true; do
         print_deploy_tui_menu
-        read -r -p "Select option [1-13, j, m, n, p, u, s, q]: " choice
+        read -r -p "Select option [1-13, j, m, n, p, r, u, s, q]: " choice
 
         case "${choice,,}" in
             1)
@@ -1366,6 +1365,9 @@ run_interactive_setup() {
             p)
                 ensure_php_fpm_installed_if_needed_from_deploy || true
                 ;;
+            r)
+                maybe_self_update_and_restart
+                ;;
             u)
                 install_app_systemd_service_from_deploy || true
                 ;;
@@ -1377,7 +1379,7 @@ run_interactive_setup() {
                 exit 0
                 ;;
             *)
-                log_warn "Unknown selection. Choose a menu number, J/M/N/P/U, S, or Q."
+                log_warn "Unknown selection. Choose a menu number, J/M/N/P/R/U, S, or Q."
                 ;;
         esac
     done
