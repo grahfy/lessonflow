@@ -77,16 +77,31 @@ BOLD='\033[1m'
 NC='\033[0m'
 DIM='\033[2m'
 
-# btop colors
+# btop colors - enhanced gradient palette
 BTOP_FG='\033[38;5;250m'
 BTOP_FG_DIM='\033[38;5;245m'
 BTOP_CYAN='\033[38;5;45m'
 BTOP_CYAN_BRIGHT='\033[38;5;51m'
 BTOP_GREEN='\033[38;5;82m'
+BTOP_GREEN_DIM='\033[38;5;77m'
 BTOP_BLUE='\033[38;5;33m'
+BTOP_BLUE_DIM='\033[38;5;31m'
 BTOP_ORANGE='\033[38;5;208m'
+BTOP_ORANGE_DIM='\033[38;5;202m'
 BTOP_PURPLE='\033[38;5;141m'
+BTOP_PURPLE_DIM='\033[38;5;135m'
 BTOP_YELLOW='\033[1;33m'
+BTOP_YELLOW_DIM='\033[38;5;178m'
+BTOP_RED='\033[38;5;196m'
+BTOP_RED_DIM='\033[38;5;160m'
+
+# btop gradient colors for usage bars
+BTOP_GRAD_0='\033[38;5;82m'   # green - low
+BTOP_GRAD_1='\033[38;5;119m'  # light green
+BTOP_GRAD_2='\033[38;5;77m'  # green-yellow
+BTOP_GRAD_3='\033[38;5;178m' # yellow
+BTOP_GRAD_4='\033[38;5;208m' # orange
+BTOP_GRAD_5='\033[38;5;196m' # red
 
 # Box drawing
 BOX_TL='┌'
@@ -239,15 +254,103 @@ get_uptime() {
 get_load_average() { awk '{print $1}' /proc/loadavg 2>/dev/null || echo "0.00"; }
 get_process_count() { grep -c '^proc' /proc/stat 2>/dev/null || echo "1"; }
 
+get_cpu_color() {
+  local p="$1"
+  if (( p < 30 )); then echo "${BTOP_GRAD_0}";
+  elif (( p < 50 )); then echo "${BTOP_GRAD_1}";
+  elif (( p < 70 )); then echo "${BTOP_GRAD_2}";
+  elif (( p < 85 )); then echo "${BTOP_GRAD_3}";
+  elif (( p < 95 )); then echo "${BTOP_ORANGE}";
+  else echo "${BTOP_RED}"; fi;
+}
+
+get_mem_color() {
+  local p="$1"
+  if (( p < 50 )); then echo "${BTOP_BLUE}";
+  elif (( p < 70 )); then echo "${BTOP_CYAN}";
+  elif (( p < 85 )); then echo "${BTOP_YELLOW}";
+  else echo "${BTOP_ORANGE}"; fi;
+}
+
+get_disk_color() {
+  local p="$1"
+  if (( p < 60 )); then echo "${BTOP_GREEN}";
+  elif (( p < 75 )); then echo "${BTOP_YELLOW}";
+  elif (( p < 90 )); then echo "${BTOP_ORANGE}";
+  else echo "${BTOP_RED}"; fi;
+}
+
 draw_mini_bar() {
-  local p="$1" w="${2:-15}"
+  local p="$1" w="${2:-12}"
   ((p = p < 0 ? 0 : p > 100 ? 100 : p))
   local filled=$(( (p * w) / 100 )) empty=$(( w - filled ))
   local bar=""
   local i
-  for ((i=0; i<filled; i++)); do bar+="${BTOP_GREEN}${BLOCK_FULL}"; done
+  local color
+  color=$(get_cpu_color "$p")
+  for ((i=0; i<filled; i++)); do bar+="${color}${BLOCK_FULL}"; done
   for ((i=0; i<empty; i++)); do bar+="${BTOP_FG_DIM}${BLOCK_EMPTY}"; done
   printf "${bar}%s${NC}" ""
+}
+
+draw_cpu_graph() {
+  local cpu="$1" width="${2:-20}"
+  local bar
+  bar=$(draw_mini_bar "$cpu" "$width")
+  local color
+  color=$(get_cpu_color "$cpu")
+  printf "${color}%s${NC} %3d%%" "${bar}" "$cpu"
+}
+
+draw_mem_graph() {
+  local mem="$1" width="${2:-20}"
+  local bar
+  bar=$(draw_mini_bar "$mem" "$width")
+  local color
+  color=$(get_mem_color "$mem")
+  printf "${color}%s${NC} %3d%%" "${bar}" "$mem"
+}
+
+draw_disk_graph() {
+  local disk="$1" width="${2:-20}"
+  local bar
+  bar=$(draw_mini_bar "$disk" "$width")
+  local color
+  color=$(get_disk_color "$disk")
+  printf "${color}%s${NC} %3d%%" "${bar}" "$disk"
+}
+
+get_hostname() { hostname 2>/dev/null || echo "unknown"; }
+get_kernel() { uname -r 2>/dev/null | cut -d- -f1 || echo "unknown"; }
+get_uptime_days() {
+  local uptime_secs=""
+  [[ -f /proc/uptime ]] && uptime_secs=$(awk '{print int($1)}' /proc/uptime)
+  [[ -z "${uptime_secs}" || "${uptime_secs}" -eq 0 ]] && { echo "0"; return; }
+  echo $((uptime_secs / 86400))
+}
+
+print_btop_header() {
+  local width="$1"
+  local ts
+  ts=$(date '+%Y-%m-%d %H:%M:%S')
+  local hn
+  hn=$(get_hostname)
+  local kern
+  kern=$(get_kernel)
+  
+  printf "${BTOP_FG}${BOX_TL}"; local i; for ((i=0;i<width-2;i++)); do printf "${BOX_H}"; done; printf "${BOX_TR}\n"
+  printf "${BTOP_FG}${BOX_V}%*s%s%*s${BTOP_FG}${BOX_V}\n" $(( (width - 28) / 2 )) "" "⬡ Melbourne Guitar School" $(( width - 28 - (width - 28) / 2 - 2 )) ""
+  printf "${BTOP_FG}${BOX_V}  ${BTOP_CYAN}Maintenance Console${NC}%*s${BTOP_FG}${BOX_V}\n" $(( width - 25 )) ""
+  printf "${BTOP_FG}${BOX_VR}"; for ((i=0;i<width-2;i++)); do printf "${BOX_H}"; done; printf "${BTOP_VL}\n"
+  
+  printf "${BTOP_FG}${BOX_V} ${BTOP_FG_DIM}Host:${NC} ${BTOP_CYAN_BRIGHT}%s${NC}" "${hn}"
+  printf "  ${BTOP_FG_DIM}Kernel:${NC} ${BTOP_YELLOW}%s${NC}" "${kern}"
+  local used=$(( 7 + ${#hn} + 10 + ${#kern} + 10 ))
+  for ((i=0; i<width-used_len-4; i++)); do printf " "; done
+  printf "${BTOP_FG}${BOX_V}\n"
+  
+  printf "${BTOP_FG}${BOX_V} ${BTOP_FG_DIM}Time:${NC} ${BTOP_GREEN}%s${NC}%*s${BTOP_FG}${BOX_V}\n" "${ts}" $(( width - ${#ts} - 15 )) ""
+  printf "${BTOP_FG}${BOX_BL}"; for ((i=0;i<width-2;i++)); do printf "${BOX_H}"; done; printf "${BOX_BR}\n"
 }
 
 # =============================================================================
@@ -762,7 +865,7 @@ detect_tty_capabilities() {
   fi
   if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then
     RED='' GREEN='' YELLOW='' BLUE='' CYAN='' MAGENTA='' BOLD='' DIM='' NC=''
-    BTOP_FG='' BTOP_FG_DIM='' BTOP_CYAN='' BTOP_CYAN_BRIGHT='' BTOP_GREEN='' BTOP_BLUE='' BTOP_ORANGE='' BTOP_PURPLE='' BTOP_YELLOW=''
+    BTOP_FG='' BTOP_FG_DIM='' BTOP_CYAN='' BTOP_CYAN_BRIGHT='' BTOP_GREEN='' BTOP_GREEN_DIM='' BTOP_BLUE='' BTOP_BLUE_DIM='' BTOP_ORANGE='' BTOP_ORANGE_DIM='' BTOP_PURPLE='' BTOP_PURPLE_DIM='' BTOP_YELLOW='' BTOP_YELLOW_DIM='' BTOP_RED='' BTOP_RED_DIM='' BTOP_GRAD_0='' BTOP_GRAD_1='' BTOP_GRAD_2='' BTOP_GRAD_3='' BTOP_GRAD_4='' BTOP_GRAD_5=''
   fi
 }
 
@@ -771,36 +874,39 @@ print_btop_main_menu() {
   local cpu=$(get_cpu_usage) mem=$(get_memory_usage) disk=$(get_disk_usage "/") up=$(get_uptime)
   local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
   
-  print_box_banner "LessonFlow Maintenance v1.0"
-  echo -e "${DIM}btop-style menu: system monitoring, backups, SEO tools.${NC}"
+  print_btop_header "$width"
   echo ""
-  echo -e "  $(status_chip "CPU" "${cpu}%")  $(status_chip "MEM" "${mem}%")  $(status_chip "DISK" "${disk}%")  $(status_chip "UPTIME" "${up}")"
+  
+  printf "  ${BTOP_FG_DIM}CPU${NC}   "; draw_cpu_graph "$cpu" 18; printf "  ${BTOP_FG_DIM}Uptime:${NC} ${BTOP_PURPLE}%s${NC}\n" "$up"
+  printf "  ${BTOP_FG_DIM}MEM${NC}   "; draw_mem_graph "$mem" 18; printf "  ${BTOP_FG_DIM}Procs:${NC} ${BTOP_CYAN}%s${NC}\n" "$(get_process_count)"
+  printf "  ${BTOP_FG_DIM}DISK${NC}  "; draw_disk_graph "$disk" 18; printf "  ${BTOP_FG_DIM}Load:${NC} ${BTOP_YELLOW}%s${NC}\n" "$(get_load_average)"
+  
   echo ""
   print_tui_panel_rule "${width}"
-  echo -e "${BOLD}${BLUE}  Backup & Restore${NC}"
+  echo -e "  ${BOLD}${BTOP_CYAN}⬡${NC} ${BOLD}Backup & Restore${NC}"
   print_tui_panel_rule "${width}"
-  print_tui_option_pair "1" "Run Backup" "$(bool_word "true")" "Create .tar.xz archive of app components." \
-    "2" "Restore Backup" "$(bool_word "true")" "Restore from local or cloud backup."
-  print_tui_option_pair "3" "Components" "Toggle" "Configure which elements to include in backups." \
+  print_tui_option_pair "1" "Run Backup" "▶ Run" "Create .tar.xz archive of app components." \
+    "2" "Restore Backup" "▶ Run" "Restore from local or cloud backup."
+  print_tui_option_pair "3" "Components" "⚙ Set" "Configure which elements to include in backups." \
     "4" "Cloud" "${BACKUP_CLOUD_PROVIDER}" "Upload backups to cloud storage."
   print_tui_option_pair "5" "Schedule" "${BACKUP_FREQUENCY}" "Set automatic backup frequency." \
     "6" "Retention" "${BACKUP_RETENTION_DAYS}d" "Days to keep local backups."
   print_tui_panel_rule "${width}"
-  echo -e "${BOLD}${BLUE}  SEO & Database${NC}"
+  echo -e "  ${BOLD}${BTOP_CYAN}⬡${NC} ${BOLD}SEO & Database${NC}"
   print_tui_panel_rule "${width}"
-  print_tui_option_pair "7" "Generate Sitemap" "Run" "Generate sitemap.xml from SEO config." \
-    "8" "Generate Robots.txt" "Run" "Generate robots.txt for search engines."
-  print_tui_option_pair "9" "Database Health" "Check" "Verify database connection and status." \
-    "10" "Clean Cache" "Run" "Remove Next.js build cache."
+  print_tui_option_pair "7" "Generate Sitemap" "▶ Run" "Generate sitemap.xml from SEO config." \
+    "8" "Generate Robots.txt" "▶ Run" "Generate robots.txt for search engines."
+  print_tui_option_pair "9" "Database Health" "● Check" "Verify database connection and status." \
+    "10" "Clean Cache" "✖ Run" "Remove Next.js build cache."
   print_tui_panel_rule "${width}"
-  echo -e "${BOLD}${BLUE}  System${NC}"
+  echo -e "  ${BOLD}${BTOP_CYAN}⬡${NC} ${BOLD}System${NC}"
   print_tui_panel_rule "${width}"
-  print_tui_option_pair "11" "Git Pull" "Run" "Fetch and merge latest from remote." \
-    "12" "Edit Config" "Open" "Edit .env or SEO config files."
+  print_tui_option_pair "11" "Git Pull" "↓ Run" "Fetch and merge latest from remote." \
+    "12" "Edit Config" "◈ Open" "Edit .env or SEO config files."
   echo ""
   print_tui_panel_rule "${width}"
-  print_tui_action_pair "S" "Start Selected Action" "Q" "Quit"
-  print_tui_hint_line "Enter number to select, or prefix with action: 1-9,0,S,Q"
+  print_tui_action_pair "Enter" "Select Option" "Q" "Quit"
+  print_tui_hint_line "Press number 1-12 to select, or Q to quit"
 }
 
 # =============================================================================
