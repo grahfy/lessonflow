@@ -290,10 +290,10 @@ get_disk_color() {
 draw_mini_bar() {
   local p="$1" w="${2:-12}"
   ((p = p < 0 ? 0 : p > 100 ? 100 : p))
-  local filled=$(( (p * w) / 100 )) empty=$(( w - filled ))
-  local bar=""
-  local i
-  local color
+  local filled empty bar i color
+  filled=$(( (p * w) / 100 ))
+  empty=$(( w - filled ))
+  bar=""
   color=$(get_cpu_color "$p")
   for ((i=0; i<filled; i++)); do bar+="${color}${BLOCK_FULL}"; done
   for ((i=0; i<empty; i++)); do bar+="${BTOP_FG_DIM}${BLOCK_EMPTY}"; done
@@ -344,20 +344,19 @@ print_btop_header() {
   hn=$(get_hostname)
   local kern
   kern=$(get_kernel)
+  local rule=""
+  local i
   
-  printf "${BTOP_FG}${BOX_TL}"; local i; for ((i=0;i<width-2;i++)); do printf "${BOX_H}"; done; printf "${BOX_TR}\n"
-  printf "${BTOP_FG}${BOX_V}%*s%s%*s${BTOP_FG}${BOX_V}\n" $(( (width - 28) / 2 )) "" "⬡ Melbourne Guitar School" $(( width - 28 - (width - 28) / 2 - 2 )) ""
-  printf "${BTOP_FG}${BOX_V}  ${BTOP_CYAN}Maintenance Console${NC}%*s${BTOP_FG}${BOX_V}\n" $(( width - 25 )) ""
-  printf "${BTOP_FG}${BOX_VR}"; for ((i=0;i<width-2;i++)); do printf "${BOX_H}"; done; printf "${BOX_VL}\n"
+  printf -v rule '%*s' "$((width - 2))" ''
+  rule="${rule// /─}"
   
-  printf "${BTOP_FG}${BOX_V} ${BTOP_FG_DIM}Host:${NC} ${BTOP_CYAN_BRIGHT}%s${NC}" "${hn}"
-  printf "  ${BTOP_FG_DIM}Kernel:${NC} ${BTOP_YELLOW}%s${NC}" "${kern}"
-  local used=$(( 7 + ${#hn} + 10 + ${#kern} + 10 ))
-  for ((i=0; i<width-used-4; i++)); do printf " "; done
-  printf "${BTOP_FG}${BOX_V}\n"
-  
-  printf "${BTOP_FG}${BOX_V} ${BTOP_FG_DIM}Time:${NC} ${BTOP_GREEN}%s${NC}%*s${BTOP_FG}${BOX_V}\n" "${ts}" $(( width - ${#ts} - 15 )) ""
-  printf "${BTOP_FG}${BOX_BL}"; for ((i=0;i<width-2;i++)); do printf "${BOX_H}"; done; printf "${BOX_BR}\n"
+  echo -e "${BOLD}${CYAN}╭${rule}╮${NC}"
+  echo -e "${BOLD}${CYAN}│${NC}  ${BOLD}⬡ Melbourne Guitar School${NC}  ${BOLD}${CYAN}│${NC}"
+  printf "${BOLD}${CYAN}│${NC} ${BOLD}Maintenance Console${NC}%*s${BOLD}${CYAN}│${NC}\n" $((width - 24)) ""
+  echo -e "${BOLD}${CYAN}├${rule}┤${NC}"
+  printf "${BOLD}${CYAN}│${NC} ${DIM}Host:${NC} ${BTOP_CYAN_BRIGHT}%s${NC}  ${DIM}Kernel:${NC} ${BTOP_YELLOW}%s${NC}%*s${BOLD}${CYAN}│${NC}\n" "${hn}" "${kern}" $((width - ${#hn} - ${#kern} - 28)) ""
+  printf "${BOLD}${CYAN}│${NC} ${DIM}Time:${NC} ${BTOP_GREEN}%s${NC}%*s${BOLD}${CYAN}│${NC}\n" "${ts}" $((width - ${#ts} - 15)) ""
+  echo -e "${BOLD}${CYAN}╰${rule}╯${NC}"
 }
 
 # =============================================================================
@@ -1028,7 +1027,7 @@ print_btop_main_menu() {
   echo ""
   print_tui_panel_rule "${width}"
   print_tui_action_pair "Enter" "Select Option" "Q" "Quit"
-  print_tui_hint_line "Press number 1-14 to select, or Q to quit"
+  print_tui_hint_line "Press number 1-14, R to refresh, or Q to quit"
 }
 
 # =============================================================================
@@ -1071,23 +1070,16 @@ check_database_health() {
 
 run_interactive_maintenance() {
   load_backup_config; create_backup_directory
-  local last_refresh=0 ch=""
+  print_btop_main_menu
+  local ch=""
   while true; do
-    local now
-    now=$(date +%s)
-    if (( now - last_refresh >= 1 )); then
-      print_btop_main_menu
-      last_refresh=$now
-    fi
     printf "\r${BTOP_FG_DIM}Select:${NC} "
-    read -r -t 1 -n 1 ch || true
-    if [[ -n "$ch" ]]; then
-      echo ""
-      read -r -p "" ch
-      case "${ch,,}" in
-      1) run_update_script; read -r -n 1 -s -p "Done. Press key..." ;;
-      2) run_deploy_script; read -r -n 1 -s -p "Done. Press key..." ;;
-      s) cycle_sudo_mode; log_info "Sudo mode: $(update_sudo_mode_label)" ;;
+    read -r -p "" ch
+    case "${ch,,}" in
+      1) run_update_script; print_btop_main_menu ;;
+      2) run_deploy_script; print_btop_main_menu ;;
+      s) cycle_sudo_mode; print_btop_main_menu ;;
+      r) print_btop_main_menu ;;
       3) local up=false; prompt_yes_no "Upload to cloud?" "n" && up=true; run_backup "${up}"; read -r -n 1 -s -p "Done. Press key..." ;;
       4) restore_backup_tui ;;
       5) print_backup_components_tui ;;
@@ -1102,7 +1094,6 @@ run_interactive_maintenance() {
       14) section "Edit Config"; prompt_env_editor; read -r -n 1 -s -p "Press key..." ;;
       q|quit|exit) exit 0 ;;
       esac
-    fi
   done
 }
 
