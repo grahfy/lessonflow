@@ -1,4 +1,7 @@
 #!/bin/bash
+# Maintenance Script for Melbourne Guitar School
+
+
 # =============================================================================
 # Melbourne Guitar School - Maintenance Script
 # =============================================================================
@@ -542,8 +545,9 @@ BACKUP_CLEAN_OLD="$(grep '^BACKUP_CLEAN_OLD=' "${MAINTENANCE_CONFIG_FILE}" | cut
   KOOFR_USERNAME=$(get_env_val "KOOFR_USERNAME")
   KOOFR_PASSWORD=$(get_env_val "KOOFR_PASSWORD")
   
-  [[ -z "${BACKUP_CLOUD_FOLDER}" ]] && BACKUP_CLOUD_FOLDER=$(get_env_val "BACKUP_CLOUD_FOLDER")
-  [[ -z "${BACKUP_CLOUD_FOLDER}" ]] && BACKUP_CLOUD_FOLDER="melbourne-guitar-school-backups"
+  [[ -z "${BACKUP_CLOUD_FOLDER}" ]] && BACKUP_CLOUD_FOLDER=$(get_env_val "BACKUP_CLOUD_FOLDER") || true
+  [[ -z "${BACKUP_CLOUD_FOLDER}" ]] && BACKUP_CLOUD_FOLDER="melbourne-guitar-school-backups" || true
+  return 0
 }
 
 save_maintenance_settings() {
@@ -568,17 +572,21 @@ get_env_val() {
   local key="$1"
   local file="${SHARED_DIR}/.env"
   # Fallback to local .env if shared doesn't exist
-  [[ -f "${file}" ]] || file="${REPO_ROOT}/.env"
+  if [[ ! -f "${file}" ]]; then
+    file="${REPO_ROOT}/.env"
+  fi
   
   if [[ -f "${file}" ]]; then
     if [[ -r "${file}" ]]; then
-      grep "^${key}=" "${file}" | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//'
+      grep "^${key}=" "${file}" | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//' || true
     else
       # If not readable, try with sudo if we have/can get it
-      ensure_sudo_for_deploy_ready >/dev/null 2>&1
-      sudo grep "^${key}=" "${file}" | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//'
+      if ensure_sudo_for_deploy_ready >/dev/null 2>&1; then
+        sudo grep "^${key}=" "${file}" | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//' || true
+      fi
     fi
   fi
+  return 0
 }
 
 get_db_creds() {
@@ -1199,7 +1207,8 @@ print_cloud_settings_tui() {
 }
 
 run_interactive_maintenance() {
-  load_backup_config; create_backup_directory
+  load_backup_config
+  create_backup_directory
   local ch=""
   while true; do
     print_btop_main_menu
@@ -1230,11 +1239,19 @@ run_interactive_maintenance() {
 
 load_backup_config() {
   load_maintenance_settings
+  return 0
 }
 
 create_backup_directory() {
-  [[ -d "${BACKUP_DIR}" ]] || mkdir -p "${BACKUP_DIR}"
-  [[ -d "${LOG_DIR}" ]] || mkdir -p "${LOG_DIR}"
+  local current_user; current_user=$(id -un)
+  if [[ ! -d "${BACKUP_DIR}" ]]; then
+    run_privileged_cmd mkdir -p "${BACKUP_DIR}"
+    run_privileged_cmd chown "${current_user}:${current_user}" "${BACKUP_DIR}" 2>/dev/null || true
+  fi
+  if [[ ! -d "${LOG_DIR}" ]]; then
+    run_privileged_cmd mkdir -p "${LOG_DIR}"
+    run_privileged_cmd chown "${current_user}:${current_user}" "${LOG_DIR}" 2>/dev/null || true
+  fi
 }
 
 prompt_env_editor() {
@@ -1275,13 +1292,26 @@ Options:
 EOF
 }
 
+
 main() {
   while [[ $# -gt 0 ]]; do
-    case "$1" in --interactive) INTERACTIVE=true ;; --skip-pull) SKIP_PULL=true ;; --branch) BRANCH="$2"; shift ;; --remote) REMOTE_NAME="$2"; shift ;; --allow-dirty) ALLOW_DIRTY=true ;; --no-color) NO_COLOR=true ;; --no-spinner) NO_SPINNER=true ;; --help|-h) show_usage; exit 0 ;; esac
+    case "$1" in 
+      --interactive) INTERACTIVE=true ;; 
+      --skip-pull) SKIP_PULL=true ;; 
+      --branch) BRANCH="$2"; shift ;; 
+      --remote) REMOTE_NAME="$2"; shift ;; 
+      --allow-dirty) ALLOW_DIRTY=true ;; 
+      --no-color) NO_COLOR=true ;; 
+      --no-spinner) NO_SPINNER=true ;; 
+      --help|-h) show_usage; exit 0 ;;
+    esac
     shift
   done
   init_paths; detect_tty_capabilities
-  if [[ "${INTERACTIVE}" == true || "${IS_TTY}" == true ]]; then run_interactive_maintenance; else show_usage; fi
+  if [[ "${INTERACTIVE}" != true && "${IS_TTY}" != true ]]; then
+    show_usage; exit 1
+  fi
+  run_interactive_maintenance
 }
 
 main "$@"
