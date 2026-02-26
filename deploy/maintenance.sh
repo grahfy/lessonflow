@@ -353,7 +353,7 @@ print_btop_header() {
   printf "${BTOP_FG}${BOX_V} ${BTOP_FG_DIM}Host:${NC} ${BTOP_CYAN_BRIGHT}%s${NC}" "${hn}"
   printf "  ${BTOP_FG_DIM}Kernel:${NC} ${BTOP_YELLOW}%s${NC}" "${kern}"
   local used=$(( 7 + ${#hn} + 10 + ${#kern} + 10 ))
-  for ((i=0; i<width-used_len-4; i++)); do printf " "; done
+  for ((i=0; i<width-used-4; i++)); do printf " "; done
   printf "${BTOP_FG}${BOX_V}\n"
   
   printf "${BTOP_FG}${BOX_V} ${BTOP_FG_DIM}Time:${NC} ${BTOP_GREEN}%s${NC}%*s${BTOP_FG}${BOX_V}\n" "${ts}" $(( width - ${#ts} - 15 )) ""
