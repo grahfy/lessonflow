@@ -542,8 +542,7 @@ BACKUP_CLEAN_OLD="$(grep '^BACKUP_CLEAN_OLD=' "${MAINTENANCE_CONFIG_FILE}" | cut
   KOOFR_USERNAME=$(get_env_val "KOOFR_USERNAME")
   KOOFR_PASSWORD=$(get_env_val "KOOFR_PASSWORD")
   
-[[ -z "${BACKUP_CLOUD_FOLDER
-}" ]] && BACKUP_CLOUD_FOLDER=$(get_env_val "BACKUP_CLOUD_FOLDER")
+  [[ -z "${BACKUP_CLOUD_FOLDER}" ]] && BACKUP_CLOUD_FOLDER=$(get_env_val "BACKUP_CLOUD_FOLDER")
   [[ -z "${BACKUP_CLOUD_FOLDER}" ]] && BACKUP_CLOUD_FOLDER="melbourne-guitar-school-backups"
 }
 
