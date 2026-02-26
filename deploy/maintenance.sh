@@ -276,6 +276,77 @@ EOF
 # Git
 # =============================================================================
 
+show_usage() {
+  cat <<'EOF'
+Melbourne Guitar School - Maintenance Script
+
+Usage: ./deploy/maintenance.sh [options]
+
+Options:
+  --interactive         Force interactive TUI mode (default when TTY detected)
+  --skip-pull          Skip git pull when running non-interactively
+  --branch BRANCH       Git branch to pull from (default: current branch)
+  --remote REMOTE      Git remote to pull from (default: origin)
+  --allow-dirty        Allow operation even if working tree is dirty
+  --no-color            Disable colored output
+  --no-spinner          Disable spinner UI
+  --help, -h            Show usage
+
+Features:
+  - Sitemap.xml and robots.txt generation
+  - Backup with tar.xz compression
+  - Selective restore from local or cloud
+  - System maintenance tasks
+EOF
+}
+
+detect_tty_capabilities() {
+  if [[ -t 0 && -t 1 ]]; then
+    IS_TTY=true
+  fi
+
+  if [[ "${IS_TTY}" == true ]]; then
+    auto_size_tui_panel_width
+  fi
+
+  if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then
+    RED='' GREEN='' YELLOW='' BLUE='' CYAN='' MAGENTA='' BOLD='' DIM='' NC=''
+    BTOP_FG='' BTOP_FG_DIM='' BTOP_CYAN='' BTOP_CYAN_BRIGHT='' BTOP_GREEN='' BTOP_GREEN_BRIGHT=''
+    BTOP_BLUE='' BTOP_ORANGE='' BTOP_PURPLE='' BTOP_YELLOW='' BTOP_RED=''
+    BTOP_OK='' BTOP_WARN='' BTOP_ERROR='' BTOP_INFO=''
+    BOX_TL='┌' BOX_TR='┐' BOX_BL='└' BOX_BR='┘' BOX_H='─' BOX_V='│'
+    BLOCK_EMPTY=' ' BLOCK_FULL='#'
+  fi
+}
+
+auto_size_tui_panel_width() {
+  local cols=""
+  local target_width=""
+
+  if command -v tput >/dev/null 2>&1; then
+    cols="$(tput cols 2>/dev/null || true)"
+  fi
+
+  if [[ -z "${cols}" && -n "${COLUMNS:-}" ]]; then
+    cols="${COLUMNS}"
+  fi
+
+  if [[ ! "${cols}" =~ ^[0-9]+$ ]]; then
+    return 0
+  fi
+
+  target_width="${cols}"
+  if (( target_width < 48 )); then
+    target_width=48
+  fi
+  if (( target_width > MAINTENANCE_TUI_PANEL_WIDTH_MAX )); then
+    target_width="${MAINTENANCE_TUI_PANEL_WIDTH_MAX}"
+  fi
+
+  MAINTENANCE_TUI_PANEL_WIDTH="${target_width}"
+}
+
+
 resolve_repo_root() {
   local c=("${SCRIPT_DIR}/.." "/var/www/${APP_NAME}/current" "/var/www/${APP_NAME}" "${HOME}/melbourne-guitar-school")
   for candidate in "${c[@]}"; do
