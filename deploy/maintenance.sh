@@ -1067,8 +1067,6 @@ print_btop_main_menu() {
     "14" "Edit Config" "◈ Open" "Edit .env or SEO config files."
   echo ""
   print_tui_panel_rule "${width}"
-  print_tui_action_pair "Enter" "Select Option" "Q" "Quit"
-  print_tui_hint_line "Press number 1-14, R to refresh, or Q to quit"
 }
 
 # =============================================================================
