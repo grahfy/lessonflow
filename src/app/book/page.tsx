@@ -21,15 +21,15 @@ export default function BookPage() {
   return (
     <PanelLayout
       kicker="Book Lesson"
-      title="Request a guitar tuition session and we’ll shape the right starting point."
-      lead="Tell us what you want to learn, choose your preferred time, and submit your request. Every booking is reviewed manually so your session is confirmed properly and matched to the guitar tuition format that best suits your goals, level, and musical direction."
+      title="Request a lesson. We'll shape your starting point."
+      lead="Share your goals and preferred time. Each request is manually reviewed to match you with the right lesson format for your level and musical direction."
       viewClassName="view-book-page"
       visualLabel="Booking"
       visualClassName="contact-hero"
       leadJustified
     >
       <p className="helper-text" data-motion-item="book-helper-text">
-        Think of this as your first step into a tailored guitar tuition plan. Booking requests are reviewed manually to avoid schedule clashes, confirm availability, and place you in the right guitar tuition format. In-person lessons are currently available in VIC, and online guitar tuition is available across Australia.
+        Your first step to a tailored lesson plan. Requests are manually reviewed to confirm availability and match the right format. In-person lessons in VIC, online across Australia.
       </p>
       <BookingForm />
     </PanelLayout>
