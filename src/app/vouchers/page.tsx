@@ -36,7 +36,7 @@ export default function VouchersPage() {
         </article>
       </div>
 
-      <p className="helper-text" data-motion-item="vouchers-helper-copy">
+      <p className="helper-text copy-justify" data-motion-item="vouchers-helper-copy">
         Vouchers are a great option when you want to give something memorable, practical, and personal. They suit complete beginners as well as players who want fresh direction, better technique, or renewed creative momentum.
       </p>
 
