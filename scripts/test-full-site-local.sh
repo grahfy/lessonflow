@@ -70,10 +70,47 @@ if [[ ! -f .env.test.local && -f .env.test.example ]]; then
   cp .env.test.example .env.test.local
 fi
 
-# Local developer bootstrap: uses the repo's sqlite dev database path so the
-# app can be explored quickly without provisioning MySQL.
+# Local developer bootstrap: starts a MySQL Docker container if not running
+# and prepares the development database.
 log "Preparing development database..."
-DATABASE_URL="file:./prisma/dev.db" npx prisma migrate deploy
+
+# Extract MySQL host/port from DATABASE_URL in .env (expects localhost/127.0.0.1)
+DB_URL=$(grep "^DATABASE_URL=" .env | cut -d'"' -f2)
+
+# Check if MySQL is accessible at the configured URL
+if ! command -v docker >/dev/null 2>&1; then
+  log "Docker is required for local MySQL. Please install Docker or provide a MySQL instance."
+  exit 1
+fi
+
+# Start MySQL container if not already running (using default dev DB name from .env.example)
+DB_CONTAINER_NAME="lessonflow-dev-mysql"
+if ! docker ps --format '{{.Names}}' | grep -q "^${DB_CONTAINER_NAME}$"; then
+  log "Starting MySQL Docker container (${DB_CONTAINER_NAME})..."
+  docker run -d \
+    --name "${DB_CONTAINER_NAME}" \
+    -e MYSQL_ROOT_PASSWORD=root \
+    -e MYSQL_DATABASE=mgs_dev \
+    -p 3306:3306 \
+    mysql:8
+  
+  # Wait for MySQL to be ready by checking connection
+  log "Waiting for MySQL to start..."
+  MAX_RETRIES=30
+  RETRY_COUNT=0
+  while ! docker exec "${DB_CONTAINER_NAME}" mysqladmin ping -h localhost -u root -proot >/dev/null 2>&1; do
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+      log "Timeout waiting for MySQL to start"
+      exit 1
+    fi
+    sleep 1
+  done
+  log "MySQL is ready"
+fi
+
+# Run migrations using the DATABASE_URL from .env
+DATABASE_URL="${DB_URL}" npx prisma migrate deploy
 
 if [[ "$SKIP_TESTS" -eq 0 ]]; then
   # `npm test` may use the MySQL-oriented harness if TEST_DATABASE_URL is set;
