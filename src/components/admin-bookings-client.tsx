@@ -1465,6 +1465,7 @@ export function AdminBookingsClient() {
       name: fullName,
       email: String(form.get("email") || ""),
       phone,
+      country: "Australia" as const,
       unitNumber: String(form.get("unitNumber") || ""),
       houseNumber: String(form.get("houseNumber") || ""),
       streetName: String(form.get("streetName") || ""),
