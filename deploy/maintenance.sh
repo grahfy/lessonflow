@@ -348,7 +348,7 @@ print_btop_header() {
   printf "${BTOP_FG}${BOX_TL}"; local i; for ((i=0;i<width-2;i++)); do printf "${BOX_H}"; done; printf "${BOX_TR}\n"
   printf "${BTOP_FG}${BOX_V}%*s%s%*s${BTOP_FG}${BOX_V}\n" $(( (width - 28) / 2 )) "" "⬡ Melbourne Guitar School" $(( width - 28 - (width - 28) / 2 - 2 )) ""
   printf "${BTOP_FG}${BOX_V}  ${BTOP_CYAN}Maintenance Console${NC}%*s${BTOP_FG}${BOX_V}\n" $(( width - 25 )) ""
-  printf "${BTOP_FG}${BOX_VR}"; for ((i=0;i<width-2;i++)); do printf "${BOX_H}"; done; printf "${BTOP_VL}\n"
+  printf "${BTOP_FG}${BOX_VR}"; for ((i=0;i<width-2;i++)); do printf "${BOX_H}"; done; printf "${BOX_VL}\n"
   
   printf "${BTOP_FG}${BOX_V} ${BTOP_FG_DIM}Host:${NC} ${BTOP_CYAN_BRIGHT}%s${NC}" "${hn}"
   printf "  ${BTOP_FG_DIM}Kernel:${NC} ${BTOP_YELLOW}%s${NC}" "${kern}"
