@@ -893,9 +893,10 @@ draw_btop_menu_item() {
 # TUI Pages
 # =============================================================================
 
-restore_backup_tui() {
-  local src="local" rs=true rw=true re=true rmat=true rse=true rd=true
+  restore_backup_tui() {
   local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
+  local src="local" rs=true rw=true re=true rmat=true rse=true rd=true
+  local ch
   while true; do
     tui_clear_screen
     print_box_banner "Restore Backup"
@@ -927,30 +928,41 @@ restore_backup_tui() {
     print_tui_panel_rule "${width}"
     print_tui_action_pair "R" "Restore Selected" "S" "Toggle Source"
     print_tui_action_pair "B" "Back to Main"
-    print_tui_hint_line "Select backup number, then press R to restore"
-    read -r -p "Select: " ch
+    print_tui_hint_line "Select options 1-6, R to restore, S to toggle, B to go back"
+    
+    read -r -n 1 -s ch
     case "${ch,,}" in
-      1) rs=$(toggle_bool "${rs}") ;; 2) rw=$(toggle_bool "${rw}") ;; 3) re=$(toggle_bool "${re}") ;;
-      4) rmat=$(toggle_bool "${rmat}") ;; 5) rse=$(toggle_bool "${rse}") ;; 6) rd=$(toggle_bool "${rd}") ;;
+      1) rs=$(toggle_bool "${rs}") ;;
+      2) rw=$(toggle_bool "${rw}") ;;
+      3) re=$(toggle_bool "${re}") ;;
+      4) rmat=$(toggle_bool "${rmat}") ;;
+      5) rse=$(toggle_bool "${rse}") ;;
+      6) rd=$(toggle_bool "${rd}") ;;
       s) [[ "${src}" == "local" ]] && src="cloud" || src="local" ;;
       r)
-        read -r -p "Backup number: " num
+        echo -e "\n"
+        read -r -p "  Enter backup number: " num
         local btr="${bks[$((num-1))]:-}"
-        [[ -n "${btr}" ]] || { log_warn "Invalid selection"; continue; }
+        [[ -n "${btr}" ]] || { log_warn "Invalid selection"; sleep 1; continue; }
         if [[ "${src}" == "cloud" ]]; then
           local dp="${BACKUP_DIR}/$(basename "${btr}")"
-          case "${BACKUP_CLOUD_PROVIDER}" in google-drive) download_from_google_drive "${btr}" "${dp}" ;; koofr) download_from_koofr "${btr}" "${dp}" ;; esac
+          case "${BACKUP_CLOUD_PROVIDER}" in
+            google-drive) download_from_google_drive "${btr}" "${dp}" ;;
+            koofr) download_from_koofr "${btr}" "${dp}" ;;
+          esac
           btr="${dp}"
         fi
         restore_backup "${btr}" "${rs}" "${rw}" "${re}" "${rmat}" "${rse}" "${rd}"
-        read -r -n 1 -s -p "Press key..." ;;
+        read -r -n 1 -s -p "  Done. Press any key..." ;;
       b) return 0 ;;
+      q) exit 0 ;;
     esac
   done
 }
 
 print_backup_components_tui() {
   local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
+  local ch
   while true; do
     tui_clear_screen
     print_box_banner "Backup Components"
@@ -968,8 +980,9 @@ print_backup_components_tui() {
     echo ""
     print_tui_panel_rule "${width}"
     print_tui_action_pair "S" "Save Settings" "B" "Back to Main"
-    print_tui_hint_line "Toggle components with 1-6, then S to save"
-    read -r -p "Select: " ch
+    print_tui_hint_line "Toggle with 1-6, S to save, B to go back"
+    
+    read -r -n 1 -s ch
     case "${ch,,}" in
       1) BACKUP_INCLUDE_SQL=$(toggle_bool "${BACKUP_INCLUDE_SQL}") ;;
       2) BACKUP_INCLUDE_WEBAPP=$(toggle_bool "${BACKUP_INCLUDE_WEBAPP}") ;;
@@ -977,8 +990,9 @@ print_backup_components_tui() {
       4) BACKUP_INCLUDE_LEARNING_MATERIALS=$(toggle_bool "${BACKUP_INCLUDE_LEARNING_MATERIALS}") ;;
       5) BACKUP_INCLUDE_SEO_CONFIG=$(toggle_bool "${BACKUP_INCLUDE_SEO_CONFIG}") ;;
       6) BACKUP_CLEAN_OLD=$(toggle_bool "${BACKUP_CLEAN_OLD}") ;;
-      s) save_maintenance_settings; return 0 ;;
+      s) save_maintenance_settings; log_info "Settings saved"; sleep 1; return 0 ;;
       b) return 0 ;;
+      q) exit 0 ;;
     esac
   done
 }
@@ -1097,30 +1111,31 @@ check_database_health() {
 
 run_interactive_maintenance() {
   load_backup_config; create_backup_directory
-  print_btop_main_menu
   local ch=""
   while true; do
-    printf "\r${BTOP_FG_DIM}Select:${NC} "
-    read -r -p "" ch
+    print_btop_main_menu
+    printf "  ${BTOP_FG_DIM}Select Option (1-14, R to refresh, Q to quit):${NC} "
+    read -r ch
     case "${ch,,}" in
-      1) run_update_script; print_btop_main_menu ;;
-      2) run_deploy_script; print_btop_main_menu ;;
-      s) cycle_sudo_mode; print_btop_main_menu ;;
-      r) print_btop_main_menu ;;
-      3) local up=false; prompt_yes_no "Upload to cloud?" "n" && up=true; run_backup "${up}"; read -r -n 1 -s -p "Done. Press key..." ;;
+      1) run_update_script; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      2) run_deploy_script; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      s) cycle_sudo_mode ;;
+      r) : ;;
+      3) local up=false; prompt_yes_no "Upload to cloud?" "n" && up=true; run_backup "${up}"; read -r -n 1 -s -p "  Done. Press any key..." ;;
       4) restore_backup_tui ;;
       5) print_backup_components_tui ;;
-      6) section "Cloud Provider"; BACKUP_CLOUD_PROVIDER=$(prompt_select "Select" "none" "google-drive" "koofr"); save_maintenance_settings ;;
-      7) section "Frequency"; BACKUP_FREQUENCY=$(prompt_select "Select" "hourly" "daily" "weekly"); save_maintenance_settings ;;
-      8) section "Retention"; BACKUP_RETENTION_DAYS=$(prompt_value "Days to keep" "${BACKUP_RETENTION_DAYS}"); save_maintenance_settings ;;
-      9) generate_sitemap; read -r -n 1 -s -p "Press key..." ;;
-      10) generate_robots_txt; read -r -n 1 -s -p "Press key..." ;;
-      11) check_database_health; read -r -n 1 -s -p "Press key..." ;;
-      12) [[ -d "${REPO_ROOT}/.next" ]] && rm -rf "${REPO_ROOT}/.next"; [[ -d "${REPO_ROOT}/node_modules/.cache" ]] && rm -rf "${REPO_ROOT}/node_modules/.cache"; log_info "Cache cleaned"; read -r -n 1 -s -p "Press key..." ;;
-      13) run_git_pull; read -r -n 1 -s -p "Press key..." ;;
-      14) section "Edit Config"; prompt_env_editor; read -r -n 1 -s -p "Press key..." ;;
+      6) section "Cloud Provider"; BACKUP_CLOUD_PROVIDER=$(prompt_select "Select" "none" "google-drive" "koofr"); save_maintenance_settings; log_info "Settings updated"; sleep 1 ;;
+      7) section "Frequency"; BACKUP_FREQUENCY=$(prompt_select "Select" "hourly" "daily" "weekly"); save_maintenance_settings; log_info "Settings updated"; sleep 1 ;;
+      8) section "Retention"; BACKUP_RETENTION_DAYS=$(prompt_value "Days to keep" "${BACKUP_RETENTION_DAYS}"); save_maintenance_settings; log_info "Settings updated"; sleep 1 ;;
+      9) generate_sitemap; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      10) generate_robots_txt; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      11) check_database_health; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      12) [[ -d "${REPO_ROOT}/.next" ]] && rm -rf "${REPO_ROOT}/.next"; [[ -d "${REPO_ROOT}/node_modules/.cache" ]] && rm -rf "${REPO_ROOT}/node_modules/.cache"; log_info "Cache cleaned"; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      13) run_git_pull; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      14) section "Edit Config"; prompt_env_editor; read -r -n 1 -s -p "  Done. Press any key..." ;;
       q|quit|exit) exit 0 ;;
-      esac
+      *) ;;
+    esac
   done
 }
 
