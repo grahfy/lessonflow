@@ -205,11 +205,21 @@ print_tui_panel_rule() {
 }
 
 tui_truncate_text() {
-  local text="$1" max_width="$2"
-  [[ -z "${max_width}" || "${max_width}" -le 0 ]] && { printf ""; return 0; }
-  (( ${#text} <= max_width )) && { printf "%s" "${text}"; return 0; }
-  (( max_width <= 3 )) && { printf '%.*s' "${max_width}" "..."; return 0; }
-  printf '%s...' "${text:0:max_width-3}"
+local text="$1" max_width="$2"
+[[ -z "${max_width}" || "${max_width}" -le 0 ]] && { printf ""; return 0; }
+(( ${#text} <= max_width )) && { printf "%s" "${text}"; return 0; }
+(( max_width <= 3 )) && { printf '%.*s' "${max_width}" "..."; return 0; }
+printf '%s...' "${text:0:max_width-3}"
+}
+
+tui_pad_text() {
+  local text="$1" width="$2"
+  local visible_len=${#text}
+  local pad_len=$(( width - visible_len ))
+  printf "%s" "${text}"
+  if [[ $pad_len -gt 0 ]]; then
+    printf "%*s" "$pad_len" ""
+  fi
 }
 
 # =============================================================================
@@ -848,19 +858,30 @@ print_tui_option_pair() {
   local right_value="${7:-}"
   local right_desc="${8:-}"
   local col_width=$(( (${MAINTENANCE_TUI_PANEL_WIDTH:-110} - 4) / 2 ))
-  local left_cell=""
+  
+  local left_cell; left_cell="$(build_tui_option_cell_text "${left_key}" "${left_label}" "${left_value}" "${col_width}")"
+  local left_desc_text; left_desc_text="$(tui_truncate_text "${left_desc}" "${col_width}")"
+  
   local right_cell=""
-  local left_desc_text=""
   local right_desc_text=""
-  left_cell="$(build_tui_option_cell_text "${left_key}" "${left_label}" "${left_value}" "${col_width}")"
-  left_desc_text="$(tui_truncate_text "${left_desc}" "${col_width}")"
   if [[ -n "${right_key}" ]]; then
     right_cell="$(build_tui_option_cell_text "${right_key}" "${right_label}" "${right_value}" "${col_width}")"
     right_desc_text="$(tui_truncate_text "${right_desc}" "${col_width}")"
   fi
-  printf "  %b%-*s%b  %b%-*s%b\n" "${BOLD}${CYAN}" "${col_width}" "${left_cell}" "${NC}" "${BOLD}${GREEN}" "${col_width}" "${right_cell}" "${NC}"
-  printf "  %b%-*s%b  %b%-*s%b\n" "${DIM}" "${col_width}" "${left_desc_text}" "${NC}" "${DIM}" "${col_width}" "${right_desc_text}" "${NC}"
+  
+  printf "  %b" "${BOLD}${CYAN}"
+  tui_pad_text "${left_cell}" "${col_width}"
+  printf "%b  %b" "${NC}" "${BOLD}${GREEN}"
+  tui_pad_text "${right_cell}" "${col_width}"
+  printf "%b\n" "${NC}"
+  
+  printf "  %b" "${DIM}"
+  tui_pad_text "${left_desc_text}" "${col_width}"
+  printf "%b  %b" "${NC}" "${DIM}"
+  tui_pad_text "${right_desc_text}" "${col_width}"
+  printf "%b\n" "${NC}"
 }
+
 
 print_tui_action_pair() {
   local left_key="$1"
@@ -957,27 +978,30 @@ draw_btop_menu_item() {
     print_tui_panel_rule "${width}"
     echo -e "${BOLD}${BLUE}  Restore Options${NC}"
     print_tui_panel_rule "${width}"
-    print_tui_option_pair "1" "SQL Database" "$(bool_word "${rs}")" "Restore database from SQL dump." \
-      "2" "App Files" "$(bool_word "${rw}")" "Restore webapp files."
-    print_tui_option_pair "3" "Env File" "$(bool_word "${re}")" "Restore .env configuration." \
-      "4" "Materials" "$(bool_word "${rmat}")" "Restore learning materials."
-    print_tui_option_pair "5" "SEO Config" "$(bool_word "${rse}")" "Restore SEO configuration." \
-      "6" "Shared Data" "$(bool_word "${rd}")" "Restore shared data files."
+    print_tui_option_pair "S" "SQL Database" "$(bool_word "${rs}")" "Restore database from SQL dump." \
+      "A" "App Files" "$(bool_word "${rw}")" "Restore webapp files."
+    print_tui_option_pair "E" "Env File" "$(bool_word "${re}")" "Restore .env configuration." \
+      "M" "Materials" "$(bool_word "${rmat}")" "Restore learning materials."
+    print_tui_option_pair "O" "SEO Config" "$(bool_word "${rse}")" "Restore SEO configuration." \
+      "D" "Shared Data" "$(bool_word "${rd}")" "Restore shared data files."
+
     echo ""
     print_tui_panel_rule "${width}"
-    print_tui_action_pair "R" "Restore Selected" "S" "Toggle Source"
+    print_tui_action_pair "R" "Restore Selected" "G" "Toggle Source"
     print_tui_action_pair "B" "Back to Main"
-    print_tui_hint_line "Select options 1-6, R to restore, S to toggle, B to go back"
+    print_tui_hint_line "Select: S,A,E,M,O,D | R:Restore, G:Source, B:Back"
+
     
     read -r -n 1 -s ch
     case "${ch,,}" in
-      1) rs=$(toggle_bool "${rs}") ;;
-      2) rw=$(toggle_bool "${rw}") ;;
-      3) re=$(toggle_bool "${re}") ;;
-      4) rmat=$(toggle_bool "${rmat}") ;;
-      5) rse=$(toggle_bool "${rse}") ;;
-      6) rd=$(toggle_bool "${rd}") ;;
-      s) [[ "${src}" == "local" ]] && src="cloud" || src="local" ;;
+      s) rs=$(toggle_bool "${rs}") ;;
+      a) rw=$(toggle_bool "${rw}") ;;
+      e) re=$(toggle_bool "${re}") ;;
+      m) rmat=$(toggle_bool "${rmat}") ;;
+      o) rse=$(toggle_bool "${rse}") ;;
+      d) rd=$(toggle_bool "${rd}") ;;
+g) [[ "${src}" == "local" ]] && src="cloud" || src="local" ;;
+
       r)
         echo -e "\n"
         read -r -p "  Enter backup number: " num
@@ -1010,26 +1034,29 @@ print_backup_components_tui() {
     print_tui_panel_rule "${width}"
     echo -e "${BOLD}${BLUE}  Components to Include${NC}"
     print_tui_panel_rule "${width}"
-    print_tui_option_pair "1" "SQL Database" "$(bool_word "${BACKUP_INCLUDE_SQL}")" "Include database dump in backup." \
-      "2" "Web App" "$(bool_word "${BACKUP_INCLUDE_WEBAPP}")" "Include Next.js app files."
-    print_tui_option_pair "3" "Environment" "$(bool_word "${BACKUP_INCLUDE_ENV}")" "Include .env configuration file." \
-      "4" "Materials" "$(bool_word "${BACKUP_INCLUDE_LEARNING_MATERIALS}")" "Include learning materials."
-    print_tui_option_pair "5" "SEO Config" "$(bool_word "${BACKUP_INCLUDE_SEO_CONFIG}")" "Include SEO configuration." \
-      "6" "Clean Old" "$(bool_word "${BACKUP_CLEAN_OLD}")" "Auto-delete backups older than retention."
+    print_tui_option_pair "S" "SQL Database" "$(bool_word "${BACKUP_INCLUDE_SQL}")" "Include database dump in backup." \
+      "A" "Web App" "$(bool_word "${BACKUP_INCLUDE_WEBAPP}")" "Include Next.js app files."
+    print_tui_option_pair "E" "Environment" "$(bool_word "${BACKUP_INCLUDE_ENV}")" "Include .env configuration file." \
+      "M" "Materials" "$(bool_word "${BACKUP_INCLUDE_LEARNING_MATERIALS}")" "Include learning materials."
+    print_tui_option_pair "O" "SEO Config" "$(bool_word "${BACKUP_INCLUDE_SEO_CONFIG}")" "Include SEO configuration." \
+      "C" "Clean Old" "$(bool_word "${BACKUP_CLEAN_OLD}")" "Auto-delete backups older than retention."
+
     echo ""
     print_tui_panel_rule "${width}"
-    print_tui_action_pair "S" "Save Settings" "B" "Back to Main"
-    print_tui_hint_line "Toggle with 1-6, S to save, B to go back"
+    print_tui_action_pair "V" "Save Settings" "B" "Back to Main"
+    print_tui_hint_line "Toggle: S,A,E,M,O,C | V:Save, B:Back"
+
     
     read -r -n 1 -s ch
     case "${ch,,}" in
-      1) BACKUP_INCLUDE_SQL=$(toggle_bool "${BACKUP_INCLUDE_SQL}") ;;
-      2) BACKUP_INCLUDE_WEBAPP=$(toggle_bool "${BACKUP_INCLUDE_WEBAPP}") ;;
-      3) BACKUP_INCLUDE_ENV=$(toggle_bool "${BACKUP_INCLUDE_ENV}") ;;
-      4) BACKUP_INCLUDE_LEARNING_MATERIALS=$(toggle_bool "${BACKUP_INCLUDE_LEARNING_MATERIALS}") ;;
-      5) BACKUP_INCLUDE_SEO_CONFIG=$(toggle_bool "${BACKUP_INCLUDE_SEO_CONFIG}") ;;
-      6) BACKUP_CLEAN_OLD=$(toggle_bool "${BACKUP_CLEAN_OLD}") ;;
-      s) save_maintenance_settings; log_info "Settings saved"; sleep 1; return 0 ;;
+      s) BACKUP_INCLUDE_SQL=$(toggle_bool "${BACKUP_INCLUDE_SQL}") ;;
+      a) BACKUP_INCLUDE_WEBAPP=$(toggle_bool "${BACKUP_INCLUDE_WEBAPP}") ;;
+      e) BACKUP_INCLUDE_ENV=$(toggle_bool "${BACKUP_INCLUDE_ENV}") ;;
+      m) BACKUP_INCLUDE_LEARNING_MATERIALS=$(toggle_bool "${BACKUP_INCLUDE_LEARNING_MATERIALS}") ;;
+      o) BACKUP_INCLUDE_SEO_CONFIG=$(toggle_bool "${BACKUP_INCLUDE_SEO_CONFIG}") ;;
+      c) BACKUP_CLEAN_OLD=$(toggle_bool "${BACKUP_CLEAN_OLD}") ;;
+v) save_maintenance_settings; log_info "Settings saved"; sleep 1; return 0 ;;
+
       b) return 0 ;;
       q) exit 0 ;;
     esac
@@ -1078,35 +1105,137 @@ print_btop_main_menu() {
   print_tui_panel_rule "${width}"
   echo -e "  ${BOLD}${BTOP_CYAN}⬡${NC} ${BOLD}Deploy${NC}"
   print_tui_panel_rule "${width}"
-  print_tui_option_pair "1" "Update + Deploy" "▶ Run" "Run update.sh then deploy.sh (git pull, build, restart)." \
-    "2" "Deploy Only" "▶ Run" "Run deploy.sh directly (build + restart app)."
-  print_tui_option_pair "S" "Toggle Sudo" "$(update_sudo_mode_label)" "Cycle sudo mode: auto / force on / force off."
+  print_tui_option_pair "D" "Deploy" "▶ Open" "Update, deploy, and sudo settings." \
+    "B" "Backup & Restore" "▶ Open" "Manage backups, cloud storage, and components."
+  print_tui_option_pair "S" "SEO & Database" "▶ Open" "Sitemap, robots.txt, and DB health." \
+    "Y" "System" "▶ Open" "Git operations, cache, and config editing."
   
   echo ""
   print_tui_panel_rule "${width}"
-  echo -e "  ${BOLD}${BTOP_CYAN}⬡${NC} ${BOLD}Backup & Restore${NC}"
-  print_tui_panel_rule "${width}"
-  print_tui_option_pair "3" "Run Backup" "▶ Run" "Create .tar.xz archive of app components." \
-    "4" "Restore Backup" "▶ Run" "Restore from local or cloud backup."
-  print_tui_option_pair "5" "Components" "⚙ Set" "Configure which elements to include in backups." \
-    "6" "Cloud" "${BACKUP_CLOUD_PROVIDER}" "Upload backups to cloud storage."
-  print_tui_option_pair "7" "Schedule" "${BACKUP_FREQUENCY}" "Set automatic backup frequency." \
-    "8" "Retention" "${BACKUP_RETENTION_DAYS}d" "Days to keep local backups."
-  print_tui_panel_rule "${width}"
-  echo -e "  ${BOLD}${BTOP_CYAN}⬡${NC} ${BOLD}SEO & Database${NC}"
-  print_tui_panel_rule "${width}"
-  print_tui_option_pair "9" "Generate Sitemap" "▶ Run" "Generate sitemap.xml from SEO config." \
-    "10" "Generate Robots.txt" "▶ Run" "Generate robots.txt for search engines."
-  print_tui_option_pair "11" "Database Health" "● Check" "Verify database connection and status." \
-    "12" "Clean Cache" "✖ Run" "Remove Next.js build cache."
-  print_tui_panel_rule "${width}"
-  echo -e "  ${BOLD}${BTOP_CYAN}⬡${NC} ${BOLD}System${NC}"
-  print_tui_panel_rule "${width}"
-  print_tui_option_pair "13" "Git Pull" "↓ Run" "Fetch and merge latest from remote." \
-    "14" "Edit Config" "◈ Open" "Edit .env or SEO config files."
-  echo ""
-  print_tui_panel_rule "${width}"
 }
+
+print_deploy_menu_tui() {
+  local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
+  local ch
+  while true; do
+    tui_clear_screen
+    print_box_banner "Deploy Management"
+    echo -e "${DIM}Update and deploy the application.${NC}"
+    echo ""
+    print_tui_panel_rule "${width}"
+    print_tui_option_pair "U" "Update + Deploy" "▶ Run" "Run update.sh then deploy.sh (git pull, build, restart)." \
+      "D" "Deploy Only" "▶ Run" "Run deploy.sh directly (build + restart app)."
+    print_tui_option_pair "S" "Toggle Sudo" "$(update_sudo_mode_label)" "Cycle sudo mode: auto / force on / force off."
+    echo ""
+    print_tui_panel_rule "${width}"
+    print_tui_action_pair "B" "Back to Main"
+    print_tui_hint_line "Select U, D, S or B to go back"
+    
+    read -r -n 1 -s ch
+    case "${ch,,}" in
+      u) run_update_script; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      d) run_deploy_script; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      s) cycle_sudo_mode ;;
+      b) return 0 ;;
+      q) exit 0 ;;
+    esac
+  done
+}
+
+print_backup_menu_tui() {
+  local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
+  local ch
+  while true; do
+    tui_clear_screen
+    print_box_banner "Backup & Restore"
+    echo -e "${DIM}Manage local and cloud backups.${NC}"
+    echo ""
+    print_tui_panel_rule "${width}"
+    print_tui_option_pair "R" "Run Backup" "▶ Run" "Create .tar.xz archive of app components." \
+      "T" "Restore Backup" "▶ Open" "Restore from local or cloud backup."
+    
+    local cp_display="${BACKUP_CLOUD_PROVIDER}"
+    [[ "${cp_display}" == "none" ]] || cp_display=$(echo "${cp_display}" | tr ' ' '+')
+    print_tui_option_pair "C" "Components" "⚙ Set" "Configure which elements to include in backups." \
+      "V" "Cloud Settings" "⚙ Set" "Configure cloud storage providers."
+    print_tui_option_pair "F" "Schedule" "${BACKUP_FREQUENCY}" "Set automatic backup frequency." \
+      "K" "Retention" "${BACKUP_RETENTION_DAYS}d" "Days to keep local backups."
+    echo ""
+    print_tui_panel_rule "${width}"
+    print_tui_action_pair "B" "Back to Main"
+    print_tui_hint_line "Select R, T, C, V, F, K or B to go back"
+    
+    read -r -n 1 -s ch
+    case "${ch,,}" in
+      r) local up=false; prompt_yes_no "Upload to cloud?" "n" && up=true; run_backup "${up}"; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      t) restore_backup_tui ;;
+      c) print_backup_components_tui ;;
+      v) print_cloud_settings_tui ;;
+      f) section "Frequency"; BACKUP_FREQUENCY=$(prompt_select "Select" "hourly" "daily" "weekly"); save_maintenance_settings; log_info "Settings updated"; sleep 1 ;;
+      k) section "Retention"; BACKUP_RETENTION_DAYS=$(prompt_value "Days to keep" "${BACKUP_RETENTION_DAYS}"); save_maintenance_settings; log_info "Settings updated"; sleep 1 ;;
+      b) return 0 ;;
+      q) exit 0 ;;
+    esac
+  done
+}
+
+print_seo_db_menu_tui() {
+  local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
+  local ch
+  while true; do
+    tui_clear_screen
+    print_box_banner "SEO & Database"
+    echo -e "${DIM}Manage search engine visibility and database health.${NC}"
+    echo ""
+    print_tui_panel_rule "${width}"
+    print_tui_option_pair "M" "Generate Sitemap" "▶ Run" "Generate sitemap.xml from SEO config." \
+      "G" "Generate Robots.txt" "▶ Run" "Generate robots.txt for search engines."
+    print_tui_option_pair "H" "Database Health" "● Check" "Verify database connection and status."
+    echo ""
+    print_tui_panel_rule "${width}"
+    print_tui_action_pair "B" "Back to Main"
+    print_tui_hint_line "Select M, G, H or B to go back"
+    
+    read -r -n 1 -s ch
+    case "${ch,,}" in
+      m) generate_sitemap; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      g) generate_robots_txt; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      h) check_database_health; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      b) return 0 ;;
+      q) exit 0 ;;
+    esac
+  done
+}
+
+print_system_menu_tui() {
+  local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
+  local ch
+  while true; do
+    tui_clear_screen
+    print_box_banner "System Management"
+    echo -e "${DIM}General system operations and configuration.${NC}"
+    echo ""
+    print_tui_panel_rule "${width}"
+    print_tui_option_pair "P" "Git Pull" "↓ Run" "Fetch and merge latest from remote." \
+      "X" "Clean Cache" "✖ Run" "Remove Next.js build cache."
+    print_tui_option_pair "E" "Edit Config" "◈ Open" "Edit .env or SEO config files."
+    echo ""
+    print_tui_panel_rule "${width}"
+    print_tui_action_pair "B" "Back to Main"
+    print_tui_hint_line "Select P, X, E or B to go back"
+    
+    read -r -n 1 -s ch
+    case "${ch,,}" in
+      p) run_git_pull; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      x) [[ -d "${REPO_ROOT}/.next" ]] && rm -rf "${REPO_ROOT}/.next"; [[ -d "${REPO_ROOT}/node_modules/.cache" ]] && rm -rf "${REPO_ROOT}/node_modules/.cache"; log_info "Cache cleaned"; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      e) section "Edit Config"; prompt_env_editor; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      b) return 0 ;;
+      q) exit 0 ;;
+    esac
+  done
+}
+
+
 
 # =============================================================================
 # Runtime
@@ -1212,30 +1341,20 @@ run_interactive_maintenance() {
   local ch=""
   while true; do
     print_btop_main_menu
-    printf "  ${BTOP_FG_DIM}Select Option (1-14, R to refresh, Q to quit):${NC} "
-    read -r ch
+    printf "  ${BTOP_FG_DIM}Select Category (D, B, S, Y, R to refresh, Q to quit):${NC} "
+    read -r -n 1 ch
     case "${ch,,}" in
-      1) run_update_script; read -r -n 1 -s -p "  Done. Press any key..." ;;
-      2) run_deploy_script; read -r -n 1 -s -p "  Done. Press any key..." ;;
-      s) cycle_sudo_mode ;;
+      d) print_deploy_menu_tui ;;
+      b) print_backup_menu_tui ;;
+      s) print_seo_db_menu_tui ;;
+      y) print_system_menu_tui ;;
       r) : ;;
-      3) local up=false; prompt_yes_no "Upload to cloud?" "n" && up=true; run_backup "${up}"; read -r -n 1 -s -p "  Done. Press any key..." ;;
-      4) restore_backup_tui ;;
-      5) print_backup_components_tui ;;
-      6) print_cloud_settings_tui ;;
-      7) section "Frequency"; BACKUP_FREQUENCY=$(prompt_select "Select" "hourly" "daily" "weekly"); save_maintenance_settings; log_info "Settings updated"; sleep 1 ;;
-      8) section "Retention"; BACKUP_RETENTION_DAYS=$(prompt_value "Days to keep" "${BACKUP_RETENTION_DAYS}"); save_maintenance_settings; log_info "Settings updated"; sleep 1 ;;
-      9) generate_sitemap; read -r -n 1 -s -p "  Done. Press any key..." ;;
-      10) generate_robots_txt; read -r -n 1 -s -p "  Done. Press any key..." ;;
-      11) check_database_health; read -r -n 1 -s -p "  Done. Press any key..." ;;
-      12) [[ -d "${REPO_ROOT}/.next" ]] && rm -rf "${REPO_ROOT}/.next"; [[ -d "${REPO_ROOT}/node_modules/.cache" ]] && rm -rf "${REPO_ROOT}/node_modules/.cache"; log_info "Cache cleaned"; read -r -n 1 -s -p "  Done. Press any key..." ;;
-      13) run_git_pull; read -r -n 1 -s -p "  Done. Press any key..." ;;
-      14) section "Edit Config"; prompt_env_editor; read -r -n 1 -s -p "  Done. Press any key..." ;;
-      q|quit|exit) exit 0 ;;
+      q) exit 0 ;;
       *) ;;
     esac
   done
 }
+
 
 load_backup_config() {
   load_maintenance_settings
