@@ -169,6 +169,7 @@ prompt_select() {
 bool_word() { [[ "$1" == true ]] && echo "ON" || echo "OFF"; }
 toggle_bool() { [[ "$1" == true ]] && echo false || echo true; }
 tui_clear_screen() { [[ "${IS_TTY}" == true ]] && clear; }
+
 print_tui_panel_rule() {
   local width="${1:-84}"
   local rule=""
@@ -273,7 +274,7 @@ EOF
 }
 
 # =============================================================================
-# Git
+# Git & Path Helpers
 # =============================================================================
 
 resolve_repo_root() {
@@ -301,7 +302,78 @@ run_git_pull() {
 }
 
 # =============================================================================
-# Backup Logic
+# SEO
+# =============================================================================
+
+init_seo_config() {
+  [[ -f "${SEO_CONFIG_FILE}" ]] && return
+  mkdir -p "$(dirname "${SEO_CONFIG_FILE}")"
+  cat > "${SEO_CONFIG_FILE}" << 'EOF'
+{
+  "version": "1.0",
+  "pages": {
+    "/": {"enabled": true, "priority": 1.0, "changeFrequency": "monthly"},
+    "/lessons": {"enabled": true, "priority": 0.9, "changeFrequency": "monthly"},
+    "/teacher": {"enabled": true, "priority": 0.7, "changeFrequency": "yearly"},
+    "/vouchers": {"enabled": true, "priority": 0.8, "changeFrequency": "monthly"},
+    "/contact": {"enabled": true, "priority": 0.6, "changeFrequency": "yearly"},
+    "/book": {"enabled": true, "priority": 0.8, "changeFrequency": "monthly"},
+    "/terms": {"enabled": true, "priority": 0.3, "changeFrequency": "yearly"}
+  }
+}
+EOF
+}
+
+generate_sitemap() {
+  section "Sitemap Generation"
+  init_seo_config
+  local bu="https://melbourneguitarschool.com.au"
+  [[ -f "${SHARED_DIR}/.env" ]] && bu="$(grep -o 'NEXT_PUBLIC_SITE_URL[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || echo "${bu}")"
+  local count=0
+  cat > "${SITEMAP_FILE}" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+EOF
+  while IFS= read -r path; do
+    local e="$(grep -A5 "\"${path}\"" "${SEO_CONFIG_FILE}" 2>/dev/null | grep -o '"enabled"[[:space:]]*:[[:space:]]*[a-z]*' | sed 's/.*: *//' || echo "true")"
+    [[ "${e}" == "true" ]] || continue
+    local p="$(grep -A5 "\"${path}\"" "${SEO_CONFIG_FILE}" 2>/dev/null | grep -o '"priority"[[:space:]]*:[[:space:]]*[0-9.]*' | sed 's/.*: *//' || echo "0.5")"
+    local f="$(grep -A5 "\"${path}\"" "${SEO_CONFIG_FILE}" 2>/dev/null | grep -o '"changeFrequency"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*: *"\([^"]*\)"/\1/' || echo "monthly")"
+    local up="${path}"; [[ "${up}" == "/" ]] && up=""
+    cat >> "${SITEMAP_FILE}" << EOF
+  <url>
+    <loc>${bu}${up}</loc>
+    <lastmod>$(date +%Y-%m-%d)</lastmod>
+    <changefreq>${f}</changefreq>
+    <priority>${p}</priority>
+  </url>
+EOF
+    ((count++))
+  done < <(grep -o '"/[^"]*"[[:space:]]*:' "${SEO_CONFIG_FILE}" 2>/dev/null | sed 's/"//g; s/:$//' | sort -u)
+  echo "</urlset>" >> "${SITEMAP_FILE}"
+  log_info "Generated ${count} pages"
+}
+
+generate_robots_txt() {
+  section "Robots.txt"
+  init_seo_config
+  local bu="https://melbourneguitarschool.com.au"
+  [[ -f "${SHARED_DIR}/.env" ]] && bu="$(grep -o 'NEXT_PUBLIC_SITE_URL[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || echo "${bu}")"
+  cat > "${ROBOTS_FILE}" << EOF
+# Robots.txt for LessonFlow
+# Generated: $(date -Iseconds)
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /student/
+Sitemap: ${bu}/sitemap.xml
+EOF
+  log_info "Generated robots.txt"
+}
+
+# =============================================================================
+# Backup & Restore Logic
 # =============================================================================
 
 load_backup_config() {
@@ -321,16 +393,33 @@ load_backup_config() {
 
 create_backup_directory() { mkdir -p "${BACKUP_DIR}" "${LOG_DIR}"; }
 
+get_db_creds() {
+  local du; [[ -f "${SHARED_DIR}/.env" ]] && du=$(grep 'DATABASE_URL' "${SHARED_DIR}/.env" | sed 's/.*=//; s/["'\'']//g')
+  [[ -z "${du:-}" ]] && return 1
+  DB_U=$(echo "${du}" | sed -n 's|.*://\([^:]*\):.*@.*|\1|p')
+  DB_P=$(echo "${du}" | sed -n 's|.*://[^:]*:\([^@]*\)@.*|\1|p')
+  DB_H=$(echo "${du}" | sed -n 's|.*@\([^:/]*\).*|\1|p')
+  DB_PORT=$(echo "${du}" | sed -n 's|.*:\([0-9]*\)/.*|\1|p')
+  DB_NAME=$(echo "${du}" | sed -n 's|.*/\([^?]*\).*|\1|p')
+  [[ -n "${DB_U}" && -n "${DB_NAME}" ]] || return 1
+}
+
 create_database_dump() {
-  local out="$1" du
-  [[ -f "${SHARED_DIR}/.env" ]] && du="$(grep -o 'DATABASE_URL[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/')"
-  [[ -n "${du}" ]] || return 1
-  local host="$(echo "${du}" | sed -n 's|.*@\([^:]*\):\([0-9]*\)/.*|\1|p')"
-  local port="$(echo "${du}" | sed -n 's|.*@\([^:]*\):\([0-9]*\)/.*|\2|p')"
-  local name="$(echo "${du}" | sed -n 's|.*/\([^?]*\).*|\1|p')"
-  local user="$(echo "${du}" | sed -n 's|.*://\([^:]*\):.*|\1|p')"
-  local pass="$(echo "${du}" | sed -n 's|.*:[^:]*:\([^@]*\)@.*|\1|p')"
-  MYSQL_PWD="${pass}" mysqldump -h "${host:-localhost}" -P "${port:-3306}" -u "${user}" --single-transaction --quick "${name}" > "${out}" 2>/dev/null
+  local out="$1"
+  get_db_creds || return 1
+  MYSQL_PWD="${DB_P}" mysqldump -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" --single-transaction --quick "${DB_NAME}" > "${out}" 2>/dev/null
+}
+
+restore_database() {
+  local sf="$1"
+  get_db_creds || return 1
+  if command -v mysql >/dev/null 2>&1; then
+    MYSQL_PWD="${DB_P}" mysql -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" "${DB_NAME}" < "${sf}" 2>/dev/null
+  elif command -v mariadb >/dev/null 2>&1; then
+    MYSQL_PWD="${DB_P}" mariadb -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" "${DB_NAME}" < "${sf}" 2>/dev/null
+  else
+    return 1
+  fi
 }
 
 upload_to_google_drive() {
@@ -410,24 +499,6 @@ list_cloud_backups() {
   esac
 }
 
-restore_database() {
-  local sf="$1" du
-  [[ -f "${SHARED_DIR}/.env" ]] && du=$(grep 'DATABASE_URL' "${SHARED_DIR}/.env" | sed 's/.*=//; s/["'\'']//g')
-  [[ -z "${du}" ]] && return 1
-  local h=$(echo "${du}" | sed -n 's|.*@\([^:/]*\).*|\1|p')
-  local p=$(echo "${du}" | sed -n 's|.*:\([0-9]*\)/.*|\1|p')
-  local n=$(echo "${du}" | sed -n 's|.*/\([^?]*\).*|\1|p')
-  local u=$(echo "${du}" | sed -n 's|.*://\([^:]*\):.*@.*|\1|p')
-  local pass=$(echo "${du}" | sed -n 's|.*://[^:]*:\([^@]*\)@.*|\1|p')
-  if command -v mysql >/dev/null 2>&1; then
-    MYSQL_PWD="${pass}" mysql -h "${h:-localhost}" -P "${p:-3306}" -u "${u}" "${n}" < "${sf}" 2>/dev/null
-  elif command -v mariadb >/dev/null 2>&1; then
-    MYSQL_PWD="${pass}" mariadb -h "${h:-localhost}" -P "${p:-3306}" -u "${u}" "${n}" < "${sf}" 2>/dev/null
-  else
-    return 1
-  fi
-}
-
 restore_backup() {
   local bf="$1" rs="${2:-true}" rw="${3:-true}" re="${4:-true}" rm="${5:-true}" rse="${6:-true}" rd="${7:-true}"
   section "Restore Backup"
@@ -475,6 +546,7 @@ print_btop_main_menu() {
   local cpu=$(get_cpu_usage) mem=$(get_memory_usage) disk=$(get_disk_usage "/") up=$(get_uptime)
   local width="${MAINTENANCE_TUI_PANEL_WIDTH}" inner_width=$((width - 2))
   local i
+  # Header
   printf "${BTOP_FG}${BOX_TL}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_TR}\n"
   printf "${BOX_V} %*s%s%*s ${BOX_V}\n" $(( (inner_width - 22) / 2 )) "" "LessonFlow Maintenance" $(( (inner_width - 22 + 1) / 2 )) ""
   printf "${BOX_VR}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_VL}\n"
@@ -562,10 +634,6 @@ print_backup_components_tui() {
   done
 }
 
-# =============================================================================
-# Main
-# =============================================================================
-
 run_interactive_maintenance() {
   load_backup_config; create_backup_directory
   while true; do
@@ -607,12 +675,12 @@ stop_spinner() {
 
 check_database_health() {
   section "Database Health"
-  local du; [[ -f "${SHARED_DIR}/.env" ]] && du=$(grep 'DATABASE_URL' "${SHARED_DIR}/.env" | sed 's/.*=//; s/["'\'']//g')
-  [[ -z "${du}" ]] && { log_error "No DATABASE_URL"; return 1; }
-  local h=$(echo "${du}" | sed -n 's|.*@\([^:/]*\).*|\1|p')
-  local p=$(echo "${du}" | sed -n 's|.*:\([0-9]*\)/.*|\1|p')
-  local n=$(echo "${du}" | sed -n 's|.*/\([^?]*\).*|\1|p')
-  if mysql -h "${h:-localhost}" -P "${p:-3306}" -u "${u:-}" -e "SELECT 1" "${n:-}" >/dev/null 2>&1; then log_info "DB OK"; else log_error "DB Fail"; fi
+  get_db_creds || { log_error "No creds"; return 1; }
+  log_info "Connecting to ${DB_NAME} on ${DB_H:-localhost}..."
+  if command -v mysql >/dev/null 2>&1; then
+    if MYSQL_PWD="${DB_P}" mysql -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" -e "SELECT 1" "${DB_NAME}" >/dev/null 2>&1; then log_info "DB OK"; else log_error "DB Fail"; fi
+  else
+    log_warn "mysql client not installed"; fi
 }
 
 init_paths() {
@@ -623,30 +691,10 @@ init_paths() {
   MAINTENANCE_CONFIG_FILE="${REPO_ROOT}/.maintenance.conf"
 }
 
-show_usage() {
-  cat <<'EOF'
-Melbourne Guitar School - Maintenance Script
-
-Usage: ./deploy/maintenance.sh [options]
-
-Options:
-  --interactive         Force interactive TUI mode (default when TTY detected)
-  --skip-pull          Skip git pull when running non-interactively
-  --branch BRANCH       Git branch to pull from (default: current branch)
-  --remote REMOTE      Git remote to pull from (default: origin)
-  --allow-dirty        Allow operation even if working tree is dirty
-  --no-color            Disable colored output
-  --no-spinner          Disable spinner UI
-  --help, -h            Show usage
-EOF
-}
-
 detect_tty_capabilities() {
   if [[ -t 0 && -t 1 ]]; then IS_TTY=true; fi
   if [[ "${IS_TTY}" == true ]]; then auto_size_tui_panel_width; fi
-  if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then
-    disable_colors
-  fi
+  if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then disable_colors; fi
 }
 
 disable_colors() {
@@ -662,7 +710,7 @@ main() {
     case "$1" in --interactive) INTERACTIVE=true ;; --skip-pull) SKIP_PULL=true ;; --branch) BRANCH="$2"; shift ;; esac
     shift
   done
-  detect_tty_capabilities; init_paths
+  init_paths; detect_tty_capabilities
   if [[ "${INTERACTIVE}" == true || "${IS_TTY}" == true ]]; then run_interactive_maintenance; else show_usage; fi
 }
 
