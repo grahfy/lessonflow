@@ -680,29 +680,99 @@ download_backup_from_cloud() {
 }
 
 print_delete_backups_tui() {
-  local selected=() backups=() local_list=() cloud_list=() i; log_info "Loading..."
-  local_list=($(list_local_backups | xargs -n1 basename || true)); cloud_list=($(list_cloud_backups || true))
-  local ids=(); for b in "${local_list[@]}" "${cloud_list[@]}"; do local id; id=$(echo "$b" | sed -n 's/backup-\(.*\)\.tar\.xz/\1/p'); [[ -n "$id" ]] && ids+=("$id"); done
-  backups=($(printf "%s\n" "${ids[@]}" | sort -u -r)); for ((i=0; i<${#backups[@]}; i++)); do selected[i]=false; done
-  while true; do auto_size_tui_panel_width; tui_clear_screen; print_box_banner "Delete Backups"
-    echo -e "${DIM}Toggle with letter, choose Action.\n"; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
+  local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
+  local selected=() backups=() local_list=() cloud_list=() i
+  
+  log_info "Loading backups..."
+  local_list=($(list_local_backups | xargs -n1 basename || true))
+  cloud_list=($(list_cloud_backups || true))
+  
+  local all_ids=()
+  for b in "${local_list[@]}" "${cloud_list[@]}"; do
+    local id; id=$(echo "$b" | sed -n 's/backup-\(.*\)\.tar\.xz/\1/p')
+    [[ -n "$id" ]] && all_ids+=("$id")
+  done
+  backups=($(printf "%s\n" "${all_ids[@]}" | sort -u -r))
+  
+  local count=${#backups[@]}
+  for ((i=0; i<count; i++)); do selected[i]=false; done
+
+  while true; do
+    auto_size_tui_panel_width
+    tui_clear_screen
+    print_box_banner "Delete Backups"
+    echo -e "${DIM}Toggle with letter, then choose action number.${NC}"
+    echo ""
+    print_tui_panel_rule "${width}"
+    
     local letters="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-    for ((i=0; i<${#backups[@]}; i++)); do [[ $i -ge 52 ]] && break; local l="${letters:$i:1}" id="${backups[i]}" bn="backup-${id}.tar.xz" isl=false isc=false
-      for bl in "${local_list[@]}"; do [[ "$bl" == "$bn" ]] && isl=true && break; done
-      for bc in "${cloud_list[@]}"; do [[ "$bc" == "$bn" ]] && isc=true && break; done
-      local s=""; [[ "$isl" == true ]] && s+="${GREEN}L${NC} " || s+="${DIM}·${NC} "; [[ "$isc" == true ]] && s+="${BLUE}C${NC} " || s+="${DIM}·${NC} "
+    for ((i=0; i<count; i++)); do
+      [[ $i -ge ${#letters} ]] && break
+      local l="${letters:$i:1}"
+      local id="${backups[i]}"
+      local bn="backup-${id}.tar.xz"
+      
+      local is_local=false; for bl in "${local_list[@]}"; do [[ "$bl" == "$bn" ]] && is_local=true && break; done
+      local is_cloud=false; for bc in "${cloud_list[@]}"; do [[ "$bc" == "$bn" ]] && is_cloud=true && break; done
+      
+      local status=""
+      [[ "$is_local" == true ]] && status+="${GREEN}L${NC} " || status+="${DIM}·${NC} "
+      [[ "$is_cloud" == true ]] && status+="${BLUE}C${NC} " || status+="${DIM}·${NC} "
+      
+      local meta; meta=$(get_backup_meta "${BACKUP_DIR}/${bn}")
       local tick="[ ]"; [[ "${selected[i]}" == true ]] && tick="[${GREEN}✔${NC}]"
-      printf "  ${CYAN}%s${NC} %s %-16s %b ${DIM}%s${NC}\n" "${l}" "${tick}" "${id}" "${s}" "$(get_backup_meta "${BACKUP_DIR}/${bn}")"; done
-    [[ ${#backups[@]} -eq 0 ]] && echo -e "  ${YELLOW}None found${NC}"
-    echo ""; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"; print_tui_action_pair "L" "Local" "C" "Cloud"; print_tui_action_pair "A" "Both" "B" "Back"
-    print_tui_hint_line "Letter: Toggle | L:Local, C:Cloud, A:Both, B:Back"; read -r -n 1 -s ch; local idx; idx=$(letter_to_index "${ch}")
-    if [[ -n "$idx" && $idx -lt ${#backups[@]} && "${ch,,}" != "l" && "${ch,,}" != "c" && "${ch,,}" != "a" && "${ch,,}" != "b" ]]; then [[ "${selected[idx]}" == true ]] && selected[idx]=false || selected[idx]=true; continue; fi
-    case "${ch,,}" in l|c|a) local m="${ch,,}" sc=0; for s in "${selected[@]}"; do [[ "$s" == true ]] && ((sc++)); done
-      [[ $sc -eq 0 ]] && { log_warn "None"; sleep 1; continue; }; echo -ne "\n  Delete $sc? (y/N): "; read -r -n 1 confirm; echo ""
-      [[ "${confirm,,}" == "y" ]] || continue; for ((i=0; i<${#backups[@]}; i++)); do [[ "${selected[i]}" == true ]] || continue; local id="${backups[i]}" bn="backup-${id}.tar.xz"
-        if [[ "$m" == "l" || "$m" == "a" ]]; then log_info "Del local ${id}"; run_privileged_cmd rm -f "${BACKUP_DIR}/${bn}" "${BACKUP_DIR}/backup-${id}.meta" 2>/dev/null || true; fi
-        if [[ "$m" == "c" || "$m" == "a" ]]; then log_info "Del cloud ${id}"; for p in ${BACKUP_CLOUD_PROVIDER}; do case "$p" in google-drive) delete_google_drive_backup "${bn}" ;; koofr) delete_koofr_backup "${bn}" ;; esac; done; fi; done
-      log_info "Done"; sleep 1; return 0 ;; b) return 0 ;; esac
+      
+      printf "  ${CYAN}%s${NC} %s %-16s %b ${DIM}%s${NC}\n" "${l}" "${tick}" "${id}" "${status}" "${meta}"
+    done
+    
+    (( count == 0 )) && echo -e "  ${YELLOW}No backups found${NC}"
+    
+    echo ""
+    print_tui_panel_rule "${width}"
+    print_tui_action_pair "1" "Delete Local" "2" "Delete Cloud"
+    print_tui_action_pair "3" "Delete Everywhere" "4" "Back / Cancel"
+    print_tui_hint_line "Letter: Toggle | 1:Local, 2:Cloud, 3:Both, 4:Back"
+    
+    local ch; read -r -n 1 -s ch
+    case "${ch}" in
+      [a-zA-Z])
+        local idx; idx=$(letter_to_index "${ch}")
+        if [[ -n "$idx" && $idx -lt $count ]]; then
+          [[ "${selected[idx]}" == true ]] && selected[idx]=false || selected[idx]=true
+          continue
+        fi
+        ;;
+      1|2|3)
+        local mode="${ch}"
+        local sel_count=0; for s in "${selected[@]}"; do [[ "$s" == true ]] && ((sel_count++)); done
+        (( sel_count == 0 )) && { log_warn "Nothing selected"; sleep 1; continue; }
+        
+        echo -ne "\n  ${RED}${BOLD}Delete ${sel_count} backups? (y/N): ${NC}"
+        local confirm; read -r -n 1 confirm; echo ""
+        [[ "${confirm,,}" == "y" ]] || continue
+        
+        for ((i=0; i<count; i++)); do
+          [[ "${selected[i]}" == true ]] || continue
+          local id="${backups[i]}"
+          local bn="backup-${id}.tar.xz"
+          
+          if [[ "$mode" == "1" || "$mode" == "3" ]]; then
+            log_info "Deleting ${id} locally..."
+            run_privileged_cmd rm -f "${BACKUP_DIR}/${bn}" "${BACKUP_DIR}/backup-${id}.meta" 2>/dev/null || true
+          fi
+          if [[ "$mode" == "2" || "$mode" == "3" ]]; then
+            log_info "Deleting ${id} from cloud..."
+            local provider; for provider in ${BACKUP_CLOUD_PROVIDER}; do
+              case "$provider" in
+                google-drive) delete_google_drive_backup "${bn}" ;;
+                koofr) delete_koofr_backup "${bn}" ;;
+              esac
+            done
+          fi
+        done
+        log_info "Deletions completed"; sleep 1; return 0 ;;
+      4) return 0 ;;
+    esac
   done
 }
 
