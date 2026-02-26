@@ -2989,7 +2989,6 @@ h1 {
   grid-template-columns: minmax(0, 170px) minmax(0, 170px) auto;
   gap: 8px;
   align-items: end;
-}
   align-self: end;
 }
 
