@@ -5,18 +5,18 @@ import { PanelLayout } from "@/components/panel-layout";
 import { buildPublicPageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = buildPublicPageMetadata({
-  title: "Terms and Policies",
+  title: "Lesson Terms, Cancellations & Voucher Policies",
   path: "/terms",
   description:
-    "Melbourne Guitar School lesson policies covering cancellations, make-up lessons, payment terms, and gift voucher conditions."
+    "Read Melbourne Guitar School policies for cancellations, make-up lessons, payments, and gift vouchers before booking."
 });
 
 export default function TermsPage() {
   return (
     <PanelLayout
       kicker="Policies"
-      title="Clear terms for lessons, cancellations, and vouchers."
-      lead="These terms are designed to keep weekly lesson progress consistent and make scheduling expectations clear for students and families."
+      title="Simple, fair policies that keep lessons running smoothly."
+      lead="These policies are designed to protect lesson momentum, keep scheduling clear, and set reliable expectations for students and families. Clear terms help every student get the most value from their lesson time and keep progress moving."
       visualLabel="Terms photo"
       visualClassName="terms-hero"
       leadJustified

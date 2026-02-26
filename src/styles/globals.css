@@ -441,6 +441,60 @@ h1 {
   line-height: 1.4;
 }
 
+.video-card {
+  display: grid;
+  gap: 10px;
+}
+
+.video-embed-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.video-embed {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.soundcloud-card {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.soundcloud-card h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-family: "Space Grotesk", "Sora", sans-serif;
+}
+
+.soundcloud-embed-frame {
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.soundcloud-embed {
+  display: block;
+  width: 100%;
+  height: 300px;
+  border: 0;
+}
+
 .list {
   margin: 0;
   padding: 0;

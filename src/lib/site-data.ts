@@ -20,6 +20,7 @@ export type NavItem = {
  */
 export const publicRouteOrder = [
   "/",
+  "/videos",
   "/lessons",
   "/teacher",
   "/vouchers",
@@ -39,6 +40,7 @@ export const publicRouteOrder = [
  */
 export const publicHeroImageByRoute: Record<(typeof publicRouteOrder)[number], string> = {
   "/": "https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=1300&q=80",
+  "/videos": "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1300&q=80",
   "/lessons": "https://images.unsplash.com/photo-1525201548942-d8732f6617a0?auto=format&fit=crop&w=1300&q=80",
   "/teacher": "https://images.unsplash.com/photo-1524230659092-07f99a75c013?auto=format&fit=crop&w=1300&q=80",
   "/vouchers": "https://images.unsplash.com/photo-1510915361894-db8b60106cb1?auto=format&fit=crop&w=1300&q=80",
@@ -66,6 +68,7 @@ export const sharedVisualImageUrls = [
  */
 export const navItems: NavItem[] = [
   { href: "/", label: "Home" },
+  { href: "/videos", label: "Videos" },
   { href: "/lessons", label: "Lessons" },
   { href: "/teacher", label: "Teacher" },
   { href: "/vouchers", label: "Gift Vouchers" },

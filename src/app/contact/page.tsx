@@ -7,10 +7,10 @@ import { getOwnerEmail } from "@/lib/env";
 import { buildPublicPageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = buildPublicPageMetadata({
-  title: "Contact Us",
+  title: "Contact Melbourne Guitar School | Northcote Guitar Lessons",
   path: "/contact",
   description:
-    "Get in touch with Melbourne Guitar School. Call, text, or email to book lessons or ask questions. Located in Northcote, Melbourne."
+    "Contact Melbourne Guitar School to book private guitar tuition, ask questions, or discuss the right lesson path. Studio based in Northcote, Melbourne."
 });
 
 /**
@@ -24,8 +24,8 @@ export default function ContactPage() {
   return (
     <PanelLayout
       kicker="Inquiries"
-      title="Book lessons or ask anything."
-      lead="Reach out by call, text, or email and we will guide you to the right lesson package for your goals."
+      title="Let’s map out the right next step for your playing."
+      lead="Reach out by call, text, or email for bookings, guitar tuition options, pricing, vouchers, or general questions. We can help you choose the best place to begin based on your level, musical interests, and what kind of player you want to become."
       visualLabel="Guitar lesson studio"
       visualClassName="contact-hero"
       leadJustified
@@ -51,8 +51,12 @@ export default function ContactPage() {
         <li data-motion-item="contact-phone">Phone: 0401 489 437</li>
         <li data-motion-item="contact-email">Email: {contactEmail}</li>
         <li data-motion-item="contact-studio">Studio: Rear 66/68 High St, Northcote VIC 3070</li>
-        <li data-motion-item="contact-formats">Lesson formats: In-person and online</li>
+        <li data-motion-item="contact-formats">Lesson formats: In-person (VIC) and online (Australia)</li>
       </ul>
+
+      <p className="helper-text" data-motion-item="contact-helper-copy">
+        If you are unsure where to start, send a quick message about your current level, the styles you enjoy, and what you want to achieve. We can help you choose the right guitar tuition format and a practical, motivating first step.
+      </p>
 
       <ContactForm />
     </PanelLayout>
