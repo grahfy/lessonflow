@@ -13,6 +13,7 @@ set -euo pipefail
 
 # Resolve paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT=""
 APP_NAME="melbourne-guitar-school"
 DEPLOY_DIR="/var/www/${APP_NAME}"
 SHARED_DIR="${DEPLOY_DIR}/shared"
@@ -21,7 +22,6 @@ LOG_DIR="/var/log/melbourne-guitar-school"
 BACKUP_DIR="${DEPLOY_DIR}/backups"
 
 # Runtime configuration
-REPO_ROOT=""
 BRANCH=""
 REMOTE_NAME="origin"
 SKIP_PULL=false
@@ -36,11 +36,10 @@ SPINNER_FRAMES=( "⠋" "⠙" "⠹" "⠸" "⠼" "⠦" "⠴" "⠧" "⠇" "⠏" )
 MAINTENANCE_TUI_PANEL_WIDTH=92
 MAINTENANCE_TUI_PANEL_WIDTH_MAX=120
 
-# Config file paths
+# SEO Configuration
 SEO_CONFIG_FILE=""
 SITEMAP_FILE=""
 ROBOTS_FILE=""
-MAINTENANCE_CONFIG_FILE=""
 
 # Backup Configuration
 BACKUP_FREQUENCY="daily"
@@ -56,6 +55,8 @@ BACKUP_INCLUDE_ENV=true
 BACKUP_INCLUDE_LEARNING_MATERIALS=true
 BACKUP_INCLUDE_SEO_CONFIG=true
 BACKUP_CLEAN_OLD=true
+
+MAINTENANCE_CONFIG_FILE=""
 
 # Cloud credentials
 GDRIVE_CLIENT_ID=""
@@ -169,7 +170,6 @@ prompt_select() {
 bool_word() { [[ "$1" == true ]] && echo "ON" || echo "OFF"; }
 toggle_bool() { [[ "$1" == true ]] && echo false || echo true; }
 tui_clear_screen() { [[ "${IS_TTY}" == true ]] && clear; }
-
 print_tui_panel_rule() {
   local width="${1:-84}"
   local rule=""
@@ -541,36 +541,6 @@ draw_btop_menu_item() {
   local fill=$((width - used - 1)); local i; for ((i=0; i<fill; i++)); do printf " "; done; printf "${BTOP_FG}%s\n" "${BOX_V}"
 }
 
-print_btop_main_menu() {
-  tui_clear_screen
-  local cpu=$(get_cpu_usage) mem=$(get_memory_usage) disk=$(get_disk_usage "/") up=$(get_uptime)
-  local width="${MAINTENANCE_TUI_PANEL_WIDTH}" inner_width=$((width - 2))
-  local i
-  # Header
-  printf "${BTOP_FG}${BOX_TL}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_TR}\n"
-  printf "${BOX_V} %*s%s%*s ${BOX_V}\n" $(( (inner_width - 22) / 2 )) "" "LessonFlow Maintenance" $(( (inner_width - 22 + 1) / 2 )) ""
-  printf "${BOX_VR}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_VL}\n"
-  printf "${BOX_V} CPU $(draw_mini_bar "$cpu" 12) %3d%%  MEM $(draw_mini_bar "$mem" 12) %3d%%  DISK $(draw_mini_bar "$disk" 12) %3d%% %*s ${BOX_V}\n" "$cpu" "$mem" "$disk" $((inner_width - 70)) ""
-  printf "${BTOP_FG}${BOX_BL}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_BR}\n\n"
-  draw_btop_separator "${width}" " BACKUP & RESTORE "
-  draw_btop_menu_item "1" "Run Backup" "Create .tar.xz archive" "Ready" "${width}"
-  draw_btop_menu_item "2" "Restore Backup" "Restore local/cloud" "Ready" "${width}"
-  draw_btop_menu_item "3" "Components" "Configure backup elements" "Edit" "${width}"
-  draw_btop_menu_item "4" "Cloud" "Cloud Provider: ${BACKUP_CLOUD_PROVIDER}" "Cloud" "${width}"
-  draw_btop_menu_item "5" "Cron" "Freq: ${BACKUP_FREQUENCY}" "Cron" "${width}"
-  echo ""
-  draw_btop_separator "${width}" " SEO & DB "
-  draw_btop_menu_item "6" "Sitemap" "Generate sitemap.xml" "Ready" "${width}"
-  draw_btop_menu_item "7" "Robots.txt" "Generate robots.txt" "Ready" "${width}"
-  draw_btop_menu_item "8" "DB Health" "Check DB connection" "Check" "${width}"
-  echo ""
-  draw_btop_separator "${width}" " SYSTEM "
-  draw_btop_menu_item "9" "Clean Cache" "Remove .next/node cache" "Clean" "${width}"
-  draw_btop_menu_item "0" "Git Pull" "Pull latest from git" "Git" "${width}"
-  echo ""
-  printf "  ${BOLD}${BTOP_YELLOW}1-9,0${NC} Select Action    ${BOLD}${BTOP_YELLOW}Q${NC} Quit\n"
-}
-
 restore_backup_tui() {
   local src="local" rs=true rw=true re=true rmat=true rse=true rd=true
   while true; do
@@ -634,6 +604,132 @@ print_backup_components_tui() {
   done
 }
 
+print_btop_main_menu() {
+  tui_clear_screen
+  local cpu=$(get_cpu_usage) mem=$(get_memory_usage) disk=$(get_disk_usage "/") up=$(get_uptime)
+  local width="${MAINTENANCE_TUI_PANEL_WIDTH}" inner_width=$((width - 2))
+  local i
+  # Header
+  printf "${BTOP_FG}${BOX_TL}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_TR}\n"
+  printf "${BOX_V} %*s%s%*s ${BOX_V}\n" $(( (inner_width - 22) / 2 )) "" "LessonFlow Maintenance" $(( (inner_width - 22 + 1) / 2 )) ""
+  printf "${BOX_VR}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_VL}\n"
+  printf "${BOX_V} CPU $(draw_mini_bar "$cpu" 12) %3d%%  MEM $(draw_mini_bar "$mem" 12) %3d%%  DISK $(draw_mini_bar "$disk" 12) %3d%% %*s ${BOX_V}\n" "$cpu" "$mem" "$disk" $((inner_width - 70)) ""
+  printf "${BTOP_FG}${BOX_BL}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_BR}\n\n"
+  draw_btop_separator "${width}" " BACKUP & RESTORE "
+  draw_btop_menu_item "1" "Run Backup" "Create .tar.xz archive" "Ready" "${width}"
+  draw_btop_menu_item "2" "Restore Backup" "Restore local/cloud" "Ready" "${width}"
+  draw_btop_menu_item "3" "Components" "Configure backup elements" "Edit" "${width}"
+  draw_btop_menu_item "4" "Cloud" "Cloud Provider: ${BACKUP_CLOUD_PROVIDER}" "Cloud" "${width}"
+  draw_btop_menu_item "5" "Cron" "Freq: ${BACKUP_FREQUENCY}" "Cron" "${width}"
+  echo ""
+  draw_btop_separator "${width}" " SEO & DB "
+  draw_btop_menu_item "6" "Sitemap" "Generate sitemap.xml" "Ready" "${width}"
+  draw_btop_menu_item "7" "Robots.txt" "Generate robots.txt" "Ready" "${width}"
+  draw_btop_menu_item "8" "DB Health" "Check DB connection" "Check" "${width}"
+  echo ""
+  draw_btop_separator "${width}" " SYSTEM "
+  draw_btop_menu_item "9" "Clean Cache" "Remove .next/node cache" "Clean" "${width}"
+  draw_btop_menu_item "0" "Git Pull" "Pull latest from git" "Git" "${width}"
+  echo ""
+  printf "  ${BOLD}${BTOP_YELLOW}1-9,0${NC} Select Action    ${BOLD}${BTOP_YELLOW}Q${NC} Quit\n"
+}
+
+# =============================================================================
+# Core functions missing or duplicated
+# =============================================================================
+
+show_usage() {
+  cat <<'EOF'
+Melbourne Guitar School - Maintenance Script
+
+Usage: ./deploy/maintenance.sh [options]
+
+Options:
+  --interactive         Force interactive TUI mode (default when TTY detected)
+  --skip-pull          Skip git pull when running non-interactively
+  --branch BRANCH       Git branch to pull from (default: current branch)
+  --remote REMOTE      Git remote to pull from (default: origin)
+  --allow-dirty        Allow operation even if working tree is dirty
+  --no-color            Disable colored output
+  --no-spinner          Disable spinner UI
+  --help, -h            Show usage
+
+Features:
+  - Sitemap.xml and robots.txt generation
+  - Backup with tar.xz compression
+  - Selective restore from local or cloud
+  - System maintenance tasks
+EOF
+}
+
+detect_tty_capabilities() {
+  if [[ -t 0 && -t 1 ]]; then
+    IS_TTY=true
+  fi
+
+  if [[ "${IS_TTY}" == true ]]; then
+    auto_size_tui_panel_width
+  fi
+
+  if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then
+    RED='' GREEN='' YELLOW='' BLUE='' CYAN='' MAGENTA='' BOLD='' DIM='' NC=''
+    BTOP_FG='' BTOP_FG_DIM='' BTOP_CYAN='' BTOP_GREEN='' BTOP_BLUE='' BTOP_ORANGE='' BTOP_PURPLE='' BTOP_YELLOW=''
+    BOX_TL='┌' BOX_TR='┐' BOX_BL='└' BOX_BR='┘' BOX_H='─' BOX_V='│'
+    BLOCK_EMPTY=' ' BLOCK_FULL='#'
+  fi
+}
+
+auto_size_tui_panel_width() {
+  local cols=""
+  local target_width=""
+
+  if command -v tput >/dev/null 2>&1; then
+    cols="$(tput cols 2>/dev/null || true)"
+  fi
+
+  if [[ -z "${cols}" && -n "${COLUMNS:-}" ]]; then
+    cols="${COLUMNS}"
+  fi
+
+  if [[ ! "${cols}" =~ ^[0-9]+$ ]]; then
+    return 0
+  fi
+
+  target_width="${cols}"
+  if (( target_width < 48 )); then
+    target_width=48
+  fi
+  if (( target_width > MAINTENANCE_TUI_PANEL_WIDTH_MAX )); then
+    target_width="${MAINTENANCE_TUI_PANEL_WIDTH_MAX}"
+  fi
+
+  MAINTENANCE_TUI_PANEL_WIDTH="${target_width}"
+}
+
+init_paths() {
+  resolve_repo_root
+  SEO_CONFIG_FILE="${REPO_ROOT}/src/lib/seo-config.json"
+  SITEMAP_FILE="${REPO_ROOT}/public/sitemap.xml"
+  ROBOTS_FILE="${REPO_ROOT}/public/robots.txt"
+  MAINTENANCE_CONFIG_FILE="${REPO_ROOT}/.maintenance.conf"
+}
+
+check_database_health() {
+  section "Database Health"
+  get_db_creds || { log_error "No creds"; return 1; }
+  log_info "Connecting to ${DB_NAME} on ${DB_H:-localhost}..."
+  if command -v mysql >/dev/null 2>&1; then
+    if MYSQL_PWD="${DB_P}" mysql -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" -e "SELECT 1" "${DB_NAME}" >/dev/null 2>&1; then log_info "DB OK"; else log_error "DB Fail"; fi
+  elif command -v mariadb >/dev/null 2>&1; then
+    if MYSQL_PWD="${DB_P}" mariadb -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" -e "SELECT 1" "${DB_NAME}" >/dev/null 2>&1; then log_info "DB OK"; else log_error "DB Fail"; fi
+  else
+    log_warn "mysql client not installed"; fi
+}
+
+# =============================================================================
+# Runtime
+# =============================================================================
+
 run_interactive_maintenance() {
   load_backup_config; create_backup_directory
   while true; do
@@ -659,6 +755,7 @@ run_step() {
   local msg="$1"; shift; start_spinner "${msg}"
   if "$@" >/dev/null 2>&1; then stop_spinner "ok"; else stop_spinner "fail"; return 1; fi
 }
+
 start_spinner() {
   local msg="$1"; local i=0; local fc="${#SPINNER_FRAMES[@]}"
   [[ "${NO_SPINNER}" == true || "${IS_TTY}" != true ]] && return 0
@@ -666,43 +763,12 @@ start_spinner() {
   ( while true; do printf "\r${CYAN}%s${NC} %s" "${SPINNER_FRAMES[$i]}" "${SPINNER_MSG}"; i=$(( (i + 1) % fc )); sleep 0.08; done ) &
   SPINNER_PID=$!
 }
+
 stop_spinner() {
   local status="$1"
   [[ "${NO_SPINNER}" == true || "${IS_TTY}" != true ]] && return 0
   kill "${SPINNER_PID}" 2>/dev/null || true; wait "${SPINNER_PID}" 2>/dev/null || true
   [[ "${status}" == "ok" ]] && printf "\r${GREEN}✔${NC} %s\n" "${SPINNER_MSG}" || printf "\r${RED}✖${NC} %s\n" "${SPINNER_MSG}"
-}
-
-check_database_health() {
-  section "Database Health"
-  get_db_creds || { log_error "No creds"; return 1; }
-  log_info "Connecting to ${DB_NAME} on ${DB_H:-localhost}..."
-  if command -v mysql >/dev/null 2>&1; then
-    if MYSQL_PWD="${DB_P}" mysql -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" -e "SELECT 1" "${DB_NAME}" >/dev/null 2>&1; then log_info "DB OK"; else log_error "DB Fail"; fi
-  else
-    log_warn "mysql client not installed"; fi
-}
-
-init_paths() {
-  resolve_repo_root
-  SEO_CONFIG_FILE="${REPO_ROOT}/src/lib/seo-config.json"
-  SITEMAP_FILE="${REPO_ROOT}/public/sitemap.xml"
-  ROBOTS_FILE="${REPO_ROOT}/public/robots.txt"
-  MAINTENANCE_CONFIG_FILE="${REPO_ROOT}/.maintenance.conf"
-}
-
-detect_tty_capabilities() {
-  if [[ -t 0 && -t 1 ]]; then IS_TTY=true; fi
-  if [[ "${IS_TTY}" == true ]]; then auto_size_tui_panel_width; fi
-  if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then disable_colors; fi
-}
-
-disable_colors() {
-  RED='' GREEN='' YELLOW='' BLUE='' CYAN='' MAGENTA='' BOLD='' DIM='' NC=''
-  BTOP_FG='' BTOP_FG_DIM='' BTOP_CYAN='' BTOP_GREEN='' BTOP_BLUE='' BTOP_ORANGE='' BTOP_PURPLE='' BTOP_YELLOW='' BTOP_RED=''
-  BTOP_OK='' BTOP_WARN='' BTOP_ERROR='' BTOP_INFO=''
-  BOX_TL='┌' BOX_TR='┐' BOX_BL='└' BOX_BR='┘' BOX_H='─' BOX_V='│'
-  BLOCK_EMPTY=' ' BLOCK_FULL='#'
 }
 
 main() {
