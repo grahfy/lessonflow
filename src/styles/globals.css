@@ -183,7 +183,7 @@ a {
 @media (min-width: 1101px) {
   .view-book-page .view-stage {
     min-height: 0;
-    grid-template-columns: 1.3fr 0.3fr;
+    grid-template-columns: 0.5fr 1fr;
   }
 
   .view-book-page .panel-copy {
@@ -213,8 +213,8 @@ a {
   }
 
   .view-book-page .form-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
   }
 
   .view-book-page .field {
