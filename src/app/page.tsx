@@ -52,7 +52,7 @@ export default function HomePage() {
           <span>Studio + Online Sessions</span>
         </div>
       </div>
-      <p className="helper-text" data-motion-item="home-copy-note">
+      <p className="helper-text copy-justify" data-motion-item="home-copy-note">
         Guitar tuition focuses on practical musicianship: cleaner technique, stronger rhythm, better fretboard awareness, and the confidence to play with control, feel, and expression. You will work on music you genuinely connect with, while building the technical foundation and creative instinct that make your playing recognisable as your own.
       </p>
     </PanelLayout>
