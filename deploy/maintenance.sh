@@ -650,11 +650,11 @@ create_backup_archive() {
   af="${BACKUP_DIR}/${bn}.tar.xz"
   mkdir -p "${td}/${bn}"
   [[ "${BACKUP_INCLUDE_SQL}" == "true" ]] && { log_info "SQL dump..."; create_database_dump "${td}/${bn}/database.sql" || log_warn "SQL failed"; }
-  [[ "${BACKUP_INCLUDE_ENV}" == "true" && -f "${SHARED_DIR}/.env" ]] && cp "${SHARED_DIR}/.env" "${td}/${bn}/"
-  [[ "${BACKUP_INCLUDE_SEO_CONFIG}" == "true" && -f "${SEO_CONFIG_FILE}" ]] && cp "${SEO_CONFIG_FILE}" "${td}/${bn}/"
-  [[ "${BACKUP_INCLUDE_WEBAPP}" == "true" && -d "${CURRENT_LINK}" ]] && { log_info "App files..."; mkdir -p "${td}/${bn}/app"; rsync -a --exclude='node_modules' --exclude='.next' "${CURRENT_LINK}/" "${td}/${bn}/app/" 2>/dev/null; }
-  [[ "${BACKUP_INCLUDE_LEARNING_MATERIALS}" == "true" && -d "${REPO_ROOT}/.data" ]] && cp -r "${REPO_ROOT}/.data" "${td}/${bn}/"
-  [[ -d "${SHARED_DIR}/data" ]] && cp -r "${SHARED_DIR}/data" "${td}/${bn}/"
+  [[ "${BACKUP_INCLUDE_ENV}" == "true" && -f "${SHARED_DIR}/.env" ]] && run_privileged_cmd cp "${SHARED_DIR}/.env" "${td}/${bn}/"
+  [[ "${BACKUP_INCLUDE_SEO_CONFIG}" == "true" && -f "${SEO_CONFIG_FILE}" ]] && run_privileged_cmd cp "${SEO_CONFIG_FILE}" "${td}/${bn}/"
+  [[ "${BACKUP_INCLUDE_WEBAPP}" == "true" && -d "${CURRENT_LINK}" ]] && { log_info "App files..."; mkdir -p "${td}/${bn}/app"; run_privileged_cmd rsync -a --exclude='node_modules' --exclude='.next' "${CURRENT_LINK}/" "${td}/${bn}/app/" 2>/dev/null; }
+  [[ "${BACKUP_INCLUDE_LEARNING_MATERIALS}" == "true" && -d "${REPO_ROOT}/.data" ]] && run_privileged_cmd cp -r "${REPO_ROOT}/.data" "${td}/${bn}/"
+  [[ -d "${SHARED_DIR}/data" ]] && run_privileged_cmd cp -r "${SHARED_DIR}/data" "${td}/${bn}/"
   log_info "Compressing (tar.xz)..."
   tar -cJf "${af}" -C "${td}" "${bn}" 2>/dev/null
   rm -rf "${td}"
@@ -716,11 +716,11 @@ restore_backup() {
   tar -xJf "${bf}" -C "${td}" 2>/dev/null || { rm -rf "${td}"; return 1; }
   local bd="$(find "${td}" -mindepth 1 -maxdepth 1 -type d | head -1)"
   [[ "${rs}" == "true" && -f "${bd}/database.sql" ]] && { log_info "SQL..."; restore_database "${bd}/database.sql" && log_info "OK" || log_warn "Fail"; }
-  [[ "${re}" == "true" && -f "${bd}/.env" ]] && cp "${bd}/.env" "${SHARED_DIR}/.env"
-  [[ "${rse}" == "true" && -f "${bd}/seo-config.json" ]] && cp "${bd}/seo-config.json" "${SEO_CONFIG_FILE}"
+  [[ "${re}" == "true" && -f "${bd}/.env" ]] && run_privileged_cmd cp "${bd}/.env" "${SHARED_DIR}/.env"
+  [[ "${rse}" == "true" && -f "${bd}/seo-config.json" ]] && run_privileged_cmd cp "${bd}/seo-config.json" "${SEO_CONFIG_FILE}"
   [[ "${rw}" == "true" && -d "${bd}/app" ]] && log_warn "Manual move: cp -r ${bd}/app/* ${CURRENT_LINK}/"
-  [[ "${rm}" == "true" && -d "${bd}/learning-materials" ]] && cp -r "${bd}/learning-materials" "${REPO_ROOT}/.data/"
-  [[ "${rd}" == "true" && -d "${bd}/data" ]] && cp -r "${bd}/data" "${SHARED_DIR}/"
+  [[ "${rm}" == "true" && -d "${bd}/learning-materials" ]] && run_privileged_cmd cp -r "${bd}/learning-materials" "${REPO_ROOT}/.data/"
+  [[ "${rd}" == "true" && -d "${bd}/data" ]] && run_privileged_cmd cp -r "${bd}/data" "${SHARED_DIR}/"
   rm -rf "${td}"
   log_info "Done!"
 }
