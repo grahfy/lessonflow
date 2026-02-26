@@ -21,8 +21,8 @@ export default function TeacherPage() {
       visualClassName="teacher-hero"
       leadJustified
     >
-      <p className="helper-text" data-motion-item="teacher-helper-text">
-        Jon’s teaching style balances technique, creativity, and confidence-building. Whether you want to learn songs, improve your tone, develop lead playing, write stronger parts, or build deeper fundamentals, lessons are shaped around your goals and the way you learn best.
+      <p className="helper-text copy-justify" data-motion-item="teacher-helper-text">
+        Jon's teaching style balances technique, creativity, and confidence-building. Whether you want to learn songs, improve your tone, develop lead playing, write stronger parts, or build deeper fundamentals, lessons are shaped around your goals and the way you learn best.
       </p>
       <ul className="list" data-motion-item="teacher-highlights">
         <li data-motion-item="teacher-highlight-endorsement">
