@@ -522,22 +522,36 @@ run_deploy_script() {
 # =============================================================================
 
 load_maintenance_settings() {
-  if [[ -f "${MAINTENANCE_CONFIG_FILE}" ]]; then
-    BACKUP_FREQUENCY="$(grep '^BACKUP_FREQUENCY=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "daily")"
+if [[ -f "${MAINTENANCE_CONFIG_FILE}" ]]; then
+BACKUP_FREQUENCY="$(grep '^BACKUP_FREQUENCY=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "daily")"
     BACKUP_CLOUD_PROVIDER="$(grep '^BACKUP_CLOUD_PROVIDER=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "none")"
-    BACKUP_INCLUDE_SQL="$(grep '^BACKUP_INCLUDE_SQL=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "true")"
-    BACKUP_INCLUDE_WEBAPP="$(grep '^BACKUP_INCLUDE_WEBAPP=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "true")"
-    BACKUP_INCLUDE_ENV="$(grep '^BACKUP_INCLUDE_ENV=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "true")"
-    BACKUP_INCLUDE_LEARNING_MATERIALS="$(grep '^BACKUP_INCLUDE_LEARNING_MATERIALS=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "true")"
-    BACKUP_INCLUDE_SEO_CONFIG="$(grep '^BACKUP_INCLUDE_SEO_CONFIG=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "true")"
-    BACKUP_CLEAN_OLD="$(grep '^BACKUP_CLEAN_OLD=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "true")"
+    BACKUP_CLOUD_FOLDER="$(grep '^BACKUP_CLOUD_FOLDER=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "melbourne-guitar-school-backups")"
+BACKUP_INCLUDE_SQL="$(grep '^BACKUP_INCLUDE_SQL=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "true")"
+BACKUP_INCLUDE_WEBAPP="$(grep '^BACKUP_INCLUDE_WEBAPP=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "true")"
+BACKUP_INCLUDE_ENV="$(grep '^BACKUP_INCLUDE_ENV=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "true")"
+BACKUP_INCLUDE_LEARNING_MATERIALS="$(grep '^BACKUP_INCLUDE_LEARNING_MATERIALS=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "true")"
+BACKUP_INCLUDE_SEO_CONFIG="$(grep '^BACKUP_INCLUDE_SEO_CONFIG=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "true")"
+BACKUP_CLEAN_OLD="$(grep '^BACKUP_CLEAN_OLD=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "true")"
   fi
+  
+  # Always load latest credentials from .env
+  GDRIVE_CLIENT_ID=$(get_env_val "GDRIVE_CLIENT_ID")
+  GDRIVE_CLIENT_SECRET=$(get_env_val "GDRIVE_CLIENT_SECRET")
+  GDRIVE_REFRESH_TOKEN=$(get_env_val "GDRIVE_REFRESH_TOKEN")
+  KOOFR_WEBDAV_URL=$(get_env_val "KOOFR_WEBDAV_URL")
+  KOOFR_USERNAME=$(get_env_val "KOOFR_USERNAME")
+  KOOFR_PASSWORD=$(get_env_val "KOOFR_PASSWORD")
+  
+  [[ -z "${BACKUP_CLOUD_FOLDER
+}" ]] && BACKUP_CLOUD_FOLDER=$(get_env_val "BACKUP_CLOUD_FOLDER")
+  [[ -z "${BACKUP_CLOUD_FOLDER}" ]] && BACKUP_CLOUD_FOLDER="melbourne-guitar-school-backups"
 }
 
 save_maintenance_settings() {
-  cat > "${MAINTENANCE_CONFIG_FILE}" << EOF
+cat > "${MAINTENANCE_CONFIG_FILE}" << EOF
 BACKUP_FREQUENCY=${BACKUP_FREQUENCY}
 BACKUP_CLOUD_PROVIDER=${BACKUP_CLOUD_PROVIDER}
+BACKUP_CLOUD_FOLDER=${BACKUP_CLOUD_FOLDER}
 BACKUP_INCLUDE_SQL=${BACKUP_INCLUDE_SQL}
 BACKUP_INCLUDE_WEBAPP=${BACKUP_INCLUDE_WEBAPP}
 BACKUP_INCLUDE_ENV=${BACKUP_INCLUDE_ENV}
@@ -551,9 +565,25 @@ EOF
 # DB & Backups
 # =============================================================================
 
+get_env_val() {
+  local key="$1"
+  local file="${SHARED_DIR}/.env"
+  # Fallback to local .env if shared doesn't exist
+  [[ -f "${file}" ]] || file="${REPO_ROOT}/.env"
+  
+  if [[ -f "${file}" ]]; then
+    if [[ -r "${file}" ]]; then
+      grep "^${key}=" "${file}" | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//'
+    else
+      # If not readable, try with sudo if we have/can get it
+      ensure_sudo_for_deploy_ready >/dev/null 2>&1
+      sudo grep "^${key}=" "${file}" | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//'
+    fi
+  fi
+}
+
 get_db_creds() {
-  local du
-  [[ -f "${SHARED_DIR}/.env" ]] && du=$(grep 'DATABASE_URL' "${SHARED_DIR}/.env" | sed 's/.*=//; s/["'\'']//g')
+  local du; du=$(get_env_val "DATABASE_URL")
   [[ -z "${du:-}" ]] && return 1
   DB_U=$(echo "${du}" | sed -n 's|.*://\([^:]*\):.*@.*|\1|p')
   DB_P=$(echo "${du}" | sed -n 's|.*://[^:]*:\([^@]*\)@.*|\1|p')
@@ -621,10 +651,12 @@ run_backup() {
   local ts="$(date +%Y%m%d-%H%M%S)"
   local af; af="$(create_backup_archive "${ts}")" || return 1
   if [[ "${up}" == "true" ]]; then
-    case "${BACKUP_CLOUD_PROVIDER}" in
-      google-drive) upload_to_google_drive "${af}" ;;
-      koofr) upload_to_koofr "${af}" ;;
-    esac
+    for provider in ${BACKUP_CLOUD_PROVIDER}; do
+      case "${provider}" in
+        google-drive) upload_to_google_drive "${af}" ;;
+        koofr) upload_to_koofr "${af}" ;;
+      esac
+    done
   fi
   [[ "${BACKUP_CLEAN_OLD}" == "true" ]] && find "${BACKUP_DIR}" -name "backup-*.tar.xz" -type f -mtime +${BACKUP_RETENTION_DAYS} -delete 2>/dev/null
   echo "[$(date -Iseconds)] Backup completed: ${af}" >> "${LOG_DIR}/backup-${ts}.log"
@@ -1107,6 +1139,66 @@ check_database_health() {
     log_warn "mysql client not installed"; fi
 }
 
+print_cloud_settings_tui() {
+  local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
+  local ch
+  while true; do
+    tui_clear_screen
+    print_box_banner "Cloud Settings"
+    echo -e "${DIM}Configure cloud storage providers for backups.${NC}"
+    echo ""
+    print_tui_panel_rule "${width}"
+    echo -e "${BOLD}${BLUE}  Active Providers${NC}"
+    print_tui_panel_rule "${width}"
+    
+    local use_gdrive="false"
+    [[ "${BACKUP_CLOUD_PROVIDER}" == *"google-drive"* ]] && use_gdrive="true"
+    local use_koofr="false"
+    [[ "${BACKUP_CLOUD_PROVIDER}" == *"koofr"* ]] && use_koofr="true"
+    
+    print_tui_option_pair "1" "Google Drive" "$(bool_word "${use_gdrive}")" "Upload to Google Drive." \
+      "2" "Koofr (WebDAV)" "$(bool_word "${use_koofr}")" "Upload via Koofr WebDAV."
+    echo ""
+    print_tui_panel_rule "${width}"
+    echo -e "${BOLD}${BLUE}  Configuration${NC}"
+    print_tui_panel_rule "${width}"
+    echo -e "  Folder: ${BOLD}${BACKUP_CLOUD_FOLDER}${NC}"
+    echo ""
+    print_tui_panel_rule "${width}"
+    print_tui_action_pair "F" "Edit Folder" "B" "Back to Main"
+    print_tui_hint_line "Toggle with 1-2, F to change folder, B to go back"
+    
+    read -r -n 1 -s ch
+    case "${ch,,}" in
+      1) 
+        if [[ "${use_gdrive}" == "true" ]]; then
+          BACKUP_CLOUD_PROVIDER="${BACKUP_CLOUD_PROVIDER//google-drive/}"
+        else
+          [[ "${BACKUP_CLOUD_PROVIDER}" == "none" ]] && BACKUP_CLOUD_PROVIDER=""
+          BACKUP_CLOUD_PROVIDER="${BACKUP_CLOUD_PROVIDER} google-drive"
+        fi
+        BACKUP_CLOUD_PROVIDER=$(echo $BACKUP_CLOUD_PROVIDER | xargs)
+        [[ -z "${BACKUP_CLOUD_PROVIDER}" ]] && BACKUP_CLOUD_PROVIDER="none"
+        save_maintenance_settings
+        ;;
+      2)
+        if [[ "${use_koofr}" == "true" ]]; then
+          BACKUP_CLOUD_PROVIDER="${BACKUP_CLOUD_PROVIDER//koofr/}"
+        else
+          [[ "${BACKUP_CLOUD_PROVIDER}" == "none" ]] && BACKUP_CLOUD_PROVIDER=""
+          BACKUP_CLOUD_PROVIDER="${BACKUP_CLOUD_PROVIDER} koofr"
+        fi
+        BACKUP_CLOUD_PROVIDER=$(echo $BACKUP_CLOUD_PROVIDER | xargs)
+        [[ -z "${BACKUP_CLOUD_PROVIDER}" ]] && BACKUP_CLOUD_PROVIDER="none"
+        save_maintenance_settings
+        ;;
+      f) BACKUP_CLOUD_FOLDER=$(prompt_value "Cloud Folder" "${BACKUP_CLOUD_FOLDER}"); save_maintenance_settings ;;
+      b) return 0 ;;
+      q) exit 0 ;;
+    esac
+  done
+}
+
 run_interactive_maintenance() {
   load_backup_config; create_backup_directory
   local ch=""
@@ -1122,7 +1214,7 @@ run_interactive_maintenance() {
       3) local up=false; prompt_yes_no "Upload to cloud?" "n" && up=true; run_backup "${up}"; read -r -n 1 -s -p "  Done. Press any key..." ;;
       4) restore_backup_tui ;;
       5) print_backup_components_tui ;;
-      6) section "Cloud Provider"; BACKUP_CLOUD_PROVIDER=$(prompt_select "Select" "none" "google-drive" "koofr"); save_maintenance_settings; log_info "Settings updated"; sleep 1 ;;
+      6) print_cloud_settings_tui ;;
       7) section "Frequency"; BACKUP_FREQUENCY=$(prompt_select "Select" "hourly" "daily" "weekly"); save_maintenance_settings; log_info "Settings updated"; sleep 1 ;;
       8) section "Retention"; BACKUP_RETENTION_DAYS=$(prompt_value "Days to keep" "${BACKUP_RETENTION_DAYS}"); save_maintenance_settings; log_info "Settings updated"; sleep 1 ;;
       9) generate_sitemap; read -r -n 1 -s -p "  Done. Press any key..." ;;
