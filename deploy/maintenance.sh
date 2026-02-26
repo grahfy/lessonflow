@@ -521,6 +521,124 @@ EOF
 # TUI Visuals
 # =============================================================================
 
+auto_size_tui_panel_width() {
+  local cols=""
+  local target_width=""
+  if command -v tput >/dev/null 2>&1; then
+    cols="$(tput cols 2>/dev/null || true)"
+  fi
+  if [[ -z "${cols}" && -n "${COLUMNS:-}" ]]; then
+    cols="${COLUMNS}"
+  fi
+  if [[ ! "${cols}" =~ ^[0-9]+$ ]]; then
+    return 0
+  fi
+  target_width="${cols}"
+  if (( target_width < 48 )); then
+    target_width=48
+  fi
+  if (( target_width > MAINTENANCE_TUI_PANEL_WIDTH_MAX )); then
+    target_width="${MAINTENANCE_TUI_PANEL_WIDTH_MAX}"
+  fi
+  MAINTENANCE_TUI_PANEL_WIDTH="${target_width}"
+}
+
+print_box_banner() {
+  local content="$1"
+  local inner_width=$(( ${#content} + 2 ))
+  local rule=""
+  printf -v rule '%*s' "${inner_width}" ''
+  rule="${rule// /─}"
+  echo ""
+  echo -e "${BOLD}${CYAN}╭${rule}╮${NC}"
+  echo -e "${BOLD}${CYAN}│${NC} ${BOLD}${content}${NC} ${BOLD}${CYAN}│${NC}"
+  echo -e "${BOLD}${CYAN}╰${rule}╯${NC}"
+}
+
+status_chip() {
+  local label="$1"
+  local state="$2"
+  local color="${DIM}"
+  if [[ "${state}" == "ON" || "${state}" == "Ready" || "${state}" == "enabled" || "${state}" == "migrate deploy" || "${state}" == "Run" || "${state}" == "Open" || "${state}" == "Toggle" ]]; then
+    color="${GREEN}"
+  elif [[ "${state}" == "OFF" || "${state}" == "Skip" || "${state}" == "disabled" || "${state}" == "skip migrations" || "${state}" == "Check" || "${state}" == "Clean" || "${state}" == "Git" ]]; then
+    color="${YELLOW}"
+  elif [[ "${state}" == *"db-push"* || "${state}" == *"%"* ]]; then
+    color="${CYAN}"
+  fi
+  printf "%b[%s: %s]%b" "${color}" "${label}" "${state}" "${NC}"
+}
+
+print_tui_option_pair() {
+  local left_key="$1"
+  local left_label="$2"
+  local left_value="$3"
+  local left_desc="$4"
+  local right_key="${5:-}"
+  local right_label="${6:-}"
+  local right_value="${7:-}"
+  local right_desc="${8:-}"
+  local col_width=$(( (MAINTENANCE_TUI_PANEL_WIDTH - 4) / 2 ))
+  local left_cell=""
+  local right_cell=""
+  local left_desc_text=""
+  local right_desc_text=""
+  left_cell="$(build_tui_option_cell_text "${left_key}" "${left_label}" "${left_value}" "${col_width}")"
+  left_desc_text="$(tui_truncate_text "${left_desc}" "${col_width}")"
+  if [[ -n "${right_key}" ]]; then
+    right_cell="$(build_tui_option_cell_text "${right_key}" "${right_label}" "${right_value}" "${col_width}")"
+    right_desc_text="$(tui_truncate_text "${right_desc}" "${col_width}")"
+  fi
+  printf "  %b%-*s%b  %b%-*s%b\n" "${BOLD}${CYAN}" "${col_width}" "${left_cell}" "${NC}" "${BOLD}${GREEN}" "${col_width}" "${right_cell}" "${NC}"
+  printf "  %b%-*s%b  %b%-*s%b\n" "${DIM}" "${col_width}" "${left_desc_text}" "${NC}" "${DIM}" "${col_width}" "${right_desc_text}" "${NC}"
+}
+
+print_tui_action_pair() {
+  local left_key="$1"
+  local left_label="$2"
+  local right_key="${3:-}"
+  local right_label="${4:-}"
+  local col_width=$(( (MAINTENANCE_TUI_PANEL_WIDTH - 4) / 2 ))
+  local left_cell=""
+  local right_cell=""
+  left_cell="$(tui_truncate_text "${left_key}  ${left_label}" "${col_width}")"
+  if [[ -n "${right_key}" ]]; then
+    right_cell="$(tui_truncate_text "${right_key}  ${right_label}" "${col_width}")"
+  fi
+  printf "  %b%-*s%b  %b%-*s%b\n" "${YELLOW}" "${col_width}" "${left_cell}" "${NC}" "${MAGENTA}" "${col_width}" "${right_cell}" "${NC}"
+}
+
+print_tui_hint_line() {
+  local text="$1"
+  local max_width=$(( MAINTENANCE_TUI_PANEL_WIDTH - 2 ))
+  local clipped=""
+  clipped="$(tui_truncate_text "${text}" "${max_width}")"
+  echo -e "  ${DIM}${CYAN}${clipped}${NC}"
+}
+
+print_summary_row() {
+  local label="$1"
+  local value="$2"
+  local value_max=$(( MAINTENANCE_TUI_PANEL_WIDTH - 24 ))
+  local clipped_value=""
+  clipped_value="$(tui_truncate_text "${value}" "${value_max}")"
+  printf "  %-18b %b%s%b\n" "${DIM}${label}:${NC}" "${CYAN}" "${clipped_value}" "${NC}"
+}
+
+build_tui_option_cell_text() {
+  local key="$1"
+  local label="$2"
+  local value="$3"
+  local cell_width="$4"
+  local raw="[${key}] ${label}: ${value}"
+  tui_truncate_text "${raw}" "${cell_width}"
+}
+
+print_tui_option_desc() {
+  local text="$1"
+  echo -e "       ${DIM}${text}${NC}"
+}
+
 draw_btop_separator() {
   local width="$1" label="${2:-}"
   if [[ -z "${label}" ]]; then
@@ -555,27 +673,44 @@ restore_backup_tui() {
   while true; do
     tui_clear_screen
     print_box_banner "Restore Backup"
-    echo -e " Source: ${BOLD}${src^^}${NC}"
+    echo -e "${DIM}Source: ${BOLD}${src^^}${NC}"
+    echo ""
+    print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
+    echo -e "${BOLD}${BLUE}  Available Backups${NC}"
+    print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
     local bks=() i=1
     if [[ "${src}" == "local" ]]; then
-      while IFS= read -r b; do [[ -n "$b" ]] || continue; echo " [$i] $(basename "${b}") $(du -h "${b}" 2>/dev/null | cut -f1)"; bks+=("${b}"); ((i++)); done < <(list_local_backups)
+      while IFS= read -r b; do [[ -n "$b" ]] || continue; echo -e "  ${CYAN}[$i]${NC} $(basename "${b}") ${DIM}$(du -h "${b}" 2>/dev/null | cut -f1)${NC}"; bks+=("${b}"); ((i++)); done < <(list_local_backups)
     else
-      while IFS= read -r b; do [[ -n "$b" ]] || continue; echo " [$i] $b"; bks+=("${b}"); ((i++)); done < <(list_cloud_backups)
+      while IFS= read -r b; do [[ -n "$b" ]] || continue; echo -e "  ${CYAN}[$i]${NC} $b"; bks+=("${b}"); ((i++)); done < <(list_cloud_backups)
+    fi
+    if (( ${#bks[@]} == 0 )); then
+      echo -e "  ${YELLOW}No backups found${NC}"
     fi
     echo ""
     print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
-    echo " [1] SQL:$(bool_word "${rs}") [2] App:$(bool_word "${rw}") [3] Env:$(bool_word "${re}")"
-    echo " [4] Mat:$(bool_word "${rmat}") [5] SEO:$(bool_word "${rse}") [6] Data:$(bool_word "${rd}")"
-    echo " [R] Restore [S] Source [B] Back"
+    echo -e "${BOLD}${BLUE}  Restore Options${NC}"
+    print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
+    print_tui_option_pair "1" "SQL Database" "$(bool_word "${rs}")" "Restore database from SQL dump." \
+      "2" "App Files" "$(bool_word "${rw}")" "Restore webapp files."
+    print_tui_option_pair "3" "Env File" "$(bool_word "${re}")" "Restore .env configuration." \
+      "4" "Materials" "$(bool_word "${rmat}")" "Restore learning materials."
+    print_tui_option_pair "5" "SEO Config" "$(bool_word "${rse}")" "Restore SEO configuration." \
+      "6" "Shared Data" "$(bool_word "${rd}")" "Restore shared data files."
+    echo ""
+    print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
+    print_tui_action_pair "R" "Restore Selected" "S" "Toggle Source"
+    print_tui_action_pair "B" "Back to Main"
+    print_tui_hint_line "Select backup number, then press R to restore"
     read -r -p "Select: " ch
     case "${ch,,}" in
       1) rs=$(toggle_bool "${rs}") ;; 2) rw=$(toggle_bool "${rw}") ;; 3) re=$(toggle_bool "${re}") ;;
       4) rmat=$(toggle_bool "${rmat}") ;; 5) rse=$(toggle_bool "${rse}") ;; 6) rd=$(toggle_bool "${rd}") ;;
       s) [[ "${src}" == "local" ]] && src="cloud" || src="local" ;;
       r)
-        read -r -p "Number: " num
+        read -r -p "Backup number: " num
         local btr="${bks[$((num-1))]:-}"
-        [[ -n "${btr}" ]] || continue
+        [[ -n "${btr}" ]] || { log_warn "Invalid selection"; continue; }
         if [[ "${src}" == "cloud" ]]; then
           local dp="${BACKUP_DIR}/$(basename "${btr}")"
           case "${BACKUP_CLOUD_PROVIDER}" in google-drive) download_from_google_drive "${btr}" "${dp}" ;; koofr) download_from_koofr "${btr}" "${dp}" ;; esac
@@ -592,14 +727,22 @@ print_backup_components_tui() {
   while true; do
     tui_clear_screen
     print_box_banner "Backup Components"
-    echo " [1] SQL:$(bool_word "${BACKUP_INCLUDE_SQL}")"
-    echo " [2] App:$(bool_word "${BACKUP_INCLUDE_WEBAPP}")"
-    echo " [3] Env:$(bool_word "${BACKUP_INCLUDE_ENV}")"
-    echo " [4] Mat:$(bool_word "${BACKUP_INCLUDE_LEARNING_MATERIALS}")"
-    echo " [5] SEO:$(bool_word "${BACKUP_INCLUDE_SEO_CONFIG}")"
-    echo " [6] Clean:$(bool_word "${BACKUP_CLEAN_OLD}")"
-    echo " [S] Save [B] Back"
-    read -r -p "Option: " ch
+    echo -e "${DIM}Configure which elements to include in backups.${NC}"
+    echo ""
+    print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
+    echo -e "${BOLD}${BLUE}  Components to Include${NC}"
+    print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
+    print_tui_option_pair "1" "SQL Database" "$(bool_word "${BACKUP_INCLUDE_SQL}")" "Include database dump in backup." \
+      "2" "Web App" "$(bool_word "${BACKUP_INCLUDE_WEBAPP}")" "Include Next.js app files."
+    print_tui_option_pair "3" "Environment" "$(bool_word "${BACKUP_INCLUDE_ENV}")" "Include .env configuration file." \
+      "4" "Materials" "$(bool_word "${BACKUP_INCLUDE_LEARNING_MATERIALS}")" "Include learning materials."
+    print_tui_option_pair "5" "SEO Config" "$(bool_word "${BACKUP_INCLUDE_SEO_CONFIG}")" "Include SEO configuration." \
+      "6" "Clean Old" "$(bool_word "${BACKUP_CLEAN_OLD}")" "Auto-delete backups older than retention."
+    echo ""
+    print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
+    print_tui_action_pair "S" "Save Settings" "B" "Back to Main"
+    print_tui_hint_line "Toggle components with 1-6, then S to save"
+    read -r -p "Select: " ch
     case "${ch,,}" in
       1) BACKUP_INCLUDE_SQL=$(toggle_bool "${BACKUP_INCLUDE_SQL}") ;;
       2) BACKUP_INCLUDE_WEBAPP=$(toggle_bool "${BACKUP_INCLUDE_WEBAPP}") ;;
@@ -613,50 +756,55 @@ print_backup_components_tui() {
   done
 }
 
+detect_tty_capabilities() {
+  if [[ -t 0 && -t 1 ]]; then
+    IS_TTY=true
+  fi
+  if [[ "${IS_TTY}" == true ]]; then
+    auto_size_tui_panel_width
+  fi
+  if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then
+    RED='' GREEN='' YELLOW='' BLUE='' CYAN='' MAGENTA='' BOLD='' DIM='' NC=''
+    BTOP_FG='' BTOP_FG_DIM='' BTOP_CYAN='' BTOP_CYAN_BRIGHT='' BTOP_GREEN='' BTOP_BLUE='' BTOP_ORANGE='' BTOP_PURPLE='' BTOP_YELLOW=''
+  fi
+}
+
 print_btop_main_menu() {
   tui_clear_screen
   local cpu=$(get_cpu_usage) mem=$(get_memory_usage) disk=$(get_disk_usage "/") up=$(get_uptime)
   local width="${MAINTENANCE_TUI_PANEL_WIDTH}" inner_width=$((width - 2))
   local i
-  # Header
-  printf "${BTOP_FG}${BOX_TL}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_TR}\n"
-  printf "${BTOP_FG}${BOX_V}%*s%s%*s${BOX_V}\n" $(( (inner_width - 22) / 2 )) "" "LessonFlow Maintenance" $(( inner_width - 22 - (inner_width - 22) / 2 )) ""
-  printf "${BTOP_FG}${BOX_VR}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_VL}\n"
-  # Stats Row
-  printf "${BTOP_FG}${BOX_V} ${BTOP_FG_DIM}CPU${NC} "
-  local cpu_bar; cpu_bar=$(draw_mini_bar "$cpu" 12)
-  printf "${BTOP_GREEN}%s${NC} %3d%% " "${cpu_bar}" "$cpu"
-  printf "${BTOP_FG_DIM}MEM${NC} "
-  local mem_bar; mem_bar=$(draw_mini_bar "$mem" 12)
-  printf "${BTOP_BLUE}%s${NC} %3d%% " "${mem_bar}" "$mem"
-  printf "${BTOP_FG_DIM}DISK${NC} "
-  local disk_bar; disk_bar=$(draw_mini_bar "$disk" 12)
-  printf "${BTOP_ORANGE}%s${NC} %3d%% " "${disk_bar}" "$disk"
-  printf "${BTOP_FG_DIM}Uptime:${NC} %s" "$up"
   
-  local used_len=$(( 6 + 12 + 5 + 4 + 12 + 5 + 5 + 12 + 5 + 8 + ${#up} ))
-  for ((i=0; i<inner_width-used_len; i++)); do printf " "; done
-  printf "${BTOP_FG}${BOX_V}\n"
-  
-  printf "${BTOP_FG}${BOX_BL}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_BR}\n\n"
-  
-  draw_btop_separator "${width}" " BACKUP & RESTORE "
-  draw_btop_menu_item "1" "Run Backup" "Create .tar.xz archive" "Ready" "${width}"
-  draw_btop_menu_item "2" "Restore Backup" "Restore local/cloud" "Ready" "${width}"
-  draw_btop_menu_item "3" "Components" "Configure elements" "Edit" "${width}"
-  draw_btop_menu_item "4" "Cloud" "Provider: ${BACKUP_CLOUD_PROVIDER}" "Cloud" "${width}"
-  draw_btop_menu_item "5" "Cron" "Freq: ${BACKUP_FREQUENCY}" "Cron" "${width}"
+  print_box_banner "LessonFlow Maintenance v1.0"
+  echo -e "${DIM}btop-style menu: system monitoring, backups, SEO tools.${NC}"
   echo ""
-  draw_btop_separator "${width}" " SEO & DB "
-  draw_btop_menu_item "6" "Sitemap" "Generate sitemap.xml" "Ready" "${width}"
-  draw_btop_menu_item "7" "Robots.txt" "Generate robots.txt" "Ready" "${width}"
-  draw_btop_menu_item "8" "DB Health" "Check connection" "Check" "${width}"
+  echo -e "  $(status_chip "CPU" "${cpu}%")  $(status_chip "MEM" "${mem}%")  $(status_chip "DISK" "${disk}%")  $(status_chip "UPTIME" "${up}")"
   echo ""
-  draw_btop_separator "${width}" " SYSTEM "
-  draw_btop_menu_item "9" "Clean Cache" "Remove build caches" "Clean" "${width}"
-  draw_btop_menu_item "0" "Git Pull" "Pull from remote" "Git" "${width}"
+  print_tui_panel_rule "${width}"
+  echo -e "${BOLD}${BLUE}  Backup & Restore${NC}"
+  print_tui_panel_rule "${width}"
+  print_tui_option_pair "1" "Run Backup" "$(bool_word "true")" "Create .tar.xz archive of app components." \
+    "2" "Restore Backup" "$(bool_word "true")" "Restore from local or cloud backup."
+  print_tui_option_pair "3" "Components" "Toggle" "Configure which elements to include in backups." \
+    "4" "Cloud" "${BACKUP_CLOUD_PROVIDER}" "Upload backups to cloud storage."
+  print_tui_option_pair "5" "Schedule" "${BACKUP_FREQUENCY}" "Set automatic backup frequency." \
+    "6" "Retention" "${BACKUP_RETENTION_DAYS}d" "Days to keep local backups."
+  print_tui_panel_rule "${width}"
+  echo -e "${BOLD}${BLUE}  SEO & Database${NC}"
+  print_tui_panel_rule "${width}"
+  print_tui_option_pair "7" "Generate Sitemap" "Run" "Generate sitemap.xml from SEO config." \
+    "8" "Generate Robots.txt" "Run" "Generate robots.txt for search engines."
+  print_tui_option_pair "9" "Database Health" "Check" "Verify database connection and status." \
+    "10" "Clean Cache" "Run" "Remove Next.js build cache."
+  print_tui_panel_rule "${width}"
+  echo -e "${BOLD}${BLUE}  System${NC}"
+  print_tui_panel_rule "${width}"
+  print_tui_option_pair "11" "Git Pull" "Run" "Fetch and merge latest from remote." \
+    "12" "Edit Config" "Open" "Edit .env or SEO config files."
   echo ""
-  printf "  ${BOLD}${BTOP_YELLOW}1-9,0${NC} Select Action    ${BOLD}${BTOP_YELLOW}Q${NC} Quit\n"
+  print_tui_panel_rule "${width}"
+  print_tui_action_pair "S" "Start Selected Action" "Q" "Quit"
+  print_tui_hint_line "Enter number to select, or prefix with action: 1-9,0,S,Q"
 }
 
 # =============================================================================
@@ -703,7 +851,7 @@ run_interactive_maintenance() {
     print_btop_main_menu
     read -r -p "Select: " ch
     case "${ch,,}" in
-      1) local up=false; prompt_yes_no "Upload?" "n" && up=true; run_backup "${up}"; read -r -n 1 -s -p "Done. Press key..." ;;
+      1) local up=false; prompt_yes_no "Upload to cloud?" "n" && up=true; run_backup "${up}"; read -r -n 1 -s -p "Done. Press key..." ;;
       2) restore_backup_tui ;;
       3) print_backup_components_tui ;;
       4) section "Cloud Provider"; BACKUP_CLOUD_PROVIDER=$(prompt_select "Select" "none" "google-drive" "koofr"); save_maintenance_settings ;;
@@ -711,11 +859,63 @@ run_interactive_maintenance() {
       6) generate_sitemap; read -r -n 1 -s -p "Press key..." ;;
       7) generate_robots_txt; read -r -n 1 -s -p "Press key..." ;;
       8) check_database_health; read -r -n 1 -s -p "Press key..." ;;
-      9) [[ -d "${REPO_ROOT}/.next" ]] && rm -rf "${REPO_ROOT}/.next"; [[ -d "${REPO_ROOT}/node_modules/.cache" ]] && rm -rf "${REPO_ROOT}/node_modules/.cache"; log_info "Cleaned"; read -r -n 1 -s -p "Press key..." ;;
-      0) run_git_pull; read -r -n 1 -s -p "Press key..." ;;
-      q) exit 0 ;;
+      9) [[ -d "${REPO_ROOT}/.next" ]] && rm -rf "${REPO_ROOT}/.next"; [[ -d "${REPO_ROOT}/node_modules/.cache" ]] && rm -rf "${REPO_ROOT}/node_modules/.cache"; log_info "Cache cleaned"; read -r -n 1 -s -p "Press key..." ;;
+      10) run_git_pull; read -r -n 1 -s -p "Press key..." ;;
+      11) section "Edit Config"; prompt_env_editor; read -r -n 1 -s -p "Press key..." ;;
+      s) 
+         section "Quick Actions"
+         log_info "Select action from menu (1-9, 10-12)"
+         read -r -n 1 -s -p "Press key..." ;;
+      q|quit|exit) exit 0 ;;
     esac
   done
+}
+
+load_backup_config() {
+  load_maintenance_settings
+}
+
+create_backup_directory() {
+  [[ -d "${BACKUP_DIR}" ]] || mkdir -p "${BACKUP_DIR}"
+  [[ -d "${LOG_DIR}" ]] || mkdir -p "${LOG_DIR}"
+}
+
+prompt_env_editor() {
+  local shared_env_path="${SHARED_DIR}/.env"
+  local editor="${VISUAL:-${EDITOR:-nano}}"
+  for candidate in nano vi vim; do
+    if command -v "${candidate}" >/dev/null 2>&1; then
+      editor="${candidate}"
+      break
+    fi
+  done
+  if command -v "${editor}" >/dev/null 2>&1; then
+    if [[ -f "${shared_env_path}" ]]; then
+      "${editor}" "${shared_env_path}"
+    else
+      log_warn "Shared .env not found at ${shared_env_path}"
+    fi
+  else
+    log_warn "No terminal editor found (tried nano, vi, vim)."
+  fi
+}
+
+show_usage() {
+  cat <<'EOF'
+Melbourne Guitar School - Maintenance Script
+
+Usage: ./deploy/maintenance.sh [options]
+
+Options:
+  --interactive     Run interactive TUI mode
+  --skip-pull       Skip git pull operations
+  --branch BRANCH   Git branch to use
+  --remote REMOTE   Git remote (default: origin)
+  --allow-dirty     Allow dirty git worktree
+  --no-color        Disable colored output
+  --no-spinner      Disable spinner animation
+  --help, -h        Show this usage information
+EOF
 }
 
 main() {
