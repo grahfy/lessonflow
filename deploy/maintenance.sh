@@ -578,7 +578,7 @@ print_tui_option_pair() {
   local right_label="${6:-}"
   local right_value="${7:-}"
   local right_desc="${8:-}"
-  local col_width=$(( (MAINTENANCE_TUI_PANEL_WIDTH - 4) / 2 ))
+  local col_width=$(( (${MAINTENANCE_TUI_PANEL_WIDTH:-110} - 4) / 2 ))
   local left_cell=""
   local right_cell=""
   local left_desc_text=""
@@ -598,7 +598,7 @@ print_tui_action_pair() {
   local left_label="$2"
   local right_key="${3:-}"
   local right_label="${4:-}"
-  local col_width=$(( (MAINTENANCE_TUI_PANEL_WIDTH - 4) / 2 ))
+  local col_width=$(( (${MAINTENANCE_TUI_PANEL_WIDTH:-110} - 4) / 2 ))
   local left_cell=""
   local right_cell=""
   left_cell="$(tui_truncate_text "${left_key}  ${left_label}" "${col_width}")"
@@ -610,7 +610,7 @@ print_tui_action_pair() {
 
 print_tui_hint_line() {
   local text="$1"
-  local max_width=$(( MAINTENANCE_TUI_PANEL_WIDTH - 2 ))
+  local max_width=$(( ${MAINTENANCE_TUI_PANEL_WIDTH:-110} - 2 ))
   local clipped=""
   clipped="$(tui_truncate_text "${text}" "${max_width}")"
   echo -e "  ${DIM}${CYAN}${clipped}${NC}"
@@ -619,7 +619,7 @@ print_tui_hint_line() {
 print_summary_row() {
   local label="$1"
   local value="$2"
-  local value_max=$(( MAINTENANCE_TUI_PANEL_WIDTH - 24 ))
+  local value_max=$(( ${MAINTENANCE_TUI_PANEL_WIDTH:-110} - 24 ))
   local clipped_value=""
   clipped_value="$(tui_truncate_text "${value}" "${value_max}")"
   printf "  %-18b %b%s%b\n" "${DIM}${label}:${NC}" "${CYAN}" "${clipped_value}" "${NC}"
@@ -772,7 +772,7 @@ detect_tty_capabilities() {
 print_btop_main_menu() {
   tui_clear_screen
   local cpu=$(get_cpu_usage) mem=$(get_memory_usage) disk=$(get_disk_usage "/") up=$(get_uptime)
-  local width="${MAINTENANCE_TUI_PANEL_WIDTH}" inner_width=$((width - 2))
+  local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}" inner_width=$((width - 2))
   local i
   
   print_box_banner "LessonFlow Maintenance v1.0"
