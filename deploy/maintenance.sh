@@ -81,7 +81,9 @@ DIM='\033[2m'
 BTOP_FG='\033[38;5;250m'
 BTOP_FG_DIM='\033[38;5;245m'
 BTOP_CYAN='\033[38;5;45m'
+BTOP_CYAN_BRIGHT='\033[38;5;51m'
 BTOP_GREEN='\033[38;5;82m'
+BTOP_GREEN_BRIGHT='\033[38;5;118m'
 BTOP_BLUE='\033[38;5;33m'
 BTOP_ORANGE='\033[38;5;208m'
 BTOP_PURPLE='\033[38;5;141m'
@@ -170,6 +172,7 @@ prompt_select() {
 bool_word() { [[ "$1" == true ]] && echo "ON" || echo "OFF"; }
 toggle_bool() { [[ "$1" == true ]] && echo false || echo true; }
 tui_clear_screen() { [[ "${IS_TTY}" == true ]] && clear; }
+
 print_tui_panel_rule() {
   local width="${1:-84}"
   local rule=""
@@ -195,7 +198,8 @@ get_cpu_usage() {
   local cpu_line
   cpu_line=$(head -1 /proc/stat)
   local user nice system idle iowait irq softirq steal=0
-  read -r user nice system idle iowait irq softirq steal <<< "$(echo "${cpu_line#cpu:}" | awk '{print $1, $2, $3, $4, $5, $6, $7, $8}')"
+  # Skip the 'cpu' prefix by reading it into a dummy variable '_'
+  read -r _ user nice system idle iowait irq softirq steal <<< "${cpu_line}"
   local total=$((user + nice + system + idle + iowait + irq + softirq + steal))
   local usage=$((user + nice + system + irq + softirq + steal))
   [[ $total -gt 0 ]] && echo "$(( (usage * 100) / total ))" || echo "0"
@@ -635,98 +639,6 @@ print_btop_main_menu() {
 }
 
 # =============================================================================
-# Core functions missing or duplicated
-# =============================================================================
-
-show_usage() {
-  cat <<'EOF'
-Melbourne Guitar School - Maintenance Script
-
-Usage: ./deploy/maintenance.sh [options]
-
-Options:
-  --interactive         Force interactive TUI mode (default when TTY detected)
-  --skip-pull          Skip git pull when running non-interactively
-  --branch BRANCH       Git branch to pull from (default: current branch)
-  --remote REMOTE      Git remote to pull from (default: origin)
-  --allow-dirty        Allow operation even if working tree is dirty
-  --no-color            Disable colored output
-  --no-spinner          Disable spinner UI
-  --help, -h            Show usage
-
-Features:
-  - Sitemap.xml and robots.txt generation
-  - Backup with tar.xz compression
-  - Selective restore from local or cloud
-  - System maintenance tasks
-EOF
-}
-
-detect_tty_capabilities() {
-  if [[ -t 0 && -t 1 ]]; then
-    IS_TTY=true
-  fi
-
-  if [[ "${IS_TTY}" == true ]]; then
-    auto_size_tui_panel_width
-  fi
-
-  if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then
-    RED='' GREEN='' YELLOW='' BLUE='' CYAN='' MAGENTA='' BOLD='' DIM='' NC=''
-    BTOP_FG='' BTOP_FG_DIM='' BTOP_CYAN='' BTOP_GREEN='' BTOP_BLUE='' BTOP_ORANGE='' BTOP_PURPLE='' BTOP_YELLOW=''
-    BOX_TL='┌' BOX_TR='┐' BOX_BL='└' BOX_BR='┘' BOX_H='─' BOX_V='│'
-    BLOCK_EMPTY=' ' BLOCK_FULL='#'
-  fi
-}
-
-auto_size_tui_panel_width() {
-  local cols=""
-  local target_width=""
-
-  if command -v tput >/dev/null 2>&1; then
-    cols="$(tput cols 2>/dev/null || true)"
-  fi
-
-  if [[ -z "${cols}" && -n "${COLUMNS:-}" ]]; then
-    cols="${COLUMNS}"
-  fi
-
-  if [[ ! "${cols}" =~ ^[0-9]+$ ]]; then
-    return 0
-  fi
-
-  target_width="${cols}"
-  if (( target_width < 48 )); then
-    target_width=48
-  fi
-  if (( target_width > MAINTENANCE_TUI_PANEL_WIDTH_MAX )); then
-    target_width="${MAINTENANCE_TUI_PANEL_WIDTH_MAX}"
-  fi
-
-  MAINTENANCE_TUI_PANEL_WIDTH="${target_width}"
-}
-
-init_paths() {
-  resolve_repo_root
-  SEO_CONFIG_FILE="${REPO_ROOT}/src/lib/seo-config.json"
-  SITEMAP_FILE="${REPO_ROOT}/public/sitemap.xml"
-  ROBOTS_FILE="${REPO_ROOT}/public/robots.txt"
-  MAINTENANCE_CONFIG_FILE="${REPO_ROOT}/.maintenance.conf"
-}
-
-check_database_health() {
-  section "Database Health"
-  get_db_creds || { log_error "No creds"; return 1; }
-  log_info "Connecting to ${DB_NAME} on ${DB_H:-localhost}..."
-  if command -v mysql >/dev/null 2>&1; then
-    if MYSQL_PWD="${DB_P}" mysql -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" -e "SELECT 1" "${DB_NAME}" >/dev/null 2>&1; then log_info "DB OK"; else log_error "DB Fail"; fi
-  elif command -v mariadb >/dev/null 2>&1; then
-    if MYSQL_PWD="${DB_P}" mariadb -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" -e "SELECT 1" "${DB_NAME}" >/dev/null 2>&1; then log_info "DB OK"; else log_error "DB Fail"; fi
-  else
-    log_warn "mysql client not installed"; fi
-}
-
-# =============================================================================
 # Runtime
 # =============================================================================
 
@@ -769,6 +681,26 @@ stop_spinner() {
   [[ "${NO_SPINNER}" == true || "${IS_TTY}" != true ]] && return 0
   kill "${SPINNER_PID}" 2>/dev/null || true; wait "${SPINNER_PID}" 2>/dev/null || true
   [[ "${status}" == "ok" ]] && printf "\r${GREEN}✔${NC} %s\n" "${SPINNER_MSG}" || printf "\r${RED}✖${NC} %s\n" "${SPINNER_MSG}"
+}
+
+init_paths() {
+  resolve_repo_root
+  SEO_CONFIG_FILE="${REPO_ROOT}/src/lib/seo-config.json"
+  SITEMAP_FILE="${REPO_ROOT}/public/sitemap.xml"
+  ROBOTS_FILE="${REPO_ROOT}/public/robots.txt"
+  MAINTENANCE_CONFIG_FILE="${REPO_ROOT}/.maintenance.conf"
+}
+
+check_database_health() {
+  section "Database Health"
+  get_db_creds || { log_error "No creds"; return 1; }
+  log_info "Connecting to ${DB_NAME} on ${DB_H:-localhost}..."
+  if command -v mysql >/dev/null 2>&1; then
+    if MYSQL_PWD="${DB_P}" mysql -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" -e "SELECT 1" "${DB_NAME}" >/dev/null 2>&1; then log_info "DB OK"; else log_error "DB Fail"; fi
+  elif command -v mariadb >/dev/null 2>&1; then
+    if MYSQL_PWD="${DB_P}" mariadb -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" -e "SELECT 1" "${DB_NAME}" >/dev/null 2>&1; then log_info "DB OK"; else log_error "DB Fail"; fi
+  else
+    log_warn "mysql client not installed"; fi
 }
 
 main() {
