@@ -1828,8 +1828,8 @@ print_summary() {
     print_summary_row "Database mode" "$(update_migration_mode_label)"
     print_summary_row "SSL setup" "$(bool_word "${SSL_SETUP}")"
     if [[ "${SSL_SETUP}" == true ]]; then
-      print_summary_row "SSL domain" "${SSL_DOMAIN}"
-      print_summary_row "Certbot email" "${SSL_EMAIL}"
+      print_summary_row "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}"
+      print_summary_row "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}"
     fi
   fi
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
@@ -1845,12 +1845,19 @@ run_deploy() {
   fi
 
   local deploy_args=()
+  local effective_ssl_domain="${SSL_DOMAIN}"
+  local effective_ssl_email="${SSL_EMAIL}"
+
+  if [[ "${SSL_SETUP}" == true ]]; then
+    [[ -n "${effective_ssl_domain}" ]] || effective_ssl_domain="melbourneguitarschool.com.au"
+    [[ -n "${effective_ssl_email}" ]] || effective_ssl_email="melbourneguitarschool@gmail.com"
+  fi
   deploy_args+=( "--branch" "${BRANCH}" )
   [[ "${SKIP_DEPS}" == true ]] && deploy_args+=( "--skip-deps" )
   [[ "${SKIP_CRON_SETUP}" == true ]] && deploy_args+=( "--skip-cron" )
   [[ "${SKIP_MIGRATE}" == true ]] && deploy_args+=( "--skip-migrate" )
   [[ "${DB_PUSH}" == true ]] && deploy_args+=( "--db-push" )
-  [[ "${SSL_SETUP}" == true ]] && deploy_args+=( "--ssl" "--domain" "${SSL_DOMAIN}" "--email" "${SSL_EMAIL}" )
+  [[ "${SSL_SETUP}" == true ]] && deploy_args+=( "--ssl" "--domain" "${effective_ssl_domain}" "--email" "${effective_ssl_email}" )
   [[ "${INSTALL_NGINX_IF_NEEDED}" == true ]] && deploy_args+=( "--install-nginx" )
   [[ "${INSTALL_PHP_FPM_IF_NEEDED}" == true ]] && deploy_args+=( "--install-php-fpm-if-needed" )
   [[ "${INSTALL_CRON_IF_NEEDED}" == true ]] && deploy_args+=( "--install-cron" )
@@ -2005,6 +2012,11 @@ detect_previous_deploy_defaults_from_host
 
 if [[ "${DB_PUSH}" == true ]]; then
   SKIP_MIGRATE=true
+fi
+
+if [[ "${SSL_SETUP}" == true ]]; then
+  [[ -n "${SSL_DOMAIN}" ]] || SSL_DOMAIN="melbourneguitarschool.com.au"
+  [[ -n "${SSL_EMAIL}" ]] || SSL_EMAIL="melbourneguitarschool@gmail.com"
 fi
 
 if [[ "${SSL_SETUP}" == true && ( -z "${SSL_DOMAIN}" || -z "${SSL_EMAIL}" ) && "${INTERACTIVE}" == false ]]; then
