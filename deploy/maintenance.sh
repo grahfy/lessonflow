@@ -634,11 +634,6 @@ build_tui_option_cell_text() {
   tui_truncate_text "${raw}" "${cell_width}"
 }
 
-print_tui_option_desc() {
-  local text="$1"
-  echo -e "       ${DIM}${text}${NC}"
-}
-
 draw_btop_separator() {
   local width="$1" label="${2:-}"
   if [[ -z "${label}" ]]; then
@@ -670,14 +665,15 @@ draw_btop_menu_item() {
 
 restore_backup_tui() {
   local src="local" rs=true rw=true re=true rmat=true rse=true rd=true
+  local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
   while true; do
     tui_clear_screen
     print_box_banner "Restore Backup"
     echo -e "${DIM}Source: ${BOLD}${src^^}${NC}"
     echo ""
-    print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
+    print_tui_panel_rule "${width}"
     echo -e "${BOLD}${BLUE}  Available Backups${NC}"
-    print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
+    print_tui_panel_rule "${width}"
     local bks=() i=1
     if [[ "${src}" == "local" ]]; then
       while IFS= read -r b; do [[ -n "$b" ]] || continue; echo -e "  ${CYAN}[$i]${NC} $(basename "${b}") ${DIM}$(du -h "${b}" 2>/dev/null | cut -f1)${NC}"; bks+=("${b}"); ((i++)); done < <(list_local_backups)
@@ -688,9 +684,9 @@ restore_backup_tui() {
       echo -e "  ${YELLOW}No backups found${NC}"
     fi
     echo ""
-    print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
+    print_tui_panel_rule "${width}"
     echo -e "${BOLD}${BLUE}  Restore Options${NC}"
-    print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
+    print_tui_panel_rule "${width}"
     print_tui_option_pair "1" "SQL Database" "$(bool_word "${rs}")" "Restore database from SQL dump." \
       "2" "App Files" "$(bool_word "${rw}")" "Restore webapp files."
     print_tui_option_pair "3" "Env File" "$(bool_word "${re}")" "Restore .env configuration." \
@@ -698,7 +694,7 @@ restore_backup_tui() {
     print_tui_option_pair "5" "SEO Config" "$(bool_word "${rse}")" "Restore SEO configuration." \
       "6" "Shared Data" "$(bool_word "${rd}")" "Restore shared data files."
     echo ""
-    print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
+    print_tui_panel_rule "${width}"
     print_tui_action_pair "R" "Restore Selected" "S" "Toggle Source"
     print_tui_action_pair "B" "Back to Main"
     print_tui_hint_line "Select backup number, then press R to restore"
@@ -724,14 +720,15 @@ restore_backup_tui() {
 }
 
 print_backup_components_tui() {
+  local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
   while true; do
     tui_clear_screen
     print_box_banner "Backup Components"
     echo -e "${DIM}Configure which elements to include in backups.${NC}"
     echo ""
-    print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
+    print_tui_panel_rule "${width}"
     echo -e "${BOLD}${BLUE}  Components to Include${NC}"
-    print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
+    print_tui_panel_rule "${width}"
     print_tui_option_pair "1" "SQL Database" "$(bool_word "${BACKUP_INCLUDE_SQL}")" "Include database dump in backup." \
       "2" "Web App" "$(bool_word "${BACKUP_INCLUDE_WEBAPP}")" "Include Next.js app files."
     print_tui_option_pair "3" "Environment" "$(bool_word "${BACKUP_INCLUDE_ENV}")" "Include .env configuration file." \
@@ -739,7 +736,7 @@ print_backup_components_tui() {
     print_tui_option_pair "5" "SEO Config" "$(bool_word "${BACKUP_INCLUDE_SEO_CONFIG}")" "Include SEO configuration." \
       "6" "Clean Old" "$(bool_word "${BACKUP_CLEAN_OLD}")" "Auto-delete backups older than retention."
     echo ""
-    print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
+    print_tui_panel_rule "${width}"
     print_tui_action_pair "S" "Save Settings" "B" "Back to Main"
     print_tui_hint_line "Toggle components with 1-6, then S to save"
     read -r -p "Select: " ch
@@ -772,8 +769,7 @@ detect_tty_capabilities() {
 print_btop_main_menu() {
   tui_clear_screen
   local cpu=$(get_cpu_usage) mem=$(get_memory_usage) disk=$(get_disk_usage "/") up=$(get_uptime)
-  local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}" inner_width=$((width - 2))
-  local i
+  local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
   
   print_box_banner "LessonFlow Maintenance v1.0"
   echo -e "${DIM}btop-style menu: system monitoring, backups, SEO tools.${NC}"
@@ -856,15 +852,16 @@ run_interactive_maintenance() {
       3) print_backup_components_tui ;;
       4) section "Cloud Provider"; BACKUP_CLOUD_PROVIDER=$(prompt_select "Select" "none" "google-drive" "koofr"); save_maintenance_settings ;;
       5) section "Frequency"; BACKUP_FREQUENCY=$(prompt_select "Select" "hourly" "daily" "weekly"); save_maintenance_settings ;;
-      6) generate_sitemap; read -r -n 1 -s -p "Press key..." ;;
-      7) generate_robots_txt; read -r -n 1 -s -p "Press key..." ;;
-      8) check_database_health; read -r -n 1 -s -p "Press key..." ;;
-      9) [[ -d "${REPO_ROOT}/.next" ]] && rm -rf "${REPO_ROOT}/.next"; [[ -d "${REPO_ROOT}/node_modules/.cache" ]] && rm -rf "${REPO_ROOT}/node_modules/.cache"; log_info "Cache cleaned"; read -r -n 1 -s -p "Press key..." ;;
-      10) run_git_pull; read -r -n 1 -s -p "Press key..." ;;
-      11) section "Edit Config"; prompt_env_editor; read -r -n 1 -s -p "Press key..." ;;
+      6) section "Retention"; BACKUP_RETENTION_DAYS=$(prompt_value "Days to keep" "${BACKUP_RETENTION_DAYS}"); save_maintenance_settings ;;
+      7) generate_sitemap; read -r -n 1 -s -p "Press key..." ;;
+      8) generate_robots_txt; read -r -n 1 -s -p "Press key..." ;;
+      9) check_database_health; read -r -n 1 -s -p "Press key..." ;;
+      10) [[ -d "${REPO_ROOT}/.next" ]] && rm -rf "${REPO_ROOT}/.next"; [[ -d "${REPO_ROOT}/node_modules/.cache" ]] && rm -rf "${REPO_ROOT}/node_modules/.cache"; log_info "Cache cleaned"; read -r -n 1 -s -p "Press key..." ;;
+      11) run_git_pull; read -r -n 1 -s -p "Press key..." ;;
+      12) section "Edit Config"; prompt_env_editor; read -r -n 1 -s -p "Press key..." ;;
       s) 
          section "Quick Actions"
-         log_info "Select action from menu (1-9, 10-12)"
+         log_info "Select action from menu (1-12)"
          read -r -n 1 -s -p "Press key..." ;;
       q|quit|exit) exit 0 ;;
     esac
