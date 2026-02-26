@@ -25,3 +25,4 @@ prisma/prisma/test.db
 prisma/prisma/test.db-journal
 
 tsconfig.tsbuildinfo
+*.exp
