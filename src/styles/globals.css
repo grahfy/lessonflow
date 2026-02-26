@@ -3073,19 +3073,12 @@ h1 {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  font-size: 0.75rem;
-}
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
   font-size: 0.86rem;
 }
 
 .report-comparison-label {
   color: rgba(255, 255, 255, 0.74);
   font-size: 0.72rem;
-}
-  color: rgba(255, 255, 255, 0.74);
 }
 
 .report-delta.positive {
