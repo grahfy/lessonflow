@@ -338,24 +338,51 @@ get_uptime_days() {
 
 print_btop_header() {
   local width="$1"
-  local ts
-  ts=$(date '+%Y-%m-%d %H:%M:%S')
-  local hn
+  local ts hn kern rule
+  ts=$(date "+%Y-%m-%d %H:%M:%S")
   hn=$(get_hostname)
-  local kern
   kern=$(get_kernel)
-  local rule=""
-  local i
   
-  printf -v rule '%*s' "$((width - 2))" ''
+  # Create horizontal rule
+  printf -v rule "%*s" "$((width - 2))" ""
   rule="${rule// /─}"
   
+  # Row 1: "⬡ Melbourne Guitar School"
+  local title="⬡ Melbourne Guitar School"
+  local title_len=25
+  local pad1_len=$((width - 2 - 2 - title_len))
+  local pad1=""
+  [[ $pad1_len -gt 0 ]] && printf -v pad1 "%*s" "$pad1_len" ""
+  
+  # Row 2: "Maintenance Console"
+  local subtitle="Maintenance Console"
+  local subtitle_len=19
+  local pad2_len=$((width - 2 - 1 - subtitle_len))
+  local pad2=""
+  [[ $pad2_len -gt 0 ]] && printf -v pad2 "%*s" "$pad2_len" ""
+
+  # Row 3: Host & Kernel
+  local h_label="Host:"
+  local k_label="Kernel:"
+  local host_kern_visible=$((1 + 5 + 1 + ${#hn} + 2 + 7 + 1 + ${#kern}))
+  local pad3_len=$((width - 2 - host_kern_visible))
+  local pad3=""
+  [[ $pad3_len -gt 0 ]] && printf -v pad3 "%*s" "$pad3_len" ""
+
+  # Row 4: Time
+  local t_label="Time:"
+  local time_visible=$((1 + 5 + 1 + ${#ts}))
+  local pad4_len=$((width - 2 - time_visible))
+  local pad4=""
+  [[ $pad4_len -gt 0 ]] && printf -v pad4 "%*s" "$pad4_len" ""
+
+  # Print it
   echo -e "${BOLD}${CYAN}╭${rule}╮${NC}"
-  echo -e "${BOLD}${CYAN}│${NC}  ${BOLD}⬡ Melbourne Guitar School${NC}  ${BOLD}${CYAN}│${NC}"
-  printf "${BOLD}${CYAN}│${NC} ${BOLD}Maintenance Console${NC}%*s${BOLD}${CYAN}│${NC}\n" $((width - 24)) ""
+  echo -e "${BOLD}${CYAN}│${NC}  ${BOLD}${title}${NC}${pad1}${BOLD}${CYAN}│${NC}"
+  echo -e "${BOLD}${CYAN}│${NC} ${BOLD}${subtitle}${NC}${pad2}${BOLD}${CYAN}│${NC}"
   echo -e "${BOLD}${CYAN}├${rule}┤${NC}"
-  printf "${BOLD}${CYAN}│${NC} ${DIM}Host:${NC} ${BTOP_CYAN_BRIGHT}%s${NC}  ${DIM}Kernel:${NC} ${BTOP_YELLOW}%s${NC}%*s${BOLD}${CYAN}│${NC}\n" "${hn}" "${kern}" $((width - ${#hn} - ${#kern} - 28)) ""
-  printf "${BOLD}${CYAN}│${NC} ${DIM}Time:${NC} ${BTOP_GREEN}%s${NC}%*s${BOLD}${CYAN}│${NC}\n" "${ts}" $((width - ${#ts} - 15)) ""
+  echo -e "${BOLD}${CYAN}│${NC} ${DIM}${h_label}${NC} ${BTOP_CYAN_BRIGHT}${hn}${NC}  ${DIM}${k_label}${NC} ${BTOP_YELLOW}${kern}${NC}${pad3}${BOLD}${CYAN}│${NC}"
+  echo -e "${BOLD}${CYAN}│${NC} ${DIM}${t_label}${NC} ${BTOP_GREEN}${ts}${NC}${pad4}${BOLD}${CYAN}│${NC}"
   echo -e "${BOLD}${CYAN}╰${rule}╯${NC}"
 }
 
