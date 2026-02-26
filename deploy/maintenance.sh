@@ -130,9 +130,9 @@ BLOCK_FULL='█'
 # Utils
 # =============================================================================
 
-log_info() { echo -e "${GREEN}●${NC} $1"; }
-log_warn() { echo -e "${YELLOW}▲${NC} $1"; }
-log_error() { echo -e "${RED}✖${NC} $1"; }
+log_info() { echo -e "${GREEN}●${NC} $1" >&2; }
+log_warn() { echo -e "${YELLOW}▲${NC} $1" >&2; }
+log_error() { echo -e "${RED}✖${NC} $1" >&2; }
 
 section() {
   echo ""
@@ -537,19 +537,20 @@ run_deploy_script() {
 # =============================================================================
 
 load_maintenance_settings() {
-if [[ -f "${MAINTENANCE_CONFIG_FILE}" ]]; then
-BACKUP_FREQUENCY="$(grep '^BACKUP_FREQUENCY=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "daily")"
-    BACKUP_CLOUD_PROVIDER="$(grep '^BACKUP_CLOUD_PROVIDER=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "none")"
-    BACKUP_CLOUD_FOLDER="$(grep '^BACKUP_CLOUD_FOLDER=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "melbourne-guitar-school-backups")"
-BACKUP_INCLUDE_SQL="$(grep '^BACKUP_INCLUDE_SQL=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "true")"
-BACKUP_INCLUDE_WEBAPP="$(grep '^BACKUP_INCLUDE_WEBAPP=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "true")"
-BACKUP_INCLUDE_ENV="$(grep '^BACKUP_INCLUDE_ENV=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "true")"
-BACKUP_INCLUDE_LEARNING_MATERIALS="$(grep '^BACKUP_INCLUDE_LEARNING_MATERIALS=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "true")"
-BACKUP_INCLUDE_SEO_CONFIG="$(grep '^BACKUP_INCLUDE_SEO_CONFIG=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "true")"
-BACKUP_CLEAN_OLD="$(grep '^BACKUP_CLEAN_OLD=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "true")"
+  local cfg="${MAINTENANCE_CONFIG_FILE}"
+  if [[ -f "${cfg}" ]]; then
+    BACKUP_FREQUENCY="$(grep '^BACKUP_FREQUENCY=' "${cfg}" | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//' || echo "daily")"
+    BACKUP_CLOUD_PROVIDER="$(grep '^BACKUP_CLOUD_PROVIDER=' "${cfg}" | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//' || echo "none")"
+    BACKUP_CLOUD_FOLDER="$(grep '^BACKUP_CLOUD_FOLDER=' "${cfg}" | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//' || echo "melbourne-guitar-school-backups")"
+    BACKUP_INCLUDE_SQL="$(grep '^BACKUP_INCLUDE_SQL=' "${cfg}" | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//' || echo "true")"
+    BACKUP_INCLUDE_WEBAPP="$(grep '^BACKUP_INCLUDE_WEBAPP=' "${cfg}" | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//' || echo "true")"
+    BACKUP_INCLUDE_ENV="$(grep '^BACKUP_INCLUDE_ENV=' "${cfg}" | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//' || echo "true")"
+    BACKUP_INCLUDE_LEARNING_MATERIALS="$(grep '^BACKUP_INCLUDE_LEARNING_MATERIALS=' "${cfg}" | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//' || echo "true")"
+    BACKUP_INCLUDE_SEO_CONFIG="$(grep '^BACKUP_INCLUDE_SEO_CONFIG=' "${cfg}" | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//' || echo "true")"
+    BACKUP_CLEAN_OLD="$(grep '^BACKUP_CLEAN_OLD=' "${cfg}" | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//' || echo "true")"
   fi
   
-  # Always load latest credentials from .env
+  # Credentials from .env (overrides)
   GDRIVE_CLIENT_ID=$(get_env_val "GDRIVE_CLIENT_ID")
   GDRIVE_CLIENT_SECRET=$(get_env_val "GDRIVE_CLIENT_SECRET")
   GDRIVE_REFRESH_TOKEN=$(get_env_val "GDRIVE_REFRESH_TOKEN")
@@ -557,22 +558,23 @@ BACKUP_CLEAN_OLD="$(grep '^BACKUP_CLEAN_OLD=' "${MAINTENANCE_CONFIG_FILE}" | cut
   KOOFR_USERNAME=$(get_env_val "KOOFR_USERNAME")
   KOOFR_PASSWORD=$(get_env_val "KOOFR_PASSWORD")
   
-  [[ -z "${BACKUP_CLOUD_FOLDER}" ]] && BACKUP_CLOUD_FOLDER=$(get_env_val "BACKUP_CLOUD_FOLDER") || true
-  [[ -z "${BACKUP_CLOUD_FOLDER}" ]] && BACKUP_CLOUD_FOLDER="melbourne-guitar-school-backups" || true
+  [[ -z "${BACKUP_CLOUD_FOLDER}" || "${BACKUP_CLOUD_FOLDER}" == "null" ]] && BACKUP_CLOUD_FOLDER=$(get_env_val "BACKUP_CLOUD_FOLDER")
+  [[ -z "${BACKUP_CLOUD_FOLDER}" || "${BACKUP_CLOUD_FOLDER}" == "null" ]] && BACKUP_CLOUD_FOLDER="melbourne-guitar-school-backups"
+  [[ -z "${BACKUP_CLOUD_PROVIDER}" || "${BACKUP_CLOUD_PROVIDER}" == "null" ]] && BACKUP_CLOUD_PROVIDER="none"
   return 0
 }
 
 save_maintenance_settings() {
-cat > "${MAINTENANCE_CONFIG_FILE}" << EOF
-BACKUP_FREQUENCY=${BACKUP_FREQUENCY}
-BACKUP_CLOUD_PROVIDER=${BACKUP_CLOUD_PROVIDER}
-BACKUP_CLOUD_FOLDER=${BACKUP_CLOUD_FOLDER}
-BACKUP_INCLUDE_SQL=${BACKUP_INCLUDE_SQL}
-BACKUP_INCLUDE_WEBAPP=${BACKUP_INCLUDE_WEBAPP}
-BACKUP_INCLUDE_ENV=${BACKUP_INCLUDE_ENV}
-BACKUP_INCLUDE_LEARNING_MATERIALS=${BACKUP_INCLUDE_LEARNING_MATERIALS}
-BACKUP_INCLUDE_SEO_CONFIG=${BACKUP_INCLUDE_SEO_CONFIG}
-BACKUP_CLEAN_OLD=${BACKUP_CLEAN_OLD}
+  cat > "${MAINTENANCE_CONFIG_FILE}" << EOF
+BACKUP_FREQUENCY="${BACKUP_FREQUENCY}"
+BACKUP_CLOUD_PROVIDER="${BACKUP_CLOUD_PROVIDER}"
+BACKUP_CLOUD_FOLDER="${BACKUP_CLOUD_FOLDER}"
+BACKUP_INCLUDE_SQL="${BACKUP_INCLUDE_SQL}"
+BACKUP_INCLUDE_WEBAPP="${BACKUP_INCLUDE_WEBAPP}"
+BACKUP_INCLUDE_ENV="${BACKUP_INCLUDE_ENV}"
+BACKUP_INCLUDE_LEARNING_MATERIALS="${BACKUP_INCLUDE_LEARNING_MATERIALS}"
+BACKUP_INCLUDE_SEO_CONFIG="${BACKUP_INCLUDE_SEO_CONFIG}"
+BACKUP_CLEAN_OLD="${BACKUP_CLEAN_OLD}"
 EOF
 }
 
@@ -631,19 +633,28 @@ restore_database() {
 }
 
 upload_to_google_drive() {
-  local fp="$1" bn="$(basename "$fp")"
+  local fp="${1:-}"
+  [[ -n "${fp}" ]] || return 1
+  local bn; bn="$(basename "${fp}")"
   [[ -n "${GDRIVE_CLIENT_ID}" && -n "${GDRIVE_REFRESH_TOKEN}" ]] || return 1
   local tr access_token fid
   tr="$(curl -s -X POST "https://oauth2.googleapis.com/token" -H "Content-Type: application/x-www-form-urlencoded" -d "client_id=${GDRIVE_CLIENT_ID}&client_secret=${GDRIVE_CLIENT_SECRET}&refresh_token=${GDRIVE_REFRESH_TOKEN}&grant_type=refresh_token" 2>/dev/null)"
   access_token="$(echo "${tr}" | grep -o '"access_token"[^}]*' | sed 's/.*: *"\(.*\)".*/\1/')"
+  [[ -n "${access_token}" ]] || return 1
   fid="$(curl -s "https://www.googleapis.com/drive/v3/files?q=name='${BACKUP_CLOUD_FOLDER}'+and+mimeType='application/vnd.google-apps.folder'" -H "Authorization: Bearer ${access_token}" | grep -o '"id"[^}]*' | head -1 | sed 's/.*: *"\(.*\)".*/\1/')"
-  curl -X POST "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart" -H "Authorization: Bearer ${access_token}" -F "metadata={name:'${bn}',parents:['${fid}']};type=application/json" -F "file=@${fp}" 2>/dev/null
+  if [[ -z "${fid}" ]]; then
+    log_error "Cloud folder '${BACKUP_CLOUD_FOLDER}' not found on GDrive"
+    return 1
+  fi
+  curl -s -X POST "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart" -H "Authorization: Bearer ${access_token}" -F "metadata={name:'${bn}',parents:['${fid}']};type=application/json" -F "file=@${fp}" >/dev/null 2>&1
 }
 
 upload_to_koofr() {
-  local fp="$1" bn="$(basename "$fp")"
+  local fp="${1:-}"
+  [[ -n "${fp}" ]] || return 1
+  local bn; bn="$(basename "${fp}")"
   [[ -n "${KOOFR_WEBDAV_URL}" ]] || return 1
-  curl -s -T "${fp}" -u "${KOOFR_USERNAME}:${KOOFR_PASSWORD}" "${KOOFR_WEBDAV_URL}/${BACKUP_CLOUD_FOLDER}/${bn}" 2>/dev/null
+  curl -s -T "${fp}" -u "${KOOFR_USERNAME}:${KOOFR_PASSWORD}" "${KOOFR_WEBDAV_URL}/${BACKUP_CLOUD_FOLDER}/${bn}" >/dev/null 2>&1
 }
 
 create_backup_archive() {
@@ -651,16 +662,47 @@ create_backup_archive() {
   td="$(mktemp -d)"
   af="${BACKUP_DIR}/${bn}.tar.xz"
   mkdir -p "${td}/${bn}"
-  [[ "${BACKUP_INCLUDE_SQL}" == "true" ]] && { log_info "SQL dump..."; create_database_dump "${td}/${bn}/database.sql" || log_warn "SQL failed"; }
-  [[ "${BACKUP_INCLUDE_ENV}" == "true" && -f "${SHARED_DIR}/.env" ]] && run_privileged_cmd cp "${SHARED_DIR}/.env" "${td}/${bn}/"
-  [[ "${BACKUP_INCLUDE_SEO_CONFIG}" == "true" && -f "${SEO_CONFIG_FILE}" ]] && run_privileged_cmd cp "${SEO_CONFIG_FILE}" "${td}/${bn}/"
-  [[ "${BACKUP_INCLUDE_WEBAPP}" == "true" && -d "${CURRENT_LINK}" ]] && { log_info "App files..."; mkdir -p "${td}/${bn}/app"; run_privileged_cmd rsync -a --exclude='node_modules' --exclude='.next' "${CURRENT_LINK}/" "${td}/${bn}/app/" 2>/dev/null; }
-  [[ "${BACKUP_INCLUDE_LEARNING_MATERIALS}" == "true" && -d "${REPO_ROOT}/.data" ]] && run_privileged_cmd cp -r "${REPO_ROOT}/.data" "${td}/${bn}/"
-  [[ -d "${SHARED_DIR}/data" ]] && run_privileged_cmd cp -r "${SHARED_DIR}/data" "${td}/${bn}/"
+  
+  if [[ "${BACKUP_INCLUDE_SQL}" == "true" ]]; then
+    run_step "SQL Dump" create_database_dump "${td}/${bn}/database.sql" || log_warn "SQL failed"
+  fi
+  
+  if [[ "${BACKUP_INCLUDE_ENV}" == "true" && -f "${SHARED_DIR}/.env" ]]; then
+    run_step "Env Config" run_privileged_cmd cp "${SHARED_DIR}/.env" "${td}/${bn}/"
+  fi
+  
+  if [[ "${BACKUP_INCLUDE_SEO_CONFIG}" == "true" && -f "${SEO_CONFIG_FILE}" ]]; then
+    run_step "SEO Config" run_privileged_cmd cp "${SEO_CONFIG_FILE}" "${td}/${bn}/"
+  fi
+  
+  if [[ "${BACKUP_INCLUDE_WEBAPP}" == "true" && -d "${CURRENT_LINK}" ]]; then
+    mkdir -p "${td}/${bn}/app"
+    run_step "App Files" run_privileged_cmd rsync -a --exclude='node_modules' --exclude='.next' "${CURRENT_LINK}/" "${td}/${bn}/app/"
+  fi
+  
+  if [[ "${BACKUP_INCLUDE_LEARNING_MATERIALS}" == "true" && -d "${REPO_ROOT}/.data" ]]; then
+    run_step "Materials" run_privileged_cmd cp -r "${REPO_ROOT}/.data" "${td}/${bn}/"
+  fi
+  
+  if [[ -d "${SHARED_DIR}/data" ]]; then
+    run_step "Shared Data" run_privileged_cmd cp -r "${SHARED_DIR}/data" "${td}/${bn}/"
+  fi
+
   log_info "Compressing (tar.xz)..."
-  tar -cJf "${af}" -C "${td}" "${bn}" 2>/dev/null
+  if [[ ! -w "${BACKUP_DIR}" ]]; then
+    run_step "Archive" run_privileged_cmd tar -cJf "${af}" -C "${td}" "${bn}"
+  else
+    run_step "Archive" tar -cJf "${af}" -C "${td}" "${bn}"
+  fi
+  
   run_privileged_cmd rm -rf "${td}"
-  [[ -f "${af}" ]] && { log_info "Created: $(du -h "${af}" | cut -f1)"; echo "${af}"; } || return 1
+  if [[ -f "${af}" ]]; then
+    log_info "Created: $(du -h "${af}" | cut -f1)"
+    echo "${af}"
+    return 0
+  else
+    return 1
+  fi
 }
 
 run_backup() {
@@ -678,7 +720,13 @@ run_backup() {
     done
   fi
   [[ "${BACKUP_CLEAN_OLD}" == "true" ]] && find "${BACKUP_DIR}" -name "backup-*.tar.xz" -type f -mtime +${BACKUP_RETENTION_DAYS} -delete 2>/dev/null
-  echo "[$(date -Iseconds)] Backup completed: ${af}" >> "${LOG_DIR}/backup-${ts}.log"
+  local log_file="${LOG_DIR}/backup-${ts}.log"
+  local log_msg="[$(date -Iseconds)] Backup completed: ${af}"
+  if [[ -w "${LOG_DIR}" ]]; then
+    echo "${log_msg}" >> "${log_file}"
+  else
+    echo "${log_msg}" | run_privileged_cmd tee -a "${log_file}" >/dev/null
+  fi
 }
 
 # =============================================================================
@@ -960,6 +1008,8 @@ draw_btop_menu_item() {
   local src="local" rs=true rw=true re=true rmat=true rse=true rd=true
   local ch
   while true; do
+    auto_size_tui_panel_width
+
     tui_clear_screen
     print_box_banner "Restore Backup"
     echo -e "${DIM}Source: ${BOLD}${src^^}${NC}"
@@ -1002,8 +1052,7 @@ draw_btop_menu_item() {
       m) rmat=$(toggle_bool "${rmat}") ;;
       o) rse=$(toggle_bool "${rse}") ;;
       d) rd=$(toggle_bool "${rd}") ;;
-g) [[ "${src}" == "local" ]] && src="cloud" || src="local" ;;
-
+      g) [[ "${src}" == "local" ]] && src="cloud" || src="local" ;;
       r)
         echo -e "\n"
         read -r -p "  Enter backup number: " num
@@ -1025,10 +1074,13 @@ g) [[ "${src}" == "local" ]] && src="cloud" || src="local" ;;
   done
 }
 
+
 print_backup_components_tui() {
   local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
   local ch
   while true; do
+    auto_size_tui_panel_width
+
     tui_clear_screen
     print_box_banner "Backup Components"
     echo -e "${DIM}Configure which elements to include in backups.${NC}"
@@ -1057,13 +1109,13 @@ print_backup_components_tui() {
       m) BACKUP_INCLUDE_LEARNING_MATERIALS=$(toggle_bool "${BACKUP_INCLUDE_LEARNING_MATERIALS}") ;;
       o) BACKUP_INCLUDE_SEO_CONFIG=$(toggle_bool "${BACKUP_INCLUDE_SEO_CONFIG}") ;;
       c) BACKUP_CLEAN_OLD=$(toggle_bool "${BACKUP_CLEAN_OLD}") ;;
-v) save_maintenance_settings; log_info "Settings saved"; sleep 1; return 0 ;;
-
+      v) save_maintenance_settings; log_info "Settings saved"; sleep 1; return 0 ;;
       b) return 0 ;;
       q) exit 0 ;;
     esac
   done
 }
+
 
 detect_tty_capabilities() {
   if [[ -t 0 && -t 1 ]]; then
@@ -1120,6 +1172,8 @@ print_deploy_menu_tui() {
   local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
   local ch
   while true; do
+    auto_size_tui_panel_width
+
     tui_clear_screen
     print_box_banner "Deploy Management"
     echo -e "${DIM}Update and deploy the application.${NC}"
@@ -1135,8 +1189,8 @@ print_deploy_menu_tui() {
     
     read -r -n 1 -s ch
     case "${ch,,}" in
-      u) run_update_script; read -r -n 1 -s -p "  Done. Press any key..." ;;
-      d) run_deploy_script; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      u) print_execute_update_deploy_tui ;;
+      d) print_execute_deploy_only_tui ;;
       s) cycle_sudo_mode ;;
       b) return 0 ;;
       q) exit 0 ;;
@@ -1144,10 +1198,14 @@ print_deploy_menu_tui() {
   done
 }
 
+
 print_backup_menu_tui() {
   local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
   local ch
   while true; do
+auto_size_tui_panel_width
+local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
+
     tui_clear_screen
     print_box_banner "Backup & Restore"
     echo -e "${DIM}Manage local and cloud backups.${NC}"
@@ -1169,7 +1227,7 @@ print_backup_menu_tui() {
     
     read -r -n 1 -s ch
     case "${ch,,}" in
-      r) local up=false; prompt_yes_no "Upload to cloud?" "n" && up=true; run_backup "${up}"; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      r) print_execute_run_backup_tui ;;
       t) restore_backup_tui ;;
       c) print_backup_components_tui ;;
       v) print_cloud_settings_tui ;;
@@ -1185,6 +1243,8 @@ print_seo_db_menu_tui() {
   local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
   local ch
   while true; do
+    auto_size_tui_panel_width
+
     tui_clear_screen
     print_box_banner "SEO & Database"
     echo -e "${DIM}Manage search engine visibility and database health.${NC}"
@@ -1200,19 +1260,22 @@ print_seo_db_menu_tui() {
     
     read -r -n 1 -s ch
     case "${ch,,}" in
-      m) generate_sitemap; read -r -n 1 -s -p "  Done. Press any key..." ;;
-      g) generate_robots_txt; read -r -n 1 -s -p "  Done. Press any key..." ;;
-      h) check_database_health; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      m) print_execute_sitemap_tui ;;
+      g) print_execute_robots_tui ;;
+      h) print_execute_db_health_tui ;;
       b) return 0 ;;
       q) exit 0 ;;
     esac
   done
 }
 
+
 print_system_menu_tui() {
   local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
   local ch
   while true; do
+    auto_size_tui_panel_width
+
     tui_clear_screen
     print_box_banner "System Management"
     echo -e "${DIM}General system operations and configuration.${NC}"
@@ -1228,8 +1291,8 @@ print_system_menu_tui() {
     
     read -r -n 1 -s ch
     case "${ch,,}" in
-      p) run_git_pull; read -r -n 1 -s -p "  Done. Press any key..." ;;
-      x) [[ -d "${REPO_ROOT}/.next" ]] && rm -rf "${REPO_ROOT}/.next"; [[ -d "${REPO_ROOT}/node_modules/.cache" ]] && rm -rf "${REPO_ROOT}/node_modules/.cache"; log_info "Cache cleaned"; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      p) print_execute_git_pull_tui ;;
+      x) print_execute_clean_cache_tui ;;
       e) section "Edit Config"; prompt_env_editor; read -r -n 1 -s -p "  Done. Press any key..." ;;
       b) return 0 ;;
       q) exit 0 ;;
@@ -1238,6 +1301,147 @@ print_system_menu_tui() {
 }
 
 
+print_execute_update_deploy_tui() {
+  local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
+  tui_clear_screen
+  print_box_banner "Update + Deploy"
+  echo -e "This will perform: ${BOLD}git pull, install, build, and restart.${NC}"
+  echo ""
+  print_tui_panel_rule "${width}"
+  print_tui_action_pair "S" "Start Process" "B" "Cancel / Back"
+  print_tui_hint_line "Press S to start, B to cancel"
+  local ch; read -r -n 1 -s ch
+  if [[ "${ch,,}" == "s" ]]; then
+    run_update_script
+    read -r -n 1 -s -p "  Done. Press any key..."
+  fi
+}
+
+print_execute_deploy_only_tui() {
+  local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
+  tui_clear_screen
+  print_box_banner "Deploy Only"
+  echo -e "This will perform: ${BOLD}install, build, and restart (no git pull).${NC}"
+  echo ""
+  print_tui_panel_rule "${width}"
+  print_tui_action_pair "S" "Start Process" "B" "Cancel / Back"
+  print_tui_hint_line "Press S to start, B to cancel"
+  local ch; read -r -n 1 -s ch
+  if [[ "${ch,,}" == "s" ]]; then
+    run_deploy_script
+    read -r -n 1 -s -p "  Done. Press any key..."
+  fi
+}
+
+print_execute_run_backup_tui() {
+  local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
+
+local up=false
+  while true; do
+    auto_size_tui_panel_width
+
+tui_clear_screen
+print_box_banner "Run Backup"
+echo -e "Create a fresh backup archive of the system components."
+echo ""
+print_tui_panel_rule "${width}"
+    print_tui_option_pair "U" "Cloud Upload" "$(bool_word "${up}")" "Upload to enabled cloud providers."
+
+echo ""
+print_tui_panel_rule "${width}"
+print_tui_action_pair "S" "Start Backup" "B" "Cancel / Back"
+print_tui_hint_line "U:Toggle Upload, S:Start, B:Cancel"
+local ch; read -r -n 1 -s ch
+case "${ch,,}" in
+u) up=$(toggle_bool "${up}") ;;
+      s) run_backup "${up}" || log_error "Backup failed"; read -r -n 1 -s -p "  Done. Press any key..."; return 0 ;;
+b) return 0 ;;
+q) exit 0 ;;
+esac
+done
+}
+
+print_execute_git_pull_tui() {
+  local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
+  tui_clear_screen
+  print_box_banner "Git Pull"
+  echo -e "Fetch and merge the latest changes from ${BOLD}${REMOTE_NAME}/${BRANCH}${NC}."
+  echo ""
+  print_tui_panel_rule "${width}"
+  print_tui_action_pair "S" "Start Pull" "B" "Cancel / Back"
+  print_tui_hint_line "Press S to start, B to cancel"
+  local ch; read -r -n 1 -s ch
+  if [[ "${ch,,}" == "s" ]]; then
+    run_git_pull
+    read -r -n 1 -s -p "  Done. Press any key..."
+  fi
+}
+
+print_execute_clean_cache_tui() {
+  local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
+  tui_clear_screen
+  print_box_banner "Clean Cache"
+  echo -e "Remove .next and node_modules cache directories."
+  echo ""
+  print_tui_panel_rule "${width}"
+  print_tui_action_pair "S" "Start Cleaning" "B" "Cancel / Back"
+  print_tui_hint_line "Press S to start, B to cancel"
+  local ch; read -r -n 1 -s ch
+  if [[ "${ch,,}" == "s" ]]; then
+    [[ -d "${REPO_ROOT}/.next" ]] && run_privileged_cmd rm -rf "${REPO_ROOT}/.next"
+    [[ -d "${REPO_ROOT}/node_modules/.cache" ]] && run_privileged_cmd rm -rf "${REPO_ROOT}/node_modules/.cache"
+    log_info "Cache cleaned"
+    read -r -n 1 -s -p "  Done. Press any key..."
+  fi
+}
+
+print_execute_sitemap_tui() {
+  local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
+  tui_clear_screen
+  print_box_banner "Generate Sitemap"
+  echo -e "Re-generate the public sitemap from the current SEO configuration."
+  echo ""
+  print_tui_panel_rule "${width}"
+  print_tui_action_pair "S" "Start Generation" "B" "Cancel / Back"
+  print_tui_hint_line "Press S to start, B to cancel"
+  local ch; read -r -n 1 -s ch
+  if [[ "${ch,,}" == "s" ]]; then
+    generate_sitemap
+    read -r -n 1 -s -p "  Done. Press any key..."
+  fi
+}
+
+print_execute_robots_tui() {
+  local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
+  tui_clear_screen
+  print_box_banner "Generate Robots.txt"
+  echo -e "Re-generate robots.txt for search engine crawlers."
+  echo ""
+  print_tui_panel_rule "${width}"
+  print_tui_action_pair "S" "Start Generation" "B" "Cancel / Back"
+  print_tui_hint_line "Press S to start, B to cancel"
+  local ch; read -r -n 1 -s ch
+  if [[ "${ch,,}" == "s" ]]; then
+    generate_robots_txt
+    read -r -n 1 -s -p "  Done. Press any key..."
+  fi
+}
+
+print_execute_db_health_tui() {
+  local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
+  tui_clear_screen
+  print_box_banner "Database Health"
+  echo -e "Verify connectivity and status of the application database."
+  echo ""
+  print_tui_panel_rule "${width}"
+  print_tui_action_pair "S" "Start Check" "B" "Cancel / Back"
+  print_tui_hint_line "Press S to start, B to cancel"
+  local ch; read -r -n 1 -s ch
+  if [[ "${ch,,}" == "s" ]]; then
+    check_database_health
+    read -r -n 1 -s -p "  Done. Press any key..."
+  fi
+}
 
 # =============================================================================
 # Runtime
@@ -1245,14 +1449,20 @@ print_system_menu_tui() {
 
 run_step() {
   local msg="$1"; shift; start_spinner "${msg}"
-  if "$@" >/dev/null 2>&1; then stop_spinner "ok"; else stop_spinner "fail"; return 1; fi
+  if "$@" >/dev/null 2>&1; then stop_spinner "ok" >&2; else stop_spinner "fail" >&2; return 1; fi
 }
 
 start_spinner() {
-  local msg="$1"; local i=0; local fc="${#SPINNER_FRAMES[@]}"
+  local msg="$1";
+  local i=0;
+  local fc="${#SPINNER_FRAMES[@]}"
   [[ "${NO_SPINNER}" == true || "${IS_TTY}" != true ]] && return 0
   SPINNER_MSG="${msg}"
-  ( while true; do printf "\r${CYAN}%s${NC} %s" "${SPINNER_FRAMES[$i]}" "${SPINNER_MSG}"; i=$(( (i + 1) % fc )); sleep 0.08; done ) &
+  ( while true;
+  do printf "\r${CYAN}%s${NC} %s" "${SPINNER_FRAMES[$i]}" "${SPINNER_MSG}" >&2;
+  i=$(( (i + 1) % fc ));
+  sleep 0.08;
+done ) &
   SPINNER_PID=$!
 }
 
@@ -1262,7 +1472,8 @@ stop_spinner() {
   if [[ -n "${SPINNER_PID}" ]] && kill -0 "${SPINNER_PID}" 2>/dev/null; then
     kill "${SPINNER_PID}" 2>/dev/null || true; wait "${SPINNER_PID}" 2>/dev/null || true
   fi
-  [[ "${status}" == "ok" ]] && printf "\r${GREEN}✔${NC} %s\n" "${SPINNER_MSG}" || printf "\r${RED}✖${NC} %s\n" "${SPINNER_MSG}"
+  printf "\r\033[K" >&2
+  [[ "${status}" == "ok" ]] && printf "${GREEN}✔${NC} %s\n" "${SPINNER_MSG}" >&2 || printf "${RED}✖${NC} %s\n" "${SPINNER_MSG}" >&2
 }
 
 check_database_health() {
@@ -1281,6 +1492,9 @@ print_cloud_settings_tui() {
   local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
   local ch
   while true; do
+    auto_size_tui_panel_width
+    local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
+
     tui_clear_screen
     print_box_banner "Cloud Settings"
     echo -e "${DIM}Configure cloud storage providers for backups.${NC}"
@@ -1294,8 +1508,8 @@ print_cloud_settings_tui() {
     local use_koofr="false"
     [[ "${BACKUP_CLOUD_PROVIDER}" == *"koofr"* ]] && use_koofr="true"
     
-    print_tui_option_pair "1" "Google Drive" "$(bool_word "${use_gdrive}")" "Upload to Google Drive." \
-      "2" "Koofr (WebDAV)" "$(bool_word "${use_koofr}")" "Upload via Koofr WebDAV."
+    print_tui_option_pair "G" "Google Drive" "$(bool_word "${use_gdrive}")" "Upload to Google Drive." \
+      "K" "Koofr (WebDAV)" "$(bool_word "${use_koofr}")" "Upload via Koofr WebDAV."
     echo ""
     print_tui_panel_rule "${width}"
     echo -e "${BOLD}${BLUE}  Configuration${NC}"
@@ -1304,11 +1518,12 @@ print_cloud_settings_tui() {
     echo ""
     print_tui_panel_rule "${width}"
     print_tui_action_pair "F" "Edit Folder" "B" "Back to Main"
-    print_tui_hint_line "Toggle with 1-2, F to change folder, B to go back"
+    print_tui_hint_line "G:Google, K:Koofr, F:Folder, B:Back"
+
     
     read -r -n 1 -s ch
     case "${ch,,}" in
-      1) 
+      g) 
         if [[ "${use_gdrive}" == "true" ]]; then
           BACKUP_CLOUD_PROVIDER="${BACKUP_CLOUD_PROVIDER//google-drive/}"
         else
@@ -1319,7 +1534,7 @@ print_cloud_settings_tui() {
         [[ -z "${BACKUP_CLOUD_PROVIDER}" ]] && BACKUP_CLOUD_PROVIDER="none"
         save_maintenance_settings
         ;;
-      2)
+      k)
         if [[ "${use_koofr}" == "true" ]]; then
           BACKUP_CLOUD_PROVIDER="${BACKUP_CLOUD_PROVIDER//koofr/}"
         else
@@ -1328,8 +1543,8 @@ print_cloud_settings_tui() {
         fi
         BACKUP_CLOUD_PROVIDER=$(echo $BACKUP_CLOUD_PROVIDER | xargs)
         [[ -z "${BACKUP_CLOUD_PROVIDER}" ]] && BACKUP_CLOUD_PROVIDER="none"
-        save_maintenance_settings
-        ;;
+        save_maintenance_settings ;;
+
       f) BACKUP_CLOUD_FOLDER=$(prompt_value "Cloud Folder" "${BACKUP_CLOUD_FOLDER}"); save_maintenance_settings ;;
       b) return 0 ;;
       q) exit 0 ;;
@@ -1342,6 +1557,8 @@ run_interactive_maintenance() {
   create_backup_directory
   local ch=""
   while true; do
+    auto_size_tui_panel_width
+
     print_btop_main_menu
     printf "  ${BTOP_FG_DIM}Select Category (D, B, S, Y, R to refresh, Q to quit):${NC} "
     read -r -n 1 ch
