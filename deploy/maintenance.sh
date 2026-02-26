@@ -13,7 +13,6 @@ set -euo pipefail
 
 # Resolve paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT=""
 APP_NAME="melbourne-guitar-school"
 DEPLOY_DIR="/var/www/${APP_NAME}"
 SHARED_DIR="${DEPLOY_DIR}/shared"
@@ -22,6 +21,7 @@ LOG_DIR="/var/log/melbourne-guitar-school"
 BACKUP_DIR="${DEPLOY_DIR}/backups"
 
 # Runtime configuration
+REPO_ROOT=""
 BRANCH=""
 REMOTE_NAME="origin"
 SKIP_PULL=false
@@ -36,10 +36,11 @@ SPINNER_FRAMES=( "⠋" "⠙" "⠹" "⠸" "⠼" "⠦" "⠴" "⠧" "⠇" "⠏" )
 MAINTENANCE_TUI_PANEL_WIDTH=92
 MAINTENANCE_TUI_PANEL_WIDTH_MAX=120
 
-# SEO Configuration
+# Config file paths
 SEO_CONFIG_FILE=""
 SITEMAP_FILE=""
 ROBOTS_FILE=""
+MAINTENANCE_CONFIG_FILE=""
 
 # Backup Configuration
 BACKUP_FREQUENCY="daily"
@@ -55,8 +56,6 @@ BACKUP_INCLUDE_ENV=true
 BACKUP_INCLUDE_LEARNING_MATERIALS=true
 BACKUP_INCLUDE_SEO_CONFIG=true
 BACKUP_CLEAN_OLD=true
-
-MAINTENANCE_CONFIG_FILE=""
 
 # Cloud credentials
 GDRIVE_CLIENT_ID=""
@@ -139,6 +138,7 @@ prompt_yes_no() {
 
 prompt_value() {
   local prompt="$1" default_value="${2:-}"
+  local value=""
   if [[ -n "${default_value}" ]]; then
     read -r -p "${prompt} [${default_value}]: " value
     echo "${value:-$default_value}"
@@ -276,77 +276,6 @@ EOF
 # Git
 # =============================================================================
 
-show_usage() {
-  cat <<'EOF'
-Melbourne Guitar School - Maintenance Script
-
-Usage: ./deploy/maintenance.sh [options]
-
-Options:
-  --interactive         Force interactive TUI mode (default when TTY detected)
-  --skip-pull          Skip git pull when running non-interactively
-  --branch BRANCH       Git branch to pull from (default: current branch)
-  --remote REMOTE      Git remote to pull from (default: origin)
-  --allow-dirty        Allow operation even if working tree is dirty
-  --no-color            Disable colored output
-  --no-spinner          Disable spinner UI
-  --help, -h            Show usage
-
-Features:
-  - Sitemap.xml and robots.txt generation
-  - Backup with tar.xz compression
-  - Selective restore from local or cloud
-  - System maintenance tasks
-EOF
-}
-
-detect_tty_capabilities() {
-  if [[ -t 0 && -t 1 ]]; then
-    IS_TTY=true
-  fi
-
-  if [[ "${IS_TTY}" == true ]]; then
-    auto_size_tui_panel_width
-  fi
-
-  if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then
-    RED='' GREEN='' YELLOW='' BLUE='' CYAN='' MAGENTA='' BOLD='' DIM='' NC=''
-    BTOP_FG='' BTOP_FG_DIM='' BTOP_CYAN='' BTOP_CYAN_BRIGHT='' BTOP_GREEN='' BTOP_GREEN_BRIGHT=''
-    BTOP_BLUE='' BTOP_ORANGE='' BTOP_PURPLE='' BTOP_YELLOW='' BTOP_RED=''
-    BTOP_OK='' BTOP_WARN='' BTOP_ERROR='' BTOP_INFO=''
-    BOX_TL='┌' BOX_TR='┐' BOX_BL='└' BOX_BR='┘' BOX_H='─' BOX_V='│'
-    BLOCK_EMPTY=' ' BLOCK_FULL='#'
-  fi
-}
-
-auto_size_tui_panel_width() {
-  local cols=""
-  local target_width=""
-
-  if command -v tput >/dev/null 2>&1; then
-    cols="$(tput cols 2>/dev/null || true)"
-  fi
-
-  if [[ -z "${cols}" && -n "${COLUMNS:-}" ]]; then
-    cols="${COLUMNS}"
-  fi
-
-  if [[ ! "${cols}" =~ ^[0-9]+$ ]]; then
-    return 0
-  fi
-
-  target_width="${cols}"
-  if (( target_width < 48 )); then
-    target_width=48
-  fi
-  if (( target_width > MAINTENANCE_TUI_PANEL_WIDTH_MAX )); then
-    target_width="${MAINTENANCE_TUI_PANEL_WIDTH_MAX}"
-  fi
-
-  MAINTENANCE_TUI_PANEL_WIDTH="${target_width}"
-}
-
-
 resolve_repo_root() {
   local c=("${SCRIPT_DIR}/.." "/var/www/${APP_NAME}/current" "/var/www/${APP_NAME}" "${HOME}/melbourne-guitar-school")
   for candidate in "${c[@]}"; do
@@ -369,77 +298,6 @@ run_git_pull() {
   run_step "Git Fetch" git -C "${REPO_ROOT}" fetch "${REMOTE_NAME}" "${BRANCH}" || return 1
   run_step "Git Pull" git -C "${REPO_ROOT}" pull --ff-only "${REMOTE_NAME}" "${BRANCH}" || return 1
   log_info "Updated to $(git -C "${REPO_ROOT}" rev-parse --short HEAD)"
-}
-
-# =============================================================================
-# SEO
-# =============================================================================
-
-init_seo_config() {
-  [[ -f "${SEO_CONFIG_FILE}" ]] && return
-  mkdir -p "$(dirname "${SEO_CONFIG_FILE}")"
-  cat > "${SEO_CONFIG_FILE}" << 'EOF'
-{
-  "version": "1.0",
-  "pages": {
-    "/": {"enabled": true, "priority": 1.0, "changeFrequency": "monthly"},
-    "/lessons": {"enabled": true, "priority": 0.9, "changeFrequency": "monthly"},
-    "/teacher": {"enabled": true, "priority": 0.7, "changeFrequency": "yearly"},
-    "/vouchers": {"enabled": true, "priority": 0.8, "changeFrequency": "monthly"},
-    "/contact": {"enabled": true, "priority": 0.6, "changeFrequency": "yearly"},
-    "/book": {"enabled": true, "priority": 0.8, "changeFrequency": "monthly"},
-    "/terms": {"enabled": true, "priority": 0.3, "changeFrequency": "yearly"}
-  }
-}
-EOF
-}
-
-generate_sitemap() {
-  section "Sitemap Generation"
-  init_seo_config
-  local bu="https://melbourneguitarschool.com.au"
-  [[ -f "${SHARED_DIR}/.env" ]] && bu="$(grep -o 'NEXT_PUBLIC_SITE_URL[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || echo "${bu}")"
-  local count=0
-  cat > "${SITEMAP_FILE}" << EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-EOF
-  while IFS= read -r path; do
-    local e="$(grep -A5 "\"${path}\"" "${SEO_CONFIG_FILE}" 2>/dev/null | grep -o '"enabled"[[:space:]]*:[[:space:]]*[a-z]*' | sed 's/.*: *//' || echo "true")"
-    [[ "${e}" == "true" ]] || continue
-    local p="$(grep -A5 "\"${path}\"" "${SEO_CONFIG_FILE}" 2>/dev/null | grep -o '"priority"[[:space:]]*:[[:space:]]*[0-9.]*' | sed 's/.*: *//' || echo "0.5")"
-    local f="$(grep -A5 "\"${path}\"" "${SEO_CONFIG_FILE}" 2>/dev/null | grep -o '"changeFrequency"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*: *"\([^"]*\)"/\1/' || echo "monthly")"
-    local up="${path}"; [[ "${up}" == "/" ]] && up=""
-    cat >> "${SITEMAP_FILE}" << EOF
-  <url>
-    <loc>${bu}${up}</loc>
-    <lastmod>$(date +%Y-%m-%d)</lastmod>
-    <changefreq>${f}</changefreq>
-    <priority>${p}</priority>
-  </url>
-EOF
-    ((count++))
-  done < <(grep -o '"/[^"]*"[[:space:]]*:' "${SEO_CONFIG_FILE}" 2>/dev/null | sed 's/"//g; s/:$//' | sort -u)
-  echo "</urlset>" >> "${SITEMAP_FILE}"
-  log_info "Generated ${count} pages"
-}
-
-generate_robots_txt() {
-  section "Robots.txt"
-  init_seo_config
-  local bu="https://melbourneguitarschool.com.au"
-  [[ -f "${SHARED_DIR}/.env" ]] && bu="$(grep -o 'NEXT_PUBLIC_SITE_URL[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || echo "${bu}")"
-  cat > "${ROBOTS_FILE}" << EOF
-# Robots.txt for LessonFlow
-# Generated: $(date -Iseconds)
-User-agent: *
-Allow: /
-Disallow: /admin/
-Disallow: /api/
-Disallow: /student/
-Sitemap: ${bu}/sitemap.xml
-EOF
-  log_info "Generated robots.txt"
 }
 
 # =============================================================================
@@ -556,32 +414,11 @@ restore_database() {
   local sf="$1" du
   [[ -f "${SHARED_DIR}/.env" ]] && du=$(grep 'DATABASE_URL' "${SHARED_DIR}/.env" | sed 's/.*=//; s/["'\'']//g')
   [[ -z "${du}" ]] && return 1
-  
-  local u=$(echo "${du}" | sed -n 's|.*://\([^:]*\):.*@.*|\1|p')
-  local pass=$(echo "${du}" | sed -n 's|.*://[^:]*:\([^@]*\)@.*|\1|p')
   local h=$(echo "${du}" | sed -n 's|.*@\([^:/]*\).*|\1|p')
   local p=$(echo "${du}" | sed -n 's|.*:\([0-9]*\)/.*|\1|p')
   local n=$(echo "${du}" | sed -n 's|.*/\([^?]*\).*|\1|p')
-  
-  if command -v mysql >/dev/null 2>&1; then
-    MYSQL_PWD="${pass}" mysql -h "${h:-localhost}" -P "${p:-3306}" -u "${u}" "${n}" < "${sf}" 2>/dev/null
-  elif command -v mariadb >/dev/null 2>&1; then
-    MYSQL_PWD="${pass}" mariadb -h "${h:-localhost}" -P "${p:-3306}" -u "${u}" "${n}" < "${sf}" 2>/dev/null
-  else
-    return 1
-  fi
-}
-restore_database() {
-  local sf="$1" du
-  [[ -f "${SHARED_DIR}/.env" ]] && du=$(grep 'DATABASE_URL' "${SHARED_DIR}/.env" | sed 's/.*=//; s/["'\'']//g')
-  [[ -z "${du}" ]] && return 1
-  
   local u=$(echo "${du}" | sed -n 's|.*://\([^:]*\):.*@.*|\1|p')
   local pass=$(echo "${du}" | sed -n 's|.*://[^:]*:\([^@]*\)@.*|\1|p')
-  local h=$(echo "${du}" | sed -n 's|.*@\([^:/]*\).*|\1|p')
-  local p=$(echo "${du}" | sed -n 's|.*:\([0-9]*\)/.*|\1|p')
-  local n=$(echo "${du}" | sed -n 's|.*/\([^?]*\).*|\1|p')
-  
   if command -v mysql >/dev/null 2>&1; then
     MYSQL_PWD="${pass}" mysql -h "${h:-localhost}" -P "${p:-3306}" -u "${u}" "${n}" < "${sf}" 2>/dev/null
   elif command -v mariadb >/dev/null 2>&1; then
@@ -608,8 +445,59 @@ restore_backup() {
 }
 
 # =============================================================================
-# TUI Menus
+# TUI Logic
 # =============================================================================
+
+draw_btop_separator() {
+  local width="$1" label="${2:-}"
+  if [[ -z "${label}" ]]; then
+    printf "${BTOP_FG}%s" "${BOX_VR}"; local i; for ((i=0; i<width-2; i++)); do printf "${BOX_H}"; done; printf "${BOX_VL}\n"
+  else
+    local label_len=${#label} line_len=$(( (width - 2 - label_len - 4) / 2 ))
+    printf "${BTOP_FG}%s" "${BOX_VR}"; for ((i=0; i<line_len; i++)); do printf "${BOX_H}"; done; printf " ${BTOP_PURPLE}%s ${BTOP_FG}" "${label}"
+    local remaining=$((width - 2 - line_len - label_len - 4)); for ((i=0; i<remaining; i++)); do printf "${BOX_H}"; done; printf "${BOX_VL}\n"
+  fi
+}
+
+draw_btop_menu_item() {
+  local key="$1" label="$2" description="$3" status="$4" width="$5"
+  local label_width=28 desc_width=$((width - label_width - 25)) key_width=4
+  printf "${BTOP_FG}%s" "${BOX_V}"; printf " ${BTOP_YELLOW}[${key}]${BTOP_FG} "; printf "${BTOP_CYAN_BRIGHT}%-${label_width}s${BTOP_FG}" "${label}"
+  [[ -n "${status}" ]] && printf "${BTOP_GREEN}●${BTOP_FG} %-12s" "${status}" || printf "%-14s" ""
+  local desc_trunc="$(tui_truncate_text "${description}" "${desc_width}")"
+  printf "${BTOP_FG_DIM}%s" "${desc_trunc}"
+  local used=$((3 + 4 + 1 + label_width + 1 + 14 + 1 + ${#desc_trunc}))
+  local fill=$((width - used - 1)); local i; for ((i=0; i<fill; i++)); do printf " "; done; printf "${BTOP_FG}%s\n" "${BOX_V}"
+}
+
+print_btop_main_menu() {
+  tui_clear_screen
+  local cpu=$(get_cpu_usage) mem=$(get_memory_usage) disk=$(get_disk_usage "/") up=$(get_uptime)
+  local width="${MAINTENANCE_TUI_PANEL_WIDTH}" inner_width=$((width - 2))
+  local i
+  printf "${BTOP_FG}${BOX_TL}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_TR}\n"
+  printf "${BOX_V} %*s%s%*s ${BOX_V}\n" $(( (inner_width - 22) / 2 )) "" "LessonFlow Maintenance" $(( (inner_width - 22 + 1) / 2 )) ""
+  printf "${BOX_VR}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_VL}\n"
+  printf "${BOX_V} CPU $(draw_mini_bar "$cpu" 12) %3d%%  MEM $(draw_mini_bar "$mem" 12) %3d%%  DISK $(draw_mini_bar "$disk" 12) %3d%% %*s ${BOX_V}\n" "$cpu" "$mem" "$disk" $((inner_width - 70)) ""
+  printf "${BTOP_FG}${BOX_BL}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_BR}\n\n"
+  draw_btop_separator "${width}" " BACKUP & RESTORE "
+  draw_btop_menu_item "1" "Run Backup" "Create .tar.xz archive" "Ready" "${width}"
+  draw_btop_menu_item "2" "Restore Backup" "Restore local/cloud" "Ready" "${width}"
+  draw_btop_menu_item "3" "Components" "Configure backup elements" "Edit" "${width}"
+  draw_btop_menu_item "4" "Cloud" "Cloud Provider: ${BACKUP_CLOUD_PROVIDER}" "Cloud" "${width}"
+  draw_btop_menu_item "5" "Cron" "Freq: ${BACKUP_FREQUENCY}" "Cron" "${width}"
+  echo ""
+  draw_btop_separator "${width}" " SEO & DB "
+  draw_btop_menu_item "6" "Sitemap" "Generate sitemap.xml" "Ready" "${width}"
+  draw_btop_menu_item "7" "Robots.txt" "Generate robots.txt" "Ready" "${width}"
+  draw_btop_menu_item "8" "DB Health" "Check DB connection" "Check" "${width}"
+  echo ""
+  draw_btop_separator "${width}" " SYSTEM "
+  draw_btop_menu_item "9" "Clean Cache" "Remove .next/node cache" "Clean" "${width}"
+  draw_btop_menu_item "0" "Git Pull" "Pull latest from git" "Git" "${width}"
+  echo ""
+  printf "  ${BOLD}${BTOP_YELLOW}1-9,0${NC} Select Action    ${BOLD}${BTOP_YELLOW}Q${NC} Quit\n"
+}
 
 restore_backup_tui() {
   local src="local" rs=true rw=true re=true rmat=true rse=true rd=true
@@ -674,62 +562,9 @@ print_backup_components_tui() {
   done
 }
 
-print_btop_main_menu() {
-  tui_clear_screen
-  local cpu=$(get_cpu_usage) mem=$(get_memory_usage) disk=$(get_disk_usage "/") up=$(get_uptime)
-  local width="${MAINTENANCE_TUI_PANEL_WIDTH}" inner_width=$((width - 2))
-  local i
-  # Header
-  printf "${BTOP_FG}${BOX_TL}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_TR}\n"
-  printf "${BOX_V} %*s%s%*s ${BOX_V}\n" $(( (inner_width - 22) / 2 )) "" "LessonFlow Maintenance" $(( (inner_width - 22 + 1) / 2 )) ""
-  printf "${BOX_VR}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_VL}\n"
-  printf "${BOX_V} CPU $(draw_mini_bar "$cpu" 12) %3d%%  MEM $(draw_mini_bar "$mem" 12) %3d%%  DISK $(draw_mini_bar "$disk" 12) %3d%% %*s ${BOX_V}\n" "$cpu" "$mem" "$disk" $((inner_width - 70)) ""
-  printf "${BTOP_FG}${BOX_BL}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_BR}\n\n"
-  draw_btop_separator "${width}" " BACKUP & RESTORE "
-  draw_btop_menu_item "1" "Run Backup" "Create .tar.xz archive" "Ready" "${width}"
-  draw_btop_menu_item "2" "Restore Backup" "Restore local/cloud" "Ready" "${width}"
-  draw_btop_menu_item "3" "Components" "Configure backup elements" "Edit" "${width}"
-  draw_btop_menu_item "4" "Cloud" "Cloud Provider: ${BACKUP_CLOUD_PROVIDER}" "Cloud" "${width}"
-  draw_btop_menu_item "5" "Cron" "Freq: ${BACKUP_FREQUENCY}" "Cron" "${width}"
-  echo ""
-  draw_btop_separator "${width}" " SEO & DB "
-  draw_btop_menu_item "6" "Sitemap" "Generate sitemap.xml" "Ready" "${width}"
-  draw_btop_menu_item "7" "Robots.txt" "Generate robots.txt" "Ready" "${width}"
-  draw_btop_menu_item "8" "DB Health" "Check DB connection" "Check" "${width}"
-  echo ""
-  draw_btop_separator "${width}" " SYSTEM "
-  draw_btop_menu_item "9" "Clean Cache" "Remove .next/node cache" "Clean" "${width}"
-  draw_btop_menu_item "0" "Git Pull" "Pull latest from git" "Git" "${width}"
-  echo ""
-  printf "  ${BOLD}${BTOP_YELLOW}1-9,0${NC} Select Action    ${BOLD}${BTOP_YELLOW}Q${NC} Quit\n"
-}
-
-  tui_clear_screen
-  local cpu=$(get_cpu_usage) mem=$(get_memory_usage) disk=$(get_disk_usage "/") up=$(get_uptime)
-  local width="${MAINTENANCE_TUI_PANEL_WIDTH}" inner_width=$((width - 2))
-  local i
-  printf "${BTOP_FG}${BOX_TL}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_TR}\n"
-  printf "${BOX_V} %*s%s%*s ${BOX_V}\n" $(( (inner_width - 22) / 2 )) "" "LessonFlow Maintenance" $(( (inner_width - 22 + 1) / 2 )) ""
-  printf "${BOX_VR}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_VL}\n"
-  printf "${BOX_V} CPU $(draw_mini_bar "$cpu" 12) %3d%%  MEM $(draw_mini_bar "$mem" 12) %3d%%  DISK $(draw_mini_bar "$disk" 12) %3d%% %*s ${BOX_V}\n" "$cpu" "$mem" "$disk" $((inner_width - 70)) ""
-  printf "${BTOP_FG}${BOX_BL}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_BR}\n\n"
-  draw_btop_separator "${width}" " BACKUP & RESTORE "
-  draw_btop_menu_item "1" "Run Backup" "Create .tar.xz archive" "Ready" "${width}"
-  draw_btop_menu_item "2" "Restore Backup" "Restore local/cloud" "Ready" "${width}"
-  draw_btop_menu_item "3" "Components" "Configure backup elements" "Edit" "${width}"
-  draw_btop_menu_item "4" "Cloud" "Cloud Provider: ${BACKUP_CLOUD_PROVIDER}" "Cloud" "${width}"
-  draw_btop_menu_item "5" "Cron" "Freq: ${BACKUP_FREQUENCY}" "Cron" "${width}"
-  echo ""
-  draw_btop_separator "${width}" " SEO & DB "
-  draw_btop_menu_item "6" "Sitemap" "Generate sitemap.xml" "Ready" "${width}"
-  draw_btop_menu_item "7" "Robots.txt" "Generate robots.txt" "Ready" "${width}"
-  draw_btop_menu_item "8" "DB Health" "Check DB connection" "Check" "${width}"
-  echo ""
-  draw_btop_separator "${width}" " SYSTEM "
-  draw_btop_menu_item "9" "Clean Cache" "Remove .next/node cache" "Clean" "${width}"
-  draw_btop_menu_item "0" "Git Pull" "Pull latest from git" "Git" "${width}"
-  echo ""
-  printf " [Q] Quit\n"
+# =============================================================================
+# Main
+# =============================================================================
 
 run_interactive_maintenance() {
   load_backup_config; create_backup_directory
@@ -774,22 +609,10 @@ check_database_health() {
   section "Database Health"
   local du; [[ -f "${SHARED_DIR}/.env" ]] && du=$(grep 'DATABASE_URL' "${SHARED_DIR}/.env" | sed 's/.*=//; s/["'\'']//g')
   [[ -z "${du}" ]] && { log_error "No DATABASE_URL"; return 1; }
-  local u=$(echo "${du}" | sed -n 's|.*://\([^:]*\):.*@.*|\1|p')
-  local pass=$(echo "${du}" | sed -n 's|.*://[^:]*:\([^@]*\)@.*|\1|p')
   local h=$(echo "${du}" | sed -n 's|.*@\([^:/]*\).*|\1|p')
   local p=$(echo "${du}" | sed -n 's|.*:\([0-9]*\)/.*|\1|p')
   local n=$(echo "${du}" | sed -n 's|.*/\([^?]*\).*|\1|p')
-  
-  log_info "Connecting to ${n} on ${h:-localhost}..."
-  if command -v mysql >/dev/null 2>&1; then
-    if MYSQL_PWD="${pass}" mysql -h "${h:-localhost}" -P "${p:-3306}" -u "${u}" -e "SELECT 1" "${n}" >/dev/null 2>&1; then
-      log_info "Database connection: OK"
-    else
-      log_error "Database connection: FAILED"
-    fi
-  else
-    log_warn "mysql client not installed, skipping test"
-  fi
+  if mysql -h "${h:-localhost}" -P "${p:-3306}" -u "${u:-}" -e "SELECT 1" "${n:-}" >/dev/null 2>&1; then log_info "DB OK"; else log_error "DB Fail"; fi
 }
 
 init_paths() {
@@ -800,6 +623,40 @@ init_paths() {
   MAINTENANCE_CONFIG_FILE="${REPO_ROOT}/.maintenance.conf"
 }
 
+show_usage() {
+  cat <<'EOF'
+Melbourne Guitar School - Maintenance Script
+
+Usage: ./deploy/maintenance.sh [options]
+
+Options:
+  --interactive         Force interactive TUI mode (default when TTY detected)
+  --skip-pull          Skip git pull when running non-interactively
+  --branch BRANCH       Git branch to pull from (default: current branch)
+  --remote REMOTE      Git remote to pull from (default: origin)
+  --allow-dirty        Allow operation even if working tree is dirty
+  --no-color            Disable colored output
+  --no-spinner          Disable spinner UI
+  --help, -h            Show usage
+EOF
+}
+
+detect_tty_capabilities() {
+  if [[ -t 0 && -t 1 ]]; then IS_TTY=true; fi
+  if [[ "${IS_TTY}" == true ]]; then auto_size_tui_panel_width; fi
+  if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then
+    disable_colors
+  fi
+}
+
+disable_colors() {
+  RED='' GREEN='' YELLOW='' BLUE='' CYAN='' MAGENTA='' BOLD='' DIM='' NC=''
+  BTOP_FG='' BTOP_FG_DIM='' BTOP_CYAN='' BTOP_GREEN='' BTOP_BLUE='' BTOP_ORANGE='' BTOP_PURPLE='' BTOP_YELLOW='' BTOP_RED=''
+  BTOP_OK='' BTOP_WARN='' BTOP_ERROR='' BTOP_INFO=''
+  BOX_TL='┌' BOX_TR='┐' BOX_BL='└' BOX_BR='┘' BOX_H='─' BOX_V='│'
+  BLOCK_EMPTY=' ' BLOCK_FULL='#'
+}
+
 main() {
   while [[ $# -gt 0 ]]; do
     case "$1" in --interactive) INTERACTIVE=true ;; --skip-pull) SKIP_PULL=true ;; --branch) BRANCH="$2"; shift ;; esac
@@ -808,4 +665,5 @@ main() {
   detect_tty_capabilities; init_paths
   if [[ "${INTERACTIVE}" == true || "${IS_TTY}" == true ]]; then run_interactive_maintenance; else show_usage; fi
 }
+
 main "$@"
