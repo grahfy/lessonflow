@@ -274,8 +274,8 @@ a {
   .view-lessons-page .panel-copy {
     min-height: 0;
     overflow-y: auto;
-    justify-content: flex-start;
-    align-content: start;
+    justify-content: center;
+    align-content: center;
     scrollbar-gutter: stable;
     padding: clamp(18px, 2.4vw, 30px);
     gap: 10px;
