@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { auPostcodeSchema } from "@/lib/booking-rules";
+import { verifyCaptchaGuard } from "@/lib/captcha";
 import { prisma } from "@/lib/db";
 import { log } from "@/lib/observability";
 import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
@@ -17,7 +18,10 @@ const MAX_LOGIN_CANDIDATES = 20;
 const loginSchema = z.object({
   fullName: z.string().trim().min(2).max(120),
   postcode: auPostcodeSchema,
-  password: z.string().min(1).max(256)
+  password: z.string().min(1).max(256),
+  website: z.string().max(256).optional(),
+  captchaToken: z.string().trim().min(1).max(200),
+  captchaAnswer: z.string().trim().min(1).max(16)
 });
 
 /**
@@ -49,6 +53,23 @@ export async function POST(request: NextRequest) {
   const parsed = loginSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid login payload." }, { status: 400 });
+  }
+
+  const gate = verifyCaptchaGuard({
+    body: parsed.data,
+    headers: request.headers,
+    scope: "student-login",
+    limit: 24,
+    windowMs: 10 * 60 * 1000
+  });
+  if (!gate.ok) {
+    return NextResponse.json(
+      { error: gate.message, code: gate.code },
+      {
+        status: gate.status,
+        headers: gate.retryAfterSeconds ? { "Retry-After": String(gate.retryAfterSeconds) } : undefined
+      }
+    );
   }
 
   const normalizedFullName = normalizeFullNameForLookup(parsed.data.fullName);

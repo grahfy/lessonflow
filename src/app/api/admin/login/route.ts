@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { createSessionToken, getSessionCookieName, verifyAdminPassword } from "@/lib/admin-auth";
 import { jsonUnexpectedError } from "@/lib/api-errors";
+import { verifyCaptchaGuard } from "@/lib/captcha";
 import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
 import { isSetupComplete } from "@/lib/setup";
 
@@ -47,6 +48,22 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => null);
     const email = String(body?.email || "").trim().toLowerCase();
     const password = String(body?.password || "");
+    const gate = verifyCaptchaGuard({
+      body,
+      headers: request.headers,
+      scope: "admin-login",
+      limit: 18,
+      windowMs: 10 * 60 * 1000
+    });
+    if (!gate.ok) {
+      return NextResponse.json(
+        { error: gate.message, code: gate.code },
+        {
+          status: gate.status,
+          headers: gate.retryAfterSeconds ? { "Retry-After": String(gate.retryAfterSeconds) } : undefined
+        }
+      );
+    }
 
     const admin = await verifyAdminPassword(email, password);
     if (!admin) {

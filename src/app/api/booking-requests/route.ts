@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { bookingRequestSchema, formatBookingAddress } from "@/lib/booking-rules";
+import { verifyCaptchaGuard } from "@/lib/captcha";
 import { prisma } from "@/lib/db";
 import { ownerPendingBookingTemplate } from "@/lib/email/templates";
 import { sendEmail } from "@/lib/email/service";
@@ -43,6 +44,23 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
+  const gate = verifyCaptchaGuard({
+    body,
+    headers: request.headers,
+    scope: "booking-request",
+    limit: 16,
+    windowMs: 10 * 60 * 1000
+  });
+  if (!gate.ok) {
+    return NextResponse.json(
+      { error: gate.message, code: gate.code },
+      {
+        status: gate.status,
+        headers: gate.retryAfterSeconds ? { "Retry-After": String(gate.retryAfterSeconds) } : undefined
+      }
+    );
+  }
+
   const parsed = bookingRequestSchema.safeParse(body);
 
   if (!parsed.success) {

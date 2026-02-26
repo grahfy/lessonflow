@@ -3,8 +3,8 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { CaptchaField, useCaptcha } from "@/components/captcha";
 import { useNoticeTween } from "@/components/motion/use-notice-tween";
-import { useCaptcha } from "@/components/captcha";
 
 /**
  * Handles student credential login using full name + postcode + generated password.
@@ -21,8 +21,8 @@ export function StudentLoginForm() {
     
     // CAPTCHA reduces trivial automated attempts before the server-side rate limit is engaged.
     if (!captcha.validateAnswer()) {
-      setError("Please answer the math question correctly.");
-      captcha.regenerate();
+      setError("Please complete the CAPTCHA challenge.");
+      void captcha.regenerate();
       return;
     }
     
@@ -33,19 +33,29 @@ export function StudentLoginForm() {
     const fullName = String(form.get("fullName") || "");
     const postcode = String(form.get("postcode") || "").replace(/\D/g, "").slice(0, 4);
     const password = String(form.get("password") || "");
+    const website = String(form.get("website") || "");
 
     // Student login is verified server-side against normalized name/postcode plus portal password.
     const response = await fetch("/api/student/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fullName, postcode, password })
+      body: JSON.stringify({
+        fullName,
+        postcode,
+        password,
+        website,
+        ...captcha.getPayload()
+      })
     });
 
     setLoading(false);
     if (!response.ok) {
-      setError("Login failed. Check your full name, postcode, and password.");
+      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      setError(body?.error || "Login failed. Check your full name, postcode, and password.");
+      await captcha.regenerate();
       return;
     }
+    await captcha.regenerate();
 
     // Full page transition is not required here because the client router refresh will read the
     // newly set httpOnly cookie on the next server request.
@@ -78,28 +88,7 @@ export function StudentLoginForm() {
         <label htmlFor="student-password">Password</label>
         <input id="student-password" type="password" name="password" autoComplete="current-password" required />
       </div>
-      <div className="field full" data-motion-item="student-login-captcha-field">
-        <label htmlFor="student-captcha">
-          Security question: {captcha.captcha?.question}
-        </label>
-        <input
-          id="student-captcha"
-          name="captcha"
-          type="text"
-          inputMode="numeric"
-          required
-          value={captcha.userAnswer}
-          onChange={(e) => captcha.handleChange(e.currentTarget.value)}
-          autoComplete="off"
-        />
-        <button
-          type="button"
-          className="btn btn-small"
-          onClick={() => captcha.regenerate()}
-        >
-          New question
-        </button>
-      </div>
+      <CaptchaField idPrefix="student-login" captcha={captcha} motionItem="student-login-captcha-field" />
       <div className="button-row" data-motion-item="student-login-actions">
         <button className="btn btn-primary" type="submit" disabled={loading}>
           {loading ? "Signing in..." : "Sign in to portal"}

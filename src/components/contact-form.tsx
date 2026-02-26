@@ -2,8 +2,8 @@
 
 import { FormEvent, useState } from "react";
 
+import { CaptchaField, useCaptcha } from "@/components/captcha";
 import { useNoticeTween } from "@/components/motion/use-notice-tween";
-import { useCaptcha } from "@/components/captcha";
 
 type ContactState =
   | { status: "idle" }
@@ -58,7 +58,8 @@ export function ContactForm() {
       name: String(form.get("name") || "").trim(),
       email: String(form.get("email") || "").trim(),
       phone: String(form.get("phone") || "").trim(),
-      message: String(form.get("message") || "").trim()
+      message: String(form.get("message") || "").trim(),
+      website: String(form.get("website") || "")
     };
 
     // Enforce trimmed required fields before sending to avoid whitespace-only
@@ -71,10 +72,10 @@ export function ContactForm() {
       return;
     }
 
-    // CAPTCHA is checked client-side first to avoid unnecessary contact API requests.
+    // CAPTCHA is checked client-side for presence/availability first to avoid unnecessary requests.
     if (!captcha.validateAnswer()) {
-      setState({ status: "error", message: "Please answer the math question correctly." });
-      captcha.regenerate();
+      setState({ status: "error", message: "Please complete the CAPTCHA challenge." });
+      void captcha.regenerate();
       return;
     }
     
@@ -86,7 +87,10 @@ export function ContactForm() {
       const response = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          ...payload,
+          ...captcha.getPayload()
+        })
       });
 
       const result = await response.json().catch(() => null);
@@ -96,10 +100,12 @@ export function ContactForm() {
         const message =
           fieldError ?? apiError ?? "We could not send your message. Please check fields and try again.";
         setState({ status: "error", message });
+        await captcha.regenerate();
         return;
       }
 
       formElement.reset();
+      await captcha.regenerate();
       setState({
         status: "success",
         message: "Thanks. Your message has been sent and the studio owner has been notified."
@@ -109,6 +115,7 @@ export function ContactForm() {
         status: "error",
         message: "We could not send your message due to a network error. Please try again."
       });
+      await captcha.regenerate();
     } finally {
       setLoading(false);
     }
@@ -136,28 +143,7 @@ export function ContactForm() {
         <textarea id="contact-message" name="message" minLength={10} maxLength={2000} required />
       </div>
 
-      <div className="field full" data-motion-item="contact-captcha-field">
-        <label htmlFor="contact-captcha">
-          Security question: {captcha.captcha?.question}
-        </label>
-        <input
-          id="contact-captcha"
-          name="captcha"
-          type="text"
-          inputMode="numeric"
-          required
-          value={captcha.userAnswer}
-          onChange={(e) => captcha.handleChange(e.currentTarget.value)}
-          autoComplete="off"
-        />
-        <button
-          type="button"
-          className="btn btn-small"
-          onClick={() => captcha.regenerate()}
-        >
-          New question
-        </button>
-      </div>
+      <CaptchaField idPrefix="contact" captcha={captcha} motionItem="contact-captcha-field" />
 
       <div className="button-row" data-motion-item="contact-actions">
         <button className="btn btn-primary" type="submit" disabled={loading}>

@@ -2,8 +2,8 @@
 
 import { FormEvent, useState } from "react";
 
+import { CaptchaField, useCaptcha } from "@/components/captcha";
 import { useNoticeTween } from "@/components/motion/use-notice-tween";
-import { useCaptcha } from "@/components/captcha";
 
 /**
  * Admin login form with a lightweight anti-bot captcha.
@@ -23,8 +23,8 @@ export function AdminLoginForm() {
 
     // Client-side captcha reduces trivial automated noise before hitting the login API.
     if (!captcha.validateAnswer()) {
-      setError("Please answer the math question correctly.");
-      captcha.regenerate();
+      setError("Please complete the CAPTCHA challenge.");
+      void captcha.regenerate();
       return;
     }
 
@@ -34,6 +34,7 @@ export function AdminLoginForm() {
     const form = new FormData(event.currentTarget);
     const email = String(form.get("email") || "");
     const password = String(form.get("password") || "");
+    const website = String(form.get("website") || "");
 
     let response: Response;
     try {
@@ -41,11 +42,17 @@ export function AdminLoginForm() {
       response = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({
+          email,
+          password,
+          website,
+          ...captcha.getPayload()
+        })
       });
     } catch {
       setLoading(false);
       setError("Login failed. Please check your connection and try again.");
+      await captcha.regenerate();
       return;
     }
 
@@ -53,8 +60,10 @@ export function AdminLoginForm() {
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { error?: string } | null;
       setError(body?.error || "Login failed. Check your email and password.");
+      await captcha.regenerate();
       return;
     }
+    await captcha.regenerate();
 
     // Use a full navigation so the first admin page/data requests always include the newly set
     // httpOnly session cookie.
@@ -88,28 +97,7 @@ export function AdminLoginForm() {
           </button>
         </div>
       </div>
-      <div className="field full" data-motion-item="admin-login-captcha-field">
-        <label htmlFor="admin-captcha">
-          Security question: {captcha.captcha?.question}
-        </label>
-        <input
-          id="admin-captcha"
-          name="captcha"
-          type="text"
-          inputMode="numeric"
-          required
-          value={captcha.userAnswer}
-          onChange={(e) => captcha.handleChange(e.currentTarget.value)}
-          autoComplete="off"
-        />
-        <button
-          type="button"
-          className="btn btn-small"
-          onClick={() => captcha.regenerate()}
-        >
-          New question
-        </button>
-      </div>
+      <CaptchaField idPrefix="admin-login" captcha={captcha} motionItem="admin-login-captcha-field" />
       <div className="button-row" data-motion-item="admin-login-actions">
         <button className="btn btn-primary" type="submit" disabled={loading}>
           {loading ? "Signing in..." : "Sign in"}

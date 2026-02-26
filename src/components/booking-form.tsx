@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { CaptchaField, useCaptcha } from "@/components/captcha";
 
 type BookingState =
   | { status: "idle" }
@@ -18,6 +19,9 @@ export function BookingForm() {
   const [loading, setLoading] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
   const [durationType, setDurationType] = useState<"min30" | "min60" | "custom">("min60");
+  const [lessonMode, setLessonMode] = useState<"in_person" | "video">("in_person");
+  const [bookingStateCode, setBookingStateCode] = useState("VIC");
+  const captcha = useCaptcha();
 
   useEffect(() => {
     if (state.status === "idle") {
@@ -36,9 +40,20 @@ export function BookingForm() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const formElement = event.currentTarget;
+
+    // Require a loaded CAPTCHA challenge and a non-empty answer before any API call.
+    if (!captcha.validateAnswer()) {
+      setState({
+        status: "error",
+        message: "Please complete the CAPTCHA challenge before requesting a booking."
+      });
+      void captcha.regenerate();
+      return;
+    }
+
     setLoading(true);
     setState({ status: "idle" });
-    const formElement = event.currentTarget;
 
     try {
       const form = new FormData(formElement);
@@ -77,6 +92,8 @@ export function BookingForm() {
         name: fullName,
         email: String(form.get("email") || ""),
         phone: phoneDigits,
+        country: String(form.get("country") || "Australia"),
+        website: String(form.get("website") || ""),
         unitNumber: String(form.get("unitNumber") || ""),
         houseNumber: String(form.get("houseNumber") || ""),
         streetName: String(form.get("streetName") || ""),
@@ -100,13 +117,17 @@ export function BookingForm() {
         response = await fetch("/api/booking-requests", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestPayload)
+          body: JSON.stringify({
+            ...requestPayload,
+            ...captcha.getPayload()
+          })
         });
       } catch {
         setState({
           status: "error",
           message: "Booking could not be submitted right now. Please try again, or contact us by phone or email."
         });
+        await captcha.regenerate();
         return;
       }
 
@@ -124,12 +145,16 @@ export function BookingForm() {
           status: "error",
           message: responsePayload?.error || "Booking could not be submitted. Check required fields and selected date."
         });
+        await captcha.regenerate();
         return;
       }
 
       formElement.reset();
       setIsRecurring(false);
       setDurationType("min60");
+      setLessonMode("in_person");
+      setBookingStateCode("VIC");
+      await captcha.regenerate();
       setState({
         status: "success",
         message:
@@ -140,6 +165,7 @@ export function BookingForm() {
         status: "error",
         message: "Booking could not be submitted right now. Please try again, or contact us by phone or email."
       });
+      await captcha.regenerate();
     } finally {
       setLoading(false);
     }
@@ -207,6 +233,10 @@ export function BookingForm() {
         />
       </div>
       <div className="field" data-motion-item="booking-field">
+        <label htmlFor="book-country">Country *</label>
+        <input id="book-country" name="country" value="Australia" readOnly aria-readonly="true" />
+      </div>
+      <div className="field" data-motion-item="booking-field">
         <label htmlFor="book-street-name">Street Name *</label>
         <input id="book-street-name" name="streetName" required />
       </div>
@@ -236,16 +266,27 @@ export function BookingForm() {
       </div>
       <div className="field">
         <label htmlFor="book-state">State *</label>
-        <select id="book-state" name="state" required defaultValue="VIC">
-          <option value="ACT">Australian Capital Territory</option>
-          <option value="NSW">New South Wales</option>
-          <option value="NT">Northern Territory</option>
-          <option value="QLD">Queensland</option>
-          <option value="SA">South Australia</option>
-          <option value="TAS">Tasmania</option>
+        <select
+          id="book-state"
+          name="state"
+          required
+          value={bookingStateCode}
+          onChange={(event) => setBookingStateCode(event.target.value)}
+        >
+          <option value="ACT" disabled={lessonMode === "in_person"}>Australian Capital Territory</option>
+          <option value="NSW" disabled={lessonMode === "in_person"}>New South Wales</option>
+          <option value="NT" disabled={lessonMode === "in_person"}>Northern Territory</option>
+          <option value="QLD" disabled={lessonMode === "in_person"}>Queensland</option>
+          <option value="SA" disabled={lessonMode === "in_person"}>South Australia</option>
+          <option value="TAS" disabled={lessonMode === "in_person"}>Tasmania</option>
           <option value="VIC">Victoria</option>
-          <option value="WA">Western Australia</option>
+          <option value="WA" disabled={lessonMode === "in_person"}>Western Australia</option>
         </select>
+        {lessonMode === "in_person" ? (
+          <p className="helper-text">In-person lessons are currently available in Victoria (VIC) only.</p>
+        ) : (
+          <p className="helper-text">Online lessons are currently available within Australia only.</p>
+        )}
       </div>
       <div className="field field-compact" data-motion-item="booking-field">
         <label htmlFor="book-postcode">Postcode *</label>
@@ -265,7 +306,19 @@ export function BookingForm() {
       </div>
       <div className="field" data-motion-item="booking-field">
         <label htmlFor="book-mode">Mode *</label>
-        <select id="book-mode" name="lessonMode" required defaultValue="in_person">
+        <select
+          id="book-mode"
+          name="lessonMode"
+          required
+          value={lessonMode}
+          onChange={(event) => {
+            const nextMode = event.target.value as "in_person" | "video";
+            setLessonMode(nextMode);
+            if (nextMode === "in_person") {
+              setBookingStateCode("VIC");
+            }
+          }}
+        >
           <option value="in_person">In-person</option>
           <option value="video">Video</option>
         </select>
@@ -336,6 +389,8 @@ export function BookingForm() {
           <input id="book-recurring-end" type="datetime-local" name="recurrenceEndAt" required />
         </div>
       ) : null}
+
+      <CaptchaField idPrefix="booking" captcha={captcha} motionItem="booking-captcha-field" />
 
       <div className="button-row" data-motion-item="booking-actions">
         <button className="btn btn-primary" type="submit" disabled={loading}>

@@ -76,13 +76,13 @@ if (!globalStore.__rateLimitStore) {
  * @param request - Next.js request object
  * @returns Client IP string or "unknown" as fallback
  */
-export function getRequestIp(request: NextRequest): string {
-  const realIp = request.headers.get("x-real-ip")?.trim();
+export function getRequestIpFromHeaders(headers: Headers): string {
+  const realIp = headers.get("x-real-ip")?.trim();
   if (realIp) {
     return realIp;
   }
 
-  const forwarded = request.headers.get("x-forwarded-for");
+  const forwarded = headers.get("x-forwarded-for");
   if (forwarded) {
     const parts = forwarded
       .split(",")
@@ -95,6 +95,13 @@ export function getRequestIp(request: NextRequest): string {
   }
 
   return "unknown";
+}
+
+/**
+ * Backward-compatible wrapper for existing callers that pass NextRequest.
+ */
+export function getRequestIp(request: NextRequest): string {
+  return getRequestIpFromHeaders(request.headers);
 }
 
 /**

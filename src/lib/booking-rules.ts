@@ -15,6 +15,8 @@ export const lessonModeSchema = z.enum(["in_person", "video"]);
 export const lessonDurationSchema = z.enum(["min30", "min60"]);
 /** Australian states/territories for address validation */
 export const auStateSchema = z.enum(["NSW", "VIC", "QLD", "SA", "WA", "TAS", "NT", "ACT"]);
+/** Country restriction for public lesson bookings */
+export const bookingCountrySchema = z.literal("Australia");
 
 // Australian phone number formats: 10 digits, mobile xxx-xxx-xxx, landline xx-xxxx-xxxx
 const isoDateParser = z.string().datetime({ offset: true });
@@ -57,6 +59,7 @@ export const bookingRequestSchema = z
     name: z.string().trim().min(2).max(120),
     email: z.string().trim().email().max(200),
     phone: auPhoneSchema,
+    country: bookingCountrySchema,
     unitNumber: optionalNumericTextSchema,
     houseNumber: z.string().trim().regex(/^\d{1,5}$/),
     streetName: z.string().trim().min(2).max(120),
@@ -133,6 +136,15 @@ export const bookingRequestSchema = z
           path: ["recurrenceEndAt"]
         });
       }
+    }
+
+    // BUSINESS RULE: In-person lessons are currently offered only in Victoria.
+    if (data.lessonMode === "in_person" && data.state !== "VIC") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "In-person lessons are currently available in Victoria (VIC) only.",
+        path: ["state"]
+      });
     }
   });
 
