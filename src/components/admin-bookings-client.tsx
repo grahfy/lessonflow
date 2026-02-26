@@ -2234,14 +2234,23 @@ export function AdminBookingsClient() {
                         )}
                       </div>
                       <div className="customer-item-actions">
-                        <a
-                          className="btn btn-secondary"
-                          href={material.previewUrl || `/api/admin/learning-materials/${material.id}?disposition=inline`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Preview
-                        </a>
+                        {material.materialType === "audio" ? (
+                          <audio
+                            className="material-audio-player"
+                            controls
+                            preload="metadata"
+                            src={material.previewUrl || `/api/admin/learning-materials/${material.id}?disposition=inline`}
+                          />
+                        ) : (
+                          <a
+                            className="btn btn-secondary"
+                            href={material.previewUrl || `/api/admin/learning-materials/${material.id}?disposition=inline`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Preview
+                          </a>
+                        )}
                         <a
                           className="btn btn-secondary"
                           href={material.downloadUrl || `/api/admin/learning-materials/${material.id}?disposition=attachment`}

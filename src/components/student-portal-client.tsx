@@ -432,9 +432,13 @@ function BookingList(input: BookingListProps) {
                       {material.title} ({material.materialType.toUpperCase()})
                     </span>
                     <span className="dialog-actions-inline">
-                      <a className="btn btn-secondary" href={material.previewUrl} target="_blank" rel="noreferrer">
-                        Preview
-                      </a>
+                      {material.materialType === "audio" ? (
+                        <audio className="material-audio-player material-audio-player-student" controls preload="metadata" src={material.previewUrl} />
+                      ) : (
+                        <a className="btn btn-secondary" href={material.previewUrl} target="_blank" rel="noreferrer">
+                          Preview
+                        </a>
+                      )}
                       <a className="btn btn-secondary" href={material.downloadUrl}>
                         Download
                       </a>
@@ -462,9 +466,13 @@ function BookingList(input: BookingListProps) {
                       {material.title} ({material.materialType.toUpperCase()})
                     </span>
                     <span className="dialog-actions-inline">
-                      <a className="btn btn-secondary" href={material.previewUrl} target="_blank" rel="noreferrer">
-                        Preview
-                      </a>
+                      {material.materialType === "audio" ? (
+                        <audio className="material-audio-player material-audio-player-student" controls preload="metadata" src={material.previewUrl} />
+                      ) : (
+                        <a className="btn btn-secondary" href={material.previewUrl} target="_blank" rel="noreferrer">
+                          Preview
+                        </a>
+                      )}
                       <a className="btn btn-secondary" href={material.downloadUrl}>
                         Download
                       </a>

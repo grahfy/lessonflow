@@ -154,9 +154,13 @@ export function StudentMaterialsClient() {
                       </td>
                       <td>{formatWhen(entry.material.createdAt)}</td>
                       <td className="student-drive-action-cell">
-                        <a className="btn btn-secondary" href={entry.material.previewUrl} target="_blank" rel="noreferrer">
-                          Preview
-                        </a>
+                        {entry.material.materialType === "audio" ? (
+                          <audio className="material-audio-player material-audio-player-student" controls preload="metadata" src={entry.material.previewUrl} />
+                        ) : (
+                          <a className="btn btn-secondary" href={entry.material.previewUrl} target="_blank" rel="noreferrer">
+                            Preview
+                          </a>
+                        )}
                         <a className="btn btn-secondary" href={entry.material.downloadUrl}>
                           Download
                         </a>
