@@ -183,7 +183,7 @@ a {
 @media (min-width: 1101px) {
   .view-book-page .view-stage {
     min-height: 0;
-    grid-template-columns: 1fr;
+    grid-template-columns: 1.3fr 0.3fr;
   }
 
   .view-book-page .panel-copy {

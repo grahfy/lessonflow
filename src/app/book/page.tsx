@@ -26,7 +26,6 @@ export default function BookPage() {
       viewClassName="view-book-page"
       visualLabel="Booking"
       visualClassName="contact-hero"
-      hideVisual
       leadJustified
     >
       <p className="helper-text" data-motion-item="book-helper-text">
