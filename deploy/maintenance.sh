@@ -11,6 +11,10 @@
 
 set -euo pipefail
 
+# =============================================================================
+# Configuration & Globals
+# =============================================================================
+
 # Resolve paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT=""
@@ -36,7 +40,7 @@ SPINNER_FRAMES=( "⠋" "⠙" "⠹" "⠸" "⠼" "⠦" "⠴" "⠧" "⠇" "⠏" )
 MAINTENANCE_TUI_PANEL_WIDTH=92
 MAINTENANCE_TUI_PANEL_WIDTH_MAX=120
 
-# SEO Configuration
+# SEO Configuration paths
 SEO_CONFIG_FILE=""
 SITEMAP_FILE=""
 ROBOTS_FILE=""
@@ -81,9 +85,7 @@ DIM='\033[2m'
 BTOP_FG='\033[38;5;250m'
 BTOP_FG_DIM='\033[38;5;245m'
 BTOP_CYAN='\033[38;5;45m'
-BTOP_CYAN_BRIGHT='\033[38;5;51m'
 BTOP_GREEN='\033[38;5;82m'
-BTOP_GREEN_BRIGHT='\033[38;5;118m'
 BTOP_BLUE='\033[38;5;33m'
 BTOP_ORANGE='\033[38;5;208m'
 BTOP_PURPLE='\033[38;5;141m'
@@ -103,12 +105,80 @@ BLOCK_EMPTY='░'
 BLOCK_FULL='█'
 
 # =============================================================================
-# Utils
+# Core Utility Functions (Defined Early)
 # =============================================================================
 
 log_info() { echo -e "${GREEN}●${NC} $1"; }
 log_warn() { echo -e "${YELLOW}▲${NC} $1"; }
 log_error() { echo -e "${RED}✖${NC} $1"; }
+
+show_usage() {
+  cat <<'EOF'
+Melbourne Guitar School - Maintenance Script
+
+Usage: ./deploy/maintenance.sh [options]
+
+Options:
+  --interactive         Force interactive TUI mode (default when TTY detected)
+  --skip-pull          Skip git pull when running non-interactively
+  --branch BRANCH       Git branch to pull from (default: current branch)
+  --remote REMOTE      Git remote to pull from (default: origin)
+  --allow-dirty        Allow operation even if working tree is dirty
+  --no-color            Disable colored output
+  --no-spinner          Disable spinner UI
+  --help, -h            Show usage
+
+Features:
+  - Sitemap.xml and robots.txt generation
+  - Backup with tar.xz compression
+  - Selective restore from local or cloud
+  - System maintenance tasks
+EOF
+}
+
+auto_size_tui_panel_width() {
+  local cols=""
+  local target_width=""
+
+  if command -v tput >/dev/null 2>&1; then
+    cols="$(tput cols 2>/dev/null || true)"
+  fi
+
+  if [[ -z "${cols}" && -n "${COLUMNS:-}" ]]; then
+    cols="${COLUMNS}"
+  fi
+
+  if [[ ! "${cols}" =~ ^[0-9]+$ ]]; then
+    return 0
+  fi
+
+  target_width="${cols}"
+  if (( target_width < 48 )); then
+    target_width=48
+  fi
+  if (( target_width > MAINTENANCE_TUI_PANEL_WIDTH_MAX )); then
+    target_width="${MAINTENANCE_TUI_PANEL_WIDTH_MAX}"
+  fi
+
+  MAINTENANCE_TUI_PANEL_WIDTH="${target_width}"
+}
+
+detect_tty_capabilities() {
+  if [[ -t 0 && -t 1 ]]; then
+    IS_TTY=true
+  fi
+
+  if [[ "${IS_TTY}" == true ]]; then
+    auto_size_tui_panel_width
+  fi
+
+  if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then
+    RED='' GREEN='' YELLOW='' BLUE='' CYAN='' MAGENTA='' BOLD='' DIM='' NC=''
+    BTOP_FG='' BTOP_FG_DIM='' BTOP_CYAN='' BTOP_GREEN='' BTOP_BLUE='' BTOP_ORANGE='' BTOP_PURPLE='' BTOP_YELLOW=''
+    BOX_TL='┌' BOX_TR='┐' BOX_BL='└' BOX_BR='┘' BOX_H='─' BOX_V='│'
+    BLOCK_EMPTY=' ' BLOCK_FULL='#'
+  fi
+}
 
 section() {
   echo ""
@@ -172,7 +242,6 @@ prompt_select() {
 bool_word() { [[ "$1" == true ]] && echo "ON" || echo "OFF"; }
 toggle_bool() { [[ "$1" == true ]] && echo false || echo true; }
 tui_clear_screen() { [[ "${IS_TTY}" == true ]] && clear; }
-
 print_tui_panel_rule() {
   local width="${1:-84}"
   local rule=""
@@ -195,11 +264,18 @@ tui_truncate_text() {
 
 get_cpu_usage() {
   [[ -f /proc/stat ]] || { echo "0"; return; }
-  local cpu_line
-  cpu_line=$(head -1 /proc/stat)
-  local user nice system idle iowait irq softirq steal=0
-  # Skip the 'cpu' prefix by reading it into a dummy variable '_'
-  read -r _ user nice system idle iowait irq softirq steal <<< "${cpu_line}"
+  # Read the first line which contains aggregated cpu stats
+  local stat=($(head -1 /proc/stat))
+  # stat[0] is 'cpu', so user is stat[1], nice is stat[2], etc.
+  local user=${stat[1]:-0}
+  local nice=${stat[2]:-0}
+  local system=${stat[3]:-0}
+  local idle=${stat[4]:-0}
+  local iowait=${stat[5]:-0}
+  local irq=${stat[6]:-0}
+  local softirq=${stat[7]:-0}
+  local steal=${stat[8]:-0}
+
   local total=$((user + nice + system + idle + iowait + irq + softirq + steal))
   local usage=$((user + nice + system + irq + softirq + steal))
   [[ $total -gt 0 ]] && echo "$(( (usage * 100) / total ))" || echo "0"
@@ -248,7 +324,43 @@ draw_mini_bar() {
 }
 
 # =============================================================================
-# Settings Persistence
+# Git & Paths
+# =============================================================================
+
+resolve_repo_root() {
+  local c=("${SCRIPT_DIR}/.." "/var/www/${APP_NAME}/current" "/var/www/${APP_NAME}" "${HOME}/melbourne-guitar-school")
+  for candidate in "${c[@]}"; do
+    if [[ -d "${candidate}/.git" && -f "${candidate}/package.json" ]]; then
+      REPO_ROOT="$(cd "${candidate}" && pwd -P)"
+      return 0
+    fi
+  done
+  REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd -P)"
+}
+
+init_paths() {
+  resolve_repo_root
+  SEO_CONFIG_FILE="${REPO_ROOT}/src/lib/seo-config.json"
+  SITEMAP_FILE="${REPO_ROOT}/public/sitemap.xml"
+  ROBOTS_FILE="${REPO_ROOT}/public/robots.txt"
+  MAINTENANCE_CONFIG_FILE="${REPO_ROOT}/.maintenance.conf"
+}
+
+current_branch_name() { git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main"; }
+git_worktree_dirty() { [[ -n "$(git -C "${REPO_ROOT}" status --porcelain 2>/dev/null || true)" ]]; }
+
+run_git_pull() {
+  section "Git Update"
+  [[ -z "${BRANCH}" ]] && BRANCH="$(current_branch_name)"
+  [[ "${ALLOW_DIRTY}" != true ]] && git_worktree_dirty && { log_warn "Tree dirty. Use --allow-dirty"; return 1; }
+  log_info "Updating ${BRANCH} from ${REMOTE_NAME}..."
+  run_step "Git Fetch" git -C "${REPO_ROOT}" fetch "${REMOTE_NAME}" "${BRANCH}" || return 1
+  run_step "Git Pull" git -C "${REPO_ROOT}" pull --ff-only "${REMOTE_NAME}" "${BRANCH}" || return 1
+  log_info "Updated to $(git -C "${REPO_ROOT}" rev-parse --short HEAD)"
+}
+
+# =============================================================================
+# Persistence
 # =============================================================================
 
 load_maintenance_settings() {
@@ -278,124 +390,8 @@ EOF
 }
 
 # =============================================================================
-# Git & Path Helpers
+# DB & Backups
 # =============================================================================
-
-resolve_repo_root() {
-  local c=("${SCRIPT_DIR}/.." "/var/www/${APP_NAME}/current" "/var/www/${APP_NAME}" "${HOME}/melbourne-guitar-school")
-  for candidate in "${c[@]}"; do
-    if [[ -d "${candidate}/.git" && -f "${candidate}/package.json" ]]; then
-      REPO_ROOT="$(cd "${candidate}" && pwd -P)"
-      return 0
-    fi
-  done
-  REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd -P)"
-}
-
-current_branch_name() { git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main"; }
-git_worktree_dirty() { [[ -n "$(git -C "${REPO_ROOT}" status --porcelain 2>/dev/null || true)" ]]; }
-
-run_git_pull() {
-  section "Git Update"
-  [[ -z "${BRANCH}" ]] && BRANCH="$(current_branch_name)"
-  [[ "${ALLOW_DIRTY}" != true ]] && git_worktree_dirty && { log_warn "Tree dirty. Use --allow-dirty"; return 1; }
-  log_info "Updating ${BRANCH} from ${REMOTE_NAME}..."
-  run_step "Git Fetch" git -C "${REPO_ROOT}" fetch "${REMOTE_NAME}" "${BRANCH}" || return 1
-  run_step "Git Pull" git -C "${REPO_ROOT}" pull --ff-only "${REMOTE_NAME}" "${BRANCH}" || return 1
-  log_info "Updated to $(git -C "${REPO_ROOT}" rev-parse --short HEAD)"
-}
-
-# =============================================================================
-# SEO
-# =============================================================================
-
-init_seo_config() {
-  [[ -f "${SEO_CONFIG_FILE}" ]] && return
-  mkdir -p "$(dirname "${SEO_CONFIG_FILE}")"
-  cat > "${SEO_CONFIG_FILE}" << 'EOF'
-{
-  "version": "1.0",
-  "pages": {
-    "/": {"enabled": true, "priority": 1.0, "changeFrequency": "monthly"},
-    "/lessons": {"enabled": true, "priority": 0.9, "changeFrequency": "monthly"},
-    "/teacher": {"enabled": true, "priority": 0.7, "changeFrequency": "yearly"},
-    "/vouchers": {"enabled": true, "priority": 0.8, "changeFrequency": "monthly"},
-    "/contact": {"enabled": true, "priority": 0.6, "changeFrequency": "yearly"},
-    "/book": {"enabled": true, "priority": 0.8, "changeFrequency": "monthly"},
-    "/terms": {"enabled": true, "priority": 0.3, "changeFrequency": "yearly"}
-  }
-}
-EOF
-}
-
-generate_sitemap() {
-  section "Sitemap Generation"
-  init_seo_config
-  local bu="https://melbourneguitarschool.com.au"
-  [[ -f "${SHARED_DIR}/.env" ]] && bu="$(grep -o 'NEXT_PUBLIC_SITE_URL[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || echo "${bu}")"
-  local count=0
-  cat > "${SITEMAP_FILE}" << EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-EOF
-  while IFS= read -r path; do
-    local e="$(grep -A5 "\"${path}\"" "${SEO_CONFIG_FILE}" 2>/dev/null | grep -o '"enabled"[[:space:]]*:[[:space:]]*[a-z]*' | sed 's/.*: *//' || echo "true")"
-    [[ "${e}" == "true" ]] || continue
-    local p="$(grep -A5 "\"${path}\"" "${SEO_CONFIG_FILE}" 2>/dev/null | grep -o '"priority"[[:space:]]*:[[:space:]]*[0-9.]*' | sed 's/.*: *//' || echo "0.5")"
-    local f="$(grep -A5 "\"${path}\"" "${SEO_CONFIG_FILE}" 2>/dev/null | grep -o '"changeFrequency"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*: *"\([^"]*\)"/\1/' || echo "monthly")"
-    local up="${path}"; [[ "${up}" == "/" ]] && up=""
-    cat >> "${SITEMAP_FILE}" << EOF
-  <url>
-    <loc>${bu}${up}</loc>
-    <lastmod>$(date +%Y-%m-%d)</lastmod>
-    <changefreq>${f}</changefreq>
-    <priority>${p}</priority>
-  </url>
-EOF
-    ((count++))
-  done < <(grep -o '"/[^"]*"[[:space:]]*:' "${SEO_CONFIG_FILE}" 2>/dev/null | sed 's/"//g; s/:$//' | sort -u)
-  echo "</urlset>" >> "${SITEMAP_FILE}"
-  log_info "Generated ${count} pages"
-}
-
-generate_robots_txt() {
-  section "Robots.txt"
-  init_seo_config
-  local bu="https://melbourneguitarschool.com.au"
-  [[ -f "${SHARED_DIR}/.env" ]] && bu="$(grep -o 'NEXT_PUBLIC_SITE_URL[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || echo "${bu}")"
-  cat > "${ROBOTS_FILE}" << EOF
-# Robots.txt for LessonFlow
-# Generated: $(date -Iseconds)
-User-agent: *
-Allow: /
-Disallow: /admin/
-Disallow: /api/
-Disallow: /student/
-Sitemap: ${bu}/sitemap.xml
-EOF
-  log_info "Generated robots.txt"
-}
-
-# =============================================================================
-# Backup & Restore Logic
-# =============================================================================
-
-load_backup_config() {
-  if [[ -f "${SHARED_DIR}/.env" ]]; then
-    GDRIVE_CLIENT_ID="$(grep -o 'GDRIVE_CLIENT_ID[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || true)"
-    GDRIVE_CLIENT_SECRET="$(grep -o 'GDRIVE_CLIENT_SECRET[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || true)"
-    GDRIVE_REFRESH_TOKEN="$(grep -o 'GDRIVE_REFRESH_TOKEN[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || true)"
-    KOOFR_WEBDAV_URL="$(grep -o 'KOOFR_WEBDAV_URL[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || true)"
-    KOOFR_USERNAME="$(grep -o 'KOOFR_USERNAME[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || true)"
-    KOOFR_PASSWORD="$(grep -o 'KOOFR_PASSWORD[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || true)"
-  fi
-  if [[ -d "${LOG_DIR}" ]]; then
-    LAST_BACKUP_DATE="$(ls -t "${LOG_DIR}"/backup-*.log 2>/dev/null | head -1 | xargs -r basename 2>/dev/null | sed 's/backup-\([0-9-]*\).log/\1/' || echo "")"
-  fi
-  load_maintenance_settings
-}
-
-create_backup_directory() { mkdir -p "${BACKUP_DIR}" "${LOG_DIR}"; }
 
 get_db_creds() {
   local du; [[ -f "${SHARED_DIR}/.env" ]] && du=$(grep 'DATABASE_URL' "${SHARED_DIR}/.env" | sed 's/.*=//; s/["'\'']//g')
@@ -474,6 +470,103 @@ run_backup() {
 }
 
 # =============================================================================
+# SEO
+# =============================================================================
+
+init_seo_config() {
+  [[ -f "${SEO_CONFIG_FILE}" ]] && return
+  mkdir -p "$(dirname "${SEO_CONFIG_FILE}")"
+  cat > "${SEO_CONFIG_FILE}" << 'EOF'
+{
+  "version": "1.0",
+  "pages": {
+    "/": {"enabled": true, "priority": 1.0, "changeFrequency": "monthly"},
+    "/lessons": {"enabled": true, "priority": 0.9, "changeFrequency": "monthly"},
+    "/teacher": {"enabled": true, "priority": 0.7, "changeFrequency": "yearly"},
+    "/vouchers": {"enabled": true, "priority": 0.8, "changeFrequency": "monthly"},
+    "/contact": {"enabled": true, "priority": 0.6, "changeFrequency": "yearly"},
+    "/book": {"enabled": true, "priority": 0.8, "changeFrequency": "monthly"},
+    "/terms": {"enabled": true, "priority": 0.3, "changeFrequency": "yearly"}
+  }
+}
+EOF
+}
+
+generate_sitemap() {
+  section "Sitemap Generation"
+  init_seo_config
+  local bu="https://melbourneguitarschool.com.au"
+  [[ -f "${SHARED_DIR}/.env" ]] && bu="$(grep -o 'NEXT_PUBLIC_SITE_URL[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || echo "${bu}")"
+  local count=0
+  cat > "${SITEMAP_FILE}" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+EOF
+  while IFS= read -r path; do
+    local e="$(grep -A5 "\"${path}\"" "${SEO_CONFIG_FILE}" 2>/dev/null | grep -o '"enabled"[[:space:]]*:[[:space:]]*[a-z]*' | sed 's/.*: *//' || echo "true")"
+    [[ "${e}" == "true" ]] || continue
+    local p="$(grep -A5 "\"${path}\"" "${SEO_CONFIG_FILE}" 2>/dev/null | grep -o '"priority"[[:space:]]*:[[:space:]]*[0-9.]*' | sed 's/.*: *//' || echo "0.5")"
+    local f="$(grep -A5 "\"${path}\"" "${SEO_CONFIG_FILE}" 2>/dev/null | grep -o '"changeFrequency"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*: *"\([^"]*\)"/\1/' || echo "monthly")"
+    local up="${path}"; [[ "${up}" == "/" ]] && up=""
+    cat >> "${SITEMAP_FILE}" << EOF
+  <url>
+    <loc>${bu}${up}</loc>
+    <lastmod>$(date +%Y-%m-%d)</lastmod>
+    <changefreq>${f}</changefreq>
+    <priority>${p}</priority>
+  </url>
+EOF
+    ((count++))
+  done < <(grep -o '"/[^"]*"[[:space:]]*:' "${SEO_CONFIG_FILE}" 2>/dev/null | sed 's/"//g; s/:$//' | sort -u)
+  echo "</urlset>" >> "${SITEMAP_FILE}"
+  log_info "Generated ${count} pages"
+}
+
+generate_robots_txt() {
+  section "Robots.txt"
+  init_seo_config
+  local bu="https://melbourneguitarschool.com.au"
+  [[ -f "${SHARED_DIR}/.env" ]] && bu="$(grep -o 'NEXT_PUBLIC_SITE_URL[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || echo "${bu}")"
+  cat > "${ROBOTS_FILE}" << EOF
+# Robots.txt for LessonFlow
+# Generated: $(date -Iseconds)
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /student/
+Sitemap: ${bu}/sitemap.xml
+EOF
+  log_info "Generated robots.txt"
+}
+
+# =============================================================================
+# TUI Visuals
+# =============================================================================
+
+draw_btop_separator() {
+  local width="$1" label="${2:-}"
+  if [[ -z "${label}" ]]; then
+    printf "${BTOP_FG}%s" "${BOX_VR}"; local i; for ((i=0; i<width-2; i++)); do printf "${BOX_H}"; done; printf "${BOX_VL}\n"
+  else
+    local label_len=${#label} line_len=$(( (width - 2 - label_len - 4) / 2 ))
+    printf "${BTOP_FG}%s" "${BOX_VR}"; for ((i=0; i<line_len; i++)); do printf "${BOX_H}"; done; printf " ${BTOP_PURPLE}%s ${BTOP_FG}" "${label}"
+    local remaining=$((width - 2 - line_len - label_len - 4)); for ((i=0; i<remaining; i++)); do printf "${BOX_H}"; done; printf "${BOX_VL}\n"
+  fi
+}
+
+draw_btop_menu_item() {
+  local key="$1" label="$2" description="$3" status="$4" width="$5"
+  local label_width=28 desc_width=$((width - label_width - 25)) key_width=4
+  printf "${BTOP_FG}%s" "${BOX_V}"; printf " ${BTOP_YELLOW}[${key}]${BTOP_FG} "; printf "${BTOP_CYAN_BRIGHT}%-${label_width}s${BTOP_FG}" "${label}"
+  [[ -n "${status}" ]] && printf "${BTOP_GREEN}●${BTOP_FG} %-12s" "${status}" || printf "%-14s" ""
+  local desc_trunc="$(tui_truncate_text "${description}" "${desc_width}")"
+  printf "${BTOP_FG_DIM}%s" "${desc_trunc}"
+  local used=$((3 + 4 + 1 + label_width + 1 + 14 + 1 + ${#desc_trunc}))
+  local fill=$((width - used - 1)); local i; for ((i=0; i<fill; i++)); do printf " "; done; printf "${BTOP_FG}%s\n" "${BOX_V}"
+}
+
+# =============================================================================
 # Restore Logic
 # =============================================================================
 
@@ -520,30 +613,8 @@ restore_backup() {
 }
 
 # =============================================================================
-# TUI Logic
+# TUI Pages
 # =============================================================================
-
-draw_btop_separator() {
-  local width="$1" label="${2:-}"
-  if [[ -z "${label}" ]]; then
-    printf "${BTOP_FG}%s" "${BOX_VR}"; local i; for ((i=0; i<width-2; i++)); do printf "${BOX_H}"; done; printf "${BOX_VL}\n"
-  else
-    local label_len=${#label} line_len=$(( (width - 2 - label_len - 4) / 2 ))
-    printf "${BTOP_FG}%s" "${BOX_VR}"; for ((i=0; i<line_len; i++)); do printf "${BOX_H}"; done; printf " ${BTOP_PURPLE}%s ${BTOP_FG}" "${label}"
-    local remaining=$((width - 2 - line_len - label_len - 4)); for ((i=0; i<remaining; i++)); do printf "${BOX_H}"; done; printf "${BOX_VL}\n"
-  fi
-}
-
-draw_btop_menu_item() {
-  local key="$1" label="$2" description="$3" status="$4" width="$5"
-  local label_width=28 desc_width=$((width - label_width - 25)) key_width=4
-  printf "${BTOP_FG}%s" "${BOX_V}"; printf " ${BTOP_YELLOW}[${key}]${BTOP_FG} "; printf "${BTOP_CYAN_BRIGHT}%-${label_width}s${BTOP_FG}" "${label}"
-  [[ -n "${status}" ]] && printf "${BTOP_GREEN}●${BTOP_FG} %-12s" "${status}" || printf "%-14s" ""
-  local desc_trunc="$(tui_truncate_text "${description}" "${desc_width}")"
-  printf "${BTOP_FG_DIM}%s" "${desc_trunc}"
-  local used=$((3 + 4 + 1 + label_width + 1 + 14 + 1 + ${#desc_trunc}))
-  local fill=$((width - used - 1)); local i; for ((i=0; i<fill; i++)); do printf " "; done; printf "${BTOP_FG}%s\n" "${BOX_V}"
-}
 
 restore_backup_tui() {
   local src="local" rs=true rw=true re=true rmat=true rse=true rd=true
@@ -611,14 +682,15 @@ print_backup_components_tui() {
 print_btop_main_menu() {
   tui_clear_screen
   local cpu=$(get_cpu_usage) mem=$(get_memory_usage) disk=$(get_disk_usage "/") up=$(get_uptime)
-  local width="${MAINTENANCE_TUI_PANEL_WIDTH}" inner_width=$((width - 2))
+  local width="${MAINTENANCE_TUI_PANEL_WIDTH}"
+  local inner_width=$((width - 2))
   local i
   # Header
-  printf "${BTOP_FG}${BOX_TL}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_TR}\n"
+  printf "${BTOP_FG}${BOX_TL}"; for ((i=0; i<inner_width; i++)); do printf "${BOX_H}"; done; printf "${BOX_TR}\n"
   printf "${BOX_V} %*s%s%*s ${BOX_V}\n" $(( (inner_width - 22) / 2 )) "" "LessonFlow Maintenance" $(( (inner_width - 22 + 1) / 2 )) ""
-  printf "${BOX_VR}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_VL}\n"
+  printf "${BOX_VR}"; for ((i=0; i<inner_width; i++)); do printf "${BOX_H}"; done; printf "${BOX_VL}\n"
   printf "${BOX_V} CPU $(draw_mini_bar "$cpu" 12) %3d%%  MEM $(draw_mini_bar "$mem" 12) %3d%%  DISK $(draw_mini_bar "$disk" 12) %3d%% %*s ${BOX_V}\n" "$cpu" "$mem" "$disk" $((inner_width - 70)) ""
-  printf "${BTOP_FG}${BOX_BL}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_BR}\n\n"
+  printf "${BTOP_FG}${BOX_BL}"; for ((i=0; i<inner_width; i++)); do printf "${BOX_H}"; done; printf "${BOX_BR}\n\n"
   draw_btop_separator "${width}" " BACKUP & RESTORE "
   draw_btop_menu_item "1" "Run Backup" "Create .tar.xz archive" "Ready" "${width}"
   draw_btop_menu_item "2" "Restore Backup" "Restore local/cloud" "Ready" "${width}"
@@ -639,7 +711,7 @@ print_btop_main_menu() {
 }
 
 # =============================================================================
-# Runtime
+# Runtime Setup & Loop
 # =============================================================================
 
 run_interactive_maintenance() {
@@ -683,85 +755,6 @@ stop_spinner() {
   [[ "${status}" == "ok" ]] && printf "\r${GREEN}✔${NC} %s\n" "${SPINNER_MSG}" || printf "\r${RED}✖${NC} %s\n" "${SPINNER_MSG}"
 }
 
-show_usage() {
-  cat <<'EOF'
-Melbourne Guitar School - Maintenance Script
-
-Usage: ./deploy/maintenance.sh [options]
-
-Options:
-  --interactive         Force interactive TUI mode (default when TTY detected)
-  --skip-pull          Skip git pull when running non-interactively
-  --branch BRANCH       Git branch to pull from (default: current branch)
-  --remote REMOTE      Git remote to pull from (default: origin)
-  --allow-dirty        Allow operation even if working tree is dirty
-  --no-color            Disable colored output
-  --no-spinner          Disable spinner UI
-  --help, -h            Show usage
-
-Features:
-  - Sitemap.xml and robots.txt generation
-  - Backup with tar.xz compression
-  - Selective restore from local or cloud
-  - System maintenance tasks
-EOF
-}
-
-detect_tty_capabilities() {
-  if [[ -t 0 && -t 1 ]]; then
-    IS_TTY=true
-  fi
-
-  if [[ "${IS_TTY}" == true ]]; then
-    auto_size_tui_panel_width
-  fi
-
-  if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then
-    RED='' GREEN='' YELLOW='' BLUE='' CYAN='' MAGENTA='' BOLD='' BLINK='' DIM='' NC=''
-    BTOP_FG='' BTOP_FG_DIM='' BTOP_CYAN='' BTOP_CYAN_BRIGHT='' BTOP_GREEN='' BTOP_GREEN_BRIGHT=''
-    BTOP_BLUE='' BTOP_ORANGE='' BTOP_PURPLE='' BTOP_YELLOW='' BTOP_RED=''
-    BTOP_OK='' BTOP_WARN='' BTOP_ERROR='' BTOP_INFO=''
-    BOX_TL='┌' BOX_TR='┐' BOX_BL='└' BOX_BR='┘' BOX_H='─' BOX_V='│'
-    BLOCK_EMPTY=' ' BLOCK_FULL='#'
-  fi
-}
-
-auto_size_tui_panel_width() {
-  local cols=""
-  local target_width=""
-
-  if command -v tput >/dev/null 2>&1; then
-    cols="$(tput cols 2>/dev/null || true)"
-  fi
-
-  if [[ -z "${cols}" && -n "${COLUMNS:-}" ]]; then
-    cols="${COLUMNS}"
-  fi
-
-  if [[ ! "${cols}" =~ ^[0-9]+$ ]]; then
-    return 0
-  fi
-
-  target_width="${cols}"
-  if (( target_width < 48 )); then
-    target_width=48
-  fi
-  if (( target_width > MAINTENANCE_TUI_PANEL_WIDTH_MAX )); then
-    target_width="${MAINTENANCE_TUI_PANEL_WIDTH_MAX}"
-  fi
-
-  MAINTENANCE_TUI_PANEL_WIDTH="${target_width}"
-}
-
-
-init_paths() {
-  resolve_repo_root
-  SEO_CONFIG_FILE="${REPO_ROOT}/src/lib/seo-config.json"
-  SITEMAP_FILE="${REPO_ROOT}/public/sitemap.xml"
-  ROBOTS_FILE="${REPO_ROOT}/public/robots.txt"
-  MAINTENANCE_CONFIG_FILE="${REPO_ROOT}/.maintenance.conf"
-}
-
 check_database_health() {
   section "Database Health"
   get_db_creds || { log_error "No creds"; return 1; }
@@ -776,7 +769,7 @@ check_database_health() {
 
 main() {
   while [[ $# -gt 0 ]]; do
-    case "$1" in --interactive) INTERACTIVE=true ;; --skip-pull) SKIP_PULL=true ;; --branch) BRANCH="$2"; shift ;; esac
+    case "$1" in --interactive) INTERACTIVE=true ;; --skip-pull) SKIP_PULL=true ;; --branch) BRANCH="$2"; shift ;; --remote) REMOTE_NAME="$2"; shift ;; --allow-dirty) ALLOW_DIRTY=true ;; --no-color) NO_COLOR=true ;; --no-spinner) NO_SPINNER=true ;; --help|-h) show_usage; exit 0 ;; esac
     shift
   done
   init_paths; detect_tty_capabilities
