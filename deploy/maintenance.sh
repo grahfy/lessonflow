@@ -978,13 +978,15 @@ print_btop_main_menu() {
   local commit_hash local_commit remote_commit commit_msg
   commit_hash=$(get_current_commit 2>/dev/null || echo "unknown")
   commit_msg=$(get_last_commit_msg 2>/dev/null || echo "none")
+  local now
+  now=$(date "+%H:%M:%S")
   
   print_btop_header "$width"
   echo ""
   
   printf "  ${BTOP_FG_DIM}CPU${NC}   "; draw_cpu_graph "$cpu" 18; printf "  ${BTOP_FG_DIM}Uptime:${NC} ${BTOP_PURPLE}%s${NC}\n" "$up"
   printf "  ${BTOP_FG_DIM}MEM${NC}   "; draw_mem_graph "$mem" 18; printf "  ${BTOP_FG_DIM}Procs:${NC} ${BTOP_CYAN}%s${NC}\n" "$(get_process_count)"
-  printf "  ${BTOP_FG_DIM}DISK${NC}  "; draw_disk_graph "$disk" 18; printf "  ${BTOP_FG_DIM}Load:${NC} ${BTOP_YELLOW}%s${NC}\n" "$(get_load_average)"
+  printf "  ${BTOP_FG_DIM}DISK${NC}  "; draw_disk_graph "$disk" 18; printf "  ${BTOP_FG_DIM}Load:${NC} ${BTOP_YELLOW}%s${NC}  ${BTOP_FG_DIM}Live:${NC} ${BTOP_GREEN}%s${NC}\n" "$(get_load_average)" "$now"
   
   echo ""
   print_tui_panel_rule "${width}"
@@ -1069,10 +1071,20 @@ check_database_health() {
 
 run_interactive_maintenance() {
   load_backup_config; create_backup_directory
+  local last_refresh=0 ch=""
   while true; do
-    print_btop_main_menu
-    read -r -p "Select: " ch
-    case "${ch,,}" in
+    local now
+    now=$(date +%s)
+    if (( now - last_refresh >= 1 )); then
+      print_btop_main_menu
+      last_refresh=$now
+    fi
+    printf "\r${BTOP_FG_DIM}Select:${NC} "
+    read -r -t 1 -n 1 ch || true
+    if [[ -n "$ch" ]]; then
+      echo ""
+      read -r -p "" ch
+      case "${ch,,}" in
       1) run_update_script; read -r -n 1 -s -p "Done. Press key..." ;;
       2) run_deploy_script; read -r -n 1 -s -p "Done. Press key..." ;;
       s) cycle_sudo_mode; log_info "Sudo mode: $(update_sudo_mode_label)" ;;
@@ -1089,7 +1101,8 @@ run_interactive_maintenance() {
       13) run_git_pull; read -r -n 1 -s -p "Press key..." ;;
       14) section "Edit Config"; prompt_env_editor; read -r -n 1 -s -p "Press key..." ;;
       q|quit|exit) exit 0 ;;
-    esac
+      esac
+    fi
   done
 }
 
