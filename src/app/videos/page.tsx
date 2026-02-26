@@ -57,23 +57,6 @@ export default function VideosPage() {
         ))}
       </div>
 
-      <section className="soundcloud-card" data-motion-item="soundcloud-section" aria-label="SoundCloud showcase">
-        <h3>Original Guitar-Oriented Music</h3>
-        <p className="helper-text">
-          SoundCloud showcase featuring original guitar-oriented songs by Jon King.
-        </p>
-        <div className="soundcloud-embed-frame">
-          <iframe
-            title="Jon King SoundCloud"
-            className="soundcloud-embed"
-            scrolling="no"
-            frameBorder="no"
-            allow="autoplay"
-            src="https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/jon-king-383799891&color=%230f3d63&auto_play=false&hide_related=false&show_comments=false&show_user=true&show_reposts=false&show_teaser=true&visual=true"
-          />
-        </div>
-      </section>
-
       <div className="button-row" data-motion-item="videos-actions">
         <TweenLink className="btn btn-primary" href="/book" data-motion-item="videos-action-book">
           Book Guitar Tuition

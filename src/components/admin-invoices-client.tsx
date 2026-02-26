@@ -975,7 +975,26 @@ export function AdminInvoicesClient() {
           {invoices.length ? (
             invoices.map((invoice) => (
               <div key={invoice.id} className="customer-item invoice-item">
-                <strong className="invoice-item-title">{invoice.invoiceNumber} - {invoice.customerName}</strong>
+                <div className="invoice-item-meta">
+                  <div className="invoice-item-title-row">
+                    <strong className="invoice-item-title">{invoice.invoiceNumber}</strong>
+                    <div className="invoice-item-summary invoice-item-summary-inline">
+                      <span className="invoice-item-chip">{invoice.documentType === "credit_note" ? "Credit note" : "Invoice"}</span>
+                      <span className={`invoice-item-chip invoice-item-chip-status invoice-item-chip-status-${invoice.status}`}>{invoice.status}</span>
+                      <span className="invoice-item-chip invoice-item-chip-total">{toCurrency(invoice.totalCents)}</span>
+                    </div>
+                  </div>
+                  <p className="invoice-item-subtitle">
+                    <span>{invoice.customerName}</span>
+                    <span>
+                      {describeAging(invoice.agingBucket)}
+                      {invoice.overdueDays ? ` (${invoice.overdueDays}d)` : ""}
+                    </span>
+                    <span>
+                      Due {new Date(invoice.dueAt).toLocaleDateString("en-AU", { timeZone: "Australia/Melbourne" })}
+                    </span>
+                  </p>
+                </div>
                 <div className="invoice-item-primary-actions">
                   <button type="button" className="btn btn-secondary" onClick={() => openInvoice(invoice)}>View</button>
                   <button type="button" className="btn btn-secondary" onClick={() => downloadInvoicePdf(invoice.id)}>Download PDF</button>
@@ -992,18 +1011,6 @@ export function AdminInvoicesClient() {
                   >
                     Delete
                   </button>
-                </div>
-                <div className="invoice-item-summary">
-                  <span className="invoice-item-chip">{invoice.documentType === "credit_note" ? "Credit note" : "Invoice"}</span>
-                  <span className={`invoice-item-chip invoice-item-chip-status invoice-item-chip-status-${invoice.status}`}>{invoice.status}</span>
-                  <span className="invoice-item-chip invoice-item-chip-total">{toCurrency(invoice.totalCents)}</span>
-                  <span className="invoice-item-chip">
-                    {describeAging(invoice.agingBucket)}
-                    {invoice.overdueDays ? ` (${invoice.overdueDays}d)` : ""}
-                  </span>
-                  <span className="invoice-item-chip">
-                    Due {new Date(invoice.dueAt).toLocaleDateString("en-AU", { timeZone: "Australia/Melbourne" })}
-                  </span>
                 </div>
               </div>
             ))

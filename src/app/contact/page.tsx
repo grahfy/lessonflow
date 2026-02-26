@@ -26,6 +26,7 @@ export default function ContactPage() {
       kicker="Inquiries"
       title="Let’s map out the right next step for your playing."
       lead="Reach out by call, text, or email for bookings, guitar tuition options, pricing, vouchers, or general questions. We can help you choose the best place to begin based on your level, musical interests, and what kind of player you want to become."
+      viewClassName="view-contact-page"
       visualLabel="Guitar lesson studio"
       visualClassName="contact-hero"
       leadJustified

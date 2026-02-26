@@ -9,6 +9,7 @@ import { publicRouteOrder } from "@/lib/site-data";
 
 const PUBLIC_FOOTER_COPY: Record<string, string> = {
   "/": "Arrow keys or swipe to move between pages.",
+  "/videos": "See and hear Jon's playing style before you book.",
   "/lessons": "Structured pathway with room for your own music style.",
   "/teacher": "Clear instruction. Real-world musical outcomes.",
   "/vouchers": "Digital delivery with simple booking follow-up.",

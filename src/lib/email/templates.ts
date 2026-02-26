@@ -486,8 +486,10 @@ export function ownerOperationsReportTemplate(input: {
         <div style="display:grid;gap:12px;">
           <div style="padding:12px;border:1px solid #e3e8f3;border-radius:10px;background:#f8fbff;">
             <p style="margin:0 0 8px;"><strong>Appointments</strong></p>
-            <p style="margin:0 0 4px;">Confirmed: ${input.report.appointments.confirmedCount}</p>
-            <p style="margin:0;">Cancelled: ${input.report.appointments.cancelledCount}</p>
+            <p style="margin:0 0 4px;">Pending appointments: ${input.report.appointmentPipeline.pendingRequestCount}</p>
+            <p style="margin:0 0 4px;">Upcoming confirmed appointments: ${input.report.appointmentPipeline.upcomingConfirmedCount}</p>
+            <p style="margin:0 0 4px;">Confirmed appointments (${escapeHtml(input.report.label)}): ${input.report.appointments.confirmedCount}</p>
+            <p style="margin:0;">Cancelled appointments (${escapeHtml(input.report.label)}): ${input.report.appointments.cancelledCount}</p>
           </div>
 
           <div style="padding:12px;border:1px solid #e3e8f3;border-radius:10px;background:#f8fbff;">
@@ -500,8 +502,8 @@ export function ownerOperationsReportTemplate(input: {
 
           <div style="padding:12px;border:1px solid #e3e8f3;border-radius:10px;background:#f8fbff;">
             <p style="margin:0 0 8px;"><strong>Earnings (paid documents in period)</strong></p>
+            <p style="margin:0 0 4px;">Amount made via paid invoices: ${money(input.report.earnings.invoicePaidCents)}</p>
             <p style="margin:0 0 4px;">Net paid: ${money(input.report.earnings.netPaidCents)}</p>
-            <p style="margin:0 0 4px;">Invoice payments: ${money(input.report.earnings.invoicePaidCents)}</p>
             <p style="margin:0 0 4px;">Credit notes: ${money(input.report.earnings.creditNotePaidCents)}</p>
             <p style="margin:0;">Paid documents: ${input.report.earnings.paidDocumentCount}</p>
           </div>

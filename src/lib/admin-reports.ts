@@ -1,7 +1,10 @@
 import { BookingStatus, InvoiceStatus } from "@prisma/client";
 import {
+  differenceInCalendarDays,
   eachDayOfInterval,
   eachMonthOfInterval,
+  eachWeekOfInterval,
+  eachYearOfInterval,
   endOfDay,
   endOfMonth,
   endOfWeek,
@@ -36,6 +39,10 @@ export type ReportMetricSnapshot = {
     confirmedCount: number;
     cancelledCount: number;
   };
+  appointmentPipeline: {
+    pendingRequestCount: number;
+    upcomingConfirmedCount: number;
+  };
   outstandingInvoices: {
     count: number;
     totalCents: number;
@@ -67,6 +74,10 @@ export type PeriodReport = ReportMetricSnapshot & {
   comparison: ReportComparison;
 };
 
+export type CustomRangeReport = Omit<PeriodReport, "key"> & {
+  key: "custom";
+};
+
 export type TrendPoint = {
   key: string;
   label: string;
@@ -88,6 +99,7 @@ export type AdminReportsDashboard = {
     monthly: TrendPoint[];
     yearly: TrendPoint[];
   };
+  customRange?: CustomRangeReport;
 };
 
 const OUTSTANDING_INVOICE_STATUSES: InvoiceStatus[] = ["draft", "sent"];
@@ -181,6 +193,26 @@ async function getAppointmentCountsForWindow(start: Date, end: Date) {
   return { confirmedCount, cancelledCount };
 }
 
+async function getAppointmentPipelineSnapshot(now: Date) {
+  const [pendingRequestCount, upcomingConfirmedCount] = await Promise.all([
+    prisma.bookingRequest.count({
+      where: {
+        status: "pending"
+      }
+    }),
+    prisma.booking.count({
+      where: {
+        status: "approved",
+        startAt: {
+          gte: now
+        }
+      }
+    })
+  ]);
+
+  return { pendingRequestCount, upcomingConfirmedCount };
+}
+
 async function getEarningsForWindow(start: Date, end: Date) {
   const paidDocs = await prisma.invoice.findMany({
     where: {
@@ -250,8 +282,9 @@ async function getOutstandingSnapshot(now: Date) {
 }
 
 async function buildPeriodMetrics(bounds: PeriodBounds, now: Date): Promise<PeriodReport> {
-  const [appointments, earnings, outstandingInvoices, previousAppointments, previousEarnings] = await Promise.all([
+  const [appointments, appointmentPipeline, earnings, outstandingInvoices, previousAppointments, previousEarnings] = await Promise.all([
     getAppointmentCountsForWindow(bounds.start, bounds.end),
+    getAppointmentPipelineSnapshot(now),
     getEarningsForWindow(bounds.start, bounds.end),
     getOutstandingSnapshot(now),
     getAppointmentCountsForWindow(bounds.previousStart, bounds.previousEnd),
@@ -272,12 +305,57 @@ async function buildPeriodMetrics(bounds: PeriodBounds, now: Date): Promise<Peri
     start: bounds.start.toISOString(),
     end: bounds.end.toISOString(),
     appointments,
+    appointmentPipeline,
     outstandingInvoices,
     earnings,
     comparison: {
       previousLabel: bounds.previousLabel,
       previousStart: bounds.previousStart.toISOString(),
       previousEnd: bounds.previousEnd.toISOString(),
+      earningsDeltaCents,
+      earningsDeltaPercent,
+      appointmentsDelta: appointments.confirmedCount - previousAppointments.confirmedCount
+    }
+  };
+}
+
+async function buildCustomPeriodMetrics(start: Date, end: Date, now: Date): Promise<CustomRangeReport> {
+  const startDate = startOfDay(start);
+  const endDate = endOfDay(end);
+  const daySpan = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
+  const previousStart = startOfDay(subDays(startDate, daySpan));
+  const previousEnd = endOfDay(subDays(startDate, 1));
+
+  const [appointments, appointmentPipeline, earnings, outstandingInvoices, previousAppointments, previousEarnings] = await Promise.all([
+    getAppointmentCountsForWindow(startDate, endDate),
+    getAppointmentPipelineSnapshot(now),
+    getEarningsForWindow(startDate, endDate),
+    getOutstandingSnapshot(now),
+    getAppointmentCountsForWindow(previousStart, previousEnd),
+    getEarningsForWindow(previousStart, previousEnd)
+  ]);
+
+  const earningsDeltaCents = earnings.netPaidCents - previousEarnings.netPaidCents;
+  const earningsDeltaPercent =
+    previousEarnings.netPaidCents === 0
+      ? earnings.netPaidCents === 0
+        ? 0
+        : null
+      : (earningsDeltaCents / Math.abs(previousEarnings.netPaidCents)) * 100;
+
+  return {
+    key: "custom",
+    label: `Custom range (${format(startDate, "d MMM yyyy")} - ${format(endDate, "d MMM yyyy")})`,
+    start: startDate.toISOString(),
+    end: endDate.toISOString(),
+    appointments,
+    appointmentPipeline,
+    outstandingInvoices,
+    earnings,
+    comparison: {
+      previousLabel: `Previous ${daySpan}-day period (${format(previousStart, "d MMM yyyy")} - ${format(previousEnd, "d MMM yyyy")})`,
+      previousStart: previousStart.toISOString(),
+      previousEnd: previousEnd.toISOString(),
       earningsDeltaCents,
       earningsDeltaPercent,
       appointmentsDelta: appointments.confirmedCount - previousAppointments.confirmedCount
@@ -300,7 +378,53 @@ function bucketDateKey(date: Date, grain: "day" | "week" | "month" | "year") {
 
 type TrendBucket = { key: string; label: string; start: Date; end: Date };
 
-function buildTrendPointsTemplate(grain: "day" | "week" | "month" | "year", now: Date): TrendBucket[] {
+function buildTrendPointsTemplate(
+  grain: "day" | "week" | "month" | "year",
+  now: Date,
+  customRange?: { start: Date; end: Date }
+): TrendBucket[] {
+  if (customRange) {
+    const customStart = startOfDay(customRange.start);
+    const customEnd = endOfDay(customRange.end);
+
+    if (grain === "day") {
+      return eachDayOfInterval({ start: customStart, end: customEnd }).map((day) => ({
+        key: bucketDateKey(day, "day"),
+        label: format(day, "d MMM"),
+        start: startOfDay(day),
+        end: endOfDay(day)
+      }));
+    }
+
+    if (grain === "week") {
+      return eachWeekOfInterval(
+        { start: customStart, end: customEnd },
+        { weekStartsOn: 1 }
+      ).map((weekStart) => ({
+        key: bucketDateKey(weekStart, "week"),
+        label: `${format(weekStart, "d MMM")}`,
+        start: startOfWeek(weekStart, { weekStartsOn: 1 }),
+        end: endOfWeek(weekStart, { weekStartsOn: 1 })
+      }));
+    }
+
+    if (grain === "month") {
+      return eachMonthOfInterval({ start: customStart, end: customEnd }).map((monthStart) => ({
+        key: bucketDateKey(monthStart, "month"),
+        label: format(monthStart, "MMM yy"),
+        start: startOfMonth(monthStart),
+        end: endOfMonth(monthStart)
+      }));
+    }
+
+    return eachYearOfInterval({ start: customStart, end: customEnd }).map((yearStart) => ({
+      key: bucketDateKey(yearStart, "year"),
+      label: format(yearStart, "yyyy"),
+      start: startOfYear(yearStart),
+      end: endOfYear(yearStart)
+    }));
+  }
+
   if (grain === "year") {
     const currentYearStart = startOfYear(now);
     const years = Array.from({ length: 6 }, (_, i) => startOfYear(subYears(currentYearStart, 5 - i)));
@@ -344,8 +468,12 @@ function buildTrendPointsTemplate(grain: "day" | "week" | "month" | "year", now:
   }));
 }
 
-async function buildTrend(grain: "day" | "week" | "month" | "year", now: Date): Promise<TrendPoint[]> {
-  const buckets = buildTrendPointsTemplate(grain, now);
+async function buildTrend(
+  grain: "day" | "week" | "month" | "year",
+  now: Date,
+  customRange?: { start: Date; end: Date }
+): Promise<TrendPoint[]> {
+  const buckets = buildTrendPointsTemplate(grain, now, customRange);
   const firstStart = buckets[0]?.start;
   const lastEnd = buckets[buckets.length - 1]?.end;
   if (!firstStart || !lastEnd) {
@@ -404,16 +532,21 @@ async function buildTrend(grain: "day" | "week" | "month" | "year", now: Date): 
   }));
 }
 
-export async function getAdminReportsDashboard(now: Date = new Date()): Promise<AdminReportsDashboard> {
-  const [daily, weekly, monthly, yearly, dailyTrend, weeklyTrend, monthlyTrend, yearlyTrend] = await Promise.all([
+export async function getAdminReportsDashboard(
+  now: Date = new Date(),
+  options?: { customRangeStart?: Date; customRangeEnd?: Date }
+): Promise<AdminReportsDashboard> {
+  const hasCustomRange = !!(options?.customRangeStart && options?.customRangeEnd);
+  const [daily, weekly, monthly, yearly, dailyTrend, weeklyTrend, monthlyTrend, yearlyTrend, customRange] = await Promise.all([
     buildPeriodMetrics(periodBounds("daily", now), now),
     buildPeriodMetrics(periodBounds("weekly", now), now),
     buildPeriodMetrics(periodBounds("monthly", now), now),
     buildPeriodMetrics(periodBounds("yearly", now), now),
-    buildTrend("day", now),
-    buildTrend("week", now),
-    buildTrend("month", now),
-    buildTrend("year", now)
+    buildTrend("day", now, hasCustomRange ? { start: options!.customRangeStart!, end: options!.customRangeEnd! } : undefined),
+    buildTrend("week", now, hasCustomRange ? { start: options!.customRangeStart!, end: options!.customRangeEnd! } : undefined),
+    buildTrend("month", now, hasCustomRange ? { start: options!.customRangeStart!, end: options!.customRangeEnd! } : undefined),
+    buildTrend("year", now, hasCustomRange ? { start: options!.customRangeStart!, end: options!.customRangeEnd! } : undefined),
+    hasCustomRange ? buildCustomPeriodMetrics(options!.customRangeStart!, options!.customRangeEnd!, now) : Promise.resolve(undefined)
   ]);
 
   return {
@@ -429,7 +562,8 @@ export async function getAdminReportsDashboard(now: Date = new Date()): Promise<
       weekly: weeklyTrend,
       monthly: monthlyTrend,
       yearly: yearlyTrend
-    }
+    },
+    ...(customRange ? { customRange } : {})
   };
 }
 

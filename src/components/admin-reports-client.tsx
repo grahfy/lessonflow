@@ -47,10 +47,13 @@ type TrendPoint = {
   earningsNetCents: number;
 };
 
+type CustomRangeReport = Omit<PeriodReport, "key"> & { key: "custom" };
+
 type AdminReportsDashboard = {
   generatedAt: string;
   periods: Record<ReportPeriodKey, PeriodReport>;
   trends: Record<TrendGrainKey, TrendPoint[]>;
+  customRange?: CustomRangeReport;
 };
 
 type AdminReportsResponse = AdminReportsDashboard & {
@@ -135,12 +138,16 @@ function formatPeriodLabel(period: PeriodReport, mode: ReportDateFormat): string
   return `This year (${formatDate(start, mode)} - ${formatDate(end, mode)})`;
 }
 
-function formatPreviousLabel(period: PeriodReport, mode: ReportDateFormat): string {
+function formatPreviousLabel(
+  period: PeriodReport | CustomRangeReport,
+  mode: ReportDateFormat
+): string {
   if (mode === "readable") {
     return period.comparison.previousLabel;
   }
   const start = toMelbourneDate(period.comparison.previousStart);
   const end = toMelbourneDate(period.comparison.previousEnd);
+  if (period.key === "custom") return `${formatDate(start, mode)} - ${formatDate(end, mode)}`;
   if (period.key === "daily") return `Previous day (${formatDate(start, mode)})`;
   if (period.key === "weekly") return `Previous week (${formatDate(start, mode)} - ${formatDate(end, mode)})`;
   if (period.key === "monthly") return `Previous month (${formatDate(start, mode)} - ${formatDate(end, mode)})`;
@@ -169,7 +176,13 @@ function periodTitle(key: ReportPeriodKey): string {
   return "Yearly";
 }
 
-function trendTitle(key: TrendGrainKey): string {
+function trendTitle(key: TrendGrainKey, customRangeActive = false): string {
+  if (customRangeActive) {
+    if (key === "daily") return "Daily trend (custom range)";
+    if (key === "weekly") return "Weekly trend (custom range)";
+    if (key === "monthly") return "Monthly trend (custom range)";
+    return "Yearly trend (custom range)";
+  }
   if (key === "daily") return "Daily trend (last 14 days)";
   if (key === "weekly") return "Weekly trend (last 8 weeks)";
   if (key === "monthly") return "Monthly trend (last 12 months)";
@@ -341,6 +354,66 @@ function PeriodCard({ period, dateFormat }: { period: PeriodReport; dateFormat: 
   );
 }
 
+function CustomRangeCard({ period, dateFormat }: { period: CustomRangeReport; dateFormat: ReportDateFormat }) {
+  const stats = useMemo(
+    () => [
+      { label: "Confirmed appointments", value: String(period.appointments.confirmedCount) },
+      { label: "Cancelled appointments", value: String(period.appointments.cancelledCount) },
+      { label: "Outstanding invoices", value: String(period.outstandingInvoices.count) },
+      { label: "Outstanding total", value: formatAud(period.outstandingInvoices.totalCents) },
+      { label: "Overdue invoices", value: String(period.outstandingInvoices.overdueCount) },
+      { label: "Overdue total", value: formatAud(period.outstandingInvoices.overdueTotalCents) },
+      { label: "Net paid earnings", value: formatAud(period.earnings.netPaidCents) },
+      { label: "Paid documents", value: String(period.earnings.paidDocumentCount) },
+      { label: "Invoice payments", value: formatAud(period.earnings.invoicePaidCents) },
+      { label: "Credit notes", value: formatAud(period.earnings.creditNotePaidCents) }
+    ],
+    [period]
+  );
+
+  const customLabel =
+    dateFormat === "readable"
+      ? `${formatDate(toMelbourneDate(period.start), dateFormat)} - ${formatDate(toMelbourneDate(period.end), dateFormat)}`
+      : `${formatDate(toMelbourneDate(period.start), dateFormat)} - ${formatDate(toMelbourneDate(period.end), dateFormat)}`;
+
+  return (
+    <section className="admin-card report-period-card">
+      <div className="report-card-header-row">
+        <h2>Custom range report</h2>
+        <p className="helper-text">{customLabel}</p>
+      </div>
+
+      <div className="report-metric-grid">
+        {stats.map((stat) => (
+          <div key={`custom-${stat.label}`} className="report-metric-cell">
+            <p className="report-metric-label">{stat.label}</p>
+            <p className="report-metric-value">{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="report-comparison-panel">
+        <div className="report-comparison-row">
+          <span className="report-comparison-label">Compared with</span>
+          <span>{formatPreviousLabel(period, dateFormat)}</span>
+        </div>
+        <div className="report-comparison-row">
+          <span className="report-comparison-label">Appointments delta</span>
+          <span className={`report-delta ${deltaClass(period.comparison.appointmentsDelta)}`}>
+            {formatDelta(period.comparison.appointmentsDelta)}
+          </span>
+        </div>
+        <div className="report-comparison-row">
+          <span className="report-comparison-label">Earnings delta</span>
+          <span className={`report-delta ${deltaClass(period.comparison.earningsDeltaCents)}`}>
+            {formatAud(period.comparison.earningsDeltaCents)} ({formatPercent(period.comparison.earningsDeltaPercent)})
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /**
  * Admin reports dashboard client for operational snapshots and trend charts.
  */
@@ -349,8 +422,12 @@ export function AdminReportsClient() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [dashboard, setDashboard] = useState<AdminReportsDashboard | null>(null);
   const [dateFormat, setDateFormat] = useState<ReportDateFormat>("readable");
+  const [rangeStart, setRangeStart] = useState("");
+  const [rangeEnd, setRangeEnd] = useState("");
+  const [sendingReportPeriod, setSendingReportPeriod] = useState<"daily" | "monthly" | "yearly" | null>(null);
   const [visibleComparisons, setVisibleComparisons] = useState<Record<TrendGrainKey, boolean>>({
     daily: true,
     weekly: true,
@@ -367,13 +444,25 @@ export function AdminReportsClient() {
     }
   }
 
-  async function load(mode: "initial" | "refresh" = "initial") {
+  async function load(mode: "initial" | "refresh" = "initial", customRange?: { start: string; end: string } | null) {
     if (mode === "initial") setLoading(true);
     if (mode === "refresh") setRefreshing(true);
     setError("");
 
     try {
-      const response = await fetch("/api/admin/reports", {
+      const params = new URLSearchParams();
+      const activeRange =
+        customRange === undefined
+          ? rangeStart && rangeEnd
+            ? { start: rangeStart, end: rangeEnd }
+            : null
+          : customRange;
+      if (activeRange) {
+        params.set("start", activeRange.start);
+        params.set("end", activeRange.end);
+      }
+
+      const response = await fetch(`/api/admin/reports${params.size ? `?${params.toString()}` : ""}`, {
         method: "GET",
         cache: "no-store"
       });
@@ -403,6 +492,60 @@ export function AdminReportsClient() {
     void load("initial");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function applyCustomRange() {
+    setNotice("");
+    if (!rangeStart || !rangeEnd) {
+      setError("Select both start and end dates to apply a custom report range.");
+      return;
+    }
+    if (rangeStart > rangeEnd) {
+      setError("Start date must be on or before end date.");
+      return;
+    }
+    void load("refresh", { start: rangeStart, end: rangeEnd });
+  }
+
+  function clearCustomRange() {
+    setNotice("");
+    setRangeStart("");
+    setRangeEnd("");
+    void load("refresh", null);
+  }
+
+  async function sendReportEmail(period: "daily" | "monthly" | "yearly") {
+    setError("");
+    setNotice("");
+    setSendingReportPeriod(period);
+    try {
+      const response = await fetch("/api/admin/reports/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ period })
+      });
+      const body = (await readJsonSafe<{ error?: string; deliveryStatus?: string }>(response)) || null;
+
+      if (response.status === 401) {
+        router.push("/admin/login");
+        router.refresh();
+        return;
+      }
+
+      if (!response.ok) {
+        setError(body?.error || "Unable to send report email.");
+        return;
+      }
+
+      const label = period === "daily" ? "today" : period === "monthly" ? "month" : "yearly";
+      setNotice(
+        `Sent ${label} report email to owner (${body?.deliveryStatus === "queued_no_smtp" ? "queued (email delivery not configured/live)" : "sent"}).`
+      );
+    } catch {
+      setError("Unable to send report email.");
+    } finally {
+      setSendingReportPeriod(null);
+    }
+  }
 
   const visibleTrendKeys = useMemo(
     () => (Object.entries(visibleComparisons).filter(([, on]) => on).map(([key]) => key) as TrendGrainKey[]),
@@ -434,6 +577,30 @@ export function AdminReportsClient() {
           <button className="btn btn-secondary" type="button" onClick={() => void load("refresh")} disabled={loading || refreshing}>
             {refreshing ? "Refreshing..." : "Refresh reports"}
           </button>
+          <button
+            className="btn btn-secondary"
+            type="button"
+            onClick={() => void sendReportEmail("daily")}
+            disabled={loading || refreshing || sendingReportPeriod !== null}
+          >
+            {sendingReportPeriod === "daily" ? "Sending Today..." : "Send Today Report"}
+          </button>
+          <button
+            className="btn btn-secondary"
+            type="button"
+            onClick={() => void sendReportEmail("monthly")}
+            disabled={loading || refreshing || sendingReportPeriod !== null}
+          >
+            {sendingReportPeriod === "monthly" ? "Sending Month..." : "Send Month Report"}
+          </button>
+          <button
+            className="btn btn-secondary"
+            type="button"
+            onClick={() => void sendReportEmail("yearly")}
+            disabled={loading || refreshing || sendingReportPeriod !== null}
+          >
+            {sendingReportPeriod === "yearly" ? "Sending Year..." : "Send Year Report"}
+          </button>
         </div>
       </div>
 
@@ -444,6 +611,40 @@ export function AdminReportsClient() {
             <option value="readable">Readable (e.g. 25 Feb 2026)</option>
             <option value="ddmmyy">DD/MM/YY</option>
           </select>
+        </div>
+        <div className="field report-compare-field">
+          <label>Custom date range (admin)</label>
+          <div className="booking-row">
+            <div className="field">
+              <label>Start</label>
+              <input
+                type="date"
+                value={rangeStart}
+                max={rangeEnd || undefined}
+                onChange={(event) => setRangeStart(event.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label>End</label>
+              <input
+                type="date"
+                value={rangeEnd}
+                min={rangeStart || undefined}
+                onChange={(event) => setRangeEnd(event.target.value)}
+              />
+            </div>
+            <div className="button-row">
+              <button className="btn btn-secondary" type="button" onClick={applyCustomRange} disabled={loading || refreshing}>
+                Apply Range
+              </button>
+              <button className="btn btn-secondary" type="button" onClick={clearCustomRange} disabled={loading || refreshing || (!rangeStart && !rangeEnd)}>
+                Clear Range
+              </button>
+            </div>
+          </div>
+          <p className="helper-text">
+            Adds a custom range summary card while keeping the standard daily/weekly/monthly/yearly reports below.
+          </p>
         </div>
         <div className="field report-compare-field">
           <label>Compare views (admin)</label>
@@ -469,6 +670,7 @@ export function AdminReportsClient() {
       </div>
 
       {error ? <p className="notice error">{error}</p> : null}
+      {notice ? <p className="notice success">{notice}</p> : null}
       {loading ? <p className="notice">Loading reports...</p> : null}
 
       {dashboard ? (
@@ -476,6 +678,12 @@ export function AdminReportsClient() {
           <div className="admin-card report-generated-card">
             <p className="helper-text">Generated at {formatGeneratedAt(dashboard.generatedAt, dateFormat)} (Australia/Melbourne)</p>
           </div>
+
+          {dashboard.customRange ? (
+            <div className="reports-period-grid">
+              <CustomRangeCard period={dashboard.customRange} dateFormat={dateFormat} />
+            </div>
+          ) : null}
 
           <div className="reports-period-grid reports-period-grid-4">
             <PeriodCard period={dashboard.periods.daily} dateFormat={dateFormat} />
@@ -487,7 +695,13 @@ export function AdminReportsClient() {
           <div className="reports-chart-grid">
             {visibleTrendKeys.length === 0 ? <p className="notice">Select at least one comparison view to display charts.</p> : null}
             {visibleTrendKeys.map((key) => (
-              <TrendPanel key={key} title={trendTitle(key)} points={dashboard.trends[key]} grain={key} dateFormat={dateFormat} />
+              <TrendPanel
+                key={key}
+                title={trendTitle(key, !!dashboard.customRange)}
+                points={dashboard.trends[key]}
+                grain={key}
+                dateFormat={dateFormat}
+              />
             ))}
           </div>
         </>

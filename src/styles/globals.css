@@ -209,6 +209,55 @@ a {
   .view-book-page .helper-text {
     font-size: 0.72rem;
   }
+
+  /* Keep the videos page panel at the same visible shell height as other public
+     pages by scrolling its content column instead of stretching the whole shell. */
+  .view-videos-page .view-stage {
+    min-height: 0;
+  }
+
+  .view-videos-page .panel-copy {
+    min-height: 0;
+    overflow-y: auto;
+    justify-content: flex-start;
+    align-content: start;
+    scrollbar-gutter: stable;
+  }
+
+  /* Contact page can overflow the fixed shell once the form + studio details stack.
+     Mirror the booking/videos behavior by keeping the shell fixed and scrolling only copy. */
+  .view-contact-page .view-stage {
+    min-height: 0;
+  }
+
+  .view-contact-page .panel-copy {
+    min-height: 0;
+    overflow-y: auto;
+    justify-content: flex-start;
+    align-content: start;
+    scrollbar-gutter: stable;
+    padding: clamp(18px, 2.4vw, 30px);
+    gap: 10px;
+  }
+
+  .view-contact-page h1 {
+    font-size: clamp(1.8rem, 2.8vw, 3.2rem);
+    line-height: 1.05;
+  }
+
+  .view-contact-page .lead {
+    font-size: clamp(0.9rem, 1vw, 1rem);
+    line-height: 1.34;
+  }
+
+  .view-contact-page .list li {
+    padding: 8px 10px;
+    font-size: 0.82rem;
+  }
+
+  .view-contact-page .field textarea {
+    min-height: 100px;
+  }
 }
 
 .kicker {
@@ -461,37 +510,6 @@ h1 {
   inset: 0;
   width: 100%;
   height: 100%;
-  border: 0;
-}
-
-.soundcloud-card {
-  margin-top: 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.03);
-  padding: 12px;
-  display: grid;
-  gap: 8px;
-}
-
-.soundcloud-card h3 {
-  margin: 0;
-  font-size: 0.95rem;
-  font-family: "Space Grotesk", "Sora", sans-serif;
-}
-
-.soundcloud-embed-frame {
-  width: 100%;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.soundcloud-embed {
-  display: block;
-  width: 100%;
-  height: 300px;
   border: 0;
 }
 
@@ -2036,21 +2054,52 @@ h1 {
   background: rgba(255, 255, 255, 0.035);
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
-    "title primary-actions"
-    "summary summary";
+    "meta primary-actions";
   column-gap: 10px;
-  row-gap: 4px;
+  row-gap: 0;
   align-items: start;
-  padding: 8px 10px;
+  padding: 6px 8px;
+}
+
+.invoice-item-meta {
+  grid-area: meta;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.invoice-item-title-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0;
 }
 
 .invoice-item-title {
-  grid-area: title;
   min-width: 0;
   font-family: "Space Grotesk", "Sora", sans-serif;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   line-height: 1.2;
-  padding-top: 2px;
+  padding-top: 0;
+  white-space: nowrap;
+}
+
+.invoice-item-subtitle {
+  margin: 0;
+  min-width: 0;
+  display: block;
+  color: var(--ink-1);
+  font-size: 0.75rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.invoice-item-subtitle span + span::before {
+  content: " · ";
+  color: rgba(255, 255, 255, 0.32);
 }
 
 .invoice-item-primary-actions {
@@ -2058,39 +2107,63 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 4px;
+  gap: 3px;
   align-items: center;
 }
 
 .invoice-item-primary-actions .btn {
-  min-height: 28px;
-  padding: 5px 10px;
-  font-size: 0.74rem;
+  min-height: 24px;
+  padding: 3px 8px;
+  font-size: 0.68rem;
 }
 
 .invoice-item-summary {
-  grid-area: summary;
   min-width: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 4px 6px;
 }
 
+.invoice-item-summary-inline {
+  flex-wrap: nowrap;
+  gap: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
 .invoice-item-summary span {
   color: var(--ink-1);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
 }
 
 .invoice-item-chip {
   display: inline-flex;
   align-items: center;
-  min-height: 20px;
-  padding: 1px 7px;
+  min-height: 18px;
+  padding: 0 6px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
   white-space: nowrap;
   line-height: 1.1;
+}
+
+.invoice-item-summary-inline .invoice-item-chip {
+  border-radius: 0;
+}
+
+.invoice-item-summary-inline .invoice-item-chip:first-child {
+  border-top-left-radius: 999px;
+  border-bottom-left-radius: 999px;
+}
+
+.invoice-item-summary-inline .invoice-item-chip:last-child {
+  border-top-right-radius: 999px;
+  border-bottom-right-radius: 999px;
+}
+
+.invoice-item-summary-inline .invoice-item-chip + .invoice-item-chip {
+  margin-left: -1px;
 }
 
 .invoice-item-chip-status {
@@ -2507,13 +2580,29 @@ h1 {
   .invoice-item {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-      "title"
-      "summary"
+      "meta"
       "primary-actions";
   }
 
   .invoice-item-primary-actions {
     justify-content: flex-start;
+  }
+
+  .invoice-item-title-row {
+    flex-wrap: wrap;
+  }
+
+  .invoice-item-summary-inline {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .invoice-item-summary-inline .invoice-item-chip {
+    border-radius: 999px;
+  }
+
+  .invoice-item-summary-inline .invoice-item-chip + .invoice-item-chip {
+    margin-left: 0;
   }
 
   .invoice-line-item {
