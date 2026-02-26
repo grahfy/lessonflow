@@ -70,6 +70,11 @@ BACKUP_INCLUDE_SEO_CONFIG=true
 BACKUP_CLEAN_OLD=true
 
 # Settings file for persistence
+MAINTENANCE_CONFIG_FILE="${REPO_ROOT}/.maintenance.conf"
+
+# Google Drive OAuth Configuration
+
+# Settings file for persistence
 MAINTENANCE_CONFIG_FILE=""
 
 # Google Drive OAuth Configuration
