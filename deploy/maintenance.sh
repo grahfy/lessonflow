@@ -363,7 +363,25 @@ run_git_pull() {
 # Persistence
 # =============================================================================
 
+load_backup_config() {
+  if [[ -f "${SHARED_DIR}/.env" ]]; then
+    GDRIVE_CLIENT_ID="$(grep -o 'GDRIVE_CLIENT_ID[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || true)"
+    GDRIVE_CLIENT_SECRET="$(grep -o 'GDRIVE_CLIENT_SECRET[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || true)"
+    GDRIVE_REFRESH_TOKEN="$(grep -o 'GDRIVE_REFRESH_TOKEN[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || true)"
+    KOOFR_WEBDAV_URL="$(grep -o 'KOOFR_WEBDAV_URL[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || true)"
+    KOOFR_USERNAME="$(grep -o 'KOOFR_USERNAME[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || true)"
+    KOOFR_PASSWORD="$(grep -o 'KOOFR_PASSWORD[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || true)"
+  fi
+  if [[ -d "${LOG_DIR}" ]]; then
+    LAST_BACKUP_DATE="$(ls -t "${LOG_DIR}"/backup-*.log 2>/dev/null | head -1 | xargs -r basename 2>/dev/null | sed 's/backup-\([0-9-]*\).log/\1/' || echo "")"
+  fi
+  load_maintenance_settings
+}
+
+create_backup_directory() { mkdir -p "${BACKUP_DIR}" "${LOG_DIR}"; }
+
 load_maintenance_settings() {
+
   if [[ -f "${MAINTENANCE_CONFIG_FILE}" ]]; then
     BACKUP_FREQUENCY="$(grep '^BACKUP_FREQUENCY=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "daily")"
     BACKUP_CLOUD_PROVIDER="$(grep '^BACKUP_CLOUD_PROVIDER=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "none")"
