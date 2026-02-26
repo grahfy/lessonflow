@@ -11,10 +11,6 @@
 
 set -euo pipefail
 
-# =============================================================================
-# Configuration & Globals
-# =============================================================================
-
 # Resolve paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT=""
@@ -36,8 +32,8 @@ NO_SPINNER=false
 IS_TTY=false
 SPINNER_PID=""
 SPINNER_MSG=""
-SPINNER_FRAMES=( "⠋" "⠙" "⠹" "⠸" "⠼" "⠦" "⠴" "⠧" "⠇" "⠏" )
-MAINTENANCE_TUI_PANEL_WIDTH=92
+SPINNER_FRAMES=( "⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏" )
+MAINTENANCE_TUI_PANEL_WIDTH=110
 MAINTENANCE_TUI_PANEL_WIDTH_MAX=120
 
 # SEO Configuration paths
@@ -92,8 +88,6 @@ BTOP_ORANGE='\033[38;5;208m'
 BTOP_PURPLE='\033[38;5;141m'
 BTOP_YELLOW='\033[1;33m'
 
-
-# Box drawing
 # Box drawing
 BOX_TL='┌'
 BOX_TR='┐'
@@ -104,93 +98,16 @@ BOX_V='│'
 BOX_VR='├'
 BOX_VL='┤'
 
-BOX_TR='╮'
-BOX_BL='╰'
-BOX_BR='╯'
-BOX_H='─'
-BOX_V='│'
-BOX_VR='├'
-BOX_VL='┤'
-
 BLOCK_EMPTY='░'
 BLOCK_FULL='█'
 
 # =============================================================================
-# Core Utility Functions (Defined Early)
+# Utils
 # =============================================================================
 
 log_info() { echo -e "${GREEN}●${NC} $1"; }
 log_warn() { echo -e "${YELLOW}▲${NC} $1"; }
 log_error() { echo -e "${RED}✖${NC} $1"; }
-
-show_usage() {
-  cat <<'EOF'
-Melbourne Guitar School - Maintenance Script
-
-Usage: ./deploy/maintenance.sh [options]
-
-Options:
-  --interactive         Force interactive TUI mode (default when TTY detected)
-  --skip-pull          Skip git pull when running non-interactively
-  --branch BRANCH       Git branch to pull from (default: current branch)
-  --remote REMOTE      Git remote to pull from (default: origin)
-  --allow-dirty        Allow operation even if working tree is dirty
-  --no-color            Disable colored output
-  --no-spinner          Disable spinner UI
-  --help, -h            Show usage
-
-Features:
-  - Sitemap.xml and robots.txt generation
-  - Backup with tar.xz compression
-  - Selective restore from local or cloud
-  - System maintenance tasks
-EOF
-}
-
-auto_size_tui_panel_width() {
-  local cols=""
-  local target_width=""
-
-  if command -v tput >/dev/null 2>&1; then
-    cols="$(tput cols 2>/dev/null || true)"
-  fi
-
-  if [[ -z "${cols}" && -n "${COLUMNS:-}" ]]; then
-    cols="${COLUMNS}"
-  fi
-
-  if [[ ! "${cols}" =~ ^[0-9]+$ ]]; then
-    return 0
-  fi
-
-  target_width="${cols}"
-  if (( target_width < 48 )); then
-    target_width=48
-  fi
-  if (( target_width > MAINTENANCE_TUI_PANEL_WIDTH_MAX )); then
-    target_width="${MAINTENANCE_TUI_PANEL_WIDTH_MAX}"
-  fi
-
-  MAINTENANCE_TUI_PANEL_WIDTH="${target_width}"
-}
-
-detect_tty_capabilities() {
-  if [[ -t 0 && -t 1 ]]; then
-    IS_TTY=true
-  fi
-
-  if [[ "${IS_TTY}" == true ]]; then
-    auto_size_tui_panel_width
-  fi
-
-  if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then
-    RED='' GREEN='' YELLOW='' BLUE='' CYAN='' MAGENTA='' BOLD='' DIM='' NC=''
-    BTOP_FG='' BTOP_FG_DIM='' BTOP_CYAN='' BTOP_CYAN_BRIGHT='' BTOP_GREEN='' BTOP_BLUE='' BTOP_ORANGE='' BTOP_PURPLE='' BTOP_YELLOW=''
-
-    BOX_TL='┌' BOX_TR='┐' BOX_BL='└' BOX_BR='┘' BOX_H='─' BOX_V='│'
-    BLOCK_EMPTY=' ' BLOCK_FULL='#'
-  fi
-}
 
 section() {
   echo ""
@@ -276,17 +193,15 @@ tui_truncate_text() {
 
 get_cpu_usage() {
   [[ -f /proc/stat ]] || { echo "0"; return; }
-  # Read the first line which contains aggregated cpu stats
-  local stat=($(head -1 /proc/stat))
-  # stat[0] is 'cpu', so user is stat[1], nice is stat[2], etc.
-  local user=${stat[1]:-0}
-  local nice=${stat[2]:-0}
-  local system=${stat[3]:-0}
-  local idle=${stat[4]:-0}
-  local iowait=${stat[5]:-0}
-  local irq=${stat[6]:-0}
-  local softirq=${stat[7]:-0}
-  local steal=${stat[8]:-0}
+  local cpu_line
+  cpu_line=$(head -1 /proc/stat)
+  local user nice system idle iowait irq softirq steal
+  # Parse the line, skipping the first 'cpu' label
+  read -r _ user nice system idle iowait irq softirq steal _ <<< "${cpu_line}"
+  
+  # Ensure they are numeric
+  user=${user:-0}; nice=${nice:-0}; system=${system:-0}; idle=${idle:-0}
+  iowait=${iowait:-0}; irq=${irq:-0}; softirq=${softirq:-0}; steal=${steal:-0}
 
   local total=$((user + nice + system + idle + iowait + irq + softirq + steal))
   local usage=$((user + nice + system + irq + softirq + steal))
@@ -327,9 +242,7 @@ get_process_count() { grep -c '^proc' /proc/stat 2>/dev/null || echo "1"; }
 draw_mini_bar() {
   local p="$1" w="${2:-15}"
   ((p = p < 0 ? 0 : p > 100 ? 100 : p))
-  local filled=$(( (p * w) / 100 ))
-  local empty=$(( w - filled ))
-
+  local filled=$(( (p * w) / 100 )) empty=$(( w - filled ))
   local bar=""
   local i
   for ((i=0; i<filled; i++)); do bar+="${BTOP_GREEN}${BLOCK_FULL}"; done
@@ -343,6 +256,7 @@ draw_mini_bar() {
 
 resolve_repo_root() {
   local c=("${SCRIPT_DIR}/.." "/var/www/${APP_NAME}/current" "/var/www/${APP_NAME}" "${HOME}/melbourne-guitar-school")
+  local candidate
   for candidate in "${c[@]}"; do
     if [[ -d "${candidate}/.git" && -f "${candidate}/package.json" ]]; then
       REPO_ROOT="$(cd "${candidate}" && pwd -P)"
@@ -377,25 +291,7 @@ run_git_pull() {
 # Persistence
 # =============================================================================
 
-load_backup_config() {
-  if [[ -f "${SHARED_DIR}/.env" ]]; then
-    GDRIVE_CLIENT_ID="$(grep -o 'GDRIVE_CLIENT_ID[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || true)"
-    GDRIVE_CLIENT_SECRET="$(grep -o 'GDRIVE_CLIENT_SECRET[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || true)"
-    GDRIVE_REFRESH_TOKEN="$(grep -o 'GDRIVE_REFRESH_TOKEN[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || true)"
-    KOOFR_WEBDAV_URL="$(grep -o 'KOOFR_WEBDAV_URL[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || true)"
-    KOOFR_USERNAME="$(grep -o 'KOOFR_USERNAME[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || true)"
-    KOOFR_PASSWORD="$(grep -o 'KOOFR_PASSWORD[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || true)"
-  fi
-  if [[ -d "${LOG_DIR}" ]]; then
-    LAST_BACKUP_DATE="$(ls -t "${LOG_DIR}"/backup-*.log 2>/dev/null | head -1 | xargs -r basename 2>/dev/null | sed 's/backup-\([0-9-]*\).log/\1/' || echo "")"
-  fi
-  load_maintenance_settings
-}
-
-create_backup_directory() { mkdir -p "${BACKUP_DIR}" "${LOG_DIR}"; }
-
 load_maintenance_settings() {
-
   if [[ -f "${MAINTENANCE_CONFIG_FILE}" ]]; then
     BACKUP_FREQUENCY="$(grep '^BACKUP_FREQUENCY=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "daily")"
     BACKUP_CLOUD_PROVIDER="$(grep '^BACKUP_CLOUD_PROVIDER=' "${MAINTENANCE_CONFIG_FILE}" | cut -d= -f2 || echo "none")"
@@ -426,7 +322,8 @@ EOF
 # =============================================================================
 
 get_db_creds() {
-  local du; [[ -f "${SHARED_DIR}/.env" ]] && du=$(grep 'DATABASE_URL' "${SHARED_DIR}/.env" | sed 's/.*=//; s/["'\'']//g')
+  local du
+  [[ -f "${SHARED_DIR}/.env" ]] && du=$(grep 'DATABASE_URL' "${SHARED_DIR}/.env" | sed 's/.*=//; s/["'\'']//g')
   [[ -z "${du:-}" ]] && return 1
   DB_U=$(echo "${du}" | sed -n 's|.*://\([^:]*\):.*@.*|\1|p')
   DB_P=$(echo "${du}" | sed -n 's|.*://[^:]*:\([^@]*\)@.*|\1|p')
@@ -471,11 +368,9 @@ upload_to_koofr() {
 }
 
 create_backup_archive() {
-  local ts="$1"
-  local bn="backup-${ts}"
-  local td="$(mktemp -d)"
-  local af="${BACKUP_DIR}/${bn}.tar.xz"
-
+  local ts="$1" bn="backup-${ts}" td af
+  td="$(mktemp -d)"
+  af="${BACKUP_DIR}/${bn}.tar.xz"
   mkdir -p "${td}/${bn}"
   [[ "${BACKUP_INCLUDE_SQL}" == "true" ]] && { log_info "SQL dump..."; create_database_dump "${td}/${bn}/database.sql" || log_warn "SQL failed"; }
   [[ "${BACKUP_INCLUDE_ENV}" == "true" && -f "${SHARED_DIR}/.env" ]] && cp "${SHARED_DIR}/.env" "${td}/${bn}/"
@@ -503,6 +398,52 @@ run_backup() {
   fi
   [[ "${BACKUP_CLEAN_OLD}" == "true" ]] && find "${BACKUP_DIR}" -name "backup-*.tar.xz" -type f -mtime +${BACKUP_RETENTION_DAYS} -delete 2>/dev/null
   echo "[$(date -Iseconds)] Backup completed: ${af}" >> "${LOG_DIR}/backup-${ts}.log"
+}
+
+# =============================================================================
+# Restore Logic
+# =============================================================================
+
+list_local_backups() { [[ -d "${BACKUP_DIR}" ]] && find "${BACKUP_DIR}" -name "backup-*.tar.xz" -type f 2>/dev/null | sort -r; }
+
+download_from_google_drive() {
+  local bn="$1" op="$2" tr at fid
+  tr="$(curl -s -X POST "https://oauth2.googleapis.com/token" -H "Content-Type: application/x-www-form-urlencoded" -d "client_id=${GDRIVE_CLIENT_ID}&client_secret=${GDRIVE_CLIENT_SECRET}&refresh_token=${GDRIVE_REFRESH_TOKEN}&grant_type=refresh_token" 2>/dev/null)"
+  at="$(echo "${tr}" | grep -o '"access_token"[^}]*' | sed 's/.*: *"\([^"]*\)".*/\1/')"
+  fid="$(curl -s "https://www.googleapis.com/drive/v3/files?q=name='${bn}'" -H "Authorization: Bearer ${at}" 2>/dev/null | grep -o '"id"[^}]*' | head -1 | sed 's/.*: *"\([^"]*\)".*/\1/')"
+  curl -s "https://www.googleapis.com/drive/v3/files/${fid}?alt=media" -H "Authorization: Bearer ${at}" -o "${op}" 2>/dev/null
+}
+
+download_from_koofr() {
+  curl -s -o "$2" -u "${KOOFR_USERNAME}:${KOOFR_PASSWORD}" "${KOOFR_WEBDAV_URL}/${BACKUP_CLOUD_FOLDER}/$1" 2>/dev/null
+}
+
+list_cloud_backups() {
+  case "${BACKUP_CLOUD_PROVIDER}" in
+    google-drive)
+      local tr at
+      tr="$(curl -s -X POST "https://oauth2.googleapis.com/token" -H "Content-Type: application/x-www-form-urlencoded" -d "client_id=${GDRIVE_CLIENT_ID}&client_secret=${GDRIVE_CLIENT_SECRET}&refresh_token=${GDRIVE_REFRESH_TOKEN}&grant_type=refresh_token" 2>/dev/null)"
+      at="$(echo "${tr}" | grep -o '"access_token"[^}]*' | sed 's/.*: *"\([^"]*\)".*/\1/')"
+      curl -s "https://www.googleapis.com/drive/v3/files?q='${BACKUP_CLOUD_FOLDER}'+in+parents" -H "Authorization: Bearer ${at}" 2>/dev/null | grep -o '"name"[^}]*' | sed 's/.*: *"\([^"]*\)".*/\1/' | grep 'backup-.*\.tar\.xz$' || true
+      ;;
+    koofr) curl -s -u "${KOOFR_USERNAME}:${KOOFR_PASSWORD}" "${KOOFR_WEBDAV_URL}/${BACKUP_CLOUD_FOLDER}/" 2>/dev/null | grep -o 'backup-[^"]*\.tar\.xz' || true ;;
+  esac
+}
+
+restore_backup() {
+  local bf="$1" rs="${2:-true}" rw="${3:-true}" re="${4:-true}" rm="${5:-true}" rse="${6:-true}" rd="${7:-true}"
+  section "Restore Backup"
+  local td="$(mktemp -d)"
+  tar -xJf "${bf}" -C "${td}" 2>/dev/null || { rm -rf "${td}"; return 1; }
+  local bd="$(find "${td}" -mindepth 1 -maxdepth 1 -type d | head -1)"
+  [[ "${rs}" == "true" && -f "${bd}/database.sql" ]] && { log_info "SQL..."; restore_database "${bd}/database.sql" && log_info "OK" || log_warn "Fail"; }
+  [[ "${re}" == "true" && -f "${bd}/.env" ]] && cp "${bd}/.env" "${SHARED_DIR}/.env"
+  [[ "${rse}" == "true" && -f "${bd}/seo-config.json" ]] && cp "${bd}/seo-config.json" "${SEO_CONFIG_FILE}"
+  [[ "${rw}" == "true" && -d "${bd}/app" ]] && log_warn "Manual move: cp -r ${bd}/app/* ${CURRENT_LINK}/"
+  [[ "${rm}" == "true" && -d "${bd}/learning-materials" ]] && cp -r "${bd}/learning-materials" "${REPO_ROOT}/.data/"
+  [[ "${rd}" == "true" && -d "${bd}/data" ]] && cp -r "${bd}/data" "${SHARED_DIR}/"
+  rm -rf "${td}"
+  log_info "Done!"
 }
 
 # =============================================================================
@@ -587,8 +528,7 @@ draw_btop_separator() {
   else
     local label_len=${#label}
     local line_len=$(( (width - 2 - label_len - 4) / 2 ))
-
-    printf "${BTOP_FG}%s" "${BOX_VR}"; for ((i=0; i<line_len; i++)); do printf "${BOX_H}"; done; printf " ${BTOP_PURPLE}%s ${BTOP_FG}" "${label}"
+    printf "${BTOP_FG}%s" "${BOX_VR}"; local i; for ((i=0; i<line_len; i++)); do printf "${BOX_H}"; done; printf " ${BTOP_PURPLE}%s ${BTOP_FG}" "${label}"
     local remaining=$((width - 2 - line_len - label_len - 4)); for ((i=0; i<remaining; i++)); do printf "${BOX_H}"; done; printf "${BOX_VL}\n"
   fi
 }
@@ -596,61 +536,14 @@ draw_btop_separator() {
 draw_btop_menu_item() {
   local key="$1" label="$2" description="$3" status="$4" width="$5"
   local label_width=28
-  local desc_width=$((width - label_width - 25))
+  local desc_width=$((width - label_width - 35))
   local key_width=4
-
   printf "${BTOP_FG}%s" "${BOX_V}"; printf " ${BTOP_YELLOW}[${key}]${BTOP_FG} "; printf "${BTOP_CYAN_BRIGHT}%-${label_width}s${BTOP_FG}" "${label}"
   [[ -n "${status}" ]] && printf "${BTOP_GREEN}●${BTOP_FG} %-12s" "${status}" || printf "%-14s" ""
   local desc_trunc="$(tui_truncate_text "${description}" "${desc_width}")"
   printf "${BTOP_FG_DIM}%s" "${desc_trunc}"
   local used=$((3 + 4 + 1 + label_width + 1 + 14 + 1 + ${#desc_trunc}))
   local fill=$((width - used - 1)); local i; for ((i=0; i<fill; i++)); do printf " "; done; printf "${BTOP_FG}%s\n" "${BOX_V}"
-}
-
-# =============================================================================
-# Restore Logic
-# =============================================================================
-
-list_local_backups() { [[ -d "${BACKUP_DIR}" ]] && find "${BACKUP_DIR}" -name "backup-*.tar.xz" -type f 2>/dev/null | sort -r; }
-
-download_from_google_drive() {
-  local bn="$1" op="$2" tr at fid
-  tr="$(curl -s -X POST "https://oauth2.googleapis.com/token" -H "Content-Type: application/x-www-form-urlencoded" -d "client_id=${GDRIVE_CLIENT_ID}&client_secret=${GDRIVE_CLIENT_SECRET}&refresh_token=${GDRIVE_REFRESH_TOKEN}&grant_type=refresh_token" 2>/dev/null)"
-  at="$(echo "${tr}" | grep -o '"access_token"[^}]*' | sed 's/.*: *"\([^"]*\)".*/\1/')"
-  fid="$(curl -s "https://www.googleapis.com/drive/v3/files?q=name='${bn}'" -H "Authorization: Bearer ${at}" 2>/dev/null | grep -o '"id"[^}]*' | head -1 | sed 's/.*: *"\([^"]*\)".*/\1/')"
-  curl -s "https://www.googleapis.com/drive/v3/files/${fid}?alt=media" -H "Authorization: Bearer ${at}" -o "${op}" 2>/dev/null
-}
-
-download_from_koofr() {
-  curl -s -o "$2" -u "${KOOFR_USERNAME}:${KOOFR_PASSWORD}" "${KOOFR_WEBDAV_URL}/${BACKUP_CLOUD_FOLDER}/$1" 2>/dev/null
-}
-
-list_cloud_backups() {
-  case "${BACKUP_CLOUD_PROVIDER}" in
-    google-drive)
-      local tr at
-      tr="$(curl -s -X POST "https://oauth2.googleapis.com/token" -H "Content-Type: application/x-www-form-urlencoded" -d "client_id=${GDRIVE_CLIENT_ID}&client_secret=${GDRIVE_CLIENT_SECRET}&refresh_token=${GDRIVE_REFRESH_TOKEN}&grant_type=refresh_token" 2>/dev/null)"
-      at="$(echo "${tr}" | grep -o '"access_token"[^}]*' | sed 's/.*: *"\([^"]*\)".*/\1/')"
-      curl -s "https://www.googleapis.com/drive/v3/files?q='${BACKUP_CLOUD_FOLDER}'+in+parents" -H "Authorization: Bearer ${at}" 2>/dev/null | grep -o '"name"[^}]*' | sed 's/.*: *"\([^"]*\)".*/\1/' | grep 'backup-.*\.tar\.xz$' || true
-      ;;
-    koofr) curl -s -u "${KOOFR_USERNAME}:${KOOFR_PASSWORD}" "${KOOFR_WEBDAV_URL}/${BACKUP_CLOUD_FOLDER}/" 2>/dev/null | grep -o 'backup-[^"]*\.tar\.xz' || true ;;
-  esac
-}
-
-restore_backup() {
-  local bf="$1" rs="${2:-true}" rw="${3:-true}" re="${4:-true}" rm="${5:-true}" rse="${6:-true}" rd="${7:-true}"
-  section "Restore Backup"
-  local td="$(mktemp -d)"
-  tar -xJf "${bf}" -C "${td}" 2>/dev/null || { rm -rf "${td}"; return 1; }
-  local bd="$(find "${td}" -mindepth 1 -maxdepth 1 -type d | head -1)"
-  [[ "${rs}" == "true" && -f "${bd}/database.sql" ]] && { log_info "SQL..."; restore_database "${bd}/database.sql" && log_info "OK" || log_warn "Fail"; }
-  [[ "${re}" == "true" && -f "${bd}/.env" ]] && cp "${bd}/.env" "${SHARED_DIR}/.env"
-  [[ "${rse}" == "true" && -f "${bd}/seo-config.json" ]] && cp "${bd}/seo-config.json" "${SEO_CONFIG_FILE}"
-  [[ "${rw}" == "true" && -d "${bd}/app" ]] && log_warn "Manual move: cp -r ${bd}/app/* ${CURRENT_LINK}/"
-  [[ "${rm}" == "true" && -d "${bd}/learning-materials" ]] && cp -r "${bd}/learning-materials" "${REPO_ROOT}/.data/"
-  [[ "${rd}" == "true" && -d "${bd}/data" ]] && cp -r "${bd}/data" "${SHARED_DIR}/"
-  rm -rf "${td}"
-  log_info "Done!"
 }
 
 # =============================================================================
@@ -670,7 +563,7 @@ restore_backup_tui() {
       while IFS= read -r b; do [[ -n "$b" ]] || continue; echo " [$i] $b"; bks+=("${b}"); ((i++)); done < <(list_cloud_backups)
     fi
     echo ""
-    print_tui_panel_rule
+    print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
     echo " [1] SQL:$(bool_word "${rs}") [2] App:$(bool_word "${rw}") [3] Env:$(bool_word "${re}")"
     echo " [4] Mat:$(bool_word "${rmat}") [5] SEO:$(bool_word "${rse}") [6] Data:$(bool_word "${rd}")"
     echo " [R] Restore [S] Source [B] Back"
@@ -723,92 +616,52 @@ print_backup_components_tui() {
 print_btop_main_menu() {
   tui_clear_screen
   local cpu=$(get_cpu_usage) mem=$(get_memory_usage) disk=$(get_disk_usage "/") up=$(get_uptime)
-  local width="${MAINTENANCE_TUI_PANEL_WIDTH}"
-  local inner_width=$((width - 2))
+  local width="${MAINTENANCE_TUI_PANEL_WIDTH}" inner_width=$((width - 2))
   local i
-
   # Header
-  printf "${BTOP_FG}${BOX_TL}"
-  for ((i=0; i<inner_width; i++)); do printf "${BOX_H}"; done
-  printf "${BOX_TR}\n"
-
-  # Title line (Center text)
-  local title="LessonFlow Maintenance"
-  local title_len=${#title}
-  local pad_total=$((inner_width - title_len))
-  local pad1=$((pad_total / 2))
-  local pad2=$((pad_total - pad1))
-  printf "${BTOP_FG}${BOX_V}%*s%s%*s${BOX_V}\n" "${pad1}" "" "${title}" "${pad2}" ""
-
-  printf "${BTOP_FG}${BOX_VR}"
-  for ((i=0; i<inner_width; i++)); do printf "${BOX_H}"; done
-  printf "${BOX_VL}\n"
-
-  # Stats row
+  printf "${BTOP_FG}${BOX_TL}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_TR}\n"
+  printf "${BTOP_FG}${BOX_V}%*s%s%*s${BOX_V}\n" $(( (inner_width - 22) / 2 )) "" "LessonFlow Maintenance" $(( inner_width - 22 - (inner_width - 22) / 2 )) ""
+  printf "${BTOP_FG}${BOX_VR}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_VL}\n"
+  # Stats Row
+  printf "${BTOP_FG}${BOX_V} ${BTOP_FG_DIM}CPU${NC} "
   local cpu_bar; cpu_bar=$(draw_mini_bar "$cpu" 12)
+  printf "${BTOP_GREEN}%s${NC} %3d%% " "${cpu_bar}" "$cpu"
+  printf "${BTOP_FG_DIM}MEM${NC} "
   local mem_bar; mem_bar=$(draw_mini_bar "$mem" 12)
+  printf "${BTOP_BLUE}%s${NC} %3d%% " "${mem_bar}" "$mem"
+  printf "${BTOP_FG_DIM}DISK${NC} "
   local disk_bar; disk_bar=$(draw_mini_bar "$disk" 12)
+  printf "${BTOP_ORANGE}%s${NC} %3d%% " "${disk_bar}" "$disk"
+  printf "${BTOP_FG_DIM}Uptime:${NC} %s" "$up"
   
-  # Format the visible parts of the row. We must be very precise with spaces.
-  # 1 (vertical) + 5 (" CPU ") + 12 (bar) + 6 (" 100% ") + 6 (" MEM ") + 12 (bar) + 6 (" 100% ") + 7 (" DISK ") + 12 (bar) + 5 (" 100% ") + padding + 1 (vertical)
-  # Simplified: stats string with ANSI codes.
-  local stats_output
-  printf -v stats_output " CPU %b %3d%%  MEM %b %3d%%  DISK %b %3d%%" "${cpu_bar}" "$cpu" "${mem_bar}" "$mem" "${disk_bar}" "$disk"
+  local used_len=$(( 6 + 12 + 5 + 4 + 12 + 5 + 5 + 12 + 5 + 8 + ${#up} ))
+  for ((i=0; i<inner_width-used_len; i++)); do printf " "; done
+  printf "${BTOP_FG}${BOX_V}\n"
   
-  # The visible length of stats_output is 5 + 12 + 6 + 6 + 12 + 6 + 7 + 12 + 5 = 71
-  local visible_len=71
-  local stats_pad=$((inner_width - visible_len))
-  [[ $stats_pad -lt 0 ]] && stats_pad=0
+  printf "${BTOP_FG}${BOX_BL}"; for ((i=0;i<inner_width;i++)); do printf "${BOX_H}"; done; printf "${BOX_BR}\n\n"
   
-  printf "${BTOP_FG}${BOX_V}%b%*s${BOX_V}\n" "${stats_output}" "${stats_pad}" ""
-
-  printf "${BTOP_FG}${BOX_BL}"
-  for ((i=0; i<inner_width; i++)); do printf "${BOX_H}"; done
-  printf "${BOX_BR}\n\n"
-
   draw_btop_separator "${width}" " BACKUP & RESTORE "
   draw_btop_menu_item "1" "Run Backup" "Create .tar.xz archive" "Ready" "${width}"
   draw_btop_menu_item "2" "Restore Backup" "Restore local/cloud" "Ready" "${width}"
-  draw_btop_menu_item "3" "Components" "Configure backup elements" "Edit" "${width}"
-  draw_btop_menu_item "4" "Cloud" "Cloud Provider: ${BACKUP_CLOUD_PROVIDER}" "Cloud" "${width}"
+  draw_btop_menu_item "3" "Components" "Configure elements" "Edit" "${width}"
+  draw_btop_menu_item "4" "Cloud" "Provider: ${BACKUP_CLOUD_PROVIDER}" "Cloud" "${width}"
   draw_btop_menu_item "5" "Cron" "Freq: ${BACKUP_FREQUENCY}" "Cron" "${width}"
   echo ""
   draw_btop_separator "${width}" " SEO & DB "
   draw_btop_menu_item "6" "Sitemap" "Generate sitemap.xml" "Ready" "${width}"
   draw_btop_menu_item "7" "Robots.txt" "Generate robots.txt" "Ready" "${width}"
-  draw_btop_menu_item "8" "DB Health" "Check DB connection" "Check" "${width}"
+  draw_btop_menu_item "8" "DB Health" "Check connection" "Check" "${width}"
   echo ""
   draw_btop_separator "${width}" " SYSTEM "
-  draw_btop_menu_item "9" "Clean Cache" "Remove .next/node cache" "Clean" "${width}"
-  draw_btop_menu_item "0" "Git Pull" "Pull latest from git" "Git" "${width}"
+  draw_btop_menu_item "9" "Clean Cache" "Remove build caches" "Clean" "${width}"
+  draw_btop_menu_item "0" "Git Pull" "Pull from remote" "Git" "${width}"
   echo ""
   printf "  ${BOLD}${BTOP_YELLOW}1-9,0${NC} Select Action    ${BOLD}${BTOP_YELLOW}Q${NC} Quit\n"
 }
 
 # =============================================================================
-# Runtime Setup & Loop
+# Runtime
 # =============================================================================
-
-run_interactive_maintenance() {
-  load_backup_config; create_backup_directory
-  while true; do
-    print_btop_main_menu
-    read -r -p "Select [1-0, Q]: " ch
-    case "${ch,,}" in
-      1) local up=false; prompt_yes_no "Upload to cloud?" "n" && up=true; run_backup "${up}"; read -r -n 1 -s -p "Done. Press key..." ;;
-      2) restore_backup_tui ;;
-      3) print_backup_components_tui ;;
-      4) section "Cloud Provider"; BACKUP_CLOUD_PROVIDER=$(prompt_select "Select" "none" "google-drive" "koofr"); save_maintenance_settings ;;
-      5) section "Frequency"; BACKUP_FREQUENCY=$(prompt_select "Select" "hourly" "daily" "weekly"); save_maintenance_settings ;;
-      6) generate_sitemap; read -r -n 1 -s -p "Press key..." ;;
-      7) generate_robots_txt; read -r -n 1 -s -p "Press key..." ;;
-      8) check_database_health; read -r -n 1 -s -p "Press key..." ;;
-      9) [[ -d "${REPO_ROOT}/.next" ]] && rm -rf "${REPO_ROOT}/.next"; [[ -d "${REPO_ROOT}/node_modules/.cache" ]] && rm -rf "${REPO_ROOT}/node_modules/.cache"; log_info "Cleaned"; read -r -n 1 -s -p "Press key..." ;;
-      0) run_git_pull; read -r -n 1 -s -p "Press key..." ;;
-      q) exit 0 ;;
-    esac
-  done
-}
 
 run_step() {
   local msg="$1"; shift; start_spinner "${msg}"
@@ -826,7 +679,9 @@ start_spinner() {
 stop_spinner() {
   local status="$1"
   [[ "${NO_SPINNER}" == true || "${IS_TTY}" != true ]] && return 0
-  kill "${SPINNER_PID}" 2>/dev/null || true; wait "${SPINNER_PID}" 2>/dev/null || true
+  if [[ -n "${SPINNER_PID}" ]] && kill -0 "${SPINNER_PID}" 2>/dev/null; then
+    kill "${SPINNER_PID}" 2>/dev/null || true; wait "${SPINNER_PID}" 2>/dev/null || true
+  fi
   [[ "${status}" == "ok" ]] && printf "\r${GREEN}✔${NC} %s\n" "${SPINNER_MSG}" || printf "\r${RED}✖${NC} %s\n" "${SPINNER_MSG}"
 }
 
@@ -840,6 +695,27 @@ check_database_health() {
     if MYSQL_PWD="${DB_P}" mariadb -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" -e "SELECT 1" "${DB_NAME}" >/dev/null 2>&1; then log_info "DB OK"; else log_error "DB Fail"; fi
   else
     log_warn "mysql client not installed"; fi
+}
+
+run_interactive_maintenance() {
+  load_backup_config; create_backup_directory
+  while true; do
+    print_btop_main_menu
+    read -r -p "Select: " ch
+    case "${ch,,}" in
+      1) local up=false; prompt_yes_no "Upload?" "n" && up=true; run_backup "${up}"; read -r -n 1 -s -p "Done. Press key..." ;;
+      2) restore_backup_tui ;;
+      3) print_backup_components_tui ;;
+      4) section "Cloud Provider"; BACKUP_CLOUD_PROVIDER=$(prompt_select "Select" "none" "google-drive" "koofr"); save_maintenance_settings ;;
+      5) section "Frequency"; BACKUP_FREQUENCY=$(prompt_select "Select" "hourly" "daily" "weekly"); save_maintenance_settings ;;
+      6) generate_sitemap; read -r -n 1 -s -p "Press key..." ;;
+      7) generate_robots_txt; read -r -n 1 -s -p "Press key..." ;;
+      8) check_database_health; read -r -n 1 -s -p "Press key..." ;;
+      9) [[ -d "${REPO_ROOT}/.next" ]] && rm -rf "${REPO_ROOT}/.next"; [[ -d "${REPO_ROOT}/node_modules/.cache" ]] && rm -rf "${REPO_ROOT}/node_modules/.cache"; log_info "Cleaned"; read -r -n 1 -s -p "Press key..." ;;
+      0) run_git_pull; read -r -n 1 -s -p "Press key..." ;;
+      q) exit 0 ;;
+    esac
+  done
 }
 
 main() {
