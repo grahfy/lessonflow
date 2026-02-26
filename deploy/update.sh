@@ -1347,44 +1347,44 @@ print_update_tui_menu() {
   fi
   echo -e "${BOLD}${BLUE}  Update Workflow Options${NC}"
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
-  print_tui_option_pair "1" "Branch" "${BRANCH}" "Branch to fetch/pull and pass through to deploy.sh." \
-    "2" "Remote" "${REMOTE_NAME}" "Git remote used for fetch/pull (usually origin)."
-  print_tui_option_pair "3" "Pull latest changes" "$(bool_word "$(toggle_bool "${SKIP_PULL}")")" "ON performs git fetch + ff-only pull before deployment." \
-    "4" "Run deploy after pull" "$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")" "ON runs deploy.sh after git update; OFF only updates the repo checkout."
-  print_tui_option_pair "5" "Allow dirty worktree" "$(bool_word "${ALLOW_DIRTY}")" "ON allows update/deploy even if tracked files are modified locally." \
-    "6" "Sudo deploy mode" "$(update_sudo_mode_label)" "Cycles deploy invocation between auto, forced sudo, and forced no-sudo."
+  print_tui_option_pair "1" "Branch" "${BRANCH}" "Branch to fetch/pull and pass to deploy.sh." \
+    "2" "Remote" "${REMOTE_NAME}" "Git remote for fetch/pull (usually origin)."
+  print_tui_option_pair "3" "Pull latest changes" "$(bool_word "$(toggle_bool "${SKIP_PULL}")")" "ON runs git fetch + ff-only pull before deploy." \
+    "4" "Run deploy after pull" "$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")" "ON runs deploy.sh after update; OFF only updates repo."
+  print_tui_option_pair "5" "Allow dirty worktree" "$(bool_word "${ALLOW_DIRTY}")" "ON allows update/deploy with local tracked changes." \
+    "6" "Sudo deploy mode" "$(update_sudo_mode_label)" "Cycle deploy invocation: auto / force sudo / no-sudo."
   print_tui_option_pair "7" "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")" "ON runs npm install in deploy.sh. OFF passes --skip-deps." \
-    "8" "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")" "ON lets deploy.sh install/update managed crontab jobs. OFF passes --skip-cron."
-  print_tui_option_pair "9" "Spinner UI" "$(spinner_ui_word)" "Animated progress spinner for git/deploy wrapper steps." \
-    "10" "Edit shared .env" "Open editor now" "Bootstraps ${SHARED_DIR}/.env from .env.example if missing, then opens it."
+    "8" "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")" "ON lets deploy.sh sync managed cron jobs."
+  print_tui_option_pair "9" "Spinner UI" "$(spinner_ui_word)" "Animated progress spinner for update/deploy steps." \
+    "10" "Edit shared .env" "Open editor now" "Create shared .env from .env.example if missing, then edit."
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
   echo -e "${BOLD}${GREEN}  Bootstrap Workflow Helpers${NC}"
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
-  print_tui_option_pair "11" "Install cron/crond" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")" "When ON, Start installs/enables cron/crond before the update/deploy flow." \
-    "12" "Install app service" "$(bool_word "${INSTALL_APP_SERVICE_IF_NEEDED}")" "When ON, Start installs/updates the app systemd unit before the flow."
-  print_tui_option_pair "13" "Install cron jobs" "$(bool_word "${INSTALL_CRON_JOBS_IF_NEEDED}")" "When ON, Start installs/updates managed cron jobs before update/deploy." \
-    "14" "Install Nginx" "$(bool_word "${INSTALL_NGINX_IF_NEEDED}")" "When ON, Start installs Nginx (if missing) before the update/deploy flow."
-  print_tui_option_pair "15" "Install PHP-FPM" "$(bool_word "${INSTALL_PHP_FPM_IF_NEEDED}")" "When ON, Start installs PHP-FPM only if deploy nginx config needs it."
+  print_tui_option_pair "11" "Install cron/crond" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")" "ON: Start installs/enables cron/crond before flow." \
+    "12" "Install app service" "$(bool_word "${INSTALL_APP_SERVICE_IF_NEEDED}")" "ON: Start installs/updates app systemd unit before flow."
+  print_tui_option_pair "13" "Install cron jobs" "$(bool_word "${INSTALL_CRON_JOBS_IF_NEEDED}")" "ON: Start installs/updates managed cron jobs first." \
+    "14" "Install Nginx" "$(bool_word "${INSTALL_NGINX_IF_NEEDED}")" "ON: Start installs Nginx (if missing) before flow."
+  print_tui_option_pair "15" "Install PHP-FPM" "$(bool_word "${INSTALL_PHP_FPM_IF_NEEDED}")" "ON: Start installs PHP-FPM only if nginx config needs it."
   if [[ "${SKIP_DEPLOY}" == false ]]; then
     print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
     echo -e "${BOLD}${MAGENTA}  Deploy Pass-through Options${NC}"
     print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
-    print_tui_option_pair "16" "Database mode" "$(update_migration_mode_label)" "Cycles deploy DB behavior: migrate deploy / skip migrations / db push." \
-      "17" "SSL setup" "$(bool_word "${SSL_SETUP}")" "Passes SSL setup flags to deploy.sh to run certbot + nginx config."
+    print_tui_option_pair "16" "Database mode" "$(update_migration_mode_label)" "Cycle deploy DB mode: migrate / skip / db push." \
+      "17" "SSL setup" "$(bool_word "${SSL_SETUP}")" "Pass SSL flags to deploy.sh (certbot + nginx config)."
     if [[ "${SSL_SETUP}" == true ]]; then
-      print_tui_option_pair "18" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}" "Domain used for certificate request and nginx server_name config." \
-        "19" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}" "Email for Let's Encrypt registration and renewal alerts."
+      print_tui_option_pair "18" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}" "Domain for cert request and nginx server_name." \
+        "19" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}" "Email for Let's Encrypt registration and renewals."
     fi
   fi
   echo ""
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
   echo -e "${BOLD}${MAGENTA}  Immediate Bootstrap Actions${NC}"
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
-  print_tui_action_pair "J" "Install/update cron jobs now" "N" "Install Nginx now"
-  print_tui_action_pair "P" "Install PHP-FPM if needed now" "U" "Install/update app service"
+  print_tui_action_pair "J" "Install/update cron jobs" "N" "Install Nginx"
+  print_tui_action_pair "P" "Install PHP-FPM (if needed)" "U" "Install/update app service"
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
-  print_tui_action_pair "S" "Start update/deploy" "Q" "Cancel"
-  print_tui_hint_line "Tip: deploy.sh handles migrations/nginx sync/restarts; this menu configures wrapper + pass-through flags."
+  print_tui_action_pair "S" "Start update + deploy" "Q" "Cancel"
+  print_tui_hint_line "Tip: deploy.sh runs migrations/nginx/restarts; this menu sets wrapper + pass-through flags."
 }
 
 # Spinner start routine used by run_step for long-running git commands.

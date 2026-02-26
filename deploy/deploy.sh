@@ -1254,40 +1254,40 @@ print_deploy_tui_menu() {
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     echo -e "${BOLD}${BLUE}  Main Options${NC}"
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
-    print_tui_option_pair "1" "Branch" "${BRANCH}" "Git branch archived into the release directory and deployed." \
-        "2" "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")" "ON runs npm install in the new release. OFF skips it (faster, riskier)."
-    print_tui_option_pair "3" "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")" "ON installs/updates managed crontab jobs. OFF skips crontab sync during deploy." \
-        "4" "Database mode" "$(deploy_migration_mode_label)" "Cycles: migrate deploy -> skip migrations -> prisma db push (test/dev fallback)."
-    print_tui_option_pair "5" "Package setup" "$(bool_word "${SETUP_PACKAGES}")" "Runs deploy/setup-packages.sh before deploy (Node/Nginx/system package bootstrap)." \
-        "6" "SSL setup" "$(bool_word "${SSL_SETUP}")" "Runs certbot/nginx SSL setup after deployment completes."
+    print_tui_option_pair "1" "Branch" "${BRANCH}" "Git branch to package into the release and deploy." \
+        "2" "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")" "ON runs npm install. OFF skips it (faster, riskier)."
+    print_tui_option_pair "3" "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")" "ON syncs managed cron jobs. OFF skips cron sync." \
+        "4" "Database mode" "$(deploy_migration_mode_label)" "Cycle DB mode: migrate / skip / prisma db push."
+    print_tui_option_pair "5" "Package setup" "$(bool_word "${SETUP_PACKAGES}")" "Run setup-packages.sh before deploy (Node/Nginx/system)." \
+        "6" "SSL setup" "$(bool_word "${SSL_SETUP}")" "Run certbot + nginx SSL setup after deploy."
     if [[ "${SSL_SETUP}" == true ]]; then
         print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
         echo -e "${BOLD}${MAGENTA}  SSL Options${NC}"
         print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
-        print_tui_option_pair "7" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}" "Domain used in nginx config and Let's Encrypt certificate request." \
-            "8" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}" "Receives certificate expiry notices and Let's Encrypt registration updates."
+        print_tui_option_pair "7" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}" "Domain for nginx server_name and cert request." \
+            "8" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}" "Email for Let's Encrypt registration and renewals."
     fi
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     echo -e "${BOLD}${YELLOW}  UI Options${NC}"
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
-    print_tui_option_pair "9" "Spinner UI" "$(spinner_ui_word)" "Animated progress spinner for long commands (disable in noisy terminals/log capture)." \
-        "10" "Edit shared .env" "Open editor now" "Bootstraps ${SHARED_DIR}/.env from .env.example if missing, then opens it."
-    print_tui_option_pair "11" "MySQL + create DB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")" "When ON, Start runs MySQL install + local DB create from shared .env."
+    print_tui_option_pair "9" "Spinner UI" "$(spinner_ui_word)" "Animated progress spinner for long-running commands." \
+        "10" "Edit shared .env" "Open editor now" "Create shared .env from .env.example if missing, then edit."
+    print_tui_option_pair "11" "MySQL + create DB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")" "ON: Start installs MySQL and creates DB from shared .env."
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     echo -e "${BOLD}${GREEN}  Bootstrap Workflow Helpers${NC}"
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
-    print_tui_option_pair "12" "Install cron/crond" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")" "When ON, Start installs/enables cron/crond before the release build." \
-        "13" "Install Nginx" "$(bool_word "${INSTALL_NGINX_IF_NEEDED}")" "When ON, Start installs Nginx (if missing) before the release build."
+    print_tui_option_pair "12" "Install cron/crond" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")" "ON: Start installs/enables cron/crond before build." \
+        "13" "Install Nginx" "$(bool_word "${INSTALL_NGINX_IF_NEEDED}")" "ON: Start installs Nginx (if missing) before build."
     echo ""
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     echo -e "${BOLD}${MAGENTA}  Immediate Bootstrap Actions${NC}"
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
-    print_tui_action_pair "M" "Run MySQL + create DB now" "N" "Install Nginx now"
-    print_tui_action_pair "P" "Install PHP-FPM if needed" "U" "Install/update app service"
-    print_tui_action_pair "J" "Install/update cron jobs now"
+    print_tui_action_pair "M" "Run MySQL + create DB" "N" "Install Nginx"
+    print_tui_action_pair "P" "Install PHP-FPM (if needed)" "U" "Install/update app service"
+    print_tui_action_pair "J" "Install/update cron jobs"
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     print_tui_action_pair "S" "Start deploy" "Q" "Cancel"
-    print_tui_hint_line "Tip: immediate actions run now; options 11-13 are workflow toggles for Start deploy."
+    print_tui_hint_line "Tip: actions run now; options 11-13 are Start deploy toggles."
 }
 
 # Ask for deploy options in a TTY using a menu-style terminal UI so one command
