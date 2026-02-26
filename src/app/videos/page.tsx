@@ -35,7 +35,7 @@ export default function VideosPage() {
       visualClassName="teacher-hero"
       leadJustified
     >
-      <p className="helper-text" data-motion-item="videos-helper-text">
+      <p className="helper-text copy-justify" data-motion-item="videos-helper-text">
         Original music on SoundCloud is written, arranged, performed, mixed, and mastered by Jon King.
       </p>
 

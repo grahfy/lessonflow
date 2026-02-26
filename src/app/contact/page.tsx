@@ -55,7 +55,7 @@ export default function ContactPage() {
         <li data-motion-item="contact-formats">Lesson formats: In-person (VIC) and online (Australia)</li>
       </ul>
 
-      <p className="helper-text" data-motion-item="contact-helper-copy">
+      <p className="helper-text copy-justify" data-motion-item="contact-helper-copy">
         If you are unsure where to start, send a quick message about your current level, the styles you enjoy, and what you want to achieve. We can help you choose the right guitar tuition format and a practical, motivating first step.
       </p>
 
