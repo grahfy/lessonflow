@@ -2975,6 +2975,15 @@ h1 {
 
 .report-date-range-row {
   display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  align-items: start;
+}
+
+.report-date-range-row .field label {
+  font-size: 0.75rem;
+}
+  display: grid;
   grid-template-columns: minmax(0, 170px) minmax(0, 170px) auto;
   gap: 8px;
   align-items: end;
@@ -3065,10 +3074,18 @@ h1 {
   display: flex;
   justify-content: space-between;
   gap: 12px;
+  font-size: 0.75rem;
+}
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
   font-size: 0.86rem;
 }
 
 .report-comparison-label {
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 0.72rem;
+}
   color: rgba(255, 255, 255, 0.74);
 }
 

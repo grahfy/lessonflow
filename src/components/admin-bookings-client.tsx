@@ -1102,15 +1102,15 @@ export function AdminBookingsClient() {
   }
 
   /**
-   * Uploads one audio/PDF material for the selected customer appointment.
+   * Uploads one audio/PDF material for the selected customer, optionally linking it to an appointment.
    */
   async function uploadLearningMaterial() {
     const formElement = materialsUploadFormRef.current;
     if (!formElement) {
       return;
     }
-    if (!materialsCustomerId || !materialsBookingId) {
-      setError("Select a customer and an appointment before uploading.");
+    if (!materialsCustomerId) {
+      setError("Select a customer before uploading.");
       return;
     }
 
@@ -1120,7 +1120,11 @@ export function AdminBookingsClient() {
       setError("Choose a PDF or audio file to upload.");
       return;
     }
-    form.set("bookingId", materialsBookingId);
+    if (materialsBookingId) {
+      form.set("bookingId", materialsBookingId);
+    } else {
+      form.delete("bookingId");
+    }
 
     setMaterialsUploading(true);
     setError("");
