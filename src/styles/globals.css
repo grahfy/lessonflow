@@ -2983,13 +2983,13 @@ h1 {
 .report-date-range-row .field label {
   font-size: 0.75rem;
 }
+
+.report-custom-range-buttons {
   display: grid;
   grid-template-columns: minmax(0, 170px) minmax(0, 170px) auto;
   gap: 8px;
   align-items: end;
 }
-
-.report-date-range-actions {
   align-self: end;
 }
 
