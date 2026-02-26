@@ -22,7 +22,7 @@ export default function LessonsPage() {
       visualClassName="lessons-hero"
       leadJustified={true}
     >
-      <p className="helper-text" data-motion-item="lessons-helper-text">
+      <p className="helper-text copy-justify" data-motion-item="lessons-helper-text">
         Lessons can include song learning, rhythm guitar, lead guitar, improvisation, technique development, ear training, tone guidance, and smart practice planning. The focus is steady progress and musical confidence, not just collecting theory or random tips.
       </p>
       <div className="card-grid" data-motion-item="lessons-cards">
