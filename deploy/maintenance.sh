@@ -94,7 +94,16 @@ BTOP_YELLOW='\033[1;33m'
 
 
 # Box drawing
-BOX_TL='╭'
+# Box drawing
+BOX_TL='┌'
+BOX_TR='┐'
+BOX_BL='└'
+BOX_BR='┘'
+BOX_H='─'
+BOX_V='│'
+BOX_VR='├'
+BOX_VL='┤'
+
 BOX_TR='╮'
 BOX_BL='╰'
 BOX_BR='╯'
@@ -717,12 +726,46 @@ print_btop_main_menu() {
   local width="${MAINTENANCE_TUI_PANEL_WIDTH}"
   local inner_width=$((width - 2))
   local i
+
   # Header
-  printf "${BTOP_FG}${BOX_TL}"; for ((i=0; i<inner_width; i++)); do printf "${BOX_H}"; done; printf "${BOX_TR}\n"
-  printf "${BOX_V} %*s%s%*s ${BOX_V}\n" $(( (inner_width - 22) / 2 )) "" "LessonFlow Maintenance" $(( (inner_width - 22 + 1) / 2 )) ""
-  printf "${BOX_VR}"; for ((i=0; i<inner_width; i++)); do printf "${BOX_H}"; done; printf "${BOX_VL}\n"
-  printf "${BOX_V} CPU $(draw_mini_bar "$cpu" 12) %3d%%  MEM $(draw_mini_bar "$mem" 12) %3d%%  DISK $(draw_mini_bar "$disk" 12) %3d%% %*s ${BOX_V}\n" "$cpu" "$mem" "$disk" $((inner_width - 70)) ""
-  printf "${BTOP_FG}${BOX_BL}"; for ((i=0; i<inner_width; i++)); do printf "${BOX_H}"; done; printf "${BOX_BR}\n\n"
+  printf "${BTOP_FG}${BOX_TL}"
+  for ((i=0; i<inner_width; i++)); do printf "${BOX_H}"; done
+  printf "${BOX_TR}\n"
+
+  # Title line (Center text)
+  local title="LessonFlow Maintenance"
+  local title_len=${#title}
+  local pad_total=$((inner_width - title_len))
+  local pad1=$((pad_total / 2))
+  local pad2=$((pad_total - pad1))
+  printf "${BTOP_FG}${BOX_V}%*s%s%*s${BOX_V}\n" "${pad1}" "" "${title}" "${pad2}" ""
+
+  printf "${BTOP_FG}${BOX_VR}"
+  for ((i=0; i<inner_width; i++)); do printf "${BOX_H}"; done
+  printf "${BOX_VL}\n"
+
+  # Stats row
+  local cpu_bar; cpu_bar=$(draw_mini_bar "$cpu" 12)
+  local mem_bar; mem_bar=$(draw_mini_bar "$mem" 12)
+  local disk_bar; disk_bar=$(draw_mini_bar "$disk" 12)
+  
+  # Format the visible parts of the row. We must be very precise with spaces.
+  # 1 (vertical) + 5 (" CPU ") + 12 (bar) + 6 (" 100% ") + 6 (" MEM ") + 12 (bar) + 6 (" 100% ") + 7 (" DISK ") + 12 (bar) + 5 (" 100% ") + padding + 1 (vertical)
+  # Simplified: stats string with ANSI codes.
+  local stats_output
+  printf -v stats_output " CPU %b %3d%%  MEM %b %3d%%  DISK %b %3d%%" "${cpu_bar}" "$cpu" "${mem_bar}" "$mem" "${disk_bar}" "$disk"
+  
+  # The visible length of stats_output is 5 + 12 + 6 + 6 + 12 + 6 + 7 + 12 + 5 = 71
+  local visible_len=71
+  local stats_pad=$((inner_width - visible_len))
+  [[ $stats_pad -lt 0 ]] && stats_pad=0
+  
+  printf "${BTOP_FG}${BOX_V}%b%*s${BOX_V}\n" "${stats_output}" "${stats_pad}" ""
+
+  printf "${BTOP_FG}${BOX_BL}"
+  for ((i=0; i<inner_width; i++)); do printf "${BOX_H}"; done
+  printf "${BOX_BR}\n\n"
+
   draw_btop_separator "${width}" " BACKUP & RESTORE "
   draw_btop_menu_item "1" "Run Backup" "Create .tar.xz archive" "Ready" "${width}"
   draw_btop_menu_item "2" "Restore Backup" "Restore local/cloud" "Ready" "${width}"
