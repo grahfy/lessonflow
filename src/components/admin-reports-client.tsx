@@ -605,16 +605,16 @@ export function AdminReportsClient() {
       </div>
 
       <div className="admin-card report-controls-card">
-        <div className="field">
+        <div className="field report-format-field">
           <label>Date format</label>
           <select value={dateFormat} onChange={(event) => setDateFormat(event.target.value as ReportDateFormat)}>
             <option value="readable">Readable (e.g. 25 Feb 2026)</option>
             <option value="ddmmyy">DD/MM/YY</option>
           </select>
         </div>
-        <div className="field report-compare-field">
+        <div className="field report-compare-field report-custom-range-field">
           <label>Custom date range (admin)</label>
-          <div className="booking-row">
+          <div className="report-date-range-row">
             <div className="field">
               <label>Start</label>
               <input
@@ -633,7 +633,7 @@ export function AdminReportsClient() {
                 onChange={(event) => setRangeEnd(event.target.value)}
               />
             </div>
-            <div className="button-row">
+            <div className="button-row report-date-range-actions">
               <button className="btn btn-secondary" type="button" onClick={applyCustomRange} disabled={loading || refreshing}>
                 Apply Range
               </button>
@@ -646,7 +646,7 @@ export function AdminReportsClient() {
             Adds a custom range summary card while keeping the standard daily/weekly/monthly/yearly reports below.
           </p>
         </div>
-        <div className="field report-compare-field">
+        <div className="field report-compare-field report-compare-toggle-field">
           <label>Compare views (admin)</label>
           <div className="report-toggle-group">
             {(["daily", "weekly", "monthly", "yearly"] as TrendGrainKey[]).map((key) => (

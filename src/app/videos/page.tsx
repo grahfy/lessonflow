@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { TweenLink } from "@/components/motion/tween-link";
 import { PanelLayout } from "@/components/panel-layout";
+import { VideosGridModal } from "@/components/videos-grid-modal";
 import { buildPublicPageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = buildPublicPageMetadata({
@@ -38,24 +39,7 @@ export default function VideosPage() {
         Original music on SoundCloud is written, arranged, performed, mixed, and mastered by Jon King.
       </p>
 
-      <div className="card-grid" data-motion-item="videos-grid">
-        {youtubeEmbeds.map((video) => (
-          <article className="info-card video-card" data-motion-item="video-card" key={video.id}>
-            <h3>{video.title}</h3>
-            <div className="video-embed-frame">
-              <iframe
-                title={video.title}
-                src={`https://www.youtube-nocookie.com/embed/${video.id}`}
-                className="video-embed"
-                loading="lazy"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                referrerPolicy="strict-origin-when-cross-origin"
-                allowFullScreen
-              />
-            </div>
-          </article>
-        ))}
-      </div>
+      <VideosGridModal videos={youtubeEmbeds} />
 
       <div className="button-row" data-motion-item="videos-actions">
         <TweenLink className="btn btn-primary" href="/book" data-motion-item="videos-action-book">

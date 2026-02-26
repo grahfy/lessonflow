@@ -423,6 +423,7 @@ export function ownerDailyDigestTemplate(input: {
 function reportPeriodTitle(period: AdminReportPeriodKey): string {
   if (period === "daily") return "Daily";
   if (period === "weekly") return "Weekly";
+  if (period === "yearly") return "Yearly";
   return "Monthly";
 }
 
@@ -435,6 +436,49 @@ export function ownerOperationsReportTemplate(input: {
   report: PeriodReport;
   trend: TrendPoint[];
 }) {
+  const reportTime = (iso: string) =>
+    new Intl.DateTimeFormat("en-AU", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "Australia/Melbourne"
+    }).format(new Date(iso));
+
+  const appointmentListHtml = (rows: Array<{ time: string; customerName: string }>, empty: string) =>
+    rows.length
+      ? `<ul style="margin:6px 0 0;padding-left:18px;">${rows
+          .map(
+            (row) =>
+              `<li style="margin:0 0 4px;"><strong>${escapeHtml(reportTime(row.time))}</strong> - ${escapeHtml(row.customerName)}</li>`
+          )
+          .join("")}</ul>`
+      : `<p style="margin:6px 0 0;color:#41506f;">${escapeHtml(empty)}</p>`;
+
+  const outstandingInvoiceRowsHtml = input.report.details.outstandingInvoices.length
+    ? `<table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;margin-top:8px;">
+         <thead>
+           <tr>
+             <th align="left" style="padding:0 6px 6px 0;font-size:12px;color:#6b7892;">Invoice</th>
+             <th align="left" style="padding:0 6px 6px 0;font-size:12px;color:#6b7892;">Customer</th>
+             <th align="right" style="padding:0 6px 6px 0;font-size:12px;color:#6b7892;">Amount</th>
+             <th align="right" style="padding:0 0 6px 0;font-size:12px;color:#6b7892;">Days overdue</th>
+           </tr>
+         </thead>
+         <tbody>
+           ${input.report.details.outstandingInvoices
+             .map(
+               (row) => `
+                 <tr>
+                   <td style="padding:6px 6px 6px 0;border-top:1px solid #edf1f8;font-size:12px;color:#16233d;">${escapeHtml(row.invoiceNumber)}</td>
+                   <td style="padding:6px 6px 6px 0;border-top:1px solid #edf1f8;font-size:12px;color:#41506f;">${escapeHtml(row.customerName)}</td>
+                   <td style="padding:6px 6px 6px 0;border-top:1px solid #edf1f8;font-size:12px;color:#16233d;text-align:right;">${money(row.amountCents)}</td>
+                   <td style="padding:6px 0;border-top:1px solid #edf1f8;font-size:12px;color:#16233d;text-align:right;">${row.daysOverdue}</td>
+                 </tr>`
+             )
+             .join("")}
+         </tbody>
+       </table>`
+    : `<p style="margin:8px 0 0;color:#41506f;">No outstanding invoices.</p>`;
+
   const trendMaxAppointments = Math.max(1, ...input.trend.map((point) => point.appointments));
   const trendMaxEarnings = Math.max(1, ...input.trend.map((point) => point.earningsNetCents));
 
@@ -490,6 +534,18 @@ export function ownerOperationsReportTemplate(input: {
             <p style="margin:0 0 4px;">Upcoming confirmed appointments: ${input.report.appointmentPipeline.upcomingConfirmedCount}</p>
             <p style="margin:0 0 4px;">Confirmed appointments (${escapeHtml(input.report.label)}): ${input.report.appointments.confirmedCount}</p>
             <p style="margin:0;">Cancelled appointments (${escapeHtml(input.report.label)}): ${input.report.appointments.cancelledCount}</p>
+            <div style="margin-top:10px;padding-top:10px;border-top:1px solid #edf1f8;">
+              <p style="margin:0 0 6px;"><strong>Pending appointments (time + customer)</strong></p>
+              ${appointmentListHtml(input.report.details.pendingAppointments, "No pending appointments.")}
+            </div>
+            <div style="margin-top:10px;padding-top:10px;border-top:1px solid #edf1f8;">
+              <p style="margin:0 0 6px;"><strong>Upcoming confirmed appointments (time + customer)</strong></p>
+              ${appointmentListHtml(input.report.details.upcomingConfirmedAppointments, "No upcoming confirmed appointments.")}
+            </div>
+            <div style="margin-top:10px;padding-top:10px;border-top:1px solid #edf1f8;">
+              <p style="margin:0 0 6px;"><strong>Cancelled appointments in report period (time + customer)</strong></p>
+              ${appointmentListHtml(input.report.details.cancelledAppointments, "No cancelled appointments in this report period.")}
+            </div>
           </div>
 
           <div style="padding:12px;border:1px solid #e3e8f3;border-radius:10px;background:#f8fbff;">
@@ -498,6 +554,7 @@ export function ownerOperationsReportTemplate(input: {
             <p style="margin:0 0 4px;">Outstanding total: ${money(input.report.outstandingInvoices.totalCents)}</p>
             <p style="margin:0 0 4px;">Overdue count: ${input.report.outstandingInvoices.overdueCount}</p>
             <p style="margin:0;">Overdue total: ${money(input.report.outstandingInvoices.overdueTotalCents)}</p>
+            ${outstandingInvoiceRowsHtml}
           </div>
 
           <div style="padding:12px;border:1px solid #e3e8f3;border-radius:10px;background:#f8fbff;">

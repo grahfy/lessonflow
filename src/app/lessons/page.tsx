@@ -17,6 +17,7 @@ export default function LessonsPage() {
       kicker="Lesson Paths"
       title="A lesson path that meets you where you are and grows with your sound."
       lead="Every program is tailored to your level, goals, and musical taste. We build technique, timing, fretboard fluency, and performance confidence through practical playing instead of disconnected exercises. The result is a lesson experience that feels creative, focused, and directly tied to the music you want to make."
+      viewClassName="view-lessons-page"
       visualLabel="Lesson"
       visualClassName="lessons-hero"
     >
@@ -37,6 +38,23 @@ export default function LessonsPage() {
           <p>Refine speed, improvisation, articulation, and advanced techniques for polished, performance-ready playing. Dial in the details that turn strong players into distinctive players.</p>
         </article>
       </div>
+
+      <section className="lesson-pricing-card" data-motion-item="lessons-pricing" aria-label="Lesson pricing">
+        <h3>Guitar Lesson Prices</h3>
+        <div className="lesson-pricing-grid">
+          <div>
+            <h4>30 minute Guitar lessons</h4>
+            <p>5 lessons - $200 ($40 each)</p>
+            <p>10 lessons - $388 ($38.80 each)</p>
+          </div>
+          <div>
+            <h4>1 Hour Guitar lessons</h4>
+            <p>5 lessons - $375 ($75 each)</p>
+            <p>10 lessons - $725 ($72.50 each)</p>
+          </div>
+        </div>
+        <p className="lesson-pricing-note">Gift vouchers are available.</p>
+      </section>
 
       <div className="button-row" data-motion-item="lessons-actions">
         <TweenLink className="btn btn-primary" href="/book" data-motion-item="lessons-action-start">

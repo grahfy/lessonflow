@@ -183,31 +183,112 @@ a {
 @media (min-width: 1101px) {
   .view-book-page .view-stage {
     min-height: 0;
+    grid-template-columns: 1fr;
   }
 
   .view-book-page .panel-copy {
+    min-height: 0;
+    overflow-y: visible;
+    justify-content: flex-start;
+    align-content: start;
+    padding: clamp(14px, 1.8vw, 22px);
+    gap: 8px;
+  }
+
+  .view-book-page h1 {
+    font-size: clamp(1.55rem, 2vw, 2.3rem);
+    line-height: 1.03;
+  }
+
+  .view-book-page .lead {
+    font-size: 0.84rem;
+    line-height: 1.24;
+    max-width: none;
+  }
+
+  .view-book-page .helper-text {
+    font-size: 0.68rem;
+    line-height: 1.18;
+    margin: 0;
+  }
+
+  .view-book-page .form-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .view-book-page .field {
+    gap: 4px;
+  }
+
+  .view-book-page .field label {
+    font-size: 0.72rem;
+    line-height: 1.1;
+  }
+
+  .view-book-page .field input,
+  .view-book-page .field select,
+  .view-book-page .field textarea {
+    padding: 7px 9px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+  }
+
+  .view-book-page .field textarea {
+    min-height: 64px;
+  }
+
+  .view-book-page .field.field-compact input,
+  .view-book-page .field.field-compact select {
+    max-width: none;
+  }
+
+  .view-book-page .btn {
+    padding: 9px 14px;
+    font-size: 0.76rem;
+  }
+
+  .view-book-page .button-row {
+    gap: 8px;
+    padding-top: 0;
+  }
+
+  .view-book-page .form-required-note {
+    font-size: 0.66rem;
+    margin-top: -2px;
+  }
+
+  .view-book-page .captcha-card {
+    padding: 8px;
+  }
+
+  .view-book-page .captcha-card p,
+  .view-book-page .captcha-card label {
+    font-size: 0.7rem;
+  }
+
+  .view-lessons-page .view-stage {
+    min-height: 0;
+  }
+
+  .view-lessons-page .panel-copy {
     min-height: 0;
     overflow-y: auto;
     justify-content: flex-start;
     align-content: start;
     scrollbar-gutter: stable;
-    padding: clamp(16px, 2.2vw, 28px);
+    padding: clamp(18px, 2.4vw, 30px);
     gap: 10px;
   }
 
-  .view-book-page h1 {
-    font-size: clamp(1.8rem, 2.8vw, 3.3rem);
-    line-height: 1.04;
+  .view-lessons-page h1 {
+    font-size: clamp(1.85rem, 2.9vw, 3.2rem);
+    line-height: 1.05;
   }
 
-  .view-book-page .lead {
-    font-size: clamp(0.92rem, 1.05vw, 1.03rem);
-    line-height: 1.32;
-    max-width: 52ch;
-  }
-
-  .view-book-page .helper-text {
-    font-size: 0.72rem;
+  .view-lessons-page .lead {
+    font-size: clamp(0.9rem, 1vw, 1rem);
+    line-height: 1.34;
   }
 
   /* Keep the videos page panel at the same visible shell height as other public
@@ -257,6 +338,16 @@ a {
 
   .view-contact-page .field textarea {
     min-height: 100px;
+  }
+}
+
+@media (min-width: 1101px) and (max-width: 1380px) {
+  .view-book-page .form-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .view-book-page .field textarea {
+    min-height: 72px;
   }
 }
 
@@ -490,9 +581,69 @@ h1 {
   line-height: 1.4;
 }
 
+.lesson-pricing-card {
+  margin-top: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.lesson-pricing-card h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-family: "Space Grotesk", "Sora", sans-serif;
+}
+
+.lesson-pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.lesson-pricing-grid > div {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 10px;
+  display: grid;
+  gap: 4px;
+}
+
+.lesson-pricing-grid h4 {
+  margin: 0 0 4px;
+  font-size: 0.86rem;
+  color: #edf3ff;
+}
+
+.lesson-pricing-grid p {
+  margin: 0;
+  color: var(--ink-1);
+  font-size: 0.82rem;
+  line-height: 1.3;
+}
+
+.lesson-pricing-note {
+  margin: 0;
+  color: #e8eefc;
+  font-size: 0.84rem;
+}
+
 .video-card {
   display: grid;
   gap: 10px;
+}
+
+.video-launch-button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  text-align: left;
 }
 
 .video-embed-frame {
@@ -505,12 +656,62 @@ h1 {
   background: rgba(255, 255, 255, 0.02);
 }
 
+.video-thumb-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.video-thumb-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: "Space Grotesk", "Sora", sans-serif;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f3f6ff;
+  background:
+    radial-gradient(circle at center, rgba(8, 12, 28, 0.12) 0 18%, rgba(8, 12, 28, 0.65) 58%, rgba(8, 12, 28, 0.78) 100%);
+}
+
+.video-launch-button:hover .video-thumb-overlay,
+.video-launch-button:focus-visible .video-thumb-overlay {
+  background:
+    radial-gradient(circle at center, rgba(59, 113, 255, 0.18) 0 18%, rgba(10, 17, 40, 0.62) 58%, rgba(8, 12, 28, 0.82) 100%);
+}
+
+.video-launch-button:focus-visible {
+  outline: 2px solid rgba(140, 160, 255, 0.65);
+  outline-offset: 4px;
+  border-radius: 14px;
+}
+
 .video-embed {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   border: 0;
+}
+
+.video-modal-content {
+  width: min(96vw, 1100px);
+  max-width: none;
+}
+
+.video-modal-frame {
+  position: relative;
+  width: min(96vw, 1040px);
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: #050814;
 }
 
 .list {
@@ -2048,6 +2249,7 @@ h1 {
   max-height: none;
   min-height: 0;
   height: 100%;
+  align-content: start;
 }
 
 .invoice-item {
@@ -2058,6 +2260,7 @@ h1 {
   column-gap: 10px;
   row-gap: 0;
   align-items: start;
+  align-self: start;
   padding: 6px 8px;
 }
 
@@ -2399,6 +2602,10 @@ h1 {
     grid-template-columns: 1fr;
   }
 
+  .lesson-pricing-grid {
+    grid-template-columns: 1fr;
+  }
+
   .metrics {
     gap: 8px;
   }
@@ -2730,8 +2937,35 @@ h1 {
 }
 
 .report-controls-card {
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1.25fr) minmax(0, 0.95fr);
   align-items: start;
+}
+
+.report-format-field {
+  max-width: 240px;
+}
+
+.report-custom-range-field {
+  min-width: 0;
+}
+
+.report-date-range-row {
+  display: grid;
+  grid-template-columns: minmax(0, 170px) minmax(0, 170px) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.report-date-range-actions {
+  align-self: end;
+}
+
+.report-date-range-actions .btn {
+  white-space: nowrap;
+}
+
+.report-compare-toggle-field {
+  min-width: 0;
 }
 
 .report-toolbar-title {
@@ -2930,6 +3164,18 @@ h1 {
 
   .report-controls-card {
     grid-template-columns: 1fr;
+  }
+
+  .report-format-field {
+    max-width: none;
+  }
+
+  .report-date-range-row {
+    grid-template-columns: 1fr;
+  }
+
+  .report-date-range-actions {
+    align-self: stretch;
   }
 }
 

@@ -20,10 +20,10 @@ export type NavItem = {
  */
 export const publicRouteOrder = [
   "/",
-  "/videos",
   "/lessons",
-  "/teacher",
   "/vouchers",
+  "/teacher",
+  "/videos",
   "/contact",
   "/book",
   "/terms",
@@ -68,10 +68,10 @@ export const sharedVisualImageUrls = [
  */
 export const navItems: NavItem[] = [
   { href: "/", label: "Home" },
-  { href: "/videos", label: "Videos" },
   { href: "/lessons", label: "Lessons" },
-  { href: "/teacher", label: "Teacher" },
   { href: "/vouchers", label: "Gift Vouchers" },
+  { href: "/teacher", label: "Teacher" },
+  { href: "/videos", label: "Videos" },
   { href: "/contact", label: "Contact" },
   { href: "/terms", label: "Terms" },
   { href: "/student/login", label: "Student Portal" }

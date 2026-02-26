@@ -55,6 +55,17 @@ export type ReportMetricSnapshot = {
     creditNotePaidCents: number;
     paidDocumentCount: number;
   };
+  details: {
+    pendingAppointments: Array<{ time: string; customerName: string }>;
+    upcomingConfirmedAppointments: Array<{ time: string; customerName: string }>;
+    cancelledAppointments: Array<{ time: string; customerName: string }>;
+    outstandingInvoices: Array<{
+      invoiceNumber: string;
+      customerName: string;
+      amountCents: number;
+      daysOverdue: number;
+    }>;
+  };
 };
 
 export type ReportComparison = {
@@ -103,6 +114,15 @@ export type AdminReportsDashboard = {
 };
 
 const OUTSTANDING_INVOICE_STATUSES: InvoiceStatus[] = ["draft", "sent"];
+
+function parseReportEmailRowLimit(value: string | undefined, fallback: number, min = 1, max = 50): number {
+  const parsed = Number.parseInt(String(value || ""), 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+const REPORT_EMAIL_APPOINTMENT_ROWS = parseReportEmailRowLimit(process.env.ADMIN_REPORT_EMAIL_APPOINTMENT_ROWS, 10);
+const REPORT_EMAIL_OUTSTANDING_INVOICE_ROWS = parseReportEmailRowLimit(process.env.ADMIN_REPORT_EMAIL_OUTSTANDING_INVOICE_ROWS, 12);
 
 function periodBounds(period: AdminReportPeriodKey, now: Date): PeriodBounds {
   if (period === "daily") {
@@ -213,6 +233,62 @@ async function getAppointmentPipelineSnapshot(now: Date) {
   return { pendingRequestCount, upcomingConfirmedCount };
 }
 
+async function getAppointmentDetailRows(start: Date, end: Date, now: Date) {
+  const [pendingAppointments, upcomingConfirmedAppointments, cancelledAppointments] = await Promise.all([
+    prisma.bookingRequest.findMany({
+      where: { status: "pending" },
+      orderBy: { requestedStartAt: "asc" },
+      take: REPORT_EMAIL_APPOINTMENT_ROWS,
+      select: {
+        requestedStartAt: true,
+        name: true
+      }
+    }),
+    prisma.booking.findMany({
+      where: {
+        status: "approved",
+        startAt: { gte: now }
+      },
+      orderBy: { startAt: "asc" },
+      take: REPORT_EMAIL_APPOINTMENT_ROWS,
+      select: {
+        startAt: true,
+        name: true
+      }
+    }),
+    prisma.booking.findMany({
+      where: {
+        status: "cancelled",
+        startAt: {
+          gte: start,
+          lte: end
+        }
+      },
+      orderBy: { startAt: "asc" },
+      take: REPORT_EMAIL_APPOINTMENT_ROWS,
+      select: {
+        startAt: true,
+        name: true
+      }
+    })
+  ]);
+
+  return {
+    pendingAppointments: pendingAppointments.map((row) => ({
+      time: row.requestedStartAt.toISOString(),
+      customerName: row.name
+    })),
+    upcomingConfirmedAppointments: upcomingConfirmedAppointments.map((row) => ({
+      time: row.startAt.toISOString(),
+      customerName: row.name
+    })),
+    cancelledAppointments: cancelledAppointments.map((row) => ({
+      time: row.startAt.toISOString(),
+      customerName: row.name
+    }))
+  };
+}
+
 async function getEarningsForWindow(start: Date, end: Date) {
   const paidDocs = await prisma.invoice.findMany({
     where: {
@@ -281,12 +357,40 @@ async function getOutstandingSnapshot(now: Date) {
   };
 }
 
+async function getOutstandingInvoiceDetailRows(now: Date) {
+  const rows = await prisma.invoice.findMany({
+    where: {
+      isDeleted: false,
+      documentType: "invoice",
+      status: { in: OUTSTANDING_INVOICE_STATUSES }
+    },
+    orderBy: [{ dueAt: "asc" }, { invoiceNumber: "asc" }],
+    take: REPORT_EMAIL_OUTSTANDING_INVOICE_ROWS,
+    select: {
+      invoiceNumber: true,
+      customerName: true,
+      totalCents: true,
+      dueAt: true
+    }
+  });
+
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return rows.map((row) => ({
+    invoiceNumber: row.invoiceNumber,
+    customerName: row.customerName,
+    amountCents: row.totalCents,
+    daysOverdue: Math.max(0, Math.floor((now.getTime() - row.dueAt.getTime()) / msPerDay))
+  }));
+}
+
 async function buildPeriodMetrics(bounds: PeriodBounds, now: Date): Promise<PeriodReport> {
-  const [appointments, appointmentPipeline, earnings, outstandingInvoices, previousAppointments, previousEarnings] = await Promise.all([
+  const [appointments, appointmentPipeline, appointmentDetails, earnings, outstandingInvoices, outstandingInvoiceDetails, previousAppointments, previousEarnings] = await Promise.all([
     getAppointmentCountsForWindow(bounds.start, bounds.end),
     getAppointmentPipelineSnapshot(now),
+    getAppointmentDetailRows(bounds.start, bounds.end, now),
     getEarningsForWindow(bounds.start, bounds.end),
     getOutstandingSnapshot(now),
+    getOutstandingInvoiceDetailRows(now),
     getAppointmentCountsForWindow(bounds.previousStart, bounds.previousEnd),
     getEarningsForWindow(bounds.previousStart, bounds.previousEnd)
   ]);
@@ -308,6 +412,10 @@ async function buildPeriodMetrics(bounds: PeriodBounds, now: Date): Promise<Peri
     appointmentPipeline,
     outstandingInvoices,
     earnings,
+    details: {
+      ...appointmentDetails,
+      outstandingInvoices: outstandingInvoiceDetails
+    },
     comparison: {
       previousLabel: bounds.previousLabel,
       previousStart: bounds.previousStart.toISOString(),
@@ -326,11 +434,13 @@ async function buildCustomPeriodMetrics(start: Date, end: Date, now: Date): Prom
   const previousStart = startOfDay(subDays(startDate, daySpan));
   const previousEnd = endOfDay(subDays(startDate, 1));
 
-  const [appointments, appointmentPipeline, earnings, outstandingInvoices, previousAppointments, previousEarnings] = await Promise.all([
+  const [appointments, appointmentPipeline, appointmentDetails, earnings, outstandingInvoices, outstandingInvoiceDetails, previousAppointments, previousEarnings] = await Promise.all([
     getAppointmentCountsForWindow(startDate, endDate),
     getAppointmentPipelineSnapshot(now),
+    getAppointmentDetailRows(startDate, endDate, now),
     getEarningsForWindow(startDate, endDate),
     getOutstandingSnapshot(now),
+    getOutstandingInvoiceDetailRows(now),
     getAppointmentCountsForWindow(previousStart, previousEnd),
     getEarningsForWindow(previousStart, previousEnd)
   ]);
@@ -352,6 +462,10 @@ async function buildCustomPeriodMetrics(start: Date, end: Date, now: Date): Prom
     appointmentPipeline,
     outstandingInvoices,
     earnings,
+    details: {
+      ...appointmentDetails,
+      outstandingInvoices: outstandingInvoiceDetails
+    },
     comparison: {
       previousLabel: `Previous ${daySpan}-day period (${format(previousStart, "d MMM yyyy")} - ${format(previousEnd, "d MMM yyyy")})`,
       previousStart: previousStart.toISOString(),
