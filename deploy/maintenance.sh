@@ -315,7 +315,9 @@ get_process_count() { grep -c '^proc' /proc/stat 2>/dev/null || echo "1"; }
 draw_mini_bar() {
   local p="$1" w="${2:-15}"
   ((p = p < 0 ? 0 : p > 100 ? 100 : p))
-  local filled=$(( (p * w) / 100 )) empty=$(( w - filled ))
+  local filled=$(( (p * w) / 100 ))
+  local empty=$(( w - filled ))
+
   local bar=""
   local i
   for ((i=0; i<filled; i++)); do bar+="${BTOP_GREEN}${BLOCK_FULL}"; done
@@ -457,7 +459,11 @@ upload_to_koofr() {
 }
 
 create_backup_archive() {
-  local ts="$1" bn="backup-${ts}" td="$(mktemp -d)" af="${BACKUP_DIR}/${bn}.tar.xz"
+  local ts="$1"
+  local bn="backup-${ts}"
+  local td="$(mktemp -d)"
+  local af="${BACKUP_DIR}/${bn}.tar.xz"
+
   mkdir -p "${td}/${bn}"
   [[ "${BACKUP_INCLUDE_SQL}" == "true" ]] && { log_info "SQL dump..."; create_database_dump "${td}/${bn}/database.sql" || log_warn "SQL failed"; }
   [[ "${BACKUP_INCLUDE_ENV}" == "true" && -f "${SHARED_DIR}/.env" ]] && cp "${SHARED_DIR}/.env" "${td}/${bn}/"
@@ -567,7 +573,9 @@ draw_btop_separator() {
   if [[ -z "${label}" ]]; then
     printf "${BTOP_FG}%s" "${BOX_VR}"; local i; for ((i=0; i<width-2; i++)); do printf "${BOX_H}"; done; printf "${BOX_VL}\n"
   else
-    local label_len=${#label} line_len=$(( (width - 2 - label_len - 4) / 2 ))
+    local label_len=${#label}
+    local line_len=$(( (width - 2 - label_len - 4) / 2 ))
+
     printf "${BTOP_FG}%s" "${BOX_VR}"; for ((i=0; i<line_len; i++)); do printf "${BOX_H}"; done; printf " ${BTOP_PURPLE}%s ${BTOP_FG}" "${label}"
     local remaining=$((width - 2 - line_len - label_len - 4)); for ((i=0; i<remaining; i++)); do printf "${BOX_H}"; done; printf "${BOX_VL}\n"
   fi
@@ -575,7 +583,10 @@ draw_btop_separator() {
 
 draw_btop_menu_item() {
   local key="$1" label="$2" description="$3" status="$4" width="$5"
-  local label_width=28 desc_width=$((width - label_width - 25)) key_width=4
+  local label_width=28
+  local desc_width=$((width - label_width - 25))
+  local key_width=4
+
   printf "${BTOP_FG}%s" "${BOX_V}"; printf " ${BTOP_YELLOW}[${key}]${BTOP_FG} "; printf "${BTOP_CYAN_BRIGHT}%-${label_width}s${BTOP_FG}" "${label}"
   [[ -n "${status}" ]] && printf "${BTOP_GREEN}●${BTOP_FG} %-12s" "${status}" || printf "%-14s" ""
   local desc_trunc="$(tui_truncate_text "${description}" "${desc_width}")"
