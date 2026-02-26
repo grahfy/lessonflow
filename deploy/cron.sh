@@ -13,6 +13,7 @@
 #   0 8 * * 1 /var/www/melbourne-guitar-school/current/deploy/cron.sh admin-reports-weekly
 #   15 8 1 * * /var/www/melbourne-guitar-school/current/deploy/cron.sh admin-reports-monthly
 #   30 8 1 1 * /var/www/melbourne-guitar-school/current/deploy/cron.sh admin-reports-yearly
+#   0 2 * * * /var/www/melbourne-guitar-school/current/deploy/cron.sh generate-sitemap
 # =============================================================================
 
 set -euo pipefail
@@ -101,9 +102,12 @@ case "${JOB_TYPE}" in
     admin-reports-yearly)
         ENDPOINT="/api/jobs/admin-reports/yearly"
         ;;
+    generate-sitemap)
+        ENDPOINT="/api/jobs/generate-sitemap"
+        ;;
     *)
         log "ERROR: Unknown job type: ${JOB_TYPE}"
-        echo "Usage: $0 {daily-bookings-digest|invoice-reminders|admin-reports-daily|admin-reports-weekly|admin-reports-monthly|admin-reports-yearly}"
+        echo "Usage: $0 {daily-bookings-digest|invoice-reminders|admin-reports-daily|admin-reports-weekly|admin-reports-monthly|admin-reports-yearly|generate-sitemap}"
         exit 1
         ;;
 esac
