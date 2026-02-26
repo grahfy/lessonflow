@@ -11,9 +11,12 @@
 
 set -euo pipefail
 
-# Resolve paths
+# Resolve paths - works from any directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+UPDATE_SCRIPT="${SCRIPT_DIR}/update.sh"
+DEPLOY_SCRIPT="${SCRIPT_DIR}/deploy.sh"
 REPO_ROOT=""
+ORIGINAL_ARGS=( "$@" )
 APP_NAME="melbourne-guitar-school"
 DEPLOY_DIR="/var/www/${APP_NAME}"
 SHARED_DIR="${DEPLOY_DIR}/shared"
@@ -25,7 +28,11 @@ BACKUP_DIR="${DEPLOY_DIR}/backups"
 BRANCH=""
 REMOTE_NAME="origin"
 SKIP_PULL=false
+SKIP_DEPLOY=false
 ALLOW_DIRTY=false
+FORCE_SUDO_DEPLOY=false
+FORCE_NO_SUDO_DEPLOY=false
+SUDO_DEPLOY_AUTH_READY=false
 INTERACTIVE=false
 NO_COLOR=false
 NO_SPINNER=false
@@ -380,6 +387,70 @@ init_paths() {
 current_branch_name() { git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main"; }
 git_worktree_dirty() { [[ -n "$(git -C "${REPO_ROOT}" status --porcelain 2>/dev/null || true)" ]]; }
 
+get_current_commit() { git -C "${REPO_ROOT}" rev-parse --short HEAD 2>/dev/null || echo "unknown"; }
+get_current_commit_full() { git -C "${REPO_ROOT}" rev-parse HEAD 2>/dev/null || echo "unknown"; }
+get_last_commit_msg() { git -C "${REPO_ROOT}" log -1 --format=%s 2>/dev/null || echo "none"; }
+get_remote_commit() {
+  [[ -n "${BRANCH}" ]] || BRANCH="$(current_branch_name)"
+  git -C "${REPO_ROOT}" rev-parse --short "${REMOTE_NAME}/${BRANCH}" 2>/dev/null || echo "unknown"
+}
+has_remote_update() {
+  local local_commit remote_commit
+  local_commit=$(get_current_commit)
+  remote_commit=$(get_remote_commit)
+  [[ "${local_commit}" != "${remote_commit}" ]]
+}
+
+should_use_sudo_for_deploy() {
+  if [[ "${FORCE_NO_SUDO_DEPLOY}" == true ]]; then return 1; fi
+  if [[ "${FORCE_SUDO_DEPLOY}" == true ]]; then return 0; fi
+  if [[ ${EUID} -eq 0 ]]; then return 1; fi
+  [[ -w "${DEPLOY_DIR}" ]] && return 1 || return 0
+}
+
+ensure_sudo_for_deploy_ready() {
+  if [[ "${SUDO_DEPLOY_AUTH_READY}" == true ]]; then return 0; fi
+  if sudo -n true 2>/dev/null; then SUDO_DEPLOY_AUTH_READY=true; return 0; fi
+  log_info "Requesting sudo authentication..."
+  sudo true && SUDO_DEPLOY_AUTH_READY=true
+}
+
+run_privileged_cmd() {
+  if [[ ${EUID} -eq 0 ]]; then
+    "$@"
+    return $?
+  fi
+  if ! should_use_sudo_for_deploy; then
+    "$@"
+    return $?
+  fi
+  ensure_sudo_for_deploy_ready
+  sudo "$@"
+}
+
+update_sudo_mode_label() {
+  if [[ "${FORCE_NO_SUDO_DEPLOY}" == true ]]; then
+    echo "forced off"
+  elif [[ "${FORCE_SUDO_DEPLOY}" == true ]]; then
+    echo "forced on"
+  else
+    echo "auto"
+  fi
+}
+
+cycle_sudo_mode() {
+  if [[ "${FORCE_NO_SUDO_DEPLOY}" == true ]]; then
+    FORCE_NO_SUDO_DEPLOY=false
+    FORCE_SUDO_DEPLOY=false
+  elif [[ "${FORCE_SUDO_DEPLOY}" == true ]]; then
+    FORCE_SUDO_DEPLOY=false
+    FORCE_NO_SUDO_DEPLOY=true
+  else
+    FORCE_SUDO_DEPLOY=true
+    FORCE_NO_SUDO_DEPLOY=false
+  fi
+}
+
 run_git_pull() {
   section "Git Update"
   [[ -z "${BRANCH}" ]] && BRANCH="$(current_branch_name)"
@@ -387,7 +458,37 @@ run_git_pull() {
   log_info "Updating ${BRANCH} from ${REMOTE_NAME}..."
   run_step "Git Fetch" git -C "${REPO_ROOT}" fetch "${REMOTE_NAME}" "${BRANCH}" || return 1
   run_step "Git Pull" git -C "${REPO_ROOT}" pull --ff-only "${REMOTE_NAME}" "${BRANCH}" || return 1
-  log_info "Updated to $(git -C "${REPO_ROOT}" rev-parse --short HEAD)"
+  log_info "Updated to $(get_current_commit)"
+}
+
+run_update_script() {
+  section "Run Update + Deploy"
+  if [[ -x "${UPDATE_SCRIPT}" ]]; then
+    if should_use_sudo_for_deploy; then
+      ensure_sudo_for_deploy_ready
+      sudo "${UPDATE_SCRIPT}" --interactive --branch "${BRANCH:-main}" --remote "${REMOTE_NAME}"
+    else
+      "${UPDATE_SCRIPT}" --interactive --branch "${BRANCH:-main}" --remote "${REMOTE_NAME}"
+    fi
+  else
+    log_error "Update script not found: ${UPDATE_SCRIPT}"
+    return 1
+  fi
+}
+
+run_deploy_script() {
+  section "Run Deploy"
+  if [[ -x "${DEPLOY_SCRIPT}" ]]; then
+    if should_use_sudo_for_deploy; then
+      ensure_sudo_for_deploy_ready
+      sudo "${DEPLOY_SCRIPT}" --interactive
+    else
+      "${DEPLOY_SCRIPT}" --interactive
+    fi
+  else
+    log_error "Deploy script not found: ${DEPLOY_SCRIPT}"
+    return 1
+  fi
 }
 
 # =============================================================================
@@ -873,6 +974,10 @@ print_btop_main_menu() {
   tui_clear_screen
   local cpu=$(get_cpu_usage) mem=$(get_memory_usage) disk=$(get_disk_usage "/") up=$(get_uptime)
   local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
+  [[ -z "${BRANCH}" ]] && BRANCH="$(current_branch_name 2>/dev/null || echo "main")"
+  local commit_hash local_commit remote_commit commit_msg
+  commit_hash=$(get_current_commit 2>/dev/null || echo "unknown")
+  commit_msg=$(get_last_commit_msg 2>/dev/null || echo "none")
   
   print_btop_header "$width"
   echo ""
@@ -883,30 +988,45 @@ print_btop_main_menu() {
   
   echo ""
   print_tui_panel_rule "${width}"
+  echo -e "  ${BOLD}${BTOP_CYAN}⬡${NC} ${BOLD}Git Status${NC}"
+  print_tui_panel_rule "${width}"
+  printf "  ${BTOP_FG_DIM}Branch:${NC} ${BTOP_GREEN}%s${NC}  ${BTOP_FG_DIM}Commit:${NC} ${BTOP_YELLOW}%s${NC}  ${BTOP_FG_DIM}Sudo:${NC} ${BTOP_PURPLE}%s${NC}\n" "${BRANCH}" "${commit_hash}" "$(update_sudo_mode_label)"
+  printf "  ${BTOP_FG_DIM}Last:${NC} ${BTOP_FG}%s${NC}\n" "$(tui_truncate_text "${commit_msg}" 60)"
+  
+  echo ""
+  print_tui_panel_rule "${width}"
+  echo -e "  ${BOLD}${BTOP_CYAN}⬡${NC} ${BOLD}Deploy${NC}"
+  print_tui_panel_rule "${width}"
+  print_tui_option_pair "1" "Update + Deploy" "▶ Run" "Run update.sh then deploy.sh (git pull, build, restart)." \
+    "2" "Deploy Only" "▶ Run" "Run deploy.sh directly (build + restart app)."
+  print_tui_option_pair "S" "Toggle Sudo" "$(update_sudo_mode_label)" "Cycle sudo mode: auto / force on / force off."
+  
+  echo ""
+  print_tui_panel_rule "${width}"
   echo -e "  ${BOLD}${BTOP_CYAN}⬡${NC} ${BOLD}Backup & Restore${NC}"
   print_tui_panel_rule "${width}"
-  print_tui_option_pair "1" "Run Backup" "▶ Run" "Create .tar.xz archive of app components." \
-    "2" "Restore Backup" "▶ Run" "Restore from local or cloud backup."
-  print_tui_option_pair "3" "Components" "⚙ Set" "Configure which elements to include in backups." \
-    "4" "Cloud" "${BACKUP_CLOUD_PROVIDER}" "Upload backups to cloud storage."
-  print_tui_option_pair "5" "Schedule" "${BACKUP_FREQUENCY}" "Set automatic backup frequency." \
-    "6" "Retention" "${BACKUP_RETENTION_DAYS}d" "Days to keep local backups."
+  print_tui_option_pair "3" "Run Backup" "▶ Run" "Create .tar.xz archive of app components." \
+    "4" "Restore Backup" "▶ Run" "Restore from local or cloud backup."
+  print_tui_option_pair "5" "Components" "⚙ Set" "Configure which elements to include in backups." \
+    "6" "Cloud" "${BACKUP_CLOUD_PROVIDER}" "Upload backups to cloud storage."
+  print_tui_option_pair "7" "Schedule" "${BACKUP_FREQUENCY}" "Set automatic backup frequency." \
+    "8" "Retention" "${BACKUP_RETENTION_DAYS}d" "Days to keep local backups."
   print_tui_panel_rule "${width}"
   echo -e "  ${BOLD}${BTOP_CYAN}⬡${NC} ${BOLD}SEO & Database${NC}"
   print_tui_panel_rule "${width}"
-  print_tui_option_pair "7" "Generate Sitemap" "▶ Run" "Generate sitemap.xml from SEO config." \
-    "8" "Generate Robots.txt" "▶ Run" "Generate robots.txt for search engines."
-  print_tui_option_pair "9" "Database Health" "● Check" "Verify database connection and status." \
-    "10" "Clean Cache" "✖ Run" "Remove Next.js build cache."
+  print_tui_option_pair "9" "Generate Sitemap" "▶ Run" "Generate sitemap.xml from SEO config." \
+    "10" "Generate Robots.txt" "▶ Run" "Generate robots.txt for search engines."
+  print_tui_option_pair "11" "Database Health" "● Check" "Verify database connection and status." \
+    "12" "Clean Cache" "✖ Run" "Remove Next.js build cache."
   print_tui_panel_rule "${width}"
   echo -e "  ${BOLD}${BTOP_CYAN}⬡${NC} ${BOLD}System${NC}"
   print_tui_panel_rule "${width}"
-  print_tui_option_pair "11" "Git Pull" "↓ Run" "Fetch and merge latest from remote." \
-    "12" "Edit Config" "◈ Open" "Edit .env or SEO config files."
+  print_tui_option_pair "13" "Git Pull" "↓ Run" "Fetch and merge latest from remote." \
+    "14" "Edit Config" "◈ Open" "Edit .env or SEO config files."
   echo ""
   print_tui_panel_rule "${width}"
   print_tui_action_pair "Enter" "Select Option" "Q" "Quit"
-  print_tui_hint_line "Press number 1-12 to select, or Q to quit"
+  print_tui_hint_line "Press number 1-14 to select, or Q to quit"
 }
 
 # =============================================================================
@@ -953,22 +1073,21 @@ run_interactive_maintenance() {
     print_btop_main_menu
     read -r -p "Select: " ch
     case "${ch,,}" in
-      1) local up=false; prompt_yes_no "Upload to cloud?" "n" && up=true; run_backup "${up}"; read -r -n 1 -s -p "Done. Press key..." ;;
-      2) restore_backup_tui ;;
-      3) print_backup_components_tui ;;
-      4) section "Cloud Provider"; BACKUP_CLOUD_PROVIDER=$(prompt_select "Select" "none" "google-drive" "koofr"); save_maintenance_settings ;;
-      5) section "Frequency"; BACKUP_FREQUENCY=$(prompt_select "Select" "hourly" "daily" "weekly"); save_maintenance_settings ;;
-      6) section "Retention"; BACKUP_RETENTION_DAYS=$(prompt_value "Days to keep" "${BACKUP_RETENTION_DAYS}"); save_maintenance_settings ;;
-      7) generate_sitemap; read -r -n 1 -s -p "Press key..." ;;
-      8) generate_robots_txt; read -r -n 1 -s -p "Press key..." ;;
-      9) check_database_health; read -r -n 1 -s -p "Press key..." ;;
-      10) [[ -d "${REPO_ROOT}/.next" ]] && rm -rf "${REPO_ROOT}/.next"; [[ -d "${REPO_ROOT}/node_modules/.cache" ]] && rm -rf "${REPO_ROOT}/node_modules/.cache"; log_info "Cache cleaned"; read -r -n 1 -s -p "Press key..." ;;
-      11) run_git_pull; read -r -n 1 -s -p "Press key..." ;;
-      12) section "Edit Config"; prompt_env_editor; read -r -n 1 -s -p "Press key..." ;;
-      s) 
-         section "Quick Actions"
-         log_info "Select action from menu (1-12)"
-         read -r -n 1 -s -p "Press key..." ;;
+      1) run_update_script; read -r -n 1 -s -p "Done. Press key..." ;;
+      2) run_deploy_script; read -r -n 1 -s -p "Done. Press key..." ;;
+      s) cycle_sudo_mode; log_info "Sudo mode: $(update_sudo_mode_label)" ;;
+      3) local up=false; prompt_yes_no "Upload to cloud?" "n" && up=true; run_backup "${up}"; read -r -n 1 -s -p "Done. Press key..." ;;
+      4) restore_backup_tui ;;
+      5) print_backup_components_tui ;;
+      6) section "Cloud Provider"; BACKUP_CLOUD_PROVIDER=$(prompt_select "Select" "none" "google-drive" "koofr"); save_maintenance_settings ;;
+      7) section "Frequency"; BACKUP_FREQUENCY=$(prompt_select "Select" "hourly" "daily" "weekly"); save_maintenance_settings ;;
+      8) section "Retention"; BACKUP_RETENTION_DAYS=$(prompt_value "Days to keep" "${BACKUP_RETENTION_DAYS}"); save_maintenance_settings ;;
+      9) generate_sitemap; read -r -n 1 -s -p "Press key..." ;;
+      10) generate_robots_txt; read -r -n 1 -s -p "Press key..." ;;
+      11) check_database_health; read -r -n 1 -s -p "Press key..." ;;
+      12) [[ -d "${REPO_ROOT}/.next" ]] && rm -rf "${REPO_ROOT}/.next"; [[ -d "${REPO_ROOT}/node_modules/.cache" ]] && rm -rf "${REPO_ROOT}/node_modules/.cache"; log_info "Cache cleaned"; read -r -n 1 -s -p "Press key..." ;;
+      13) run_git_pull; read -r -n 1 -s -p "Press key..." ;;
+      14) section "Edit Config"; prompt_env_editor; read -r -n 1 -s -p "Press key..." ;;
       q|quit|exit) exit 0 ;;
     esac
   done
