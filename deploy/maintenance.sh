@@ -167,13 +167,13 @@ toggle_bool() { [[ "$1" == true ]] && echo false || echo true; }
 
 index_to_letter() {
   local idx=$1
-  local letters="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+  local letters="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
   echo "${letters:$idx:1}"
 }
 
 letter_to_index() {
   local l=$1
-  local letters="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+  local letters="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
   local i
   for ((i=0; i<${#letters}; i++)); do
     [[ "${letters:$i:1}" == "$l" ]] && { echo "$i"; return 0; }
@@ -184,12 +184,15 @@ letter_to_index() {
 get_backup_meta() {
   local bf="$1"
   local meta_file="${bf%.tar.xz}.meta"
-  if [[ -f "${meta_file}" ]]; then
-    cat "${meta_file}"
+  if run_privileged_cmd test -f "${meta_file}"; then
+    run_privileged_cmd cat "${meta_file}"
   else
     echo "Unknown"
   fi
 }
+
+
+
 
 tui_clear_screen() { [[ "${IS_TTY}" == true ]] && clear; }
 
@@ -646,7 +649,8 @@ restore_backup_tui() {
     auto_size_tui_panel_width; tui_clear_screen; print_box_banner "Restore Backup"
     echo -e "${DIM}Source: ${BOLD}${src^^}${NC}\n"; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
     echo -e "${BOLD}${BLUE}  Backups${NC}"; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
-    local bks=() i=0; local letters="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+    local bks=() i=0; local letters="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
     if [[ "${src}" == "local" ]]; then
       while IFS= read -r b; do
         [[ -n "$b" ]] || continue; local l="${letters:$i:1}"
@@ -705,7 +709,8 @@ print_delete_backups_tui() {
     echo ""
     print_tui_panel_rule "${width}"
     
-    local letters="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+    local letters="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
     for ((i=0; i<count; i++)); do
       [[ $i -ge ${#letters} ]] && break
       local l="${letters:$i:1}"
@@ -745,6 +750,10 @@ print_delete_backups_tui() {
       1|2|3)
         local mode="${ch}"
         local sel_count=0; for s in "${selected[@]}"; do [[ "$s" == true ]] && ((sel_count++)); done
+        [[ $sel_count -eq 0 ]] && { log_warn "Nothing selected"; sleep 1; continue; }
+        
+        echo -ne "\n  ${RED}${BOLD}Delete ${sel_count} backups? (y/N): ${NC}"
+
         (( sel_count == 0 )) && { log_warn "Nothing selected"; sleep 1; continue; }
         
         echo -ne "\n  ${RED}${BOLD}Delete ${sel_count} backups? (y/N): ${NC}"
