@@ -444,7 +444,9 @@ should_use_sudo_for_deploy() {
   if [[ "${FORCE_NO_SUDO_DEPLOY}" == true ]]; then return 1; fi
   if [[ "${FORCE_SUDO_DEPLOY}" == true ]]; then return 0; fi
   if [[ ${EUID} -eq 0 ]]; then return 1; fi
-  [[ -w "${DEPLOY_DIR}" ]] && return 1 || return 0
+  [[ -w "${DEPLOY_DIR}" ]] || return 0
+  [[ -r "${SHARED_DIR}/.env" ]] || return 0
+  return 1
 }
 
 ensure_sudo_for_deploy_ready() {
@@ -657,7 +659,7 @@ create_backup_archive() {
   [[ -d "${SHARED_DIR}/data" ]] && run_privileged_cmd cp -r "${SHARED_DIR}/data" "${td}/${bn}/"
   log_info "Compressing (tar.xz)..."
   tar -cJf "${af}" -C "${td}" "${bn}" 2>/dev/null
-  rm -rf "${td}"
+  run_privileged_cmd rm -rf "${td}"
   [[ -f "${af}" ]] && { log_info "Created: $(du -h "${af}" | cut -f1)"; echo "${af}"; } || return 1
 }
 
@@ -721,7 +723,7 @@ restore_backup() {
   [[ "${rw}" == "true" && -d "${bd}/app" ]] && log_warn "Manual move: cp -r ${bd}/app/* ${CURRENT_LINK}/"
   [[ "${rm}" == "true" && -d "${bd}/learning-materials" ]] && run_privileged_cmd cp -r "${bd}/learning-materials" "${REPO_ROOT}/.data/"
   [[ "${rd}" == "true" && -d "${bd}/data" ]] && run_privileged_cmd cp -r "${bd}/data" "${SHARED_DIR}/"
-  rm -rf "${td}"
+  run_privileged_cmd rm -rf "${td}"
   log_info "Done!"
 }
 
