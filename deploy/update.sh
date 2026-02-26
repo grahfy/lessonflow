@@ -1227,17 +1227,30 @@ cycle_update_sudo_mode() {
 # The goal is to show operators when a newer remote commit exists before they
 # start the update workflow.
 refresh_tui_remote_update_cache() {
-  local cache_key="${REMOTE_NAME}:${BRANCH}"
+  local cache_key=""
   local now_epoch=0
   local remote_ref=""
   local local_ref=""
   local local_commit=""
   local remote_commit=""
+  local git_root=""
 
   [[ "${IS_TTY}" == true ]] || return 0
   [[ -n "${BRANCH}" && -n "${REMOTE_NAME}" ]] || return 0
-  [[ -d "${REPO_ROOT}/.git" || -d .git ]] || return 0
 
+  # Resolve the git root once and use it for all git operations to ensure
+  # consistent results regardless of the current working directory.
+  if [[ -n "${REPO_ROOT}" && -d "${REPO_ROOT}/.git" ]]; then
+    git_root="${REPO_ROOT}"
+  elif [[ -d .git ]]; then
+    git_root="$(pwd)"
+  else
+    git_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  fi
+  [[ -z "${git_root}" ]] && return 0
+
+  # Include git_root in the cache key so different repo paths have separate caches.
+  cache_key="${git_root}:${REMOTE_NAME}:${BRANCH}"
   now_epoch="$(date +%s 2>/dev/null || echo 0)"
 
   if [[ "${TUI_REMOTE_UPDATE_CACHE_KEY}" == "${cache_key}" && "${TUI_REMOTE_UPDATE_CACHE_AT}" =~ ^[0-9]+$ ]]; then
@@ -1261,14 +1274,15 @@ refresh_tui_remote_update_cache() {
   fi
 
   # Never prompt for credentials from inside the TUI refresh loop.
+  # Run git commands from the resolved git root for consistent results.
   if command -v timeout >/dev/null 2>&1; then
-    if ! timeout 8s env GIT_TERMINAL_PROMPT=0 git fetch --quiet --no-tags "${REMOTE_NAME}" "${BRANCH}" >/dev/null 2>&1; then
+    if ! timeout 8s env GIT_TERMINAL_PROMPT=0 git -C "${git_root}" fetch --quiet --no-tags "${REMOTE_NAME}" "${BRANCH}" >/dev/null 2>&1; then
       TUI_REMOTE_UPDATE_STATUS="error"
       TUI_REMOTE_UPDATE_ERROR="remote check failed or timed out"
       return 0
     fi
   else
-    if ! env GIT_TERMINAL_PROMPT=0 git fetch --quiet --no-tags "${REMOTE_NAME}" "${BRANCH}" >/dev/null 2>&1; then
+    if ! env GIT_TERMINAL_PROMPT=0 git -C "${git_root}" fetch --quiet --no-tags "${REMOTE_NAME}" "${BRANCH}" >/dev/null 2>&1; then
       TUI_REMOTE_UPDATE_STATUS="error"
       TUI_REMOTE_UPDATE_ERROR="remote check failed"
       return 0
@@ -1276,7 +1290,7 @@ refresh_tui_remote_update_cache() {
   fi
 
   remote_ref="refs/remotes/${REMOTE_NAME}/${BRANCH}"
-  remote_commit="$(git rev-parse --verify "${remote_ref}" 2>/dev/null || true)"
+  remote_commit="$(git -C "${git_root}" rev-parse --verify "${remote_ref}" 2>/dev/null || true)"
   if [[ -z "${remote_commit}" ]]; then
     TUI_REMOTE_UPDATE_STATUS="error"
     TUI_REMOTE_UPDATE_ERROR="missing remote ref ${REMOTE_NAME}/${BRANCH}"
@@ -1284,16 +1298,16 @@ refresh_tui_remote_update_cache() {
   fi
 
   local_ref="${BRANCH}"
-  local_commit="$(git rev-parse --verify "${local_ref}" 2>/dev/null || true)"
+  local_commit="$(git -C "${git_root}" rev-parse --verify "${local_ref}" 2>/dev/null || true)"
   if [[ -z "${local_commit}" ]]; then
-    local_commit="$(git rev-parse --verify HEAD 2>/dev/null || true)"
+    local_commit="$(git -C "${git_root}" rev-parse --verify HEAD 2>/dev/null || true)"
   fi
 
-  TUI_REMOTE_UPDATE_REMOTE_SHORT="$(git rev-parse --short "${remote_commit}" 2>/dev/null || printf '%s' "${remote_commit:0:12}")"
-  TUI_REMOTE_UPDATE_REMOTE_SUBJECT="$(git log -1 --format=%s "${remote_ref}" 2>/dev/null || true)"
+  TUI_REMOTE_UPDATE_REMOTE_SHORT="$(git -C "${git_root}" rev-parse --short "${remote_commit}" 2>/dev/null || printf '%s' "${remote_commit:0:12}")"
+  TUI_REMOTE_UPDATE_REMOTE_SUBJECT="$(git -C "${git_root}" log -1 --format=%s "${remote_ref}" 2>/dev/null || true)"
 
   if [[ -n "${local_commit}" ]]; then
-    TUI_REMOTE_UPDATE_LOCAL_SHORT="$(git rev-parse --short "${local_commit}" 2>/dev/null || printf '%s' "${local_commit:0:12}")"
+    TUI_REMOTE_UPDATE_LOCAL_SHORT="$(git -C "${git_root}" rev-parse --short "${local_commit}" 2>/dev/null || printf '%s' "${local_commit:0:12}")"
   fi
 
   if [[ -n "${local_commit}" && "${local_commit}" == "${remote_commit}" ]]; then
@@ -1969,6 +1983,20 @@ done
 
 detect_tty_capabilities
 
+# Validate repository context early because this script is intended for a git clone
+# and REPO_ROOT is needed for TUI remote update checks.
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  log_error "This script must be run from inside the application git repository."
+  exit 1
+fi
+
+# Normalize to the repository root so git commands and the deploy script run from
+# a stable source directory even when the operator starts this script in ./deploy.
+# This is set early so the TUI remote update check can use it.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "${REPO_ROOT}"
+log_info "Repository root: ${REPO_ROOT}"
+
 if [[ "${MGS_RETURN_TO_MENU_AFTER_SELF_UPDATE:-}" == "1" && "${IS_TTY}" == true ]]; then
   INTERACTIVE=true
   unset MGS_RETURN_TO_MENU_AFTER_SELF_UPDATE
@@ -1987,18 +2015,6 @@ if [[ "${INTERACTIVE}" == true && "${IS_TTY}" != true ]]; then
 fi
 
 print_banner
-
-# Validate repository context early because this script is intended for a git clone.
-if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  log_error "This script must be run from inside the application git repository."
-  exit 1
-fi
-
-# Normalize to the repository root so git commands and the deploy script run from
-# a stable source directory even when the operator starts this script in ./deploy.
-REPO_ROOT="$(git rev-parse --show-toplevel)"
-cd "${REPO_ROOT}"
-log_info "Repository root: ${REPO_ROOT}"
 
 if [[ -z "${BRANCH}" ]]; then
   BRANCH="$(current_branch_name)"
