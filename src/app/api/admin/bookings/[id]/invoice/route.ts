@@ -40,49 +40,11 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     const taxMode = parsed.data.taxMode ?? getDefaultInvoiceTaxMode();
-    const lineItems: InvoiceLineItemDraft[] = [
-      {
-        description: "Lesson fee",
-        quantity: 1,
-        unitPriceCents: parsed.data.lessonPriceCents,
-        taxMode,
-        kind: "lesson_fee",
-        sortOrder: 0
-      }
-    ];
-
-    if (parsed.data.includeEducationalBooks && parsed.data.educationalBooksPriceCents !== undefined) {
-      lineItems.push({
-        description: "Educational books",
-        quantity: 1,
-        unitPriceCents: parsed.data.educationalBooksPriceCents,
-        taxMode,
-        kind: "educational_books",
-        sortOrder: lineItems.length
-      });
-    }
-
-    if (parsed.data.includeDigitalGuitarLessons && parsed.data.digitalGuitarLessonsPriceCents !== undefined) {
-      lineItems.push({
-        description: "Digital guitar lessons",
-        quantity: 1,
-        unitPriceCents: parsed.data.digitalGuitarLessonsPriceCents,
-        taxMode,
-        kind: "digital_guitar_lessons",
-        sortOrder: lineItems.length
-      });
-    }
-
-    if (parsed.data.includeCustomCharge && parsed.data.customChargeDescription && parsed.data.customChargePriceCents !== undefined) {
-      lineItems.push({
-        description: parsed.data.customChargeDescription,
-        quantity: 1,
-        unitPriceCents: parsed.data.customChargePriceCents,
-        taxMode,
-        kind: "custom",
-        sortOrder: lineItems.length
-      });
-    }
+    const lineItems: InvoiceLineItemDraft[] = parsed.data.lineItems.map((item, index) => ({
+      ...item,
+      taxMode: item.taxMode || taxMode,
+      sortOrder: item.sortOrder ?? index
+    }));
 
     const issuedAt = new Date();
     const dueAt = parsed.data.dueAt ? new Date(parsed.data.dueAt) : getDefaultDueAt(issuedAt);

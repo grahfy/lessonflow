@@ -104,16 +104,9 @@ export const listInvoicesQuerySchema = z.object({
  * Booking-linked invoice creation schema used by the booking dialog action.
  */
 export const createBookingInvoiceSchema = z.object({
-  lessonPriceCents: z.number().int().min(0).max(50_000_000),
-  includeEducationalBooks: z.boolean().optional(),
-  educationalBooksPriceCents: z.number().int().min(0).max(50_000_000).optional(),
-  includeDigitalGuitarLessons: z.boolean().optional(),
-  digitalGuitarLessonsPriceCents: z.number().int().min(0).max(50_000_000).optional(),
-  includeCustomCharge: z.boolean().optional(),
-  customChargeDescription: z.string().trim().max(200).optional(),
-  customChargePriceCents: z.number().int().min(0).max(50_000_000).optional(),
-  notes: z.string().trim().max(2_000).optional(),
+  lineItems: z.array(invoiceLineItemInputSchema).min(1).max(100),
   dueAt: z.string().datetime({ offset: true }).optional(),
+  notes: z.string().trim().max(2_000).optional(),
   taxMode: invoiceTaxModeSchema.optional()
 });
 

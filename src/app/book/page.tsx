@@ -28,9 +28,21 @@ export default function BookPage() {
       visualClassName="contact-hero"
       leadJustified
     >
-      <p className="helper-text" data-motion-item="book-helper-text">
-        Your first step to a tailored lesson plan. Requests are manually reviewed to confirm availability and match the right format. In-person lessons in VIC, online across Australia.
-      </p>
+      <div className="card-grid" data-motion-item="book-cards">
+        <article className="info-card" data-motion-item="book-how-card">
+          <h3>How It Works</h3>
+          <p>Submit your preferred time and goals. We manually review every request to confirm availability and ensure the best fit for your level.</p>
+        </article>
+        <article className="info-card" data-motion-item="book-who-card">
+          <h3>Who It Suits</h3>
+          <p>Beginners through to advanced players. All ages are welcome, with coaching tailored to your musical interests and creative goals.</p>
+        </article>
+        <article className="info-card" data-motion-item="book-formats-card">
+          <h3>Flexible Formats</h3>
+          <p>Choose between focused in-person sessions at our Northcote studio or high-quality video lessons from anywhere across Australia.</p>
+        </article>
+      </div>
+
       <BookingForm />
     </PanelLayout>
   );

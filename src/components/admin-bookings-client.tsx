@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { parseAudInputToCents } from "@/lib/invoices/currency";
 import { AdminBookingCalendar, AdminCalendarEvent } from "@/components/admin-booking-calendar";
 import { AdminDeployUpdatesButton } from "@/components/admin-deploy-updates-button";
 import { animateIn, animateOut } from "@/components/motion/tween-orchestrator";
@@ -167,15 +168,57 @@ type DialogForm = {
 
 type InvoiceTaxMode = "taxable" | "gst_free";
 
+type InvoiceProductPreset = {
+  id: string;
+  label: string;
+  description: string;
+  unitPriceCents: number;
+};
+
+const INVOICE_PRODUCT_PRESETS: InvoiceProductPreset[] = [
+  {
+    id: "trial_30min",
+    label: "30min Trial Lesson ($20)",
+    description: "30min Trial Lesson",
+    unitPriceCents: 2000
+  },
+  {
+    id: "pack_5x30",
+    label: "5 × 30 Minute Lessons ($200)",
+    description: "5 × 30 Minute Lessons",
+    unitPriceCents: 20000
+  },
+  {
+    id: "pack_10x30",
+    label: "10 × 30 Minute Lessons ($388)",
+    description: "10 × 30 Minute Lessons",
+    unitPriceCents: 38800
+  },
+  {
+    id: "pack_5x60",
+    label: "5 × 1 Hour Lessons ($375)",
+    description: "5 × 1 Hour Lessons",
+    unitPriceCents: 37500
+  },
+  {
+    id: "pack_10x60",
+    label: "10 × 1 Hour Lessons ($725)",
+    description: "10 × 1 Hour Lessons",
+    unitPriceCents: 72500
+  }
+];
+
+type EditableLineItem = {
+  key: string;
+  kind: "lesson_fee" | "educational_books" | "digital_guitar_lessons" | "custom";
+  description: string;
+  quantity: string;
+  unitPriceAud: string;
+  taxMode: InvoiceTaxMode;
+  isPreset?: boolean;
+};
+
 type BookingInvoiceForm = {
-  lessonPrice: string;
-  includeEducationalBooks: boolean;
-  educationalBooksPrice: string;
-  includeDigitalGuitarLessons: boolean;
-  digitalGuitarLessonsPrice: string;
-  includeCustomCharge: boolean;
-  customChargeDescription: string;
-  customChargePrice: string;
   dueAtLocal: string;
   taxMode: InvoiceTaxMode;
   notes: string;
@@ -185,26 +228,10 @@ function defaultBookingInvoiceForm(): BookingInvoiceForm {
   const dueAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
   const shifted = new Date(dueAt.getTime() - dueAt.getTimezoneOffset() * 60_000);
   return {
-    lessonPrice: "",
-    includeEducationalBooks: false,
-    educationalBooksPrice: "",
-    includeDigitalGuitarLessons: false,
-    digitalGuitarLessonsPrice: "",
-    includeCustomCharge: false,
-    customChargeDescription: "",
-    customChargePrice: "",
     dueAtLocal: shifted.toISOString().slice(0, 16),
     taxMode: "taxable",
     notes: ""
   };
-}
-
-function dollarsToCents(value: string): number | null {
-  const amount = Number.parseFloat(value);
-  if (!Number.isFinite(amount) || amount < 0) {
-    return null;
-  }
-  return Math.round(amount * 100);
 }
 
 function emptyCustomerForm(): CustomerForm {
@@ -437,6 +464,8 @@ export function AdminBookingsClient() {
   const [emailSubject, setEmailSubject] = useState("");
   const [emailMessage, setEmailMessage] = useState("");
   const [invoiceForm, setInvoiceForm] = useState<BookingInvoiceForm>(defaultBookingInvoiceForm());
+  const [editingLineItems, setEditingLineItems] = useState<EditableLineItem[]>([]);
+  const [editingProductPresetId, setEditingProductPresetId] = useState("");
   const [materialsCustomerId, setMaterialsCustomerId] = useState("");
   const [materialsBookingId, setMaterialsBookingId] = useState("");
   const [materialsBookings, setMaterialsBookings] = useState<LearningMaterialBooking[]>([]);
@@ -465,6 +494,47 @@ export function AdminBookingsClient() {
   const dialogSessionRef = useRef(0);
 
   const rangeLabel = useMemo(() => `${view.toUpperCase()} VIEW`, [view]);
+
+  function toCurrency(cents: number): string {
+    return new Intl.NumberFormat("en-AU", {
+      style: "currency",
+      currency: "AUD"
+    }).format(cents / 100);
+  }
+
+  function toMoneyInput(cents: number): string {
+    return (cents / 100).toFixed(2);
+  }
+
+  function addEditableLineItem() {
+    setEditingLineItems((previous) => [
+      ...previous,
+      {
+        key: `new-${Date.now()}-${previous.length}`,
+        kind: "custom",
+        description: "",
+        quantity: "1",
+        unitPriceAud: "0.00",
+        taxMode: invoiceForm.taxMode
+      }
+    ]);
+  }
+
+  function addInvoiceProductPresetToEditor(preset: InvoiceProductPreset) {
+    setEditingLineItems((previous) => [
+      ...previous,
+      {
+        key: `preset-${preset.id}-${Date.now()}-${previous.length}`,
+        kind: "custom",
+        description: preset.description,
+        quantity: "1",
+        unitPriceAud: toMoneyInput(preset.unitPriceCents),
+        taxMode: invoiceForm.taxMode,
+        isPreset: true
+      }
+    ]);
+  }
+
   const safeFetch = useCallback(async (...args: Parameters<typeof globalThis.fetch>): Promise<Response> => {
     try {
       return await globalThis.fetch(...args);
@@ -730,6 +800,8 @@ export function AdminBookingsClient() {
 
   function openInvoiceDialog() {
     setInvoiceForm(defaultBookingInvoiceForm());
+    setEditingLineItems([]);
+    setEditingProductPresetId("");
     invoiceDialogPresence.show();
   }
 
@@ -737,8 +809,14 @@ export function AdminBookingsClient() {
     if (invoiceDialogRootRef.current) {
       await animateOut(invoiceDialogRootRef.current, { scope: "admin" });
     }
-    invoiceDialogPresence.hide(undefined, { immediate: true });
-    setInvoiceForm(defaultBookingInvoiceForm());
+    invoiceDialogPresence.hide(
+      () => {
+        setInvoiceForm(defaultBookingInvoiceForm());
+        setEditingLineItems([]);
+        setEditingProductPresetId("");
+      },
+      { immediate: true }
+    );
   }
 
   async function createInvoiceFromBooking() {
@@ -746,21 +824,35 @@ export function AdminBookingsClient() {
       return;
     }
 
-    const lessonPriceCents = dollarsToCents(invoiceForm.lessonPrice);
-    if (lessonPriceCents === null) {
-      setError("Lesson price is required.");
+    if (!editingLineItems.length) {
+      setError("Add at least one line item to create the invoice.");
       return;
     }
 
-    const booksPriceCents = dollarsToCents(invoiceForm.educationalBooksPrice);
-    const digitalPriceCents = dollarsToCents(invoiceForm.digitalGuitarLessonsPrice);
-    const customPriceCents = dollarsToCents(invoiceForm.customChargePrice);
-    if (invoiceForm.includeCustomCharge && !invoiceForm.customChargeDescription.trim()) {
-      setError("Custom charge description is required when custom charge is enabled.");
-      return;
-    }
-    if (!invoiceForm.dueAtLocal) {
-      setError("Invoice due date is required.");
+    const lineItemsPayload = editingLineItems.map((lineItem, index) => {
+      const quantity = Number.parseInt(lineItem.quantity, 10);
+      const unitPriceCents = Math.round(Number.parseFloat(lineItem.unitPriceAud || "0") * 100);
+      return {
+        kind: lineItem.kind,
+        description: lineItem.description.trim(),
+        quantity,
+        unitPriceCents,
+        taxMode: lineItem.taxMode,
+        sortOrder: index
+      };
+    });
+
+    const invalid = lineItemsPayload.some(
+      (lineItem) =>
+        !lineItem.description ||
+        !Number.isFinite(lineItem.quantity) ||
+        lineItem.quantity < 1 ||
+        !Number.isFinite(lineItem.unitPriceCents) ||
+        lineItem.unitPriceCents < 0
+    );
+
+    if (invalid) {
+      setError("Each line item needs description, quantity >= 1, and unit price >= 0.");
       return;
     }
 
@@ -770,17 +862,10 @@ export function AdminBookingsClient() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        lessonPriceCents,
-        includeEducationalBooks: invoiceForm.includeEducationalBooks,
-        educationalBooksPriceCents: invoiceForm.includeEducationalBooks ? booksPriceCents ?? 0 : undefined,
-        includeDigitalGuitarLessons: invoiceForm.includeDigitalGuitarLessons,
-        digitalGuitarLessonsPriceCents: invoiceForm.includeDigitalGuitarLessons ? digitalPriceCents ?? 0 : undefined,
-        includeCustomCharge: invoiceForm.includeCustomCharge,
-        customChargeDescription: invoiceForm.includeCustomCharge ? invoiceForm.customChargeDescription.trim() : undefined,
-        customChargePriceCents: invoiceForm.includeCustomCharge ? customPriceCents ?? 0 : undefined,
-        dueAt: new Date(invoiceForm.dueAtLocal).toISOString(),
         taxMode: invoiceForm.taxMode,
-        notes: invoiceForm.notes.trim() || undefined
+        dueAt: new Date(invoiceForm.dueAtLocal).toISOString(),
+        notes: invoiceForm.notes.trim() || undefined,
+        lineItems: lineItemsPayload
       })
     });
     setBusyAction(null);
@@ -3004,87 +3089,11 @@ export function AdminBookingsClient() {
                 </p>
                 <div className="manual-grid manual-grid-2">
                   <div className="field">
-                    <label>Lesson fee (AUD) *</label>
-                    <input
-                      value={invoiceForm.lessonPrice}
-                      placeholder="e.g. 80"
-                      onChange={(event) => setInvoiceForm((prev) => ({ ...prev, lessonPrice: event.target.value }))}
-                    />
-                  </div>
-                  <div className="field">
                     <label>Due date *</label>
                     <input
                       type="datetime-local"
                       value={invoiceForm.dueAtLocal}
                       onChange={(event) => setInvoiceForm((prev) => ({ ...prev, dueAtLocal: event.target.value }))}
-                    />
-                  </div>
-                  <div className="field">
-                    <label className="helper-toggle">
-                      <input
-                        type="checkbox"
-                        checked={invoiceForm.includeEducationalBooks}
-                        onChange={(event) =>
-                          setInvoiceForm((prev) => ({ ...prev, includeEducationalBooks: event.target.checked }))
-                        }
-                      />{" "}
-                      Educational books
-                    </label>
-                    <input
-                      disabled={!invoiceForm.includeEducationalBooks}
-                      value={invoiceForm.educationalBooksPrice}
-                      placeholder="AUD"
-                      onChange={(event) =>
-                        setInvoiceForm((prev) => ({ ...prev, educationalBooksPrice: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="field">
-                    <label className="helper-toggle">
-                      <input
-                        type="checkbox"
-                        checked={invoiceForm.includeDigitalGuitarLessons}
-                        onChange={(event) =>
-                          setInvoiceForm((prev) => ({ ...prev, includeDigitalGuitarLessons: event.target.checked }))
-                        }
-                      />{" "}
-                      Digital guitar lessons
-                    </label>
-                    <input
-                      disabled={!invoiceForm.includeDigitalGuitarLessons}
-                      value={invoiceForm.digitalGuitarLessonsPrice}
-                      placeholder="AUD"
-                      onChange={(event) =>
-                        setInvoiceForm((prev) => ({ ...prev, digitalGuitarLessonsPrice: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="field manual-span-2">
-                    <label className="helper-toggle">
-                      <input
-                        type="checkbox"
-                        checked={invoiceForm.includeCustomCharge}
-                        onChange={(event) => setInvoiceForm((prev) => ({ ...prev, includeCustomCharge: event.target.checked }))}
-                      />{" "}
-                      Custom charge
-                    </label>
-                  </div>
-                  <div className="field">
-                    <label>Custom description</label>
-                    <input
-                      disabled={!invoiceForm.includeCustomCharge}
-                      value={invoiceForm.customChargeDescription}
-                      onChange={(event) =>
-                        setInvoiceForm((prev) => ({ ...prev, customChargeDescription: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="field">
-                    <label>Custom amount (AUD)</label>
-                    <input
-                      disabled={!invoiceForm.includeCustomCharge}
-                      value={invoiceForm.customChargePrice}
-                      onChange={(event) => setInvoiceForm((prev) => ({ ...prev, customChargePrice: event.target.value }))}
                     />
                   </div>
                   <div className="field">
@@ -3097,7 +3106,7 @@ export function AdminBookingsClient() {
                       <option value="gst_free">GST-free</option>
                     </select>
                   </div>
-                  <div className="field">
+                  <div className="field manual-span-2">
                     <label>Notes</label>
                     <textarea
                       value={invoiceForm.notes}
@@ -3105,6 +3114,101 @@ export function AdminBookingsClient() {
                     />
                   </div>
                 </div>
+
+                <div className="invoice-line-list">
+                  {editingLineItems.map((lineItem, index) => (
+                    <div key={lineItem.key} className="invoice-line-item invoice-line-item-editable">
+                      <input
+                        value={lineItem.description}
+                        onChange={(event) =>
+                          setEditingLineItems((previous) =>
+                            previous.map((entry, entryIndex) => (entryIndex === index ? { ...entry, description: event.target.value } : entry))
+                          )
+                        }
+                        placeholder="Description"
+                      />
+                      {!lineItem.isPreset ? (
+                        <input
+                          type="number"
+                          min={1}
+                          step={1}
+                          value={lineItem.quantity}
+                          onChange={(event) =>
+                            setEditingLineItems((previous) =>
+                              previous.map((entry, entryIndex) => (entryIndex === index ? { ...entry, quantity: event.target.value } : entry))
+                            )
+                          }
+                        />
+                      ) : (
+                        <div />
+                      )}
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={lineItem.unitPriceAud}
+                        onChange={(event) =>
+                          setEditingLineItems((previous) =>
+                            previous.map((entry, entryIndex) => (entryIndex === index ? { ...entry, unitPriceAud: event.target.value } : entry))
+                          )
+                        }
+                      />
+                      <select
+                        value={lineItem.taxMode}
+                        onChange={(event) =>
+                          setEditingLineItems((previous) =>
+                            previous.map((entry, entryIndex) =>
+                              entryIndex === index ? { ...entry, taxMode: event.target.value as InvoiceTaxMode } : entry
+                            )
+                          )
+                        }
+                      >
+                        <option value="taxable">Taxable (GST)</option>
+                        <option value="gst_free">GST-free</option>
+                      </select>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() =>
+                          setEditingLineItems((previous) => previous.filter((_, entryIndex) => entryIndex !== index))
+                        }
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="dialog-actions dialog-actions-inline">
+                  <button className="btn btn-secondary" type="button" onClick={() => addEditableLineItem()}>
+                    Add line item
+                  </button>
+                  <select
+                    value={editingProductPresetId}
+                    onChange={(event) => setEditingProductPresetId(event.target.value)}
+                    className="invoice-product-preset-select"
+                  >
+                    <option value="">Add lesson package preset...</option>
+                    {INVOICE_PRODUCT_PRESETS.map((preset) => (
+                      <option key={preset.id} value={preset.id}>
+                        {preset.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    disabled={!editingProductPresetId}
+                    onClick={() => {
+                      const preset = INVOICE_PRODUCT_PRESETS.find((entry) => entry.id === editingProductPresetId);
+                      if (!preset) return;
+                      addInvoiceProductPresetToEditor(preset);
+                      setEditingProductPresetId("");
+                    }}
+                  >
+                    Add product preset
+                  </button>
+                </div>
+
                 <div className="dialog-actions" data-motion-item="invoice-dialog-actions">
                   <button className="btn btn-secondary" type="button" disabled={!!busyAction} onClick={() => void closeInvoiceDialog()}>
                     Cancel

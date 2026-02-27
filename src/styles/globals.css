@@ -177,9 +177,8 @@ a {
   gap: clamp(10px, 1.6vw, 18px);
 }
 
-/* Booking form panel is substantially taller than other marketing-page content.
-   On desktop, keep the page shell fixed-height and allow only the left copy/form
-   column to scroll so the user does not need to scroll the entire page. */
+/* Booking form panel used to be substantially taller than other marketing-page content.
+   With the simplified form, we now allow it to center vertically like other pages. */
 @media (min-width: 1101px) {
   .view-book-page .view-stage {
     min-height: 0;
@@ -188,11 +187,12 @@ a {
 
   .view-book-page .panel-copy {
     min-height: 0;
-    overflow-y: visible;
-    justify-content: flex-start;
-    align-content: start;
+    overflow-y: auto;
+    justify-content: center;
+    align-content: center;
+    scrollbar-gutter: stable;
     padding: clamp(14px, 1.8vw, 22px);
-    gap: 8px;
+    gap: 12px;
   }
 
   .view-book-page h1 {

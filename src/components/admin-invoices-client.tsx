@@ -31,6 +31,7 @@ type EditableLineItem = {
   quantity: string;
   unitPriceAud: string;
   taxMode: InvoiceTaxMode;
+  isPreset?: boolean;
 };
 
 type InvoiceRow = {
@@ -92,6 +93,12 @@ type InvoiceProductPreset = {
 };
 
 const INVOICE_PRODUCT_PRESETS: InvoiceProductPreset[] = [
+  {
+    id: "trial_30min",
+    label: "30min Trial Lesson ($20)",
+    description: "30min Trial Lesson",
+    unitPriceCents: 2000
+  },
   {
     id: "pack_5x30",
     label: "5 × 30 Minute Lessons ($200)",
@@ -511,7 +518,8 @@ export function AdminInvoicesClient() {
         description: preset.description,
         quantity: "1",
         unitPriceAud: toMoneyInput(preset.unitPriceCents),
-        taxMode: selectedInvoice?.taxMode ?? "taxable"
+        taxMode: selectedInvoice?.taxMode ?? "taxable",
+        isPreset: true
       }
     ]);
   }
@@ -1064,18 +1072,22 @@ export function AdminInvoicesClient() {
                     readOnly={selectedInvoice.documentType === "credit_note"}
                     placeholder="Description"
                   />
-                  <input
-                    type="number"
-                    min={1}
-                    step={1}
-                    value={lineItem.quantity}
-                    onChange={(event) =>
-                      setEditingLineItems((previous) =>
-                        previous.map((entry, entryIndex) => (entryIndex === index ? { ...entry, quantity: event.target.value } : entry))
-                      )
-                    }
-                    readOnly={selectedInvoice.documentType === "credit_note"}
-                  />
+                  {!lineItem.isPreset ? (
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={lineItem.quantity}
+                      onChange={(event) =>
+                        setEditingLineItems((previous) =>
+                          previous.map((entry, entryIndex) => (entryIndex === index ? { ...entry, quantity: event.target.value } : entry))
+                        )
+                      }
+                      readOnly={selectedInvoice.documentType === "credit_note"}
+                    />
+                  ) : (
+                    <div />
+                  )}
                   <input
                     type="number"
                     min={0}

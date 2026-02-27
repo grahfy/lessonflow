@@ -110,14 +110,41 @@ describe("admin-invoices", () => {
     });
 
     const req = adminRequest(`http://localhost/api/admin/bookings/${booking.id}/invoice`, "POST", token, {
-      lessonPriceCents: 9500,
-      includeEducationalBooks: true,
-      educationalBooksPriceCents: 1500,
-      includeDigitalGuitarLessons: true,
-      digitalGuitarLessonsPriceCents: 2000,
-      includeCustomCharge: true,
-      customChargeDescription: "String pack",
-      customChargePriceCents: 3000
+      taxMode: "taxable",
+      lineItems: [
+        {
+          kind: "lesson_fee",
+          description: "Lesson fee",
+          quantity: 1,
+          unitPriceCents: 9500,
+          taxMode: "taxable",
+          sortOrder: 0
+        },
+        {
+          kind: "educational_books",
+          description: "Educational books",
+          quantity: 1,
+          unitPriceCents: 1500,
+          taxMode: "taxable",
+          sortOrder: 1
+        },
+        {
+          kind: "digital_guitar_lessons",
+          description: "Digital guitar lessons",
+          quantity: 1,
+          unitPriceCents: 2000,
+          taxMode: "taxable",
+          sortOrder: 2
+        },
+        {
+          kind: "custom",
+          description: "String pack",
+          quantity: 1,
+          unitPriceCents: 3000,
+          taxMode: "taxable",
+          sortOrder: 3
+        }
+      ]
     });
     const res = await createBookingInvoice(req, { params: Promise.resolve({ id: booking.id }) });
     expect(res.status).toBe(201);
