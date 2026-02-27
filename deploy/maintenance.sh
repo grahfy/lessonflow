@@ -515,6 +515,16 @@ EOF
 # DB & Env Operations
 # =============================================================================
 
+get_env_val() {
+  local key="$1" val
+  # Try environment first, then shared .env file
+  eval "val=\${${key}:-}"
+  if [[ -z "${val}" && -f "${SHARED_DIR}/.env" ]]; then
+    val=$(grep -E "^${key}=" "${SHARED_DIR}/.env" 2>/dev/null | cut -d'=' -f2- | sed 's/^["'"'"']//;s/["'"'"']$//')
+  fi
+  echo "${val}"
+}
+
 get_db_creds() {
   local du; du=$(get_env_val "DATABASE_URL")
   [[ -z "${du:-}" ]] && { log_error "DATABASE_URL is not set"; return 1; }
