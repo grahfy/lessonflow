@@ -91,7 +91,7 @@ function getEmailBranding() {
     phone: process.env.CONTACT_PHONE || "0401 489 437",
     email: process.env.CONTACT_EMAIL || getOwnerEmail(),
     address: process.env.CONTACT_ADDRESS || "Rear 66/68 High St, Northcote VIC 3070",
-    logoUrl: `${siteUrl}/images/mgs-logo.png`
+    logoUrl: `${siteUrl}/images/mgs-logo.webp`
   };
 }
 

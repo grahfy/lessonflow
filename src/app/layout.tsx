@@ -88,7 +88,7 @@ export const metadata: Metadata = {
     countryName: "Australia",
     images: [
       {
-        url: "/images/mgs-logo.png",
+        url: "/images/mgs-logo.webp",
         alt: "Melbourne Guitar School"
       }
     ]
@@ -98,7 +98,7 @@ export const metadata: Metadata = {
     title: "Melbourne Guitar School",
     description:
       "Modern guitar lessons in Northcote for beginners through advanced players.",
-    images: ["/images/mgs-logo.png"]
+    images: ["/images/mgs-logo.webp"]
   },
   robots: {
     index: true,

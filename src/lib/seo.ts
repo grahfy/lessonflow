@@ -27,7 +27,7 @@ export function buildPublicPageMetadata(input: PublicPageMetadataInput): Metadat
   const base = getSeoSiteUrl();
   const path = input.path === "/" ? "/" : `/${input.path.replace(/^\/+/, "")}`;
   const url = `${base}${path === "/" ? "" : path}`;
-  const imageUrl = `${base}/images/mgs-logo.png`;
+  const imageUrl = `${base}/images/mgs-logo.webp`;
 
   return {
     title: input.title,

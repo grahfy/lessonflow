@@ -36,7 +36,7 @@ describe("email-templates", () => {
     });
 
     expect(template.html).toContain("Melbourne Guitar School");
-    expect(template.html).toContain("mgs-logo.png");
+    expect(template.html).toContain("mgs-logo.webp");
     expect(template.html).toContain("Call or text:");
     expect(template.html).toContain("Email:");
     expect(template.html).toContain("Studio:");

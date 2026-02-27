@@ -99,7 +99,7 @@ a {
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background-color: #efd55a;
-  background-image: url("/images/mgs-logo.png");
+  background-image: url("/images/mgs-logo.webp");
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
@@ -504,7 +504,7 @@ h1 {
 }
 
 .home-hero {
-  background-image: url("/images/home-image.jpg");
+  background-image: url("/images/home-image.webp");
 }
 
 .lessons-hero {
@@ -512,7 +512,7 @@ h1 {
 }
 
 .teacher-hero {
-  background-image: url("/images/teacher-image.jpg");
+  background-image: url("/images/teacher-image.webp");
 }
 
 .student-login-hero {
@@ -528,15 +528,15 @@ h1 {
 }
 
 .vouchers-hero {
-  background-image: url("/images/voucher-image.jpg");
+  background-image: url("/images/voucher-image.webp");
 }
 
 .contact-hero {
-  background-image: url("/images/school-front-shot.jpg");
+  background-image: url("/images/contact-image-hero.webp");
 }
 
 .terms-hero {
-  background-image: url("/images/terms-photo.jpg");
+  background-image: url("/images/terms-photo.webp");
 }
 
 .film-strip {

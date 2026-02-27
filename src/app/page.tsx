@@ -23,8 +23,9 @@ export default function HomePage() {
       actions={
         <div className="home-actions" data-motion-item="home-actions">
           <div className="home-actions-primary" data-motion-item="home-action-book">
+            {/* Primary call to action: encourage immediate booking with clearer, more direct language */}
             <TweenLink className="btn btn-primary" href="/book">
-              Start With a First Guitar Tuition Session
+              Book Your Guitar Lesson Today
             </TweenLink>
           </div>
           <div className="home-actions-secondary">

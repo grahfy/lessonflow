@@ -66,7 +66,7 @@ export function renderInvoiceHtml(invoice: InvoiceTemplateRecord): string {
     <section style="font-family:Arial,sans-serif; color:#0f172a; max-width:860px; margin:0 auto; padding:16px;">
       <header style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px;">
         <div>
-          <img src="${escapeHtml(process.env.NEXT_PUBLIC_SITE_URL || "")}/images/company-logo-invoice.png" alt="Melbourne Guitar School" style="width:200px;height:auto;object-fit:contain;" />
+          <img src="${escapeHtml(process.env.NEXT_PUBLIC_SITE_URL || "")}/images/company-logo-invoice.webp" alt="Melbourne Guitar School" style="width:200px;height:auto;object-fit:contain;" />
           <h1 style="margin:10px 0 6px;">${heading}</h1>
           <p style="margin:0;"><strong>${escapeHtml(invoice.sellerBusinessName)}</strong></p>
           <p style="margin:0;">ABN: ${escapeHtml(invoice.sellerAbn || "Not provided")}</p>

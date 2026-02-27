@@ -34,7 +34,7 @@ export default function ContactPage() {
       <ul className="list" data-motion-item="contact-list">
         <li data-motion-item="map-button">
           <ImageModal
-            src="/images/google-map.jpg"
+            src="/images/google-map.webp"
             alt="Melbourne Guitar School location map"
             triggerText="Google Maps Location"
             caption={
