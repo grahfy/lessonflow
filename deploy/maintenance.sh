@@ -519,13 +519,18 @@ get_env_val() {
   local key="$1" val
   # Try environment first, then shared .env file
   eval "val=\${${key}:-}"
-  if [[ -z "${val}" && -f "${SHARED_DIR}/.env" ]]; then
-    val=$(grep -E "^${key}=" "${SHARED_DIR}/.env" 2>/dev/null | cut -d'=' -f2- | sed 's/^["'"'"']//;s/["'"'"']$//')
+  if [[ -z "${val}" ]]; then
+    if [[ -f "${SHARED_DIR}/.env" ]]; then
+      val=$(grep -E "^${key}=" "${SHARED_DIR}/.env" 2>/dev/null | cut -d'=' -f2- | sed 's/^["'"'"']//;s/["'"'"']$//')
+    else
+      log_warn "Shared .env not found at ${SHARED_DIR}/.env"
+    fi
   fi
   echo "${val}"
 }
 
 get_db_creds() {
+  log_info "Looking for DATABASE_URL in ${SHARED_DIR}/.env"
   local du; du=$(get_env_val "DATABASE_URL")
   [[ -z "${du:-}" ]] && { log_error "DATABASE_URL is not set"; return 1; }
   log_info "DATABASE_URL found (length: ${#du})"
