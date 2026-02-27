@@ -2535,20 +2535,21 @@ h1 {
   .site-shell {
     padding: 16px;
     gap: 14px;
-    height: 100dvh;
+    height: auto;
+    min-height: 100dvh;
   }
 
   .view {
-    overflow: auto;
+    overflow: visible;
   }
 
   .view-stage {
     grid-template-columns: 1fr;
-    min-height: 0;
+    min-height: auto;
   }
 
   .panel-copy {
-    overflow-y: auto;
+    overflow-y: visible;
   }
 
   .panel-visual {
