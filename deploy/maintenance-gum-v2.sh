@@ -108,6 +108,13 @@ BACKUP_INCLUDE_LEARNING_MATERIALS=true
 BACKUP_INCLUDE_SEO_CONFIG=true
 BACKUP_CLEAN_OLD=true
 
+# Runtime vars
+FORCE_SUDO_DEPLOY=false
+FORCE_NO_SUDO_DEPLOY=false
+SUDO_DEPLOY_AUTH_READY=false
+BRANCH=""
+REMOTE_NAME="origin"
+
 # Cloud credentials
 GDRIVE_CLIENT_ID=""
 GDRIVE_CLIENT_SECRET=""
@@ -188,6 +195,58 @@ get_memory_usage() { free | grep Mem | awk '{printf "%d", $3/$2 * 100.0}'; }
 get_disk_usage() { df -h / | awk 'NR==2 {print $5}' | sed 's/%//'; }
 get_uptime() { uptime -p | sed 's/up //'; }
 
+# Sudo Management
+should_use_sudo_for_deploy() {
+  if [[ "${FORCE_NO_SUDO_DEPLOY:-false}" == true ]]; then return 1; fi
+  if [[ "${FORCE_SUDO_DEPLOY:-false}" == true ]]; then return 0; fi
+  if [[ ${EUID} -eq 0 ]]; then return 1; fi
+  [[ -w "${DEPLOY_DIR}" ]] || return 0
+  return 1
+}
+
+ensure_sudo_for_deploy_ready() {
+  if should_use_sudo_for_deploy; then
+    if [[ "${SUDO_DEPLOY_AUTH_READY:-false}" == true ]]; then return 0; fi
+    if sudo -n true 2>/dev/null; then
+      SUDO_DEPLOY_AUTH_READY=true
+      return 0
+    fi
+    center_style "Sudo required. Please authenticate..." --foreground 212
+    if sudo -v; then
+      SUDO_DEPLOY_AUTH_READY=true
+      return 0
+    else
+      return 1
+    fi
+  fi
+  return 0
+}
+
+run_privileged_cmd() {
+  if should_use_sudo_for_deploy; then
+    ensure_sudo_for_deploy_ready >/dev/null
+    sudo "$@"
+  else
+    "$@"
+  fi
+}
+
+update_sudo_mode_label() {
+  if [[ "${FORCE_SUDO_DEPLOY:-false}" == true ]]; then echo "FORCE ON";
+  elif [[ "${FORCE_NO_SUDO_DEPLOY:-false}" == true ]]; then echo "FORCE OFF";
+  else echo "AUTO"; fi
+}
+
+cycle_sudo_mode() {
+  if [[ "${FORCE_SUDO_DEPLOY:-false}" == true ]]; then
+    FORCE_SUDO_DEPLOY=false; FORCE_NO_SUDO_DEPLOY=true
+  elif [[ "${FORCE_NO_SUDO_DEPLOY:-false}" == true ]]; then
+    FORCE_SUDO_DEPLOY=false; FORCE_NO_SUDO_DEPLOY=false
+  else
+    FORCE_SUDO_DEPLOY=true; FORCE_NO_SUDO_DEPLOY=false
+  fi
+}
+
 # =============================================================================
 # 4. UI Components & Centering Logic
 # =============================================================================
@@ -265,7 +324,7 @@ show_header() {
 
     local stats_line="CPU: $(draw_bar $cpu 82)  MEM: $(draw_bar $mem 33)"
     local system_line="DISK: $(draw_bar $disk 208)  UP: $up"
-    local git_line="Branch: $branch  |  Commit: $commit"
+    local git_line="Branch: $branch  |  Commit: $commit  |  Sudo: $(update_sudo_mode_label)"
 
     ui_wrapper 20
 
@@ -279,6 +338,7 @@ show_header() {
         "" \
         "$(gum style --foreground 245 "$git_line")")
     
+    # Truly center the box block
     echo "$box" | center_style
 }
 
@@ -304,7 +364,6 @@ run_task() {
     
     local tmp=$(mktemp)
     # Run command/function in background and capture exit code
-    # Important: We must use a subshell that can see internal functions
     ( "$@" > /dev/null 2>&1; echo $? > "$tmp" ) &
     local pid=$!
     
@@ -334,6 +393,18 @@ create_database_dump() {
     MYSQL_PWD="${DB_P}" mysqldump -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" "${DB_NAME}" > "${output_file}" 2>/dev/null
   elif command -v mariadb-dump >/dev/null 2>&1; then
     MYSQL_PWD="${DB_P}" mariadb-dump -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" "${DB_NAME}" > "${output_file}" 2>/dev/null
+  else
+    return 1
+  fi
+}
+
+restore_database() {
+  local input_file="$1"
+  get_db_creds || return 1
+  if command -v mysql >/dev/null 2>&1; then
+    MYSQL_PWD="${DB_P}" mysql -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" "${DB_NAME}" < "${input_file}" 2>/dev/null
+  elif command -v mariadb >/dev/null 2>&1; then
+    MYSQL_PWD="${DB_P}" mariadb -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" "${DB_NAME}" < "${input_file}" 2>/dev/null
   else
     return 1
   fi
@@ -379,17 +450,44 @@ $(cat "${file_path}")
 EOF
 }
 
+upload_to_koofr() {
+  local fp="$1" bn="$(basename "$fp")"
+  [[ -n "${KOOFR_WEBDAV_URL}" && -n "${KOOFR_USERNAME}" && -n "${KOOFR_PASSWORD}" ]] || return 1
+  curl -s -X MKCOL -u "${KOOFR_USERNAME}:${KOOFR_PASSWORD}" "${KOOFR_WEBDAV_URL}/${BACKUP_CLOUD_FOLDER}/" >/dev/null 2>&1 || true
+  local code=$(curl -s -w "%{http_code}" -T "$fp" -u "${KOOFR_USERNAME}:${KOOFR_PASSWORD}" "${KOOFR_WEBDAV_URL}/${BACKUP_CLOUD_FOLDER}/${bn}" -o /dev/null)
+  [[ "${code}" =~ ^(200|201|204)$ ]] && return 0 || return 1
+}
+
+get_backup_meta() {
+  local bf="$1" meta_file="${bf%.tar.xz}.meta"
+  if run_privileged_cmd test -f "${meta_file}"; then
+    run_privileged_cmd cat "${meta_file}"
+  else
+    echo "Unknown"
+  fi
+}
+
+format_backup_meta() {
+  local meta="$1" result=""
+  [[ "${meta}" == *"Database"* ]] && result+="DB "
+  [[ "${meta}" == *"Environment"* ]] && result+="Env "
+  [[ "${meta}" == *"SEO"* ]] && result+="SEO "
+  [[ "${meta}" == *"Application"* ]] && result+="App "
+  [[ "${meta}" == *"Materials"* ]] && result+="Mat "
+  echo "${result:-Unknown}"
+}
+
 # =============================================================================
 # 6. High-level Tasks
 # =============================================================================
 
 run_backup_process() {
-    local steps=()
-    [[ "$BACKUP_INCLUDE_SQL" == "true" ]] && steps+=("Database Dump")
-    [[ "$BACKUP_INCLUDE_ENV" == "true" ]] && steps+=("Environment")
-    [[ "$BACKUP_INCLUDE_SEO_CONFIG" == "true" ]] && steps+=("SEO Config")
-    [[ "$BACKUP_INCLUDE_WEBAPP" == "true" ]] && steps+=("Application")
-    [[ "$BACKUP_INCLUDE_LEARNING_MATERIALS" == "true" ]] && steps+=("Materials")
+    local steps=() components=""
+    [[ "$BACKUP_INCLUDE_SQL" == "true" ]] && { steps+=("Database Dump"); components+="Database "; }
+    [[ "$BACKUP_INCLUDE_ENV" == "true" ]] && { steps+=("Environment"); components+="Environment "; }
+    [[ "$BACKUP_INCLUDE_SEO_CONFIG" == "true" ]] && { steps+=("SEO Config"); components+="SEO "; }
+    [[ "$BACKUP_INCLUDE_WEBAPP" == "true" ]] && { steps+=("Application"); components+="Application "; }
+    [[ "$BACKUP_INCLUDE_LEARNING_MATERIALS" == "true" ]] && { steps+=("Materials"); components+="Materials "; }
     steps+=("Compression")
     [[ "$BACKUP_AUTO_UPLOAD" == "true" ]] && steps+=("Cloud Upload")
 
@@ -398,9 +496,7 @@ run_backup_process() {
         return
     fi
 
-    local ts="$(date +%Y%m%d-%H%M%S)"
-    local bn="backup-${ts}"
-    local td="$(mktemp -d)"
+    local ts="$(date +%Y%m%d-%H%M%S)" bn="backup-${ts}" td="$(mktemp -d)"
     mkdir -p "${td}/${bn}"
     local archive="${BACKUP_DIR}/${bn}.tar.xz"
     mkdir -p "$BACKUP_DIR"
@@ -408,30 +504,27 @@ run_backup_process() {
     center_style "Starting backup workflow..."
     
     for i in "${!steps[@]}"; do
-        local step="${steps[$i]}"
-        local count=$((i + 1))
-        local total=${#steps[@]}
-        local prefix="[$count/$total]"
-        
+        local step="${steps[$i]}" count=$((i + 1)) total=${#steps[@]} prefix="[$count/$total]"
         case "$step" in
-            "Database Dump") 
-                run_task "$prefix Creating Database Dump" create_database_dump "${td}/${bn}/database.sql" ;;
-            "Environment") 
-                run_task "$prefix Copying Environment Files" bash -c "[[ -f \"${SHARED_DIR}/.env\" ]] && cp \"${SHARED_DIR}/.env\" \"${td}/${bn}/\"" ;;
-            "SEO Config") 
-                run_task "$prefix Copying SEO Config" bash -c "[[ -f \"$SEO_CONFIG_FILE\" ]] && cp \"$SEO_CONFIG_FILE\" \"${td}/${bn}/\"" ;;
-            "Application") 
-                run_task "$prefix Syncing Application Files" rsync -a --exclude='node_modules' --exclude='.next' "${CURRENT_LINK}/" "${td}/${bn}/app/" ;;
-            "Materials")
-                run_task "$prefix Copying Learning Materials" bash -c "[[ -d \"${REPO_ROOT}/.data\" ]] && cp -r \"${REPO_ROOT}/.data\" \"${td}/${bn}/\"" ;;
-            "Compression") 
-                run_task "$prefix Compressing Archive" tar -cJf "${archive}" -C "${td}" "${bn}" ;;
+            "Database Dump") run_task "$prefix Creating Database Dump" create_database_dump "${td}/${bn}/database.sql" ;;
+            "Environment") run_task "$prefix Copying Environment Files" bash -c "[[ -f \"${SHARED_DIR}/.env\" ]] && cp \"${SHARED_DIR}/.env\" \"${td}/${bn}/\"" ;;
+            "SEO Config") run_task "$prefix Copying SEO Config" bash -c "[[ -f \"$SEO_CONFIG_FILE\" ]] && cp \"$SEO_CONFIG_FILE\" \"${td}/${bn}/\"" ;;
+            "Application") run_task "$prefix Syncing Application Files" rsync -a --exclude='node_modules' --exclude='.next' "${CURRENT_LINK}/" "${td}/${bn}/app/" ;;
+            "Materials") run_task "$prefix Copying Learning Materials" bash -c "[[ -d \"${REPO_ROOT}/.data\" ]] && cp -r \"${REPO_ROOT}/.data\" \"${td}/${bn}/\"" ;;
+            "Compression") run_task "$prefix Compressing Archive" tar -cJf "${archive}" -C "${td}" "${bn}" ;;
             "Cloud Upload") 
-                run_task "$prefix Uploading to Cloud" upload_to_gdrive "$archive" ;;
+                if [[ "$BACKUP_CLOUD_PROVIDER" == *"google-drive"* ]]; then run_task "$prefix Uploading to GDrive" upload_to_gdrive "$archive"; fi
+                if [[ "$BACKUP_CLOUD_PROVIDER" == *"koofr"* ]]; then run_task "$prefix Uploading to Koofr" upload_to_koofr "$archive"; fi ;;
         esac
     done
 
+    echo "${components}" | run_privileged_cmd tee "${BACKUP_DIR}/${bn}.meta" >/dev/null
     rm -rf "${td}"
+    
+    if [[ "${BACKUP_CLEAN_OLD}" == "true" ]]; then
+        run_task "Cleaning old backups" bash -c "find \"${BACKUP_DIR}\" -name \"backup-*.tar.xz\" -type f -mtime +${BACKUP_RETENTION_DAYS} -delete"
+    fi
+
     notify_success "Backup complete: $(basename "$archive")"
 }
 
@@ -443,11 +536,41 @@ run_restore_process() {
     fi
 
     local selected=$(center_choose "Select backup to restore" "${backups[@]}")
-    if [[ -n "$selected" ]]; then
-        if gum confirm "$(center_style "Restore $(basename "$selected")? This will overwrite existing data!")"; then
-            run_task "Extracting backup" tar -xJf "$selected" -C /tmp/
-            notify_success "Restore completed"
-        fi
+    [[ -z "$selected" ]] && return
+
+    # Component selection for restore
+    local r_sql=true r_app=true r_env=true r_mat=true r_seo=true
+    while true; do
+        show_header
+        local choice=$(center_choose "Toggle components to restore" \
+            "Database [$(bool_word $r_sql)]" "App Files [$(bool_word $r_app)]" \
+            "Env File [$(bool_word $r_env)]" "Materials [$(bool_word $r_mat)]" \
+            "SEO Config [$(bool_word $r_seo)]" "Start Restore" "Cancel")
+        
+        case "$choice" in
+            "Database "*) r_sql=$(toggle_bool "$r_sql") ;;
+            "App Files "*) r_app=$(toggle_bool "$r_app") ;;
+            "Env File "*) r_env=$(toggle_bool "$r_env") ;;
+            "Materials "*) r_mat=$(toggle_bool "$r_mat") ;;
+            "SEO Config "*) r_seo=$(toggle_bool "$r_seo") ;;
+            "Cancel") return ;;
+            "Start Restore") break ;;
+        esac
+    done
+
+    if gum confirm "$(center_style "Restore $(basename "$selected")? This will overwrite existing data!")"; then
+        local td="$(mktemp -d)"
+        run_task "Extracting archive" tar -xJf "$selected" -C "$td"
+        local bd=$(find "$td" -mindepth 1 -maxdepth 1 -type d | head -1)
+        
+        [[ "$r_sql" == "true" && -f "$bd/database.sql" ]] && run_task "Restoring Database" restore_database "$bd/database.sql"
+        [[ "$r_env" == "true" && -f "$bd/.env" ]] && run_task "Restoring Env" run_privileged_cmd cp "$bd/.env" "${SHARED_DIR}/.env"
+        [[ "$r_seo" == "true" && -f "$bd/seo-config.json" ]] && run_task "Restoring SEO" run_privileged_cmd cp "$bd/seo-config.json" "$SEO_CONFIG_FILE"
+        [[ "$r_mat" == "true" && -d "$bd/.data" ]] && run_task "Restoring Materials" run_privileged_cmd cp -r "$bd/.data" "${REPO_ROOT}/"
+        [[ "$r_app" == "true" && -d "$bd/app" ]] && center_style "Manual app copy required from $bd/app" --foreground 220
+        
+        rm -rf "$td"
+        notify_success "Restore process finished"
     fi
 }
 
@@ -458,11 +581,20 @@ run_delete_backups() {
         return
     fi
 
-    local selected=$(gum choose --no-limit --header "$(center_style "Select backups to DELETE (SPACE to toggle, ENTER to confirm)")" "${backups[@]}")
+    local display_list=()
+    for b in "${backups[@]}"; do
+        local meta=$(get_backup_meta "$b")
+        display_list+=("$(basename "$b") ($(format_backup_meta "$meta"))")
+    done
+
+    local selected=$(gum choose --no-limit --header "$(center_style "Select backups to DELETE (SPACE to toggle, ENTER to confirm)")" "${display_list[@]}")
     if [[ -n "$selected" ]]; then
         local count=$(echo "$selected" | wc -l)
         if gum confirm "$(center_style "Delete $count backups permanently?")"; then
-            gum spin --spinner bouncer --title "$(center_style "Deleting files...")" -- bash -c "echo '$selected' | xargs rm -f"
+            echo "$selected" | while read -r line; do
+                local fname=$(echo "$line" | cut -d' ' -f1)
+                rm -f "${BACKUP_DIR}/$fname" "${BACKUP_DIR}/${fname%.tar.xz}.meta"
+            done
             notify_success "Backups removed"
         fi
     fi
@@ -492,7 +624,7 @@ main_menu() {
 deploy_menu() {
     while true; do
         show_header
-        local choice=$(center_choose "Deploy Management" "Update App (update.sh)" "Deploy App (deploy.sh)" "Back")
+        local choice=$(center_choose "Deploy Management" "Update App (update.sh)" "Deploy App (deploy.sh)" "Toggle Sudo [$(update_sudo_mode_label)]" "Back")
         case $choice in
             "Update App"*) 
                 run_task "Running update" bash "${UPDATE_SCRIPT}" --sudo-deploy
@@ -500,6 +632,7 @@ deploy_menu() {
             "Deploy App"*) 
                 run_task "Running deploy" bash "${DEPLOY_SCRIPT}" --skip-pull
                 notify_success "Deployment finished" ;;
+            "Toggle Sudo"*) cycle_sudo_mode ;;
             "Back") return ;;
         esac
     done
@@ -527,15 +660,19 @@ backup_components_tui() {
         local a=$(bool_word "$BACKUP_INCLUDE_WEBAPP")
         local e=$(bool_word "$BACKUP_INCLUDE_ENV")
         local m=$(bool_word "$BACKUP_INCLUDE_LEARNING_MATERIALS")
+        local o=$(bool_word "$BACKUP_INCLUDE_SEO_CONFIG")
+        local c=$(bool_word "$BACKUP_CLEAN_OLD")
         
-        local choice=$(center_choose "Toggle Components (SPACE to toggle, ENTER to finish)" \
-            "Database [$s]" "App Files [$a]" "Env File [$e]" "Materials [$m]" "Save & Back")
+        local choice=$(center_choose "Toggle Components" \
+            "Database [$s]" "App Files [$a]" "Env File [$e]" "Materials [$m]" "SEO Config [$o]" "Clean Old [$c]" "Save & Back")
         
         case $choice in
             "Database "*) BACKUP_INCLUDE_SQL=$(toggle_bool "$BACKUP_INCLUDE_SQL") ;;
             "App Files "*) BACKUP_INCLUDE_WEBAPP=$(toggle_bool "$BACKUP_INCLUDE_WEBAPP") ;;
             "Env File "*) BACKUP_INCLUDE_ENV=$(toggle_bool "$BACKUP_INCLUDE_ENV") ;;
             "Materials "*) BACKUP_INCLUDE_LEARNING_MATERIALS=$(toggle_bool "$BACKUP_INCLUDE_LEARNING_MATERIALS") ;;
+            "SEO Config "*) BACKUP_INCLUDE_SEO_CONFIG=$(toggle_bool "$BACKUP_INCLUDE_SEO_CONFIG") ;;
+            "Clean Old "*) BACKUP_CLEAN_OLD=$(toggle_bool "$BACKUP_CLEAN_OLD") ;;
             "Save & Back") save_maintenance_settings; return ;;
         esac
     done
@@ -544,8 +681,20 @@ backup_components_tui() {
 cloud_settings_tui() {
     while true; do
         show_header
-        local choice=$(center_choose "Cloud Configuration" "Toggle Auto-Upload [$(bool_word "$BACKUP_AUTO_UPLOAD")]" "Set Cloud Folder" "Back")
+        local g="false" k="false"
+        [[ "$BACKUP_CLOUD_PROVIDER" == *"google-drive"* ]] && g="true"
+        [[ "$BACKUP_CLOUD_PROVIDER" == *"koofr"* ]] && k="true"
+        
+        local choice=$(center_choose "Cloud Configuration" \
+            "GDrive [$(bool_word $g)]" "Koofr [$(bool_word $k)]" \
+            "Toggle Auto-Upload [$(bool_word "$BACKUP_AUTO_UPLOAD")]" "Set Cloud Folder" "Back")
         case $choice in
+            "GDrive "*) 
+                if [[ "$g" == "true" ]]; then BACKUP_CLOUD_PROVIDER="${BACKUP_CLOUD_PROVIDER//google-drive/}"; else BACKUP_CLOUD_PROVIDER="${BACKUP_CLOUD_PROVIDER} google-drive"; fi
+                BACKUP_CLOUD_PROVIDER=$(echo "$BACKUP_CLOUD_PROVIDER" | xargs); [[ -z "$BACKUP_CLOUD_PROVIDER" ]] && BACKUP_CLOUD_PROVIDER="none"; save_maintenance_settings ;;
+            "Koofr "*) 
+                if [[ "$k" == "true" ]]; then BACKUP_CLOUD_PROVIDER="${BACKUP_CLOUD_PROVIDER//koofr/}"; else BACKUP_CLOUD_PROVIDER="${BACKUP_CLOUD_PROVIDER} koofr"; fi
+                BACKUP_CLOUD_PROVIDER=$(echo "$BACKUP_CLOUD_PROVIDER" | xargs); [[ -z "$BACKUP_CLOUD_PROVIDER" ]] && BACKUP_CLOUD_PROVIDER="none"; save_maintenance_settings ;;
             "Toggle Auto-Upload "*) BACKUP_AUTO_UPLOAD=$(toggle_bool "$BACKUP_AUTO_UPLOAD"); save_maintenance_settings ;;
             "Set Cloud Folder") 
                 BACKUP_CLOUD_FOLDER=$(gum input --prompt "$(center_style "Folder: ")" --value "$BACKUP_CLOUD_FOLDER")
@@ -576,14 +725,18 @@ seo_db_menu() {
 system_menu() {
     while true; do
         show_header
-        local choice=$(center_choose "System Management" "Git Pull" "Clean Cache" "Back")
+        local choice=$(center_choose "System Management" "Git Pull" "Clean Cache" "Edit Config" "Back")
         case $choice in
             "Git Pull") 
-                run_task "Pulling from origin" git -C "${REPO_ROOT}" pull origin main
+                run_task "Pulling from origin" git -C "${REPO_ROOT}" pull "${REMOTE_NAME}" "${BRANCH:-$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD)}"
                 notify_success "Git pull complete" ;;
             "Clean Cache") 
                 run_task "Cleaning cache" bash -c "rm -rf \"${REPO_ROOT}/.next\" && rm -rf \"${REPO_ROOT}/node_modules/.cache\""
                 notify_success "Cache cleared" ;;
+            "Edit Config")
+                local se="${SHARED_DIR}/.env" ed="${VISUAL:-${EDITOR:-nano}}"
+                for c in nano vi vim; do command -v "$c" >/dev/null && { ed="$c"; break; }; done
+                [[ -f "$se" ]] && run_privileged_cmd "$ed" "$se" || notify_error "Config not found" ;;
             "Back") return ;;
         esac
     done
