@@ -189,8 +189,23 @@ get_disk_usage() { df -h / | awk 'NR==2 {print $5}' | sed 's/%//'; }
 get_uptime() { uptime -p | sed 's/up //'; }
 
 # =============================================================================
-# 4. UI Components
+# 4. UI Components & Centering Logic
 # =============================================================================
+
+# Helper to horizontally center a string or style block
+center_style() {
+    local width=$(tput cols)
+    gum style --width "$width" --align center "$@"
+}
+
+# Helper to provide vertical padding
+ui_wrapper() {
+    local content_height="${1:-15}"
+    local term_height=$(tput lines)
+    local pad=$(( (term_height - content_height) / 2 ))
+    [[ $pad -lt 0 ]] && pad=0
+    for ((i=0; i<pad; i++)); do echo ""; done
+}
 
 draw_bar() {
   local p="$1" color="${2:-212}" width=20
@@ -199,7 +214,7 @@ draw_bar() {
   local bar=""
   for ((i=0; i<filled; i++)); do bar+="█"; done
   for ((i=0; i<empty; i++)); do bar+="░"; done
-  gum style --foreground "$color" "$bar $p%"
+  echo "$bar $p%"
 }
 
 show_header() {
@@ -211,27 +226,30 @@ show_header() {
     local branch=$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
     local commit=$(git -C "${REPO_ROOT}" rev-parse --short HEAD 2>/dev/null || echo "???")
 
-    local header_box
-    header_box=$(gum style \
+    local stats_line="CPU: $(draw_bar $cpu 82)  MEM: $(draw_bar $mem 33)"
+    local system_line="DISK: $(draw_bar $disk 208)  UP: $up"
+    local git_line="Branch: $branch  |  Commit: $commit"
+
+    ui_wrapper 20
+
+    gum style \
         --foreground 212 --border-foreground 212 --border double \
-        --align center --width 70 --margin "1 2" --padding "1 2" \
+        --align center --width 75 --margin "0 auto" --padding "1 2" \
         "⬡ Melbourne Guitar School - Maintenance Console" \
         "" \
-        "$(gum style --foreground 250 "CPU: $(draw_bar $cpu 82)  MEM: $(draw_bar $mem 33)")" \
-        "$(gum style --foreground 250 "DISK: $(draw_bar $disk 208)  UP: $up")" \
+        "$(gum style --foreground 250 "$stats_line")" \
+        "$(gum style --foreground 250 "$system_line")" \
         "" \
-        "$(gum style --foreground 245 "Branch: $branch  |  Commit: $commit")"
-    )
-    echo "$header_box"
+        "$(gum style --foreground 245 "$git_line")"
 }
 
 notify_success() {
-    gum style --foreground 82 --border normal --border-foreground 82 --padding "0 2" --margin "1 0" "✔ $1"
+    center_style --foreground 82 --border normal --border-foreground 82 --padding "0 2" --margin "1 0" "✔ $1"
     sleep 1.5
 }
 
 notify_error() {
-    gum style --foreground 196 --border normal --border-foreground 196 --padding "0 2" --margin "1 0" "✖ $1"
+    center_style --foreground 196 --border normal --border-foreground 196 --padding "0 2" --margin "1 0" "✖ $1"
     sleep 2
 }
 
@@ -239,19 +257,10 @@ notify_error() {
 # 5. Core Logic Operations & Task Runner
 # =============================================================================
 
-# Helper to run a task with visual feedback
-# Usage: run_task "Title" "command..."
 run_task() {
     local title="$1"
     shift
-    
-    if gum --help | grep -q "progress"; then
-        # If progress is supported
-        echo "100" | gum progress --title "$title" -- "$@"
-    else
-        # Fallback to spinner which is more widely available
-        gum spin --spinner dot --title "$title..." -- "$@"
-    fi
+    gum spin --spinner dot --title "$title..." -- "$@"
 }
 
 get_db_creds() {
@@ -285,14 +294,12 @@ upload_to_gdrive() {
         return 1
     fi
     
-    # Get access token
     local token_response=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
         -d "client_id=${GDRIVE_CLIENT_ID}&client_secret=${GDRIVE_CLIENT_SECRET}&refresh_token=${GDRIVE_REFRESH_TOKEN}&grant_type=refresh_token")
-    local access_token=$(echo "${token_response}" | grep -o '"access_token"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*: *"\([^"]*\)"/\1/')
+    local access_token=$(echo "${token_response}" | grep -o '"access_token"[[:space:]]*:[[:space:]]*" [^"]*"' | sed 's/.*: *"\([^"]*\)"/\1/')
     
     [[ -z "${access_token}" ]] && return 1
 
-    # Get folder ID
     local folder_id=$(curl -s "https://www.googleapis.com/drive/v3/files?q=name='${folder_name}'+and+mimeType='application/vnd.google-apps.folder'+and+trashed=false" \
         -H "Authorization: Bearer ${access_token}" | grep -o '"id"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*: *"\([^"]*\)"/\1/')
 
@@ -345,7 +352,7 @@ run_backup_process() {
     local archive="${BACKUP_DIR}/${bn}.tar.xz"
     mkdir -p "$BACKUP_DIR"
 
-    echo "Starting backup workflow..."
+    center_style "Starting backup workflow..."
     
     for i in "${!steps[@]}"; do
         local step="${steps[$i]}"
@@ -382,11 +389,10 @@ run_restore_process() {
         return
     fi
 
-    local selected=$(gum choose --header "Select backup to restore" "${backups[@]}")
+    local selected=$(gum choose --header "$(center_style "Select backup to restore")" "${backups[@]}")
     if [[ -n "$selected" ]]; then
-        if gum confirm "Restore $(basename "$selected")? This will overwrite existing data!"; then
+        if gum confirm "$(center_style "Restore $(basename "$selected")? This will overwrite existing data!")"; then
             run_task "Extracting backup" tar -xJf "$selected" -C /tmp/
-            # Add more restoration steps here
             notify_success "Restore completed"
         fi
     fi
@@ -399,10 +405,10 @@ run_delete_backups() {
         return
     fi
 
-    local selected=$(gum choose --no-limit --header "Select backups to DELETE (SPACE to toggle, ENTER to confirm)" "${backups[@]}")
+    local selected=$(gum choose --no-limit --header "$(center_style "Select backups to DELETE (SPACE to toggle, ENTER to confirm)")" "${backups[@]}")
     if [[ -n "$selected" ]]; then
         local count=$(echo "$selected" | wc -l)
-        if gum confirm "Delete $count backups permanently?"; then
+        if gum confirm "$(center_style "Delete $count backups permanently?")"; then
             gum spin --spinner bouncer --title "Deleting files..." -- bash -c "echo '$selected' | xargs rm -f"
             notify_success "Backups removed"
         fi
@@ -410,14 +416,14 @@ run_delete_backups() {
 }
 
 # =============================================================================
-# 6. Menus
+# 7. Navigation Menus
 # =============================================================================
 
 main_menu() {
     load_maintenance_settings
     while true; do
         show_header
-        local choice=$(gum choose --header "Main Menu" "Deploy Management" "Backup & Restore" "SEO & Database" "System Management" "Quit")
+        local choice=$(gum choose --header "$(center_style "Main Menu")" "Deploy Management" "Backup & Restore" "SEO & Database" "System Management" "Quit")
         
         case $choice in
             "Deploy Management") deploy_menu ;;
@@ -425,7 +431,7 @@ main_menu() {
             "SEO & Database") seo_db_menu ;;
             "System Management") system_menu ;;
             "Quit") 
-                if gum confirm "Quit Maintenance Console?"; then exit 0; fi ;;
+                if gum confirm "$(center_style "Quit Maintenance Console?")"; then exit 0; fi ;;
         esac
     done
 }
@@ -433,7 +439,7 @@ main_menu() {
 deploy_menu() {
     while true; do
         show_header
-        local choice=$(gum choose --header "Deploy Management" "Update App (update.sh)" "Deploy App (deploy.sh)" "Back")
+        local choice=$(gum choose --header "$(center_style "Deploy Management")" "Update App (update.sh)" "Deploy App (deploy.sh)" "Back")
         case $choice in
             "Update App"*) 
                 gum spin --title "Running update..." -- bash "${UPDATE_SCRIPT}" --sudo-deploy
@@ -449,7 +455,7 @@ deploy_menu() {
 backup_menu() {
     while true; do
         show_header
-        local choice=$(gum choose --header "Backup & Restore" "Run New Backup" "Restore Backup" "Delete Backups" "Backup Components" "Cloud Settings" "Back")
+        local choice=$(gum choose --header "$(center_style "Backup & Restore")" "Run New Backup" "Restore Backup" "Delete Backups" "Backup Components" "Cloud Settings" "Back")
         case $choice in
             "Run New Backup") run_backup_process ;;
             "Restore Backup") run_restore_process ;;
@@ -469,7 +475,7 @@ backup_components_tui() {
         local e=$(bool_word "$BACKUP_INCLUDE_ENV")
         local m=$(bool_word "$BACKUP_INCLUDE_LEARNING_MATERIALS")
         
-        local choice=$(gum choose --header "Toggle Components (SPACE to toggle, ENTER to finish)" \
+        local choice=$(gum choose --header "$(center_style "Toggle Components (SPACE to toggle, ENTER to finish)")" \
             "Database [$s]" "App Files [$a]" "Env File [$e]" "Materials [$m]" "Save & Back")
         
         case $choice in
@@ -485,7 +491,7 @@ backup_components_tui() {
 cloud_settings_tui() {
     while true; do
         show_header
-        local choice=$(gum choose --header "Cloud Configuration" "Toggle Auto-Upload [$(bool_word "$BACKUP_AUTO_UPLOAD")]" "Set Cloud Folder" "Back")
+        local choice=$(gum choose --header "$(center_style "Cloud Configuration")" "Toggle Auto-Upload [$(bool_word "$BACKUP_AUTO_UPLOAD")]" "Set Cloud Folder" "Back")
         case $choice in
             "Toggle Auto-Upload "*) BACKUP_AUTO_UPLOAD=$(toggle_bool "$BACKUP_AUTO_UPLOAD"); save_maintenance_settings ;;
             "Set Cloud Folder") 
@@ -499,11 +505,10 @@ cloud_settings_tui() {
 seo_db_menu() {
     while true; do
         show_header
-        local choice=$(gum choose --header "SEO & Database" "Check DB Health" "Generate Sitemap" "Generate Robots" "Back")
+        local choice=$(gum choose --header "$(center_style "SEO & Database")" "Check DB Health" "Generate Sitemap" "Generate Robots" "Back")
         case $choice in
             "Check DB Health") 
-                gum spin --spinner monkey --title "Checking connection..." -- sleep 1
-                notify_success "Database is healthy" ;;
+                check_database_health; gum input --placeholder "Press Enter to continue..." ;;
             "Generate Sitemap") 
                 gum spin --title "Generating..." -- sleep 1
                 notify_success "Sitemap created" ;;
@@ -518,7 +523,7 @@ seo_db_menu() {
 system_menu() {
     while true; do
         show_header
-        local choice=$(gum choose --header "System Management" "Git Pull" "Clean Cache" "Back")
+        local choice=$(gum choose --header "$(center_style "System Management")" "Git Pull" "Clean Cache" "Back")
         case $choice in
             "Git Pull") 
                 gum spin --spinner pulse --title "Pulling from origin..." -- git -C "${REPO_ROOT}" pull origin main
@@ -531,9 +536,21 @@ system_menu() {
     done
 }
 
-# Final boolean helpers
+# Boolean helpers
 bool_word() { [[ "$1" == true ]] && echo "ON" || echo "OFF"; }
 toggle_bool() { [[ "$1" == true ]] && echo false || echo true; }
+
+check_database_health() { 
+    get_db_creds || { notify_error "No DB creds"; return 1; }
+    gum spin --spinner monkey --title "Checking connection to $DB_NAME..." -- sleep 1
+    if command -v mysql >/dev/null 2>&1; then
+        if MYSQL_PWD="${DB_P}" mysql -h "${DB_H:-localhost}" -u "${DB_U}" -e "SELECT 1" "${DB_NAME}" >/dev/null 2>&1; then
+            notify_success "Database connected"
+        else
+            notify_error "Connection failed"
+        fi
+    fi
+}
 
 # Start the application
 main_menu
