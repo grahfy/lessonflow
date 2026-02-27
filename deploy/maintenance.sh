@@ -732,8 +732,8 @@ print_delete_backups_tui() {
       
       local meta; meta=$(get_backup_meta "${BACKUP_DIR}/${bn}")
       local tick="[ ]"; [[ "${selected[i]}" == true ]] && tick="[${GREEN}✔${NC}]"
-      
-      printf "  ${CYAN}%s${NC} %s %-16s %b ${DIM}%s${NC}\n" "${l}" "${tick}" "${id}" "${status}" "${meta}"
+
+      printf "  ${CYAN}%s${NC} %b %-16s %b ${DIM}%s${NC}\n" "${l}" "${tick}" "${id}" "${status}" "${meta}"
     done
     
     (( count == 0 )) && echo -e "  ${YELLOW}No backups found${NC}"
