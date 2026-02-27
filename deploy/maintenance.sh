@@ -212,6 +212,8 @@ gpgkey=https://repo.charm.sh/yum/gpg.key' | tee /etc/yum.repos.d/charm.repo >/de
 }
 
 section() {
+  tui_clear_screen
+  print_dashboard_header
   echo ""
   local title="$1"
   local width=$(( ${#title} + 4 ))
@@ -794,8 +796,8 @@ restore_backup() {
 restore_backup_tui() {
   local src="local" rs=true rw=true re=true rmat=true rse=true rd=true
   while true; do
-    auto_size_tui_panel_width; tui_clear_screen; 
-    gum style --border rounded --border-foreground "82" --padding "0 2" --width "${MAINTENANCE_TUI_PANEL_WIDTH}" --align center $(gum style --foreground "82" --bold "🔄 Restore Backup")
+    auto_size_tui_panel_width; print_dashboard_header; 
+    gum style --border rounded --border-foreground "82" --padding "0 2" --width "${MAINTENANCE_TUI_PANEL_WIDTH}" --align center --bold --foreground "82" "🔄 Restore Backup"
     echo -e "  ${DIM}Source: ${BOLD}${src^^}${NC} | Use arrows to configure, then select backup\n"
     
     local backups=()
@@ -806,7 +808,16 @@ restore_backup_tui() {
       while IFS= read -r b; do [[ -n "$b" ]] && backups+=("$b"); done < <(list_cloud_backups)
     fi
 
-    local options_choice; options_choice=$(gum choose "SQL: $(bool_word "${rs}")" "App: $(bool_word "${rw}")" "Env: $(bool_word "${re}")" "Mat: $(bool_word "${rmat}")" "SEO: $(bool_word "${rse}")" "Data: $(bool_word "${rd}")" "🚀 PROCEED TO SELECT BACKUP" "🔄 Toggle Source (${src^^})" "⬅️  Back")
+    local options_choice; options_choice=$(gum choose --cursor.foreground="82" --item.foreground="250" \
+      "SQL: $(bool_word "${rs}")      - Include database dump in restore" \
+      "App: $(bool_word "${rw}")      - Include application files in restore" \
+      "Env: $(bool_word "${re}")      - Include environment variables in restore" \
+      "Mat: $(bool_word "${rmat}")      - Include learning materials in restore" \
+      "SEO: $(bool_word "${rse}")      - Include SEO configuration in restore" \
+      "Data: $(bool_word "${rd}")     - Include shared data files in restore" \
+      "🚀 PROCEED          - Select backup file to begin restoration" \
+      "🔄 Source: ${src^^}   - Toggle between Local and Cloud storage" \
+      "⬅️  Back             - Return to the backup menu")
     
     case "${options_choice}" in
       "SQL"*) rs=$(toggle_bool "${rs}") ; continue ;;
@@ -815,9 +826,9 @@ restore_backup_tui() {
       "Mat"*) rmat=$(toggle_bool "${rmat}") ; continue ;;
       "SEO"*) rse=$(toggle_bool "${rse}") ; continue ;;
       "Data"*) rd=$(toggle_bool "${rd}") ; continue ;;
-      "🔄 Toggle Source"*) [[ "$src" == "local" ]] && src="cloud" || src="local" ; continue ;;
-      "⬅️  Back") return 0 ;;
-      "🚀 PROCEED TO SELECT BACKUP") ;;
+      "🔄 Source"*) [[ "$src" == "local" ]] && src="cloud" || src="local" ; continue ;;
+      "⬅️  Back"*) return 0 ;;
+      "🚀 PROCEED"*) ;;
     esac
 
     if [[ ${#backups[@]} -eq 0 ]]; then
@@ -849,8 +860,8 @@ download_backup_from_cloud() {
 
 print_delete_backups_tui() {
   while true; do
-    auto_size_tui_panel_width; tui_clear_screen;
-    gum style --border rounded --border-foreground "196" --padding "0 2" --width "${MAINTENANCE_TUI_PANEL_WIDTH}" --align center $(gum style --foreground "196" --bold "🗑️  Delete Backups")
+    auto_size_tui_panel_width; print_dashboard_header;
+    gum style --border rounded --border-foreground "196" --padding "0 2" --width "${MAINTENANCE_TUI_PANEL_WIDTH}" --align center --bold --foreground "196" "🗑️  Delete Backups"
     
     log_info "Scanning for backups..."
     local local_list=(); while IFS= read -r b; do [[ -n "$b" ]] && local_list+=("$(basename "$b")"); done < <(list_local_backups)
@@ -888,19 +899,19 @@ print_delete_backups_tui() {
 
 print_backup_components_tui() {
   while true; do
-    auto_size_tui_panel_width; tui_clear_screen;
-    gum style --border rounded --border-foreground "82" --padding "0 2" --width "${MAINTENANCE_TUI_PANEL_WIDTH}" --align center $(gum style --foreground "82" --bold "🧩 Backup Components")
+    auto_size_tui_panel_width; print_dashboard_header;
+    gum style --border rounded --border-foreground "82" --padding "0 2" --width "${MAINTENANCE_TUI_PANEL_WIDTH}" --align center --bold --foreground "82" "🧩 Backup Components"
     local options=(
-      "Database: $(bool_word "${BACKUP_INCLUDE_SQL}")"
-      "Application: $(bool_word "${BACKUP_INCLUDE_WEBAPP}")"
-      "Environment: $(bool_word "${BACKUP_INCLUDE_ENV}")"
-      "Materials: $(bool_word "${BACKUP_INCLUDE_LEARNING_MATERIALS}")"
-      "SEO Config: $(bool_word "${BACKUP_INCLUDE_SEO_CONFIG}")"
-      "Clean Old: $(bool_word "${BACKUP_CLEAN_OLD}")"
-      "💾 Save & Back"
-      "❌ Cancel"
+      "Database: $(bool_word "${BACKUP_INCLUDE_SQL}")      - Toggle SQL database dumps"
+      "Application: $(bool_word "${BACKUP_INCLUDE_WEBAPP}")   - Toggle web application files"
+      "Environment: $(bool_word "${BACKUP_INCLUDE_ENV}")   - Toggle .env configuration files"
+      "Materials: $(bool_word "${BACKUP_INCLUDE_LEARNING_MATERIALS}")     - Toggle learning material data"
+      "SEO Config: $(bool_word "${BACKUP_INCLUDE_SEO_CONFIG}")    - Toggle SEO settings file"
+      "Clean Old: $(bool_word "${BACKUP_CLEAN_OLD}")     - Automatically purge aged archives"
+      "💾 Save & Back      - Apply changes and return"
+      "❌ Cancel           - Discard changes and return"
     )
-    local choice; choice=$(gum choose --cursor.foreground="82" "${options[@]}")
+    local choice; choice=$(gum choose --cursor.foreground="82" --item.foreground="250" "${options[@]}")
     case "${choice}" in
       "Database"*) BACKUP_INCLUDE_SQL=$(toggle_bool "${BACKUP_INCLUDE_SQL}") ;;
       "Application"*) BACKUP_INCLUDE_WEBAPP=$(toggle_bool "${BACKUP_INCLUDE_WEBAPP}") ;;
@@ -908,20 +919,25 @@ print_backup_components_tui() {
       "Materials"*) BACKUP_INCLUDE_LEARNING_MATERIALS=$(toggle_bool "${BACKUP_INCLUDE_LEARNING_MATERIALS}") ;;
       "SEO Config"*) BACKUP_INCLUDE_SEO_CONFIG=$(toggle_bool "${BACKUP_INCLUDE_SEO_CONFIG}") ;;
       "Clean Old"*) BACKUP_CLEAN_OLD=$(toggle_bool "${BACKUP_CLEAN_OLD}") ;;
-      "💾 Save & Back") save_maintenance_settings; return 0 ;;
-      "❌ Cancel") return 0 ;;
+      "💾 Save & Back"*) save_maintenance_settings; return 0 ;;
+      "❌ Cancel"*) return 0 ;;
     esac
   done
 }
 
 print_cloud_settings_tui() {
   while true; do
-    auto_size_tui_panel_width; tui_clear_screen;
-    gum style --border rounded --border-foreground "51" --padding "0 2" --width "${MAINTENANCE_TUI_PANEL_WIDTH}" --align center $(gum style --foreground "51" --bold "☁️  Cloud Settings")
+    auto_size_tui_panel_width; print_dashboard_header;
+    gum style --border rounded --border-foreground "51" --padding "0 2" --width "${MAINTENANCE_TUI_PANEL_WIDTH}" --align center --bold --foreground "51" "☁️  Cloud Settings"
     local use_g="OFF"; [[ "${BACKUP_CLOUD_PROVIDER}" == *"google-drive"* ]] && use_g="ON"
     local use_k="OFF"; [[ "${BACKUP_CLOUD_PROVIDER}" == *"koofr"* ]] && use_k="ON"
     
-    local choice; choice=$(gum choose --cursor.foreground="51" "Toggle Google Drive (Currently $use_g)" "Toggle Koofr (Currently $use_k)" "Toggle Auto-upload ($(bool_word "${BACKUP_AUTO_UPLOAD}"))" "Set Cloud Folder (${BACKUP_CLOUD_FOLDER})" "⬅️  Back")
+    local choice; choice=$(gum choose --cursor.foreground="51" --item.foreground="250" \
+      "Toggle Google Drive (Currently $use_g) - External GDrive backup storage" \
+      "Toggle Koofr (Currently $use_k)        - WebDAV compatible backup storage" \
+      "Toggle Auto-upload ($(bool_word "${BACKUP_AUTO_UPLOAD}"))      - Upload backups after creation" \
+      "Set Cloud Folder (${BACKUP_CLOUD_FOLDER:0:15}...) - Target directory name in cloud" \
+      "⬅️  Back                              - Return to the backup menu")
     case "${choice}" in
       "Toggle Google Drive"*) 
         if [[ "${use_g}" == "ON" ]]; then BACKUP_CLOUD_PROVIDER="${BACKUP_CLOUD_PROVIDER//google-drive/}"; else [[ "${BACKUP_CLOUD_PROVIDER}" == "none" ]] && BACKUP_CLOUD_PROVIDER=""; BACKUP_CLOUD_PROVIDER="${BACKUP_CLOUD_PROVIDER} google-drive"; fi
@@ -931,7 +947,7 @@ print_cloud_settings_tui() {
         BACKUP_CLOUD_PROVIDER=$(echo $BACKUP_CLOUD_PROVIDER | xargs); [[ -z "${BACKUP_CLOUD_PROVIDER}" ]] && BACKUP_CLOUD_PROVIDER="none"; save_maintenance_settings ;;
       "Toggle Auto-upload"*) BACKUP_AUTO_UPLOAD=$(toggle_bool "${BACKUP_AUTO_UPLOAD}"); save_maintenance_settings ;;
       "Set Cloud Folder"*) BACKUP_CLOUD_FOLDER=$(gum input --placeholder "Folder Name" --value "${BACKUP_CLOUD_FOLDER}"); save_maintenance_settings ;;
-      "⬅️  Back") return 0 ;;
+      "⬅️  Back"*) return 0 ;;
     esac
   done
 }
@@ -1036,9 +1052,9 @@ print_deploy_menu_tui() {
     echo ""
     
     local choice; choice=$(gum choose --cursor.foreground="33" --item.foreground="250" \
-      "📦 Update Application  - Fetch latest code and install dependencies" \
-      "🚢 Deploy Application  - Build and swap to the new version" \
-      "⬅️  Back               - Return to the main menu")
+      "📦 Update Application - Fetch latest code and install dependencies" \
+      "🚢 Deploy Application - Build and swap to the new version" \
+      "⬅️  Back              - Return to the main menu")
       
     case "${choice}" in
       "📦 Update Application"*) run_update_script; read -r -n 1 -s -p "  Done. Press any key..." ;;
@@ -1055,14 +1071,14 @@ print_backup_menu_tui() {
     echo ""
     
     local choice; choice=$(gum choose --cursor.foreground="82" --item.foreground="250" \
-      "✨ Run New Backup      - Execute immediate local and cloud backup" \
-      "🔄 Restore Backup      - Rollback database or files from archive" \
-      "🗑️ Delete Backups      - Clean up old local and cloud archives" \
-      "☁️ Cloud Settings      - Configure GDrive and Koofr integration" \
-      "🧩 Backup Components   - Toggle which data types to include" \
-      "📅 Set Frequency       - Current: ${BACKUP_FREQUENCY}" \
-      "⏱️ Set Retention       - Current: ${BACKUP_RETENTION_DAYS}d" \
-      "⬅️  Back               - Return to the main menu")
+      "✨ Run New Backup     - Execute immediate local and cloud backup" \
+      "🔄 Restore Backup     - Rollback database or files from archive" \
+      "🗑️ Delete Backups     - Clean up old local and cloud archives" \
+      "☁️ Cloud Settings     - Configure GDrive and Koofr integration" \
+      "🧩 Backup Components  - Toggle which data types to include" \
+      "📅 Set Frequency      - Current: ${BACKUP_FREQUENCY}" \
+      "⏱️ Set Retention      - Current: ${BACKUP_RETENTION_DAYS}d" \
+      "⬅️  Back              - Return to the main menu")
       
     case "${choice}" in
       "✨ Run New Backup"*) run_backup "${BACKUP_AUTO_UPLOAD:-false}"; read -r -n 1 -s -p "  Done. Press any key..." ;;
@@ -1084,10 +1100,10 @@ print_seo_db_menu_tui() {
     echo ""
     
     local choice; choice=$(gum choose --cursor.foreground="51" --item.foreground="250" \
-      "🗺️  Generate Sitemap    - Rebuild search engine sitemap.xml" \
-      "🤖 Generate Robots.txt  - Rebuild robots.txt access rules" \
-      "🏥 Check DB Health     - Verify database connectivity and status" \
-      "⬅️  Back               - Return to the main menu")
+      "🗺️  Generate Sitemap   - Rebuild search engine sitemap.xml" \
+      "🤖 Generate Robots.txt - Rebuild robots.txt access rules" \
+      "🏥 Check DB Health    - Verify database connectivity and status" \
+      "⬅️  Back              - Return to the main menu")
       
     case "${choice}" in
       "🗺️  Generate Sitemap"*) generate_sitemap; read -r -n 1 -s -p "  Done. Press any key..." ;;
@@ -1105,10 +1121,10 @@ print_system_menu_tui() {
     echo ""
     
     local choice; choice=$(gum choose --cursor.foreground="208" --item.foreground="250" \
-      "📥 Git Pull            - Update local repository from remote" \
-      "🧹 Clean Cache         - Clear Next.js and node_modules cache" \
-      "📝 Edit Config (.env)  - Open shared environment file in editor" \
-      "⬅️  Back               - Return to the main menu")
+      "📥 Git Pull           - Update local repository from remote" \
+      "🧹 Clean Cache        - Clear Next.js and node_modules cache" \
+      "📝 Edit Config (.env) - Open shared environment file in editor" \
+      "⬅️  Back              - Return to the main menu")
       
     case "${choice}" in
       "📥 Git Pull"*) run_git_pull; read -r -n 1 -s -p "  Done. Press any key..." ;;
@@ -1124,14 +1140,13 @@ run_interactive_maintenance() {
   tui_clear_screen
   while true; do
     auto_size_tui_panel_width; print_btop_main_menu;
-    local choice; choice=$(gum choose --cursor.foreground="33" --item.foreground="250" \
-      "🚀 Deploy Management  - Update code and trigger deployments" \
-      "💾 Backup & Restore   - Local & Cloud backups, database dumps" \
-      "🔍 SEO & Database     - Sitemap, Robots.txt and DB health" \
-      "🛠️  System Management - Git operations, cache and config" \
-      "🔄 Refresh           - Update dashboard stats" \
-      "❌ Quit              - Exit maintenance console")
-      
+            local choice; choice=$(gum choose --cursor.foreground="33" --item.foreground="250" \
+              "🚀 Deploy Management  - Update code and trigger deployments" \
+              "💾 Backup & Restore   - Local & Cloud backups, database dumps" \
+              "🔍 SEO & Database     - Sitemap, Robots.txt and DB health" \
+              "🛠️ System Management - Git operations, cache and config" \
+              "🔄 Refresh           - Update dashboard stats" \
+              "❌ Quit              - Exit maintenance console")      
     case "${choice}" in
       "🚀 Deploy Management"*) print_deploy_menu_tui ;;
       "💾 Backup & Restore"*) print_backup_menu_tui ;;
