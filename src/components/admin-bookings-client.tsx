@@ -3069,7 +3069,7 @@ export function AdminBookingsClient() {
               }}
             >
               <div
-                className="dialog-panel dialog-panel-compact"
+                className="dialog-panel booking-dialog-panel dialog-panel-wide"
                 data-motion-item="invoice-dialog-panel"
                 role="dialog"
                 aria-modal="true"
@@ -3084,129 +3084,139 @@ export function AdminBookingsClient() {
                     Cancel
                   </button>
                 </div>
-                <p className="helper-text dialog-status" data-motion-item="invoice-dialog-status">
-                  Add lesson price and optional extras. You can edit and send the invoice from the invoice console.
-                </p>
-                <div className="manual-grid manual-grid-2">
-                  <div className="field">
-                    <label>Due date *</label>
-                    <input
-                      type="datetime-local"
-                      value={invoiceForm.dueAtLocal}
-                      onChange={(event) => setInvoiceForm((prev) => ({ ...prev, dueAtLocal: event.target.value }))}
-                    />
-                  </div>
-                  <div className="field">
-                    <label>Tax mode</label>
-                    <select
-                      value={invoiceForm.taxMode}
-                      onChange={(event) => setInvoiceForm((prev) => ({ ...prev, taxMode: event.target.value as InvoiceTaxMode }))}
-                    >
-                      <option value="taxable">Taxable (GST)</option>
-                      <option value="gst_free">GST-free</option>
-                    </select>
-                  </div>
-                  <div className="field manual-span-2">
-                    <label>Notes</label>
-                    <textarea
-                      value={invoiceForm.notes}
-                      onChange={(event) => setInvoiceForm((prev) => ({ ...prev, notes: event.target.value }))}
-                    />
-                  </div>
-                </div>
-
-                <div className="invoice-line-list">
-                  {editingLineItems.map((lineItem, index) => (
-                    <div key={lineItem.key} className="invoice-line-item invoice-line-item-editable">
+                <div className="booking-dialog-scroll">
+                  <p className="helper-text dialog-status" data-motion-item="invoice-dialog-status">
+                    Add lesson price and optional extras. You can edit and send the invoice from the invoice console.
+                  </p>
+                  <div className="manual-grid manual-grid-2">
+                    <div className="field">
+                      <label>Due date *</label>
                       <input
-                        value={lineItem.description}
-                        onChange={(event) =>
-                          setEditingLineItems((previous) =>
-                            previous.map((entry, entryIndex) => (entryIndex === index ? { ...entry, description: event.target.value } : entry))
-                          )
-                        }
-                        placeholder="Description"
+                        type="datetime-local"
+                        value={invoiceForm.dueAtLocal}
+                        onChange={(event) => setInvoiceForm((prev) => ({ ...prev, dueAtLocal: event.target.value }))}
                       />
-                      {!lineItem.isPreset ? (
-                        <input
-                          type="number"
-                          min={1}
-                          step={1}
-                          value={lineItem.quantity}
-                          onChange={(event) =>
-                            setEditingLineItems((previous) =>
-                              previous.map((entry, entryIndex) => (entryIndex === index ? { ...entry, quantity: event.target.value } : entry))
-                            )
-                          }
-                        />
-                      ) : (
-                        <div />
-                      )}
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={lineItem.unitPriceAud}
-                        onChange={(event) =>
-                          setEditingLineItems((previous) =>
-                            previous.map((entry, entryIndex) => (entryIndex === index ? { ...entry, unitPriceAud: event.target.value } : entry))
-                          )
-                        }
-                      />
+                    </div>
+                    <div className="field">
+                      <label>Tax mode</label>
                       <select
-                        value={lineItem.taxMode}
-                        onChange={(event) =>
-                          setEditingLineItems((previous) =>
-                            previous.map((entry, entryIndex) =>
-                              entryIndex === index ? { ...entry, taxMode: event.target.value as InvoiceTaxMode } : entry
-                            )
-                          )
-                        }
+                        value={invoiceForm.taxMode}
+                        onChange={(event) => setInvoiceForm((prev) => ({ ...prev, taxMode: event.target.value as InvoiceTaxMode }))}
                       >
                         <option value="taxable">Taxable (GST)</option>
                         <option value="gst_free">GST-free</option>
                       </select>
-                      <button
-                        className="btn btn-secondary"
-                        onClick={() =>
-                          setEditingLineItems((previous) => previous.filter((_, entryIndex) => entryIndex !== index))
-                        }
-                      >
-                        Remove
-                      </button>
                     </div>
-                  ))}
-                </div>
+                    <div className="field manual-span-2">
+                      <label>Notes</label>
+                      <textarea
+                        value={invoiceForm.notes}
+                        onChange={(event) => setInvoiceForm((prev) => ({ ...prev, notes: event.target.value }))}
+                      />
+                    </div>
+                  </div>
 
-                <div className="dialog-actions dialog-actions-inline">
-                  <button className="btn btn-secondary" type="button" onClick={() => addEditableLineItem()}>
-                    Add line item
-                  </button>
-                  <select
-                    value={editingProductPresetId}
-                    onChange={(event) => setEditingProductPresetId(event.target.value)}
-                    className="invoice-product-preset-select"
-                  >
-                    <option value="">Add lesson package preset...</option>
-                    {INVOICE_PRODUCT_PRESETS.map((preset) => (
-                      <option key={preset.id} value={preset.id}>
-                        {preset.label}
-                      </option>
+                  <div className="invoice-line-list">
+                    {editingLineItems.map((lineItem, index) => (
+                      <div key={lineItem.key} className="invoice-line-item invoice-line-item-editable">
+                        <input
+                          value={lineItem.description}
+                          onChange={(event) =>
+                            setEditingLineItems((previous) =>
+                              previous.map((entry, entryIndex) => (entryIndex === index ? { ...entry, description: event.target.value } : entry))
+                            )
+                          }
+                          placeholder="Description"
+                        />
+                        {!lineItem.isPreset ? (
+                          <input
+                            type="number"
+                            min={1}
+                            step={1}
+                            value={lineItem.quantity}
+                            onChange={(event) =>
+                              setEditingLineItems((previous) =>
+                                previous.map((entry, entryIndex) => (entryIndex === index ? { ...entry, quantity: event.target.value } : entry))
+                              )
+                            }
+                          />
+                        ) : (
+                          <div />
+                        )}
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={lineItem.unitPriceAud}
+                          onChange={(event) =>
+                            setEditingLineItems((previous) =>
+                              previous.map((entry, entryIndex) => (entryIndex === index ? { ...entry, unitPriceAud: event.target.value } : entry))
+                            )
+                          }
+                        />
+                        <select
+                          value={lineItem.taxMode}
+                          onChange={(event) =>
+                            setEditingLineItems((previous) =>
+                              previous.map((entry, entryIndex) =>
+                                entryIndex === index ? { ...entry, taxMode: event.target.value as InvoiceTaxMode } : entry
+                              )
+                            )
+                          }
+                        >
+                          <option value="taxable">Taxable (GST)</option>
+                          <option value="gst_free">GST-free</option>
+                        </select>
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() =>
+                            setEditingLineItems((previous) => previous.filter((_, entryIndex) => entryIndex !== index))
+                          }
+                        >
+                          Remove
+                        </button>
+                      </div>
                     ))}
-                  </select>
-                  <button
-                    className="btn btn-secondary"
-                    type="button"
-                    disabled={!editingProductPresetId}
-                    onClick={() => {
-                      const preset = INVOICE_PRODUCT_PRESETS.find((entry) => entry.id === editingProductPresetId);
-                      if (!preset) return;
-                      addInvoiceProductPresetToEditor(preset);
-                      setEditingProductPresetId("");
-                    }}
-                  >
-                    Add product preset
-                  </button>
+                  </div>
+
+                  <div className="dialog-actions dialog-actions-inline">
+                    <select
+                      value={editingProductPresetId}
+                      onChange={(event) => {
+                        const val = event.target.value;
+                        setEditingProductPresetId(val);
+                        const preset = INVOICE_PRODUCT_PRESETS.find((entry) => entry.id === val);
+                        if (preset) {
+                          addInvoiceProductPresetToEditor(preset);
+                          setEditingProductPresetId("");
+                        }
+                      }}
+                      className="invoice-product-preset-select"
+                    >
+                      <option value="">Add lesson package preset...</option>
+                      {INVOICE_PRODUCT_PRESETS.map((preset) => (
+                        <option key={preset.id} value={preset.id}>
+                          {preset.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className="btn btn-secondary"
+                      type="button"
+                      disabled={!editingProductPresetId}
+                      onClick={() => {
+                        const preset = INVOICE_PRODUCT_PRESETS.find((entry) => entry.id === editingProductPresetId);
+                        if (!preset) return;
+                        addInvoiceProductPresetToEditor(preset);
+                        setEditingProductPresetId("");
+                      }}
+                    >
+                      Add product preset
+                    </button>
+                    <button className="btn btn-secondary" type="button" onClick={() => addEditableLineItem()}>
+                      Add line item
+                    </button>
+                  </div>
                 </div>
 
                 <div className="dialog-actions" data-motion-item="invoice-dialog-actions">

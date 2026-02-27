@@ -48,7 +48,7 @@ a {
 
 .site-shell {
   min-height: 100dvh;
-  width: min(1300px, 100%);
+  width: min(1100px, 100%);
   margin: 0 auto;
   padding: 20px 24px 18px;
   display: grid;
@@ -145,6 +145,7 @@ a {
 
 .view {
   min-height: 0;
+  max-height: 800px;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: linear-gradient(145deg, rgba(9, 13, 32, 0.75), rgba(10, 15, 35, 0.64));
@@ -1162,7 +1163,7 @@ h1 {
 
 .admin-shell {
   min-height: 100dvh;
-  width: min(1200px, 100%);
+  width: min(1100px, 100%);
   margin: 0 auto;
   padding: 20px;
   display: grid;
@@ -1456,7 +1457,7 @@ h1 {
 }
 
 .dialog-panel {
-  width: min(980px, 96vw);
+  width: min(800px, 96vw);
   max-height: min(88vh, 920px);
   overflow: auto;
   border-radius: 18px;
@@ -1473,7 +1474,7 @@ h1 {
 }
 
 .dialog-panel-wide {
-  width: min(1040px, 96vw);
+  width: min(1000px, 96vw);
 }
 
 .dialog-head {
@@ -2590,6 +2591,7 @@ h1 {
     border-radius: 20px;
     background: var(--panel-strong);
     box-shadow: 0 18px 40px rgba(0, 0, 0, 0.34);
+    max-height: none;
   }
 
   .admin-grid {
