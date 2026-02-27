@@ -995,7 +995,7 @@ print_btop_header() {
   gum style --border rounded --border-foreground "33" --padding "0 2" --width "$width" --align center "$(printf "%s\n%s\n\n%s" "$title" "$subtitle" "$info")"
 }
 
-print_btop_main_menu() {
+print_dashboard_header() {
   printf "\033[H"
   local cpu=$(get_cpu_usage) mem=$(get_memory_usage) disk=$(get_disk_usage "/") up=$(get_uptime) w="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
   [[ -z "${BRANCH:-}" ]] && BRANCH="$(current_branch_name 2>/dev/null || echo "main")"; local h=$(get_current_commit 2>/dev/null || echo "???") m=$(get_last_commit_msg 2>/dev/null || echo "...")
@@ -1025,69 +1025,96 @@ print_btop_main_menu() {
   echo ""
 }
 
+print_btop_main_menu() {
+  print_dashboard_header
+}
+
 print_deploy_menu_tui() {
   while true; do
-    auto_size_tui_panel_width; tui_clear_screen; 
+    auto_size_tui_panel_width; print_dashboard_header; 
     gum style --border rounded --border-foreground "33" --padding "0 2" --width "${MAINTENANCE_TUI_PANEL_WIDTH}" --align center $(gum style --foreground "33" --bold "🚀 Deploy Management")
-    echo -e "  ${DIM}Update and deploy the application to the production environment.${NC}\n"
+    echo ""
     
-    local choice; choice=$(gum choose --cursor.foreground="33" "📦 Update Application" "🚢 Deploy Application" "⬅️  Back")
+    local choice; choice=$(gum choose --cursor.foreground="33" --item.foreground="250" \
+      "📦 Update Application  - Fetch latest code and install dependencies" \
+      "🚢 Deploy Application  - Build and swap to the new version" \
+      "⬅️  Back               - Return to the main menu")
+      
     case "${choice}" in
-      "📦 Update Application") run_update_script; read -r -n 1 -s -p "  Done. Press any key..." ;;
-      "🚢 Deploy Application") run_deploy_script; read -r -n 1 -s -p "  Done. Press any key..." ;;
-      "⬅️  Back") return 0 ;;
+      "📦 Update Application"*) run_update_script; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      "🚢 Deploy Application"*) run_deploy_script; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      "⬅️  Back"*) return 0 ;;
     esac
   done
 }
 
 print_backup_menu_tui() {
   while true; do
-    auto_size_tui_panel_width; tui_clear_screen;
+    auto_size_tui_panel_width; print_dashboard_header;
     gum style --border rounded --border-foreground "82" --padding "0 2" --width "${MAINTENANCE_TUI_PANEL_WIDTH}" --align center $(gum style --foreground "82" --bold "💾 Backup & Restore")
-    echo -e "  ${DIM}Manage local and cloud backups for databases and application data.${NC}\n"
+    echo ""
     
-    local choice; choice=$(gum choose --cursor.foreground="82" "✨ Run New Backup" "🔄 Restore Backup" "🗑️  Delete Backups" "☁️  Cloud Settings" "🧩 Backup Components" "📅 Set Frequency (${BACKUP_FREQUENCY})" "⏱️  Set Retention (${BACKUP_RETENTION_DAYS}d)" "⬅️  Back")
+    local choice; choice=$(gum choose --cursor.foreground="82" --item.foreground="250" \
+      "✨ Run New Backup      - Execute immediate local and cloud backup" \
+      "🔄 Restore Backup      - Rollback database or files from archive" \
+      "🗑️  Delete Backups      - Clean up old local and cloud archives" \
+      "☁️  Cloud Settings      - Configure GDrive and Koofr integration" \
+      "🧩 Backup Components   - Toggle which data types to include" \
+      "📅 Set Frequency       - Current: ${BACKUP_FREQUENCY}" \
+      "⏱️  Set Retention       - Current: ${BACKUP_RETENTION_DAYS}d" \
+      "⬅️  Back               - Return to the main menu")
+      
     case "${choice}" in
-      "✨ Run New Backup") run_backup "${BACKUP_AUTO_UPLOAD:-false}"; read -r -n 1 -s -p "  Done. Press any key..." ;;
-      "🔄 Restore Backup") restore_backup_tui ;;
-      "🗑️  Delete Backups") print_delete_backups_tui ;;
-      "☁️  Cloud Settings") print_cloud_settings_tui ;;
-      "🧩 Backup Components") print_backup_components_tui ;;
+      "✨ Run New Backup"*) run_backup "${BACKUP_AUTO_UPLOAD:-false}"; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      "🔄 Restore Backup"*) restore_backup_tui ;;
+      "🗑️  Delete Backups"*) print_delete_backups_tui ;;
+      "☁️  Cloud Settings"*) print_cloud_settings_tui ;;
+      "🧩 Backup Components"*) print_backup_components_tui ;;
       "📅 Set Frequency"*) BACKUP_FREQUENCY=$(gum choose "hourly" "daily" "weekly"); save_maintenance_settings ;;
       "⏱️  Set Retention"*) BACKUP_RETENTION_DAYS=$(gum input --placeholder "Days (e.g. 30)" --value "${BACKUP_RETENTION_DAYS}"); save_maintenance_settings ;;
-      "⬅️  Back") return 0 ;;
+      "⬅️  Back"*) return 0 ;;
     esac
   done
 }
 
 print_seo_db_menu_tui() {
   while true; do
-    auto_size_tui_panel_width; tui_clear_screen;
+    auto_size_tui_panel_width; print_dashboard_header;
     gum style --border rounded --border-foreground "51" --padding "0 2" --width "${MAINTENANCE_TUI_PANEL_WIDTH}" --align center $(gum style --foreground "51" --bold "🔍 SEO & Database")
-    echo -e "  ${DIM}Search engine optimization and database health checks.${NC}\n"
+    echo ""
     
-    local choice; choice=$(gum choose --cursor.foreground="51" "🗺️  Generate Sitemap" "🤖 Generate Robots.txt" "🏥 Check Database Health" "⬅️  Back")
+    local choice; choice=$(gum choose --cursor.foreground="51" --item.foreground="250" \
+      "🗺️  Generate Sitemap    - Rebuild search engine sitemap.xml" \
+      "🤖 Generate Robots.txt  - Rebuild robots.txt access rules" \
+      "🏥 Check DB Health     - Verify database connectivity and status" \
+      "⬅️  Back               - Return to the main menu")
+      
     case "${choice}" in
-      "🗺️  Generate Sitemap") generate_sitemap; read -r -n 1 -s -p "  Done. Press any key..." ;;
-      "🤖 Generate Robots.txt") generate_robots_txt; read -r -n 1 -s -p "  Done. Press any key..." ;;
-      "🏥 Check Database Health") check_database_health; read -r -n 1 -s -p "  Done. Press any key..." ;;
-      "⬅️  Back") return 0 ;;
+      "🗺️  Generate Sitemap"*) generate_sitemap; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      "🤖 Generate Robots.txt"*) generate_robots_txt; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      "🏥 Check DB Health"*) check_database_health; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      "⬅️  Back"*) return 0 ;;
     esac
   done
 }
 
 print_system_menu_tui() {
   while true; do
-    auto_size_tui_panel_width; tui_clear_screen;
+    auto_size_tui_panel_width; print_dashboard_header;
     gum style --border rounded --border-foreground "208" --padding "0 2" --width "${MAINTENANCE_TUI_PANEL_WIDTH}" --align center $(gum style --foreground "208" --bold "🛠️  System Management")
-    echo -e "  ${DIM}Low-level system operations and configuration management.${NC}\n"
+    echo ""
     
-    local choice; choice=$(gum choose --cursor.foreground="208" "📥 Git Pull" "🧹 Clean Cache" "📝 Edit Config (.env)" "⬅️  Back")
+    local choice; choice=$(gum choose --cursor.foreground="208" --item.foreground="250" \
+      "📥 Git Pull            - Update local repository from remote" \
+      "🧹 Clean Cache         - Clear Next.js and node_modules cache" \
+      "📝 Edit Config (.env)  - Open shared environment file in editor" \
+      "⬅️  Back               - Return to the main menu")
+      
     case "${choice}" in
-      "📥 Git Pull") run_git_pull; read -r -n 1 -s -p "  Done. Press any key..." ;;
-      "🧹 Clean Cache") [[ -d "${REPO_ROOT}/.next" ]] && rm -rf "${REPO_ROOT}/.next"; [[ -d "${REPO_ROOT}/node_modules/.cache" ]] && rm -rf "${REPO_ROOT}/node_modules/.cache"; log_info "Cache cleaned"; read -r -n 1 -s -p "  Done. Press any key..." ;;
-      "📝 Edit Config (.env)") section "Edit Configuration"; prompt_env_editor; read -r -n 1 -s -p "  Done. Press any key..." ;;
-      "⬅️  Back") return 0 ;;
+      "📥 Git Pull"*) run_git_pull; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      "🧹 Clean Cache"*) [[ -d "${REPO_ROOT}/.next" ]] && rm -rf "${REPO_ROOT}/.next"; [[ -d "${REPO_ROOT}/node_modules/.cache" ]] && rm -rf "${REPO_ROOT}/node_modules/.cache"; log_info "Cache cleaned"; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      "📝 Edit Config (.env)"*) section "Edit Configuration"; prompt_env_editor; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      "⬅️  Back"*) return 0 ;;
     esac
   done
 }
