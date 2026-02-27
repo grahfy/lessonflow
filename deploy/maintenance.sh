@@ -1032,7 +1032,7 @@ print_btop_main_menu() {
 print_deploy_menu_tui() {
   while true; do
     auto_size_tui_panel_width; print_dashboard_header; 
-    gum style --border rounded --border-foreground "33" --padding "0 2" --width "${MAINTENANCE_TUI_PANEL_WIDTH}" --align center $(gum style --foreground "33" --bold "🚀 Deploy Management")
+    gum style --border rounded --border-foreground "33" --padding "0 2" --width "${MAINTENANCE_TUI_PANEL_WIDTH}" --align center --bold --foreground "33" "🚀 Deploy Management"
     echo ""
     
     local choice; choice=$(gum choose --cursor.foreground="33" --item.foreground="250" \
@@ -1051,27 +1051,27 @@ print_deploy_menu_tui() {
 print_backup_menu_tui() {
   while true; do
     auto_size_tui_panel_width; print_dashboard_header;
-    gum style --border rounded --border-foreground "82" --padding "0 2" --width "${MAINTENANCE_TUI_PANEL_WIDTH}" --align center $(gum style --foreground "82" --bold "💾 Backup & Restore")
+    gum style --border rounded --border-foreground "82" --padding "0 2" --width "${MAINTENANCE_TUI_PANEL_WIDTH}" --align center --bold --foreground "82" "💾 Backup & Restore"
     echo ""
     
     local choice; choice=$(gum choose --cursor.foreground="82" --item.foreground="250" \
       "✨ Run New Backup      - Execute immediate local and cloud backup" \
       "🔄 Restore Backup      - Rollback database or files from archive" \
-      "🗑️  Delete Backups      - Clean up old local and cloud archives" \
-      "☁️  Cloud Settings      - Configure GDrive and Koofr integration" \
+      "🗑️ Delete Backups      - Clean up old local and cloud archives" \
+      "☁️ Cloud Settings      - Configure GDrive and Koofr integration" \
       "🧩 Backup Components   - Toggle which data types to include" \
       "📅 Set Frequency       - Current: ${BACKUP_FREQUENCY}" \
-      "⏱️  Set Retention       - Current: ${BACKUP_RETENTION_DAYS}d" \
+      "⏱️ Set Retention       - Current: ${BACKUP_RETENTION_DAYS}d" \
       "⬅️  Back               - Return to the main menu")
       
     case "${choice}" in
       "✨ Run New Backup"*) run_backup "${BACKUP_AUTO_UPLOAD:-false}"; read -r -n 1 -s -p "  Done. Press any key..." ;;
       "🔄 Restore Backup"*) restore_backup_tui ;;
-      "🗑️  Delete Backups"*) print_delete_backups_tui ;;
-      "☁️  Cloud Settings"*) print_cloud_settings_tui ;;
+      "🗑️ Delete Backups"*) print_delete_backups_tui ;;
+      "☁️ Cloud Settings"*) print_cloud_settings_tui ;;
       "🧩 Backup Components"*) print_backup_components_tui ;;
       "📅 Set Frequency"*) BACKUP_FREQUENCY=$(gum choose "hourly" "daily" "weekly"); save_maintenance_settings ;;
-      "⏱️  Set Retention"*) BACKUP_RETENTION_DAYS=$(gum input --placeholder "Days (e.g. 30)" --value "${BACKUP_RETENTION_DAYS}"); save_maintenance_settings ;;
+      "⏱️ Set Retention"*) BACKUP_RETENTION_DAYS=$(gum input --placeholder "Days (e.g. 30)" --value "${BACKUP_RETENTION_DAYS}"); save_maintenance_settings ;;
       "⬅️  Back"*) return 0 ;;
     esac
   done
@@ -1080,7 +1080,7 @@ print_backup_menu_tui() {
 print_seo_db_menu_tui() {
   while true; do
     auto_size_tui_panel_width; print_dashboard_header;
-    gum style --border rounded --border-foreground "51" --padding "0 2" --width "${MAINTENANCE_TUI_PANEL_WIDTH}" --align center $(gum style --foreground "51" --bold "🔍 SEO & Database")
+    gum style --border rounded --border-foreground "51" --padding "0 2" --width "${MAINTENANCE_TUI_PANEL_WIDTH}" --align center --bold --foreground "51" "🔍 SEO & Database"
     echo ""
     
     local choice; choice=$(gum choose --cursor.foreground="51" --item.foreground="250" \
@@ -1101,7 +1101,7 @@ print_seo_db_menu_tui() {
 print_system_menu_tui() {
   while true; do
     auto_size_tui_panel_width; print_dashboard_header;
-    gum style --border rounded --border-foreground "208" --padding "0 2" --width "${MAINTENANCE_TUI_PANEL_WIDTH}" --align center $(gum style --foreground "208" --bold "🛠️  System Management")
+    gum style --border rounded --border-foreground "208" --padding "0 2" --width "${MAINTENANCE_TUI_PANEL_WIDTH}" --align center --bold --foreground "208" "🛠️  System Management"
     echo ""
     
     local choice; choice=$(gum choose --cursor.foreground="208" --item.foreground="250" \
