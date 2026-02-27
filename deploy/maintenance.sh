@@ -517,13 +517,15 @@ EOF
 
 get_db_creds() {
   local du; du=$(get_env_val "DATABASE_URL")
-  [[ -z "${du:-}" ]] && return 1
+  [[ -z "${du:-}" ]] && { log_error "DATABASE_URL is not set"; return 1; }
+  log_info "DATABASE_URL found (length: ${#du})"
   DB_U=$(echo "${du}" | sed -n 's|.*://\([^:]*\):.*@.*|\1|p')
   DB_P=$(echo "${du}" | sed -n 's|.*://[^:]*:\([^@]*\)@.*|\1|p')
   DB_H=$(echo "${du}" | sed -n 's|.*@\([^:/]*\).*|\1|p')
   DB_PORT=$(echo "${du}" | sed -n 's|.*:\([0-9]*\)/.*|\1|p')
   DB_NAME=$(echo "${du}" | sed -n 's|.*/\([^?]*\).*|\1|p')
-  [[ -n "${DB_U}" && -n "${DB_NAME}" ]] || return 1
+  log_info "Parsed: user=${DB_U:-empty} host=${DB_H:-empty} port=${DB_PORT:-empty} db=${DB_NAME:-empty}"
+  [[ -n "${DB_U}" && -n "${DB_NAME}" ]] || { log_error "Failed to parse DATABASE_URL"; return 1; }
 }
 
 create_database_dump() {
@@ -532,20 +534,25 @@ create_database_dump() {
   [[ -z "${DB_U:-}" ]] && { log_error "Database username is empty"; return 1; }
   [[ -z "${DB_NAME:-}" ]] && { log_error "Database name is empty"; return 1; }
   log_info "DB: ${DB_NAME}@${DB_H:-localhost}:${DB_PORT:-3306} as ${DB_U}"
+  local dump_err; dump_err=$(mktemp)
   if command -v mysqldump >/dev/null 2>&1; then
     log_info "Using mysqldump..."
-    if MYSQL_PWD="${DB_P}" mysqldump -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" "${DB_NAME}" > "${output_file}" 2>&1; then
+    if MYSQL_PWD="${DB_P}" mysqldump -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" "${DB_NAME}" > "${output_file}" 2>"${dump_err}"; then
+      rm -f "${dump_err}"
       return 0
     else
-      log_error "mysqldump failed"
+      log_error "mysqldump failed: $(cat "${dump_err}" | head -1)"
+      rm -f "${dump_err}"
       return 1
     fi
   elif command -v mariadb-dump >/dev/null 2>&1; then
     log_info "Using mariadb-dump..."
-    if MYSQL_PWD="${DB_P}" mariadb-dump -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" "${DB_NAME}" > "${output_file}" 2>&1; then
+    if MYSQL_PWD="${DB_P}" mariadb-dump -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" "${DB_NAME}" > "${output_file}" 2>"${dump_err}"; then
+      rm -f "${dump_err}"
       return 0
     else
-      log_error "mariadb-dump failed"
+      log_error "mariadb-dump failed: $(cat "${dump_err}" | head -1)"
+      rm -f "${dump_err}"
       return 1
     fi
   else
