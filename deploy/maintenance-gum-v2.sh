@@ -420,7 +420,7 @@ upload_to_gdrive() {
     
     local token_response=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
         -d "client_id=${GDRIVE_CLIENT_ID}&client_secret=${GDRIVE_CLIENT_SECRET}&refresh_token=${GDRIVE_REFRESH_TOKEN}&grant_type=refresh_token")
-    local access_token=$(echo "${token_response}" | grep -o '"access_token"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*: *"\([^"]*\)"/\1/')
+        local access_token=$(echo "${token_response}" | grep -o '"access_token"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*: *"\([^"]*\)"/\1/')
     
     [[ -z "${access_token}" ]] && return 1
 
@@ -451,7 +451,8 @@ EOF
 }
 
 upload_to_koofr() {
-  local fp="$1" bn="$(basename "$fp")"
+  local fp="$1"
+  local bn="$(basename "$fp")"
   [[ -n "${KOOFR_WEBDAV_URL}" && -n "${KOOFR_USERNAME}" && -n "${KOOFR_PASSWORD}" ]] || return 1
   curl -s -X MKCOL -u "${KOOFR_USERNAME}:${KOOFR_PASSWORD}" "${KOOFR_WEBDAV_URL}/${BACKUP_CLOUD_FOLDER}/" >/dev/null 2>&1 || true
   local code=$(curl -s -w "%{http_code}" -T "$fp" -u "${KOOFR_USERNAME}:${KOOFR_PASSWORD}" "${KOOFR_WEBDAV_URL}/${BACKUP_CLOUD_FOLDER}/${bn}" -o /dev/null)
@@ -459,7 +460,8 @@ upload_to_koofr() {
 }
 
 get_backup_meta() {
-  local bf="$1" meta_file="${bf%.tar.xz}.meta"
+  local bf="${1:-}"
+  local meta_file="${bf%.tar.xz}.meta"
   if run_privileged_cmd test -f "${meta_file}"; then
     run_privileged_cmd cat "${meta_file}"
   else
@@ -482,7 +484,8 @@ format_backup_meta() {
 # =============================================================================
 
 run_backup_process() {
-    local steps=() components=""
+    local steps=()
+    local components=""
     [[ "$BACKUP_INCLUDE_SQL" == "true" ]] && { steps+=("Database Dump"); components+="Database "; }
     [[ "$BACKUP_INCLUDE_ENV" == "true" ]] && { steps+=("Environment"); components+="Environment "; }
     [[ "$BACKUP_INCLUDE_SEO_CONFIG" == "true" ]] && { steps+=("SEO Config"); components+="SEO "; }
@@ -496,7 +499,9 @@ run_backup_process() {
         return
     fi
 
-    local ts="$(date +%Y%m%d-%H%M%S)" bn="backup-${ts}" td="$(mktemp -d)"
+    local ts="$(date +%Y%m%d-%H%M%S)"
+    local bn="backup-${ts}"
+    local td="$(mktemp -d)"
     mkdir -p "${td}/${bn}"
     local archive="${BACKUP_DIR}/${bn}.tar.xz"
     mkdir -p "$BACKUP_DIR"
@@ -504,7 +509,10 @@ run_backup_process() {
     center_style "Starting backup workflow..."
     
     for i in "${!steps[@]}"; do
-        local step="${steps[$i]}" count=$((i + 1)) total=${#steps[@]} prefix="[$count/$total]"
+        local step="${steps[$i]}"
+        local count=$((i + 1))
+        local total=${#steps[@]}
+        local prefix="[$count/$total]"
         case "$step" in
             "Database Dump") run_task "$prefix Creating Database Dump" create_database_dump "${td}/${bn}/database.sql" ;;
             "Environment") run_task "$prefix Copying Environment Files" bash -c "[[ -f \"${SHARED_DIR}/.env\" ]] && cp \"${SHARED_DIR}/.env\" \"${td}/${bn}/\"" ;;
