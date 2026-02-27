@@ -1,7 +1,7 @@
 #!/bin/bash
 # Maintenance Script V2 for Melbourne Guitar School
 # Reimagined with Charmbracelet Gum for a modern TUI experience.
-# Features: Distro-aware installation, Arrow-key menus, Progress bars, and Styled Dialogs.
+# Features: Distro-aware installation, Arrow-key menus, centered output, and Styled Dialogs.
 
 set -euo pipefail
 
@@ -192,10 +192,45 @@ get_uptime() { uptime -p | sed 's/up //'; }
 # 4. UI Components & Centering Logic
 # =============================================================================
 
-# Helper to horizontally center a string or style block
+# Helper to horizontally center text or a style block on the screen
 center_style() {
     local width=$(tput cols)
-    gum style --width "$width" --align center "$@"
+    # If first arg is a string and not a flag, treat it as text
+    if [[ "$1" != -* ]]; then
+        local text="$1"
+        shift
+        echo "$text" | gum style --width "$width" --align center "$@"
+    else
+        gum style --width "$width" --align center "$@"
+    fi
+}
+
+# Helper to center gum choose options
+# Pads each option with spaces to roughly center them
+center_choose() {
+    local header="$1"
+    shift
+    local options=("$@")
+    local term_width=$(tput cols)
+    local max_len=0
+    
+    for opt in "${options[@]}"; do
+        # Use awk to handle multi-byte characters length if needed, but standard ${#opt} usually fine for ASCII
+        local len=${#opt}
+        [[ $len -gt $max_len ]] && max_len=$len
+    done
+    
+    # Calculate padding to center the list of items
+    local pad=$(( (term_width - max_len) / 2 ))
+    local pad_str=$(printf '%*s' "$pad" "")
+    
+    local padded_options=()
+    for opt in "${options[@]}"; do
+        padded_options+=("${pad_str}${opt}")
+    done
+    
+    # We use gum choose and then strip the padding from the result
+    gum choose --header "$(center_style "$header")" "${padded_options[@]}" | sed "s/^ *//"
 }
 
 # Helper to provide vertical padding
@@ -232,24 +267,29 @@ show_header() {
 
     ui_wrapper 20
 
-    gum style \
+    local box=$(gum style \
         --foreground 212 --border-foreground 212 --border double \
-        --align center --width 75 --margin "0 auto" --padding "1 2" \
+        --align center --width 75 --padding "1 2" \
         "⬡ Melbourne Guitar School - Maintenance Console" \
         "" \
         "$(gum style --foreground 250 "$stats_line")" \
         "$(gum style --foreground 250 "$system_line")" \
         "" \
-        "$(gum style --foreground 245 "$git_line")"
+        "$(gum style --foreground 245 "$git_line")")
+    
+    # Truly center the box block
+    echo "$box" | center_style
 }
 
 notify_success() {
-    center_style --foreground 82 --border normal --border-foreground 82 --padding "0 2" --margin "1 0" "✔ $1"
+    echo ""
+    center_style "✔ $1" --foreground 82 --border normal --border-foreground 82 --padding "0 2"
     sleep 1.5
 }
 
 notify_error() {
-    center_style --foreground 196 --border normal --border-foreground 196 --padding "0 2" --margin "1 0" "✖ $1"
+    echo ""
+    center_style "✖ $1" --foreground 196 --border normal --border-foreground 196 --padding "0 2"
     sleep 2
 }
 
@@ -260,7 +300,8 @@ notify_error() {
 run_task() {
     local title="$1"
     shift
-    gum spin --spinner dot --title "$title..." -- "$@"
+    # Centering the spinner
+    gum spin --spinner dot --title "$(center_style "$title...")" -- "$@"
 }
 
 get_db_creds() {
@@ -296,7 +337,7 @@ upload_to_gdrive() {
     
     local token_response=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
         -d "client_id=${GDRIVE_CLIENT_ID}&client_secret=${GDRIVE_CLIENT_SECRET}&refresh_token=${GDRIVE_REFRESH_TOKEN}&grant_type=refresh_token")
-    local access_token=$(echo "${token_response}" | grep -o '"access_token"[[:space:]]*:[[:space:]]*" [^"]*"' | sed 's/.*: *"\([^"]*\)"/\1/')
+    local access_token=$(echo "${token_response}" | grep -o '"access_token"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*: *"\([^"]*\)"/\1/')
     
     [[ -z "${access_token}" ]] && return 1
 
@@ -389,7 +430,7 @@ run_restore_process() {
         return
     fi
 
-    local selected=$(gum choose --header "$(center_style "Select backup to restore")" "${backups[@]}")
+    local selected=$(center_choose "Select backup to restore" "${backups[@]}")
     if [[ -n "$selected" ]]; then
         if gum confirm "$(center_style "Restore $(basename "$selected")? This will overwrite existing data!")"; then
             run_task "Extracting backup" tar -xJf "$selected" -C /tmp/
@@ -409,7 +450,7 @@ run_delete_backups() {
     if [[ -n "$selected" ]]; then
         local count=$(echo "$selected" | wc -l)
         if gum confirm "$(center_style "Delete $count backups permanently?")"; then
-            gum spin --spinner bouncer --title "Deleting files..." -- bash -c "echo '$selected' | xargs rm -f"
+            gum spin --spinner bouncer --title "$(center_style "Deleting files...")" -- bash -c "echo '$selected' | xargs rm -f"
             notify_success "Backups removed"
         fi
     fi
@@ -423,7 +464,7 @@ main_menu() {
     load_maintenance_settings
     while true; do
         show_header
-        local choice=$(gum choose --header "$(center_style "Main Menu")" "Deploy Management" "Backup & Restore" "SEO & Database" "System Management" "Quit")
+        local choice=$(center_choose "Main Menu" "Deploy Management" "Backup & Restore" "SEO & Database" "System Management" "Quit")
         
         case $choice in
             "Deploy Management") deploy_menu ;;
@@ -439,13 +480,13 @@ main_menu() {
 deploy_menu() {
     while true; do
         show_header
-        local choice=$(gum choose --header "$(center_style "Deploy Management")" "Update App (update.sh)" "Deploy App (deploy.sh)" "Back")
+        local choice=$(center_choose "Deploy Management" "Update App (update.sh)" "Deploy App (deploy.sh)" "Back")
         case $choice in
             "Update App"*) 
-                gum spin --title "Running update..." -- bash "${UPDATE_SCRIPT}" --sudo-deploy
+                gum spin --title "$(center_style "Running update...")" -- bash "${UPDATE_SCRIPT}" --sudo-deploy
                 notify_success "Update finished" ;;
             "Deploy App"*) 
-                gum spin --title "Running deploy..." -- bash "${DEPLOY_SCRIPT}" --skip-pull
+                gum spin --title "$(center_style "Running deploy...")" -- bash "${DEPLOY_SCRIPT}" --skip-pull
                 notify_success "Deployment finished" ;;
             "Back") return ;;
         esac
@@ -455,7 +496,7 @@ deploy_menu() {
 backup_menu() {
     while true; do
         show_header
-        local choice=$(gum choose --header "$(center_style "Backup & Restore")" "Run New Backup" "Restore Backup" "Delete Backups" "Backup Components" "Cloud Settings" "Back")
+        local choice=$(center_choose "Backup & Restore" "Run New Backup" "Restore Backup" "Delete Backups" "Backup Components" "Cloud Settings" "Back")
         case $choice in
             "Run New Backup") run_backup_process ;;
             "Restore Backup") run_restore_process ;;
@@ -475,7 +516,7 @@ backup_components_tui() {
         local e=$(bool_word "$BACKUP_INCLUDE_ENV")
         local m=$(bool_word "$BACKUP_INCLUDE_LEARNING_MATERIALS")
         
-        local choice=$(gum choose --header "$(center_style "Toggle Components (SPACE to toggle, ENTER to finish)")" \
+        local choice=$(center_choose "Toggle Components (SPACE to toggle, ENTER to finish)" \
             "Database [$s]" "App Files [$a]" "Env File [$e]" "Materials [$m]" "Save & Back")
         
         case $choice in
@@ -491,11 +532,11 @@ backup_components_tui() {
 cloud_settings_tui() {
     while true; do
         show_header
-        local choice=$(gum choose --header "$(center_style "Cloud Configuration")" "Toggle Auto-Upload [$(bool_word "$BACKUP_AUTO_UPLOAD")]" "Set Cloud Folder" "Back")
+        local choice=$(center_choose "Cloud Configuration" "Toggle Auto-Upload [$(bool_word "$BACKUP_AUTO_UPLOAD")]" "Set Cloud Folder" "Back")
         case $choice in
             "Toggle Auto-Upload "*) BACKUP_AUTO_UPLOAD=$(toggle_bool "$BACKUP_AUTO_UPLOAD"); save_maintenance_settings ;;
             "Set Cloud Folder") 
-                BACKUP_CLOUD_FOLDER=$(gum input --prompt "Folder: " --value "$BACKUP_CLOUD_FOLDER")
+                BACKUP_CLOUD_FOLDER=$(gum input --prompt "$(center_style "Folder: ")" --value "$BACKUP_CLOUD_FOLDER")
                 save_maintenance_settings ;;
             "Back") return ;;
         esac
@@ -505,15 +546,15 @@ cloud_settings_tui() {
 seo_db_menu() {
     while true; do
         show_header
-        local choice=$(gum choose --header "$(center_style "SEO & Database")" "Check DB Health" "Generate Sitemap" "Generate Robots" "Back")
+        local choice=$(center_choose "SEO & Database" "Check DB Health" "Generate Sitemap" "Generate Robots" "Back")
         case $choice in
             "Check DB Health") 
-                check_database_health; gum input --placeholder "Press Enter to continue..." ;;
+                check_database_health; gum input --placeholder "$(center_style "Press Enter to continue...")" ;;
             "Generate Sitemap") 
-                gum spin --title "Generating..." -- sleep 1
+                gum spin --title "$(center_style "Generating...")" -- sleep 1
                 notify_success "Sitemap created" ;;
             "Generate Robots") 
-                gum spin --title "Generating..." -- sleep 1
+                gum spin --title "$(center_style "Generating...")" -- sleep 1
                 notify_success "Robots.txt updated" ;;
             "Back") return ;;
         esac
@@ -523,13 +564,13 @@ seo_db_menu() {
 system_menu() {
     while true; do
         show_header
-        local choice=$(gum choose --header "$(center_style "System Management")" "Git Pull" "Clean Cache" "Back")
+        local choice=$(center_choose "System Management" "Git Pull" "Clean Cache" "Back")
         case $choice in
             "Git Pull") 
-                gum spin --spinner pulse --title "Pulling from origin..." -- git -C "${REPO_ROOT}" pull origin main
+                gum spin --spinner pulse --title "$(center_style "Pulling from origin...")" -- git -C "${REPO_ROOT}" pull origin main
                 notify_success "Git pull complete" ;;
             "Clean Cache") 
-                gum spin --title "Cleaning..." -- rm -rf "${REPO_ROOT}/.next"
+                gum spin --title "$(center_style "Cleaning...")" -- rm -rf "${REPO_ROOT}/.next"
                 notify_success "Cache cleared" ;;
             "Back") return ;;
         esac
@@ -542,7 +583,7 @@ toggle_bool() { [[ "$1" == true ]] && echo false || echo true; }
 
 check_database_health() { 
     get_db_creds || { notify_error "No DB creds"; return 1; }
-    gum spin --spinner monkey --title "Checking connection to $DB_NAME..." -- sleep 1
+    gum spin --spinner monkey --title "$(center_style "Checking connection to $DB_NAME...")" -- sleep 1
     if command -v mysql >/dev/null 2>&1; then
         if MYSQL_PWD="${DB_P}" mysql -h "${DB_H:-localhost}" -u "${DB_U}" -e "SELECT 1" "${DB_NAME}" >/dev/null 2>&1; then
             notify_success "Database connected"
