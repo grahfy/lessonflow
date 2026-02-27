@@ -115,12 +115,115 @@ BLOCK_EMPTY='░'
 BLOCK_FULL='█'
 
 # =============================================================================
+# Run wrappers
+# =============================================================================
+
+run_interactive_maintenance() {
+  load_maintenance_settings; create_backup_directory;
+  tui_clear_screen
+  while true; do
+    auto_size_tui_panel_width; print_btop_main_menu;
+    local choice; choice=$(gum choose --cursor.foreground="33" --item.foreground="250" "Deploy Management" "Backup & Restore" "SEO & Database" "System Management" "Refresh" "Quit")
+    case "${choice}" in
+      "Deploy Management") print_deploy_menu_tui ;;
+      "Backup & Restore") print_backup_menu_tui ;;
+      "SEO & Database") print_seo_db_menu_tui ;;
+      "System Management") print_system_menu_tui ;;
+      "Refresh") : ;;
+      "Quit") exit 0 ;;
+    esac
+  done
+}
+
+detect_tty_capabilities() {
+  if [[ -t 0 && -t 1 ]]; then IS_TTY=true; fi
+  if [[ "${IS_TTY}" == true ]]; then auto_size_tui_panel_width; fi
+  if [[ "${NO_COLOR:-false}" == true || ! -t 1 ]]; then
+    RED='' GREEN='' YELLOW='' BLUE='' CYAN='' MAGENTA='' BOLD='' DIM='' NC=''
+    BTOP_FG='' BTOP_FG_DIM='' BTOP_CYAN='' BTOP_CYAN_BRIGHT='' BTOP_GREEN='' BTOP_GREEN_DIM='' BTOP_BLUE='' BTOP_BLUE_DIM='' BTOP_ORANGE='' BTOP_ORANGE_DIM='' BTOP_PURPLE='' BTOP_PURPLE_DIM='' BTOP_YELLOW='' BTOP_YELLOW_DIM='' BTOP_RED='' BTOP_RED_DIM='' BTOP_GRAD_0='' BTOP_GRAD_1='' BTOP_GRAD_2='' BTOP_GRAD_3='' BTOP_GRAD_4='' BTOP_GRAD_5=''
+  fi
+}
+
+run_step() { local msg="$1"; shift; start_spinner "${msg}"; if "$@" >/dev/null 2>&1; then stop_spinner "ok" >&2; else stop_spinner "fail" >&2; return 1; fi; }
+start_spinner() { local msg="$1" i=0 fc="${#SPINNER_FRAMES[@]}"; [[ "${NO_SPINNER:-false}" == true || "${IS_TTY:-false}" != true ]] && return 0; SPINNER_MSG="${msg}"; ( while true; do printf "\r${CYAN}%s${NC} %s" "${SPINNER_FRAMES[$i]}" "${SPINNER_MSG}" >&2; i=$(( (i + 1) % fc )); sleep 0.08; done ) & SPINNER_PID=$!; }
+stop_spinner() { local status="$1"; [[ "${NO_SPINNER:-false}" == true || "${IS_TTY:-false}" != true ]] && return 0; if [[ -n "${SPINNER_PID:-}" ]] && kill -0 "${SPINNER_PID}" 2>/dev/null; then kill "${SPINNER_PID}" 2>/dev/null || true; wait "${SPINNER_PID}" 2>/dev/null || true; fi; printf "\r\033[K" >&2; [[ "${status}" == "ok" ]] && printf "${GREEN}✔${NC} %s\n" "${SPINNER_MSG}" >&2 || printf "${RED}✖${NC} %s\n" "${SPINNER_MSG}" >&2; }
+check_database_health() { section "Database Health"; get_db_creds || { log_error "No creds"; return 1; }; log_info "Connecting to ${DB_NAME} on ${DB_H:-localhost}..."; if command -v mysql >/dev/null 2>&1; then if MYSQL_PWD="${DB_P}" mysql -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" -e "SELECT 1" "${DB_NAME}" >/dev/null 2>&1; then log_info "DB OK"; else log_error "DB Fail"; fi; elif command -v mariadb >/dev/null 2>&1; then if MYSQL_PWD="${DB_P}" mariadb -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" -e "SELECT 1" "${DB_NAME}" >/dev/null 2>&1; then log_info "DB OK"; else log_error "DB Fail"; fi; else log_error "No mysql client"; fi; }
+run_git_pull() { section "Git Pull"; run_step "Fetching" git -C "${REPO_ROOT}" fetch "${REMOTE_NAME}"; run_step "Pulling" git -C "${REPO_ROOT}" pull "${REMOTE_NAME}" "${BRANCH:-$(current_branch_name)}"; }
+run_update_script() { section "Updating Application"; bash "${UPDATE_SCRIPT}" --sudo-deploy; }
+run_deploy_script() { section "Deploying Application"; bash "${DEPLOY_SCRIPT}" --skip-pull; }
+create_backup_directory() { local u; u=$(id -un); if [[ ! -d "${BACKUP_DIR}" ]]; then run_privileged_cmd mkdir -p "${BACKUP_DIR}"; run_privileged_cmd chown "${u}:${u}" "${BACKUP_DIR}" 2>/dev/null || true; fi; if [[ ! -d "${LOG_DIR}" ]]; then run_privileged_cmd mkdir -p "${LOG_DIR}"; run_privileged_cmd chown "${u}:${u}" "${LOG_DIR}" 2>/dev/null || true; fi; }
+prompt_env_editor() { local se="${SHARED_DIR}/.env" ed="${VISUAL:-${EDITOR:-nano}}"; for c in nano vi vim; do if command -v "${c}" >/dev/null 2>&1; then ed="${c}"; break; fi; done; if command -v "${ed}" >/dev/null 2>&1; then if [[ -f "${se}" ]]; then "${ed}" "${se}"; else log_warn "Shared .env not found"; fi; else log_warn "No terminal editor found"; fi; }
+
+# =============================================================================
 # Utils
 # =============================================================================
 
 log_info() { echo -e "${GREEN}●${NC} $1" >&2; }
 log_warn() { echo -e "${YELLOW}▲${NC} $1" >&2; }
 log_error() { echo -e "${RED}✖${NC} $1" >&2; }
+
+ensure_dependencies() {
+  if command -v gum >/dev/null 2>&1 && command -v fzf >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if [[ "${IS_TTY}" != true ]]; then
+    return 0
+  fi
+
+  start_spinner "Installing Dependencies..."
+  
+  if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    local os_id=$ID
+    local os_like=${ID_LIKE:-}
+  else
+    stop_spinner "fail"
+    return 1
+  fi
+
+  local install_cmd=""
+  if [[ "$os_id" == "ubuntu" || "$os_id" == "debian" || "$os_like" == *"debian"* ]]; then
+    sudo apt-get update -qq >/dev/null 2>&1 || true
+    install_cmd="sudo apt-get install -y -qq"
+  elif [[ "$os_id" == "arch" || "$os_id" == "cachyos" || "$os_like" == *"arch"* ]]; then
+    install_cmd="sudo pacman -S --noconfirm -q"
+  elif [[ "$os_id" == "fedora" || "$os_like" == *"fedora"* ]]; then
+    install_cmd="sudo dnf install -y -q"
+  elif [[ "$os_id" == "alpine" ]]; then
+    install_cmd="sudo apk add -q"
+  fi
+
+  if [[ -n "$install_cmd" ]]; then
+    if ! command -v fzf >/dev/null 2>&1; then
+      $install_cmd fzf >/dev/null 2>&1 || true
+    fi
+    if ! command -v gum >/dev/null 2>&1; then
+      if [[ "$os_id" == "ubuntu" || "$os_id" == "debian" ]]; then
+        sudo mkdir -p /etc/apt/keyrings
+        curl -fsSL https://repo.charm.sh/apt/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg >/dev/null 2>&1
+        echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" | sudo tee /etc/apt/sources.list.d/charm.list >/dev/null
+        sudo apt-get update -qq >/dev/null 2>&1 && sudo apt-get install -y -qq gum >/dev/null 2>&1 || true
+      elif [[ "$os_id" == "fedora" ]]; then
+        echo '[charm]
+name=Charm
+baseurl=https://repo.charm.sh/yum/
+enabled=1
+gpgcheck=1
+gpgkey=https://repo.charm.sh/yum/gpg.key' | sudo tee /etc/yum.repos.d/charm.repo >/dev/null
+        sudo dnf install -y -q gum >/dev/null 2>&1 || true
+      else
+        $install_cmd gum >/dev/null 2>&1 || true
+      fi
+    fi
+  fi
+
+  if command -v gum >/dev/null 2>&1 && command -v fzf >/dev/null 2>&1; then
+    stop_spinner "ok"
+  else
+    stop_spinner "fail"
+  fi
+}
 
 section() {
   echo ""
@@ -137,29 +240,14 @@ section() {
 prompt_value() {
   local prompt="$1"
   local default="${2:-}"
-  local value
-  read -r -p "  ${prompt} [${default}]: " value
-  echo "${value:-${default}}"
+  gum input --placeholder "${prompt}" --value "${default}"
 }
 
 prompt_select() {
   local prompt="$1"
   shift
   local options=("$@")
-  local choice
-  while true; do
-    echo -e "  ${prompt}:"
-    local i
-    for i in "${!options[@]}"; do
-      echo -e "    $((i+1))) ${options[i]}"
-    done
-    read -r -p "  Choice [1-${#options[@]}]: " choice
-    if [[ "${choice}" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#options[@]} )); then
-      echo "${options[$((choice - 1))]}"
-      return 0
-    fi
-    log_warn "Please enter a valid number."
-  done
+  gum choose "${options[@]}"
 }
 
 bool_word() { [[ "$1" == true ]] && echo "ON" || echo "OFF"; }
@@ -346,41 +434,15 @@ get_kernel() { uname -r 2>/dev/null | cut -d- -f1 || echo "unknown"; }
 
 print_btop_header() {
   local width="$1"
-  local ts hn kern rule
-  ts=$(date "+%Y-%m-%d %H:%M:%S")
-  hn=$(get_hostname)
-  kern=$(get_kernel)
-  printf -v rule "%*s" "$((width - 2))" ""
-  rule="${rule// /─}"
-  local title="⬡ Melbourne Guitar School"
-  local title_len=25
-  local pad1_len=$((width - 2 - 2 - title_len))
-  local pad1=""
-  [[ $pad1_len -gt 0 ]] && printf -v pad1 "%*s" "$pad1_len" ""
-  local subtitle="Maintenance Console"
-  local subtitle_len=19
-  local pad2_len=$((width - 2 - 1 - subtitle_len))
-  local pad2=""
-  [[ $pad2_len -gt 0 ]] && printf -v pad2 "%*s" "$pad2_len" ""
-  local h_label="Host:"
-  local k_label="Kernel:"
-  local host_kern_visible=$((1 + 5 + 1 + ${#hn} + 2 + 7 + 1 + ${#kern}))
-  local pad3_len=$((width - 2 - host_kern_visible))
-  local pad3=""
-  [[ $pad3_len -gt 0 ]] && printf -v pad3 "%*s" "$pad3_len" ""
-  local t_label="Time:"
-  local time_visible=$((1 + 5 + 1 + ${#ts}))
-  local pad4_len=$((width - 2 - time_visible))
-  local pad4=""
-  [[ $pad4_len -gt 0 ]] && printf -v pad4 "%*s" "$pad4_len" ""
-
-  echo -e "${BOLD}${CYAN}╭${rule}╮${NC}"
-  echo -e "${BOLD}${CYAN}│${NC}  ${BOLD}${title}${NC}${pad1}${BOLD}${CYAN}│${NC}"
-  echo -e "${BOLD}${CYAN}│${NC} ${BOLD}${subtitle}${NC}${pad2}${BOLD}${CYAN}│${NC}"
-  echo -e "${BOLD}${CYAN}├${rule}┤${NC}"
-  echo -e "${BOLD}${CYAN}│${NC} ${DIM}${h_label}${NC} ${BTOP_CYAN_BRIGHT}${hn}${NC}  ${DIM}${k_label}${NC} ${BTOP_YELLOW}${kern}${NC}${pad3}${BOLD}${CYAN}│${NC}"
-  echo -e "${BOLD}${CYAN}│${NC} ${DIM}${t_label}${NC} ${BTOP_GREEN}${ts}${NC}${pad4}${BOLD}${CYAN}│${NC}"
-  echo -e "${BOLD}${CYAN}╰${rule}╯${NC}"
+  local ts; ts=$(date "+%Y-%m-%d %H:%M:%S")
+  local hn; hn=$(get_hostname)
+  local kern; kern=$(get_kernel)
+  
+  local title; title=$(gum style --foreground "33" --bold "⬡ Melbourne Guitar School")
+  local subtitle; subtitle=$(gum style --foreground "250" --italic "Maintenance Console")
+  local info; info=$(printf "Host: %s | Kernel: %s | Time: %s" "$(gum style --foreground "51" "$hn")" "$(gum style --foreground "178" "$kern")" "$(gum style --foreground "82" "$ts")")
+  
+  gum style --border rounded --border-foreground "33" --padding "0 2" --width "$width" "$(printf "%s\n%s\n\n%s" "$title" "$subtitle" "$info")"
 }
 
 # =============================================================================
@@ -855,34 +917,51 @@ restore_backup_tui() {
   local src="local" rs=true rw=true re=true rmat=true rse=true rd=true ch
   while true; do
     auto_size_tui_panel_width; tui_clear_screen; print_box_banner "Restore Backup"
-    echo -e "${DIM}Source: ${BOLD}${src^^}${NC}\n"; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
-    echo -e "${BOLD}${BLUE}  Available Backups${NC}"; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
-    local bks=() i=0; local letters="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    echo -e "${DIM}Source: ${BOLD}${src^^}${NC} | Use fzf to select backup below\n"
+    
+    local backups=()
     if [[ "${src}" == "local" ]]; then
-      while IFS= read -r b; do
-        [[ -n "$b" ]] || continue; local l="${letters:$i:1}"
-        local meta; meta=$(get_backup_meta "$b")
-        local fmt_meta; fmt_meta=$(format_backup_meta "${meta}")
-        echo -e "  ${CYAN}[$l]${NC} $(basename "${b}") ${DIM}$(du -h "${b}" 2>/dev/null | cut -f1) ${fmt_meta}${NC}"
-        bks+=("${b}"); ((i++)); [[ $i -ge 52 ]] && break
-      done < <(list_local_backups)
+      while IFS= read -r b; do [[ -n "$b" ]] && backups+=("$b"); done < <(list_local_backups)
     else
-      log_info "Fetch cloud..."; while IFS= read -r b; do
-        [[ -n "$b" ]] || continue; local l="${letters:$i:1}"; echo -e "  ${CYAN}[$l]${NC} $b"
-        bks+=("${b}"); ((i++)); [[ $i -ge 52 ]] && break
-      done < <(list_cloud_backups)
+      log_info "Fetching cloud backups..."
+      while IFS= read -r b; do [[ -n "$b" ]] && backups+=("$b"); done < <(list_cloud_backups)
     fi
-    [[ ${#bks[@]} -eq 0 ]] && echo -e "  ${YELLOW}No backups found${NC}"
-    echo ""; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"; echo -e "${BOLD}${BLUE}  Options${NC}"
-    print_tui_option_pair "S" "SQL" "$(bool_word "${rs}")" "Restore SQL." "A" "App" "$(bool_word "${rw}")" "Restore app."
-    print_tui_option_pair "E" "Env" "$(bool_word "${re}")" "Restore env." "M" "Mat" "$(bool_word "${rmat}")" "Restore materials."
-    print_tui_option_pair "O" "SEO" "$(bool_word "${rse}")" "Restore SEO." "D" "Data" "$(bool_word "${rd}")" "Restore data."
-    echo ""; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"; print_tui_action_pair "R" "Restore" "G" "Toggle Src"; print_tui_action_pair "B" "Back"
-    print_tui_hint_line "Letter: Select | S,A,E,M,O,D: Toggle | R:Run, G:Src, B:Back"; read -r -n 1 -s ch; local idx; idx=$(letter_to_index "${ch}")
-    if [[ -n "${idx}" && $idx -lt ${#bks[@]} ]]; then case "${ch,,}" in s|a|e|m|o|d|r|g|b|q) : ;; *) local btr="${bks[$idx]}"; echo -ne "\n  Restore $(basename "$btr")? (y/N): "; read -r -n 1 c; echo ""
-      if [[ "${c,,}" == "y" ]]; then if [[ "${src}" == "cloud" ]]; then local dp="${BACKUP_DIR}/$(basename "${btr}")"; download_backup_from_cloud "${btr}" "${dp}" || continue; btr="${dp}"; fi
-        restore_backup "${btr}" "${rs}" "${rw}" "${re}" "${rmat}" "${rse}" "${rd}"; read -r -n 1 -s -p "  Done. Key..."; fi; continue ;; esac; fi
-    case "${ch,,}" in s) rs=$(toggle_bool "${rs}") ;; a) rw=$(toggle_bool "${rw}") ;; e) re=$(toggle_bool "${re}") ;; m) rmat=$(toggle_bool "${rmat}") ;; o) rse=$(toggle_bool "${rse}") ;; d) rd=$(toggle_bool "${rd}") ;; g) [[ "${src}" == "local" ]] && src="cloud" || src="local" ;; b) return 0 ;; q) exit 0 ;; esac
+
+    if [[ ${#backups[@]} -eq 0 ]]; then
+      echo -e "  ${YELLOW}No backups found${NC}"
+      local choice; choice=$(gum choose "Toggle Source" "Back")
+      [[ "$choice" == "Toggle Source" ]] && { [[ "$src" == "local" ]] && src="cloud" || src="local"; continue; }
+      [[ "$choice" == "Back" ]] && return 0
+      continue
+    fi
+
+    echo -e "${BOLD}${BLUE}  1. Configure Restore Options${NC}"
+    local options_choice; options_choice=$(gum choose "SQL: $(bool_word "${rs}")" "App: $(bool_word "${rw}")" "Env: $(bool_word "${re}")" "Mat: $(bool_word "${rmat}")" "SEO: $(bool_word "${rse}")" "Data: $(bool_word "${rd}")" "PROCEED TO SELECT BACKUP" "Toggle Source (${src^^})" "Back")
+    
+    case "${options_choice}" in
+      "SQL"*) rs=$(toggle_bool "${rs}") ; continue ;;
+      "App"*) rw=$(toggle_bool "${rw}") ; continue ;;
+      "Env"*) re=$(toggle_bool "${re}") ; continue ;;
+      "Mat"*) rmat=$(toggle_bool "${rmat}") ; continue ;;
+      "SEO"*) rse=$(toggle_bool "${rse}") ; continue ;;
+      "Data"*) rd=$(toggle_bool "${rd}") ; continue ;;
+      "Toggle Source"*) [[ "$src" == "local" ]] && src="cloud" || src="local" ; continue ;;
+      "Back") return 0 ;;
+      "PROCEED TO SELECT BACKUP") ;;
+    esac
+
+    local selected_backup; selected_backup=$(printf "%s\n" "${backups[@]}" | fzf --height 15 --reverse --header "Select backup to restore" --preview "echo {}")
+    [[ -z "${selected_backup}" ]] && continue
+
+    if gum confirm "Restore $(basename "${selected_backup}")?"; then
+      if [[ "${src}" == "cloud" ]]; then
+        local dp="${BACKUP_DIR}/$(basename "${selected_backup}")"
+        download_backup_from_cloud "${selected_backup}" "${dp}" || continue
+        selected_backup="${dp}"
+      fi
+      restore_backup "${selected_backup}" "${rs}" "${rw}" "${re}" "${rmat}" "${rse}" "${rd}"
+      read -r -n 1 -s -p "  Done. Press any key..."
+    fi
   done
 }
 
@@ -895,130 +974,90 @@ download_backup_from_cloud() {
 
 print_delete_backups_tui() {
   local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
-  local selected=() backups=() local_list=() cloud_list=() i
-
-  log_info "Loading backups..."
-  local_list=($(list_local_backups | xargs -n1 basename || true))
-  cloud_list=($(list_cloud_backups || true))
-  
-  local all_ids=()
-  for b in "${local_list[@]}" "${cloud_list[@]}"; do
-    local id; id=$(echo "$b" | sed -n 's/backup-\(.*\)\.tar\.xz/\1/p')
-    [[ -n "$id" ]] && all_ids+=("$id")
-  done
-  backups=($(printf "%s\n" "${all_ids[@]}" | sort -u -r))
-  
-  local count=${#backups[@]}
-  for ((i=0; i<count; i++)); do selected[i]=false; done
-
   while true; do
-    auto_size_tui_panel_width
-    tui_clear_screen
-    print_box_banner "Delete Backups"
-    echo -e "${DIM}Toggle with letter, then choose action number.${NC}"
-    echo ""
-    print_tui_panel_rule "${width}"
+    auto_size_tui_panel_width; tui_clear_screen; print_box_banner "Delete Backups"
     
-    local letters="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    for ((i=0; i<count; i++)); do
-      [[ $i -ge ${#letters} ]] && break
-      local l="${letters:$i:1}"
-      local id="${backups[i]}"
-      local bn="backup-${id}.tar.xz"
-      
-      local is_local=false; for bl in "${local_list[@]}"; do [[ "$bl" == "$bn" ]] && is_local=true && break; done
-      local is_cloud=false; for bc in "${cloud_list[@]}"; do [[ "$bc" == "$bn" ]] && is_cloud=true && break; done
-      
-      local status=""
-      [[ "$is_local" == true ]] && status+="${GREEN}L${NC} " || status+="${DIM}·${NC} "
-      [[ "$is_cloud" == true ]] && status+="${BLUE}C${NC} " || status+="${DIM}·${NC} "
-
-      local meta; meta=$(get_backup_meta "${BACKUP_DIR}/${bn}")
-      local fmt_meta; fmt_meta=$(format_backup_meta "${meta}")
-      local tick="[ ]"; [[ "${selected[i]}" == true ]] && tick="[${GREEN}✔${NC}]"
-
-      printf "  ${CYAN}%s${NC} %b %-16s %b ${DIM}%s${NC}\n" "${l}" "${tick}" "${id}" "${status}" "${fmt_meta}"
-    done
+    log_info "Loading backups..."
+    local local_list=(); while IFS= read -r b; do [[ -n "$b" ]] && local_list+=("$(basename "$b")"); done < <(list_local_backups)
+    local cloud_list=(); while IFS= read -r b; do [[ -n "$b" ]] && cloud_list+=("$b"); done < <(list_cloud_backups)
     
-    (( count == 0 )) && echo -e "  ${YELLOW}No backups found${NC}"
+    local all_backups; mapfile -t all_backups < <(printf "%s\n" "${local_list[@]}" "${cloud_list[@]}" | sort -u -r | grep -v "^$")
     
-    echo ""
-    print_tui_panel_rule "${width}"
-    print_tui_action_pair "1" "Delete Local" "2" "Delete Cloud"
-    print_tui_action_pair "3" "Delete Everywhere" "4" "Back / Cancel"
-    print_tui_hint_line "Letter: Toggle | 1:Local, 2:Cloud, 3:Both, 4:Back"
-    
-    local ch; read -r -n 1 -s ch
-    case "${ch}" in
-      [a-zA-Z])
-        local idx; idx=$(letter_to_index "${ch}")
-        if [[ -n "$idx" && $idx -lt $count ]]; then
-          [[ "${selected[idx]}" == true ]] && selected[idx]=false || selected[idx]=true
-          continue
-        fi
-        ;;
-      1|2|3)
-        local mode="${ch}"
-        local sel_count=0; for s in "${selected[@]}"; do [[ "$s" == true ]] && ((sel_count++)); done
-        [[ $sel_count -eq 0 ]] && { log_warn "Nothing selected"; sleep 1; continue; }
+    if [[ ${#all_backups[@]} -eq 0 ]]; then
+      echo -e "  ${YELLOW}No backups found${NC}"
+      sleep 1; return 0
+    fi
 
-        echo -ne "\n  ${RED}${BOLD}Delete ${sel_count} backups? (y/N): ${NC}"
-        local confirm; read -r -n 1 confirm; echo ""
-        [[ "${confirm,,}" == "y" ]] || continue
+    local selected; selected=$(printf "%s\n" "${all_backups[@]}" | fzf --multi --height 15 --reverse --header "Tab to select multiple, Enter to delete" --preview "echo {}")
+    [[ -z "${selected}" ]] && return 0
 
-        ensure_sudo_for_deploy_ready || { log_error "Sudo authentication failed"; sleep 2; continue; }
-
-        for ((i=0; i<count; i++)); do
-          [[ "${selected[i]}" == true ]] || continue
-          local id="${backups[i]}"
-          local bn="backup-${id}.tar.xz"
-
-          if [[ "$mode" == "1" || "$mode" == "3" ]]; then
-            log_info "Deleting ${id} locally..."
-            run_privileged_cmd rm -f "${BACKUP_DIR}/${bn}" "${BACKUP_DIR}/backup-${id}.meta" 2>/dev/null || true
-          fi
-          if [[ "$mode" == "2" || "$mode" == "3" ]]; then
-            log_info "Deleting ${id} from cloud..."
-            local provider; for provider in ${BACKUP_CLOUD_PROVIDER}; do
-              case "$provider" in
-                google-drive) delete_google_drive_backup "${bn}" ;;
-                koofr) delete_koofr_backup "${bn}" ;;
-              esac
-            done
-          fi
+    local sel_count; sel_count=$(echo "$selected" | wc -l)
+    if gum confirm "Delete ${sel_count} backups from ALL locations?"; then
+      ensure_sudo_for_deploy_ready
+      while IFS= read -r b; do
+        [[ -z "$b" ]] && continue
+        local bn; bn=$(basename "$b")
+        log_info "Deleting ${bn}..."
+        run_privileged_cmd rm -f "${BACKUP_DIR}/${bn}" "${BACKUP_DIR}/${bn%.tar.xz}.meta" 2>/dev/null || true
+        for provider in ${BACKUP_CLOUD_PROVIDER}; do
+          case "$provider" in
+            google-drive) delete_google_drive_backup "${bn}" ;;
+            koofr) delete_koofr_backup "${bn}" ;;
+          esac
         done
-        log_info "Deletions completed"; sleep 1; return 0 ;;
-      4) return 0 ;;
-    esac
+      done <<< "$selected"
+      log_info "Deletions completed"; sleep 1
+    fi
   done
 }
 
 
 print_backup_components_tui() {
-  local ch; while true; do auto_size_tui_panel_width; tui_clear_screen; print_box_banner "Backup Components"
-    echo -e "${DIM}Configure included parts.\n"; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
-    print_tui_option_pair "S" "Database" "$(bool_word "${BACKUP_INCLUDE_SQL}")" "Database dump." "A" "App" "$(bool_word "${BACKUP_INCLUDE_WEBAPP}")" "Application."
-    print_tui_option_pair "E" "Env" "$(bool_word "${BACKUP_INCLUDE_ENV}")" "Environment." "M" "Materials" "$(bool_word "${BACKUP_INCLUDE_LEARNING_MATERIALS}")" "Learning materials."
-    print_tui_option_pair "O" "SEO" "$(bool_word "${BACKUP_INCLUDE_SEO_CONFIG}")" "SEO config." "C" "Clean" "$(bool_word "${BACKUP_CLEAN_OLD}")" "Auto-del old."
-    echo ""; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"; print_tui_action_pair "V" "Save" "B" "Back"
-    read -r -n 1 -s ch; case "${ch,,}" in s) BACKUP_INCLUDE_SQL=$(toggle_bool "${BACKUP_INCLUDE_SQL}") ;; a) BACKUP_INCLUDE_WEBAPP=$(toggle_bool "${BACKUP_INCLUDE_WEBAPP}") ;; e) BACKUP_INCLUDE_ENV=$(toggle_bool "${BACKUP_INCLUDE_ENV}") ;; m) BACKUP_INCLUDE_LEARNING_MATERIALS=$(toggle_bool "${BACKUP_INCLUDE_LEARNING_MATERIALS}") ;; o) BACKUP_INCLUDE_SEO_CONFIG=$(toggle_bool "${BACKUP_INCLUDE_SEO_CONFIG}") ;; c) BACKUP_CLEAN_OLD=$(toggle_bool "${BACKUP_CLEAN_OLD}") ;; v) save_maintenance_settings; log_info "Saved"; sleep 1; return 0 ;; b) return 0 ;; q) exit 0 ;; esac; done
+  while true; do
+    auto_size_tui_panel_width; tui_clear_screen; print_box_banner "Backup Components"
+    local options=(
+      "Database: $(bool_word "${BACKUP_INCLUDE_SQL}")"
+      "Application: $(bool_word "${BACKUP_INCLUDE_WEBAPP}")"
+      "Environment: $(bool_word "${BACKUP_INCLUDE_ENV}")"
+      "Materials: $(bool_word "${BACKUP_INCLUDE_LEARNING_MATERIALS}")"
+      "SEO Config: $(bool_word "${BACKUP_INCLUDE_SEO_CONFIG}")"
+      "Clean Old: $(bool_word "${BACKUP_CLEAN_OLD}")"
+      "Save & Back"
+      "Cancel"
+    )
+    local choice; choice=$(gum choose --cursor.foreground="33" "${options[@]}")
+    case "${choice}" in
+      "Database"*) BACKUP_INCLUDE_SQL=$(toggle_bool "${BACKUP_INCLUDE_SQL}") ;;
+      "Application"*) BACKUP_INCLUDE_WEBAPP=$(toggle_bool "${BACKUP_INCLUDE_WEBAPP}") ;;
+      "Environment"*) BACKUP_INCLUDE_ENV=$(toggle_bool "${BACKUP_INCLUDE_ENV}") ;;
+      "Materials"*) BACKUP_INCLUDE_LEARNING_MATERIALS=$(toggle_bool "${BACKUP_INCLUDE_LEARNING_MATERIALS}") ;;
+      "SEO Config"*) BACKUP_INCLUDE_SEO_CONFIG=$(toggle_bool "${BACKUP_INCLUDE_SEO_CONFIG}") ;;
+      "Clean Old"*) BACKUP_CLEAN_OLD=$(toggle_bool "${BACKUP_CLEAN_OLD}") ;;
+      "Save & Back") save_maintenance_settings; return 0 ;;
+      "Cancel") return 0 ;;
+    esac
+  done
 }
 
 print_cloud_settings_tui() {
-  local ch; while true; do auto_size_tui_panel_width; tui_clear_screen; print_box_banner "Cloud Settings"
-    local use_g="false"; [[ "${BACKUP_CLOUD_PROVIDER}" == *"google-drive"* ]] && use_g="true"
-    local use_k="false"; [[ "${BACKUP_CLOUD_PROVIDER}" == *"koofr"* ]] && use_k="true"
-    print_tui_option_pair "G" "GDrive" "$(bool_word "${use_g}")" "GDrive." "K" "Koofr" "$(bool_word "${use_k}")" "Koofr."
-    print_tui_option_pair "U" "Auto Up" "$(bool_word "${BACKUP_AUTO_UPLOAD}")" "Auto-upload."
-    echo ""; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"; echo -e "  Folder: ${BOLD}${BACKUP_CLOUD_FOLDER}${NC}\n"
-    print_tui_action_pair "F" "Folder" "B" "Back"
-    read -r -n 1 -s ch; case "${ch,,}" in
-      g) if [[ "${use_g}" == "true" ]]; then BACKUP_CLOUD_PROVIDER="${BACKUP_CLOUD_PROVIDER//google-drive/}"; else [[ "${BACKUP_CLOUD_PROVIDER}" == "none" ]] && BACKUP_CLOUD_PROVIDER=""; BACKUP_CLOUD_PROVIDER="${BACKUP_CLOUD_PROVIDER} google-drive"; fi; BACKUP_CLOUD_PROVIDER=$(echo $BACKUP_CLOUD_PROVIDER | xargs); [[ -z "${BACKUP_CLOUD_PROVIDER}" ]] && BACKUP_CLOUD_PROVIDER="none"; save_maintenance_settings ;;
-      k) if [[ "${use_k}" == "true" ]]; then BACKUP_CLOUD_PROVIDER="${BACKUP_CLOUD_PROVIDER//koofr/}"; else [[ "${BACKUP_CLOUD_PROVIDER}" == "none" ]] && BACKUP_CLOUD_PROVIDER=""; BACKUP_CLOUD_PROVIDER="${BACKUP_CLOUD_PROVIDER} koofr"; fi; BACKUP_CLOUD_PROVIDER=$(echo $BACKUP_CLOUD_PROVIDER | xargs); [[ -z "${BACKUP_CLOUD_PROVIDER}" ]] && BACKUP_CLOUD_PROVIDER="none"; save_maintenance_settings ;;
-      u) BACKUP_AUTO_UPLOAD=$(toggle_bool "${BACKUP_AUTO_UPLOAD}"); save_maintenance_settings ;;
-      f) BACKUP_CLOUD_FOLDER=$(prompt_value "Folder" "${BACKUP_CLOUD_FOLDER}"); save_maintenance_settings ;;
-      b) return 0 ;; q) exit 0 ;;
-    esac; done
+  while true; do
+    auto_size_tui_panel_width; tui_clear_screen; print_box_banner "Cloud Settings"
+    local use_g="OFF"; [[ "${BACKUP_CLOUD_PROVIDER}" == *"google-drive"* ]] && use_g="ON"
+    local use_k="OFF"; [[ "${BACKUP_CLOUD_PROVIDER}" == *"koofr"* ]] && use_k="ON"
+    
+    local choice; choice=$(gum choose --cursor.foreground="33" "Toggle Google Drive (Currently $use_g)" "Toggle Koofr (Currently $use_k)" "Toggle Auto-upload ($(bool_word "${BACKUP_AUTO_UPLOAD}"))" "Set Cloud Folder (${BACKUP_CLOUD_FOLDER})" "Back")
+    case "${choice}" in
+      "Toggle Google Drive"*) 
+        if [[ "${use_g}" == "ON" ]]; then BACKUP_CLOUD_PROVIDER="${BACKUP_CLOUD_PROVIDER//google-drive/}"; else [[ "${BACKUP_CLOUD_PROVIDER}" == "none" ]] && BACKUP_CLOUD_PROVIDER=""; BACKUP_CLOUD_PROVIDER="${BACKUP_CLOUD_PROVIDER} google-drive"; fi
+        BACKUP_CLOUD_PROVIDER=$(echo $BACKUP_CLOUD_PROVIDER | xargs); [[ -z "${BACKUP_CLOUD_PROVIDER}" ]] && BACKUP_CLOUD_PROVIDER="none"; save_maintenance_settings ;;
+      "Toggle Koofr"*)
+        if [[ "${use_k}" == "ON" ]]; then BACKUP_CLOUD_PROVIDER="${BACKUP_CLOUD_PROVIDER//koofr/}"; else [[ "${BACKUP_CLOUD_PROVIDER}" == "none" ]] && BACKUP_CLOUD_PROVIDER=""; BACKUP_CLOUD_PROVIDER="${BACKUP_CLOUD_PROVIDER} koofr"; fi
+        BACKUP_CLOUD_PROVIDER=$(echo $BACKUP_CLOUD_PROVIDER | xargs); [[ -z "${BACKUP_CLOUD_PROVIDER}" ]] && BACKUP_CLOUD_PROVIDER="none"; save_maintenance_settings ;;
+      "Toggle Auto-upload"*) BACKUP_AUTO_UPLOAD=$(toggle_bool "${BACKUP_AUTO_UPLOAD}"); save_maintenance_settings ;;
+      "Set Cloud Folder"*) BACKUP_CLOUD_FOLDER=$(gum input --placeholder "Folder Name" --value "${BACKUP_CLOUD_FOLDER}"); save_maintenance_settings ;;
+      "Back") return 0 ;;
+    esac
+  done
 }
 
 # =============================================================================
@@ -1026,102 +1065,83 @@ print_cloud_settings_tui() {
 # =============================================================================
 
 print_btop_main_menu() {
-  tui_clear_screen; local cpu=$(get_cpu_usage) mem=$(get_memory_usage) disk=$(get_disk_usage "/") up=$(get_uptime) w="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
+  printf "\033[H"
+  local cpu=$(get_cpu_usage) mem=$(get_memory_usage) disk=$(get_disk_usage "/") up=$(get_uptime) w="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
   [[ -z "${BRANCH:-}" ]] && BRANCH="$(current_branch_name 2>/dev/null || echo "main")"; local h=$(get_current_commit 2>/dev/null || echo "???") m=$(get_last_commit_msg 2>/dev/null || echo "...")
-  print_btop_header "$w"; echo ""; printf "  ${DIM}CPU${NC}   "; draw_cpu_graph "$cpu" 18; printf "  ${DIM}Uptime:${NC} ${BTOP_PURPLE}%s${NC}\n" "$up"
-  printf "  ${DIM}MEM${NC}   "; draw_mem_graph "$mem" 18; printf "  ${DIM}Procs:${NC} ${BTOP_CYAN}%s${NC}\n" "$(get_process_count)"
-  printf "  ${DIM}DISK${NC}  "; draw_disk_graph "$disk" 18; printf "  ${DIM}Load:${NC} ${BTOP_YELLOW}%s${NC}  ${DIM}Live:${NC} ${BTOP_GREEN}%s${NC}\n" "$(get_load_average)" "$(date "+%H:%M:%S")"
+  
+  print_btop_header "$w"
+  echo ""
+  
+  local left; left=$(printf "  ${DIM}CPU${NC}   $(draw_cpu_graph "$cpu" 18)\n  ${DIM}MEM${NC}   $(draw_mem_graph "$mem" 18)\n  ${DIM}DISK${NC}  $(draw_disk_graph "$disk" 18)")
+  local right; right=$(printf "  ${DIM}Uptime:${NC} ${BTOP_PURPLE}%s${NC}\n  ${DIM}Procs:${NC}  ${BTOP_CYAN}%s${NC}\n  ${DIM}Load:${NC}   ${BTOP_YELLOW}%s${NC}" "$up" "$(get_process_count)" "$(get_load_average)")
+  
+  gum join --horizontal --align top --padding "0 10 0 0" "$left" "$right"
+  
   echo ""; print_tui_panel_rule "$w"; echo -e "  ${BOLD}${BTOP_CYAN}⬡${NC} ${BOLD}Git Status${NC}"; print_tui_panel_rule "$w"
   printf "  ${DIM}Branch:${NC} ${BTOP_GREEN}%s${NC}  ${DIM}Commit:${NC} ${BTOP_YELLOW}%s${NC}  ${DIM}Sudo:${NC} ${BTOP_PURPLE}%s${NC}\n" "${BRANCH}" "$h" "$(update_sudo_mode_label)"
-  printf "  ${DIM}Last:${NC} ${BTOP_FG}%s${NC}\n" "$(tui_truncate_text "$m" 60)"
-  echo ""; print_tui_panel_rule "$w"; echo -e "  ${BOLD}${BTOP_CYAN}⬡${NC} ${BOLD}Categories${NC}"; print_tui_panel_rule "$w"
-  print_tui_option_pair "D" "Deploy" "▶ Open" "Deploy/Update." "B" "Backup" "▶ Open" "Manage Backups."
-  print_tui_option_pair "S" "SEO/DB" "▶ Open" "SEO & Health." "Y" "System" "▶ Open" "Config/Git."
-  echo ""; print_tui_panel_rule "$w"
+  printf "  ${DIM}Last:${NC} ${BTOP_FG}%s${NC}\n" "$(tui_truncate_text "$m" $((w-10)))"
+  echo ""; print_tui_panel_rule "$w"; echo -e "  ${BOLD}${BTOP_CYAN}⬡${NC} ${BOLD}Navigation${NC}"; print_tui_panel_rule "$w"
 }
 
 print_deploy_menu_tui() {
-  local ch; while true; do auto_size_tui_panel_width; tui_clear_screen; print_box_banner "Deploy Management"
+  while true; do
+    auto_size_tui_panel_width; tui_clear_screen; print_box_banner "Deploy Management"
     echo -e "${DIM}Update and deploy.\n"; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
-    print_tui_option_pair "U" "Update" "▶ Run" "update.sh" "D" "Deploy" "▶ Run" "deploy.sh"
-    print_tui_option_pair "S" "Sudo" "$(update_sudo_mode_label)" "Toggle sudo."
-    echo ""; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"; print_tui_action_pair "B" "Back"; print_tui_hint_line "Select U, D, S or B"
-    read -r -n 1 -s ch; case "${ch,,}" in
-      u) run_update_script; read -r -n 1 -s -p "  Done. Key..." ;;
-      d) run_deploy_script; read -r -n 1 -s -p "  Done. Key..." ;;
-      s) cycle_sudo_mode ;; b) return 0 ;; q) exit 0 ;;
-    esac; done
+    local choice; choice=$(gum choose --cursor.foreground="33" "Update Application" "Deploy Application" "Toggle Sudo Mode ($(update_sudo_mode_label))" "Back")
+    case "${choice}" in
+      "Update Application") run_update_script; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      "Deploy Application") run_deploy_script; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      "Toggle Sudo Mode"*) cycle_sudo_mode ;;
+      "Back") return 0 ;;
+    esac
+  done
 }
 
 print_backup_menu_tui() {
-  local ch; while true; do auto_size_tui_panel_width; tui_clear_screen; print_box_banner "Backup & Restore"
+  while true; do
+    auto_size_tui_panel_width; tui_clear_screen; print_box_banner "Backup & Restore"
     echo -e "${DIM}Manage local and cloud.\n"; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
-    print_tui_option_pair "R" "Run" "▶ Run" "New backup." "T" "Restore" "▶ Open" "Restore."
-    print_tui_option_pair "D" "Manage" "✖ Open" "Delete backups." "V" "Cloud" "⚙ Set" "Cloud providers."
-    print_tui_option_pair "C" "Comps" "⚙ Set" "Included parts." "F" "Freq" "${BACKUP_FREQUENCY}" "Frequency."
-    print_tui_option_pair "K" "Keep" "${BACKUP_RETENTION_DAYS}d" "Retention."
-    echo ""; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"; print_tui_action_pair "B" "Back"; print_tui_hint_line "Select R, T, D, V, C, F, K or B"
-    read -r -n 1 -s ch; case "${ch,,}" in
-      r) run_backup "${BACKUP_AUTO_UPLOAD:-false}"; read -r -n 1 -s -p "  Done. Key..." ;;
-      t) restore_backup_tui ;; d) print_delete_backups_tui ;; v) print_cloud_settings_tui ;; c) print_backup_components_tui ;;
-      f) section "Freq"; BACKUP_FREQUENCY=$(prompt_select "Select" "hourly" "daily" "weekly"); save_maintenance_settings; sleep 1 ;;
-      k) section "Keep"; BACKUP_RETENTION_DAYS=$(prompt_value "Days" "${BACKUP_RETENTION_DAYS}"); save_maintenance_settings; sleep 1 ;;
-      b) return 0 ;; q) exit 0 ;;
-    esac; done
+    local choice; choice=$(gum choose --cursor.foreground="33" "Run New Backup" "Restore Backup" "Delete Backups" "Cloud Settings" "Backup Components" "Set Frequency (${BACKUP_FREQUENCY})" "Set Retention (${BACKUP_RETENTION_DAYS}d)" "Back")
+    case "${choice}" in
+      "Run New Backup") run_backup "${BACKUP_AUTO_UPLOAD:-false}"; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      "Restore Backup") restore_backup_tui ;;
+      "Delete Backups") print_delete_backups_tui ;;
+      "Cloud Settings") print_cloud_settings_tui ;;
+      "Backup Components") print_backup_components_tui ;;
+      "Set Frequency"*) BACKUP_FREQUENCY=$(gum choose "hourly" "daily" "weekly"); save_maintenance_settings ;;
+      "Set Retention"*) BACKUP_RETENTION_DAYS=$(gum input --placeholder "Days (e.g. 30)" --value "${BACKUP_RETENTION_DAYS}"); save_maintenance_settings ;;
+      "Back") return 0 ;;
+    esac
+  done
 }
 
 print_seo_db_menu_tui() {
-  local ch; while true; do auto_size_tui_panel_width; tui_clear_screen; print_box_banner "SEO & Database"
+  while true; do
+    auto_size_tui_panel_width; tui_clear_screen; print_box_banner "SEO & Database"
     echo -e "${DIM}SEO and health.\n"; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
-    print_tui_option_pair "M" "Sitemap" "▶ Run" "Generate sitemap." "G" "Robots" "▶ Run" "Generate robots."
-    print_tui_option_pair "H" "Health" "● Check" "DB Check."
-    echo ""; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"; print_tui_action_pair "B" "Back"; print_tui_hint_line "Select M, G, H or B"
-    read -r -n 1 -s ch; case "${ch,,}" in
-      m) generate_sitemap; read -r -n 1 -s -p "  Done. Key..." ;;
-      g) generate_robots_txt; read -r -n 1 -s -p "  Done. Key..." ;;
-      h) check_database_health; read -r -n 1 -s -p "  Done. Key..." ;;
-      b) return 0 ;; q) exit 0 ;;
-    esac; done
+    local choice; choice=$(gum choose --cursor.foreground="33" "Generate Sitemap" "Generate Robots.txt" "Check Database Health" "Back")
+    case "${choice}" in
+      "Generate Sitemap") generate_sitemap; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      "Generate Robots.txt") generate_robots_txt; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      "Check Database Health") check_database_health; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      "Back") return 0 ;;
+    esac
+  done
 }
 
 print_system_menu_tui() {
-  local ch; while true; do auto_size_tui_panel_width; tui_clear_screen; print_box_banner "System Management"
+  while true; do
+    auto_size_tui_panel_width; tui_clear_screen; print_box_banner "System Management"
     echo -e "${DIM}Ops and config.\n"; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
-    print_tui_option_pair "P" "Pull" "↓ Run" "Git Pull." "X" "Clean" "✖ Run" "Clean Cache."
-    print_tui_option_pair "E" "Edit" "◈ Open" "Edit Config."
-    echo ""; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"; print_tui_action_pair "B" "Back"; print_tui_hint_line "Select P, X, E or B"
-    read -r -n 1 -s ch; case "${ch,,}" in
-      p) run_git_pull; read -r -n 1 -s -p "  Done. Key..." ;;
-      x) [[ -d "${REPO_ROOT}/.next" ]] && run_privileged_cmd rm -rf "${REPO_ROOT}/.next"; [[ -d "${REPO_ROOT}/node_modules/.cache" ]] && run_privileged_cmd rm -rf "${REPO_ROOT}/node_modules/.cache"; log_info "Cache cleaned"; read -r -n 1 -s -p "  Done. Key..." ;;
-      e) section "Edit"; prompt_env_editor; read -r -n 1 -s -p "  Done...";;
-      b) return 0 ;; q) exit 0 ;;
-    esac; done
+    local choice; choice=$(gum choose --cursor.foreground="33" "Git Pull" "Clean Cache" "Edit Config (.env)" "Back")
+    case "${choice}" in
+      "Git Pull") run_git_pull; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      "Clean Cache") [[ -d "${REPO_ROOT}/.next" ]] && run_privileged_cmd rm -rf "${REPO_ROOT}/.next"; [[ -d "${REPO_ROOT}/node_modules/.cache" ]] && run_privileged_cmd rm -rf "${REPO_ROOT}/node_modules/.cache"; log_info "Cache cleaned"; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      "Edit Config (.env)") section "Edit"; prompt_env_editor; read -r -n 1 -s -p "  Done. Press any key..." ;;
+      "Back") return 0 ;;
+    esac
+  done
 }
-
-# =============================================================================
-# Run wrappers
-# =============================================================================
-
-run_interactive_maintenance() { load_maintenance_settings; create_backup_directory; local ch; while true; do auto_size_tui_panel_width; print_btop_main_menu; printf "  ${DIM}Select Category (D, B, S, Y, R to refresh, Q to quit):${NC} "; read -r -n 1 ch; case "${ch,,}" in d) print_deploy_menu_tui ;; b) print_backup_menu_tui ;; s) print_seo_db_menu_tui ;; y) print_system_menu_tui ;; r) : ;; q) exit 0 ;; esac; done; }
-
-detect_tty_capabilities() {
-  if [[ -t 0 && -t 1 ]]; then IS_TTY=true; fi
-  if [[ "${IS_TTY}" == true ]]; then auto_size_tui_panel_width; fi
-  if [[ "${NO_COLOR:-false}" == true || ! -t 1 ]]; then
-    RED='' GREEN='' YELLOW='' BLUE='' CYAN='' MAGENTA='' BOLD='' DIM='' NC=''
-    BTOP_FG='' BTOP_FG_DIM='' BTOP_CYAN='' BTOP_CYAN_BRIGHT='' BTOP_GREEN='' BTOP_GREEN_DIM='' BTOP_BLUE='' BTOP_BLUE_DIM='' BTOP_ORANGE='' BTOP_ORANGE_DIM='' BTOP_PURPLE='' BTOP_PURPLE_DIM='' BTOP_YELLOW='' BTOP_YELLOW_DIM='' BTOP_RED='' BTOP_RED_DIM='' BTOP_GRAD_0='' BTOP_GRAD_1='' BTOP_GRAD_2='' BTOP_GRAD_3='' BTOP_GRAD_4='' BTOP_GRAD_5=''
-  fi
-}
-
-run_step() { local msg="$1"; shift; start_spinner "${msg}"; if "$@" >/dev/null 2>&1; then stop_spinner "ok" >&2; else stop_spinner "fail" >&2; return 1; fi; }
-start_spinner() { local msg="$1" i=0 fc="${#SPINNER_FRAMES[@]}"; [[ "${NO_SPINNER:-false}" == true || "${IS_TTY:-false}" != true ]] && return 0; SPINNER_MSG="${msg}"; ( while true; do printf "\r${CYAN}%s${NC} %s" "${SPINNER_FRAMES[$i]}" "${SPINNER_MSG}" >&2; i=$(( (i + 1) % fc )); sleep 0.08; done ) & SPINNER_PID=$!; }
-stop_spinner() { local status="$1"; [[ "${NO_SPINNER:-false}" == true || "${IS_TTY:-false}" != true ]] && return 0; if [[ -n "${SPINNER_PID:-}" ]] && kill -0 "${SPINNER_PID}" 2>/dev/null; then kill "${SPINNER_PID}" 2>/dev/null || true; wait "${SPINNER_PID}" 2>/dev/null || true; fi; printf "\r\033[K" >&2; [[ "${status}" == "ok" ]] && printf "${GREEN}✔${NC} %s\n" "${SPINNER_MSG}" >&2 || printf "${RED}✖${NC} %s\n" "${SPINNER_MSG}" >&2; }
-check_database_health() { section "Database Health"; get_db_creds || { log_error "No creds"; return 1; }; log_info "Connecting to ${DB_NAME} on ${DB_H:-localhost}..."; if command -v mysql >/dev/null 2>&1; then if MYSQL_PWD="${DB_P}" mysql -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" -e "SELECT 1" "${DB_NAME}" >/dev/null 2>&1; then log_info "DB OK"; else log_error "DB Fail"; fi; elif command -v mariadb >/dev/null 2>&1; then if MYSQL_PWD="${DB_P}" mariadb -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" -e "SELECT 1" "${DB_NAME}" >/dev/null 2>&1; then log_info "DB OK"; else log_error "DB Fail"; fi; else log_error "No mysql client"; fi; }
-run_git_pull() { section "Git Pull"; run_step "Fetching" git -C "${REPO_ROOT}" fetch "${REMOTE_NAME}"; run_step "Pulling" git -C "${REPO_ROOT}" pull "${REMOTE_NAME}" "${BRANCH:-$(current_branch_name)}"; }
-run_update_script() { section "Updating Application"; bash "${UPDATE_SCRIPT}" --sudo-deploy; }
-run_deploy_script() { section "Deploying Application"; bash "${DEPLOY_SCRIPT}" --skip-pull; }
-create_backup_directory() { local u; u=$(id -un); if [[ ! -d "${BACKUP_DIR}" ]]; then run_privileged_cmd mkdir -p "${BACKUP_DIR}"; run_privileged_cmd chown "${u}:${u}" "${BACKUP_DIR}" 2>/dev/null || true; fi; if [[ ! -d "${LOG_DIR}" ]]; then run_privileged_cmd mkdir -p "${LOG_DIR}"; run_privileged_cmd chown "${u}:${u}" "${LOG_DIR}" 2>/dev/null || true; fi; }
-prompt_env_editor() { local se="${SHARED_DIR}/.env" ed="${VISUAL:-${EDITOR:-nano}}"; for c in nano vi vim; do if command -v "${c}" >/dev/null 2>&1; then ed="${c}"; break; fi; done; if command -v "${ed}" >/dev/null 2>&1; then if [[ -f "${se}" ]]; then "${ed}" "${se}"; else log_warn "Shared .env not found"; fi; else log_warn "No terminal editor found"; fi; }
 
 show_usage() {
   cat <<'EOF'
@@ -1134,7 +1154,7 @@ EOF
 
 main() {
   while [[ $# -gt 0 ]]; do case "$1" in --interactive) INTERACTIVE=true ;; --branch) BRANCH="$2"; shift ;; --remote) REMOTE_NAME="$2"; shift ;; --help|-h) show_usage; exit 0 ;; esac; shift; done
-  init_paths; detect_tty_capabilities; [[ "${INTERACTIVE:-false}" == true || "${IS_TTY:-false}" == true ]] && run_interactive_maintenance || show_usage
+  init_paths; detect_tty_capabilities; [[ "${INTERACTIVE:-false}" == true || "${IS_TTY:-false}" == true ]] && { ensure_dependencies; run_interactive_maintenance; } || show_usage
 }
 main "$@"
 
