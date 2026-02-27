@@ -411,9 +411,15 @@ should_use_sudo_for_deploy() {
 ensure_sudo_for_deploy_ready() {
   if should_use_sudo_for_deploy; then
     if [[ "${SUDO_DEPLOY_AUTH_READY:-false}" == true ]]; then return 0; fi
+    if sudo -n true 2>/dev/null; then
+      SUDO_DEPLOY_AUTH_READY=true
+      export SUDO_DEPLOY_AUTH_READY
+      return 0
+    fi
     log_info "Sudo required. Please authenticate..."
     if sudo -v; then
       SUDO_DEPLOY_AUTH_READY=true
+      export SUDO_DEPLOY_AUTH_READY
       return 0
     else
       return 1
@@ -571,7 +577,7 @@ create_backup_archive() {
 }
 
 run_backup() {
-  local up="${1:-false}" section "Backup Execution"; create_backup_directory; local ts="$(date +%Y%m%d-%H%M%S)" af; af="$(create_backup_archive "${ts}")" || return 1
+  local up="${1:-false}" section="Backup Execution"; create_backup_directory; local ts="$(date +%Y%m%d-%H%M%S)" af; af="$(create_backup_archive "${ts}")" || return 1
   if [[ "${up}" == "true" ]]; then local p; for p in ${BACKUP_CLOUD_PROVIDER}; do case "${p}" in google-drive) upload_to_google_drive "${af}" || log_warn "GDrive fail" ;; koofr) upload_to_koofr "${af}" || log_warn "Koofr fail" ;; esac; done; fi
   [[ "${BACKUP_CLEAN_OLD}" == "true" ]] && find "${BACKUP_DIR}" -name "backup-*.tar.xz" -type f -mtime +${BACKUP_RETENTION_DAYS} -delete 2>/dev/null
   local lf="${LOG_DIR}/backup-${ts}.log" lm="[$(date -Iseconds)] Backup: ${af}"; if [[ -w "${LOG_DIR}" ]]; then echo "${lm}" >> "${lf}"; else echo "${lm}" | run_privileged_cmd tee -a "${lf}" >/dev/null; fi
@@ -644,13 +650,13 @@ build_tui_option_cell_text() {
 # =============================================================================
 
 restore_backup_tui() {
+  ensure_sudo_for_deploy_ready
   local src="local" rs=true rw=true re=true rmat=true rse=true rd=true ch
   while true; do
     auto_size_tui_panel_width; tui_clear_screen; print_box_banner "Restore Backup"
     echo -e "${DIM}Source: ${BOLD}${src^^}${NC}\n"; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
-    echo -e "${BOLD}${BLUE}  Backups${NC}"; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
+    echo -e "${BOLD}${BLUE}  Available Backups${NC}"; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
     local bks=() i=0; local letters="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
     if [[ "${src}" == "local" ]]; then
       while IFS= read -r b; do
         [[ -n "$b" ]] || continue; local l="${letters:$i:1}"
@@ -663,7 +669,7 @@ restore_backup_tui() {
         bks+=("${b}"); ((i++)); [[ $i -ge 52 ]] && break
       done < <(list_cloud_backups)
     fi
-    [[ ${#bks[@]} -eq 0 ]] && echo -e "  ${YELLOW}None found${NC}"
+    [[ ${#bks[@]} -eq 0 ]] && echo -e "  ${YELLOW}No backups found${NC}"
     echo ""; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"; echo -e "${BOLD}${BLUE}  Options${NC}"
     print_tui_option_pair "S" "SQL" "$(bool_word "${rs}")" "Restore SQL." "A" "App" "$(bool_word "${rw}")" "Restore app."
     print_tui_option_pair "E" "Env" "$(bool_word "${re}")" "Restore env." "M" "Mat" "$(bool_word "${rmat}")" "Restore materials."
@@ -677,6 +683,7 @@ restore_backup_tui() {
   done
 }
 
+
 download_backup_from_cloud() {
   local btr="$1" dp="$2" success=false; for p in ${BACKUP_CLOUD_PROVIDER}; do
     case "$p" in google-drive) download_from_google_drive "${btr}" "${dp}" && success=true && break ;; koofr) download_from_koofr "${btr}" "${dp}" && success=true && break ;; esac
@@ -684,6 +691,7 @@ download_backup_from_cloud() {
 }
 
 print_delete_backups_tui() {
+  ensure_sudo_for_deploy_ready
   local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
   local selected=() backups=() local_list=() cloud_list=() i
   
@@ -710,7 +718,6 @@ print_delete_backups_tui() {
     print_tui_panel_rule "${width}"
     
     local letters="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
     for ((i=0; i<count; i++)); do
       [[ $i -ge ${#letters} ]] && break
       local l="${letters:$i:1}"
@@ -753,10 +760,6 @@ print_delete_backups_tui() {
         [[ $sel_count -eq 0 ]] && { log_warn "Nothing selected"; sleep 1; continue; }
         
         echo -ne "\n  ${RED}${BOLD}Delete ${sel_count} backups? (y/N): ${NC}"
-
-        (( sel_count == 0 )) && { log_warn "Nothing selected"; sleep 1; continue; }
-        
-        echo -ne "\n  ${RED}${BOLD}Delete ${sel_count} backups? (y/N): ${NC}"
         local confirm; read -r -n 1 confirm; echo ""
         [[ "${confirm,,}" == "y" ]] || continue
         
@@ -784,6 +787,7 @@ print_delete_backups_tui() {
     esac
   done
 }
+
 
 print_backup_components_tui() {
   local ch; while true; do auto_size_tui_panel_width; tui_clear_screen; print_box_banner "Backup Components"
