@@ -514,6 +514,32 @@ get_db_creds() {
   [[ -n "${DB_U}" && -n "${DB_NAME}" ]] || return 1
 }
 
+create_database_dump() {
+  local output_file="$1"
+  get_db_creds || return 1
+  if command -v mysqldump >/dev/null 2>&1; then
+    MYSQL_PWD="${DB_P}" mysqldump -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" "${DB_NAME}" > "${output_file}" 2>/dev/null
+  elif command -v mariadb-dump >/dev/null 2>&1; then
+    MYSQL_PWD="${DB_P}" mariadb-dump -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" "${DB_NAME}" > "${output_file}" 2>/dev/null
+  else
+    log_error "No mysqldump or mariadb-dump found"
+    return 1
+  fi
+}
+
+restore_database() {
+  local input_file="$1"
+  get_db_creds || return 1
+  if command -v mysql >/dev/null 2>&1; then
+    MYSQL_PWD="${DB_P}" mysql -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" "${DB_NAME}" < "${input_file}" 2>/dev/null
+  elif command -v mariadb >/dev/null 2>&1; then
+    MYSQL_PWD="${DB_P}" mariadb -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" "${DB_NAME}" < "${input_file}" 2>/dev/null
+  else
+    log_error "No mysql or mariadb client found"
+    return 1
+  fi
+}
+
 # =============================================================================
 # Cloud Provider Operations
 # =============================================================================
