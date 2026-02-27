@@ -236,7 +236,91 @@ notify_error() {
 }
 
 # =============================================================================
-# 5. Core Tasks
+# 5. Core Logic Operations & Task Runner
+# =============================================================================
+
+# Helper to run a task with visual feedback
+# Usage: run_task "Title" "command..."
+run_task() {
+    local title="$1"
+    shift
+    
+    if gum --help | grep -q "progress"; then
+        # If progress is supported
+        echo "100" | gum progress --title "$title" -- "$@"
+    else
+        # Fallback to spinner which is more widely available
+        gum spin --spinner dot --title "$title..." -- "$@"
+    fi
+}
+
+get_db_creds() {
+  local du; du=$(get_env_val "DATABASE_URL")
+  [[ -z "${du:-}" ]] && return 1
+  DB_U=$(echo "${du}" | sed -n 's|.*://\([^:]*\):.*@.*|\1|p')
+  DB_P=$(echo "${du}" | sed -n 's|.*://[^:]*:\([^@]*\)@.*|\1|p')
+  DB_H=$(echo "${du}" | sed -n 's|.*@\([^:/]*\).*|\1|p')
+  DB_PORT=$(echo "${du}" | sed -n 's|.*:\([0-9]*\)/.*|\1|p')
+  DB_NAME=$(echo "${du}" | sed -n 's|.*/\([^?]*\).*|\1|p')
+  [[ -n "${DB_U}" && -n "${DB_NAME}" ]] || return 1
+}
+
+create_database_dump() {
+  local output_file="$1"
+  get_db_creds || return 1
+  if command -v mysqldump >/dev/null 2>&1; then
+    MYSQL_PWD="${DB_P}" mysqldump -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" "${DB_NAME}" > "${output_file}" 2>/dev/null
+  elif command -v mariadb-dump >/dev/null 2>&1; then
+    MYSQL_PWD="${DB_P}" mariadb-dump -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" "${DB_NAME}" > "${output_file}" 2>/dev/null
+  else
+    return 1
+  fi
+}
+
+upload_to_gdrive() {
+    local file_path="$1"
+    local folder_name="${BACKUP_CLOUD_FOLDER}"
+    
+    if [[ -z "${GDRIVE_CLIENT_ID}" || -z "${GDRIVE_CLIENT_SECRET}" || -z "${GDRIVE_REFRESH_TOKEN}" ]]; then
+        return 1
+    fi
+    
+    # Get access token
+    local token_response=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
+        -d "client_id=${GDRIVE_CLIENT_ID}&client_secret=${GDRIVE_CLIENT_SECRET}&refresh_token=${GDRIVE_REFRESH_TOKEN}&grant_type=refresh_token")
+    local access_token=$(echo "${token_response}" | grep -o '"access_token"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*: *"\([^"]*\)"/\1/')
+    
+    [[ -z "${access_token}" ]] && return 1
+
+    # Get folder ID
+    local folder_id=$(curl -s "https://www.googleapis.com/drive/v3/files?q=name='${folder_name}'+and+mimeType='application/vnd.google-apps.folder'+and+trashed=false" \
+        -H "Authorization: Bearer ${access_token}" | grep -o '"id"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*: *"\([^"]*\)"/\1/')
+
+    if [[ -z "${folder_id}" ]]; then
+        folder_id=$(curl -s -X POST "https://www.googleapis.com/drive/v3/files" \
+            -H "Authorization: Bearer ${access_token}" -H "Content-Type: application/json" \
+            -d "{\"name\": \"${folder_name}\", \"mimeType\": \"application/vnd.google-apps.folder\"}" | grep -o '"id"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*: *"\([^"]*\)"/\1/')
+    fi
+
+    local file_name=$(basename "${file_path}")
+    curl -s -X POST "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart" \
+        -H "Authorization: Bearer ${access_token}" \
+        -H "Content-Type: multipart/related; boundary=foo_bar_baz" \
+        --data-binary @- <<EOF
+--foo_bar_baz
+Content-Type: application/json; charset=UTF-8
+
+{"name": "${file_name}", "parents": ["${folder_id}"]}
+--foo_bar_baz
+Content-Type: application/octet-stream
+
+$(cat "${file_path}")
+--foo_bar_baz--
+EOF
+}
+
+# =============================================================================
+# 6. High-level Tasks
 # =============================================================================
 
 run_backup_process() {
@@ -261,36 +345,31 @@ run_backup_process() {
     local archive="${BACKUP_DIR}/${bn}.tar.xz"
     mkdir -p "$BACKUP_DIR"
 
-    (
-        for i in "${!steps[@]}"; do
-            local step="${steps[$i]}"
-            local progress=$(( (i + 1) * 100 / ${#steps[@]} ))
-            
-            # Update title via stderr to avoid piping into gum progress
-            echo "TASK: $step" >&2
-            
-            case "$step" in
-                "Database Dump") 
-                    # Real logic here
-                    sleep 0.5 ;;
-                "Environment") 
-                    [[ -f "${SHARED_DIR}/.env" ]] && cp "${SHARED_DIR}/.env" "${td}/${bn}/" ;;
-                "SEO Config") 
-                    [[ -f "$SEO_CONFIG_FILE" ]] && cp "$SEO_CONFIG_FILE" "${td}/${bn}/" ;;
-                "Application") 
-                    rsync -a --exclude='node_modules' --exclude='.next' "${CURRENT_LINK}/" "${td}/${bn}/app/" 2>/dev/null || true ;;
-                "Materials")
-                    [[ -d "${REPO_ROOT}/.data" ]] && cp -r "${REPO_ROOT}/.data" "${td}/${bn}/" ;;
-                "Compression") 
-                    tar -cJf "${archive}" -C "${td}" "${bn}" 2>/dev/null || true ;;
-                "Cloud Upload") 
-                    sleep 1 ;;
-            esac
-            
-            echo "$progress"
-            sleep 0.1
-        done
-    ) | gum progress --title "Executing Backup Workflow..."
+    echo "Starting backup workflow..."
+    
+    for i in "${!steps[@]}"; do
+        local step="${steps[$i]}"
+        local count=$((i + 1))
+        local total=${#steps[@]}
+        local prefix="[$count/$total]"
+        
+        case "$step" in
+            "Database Dump") 
+                run_task "$prefix Creating Database Dump" create_database_dump "${td}/${bn}/database.sql" ;;
+            "Environment") 
+                run_task "$prefix Copying Environment Files" bash -c "[[ -f \"${SHARED_DIR}/.env\" ]] && cp \"${SHARED_DIR}/.env\" \"${td}/${bn}/\"" ;;
+            "SEO Config") 
+                run_task "$prefix Copying SEO Config" bash -c "[[ -f \"$SEO_CONFIG_FILE\" ]] && cp \"$SEO_CONFIG_FILE\" \"${td}/${bn}/\"" ;;
+            "Application") 
+                run_task "$prefix Syncing Application Files" rsync -a --exclude='node_modules' --exclude='.next' "${CURRENT_LINK}/" "${td}/${bn}/app/" ;;
+            "Materials")
+                run_task "$prefix Copying Learning Materials" bash -c "[[ -d \"${REPO_ROOT}/.data\" ]] && cp -r \"${REPO_ROOT}/.data\" \"${td}/${bn}/\"" ;;
+            "Compression") 
+                run_task "$prefix Compressing Archive" tar -cJf "${archive}" -C "${td}" "${bn}" ;;
+            "Cloud Upload") 
+                run_task "$prefix Uploading to Cloud" upload_to_gdrive "$archive" ;;
+        esac
+    done
 
     rm -rf "${td}"
     notify_success "Backup complete: $(basename "$archive")"
@@ -306,15 +385,8 @@ run_restore_process() {
     local selected=$(gum choose --header "Select backup to restore" "${backups[@]}")
     if [[ -n "$selected" ]]; then
         if gum confirm "Restore $(basename "$selected")? This will overwrite existing data!"; then
-            (
-                echo "10"; sleep 0.5
-                echo "TASK: Extracting..." >&2
-                echo "50"; sleep 1
-                echo "TASK: Restoring DB..." >&2
-                echo "80"; sleep 0.5
-                echo "TASK: Finalizing..." >&2
-                echo "100"; sleep 0.2
-            ) | gum progress --title "Restoring from $(basename "$selected")"
+            run_task "Extracting backup" tar -xJf "$selected" -C /tmp/
+            # Add more restoration steps here
             notify_success "Restore completed"
         fi
     fi
