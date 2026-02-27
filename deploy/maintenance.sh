@@ -592,21 +592,107 @@ list_cloud_backups() {
 
 create_backup_archive() {
   local ts="$1" bn="backup-${ts}" td af; td="$(mktemp -d)"; af="${BACKUP_DIR}/${bn}.tar.xz"; mkdir -p "${td}/${bn}"; local c=""
-  [[ "${BACKUP_INCLUDE_SQL}" == "true" ]] && run_step "SQL" create_database_dump "${td}/${bn}/database.sql" && c+="SQL " || log_warn "SQL fail"
-  [[ "${BACKUP_INCLUDE_ENV}" == "true" && -f "${SHARED_DIR}/.env" ]] && run_step "Env" run_privileged_cmd cp "${SHARED_DIR}/.env" "${td}/${bn}/" && c+="Env "
-  [[ "${BACKUP_INCLUDE_SEO_CONFIG}" == "true" && -f "${SEO_CONFIG_FILE}" ]] && run_step "SEO" run_privileged_cmd cp "${SEO_CONFIG_FILE}" "${td}/${bn}/" && c+="SEO "
-  [[ "${BACKUP_INCLUDE_WEBAPP}" == "true" && -d "${CURRENT_LINK}" ]] && mkdir -p "${td}/${bn}/app" && run_step "App" run_privileged_cmd rsync -a --exclude='node_modules' --exclude='.next' "${CURRENT_LINK}/" "${td}/${bn}/app/" && c+="App "
-  [[ "${BACKUP_INCLUDE_LEARNING_MATERIALS}" == "true" && -d "${REPO_ROOT}/.data" ]] && run_step "Mat" run_privileged_cmd cp -r "${REPO_ROOT}/.data" "${td}/${bn}/" && c+="Mat "
-  [[ -d "${SHARED_DIR}/data" ]] && run_step "Data" run_privileged_cmd cp -r "${SHARED_DIR}/data" "${td}/${bn}/" && c+="Data "
-  log_info "Compressing..."; if [[ ! -w "${BACKUP_DIR}" ]]; then run_step "Tar" run_privileged_cmd tar -cJf "${af}" -C "${td}" "${bn}"; else run_step "Tar" tar -cJf "${af}" -C "${td}" "${bn}"; fi
-  echo "${c}" | run_privileged_cmd tee "${BACKUP_DIR}/${bn}.meta" >/dev/null; run_privileged_cmd rm -rf "${td}"; [[ -f "${af}" ]] && { log_info "Done: $(du -h "${af}" | cut -f1)"; echo "${af}"; return 0; } || return 1
+  log_info "Creating backup: ${bn}"
+  log_info "Staging directory: ${td}"
+  
+  if [[ "${BACKUP_INCLUDE_SQL}" == "true" ]]; then
+    if run_step "SQL" create_database_dump "${td}/${bn}/database.sql"; then
+      c+="SQL "
+    else
+      log_warn "SQL backup failed (check database connection)"
+    fi
+  fi
+  
+  if [[ "${BACKUP_INCLUDE_ENV}" == "true" && -f "${SHARED_DIR}/.env" ]]; then
+    run_step "Env" run_privileged_cmd cp "${SHARED_DIR}/.env" "${td}/${bn}/" && c+="Env " || log_warn "Env copy failed"
+  fi
+  
+  if [[ "${BACKUP_INCLUDE_SEO_CONFIG}" == "true" && -f "${SEO_CONFIG_FILE}" ]]; then
+    run_step "SEO" run_privileged_cmd cp "${SEO_CONFIG_FILE}" "${td}/${bn}/" && c+="SEO " || log_warn "SEO config copy failed"
+  fi
+  
+  if [[ "${BACKUP_INCLUDE_WEBAPP}" == "true" && -d "${CURRENT_LINK}" ]]; then
+    mkdir -p "${td}/${bn}/app"
+    if run_step "App" run_privileged_cmd rsync -a --exclude='node_modules' --exclude='.next' "${CURRENT_LINK}/" "${td}/${bn}/app/"; then
+      c+="App "
+    else
+      log_warn "App copy failed"
+    fi
+  fi
+  
+  if [[ "${BACKUP_INCLUDE_LEARNING_MATERIALS}" == "true" && -d "${REPO_ROOT}/.data" ]]; then
+    run_step "Mat" run_privileged_cmd cp -r "${REPO_ROOT}/.data" "${td}/${bn}/" && c+="Mat " || log_warn "Materials copy failed"
+  fi
+  
+  if [[ -d "${SHARED_DIR}/data" ]]; then
+    run_step "Data" run_privileged_cmd cp -r "${SHARED_DIR}/data" "${td}/${bn}/" && c+="Data " || log_warn "Shared data copy failed"
+  fi
+  
+  log_info "Compressing archive..."
+  if [[ ! -w "${BACKUP_DIR}" ]]; then
+    run_step "Tar" run_privileged_cmd tar -cJf "${af}" -C "${td}" "${bn}"
+  else
+    run_step "Tar" tar -cJf "${af}" -C "${td}" "${bn}"
+  fi
+  
+  echo "${c}" | run_privileged_cmd tee "${BACKUP_DIR}/${bn}.meta" >/dev/null
+  run_privileged_cmd rm -rf "${td}"
+  
+  if [[ -f "${af}" ]]; then
+    local size; size=$(du -h "${af}" | cut -f1)
+    log_info "Backup complete: ${size} (${c})"
+    log_info "Archive: ${af}"
+    echo "${af}"
+    return 0
+  else
+    log_error "Backup archive creation failed"
+    return 1
+  fi
 }
 
 run_backup() {
-  local up="${1:-false}" section="Backup Execution"; create_backup_directory; local ts="$(date +%Y%m%d-%H%M%S)" af; af="$(create_backup_archive "${ts}")" || return 1
-  if [[ "${up}" == "true" ]]; then local p; for p in ${BACKUP_CLOUD_PROVIDER}; do case "${p}" in google-drive) upload_to_google_drive "${af}" || log_warn "GDrive fail" ;; koofr) upload_to_koofr "${af}" || log_warn "Koofr fail" ;; esac; done; fi
-  [[ "${BACKUP_CLEAN_OLD}" == "true" ]] && find "${BACKUP_DIR}" -name "backup-*.tar.xz" -type f -mtime +${BACKUP_RETENTION_DAYS} -delete 2>/dev/null
-  local lf="${LOG_DIR}/backup-${ts}.log" lm="[$(date -Iseconds)] Backup: ${af}"; if [[ -w "${LOG_DIR}" ]]; then echo "${lm}" >> "${lf}"; else echo "${lm}" | run_privileged_cmd tee -a "${lf}" >/dev/null; fi
+  local up="${1:-false}" section="Backup Execution"
+  create_backup_directory
+  local ts="$(date +%Y%m%d-%H%M%S)" af
+  af="$(create_backup_archive "${ts}")" || return 1
+  
+  if [[ "${up}" == "true" ]]; then
+    log_info "Uploading to cloud providers..."
+    local p
+    for p in ${BACKUP_CLOUD_PROVIDER}; do
+      case "${p}" in
+        google-drive)
+          if upload_to_google_drive "${af}"; then
+            log_info "Uploaded to Google Drive"
+          else
+            log_warn "Google Drive upload failed"
+          fi
+          ;;
+        koofr)
+          if upload_to_koofr "${af}"; then
+            log_info "Uploaded to Koofr"
+          else
+            log_warn "Koofr upload failed"
+          fi
+          ;;
+      esac
+    done
+  fi
+  
+  if [[ "${BACKUP_CLEAN_OLD}" == "true" ]]; then
+    log_info "Cleaning old backups (>${BACKUP_RETENTION_DAYS} days)..."
+    find "${BACKUP_DIR}" -name "backup-*.tar.xz" -type f -mtime +${BACKUP_RETENTION_DAYS} -delete 2>/dev/null
+  fi
+  
+  local lf="${LOG_DIR}/backup-${ts}.log"
+  local lm="[$(date -Iseconds)] Backup: ${af}"
+  if [[ -w "${LOG_DIR}" ]]; then
+    echo "${lm}" >> "${lf}"
+  else
+    echo "${lm}" | run_privileged_cmd tee -a "${lf}" >/dev/null
+  fi
+  
+  log_info "Backup process completed"
 }
 
 list_local_backups() { [[ -d "${BACKUP_DIR}" ]] && find "${BACKUP_DIR}" -name "backup-*.tar.xz" -type f 2>/dev/null | sort -r; }
@@ -614,17 +700,49 @@ list_local_backups() { [[ -d "${BACKUP_DIR}" ]] && find "${BACKUP_DIR}" -name "b
 restore_backup() {
   local bf="$1" rs="${2:-true}" rw="${3:-true}" re="${4:-true}" rm="${5:-true}" rse="${6:-true}" rd="${7:-true}"
   section "Restore Backup"
+  
+  log_info "Extracting archive: ${bf}"
   local td="$(mktemp -d)"
-  tar -xJf "${bf}" -C "${td}" 2>/dev/null || { rm -rf "${td}"; return 1; }
+  tar -xJf "${bf}" -C "${td}" 2>/dev/null || { rm -rf "${td}"; log_error "Failed to extract archive"; return 1; }
   local bd="$(find "${td}" -mindepth 1 -maxdepth 1 -type d | head -1)"
-  [[ "${rs}" == "true" && -f "${bd}/database.sql" ]] && { log_info "SQL..."; restore_database "${bd}/database.sql" && log_info "OK" || log_warn "Fail"; }
-  [[ "${re}" == "true" && -f "${bd}/.env" ]] && run_privileged_cmd cp "${bd}/.env" "${SHARED_DIR}/.env"
-  [[ "${rse}" == "true" && -f "${bd}/seo-config.json" ]] && run_privileged_cmd cp "${bd}/seo-config.json" "${SEO_CONFIG_FILE}"
-  [[ "${rw}" == "true" && -d "${bd}/app" ]] && log_warn "Manual move: cp -r ${bd}/app/* ${CURRENT_LINK}/"
-  [[ "${rm}" == "true" && -d "${bd}/learning-materials" ]] && run_privileged_cmd cp -r "${bd}/learning-materials" "${REPO_ROOT}/.data/"
-  [[ "${rd}" == "true" && -d "${bd}/data" ]] && run_privileged_cmd cp -r "${bd}/data" "${SHARED_DIR}/"
+  log_info "Backup source: ${bd}"
+  
+  if [[ "${rs}" == "true" && -f "${bd}/database.sql" ]]; then
+    log_info "Restoring database..."
+    if restore_database "${bd}/database.sql"; then
+      log_info "Database restored successfully"
+    else
+      log_warn "Database restore failed"
+    fi
+  fi
+  
+  if [[ "${re}" == "true" && -f "${bd}/.env" ]]; then
+    log_info "Restoring environment file..."
+    run_privileged_cmd cp "${bd}/.env" "${SHARED_DIR}/.env" && log_info "Environment restored" || log_warn "Environment copy failed"
+  fi
+  
+  if [[ "${rse}" == "true" && -f "${bd}/seo-config.json" ]]; then
+    log_info "Restoring SEO configuration..."
+    run_privileged_cmd cp "${bd}/seo-config.json" "${SEO_CONFIG_FILE}" && log_info "SEO config restored" || log_warn "SEO config copy failed"
+  fi
+  
+  if [[ "${rw}" == "true" && -d "${bd}/app" ]]; then
+    log_info "Application files ready in: ${bd}/app"
+    log_warn "Manual action required: cp -r ${bd}/app/* ${CURRENT_LINK}/"
+  fi
+  
+  if [[ "${rm}" == "true" && -d "${bd}/learning-materials" ]]; then
+    log_info "Restoring learning materials..."
+    run_privileged_cmd cp -r "${bd}/learning-materials" "${REPO_ROOT}/.data/" && log_info "Learning materials restored" || log_warn "Learning materials copy failed"
+  fi
+  
+  if [[ "${rd}" == "true" && -d "${bd}/data" ]]; then
+    log_info "Restoring shared data..."
+    run_privileged_cmd cp -r "${bd}/data" "${SHARED_DIR}/" && log_info "Shared data restored" || log_warn "Shared data copy failed"
+  fi
+  
   run_privileged_cmd rm -rf "${td}"
-  log_info "Done!"
+  log_info "Restore process completed!"
 }
 
 # =============================================================================
