@@ -400,28 +400,28 @@ draw_mini_bar() {
   color=$(get_cpu_color "$p")
   for ((i=0; i<filled; i++)); do bar+="${color}${BLOCK_FULL}"; done
   for ((i=0; i<empty; i++)); do bar+="${BTOP_FG_DIM}${BLOCK_EMPTY}"; done
-  printf "${bar}%s${NC}" ""
+  printf "%s%s" "${bar}" "${NC}"
 }
 
 draw_cpu_graph() {
   local cpu="$1" width="${2:-20}"
   local bar; bar=$(draw_mini_bar "$cpu" "$width")
   local color; color=$(get_cpu_color "$cpu")
-  printf "${color}%s${NC} %3d%%" "${bar}" "$cpu"
+  printf "%s%s%s %3d%%" "${color}" "${bar}" "${NC}" "$cpu"
 }
 
 draw_mem_graph() {
   local mem="$1" width="${2:-20}"
   local bar; bar=$(draw_mini_bar "$mem" "$width")
   local color; color=$(get_mem_color "$mem")
-  printf "${color}%s${NC} %3d%%" "${bar}" "$mem"
+  printf "%s%s%s %3d%%" "${color}" "${bar}" "${NC}" "$mem"
 }
 
 draw_disk_graph() {
   local disk="$1" width="${2:-20}"
   local bar; bar=$(draw_mini_bar "$disk" "$width")
   local color; color=$(get_disk_color "$disk")
-  printf "${color}%s${NC} %3d%%" "${bar}" "$disk"
+  printf "%s%s%s %3d%%" "${color}" "${bar}" "${NC}" "$disk"
 }
 
 get_process_count() { ps ax | wc -l | xargs; }
@@ -1016,10 +1016,15 @@ print_btop_main_menu() {
   
   # Calculate column widths for resources (roughly 50/50 split)
   local col_w=$(( (w - 10) / 2 ))
-  local left; left=$(printf "  ${BOLD}${BTOP_CYAN}SYSTEM RESOURCES${NC}\n\n  ${DIM}CPU${NC}   $(draw_cpu_graph "$cpu" $((col_w - 10)))\n  ${DIM}MEM${NC}   $(draw_mem_graph "$mem" $((col_w - 10)))\n  ${DIM}DISK${NC}  $(draw_disk_graph "$disk" $((col_w - 10)))")
-  local right; right=$(printf "  ${BOLD}${BTOP_PURPLE}ENVIRONMENT${NC}\n\n  ${DIM}Uptime:${NC} ${BTOP_PURPLE}%s${NC}\n  ${DIM}Procs:${NC}  ${BTOP_CYAN}%s${NC}\n  ${DIM}Load:${NC}   ${BTOP_YELLOW}%s${NC}" "$up" "$(get_process_count)" "$(get_load_average)")
+  local left; left=$(printf "  ${BOLD}${BTOP_CYAN}SYSTEM RESOURCES${NC}\n\n  ${DIM}CPU${NC}   %s\n  ${DIM}MEM${NC}   %s\n  ${DIM}DISK${NC}  %s" \
+    "$(draw_cpu_graph "$cpu" $((col_w - 10)))" \
+    "$(draw_mem_graph "$mem" $((col_w - 10)))" \
+    "$(draw_disk_graph "$disk" $((col_w - 10)))")
   
-  gum join --horizontal --align top --padding "0 4 0 0" "$left" "$right"
+  local right; right=$(printf "  ${BOLD}${BTOP_PURPLE}ENVIRONMENT${NC}\n\n  ${DIM}Uptime:${NC} ${BTOP_PURPLE}%s${NC}\n  ${DIM}Procs:${NC}  ${BTOP_CYAN}%s${NC}\n  ${DIM}Load:${NC}   ${BTOP_YELLOW}%s${NC}" \
+    "$up" "$(get_process_count)" "$(get_load_average)")
+  
+  gum join --horizontal --align top "$left" "$right"
   
   echo ""
   local inner_w=$(( w - 4 ))
