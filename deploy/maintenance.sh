@@ -517,13 +517,13 @@ EOF
 
 get_env_val() {
   local key="$1" val
-  # Try environment first, then shared .env file
+  # Try environment first, then shared .env file (with sudo if needed)
   eval "val=\${${key}:-}"
   if [[ -z "${val}" ]]; then
-    if [[ -f "${SHARED_DIR}/.env" ]]; then
-      val=$(grep -E "^${key}=" "${SHARED_DIR}/.env" 2>/dev/null | cut -d'=' -f2- | sed 's/^["'"'"']//;s/["'"'"']$//')
+    if run_privileged_cmd test -f "${SHARED_DIR}/.env" 2>/dev/null; then
+      val=$(run_privileged_cmd grep -E "^${key}=" "${SHARED_DIR}/.env" 2>/dev/null | cut -d'=' -f2- | sed 's/^["'"'"']//;s/["'"'"']$//')
     else
-      log_warn "Shared .env not found at ${SHARED_DIR}/.env"
+      log_warn "Shared .env not found at ${SHARED_DIR}/.env (check permissions)"
     fi
   fi
   echo "${val}"
@@ -708,6 +708,7 @@ create_backup_archive() {
 
 run_backup() {
   local up="${1:-false}" section="Backup Execution"
+  ensure_sudo_for_deploy_ready || { log_error "Sudo access required for backup"; return 1; }
   create_backup_directory
   local ts="$(date +%Y%m%d-%H%M%S)" af
   af="$(create_backup_archive "${ts}")" || return 1
