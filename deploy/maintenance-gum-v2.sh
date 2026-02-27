@@ -195,10 +195,9 @@ get_uptime() { uptime -p | sed 's/up //'; }
 # Helper to horizontally center text or a style block on the screen
 center_style() {
     local width=$(tput cols)
-    # If first arg is a string and not a flag, treat it as text
-    if [[ "$1" != -* ]]; then
-        local text="$1"
-        shift
+    local text="${1:-}"
+    shift || true
+    if [[ -n "$text" ]]; then
         echo "$text" | gum style --width "$width" --align center "$@"
     else
         gum style --width "$width" --align center "$@"
@@ -206,22 +205,25 @@ center_style() {
 }
 
 # Helper to center gum choose options
-# Pads each option with spaces to roughly center them
 center_choose() {
     local header="$1"
     shift
     local options=("$@")
     local term_width=$(tput cols)
-    local max_len=0
     
+    # Calculate max length of options
+    local max_len=0
     for opt in "${options[@]}"; do
-        # Use awk to handle multi-byte characters length if needed, but standard ${#opt} usually fine for ASCII
         local len=${#opt}
         [[ $len -gt $max_len ]] && max_len=$len
     done
     
-    # Calculate padding to center the list of items
+    # Add 2 for gum's cursor prefix
+    max_len=$((max_len + 2))
+    
+    # Calculate left padding to center the block
     local pad=$(( (term_width - max_len) / 2 ))
+    [[ $pad -lt 0 ]] && pad=0
     local pad_str=$(printf '%*s' "$pad" "")
     
     local padded_options=()
@@ -229,8 +231,8 @@ center_choose() {
         padded_options+=("${pad_str}${opt}")
     done
     
-    # We use gum choose and then strip the padding from the result
-    gum choose --header "$(center_style "$header")" "${padded_options[@]}" | sed "s/^ *//"
+    # Show centered header and padded options, then strip padding from selection
+    gum choose --header "$(center_style "$header")" "${padded_options[@]}" | sed "s/^${pad_str}//"
 }
 
 # Helper to provide vertical padding
@@ -277,7 +279,6 @@ show_header() {
         "" \
         "$(gum style --foreground 245 "$git_line")")
     
-    # Truly center the box block
     echo "$box" | center_style
 }
 
@@ -300,8 +301,19 @@ notify_error() {
 run_task() {
     local title="$1"
     shift
-    # Centering the spinner
-    gum spin --spinner dot --title "$(center_style "$title...")" -- "$@"
+    
+    local tmp=$(mktemp)
+    # Run command/function in background and capture exit code
+    # Important: We must use a subshell that can see internal functions
+    ( "$@" > /dev/null 2>&1; echo $? > "$tmp" ) &
+    local pid=$!
+    
+    # Use gum spin to wait for the background process
+    gum spin --spinner dot --title " $title... " -- bash -c "while kill -0 $pid 2>/dev/null; do sleep 0.1; done"
+    
+    local res=$(cat "$tmp")
+    rm -f "$tmp"
+    return $res
 }
 
 get_db_creds() {
@@ -483,10 +495,10 @@ deploy_menu() {
         local choice=$(center_choose "Deploy Management" "Update App (update.sh)" "Deploy App (deploy.sh)" "Back")
         case $choice in
             "Update App"*) 
-                gum spin --title "$(center_style "Running update...")" -- bash "${UPDATE_SCRIPT}" --sudo-deploy
+                run_task "Running update" bash "${UPDATE_SCRIPT}" --sudo-deploy
                 notify_success "Update finished" ;;
             "Deploy App"*) 
-                gum spin --title "$(center_style "Running deploy...")" -- bash "${DEPLOY_SCRIPT}" --skip-pull
+                run_task "Running deploy" bash "${DEPLOY_SCRIPT}" --skip-pull
                 notify_success "Deployment finished" ;;
             "Back") return ;;
         esac
@@ -551,10 +563,10 @@ seo_db_menu() {
             "Check DB Health") 
                 check_database_health; gum input --placeholder "$(center_style "Press Enter to continue...")" ;;
             "Generate Sitemap") 
-                gum spin --title "$(center_style "Generating...")" -- sleep 1
+                run_task "Generating sitemap" sleep 1
                 notify_success "Sitemap created" ;;
             "Generate Robots") 
-                gum spin --title "$(center_style "Generating...")" -- sleep 1
+                run_task "Generating robots.txt" sleep 1
                 notify_success "Robots.txt updated" ;;
             "Back") return ;;
         esac
@@ -567,10 +579,10 @@ system_menu() {
         local choice=$(center_choose "System Management" "Git Pull" "Clean Cache" "Back")
         case $choice in
             "Git Pull") 
-                gum spin --spinner pulse --title "$(center_style "Pulling from origin...")" -- git -C "${REPO_ROOT}" pull origin main
+                run_task "Pulling from origin" git -C "${REPO_ROOT}" pull origin main
                 notify_success "Git pull complete" ;;
             "Clean Cache") 
-                gum spin --title "$(center_style "Cleaning...")" -- rm -rf "${REPO_ROOT}/.next"
+                run_task "Cleaning cache" bash -c "rm -rf \"${REPO_ROOT}/.next\" && rm -rf \"${REPO_ROOT}/node_modules/.cache\""
                 notify_success "Cache cleared" ;;
             "Back") return ;;
         esac
@@ -583,13 +595,11 @@ toggle_bool() { [[ "$1" == true ]] && echo false || echo true; }
 
 check_database_health() { 
     get_db_creds || { notify_error "No DB creds"; return 1; }
-    gum spin --spinner monkey --title "$(center_style "Checking connection to $DB_NAME...")" -- sleep 1
-    if command -v mysql >/dev/null 2>&1; then
-        if MYSQL_PWD="${DB_P}" mysql -h "${DB_H:-localhost}" -u "${DB_U}" -e "SELECT 1" "${DB_NAME}" >/dev/null 2>&1; then
-            notify_success "Database connected"
-        else
-            notify_error "Connection failed"
-        fi
+    run_task "Checking connection to $DB_NAME" bash -c "if command -v mysql >/dev/null 2>&1; then MYSQL_PWD=\"${DB_P}\" mysql -h \"${DB_H:-localhost}\" -u \"${DB_U}\" -e \"SELECT 1\" \"${DB_NAME}\"; fi"
+    if [[ $? -eq 0 ]]; then
+        notify_success "Database connected"
+    else
+        notify_error "Connection failed"
     fi
 }
 
