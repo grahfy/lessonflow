@@ -1033,21 +1033,12 @@ print_btop_main_menu() {
   gum join --horizontal --align top "$left" "$right"
   
   echo ""
-  local inner_w=$(( w - 4 ))
-  local top_line; printf -v top_line "%*s" "$inner_w" ""; top_line="╭${top_line// /─}╮"
-  local bot_line; printf -v bot_line "%*s" "$inner_w" ""; bot_line="╰${bot_line// /─}╯"
+  # Use gum style for the Git Status box - much more reliable for borders
+  local git_status_content
+  git_status_content=$(printf "${BOLD}${BTOP_CYAN}GIT STATUS${NC}  Branch: ${BOLD}${GREEN}%s${NC}  Commit: ${BOLD}${YELLOW}%s${NC}  Mode: ${BOLD}${PURPLE}ROOT/SUDO${NC}\n${DIM}Last:${NC} %s" \
+    "${BRANCH}" "$h" "$(tui_truncate_text "$m" $((w - 15)))")
   
-  echo -e "  ${BOLD}${BTOP_GREEN}${top_line}${NC}"
-  printf "  ${BOLD}${BTOP_GREEN}│${NC}  ${BOLD}${BTOP_CYAN}GIT STATUS${NC}  Branch: ${BOLD}${GREEN}%-10s${NC}  Commit: ${BOLD}${YELLOW}%-8s${NC}  Mode: ${BOLD}${PURPLE}%-10s${NC}" "${BRANCH:0:10}" "$h" "ROOT/SUDO"
-  # Pad the rest of the line to the border
-  local git_info_len=$(( 10 + 10 + 10 + 8 + 10 + 10 )) # Estimation of fixed text + fields
-  local current_pos=55 # Approximate
-  local pad_len=$(( inner_w - current_pos ))
-  (( pad_len < 0 )) && pad_len=0
-  printf "%*s${BOLD}${BTOP_GREEN}│${NC}\n" "$pad_len" ""
-  
-  printf "  ${BOLD}${BTOP_GREEN}│${NC}  ${DIM}Last:${NC} %-*s ${BOLD}${BTOP_GREEN}│${NC}\n" "$(( inner_w - 10 ))" "$(tui_truncate_text "$m" $(( inner_w - 10 )))"
-  echo -e "  ${BOLD}${BTOP_GREEN}${bot_line}${NC}"
+  gum style --border rounded --border-foreground "82" --padding "0 2" --width "$((w - 4))" --margin "0 2" "$git_status_content"
   echo ""
 }
 
@@ -1114,6 +1105,30 @@ print_system_menu_tui() {
       "🧹 Clean Cache") [[ -d "${REPO_ROOT}/.next" ]] && rm -rf "${REPO_ROOT}/.next"; [[ -d "${REPO_ROOT}/node_modules/.cache" ]] && rm -rf "${REPO_ROOT}/node_modules/.cache"; log_info "Cache cleaned"; read -r -n 1 -s -p "  Done. Press any key..." ;;
       "📝 Edit Config (.env)") section "Edit Configuration"; prompt_env_editor; read -r -n 1 -s -p "  Done. Press any key..." ;;
       "⬅️  Back") return 0 ;;
+    esac
+  done
+}
+
+run_interactive_maintenance() {
+  load_maintenance_settings; create_backup_directory;
+  tui_clear_screen
+  while true; do
+    auto_size_tui_panel_width; print_btop_main_menu;
+    local choice; choice=$(gum choose --cursor.foreground="33" --item.foreground="250" \
+      "🚀 Deploy Management   - Update code and trigger deployments" \
+      "💾 Backup & Restore    - Local & Cloud backups, database dumps" \
+      "🔍 SEO & Database     - Sitemap, Robots.txt and DB health" \
+      "🛠️  System Management  - Git operations, cache and config" \
+      "🔄 Refresh            - Update dashboard stats" \
+      "❌ Quit               - Exit maintenance console")
+      
+    case "${choice}" in
+      "🚀 Deploy Management"*) print_deploy_menu_tui ;;
+      "💾 Backup & Restore"*) print_backup_menu_tui ;;
+      "🔍 SEO & Database"*) print_seo_db_menu_tui ;;
+      "🛠️  System Management"*) print_system_menu_tui ;;
+      "🔄 Refresh"*) : ;;
+      "❌ Quit"*) exit 0 ;;
     esac
   done
 }
