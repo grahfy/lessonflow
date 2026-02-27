@@ -121,23 +121,6 @@ BLOCK_FULL='█'
 # Run wrappers
 # =============================================================================
 
-run_interactive_maintenance() {
-  load_maintenance_settings; create_backup_directory;
-  tui_clear_screen
-  while true; do
-    auto_size_tui_panel_width; print_btop_main_menu;
-    local choice; choice=$(gum choose --cursor.foreground="33" --item.foreground="250" "🚀 Deploy Management" "💾 Backup & Restore" "🔍 SEO & Database" "🛠️  System Management" "🔄 Refresh" "❌ Quit")
-    case "${choice}" in
-      "🚀 Deploy Management") print_deploy_menu_tui ;;
-      "💾 Backup & Restore") print_backup_menu_tui ;;
-      "🔍 SEO & Database") print_seo_db_menu_tui ;;
-      "🛠️  System Management") print_system_menu_tui ;;
-      "🔄 Refresh") : ;;
-      "❌ Quit") exit 0 ;;
-    esac
-  done
-}
-
 detect_tty_capabilities() {
   if [[ -t 0 && -t 1 ]]; then IS_TTY=true; fi
   if [[ "${IS_TTY}" == true ]]; then auto_size_tui_panel_width; fi
@@ -1115,12 +1098,12 @@ run_interactive_maintenance() {
   while true; do
     auto_size_tui_panel_width; print_btop_main_menu;
     local choice; choice=$(gum choose --cursor.foreground="33" --item.foreground="250" \
-      "🚀 Deploy Management   - Update code and trigger deployments" \
-      "💾 Backup & Restore    - Local & Cloud backups, database dumps" \
+      "🚀 Deploy Management  - Update code and trigger deployments" \
+      "💾 Backup & Restore   - Local & Cloud backups, database dumps" \
       "🔍 SEO & Database     - Sitemap, Robots.txt and DB health" \
-      "🛠️  System Management  - Git operations, cache and config" \
-      "🔄 Refresh            - Update dashboard stats" \
-      "❌ Quit               - Exit maintenance console")
+      "🛠️  System Management - Git operations, cache and config" \
+      "🔄 Refresh           - Update dashboard stats" \
+      "❌ Quit              - Exit maintenance console")
       
     case "${choice}" in
       "🚀 Deploy Management"*) print_deploy_menu_tui ;;
