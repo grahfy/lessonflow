@@ -19,10 +19,18 @@ export const metadata: Metadata = buildPublicPageMetadata({
  * playing style before booking guitar tuition.
  */
 export default function VideosPage() {
+  /**
+   * YOUTUBE EMBEDS CONFIGURATION
+   * These IDs represent the curated performance showcase displayed in the modal grid.
+   * RATIONALE: Each video is selected to demonstrate a specific aspect of Jon's playing style
+   * (e.g., technique, expressiveness, gear tone) to prospective students.
+   * 
+   * UPDATED: 2026-02-27 - Replaced video 3 with a new performance (OQiUAlJGfBM) to keep the showcase fresh.
+   */
   const youtubeEmbeds = [
     { id: "0M9ZXR2yw0A", title: "Jon King Video Showcase 1" },
     { id: "qPTGx0iQKoc", title: "Jon King Video Showcase 2" },
-    { id: "VM8UmR9Atgo", title: "Jon King Video Showcase 3" }
+    { id: "OQiUAlJGfBM", title: "Jon King Video Showcase 3" }
   ] as const;
 
   return (

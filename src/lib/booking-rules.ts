@@ -21,10 +21,6 @@ export const bookingCountrySchema = z.literal("Australia");
 // Australian phone number formats: 10 digits, mobile xxx-xxx-xxx, landline xx-xxxx-xxxx
 const isoDateParser = z.string().datetime({ offset: true });
 const auPhoneRegex = /^(?:\d{10}|\d{4}-\d{3}-\d{3}|\d{2}-\d{4}-\d{4})$/;
-const optionalNumericTextSchema = z.preprocess(
-  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
-  z.string().trim().regex(/^\d{1,5}$/).optional()
-);
 
 /** Australian phone number validation - handles mobile and landline formats */
 export const auPhoneSchema = z
@@ -50,22 +46,31 @@ export const contactSubmissionSchema = z.object({
 // =============================================================================
 
 /**
- * Complete booking request schema with Australian address validation.
- * LOGIC: Validates all fields including address format, lesson preferences,
- * and ensures booking dates are in the future within the current calendar year.
+ * Complete booking request schema with simplified address validation.
+ * LOGIC: Validates core identification fields (Name, Email, Phone, Postcode).
+ * RATIONALE: Address fields (street, house number, etc.) have been moved out of the 
+ * public UI to reduce friction. They are kept in the schema as optional/empty strings 
+ * to maintain backward compatibility with existing database rows and admin views.
  */
 export const bookingRequestSchema = z
   .object({
+    // Split name for better customer matching logic
+    firstName: z.string().trim().min(1, "First name is required").max(60),
+    lastName: z.string().trim().min(1, "Last name is required").max(60),
+    // name is kept for backward compatibility with the database schema
     name: z.string().trim().min(2).max(120),
     email: z.string().trim().email().max(200),
     phone: auPhoneSchema,
-    country: bookingCountrySchema,
-    unitNumber: optionalNumericTextSchema,
-    houseNumber: z.string().trim().regex(/^\d{1,5}$/),
-    streetName: z.string().trim().min(2).max(120),
-    streetType: z.string().trim().min(2).max(40),
-    suburb: z.string().trim().min(2).max(80),
-    state: auStateSchema,
+    // Country is defaulted to Australia but allowed to be empty
+    country: z.string().trim().optional().default("Australia"),
+    // Address fields are now optional to support simplified booking flow
+    unitNumber: z.string().trim().optional().nullable(),
+    houseNumber: z.string().trim().optional().default(""),
+    streetName: z.string().trim().optional().default(""),
+    streetType: z.string().trim().optional().default(""),
+    suburb: z.string().trim().optional().default(""),
+    state: z.string().trim().optional().default("VIC"),
+    // Postcode remains mandatory for matching and service eligibility
     postcode: auPostcodeSchema,
     lessonMode: lessonModeSchema,
     skillLevel: skillLevelSchema,
@@ -139,7 +144,8 @@ export const bookingRequestSchema = z
     }
 
     // BUSINESS RULE: In-person lessons are currently offered only in Victoria.
-    if (data.lessonMode === "in_person" && data.state !== "VIC") {
+    // If state is empty/defaulted to VIC, this passes.
+    if (data.lessonMode === "in_person" && data.state && data.state !== "VIC") {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "In-person lessons are currently available in Victoria (VIC) only.",
@@ -154,18 +160,38 @@ export type BookingRequestInput = z.infer<typeof bookingRequestSchema>;
 // ADDRESS FORMATTING - UI helper for display
 // =============================================================================
 
-/** Formats Australian address for display in UI */
+/** 
+ * Formats Australian address for display in UI.
+ * LOGIC: Handles missing components by filtering out empty strings and joining with 
+ * sensible delimiters. If only postcode exists, returns that.
+ */
 export function formatBookingAddress(input: {
-  unitNumber?: string;
-  houseNumber: string;
-  streetName: string;
-  streetType: string;
-  suburb: string;
-  state: string;
+  unitNumber?: string | null;
+  houseNumber?: string | null;
+  streetName?: string | null;
+  streetType?: string | null;
+  suburb?: string | null;
+  state?: string | null;
   postcode: string;
 }): string {
   const unit = input.unitNumber ? `${input.unitNumber}/` : "";
-  return `${unit}${input.houseNumber} ${input.streetName} ${input.streetType}, ${input.suburb} ${input.state} ${input.postcode}`;
+  const street = [input.houseNumber, input.streetName, input.streetType]
+    .filter(Boolean)
+    .join(" ");
+  
+  const region = [input.suburb, input.state, input.postcode]
+    .filter(Boolean)
+    .join(" ");
+
+  if (!street && !input.suburb && !input.state) {
+    return input.postcode;
+  }
+
+  const parts = [];
+  if (unit || street) parts.push(`${unit}${street}`);
+  if (region) parts.push(region);
+
+  return parts.join(", ");
 }
 
 // =============================================================================

@@ -22,8 +22,12 @@ describe("student-portal-auth", () => {
   // Helper centralizes customer fixture creation so auth tests stay focused on
   // credential matching inputs (full name + postcode + password).
   async function createCustomer(name: string, email: string, phone: string, postcode = "3070") {
+    const [firstName, ...rest] = name.split(" ");
+    const lastName = rest.join(" ") || firstName;
     return prisma.customer.create({
       data: customerSnapshotFromInput({
+        firstName,
+        lastName,
         name,
         email,
         phone,
@@ -55,7 +59,9 @@ describe("student-portal-auth", () => {
       body: JSON.stringify({
         fullName: "Casey Smith",
         postcode: "3070",
-        password: credential.generatedPassword
+        password: credential.generatedPassword,
+        captchaToken: "test-token",
+        captchaAnswer: "test-answer"
       }),
       headers: {
         "content-type": "application/json"
@@ -86,7 +92,9 @@ describe("student-portal-auth", () => {
       body: JSON.stringify({
         fullName: "Jordan Lee",
         postcode: "3070",
-        password: "wrong-password"
+        password: "wrong-password",
+        captchaToken: "test-token",
+        captchaAnswer: "test-answer"
       }),
       headers: {
         "content-type": "application/json"
@@ -100,7 +108,9 @@ describe("student-portal-auth", () => {
       body: JSON.stringify({
         fullName: "Jordan Lee",
         postcode: "3070",
-        password: credentialB.generatedPassword
+        password: credentialB.generatedPassword,
+        captchaToken: "test-token",
+        captchaAnswer: "test-answer"
       }),
       headers: {
         "content-type": "application/json"

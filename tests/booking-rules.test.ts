@@ -16,6 +16,8 @@ describe("booking-rules", () => {
     const end = endDate.toISOString().replace("Z", "+00:00");
 
     const parsed = bookingRequestSchema.safeParse({
+      firstName: "Alex",
+      lastName: "Student",
       name: "Alex Student",
       email: "alex@example.com",
       phone: "0400-123-456",
@@ -43,6 +45,8 @@ describe("booking-rules", () => {
     const start = toIso(year, 1, 10, 3);
 
     const parsed = bookingRequestSchema.safeParse({
+      firstName: "Alex",
+      lastName: "Student",
       name: "Alex Student",
       email: "alex@example.com",
       phone: "0400-123-456",

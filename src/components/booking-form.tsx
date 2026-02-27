@@ -17,10 +17,10 @@ type BookingState =
 export function BookingForm() {
   const [state, setState] = useState<BookingState>({ status: "idle" });
   const [loading, setLoading] = useState(false);
-  const [isRecurring, setIsRecurring] = useState(false);
+  // RATIONALE: durationType and lessonMode are kept as state to drive conditional UI rendering
+  // (e.g., custom duration input) and validation messaging.
   const [durationType, setDurationType] = useState<"min30" | "min60" | "custom">("min60");
   const [lessonMode, setLessonMode] = useState<"in_person" | "video">("in_person");
-  const [bookingStateCode, setBookingStateCode] = useState("VIC");
   const captcha = useCaptcha();
 
   useEffect(() => {
@@ -56,13 +56,32 @@ export function BookingForm() {
     setState({ status: "idle" });
 
     try {
+      /**
+       * GEOLOCATION CHECK
+       * RATIONALE: To prevent unqualified leads and international spam, we verify the 
+       * user's country via their IP address before allowing form submission.
+       */
+      const geoResponse = await fetch("/api/geo");
+      if (geoResponse.ok) {
+        const geoData = await geoResponse.json();
+        // Strict restriction to Australia (AU)
+        if (geoData.country && geoData.country !== "AU") {
+          setState({
+            status: "error",
+            message: "Currently only AU residents are applicable for lessons."
+          });
+          setLoading(false);
+          await captcha.regenerate();
+          return;
+        }
+      }
+
       const form = new FormData(formElement);
       const firstName = String(form.get("firstName") || "").trim();
-      const middleName = String(form.get("middleName") || "").trim();
       const lastName = String(form.get("lastName") || "").trim();
-      const fullName = [firstName, middleName, lastName].filter(Boolean).join(" ");
+      // Combine name for backward compatibility with database schema
+      const fullName = [firstName, lastName].filter(Boolean).join(" ");
       const startRaw = String(form.get("requestedStartAt") || "");
-      const recurrenceRaw = String(form.get("recurrenceEndAt") || "");
       const phoneDigits = String(form.get("phone") || "").replace(/\D/g, "").slice(0, 10);
       const customDurationRaw = String(form.get("customDurationMinutes") || "");
       const customDurationMinutes =
@@ -74,32 +93,22 @@ export function BookingForm() {
           status: "error",
           message: "Please choose a valid booking start date and time."
         });
+        setLoading(false);
         return;
       }
 
-      const recurrenceEndAtDate =
-        isRecurring && recurrenceRaw ? new Date(recurrenceRaw) : null;
-      if (isRecurring && recurrenceRaw && recurrenceEndAtDate && Number.isNaN(recurrenceEndAtDate.getTime())) {
-        setState({
-          status: "error",
-          message: "Please choose a valid recurrence end date and time."
-        });
-        return;
-      }
-
-      // Build the API payload in the same shape used by `/api/booking-requests`.
+      /**
+       * SIMPLIFIED PAYLOAD
+       * RATIONALE: UI has been simplified to reduce friction. Removed address fields 
+       * are defaulted to empty strings to maintain compatibility with existing 
+       * database constraints and downstream logic.
+       */
       const requestPayload = {
+        firstName,
+        lastName,
         name: fullName,
         email: String(form.get("email") || ""),
         phone: phoneDigits,
-        country: String(form.get("country") || "Australia"),
-        website: String(form.get("website") || ""),
-        unitNumber: String(form.get("unitNumber") || ""),
-        houseNumber: String(form.get("houseNumber") || ""),
-        streetName: String(form.get("streetName") || ""),
-        streetType: String(form.get("streetType") || ""),
-        suburb: String(form.get("suburb") || ""),
-        state: String(form.get("state") || ""),
         postcode: String(form.get("postcode") || ""),
         lessonMode: String(form.get("lessonMode") || ""),
         skillLevel: String(form.get("skillLevel") || ""),
@@ -107,8 +116,17 @@ export function BookingForm() {
         customDurationMinutes,
         requestedStartAt: requestedStartAtDate.toISOString(),
         notes: String(form.get("notes") || ""),
-        isRecurring,
-        recurrenceEndAt: recurrenceEndAtDate ? recurrenceEndAtDate.toISOString() : undefined
+        // Address fields are now sent as empty strings from public UI
+        country: "Australia",
+        unitNumber: "",
+        houseNumber: "",
+        streetName: "",
+        streetType: "",
+        suburb: "",
+        state: "VIC",
+        // Recurring bookings are disabled for the public form
+        isRecurring: false,
+        recurrenceEndAt: undefined
       };
 
       let response: Response;
@@ -150,10 +168,8 @@ export function BookingForm() {
       }
 
       formElement.reset();
-      setIsRecurring(false);
       setDurationType("min60");
       setLessonMode("in_person");
-      setBookingStateCode("VIC");
       await captcha.regenerate();
       setState({
         status: "success",
@@ -178,10 +194,6 @@ export function BookingForm() {
         <input id="book-first-name" name="firstName" required />
       </div>
       <div className="field" data-motion-item="booking-field">
-        <label htmlFor="book-middle-name">Middle Name</label>
-        <input id="book-middle-name" name="middleName" />
-      </div>
-      <div className="field" data-motion-item="booking-field">
         <label htmlFor="book-last-name">Last Name *</label>
         <input id="book-last-name" name="lastName" required />
       </div>
@@ -204,89 +216,6 @@ export function BookingForm() {
             event.currentTarget.value = event.currentTarget.value.replace(/\D/g, "").slice(0, 10);
           }}
         />
-      </div>
-      <div className="field field-compact" data-motion-item="booking-field">
-        <label htmlFor="book-unit-number">Unit/Apartment</label>
-        <input
-          id="book-unit-number"
-          name="unitNumber"
-          maxLength={5}
-          inputMode="numeric"
-          pattern="[0-9]{1,5}"
-          onInput={(event) => {
-            event.currentTarget.value = event.currentTarget.value.replace(/\D/g, "").slice(0, 5);
-          }}
-        />
-      </div>
-      <div className="field field-compact" data-motion-item="booking-field">
-        <label htmlFor="book-house-number">House/Building Number *</label>
-        <input
-          id="book-house-number"
-          name="houseNumber"
-          required
-          maxLength={5}
-          inputMode="numeric"
-          pattern="[0-9]{1,5}"
-          onInput={(event) => {
-            event.currentTarget.value = event.currentTarget.value.replace(/\D/g, "").slice(0, 5);
-          }}
-        />
-      </div>
-      <div className="field" data-motion-item="booking-field">
-        <label htmlFor="book-country">Country *</label>
-        <input id="book-country" name="country" value="Australia" readOnly aria-readonly="true" />
-      </div>
-      <div className="field" data-motion-item="booking-field">
-        <label htmlFor="book-street-name">Street Name *</label>
-        <input id="book-street-name" name="streetName" required />
-      </div>
-      <div className="field" data-motion-item="booking-field">
-        <label htmlFor="book-street-type">Street Type *</label>
-        <select id="book-street-type" name="streetType" required defaultValue="">
-          <option value="" disabled>
-            Select street type
-          </option>
-          <option value="Street">Street</option>
-          <option value="Road">Road</option>
-          <option value="Avenue">Avenue</option>
-          <option value="Drive">Drive</option>
-          <option value="Lane">Lane</option>
-          <option value="Court">Court</option>
-          <option value="Crescent">Crescent</option>
-          <option value="Place">Place</option>
-          <option value="Boulevard">Boulevard</option>
-          <option value="Terrace">Terrace</option>
-          <option value="Parade">Parade</option>
-          <option value="Close">Close</option>
-        </select>
-      </div>
-      <div className="field" data-motion-item="booking-field">
-        <label htmlFor="book-suburb">Suburb *</label>
-        <input id="book-suburb" name="suburb" required />
-      </div>
-      <div className="field">
-        <label htmlFor="book-state">State *</label>
-        <select
-          id="book-state"
-          name="state"
-          required
-          value={bookingStateCode}
-          onChange={(event) => setBookingStateCode(event.target.value)}
-        >
-          <option value="ACT" disabled={lessonMode === "in_person"}>Australian Capital Territory</option>
-          <option value="NSW" disabled={lessonMode === "in_person"}>New South Wales</option>
-          <option value="NT" disabled={lessonMode === "in_person"}>Northern Territory</option>
-          <option value="QLD" disabled={lessonMode === "in_person"}>Queensland</option>
-          <option value="SA" disabled={lessonMode === "in_person"}>South Australia</option>
-          <option value="TAS" disabled={lessonMode === "in_person"}>Tasmania</option>
-          <option value="VIC">Victoria</option>
-          <option value="WA" disabled={lessonMode === "in_person"}>Western Australia</option>
-        </select>
-        {lessonMode === "in_person" ? (
-          <p className="helper-text">In-person lessons are currently available in Victoria (VIC) only.</p>
-        ) : (
-          <p className="helper-text">Online lessons are currently available within Australia only.</p>
-        )}
       </div>
       <div className="field field-compact" data-motion-item="booking-field">
         <label htmlFor="book-postcode">Postcode *</label>
@@ -314,9 +243,6 @@ export function BookingForm() {
           onChange={(event) => {
             const nextMode = event.target.value as "in_person" | "video";
             setLessonMode(nextMode);
-            if (nextMode === "in_person") {
-              setBookingStateCode("VIC");
-            }
           }}
         >
           <option value="in_person">In-person</option>
@@ -370,25 +296,6 @@ export function BookingForm() {
         <label htmlFor="book-notes">Notes (optional)</label>
         <textarea id="book-notes" name="notes" />
       </div>
-
-      <div className="field full" data-motion-item="booking-field">
-        <label htmlFor="book-recurring">
-          <input
-            id="book-recurring"
-            type="checkbox"
-            checked={isRecurring}
-            onChange={(event) => setIsRecurring(event.target.checked)}
-          />{" "}
-          Weekly recurring booking
-        </label>
-      </div>
-
-      {isRecurring ? (
-        <div className="field full" data-motion-item="booking-field">
-          <label htmlFor="book-recurring-end">Recurrence end date</label>
-          <input id="book-recurring-end" type="datetime-local" name="recurrenceEndAt" required />
-        </div>
-      ) : null}
 
       <CaptchaField idPrefix="booking" captcha={captcha} motionItem="booking-captcha-field" />
 

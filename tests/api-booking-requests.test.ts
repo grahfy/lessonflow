@@ -30,7 +30,9 @@ describe("api-booking-requests", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: "Taylor",
+        firstName: "Taylor",
+        lastName: "Swift",
+        name: "Taylor Swift",
         email: "taylor@example.com",
         phone: "0401-111-111",
         unitNumber: "4",
@@ -65,5 +67,92 @@ describe("api-booking-requests", () => {
     });
     expect(row?.status).toBe("pending");
     expect(row?.isRecurring).toBe(true);
+  });
+
+  it("enforces 30-minute duration for new customers", async () => {
+    const startAt = addDays(new Date(), 7).toISOString();
+
+    const request = new Request("http://localhost/api/booking-requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        firstName: "New",
+        lastName: "Customer",
+        name: "New Customer",
+        email: "new@example.com",
+        phone: "0400-000-000",
+        postcode: "3000",
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min60", // Requesting 60 mins
+        requestedStartAt: startAt,
+        isRecurring: false,
+        captchaToken: "test-token",
+        captchaAnswer: "test-answer"
+      })
+    });
+
+    const response = await POST(request);
+    expect([200, 503]).toContain(response.status);
+    const payload = (await response.json()) as { id: string };
+    
+    const row = await prisma.bookingRequest.findUnique({
+      where: { id: payload.id }
+    });
+    
+    // Should be overridden to 30 mins
+    expect(row?.lessonDuration).toBe("min30");
+    expect(row?.customerId).toBeNull();
+  });
+
+  it("matches existing customer and preserves requested duration", async () => {
+    // Create existing customer
+    const customer = await prisma.customer.create({
+      data: {
+        fullName: "Existing Student",
+        normalizedFullName: "existing student",
+        email: "existing@example.com",
+        normalizedEmail: "existing@example.com",
+        phone: "0411 111 111",
+        normalizedPhone: "0411111111",
+        postcode: "3070",
+        skillLevel: "intermediate",
+        lessonMode: "in_person"
+      }
+    });
+
+    const startAt = addDays(new Date(), 7).toISOString();
+
+    const request = new Request("http://localhost/api/booking-requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        firstName: "Existing",
+        lastName: "Student",
+        name: "Existing Student",
+        email: "existing@example.com",
+        phone: "0411-111-111",
+        postcode: "3070",
+        lessonMode: "in_person",
+        skillLevel: "intermediate",
+        lessonDuration: "min60", // Requesting 60 mins
+        requestedStartAt: startAt,
+        isRecurring: false,
+        captchaToken: "test-token",
+        captchaAnswer: "test-answer"
+      })
+    });
+
+    const response = await POST(request);
+    expect([200, 503]).toContain(response.status);
+    const payload = (await response.json()) as { id: string };
+    
+    const row = await prisma.bookingRequest.findUnique({
+      where: { id: payload.id }
+    });
+    
+    // Should preserve 60 mins and link to customer
+    expect(row?.lessonDuration).toBe("min60");
+    expect(row?.customerId).toBe(customer.id);
   });
 });

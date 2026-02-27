@@ -73,6 +73,46 @@ export async function POST(request: Request) {
   let createdId: string | null = null;
 
   try {
+    /**
+     * CUSTOMER MATCHING LOGIC
+     * RATIONALE: To prevent duplicate records and maintain continuity, we attempt 
+     * to link this booking request to an existing customer profile.
+     * 
+     * CRITERIA: 
+     * 1. Full name match (normalized firstName + lastName)
+     * 2. Normalized phone match
+     * 3. Postcode match
+     */
+    const normalizedName = [parsed.data.firstName, parsed.data.lastName]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .trim();
+    const normalizedPhone = parsed.data.phone.replace(/\D/g, "");
+    
+    const existingCustomer = await prisma.customer.findFirst({
+      where: {
+        isArchived: false,
+        normalizedFullName: normalizedName,
+        normalizedPhone: normalizedPhone,
+        postcode: parsed.data.postcode
+      }
+    });
+
+    /**
+     * DURATION ENFORCEMENT
+     * RATIONALE: New customers (not found in the system) are restricted to a 
+     * 30-minute introductory lesson. Existing customers can request their 
+     * preferred duration.
+     */
+    let finalDuration = parsed.data.lessonDuration;
+    let finalCustomDuration = parsed.data.customDurationMinutes ?? null;
+
+    if (!existingCustomer) {
+      finalDuration = "min30";
+      finalCustomDuration = null;
+    }
+
     // Persist first so the admin can review the request even if outbound email delivery is degraded.
     const created = await prisma.bookingRequest.create({
       data: {
@@ -89,12 +129,14 @@ export async function POST(request: Request) {
         postcode: parsed.data.postcode,
         lessonMode: parsed.data.lessonMode,
         skillLevel: parsed.data.skillLevel,
-        lessonDuration: parsed.data.lessonDuration,
-        customDurationMinutes: parsed.data.customDurationMinutes ?? null,
+        lessonDuration: finalDuration,
+        customDurationMinutes: finalCustomDuration,
         requestedStartAt: new Date(parsed.data.requestedStartAt),
         notes: parsed.data.notes,
         isRecurring: parsed.data.isRecurring,
-        recurrenceEndAt: parsed.data.recurrenceEndAt ? new Date(parsed.data.recurrenceEndAt) : null
+        recurrenceEndAt: parsed.data.recurrenceEndAt ? new Date(parsed.data.recurrenceEndAt) : null,
+        // Link to existing customer if found
+        customerId: existingCustomer?.id ?? null
       }
     });
     createdId = created.id;

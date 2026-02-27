@@ -22,7 +22,9 @@ describe("api-contact", () => {
         name: "Jordan",
         email: "jordan@example.com",
         phone: "0400000000",
-        message: "I want to book beginner lessons next week."
+        message: "I want to book beginner lessons next week.",
+        captchaToken: "test-token",
+        captchaAnswer: "test-answer"
       })
     });
 

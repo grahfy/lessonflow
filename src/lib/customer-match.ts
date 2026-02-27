@@ -52,8 +52,11 @@ export function normalizePhone(value: string): string {
 /**
  * Type definition for input required to create a customer snapshot.
  * @description Picks specific fields from the booking request input that are
- * needed for customer identification and matching. Excludes fields like
- * lesson details, notes, and referral source that are not part of identity.
+ * needed for customer identification and matching. 
+ * 
+ * firstName and lastName are optional here to maintain compatibility with 
+ * existing admin routes and internal services that still pass a single 'name' 
+ * field.
  */
 export type CustomerSnapshotInput = Pick<
   BookingRequestInput,
@@ -69,7 +72,10 @@ export type CustomerSnapshotInput = Pick<
   | "suburb"
   | "state"
   | "postcode"
->;
+> & {
+  firstName?: string;
+  lastName?: string;
+};
 
 /**
  * Creates a complete customer snapshot from booking input data.
@@ -79,16 +85,26 @@ export type CustomerSnapshotInput = Pick<
  *   1. Match new bookings against existing customers
  *   2. Provide fallback matching if email/phone exact match fails
  *   3. Allow fuzzy name-based searching for customer lookup
- * @ui - The normalized fields are displayed in admin panels for consistent appearance
+ * 
+ * NAME HANDLING: If firstName/lastName are provided (new public booking flow), 
+ * they are used to construct the canonical fullName. Otherwise, it falls back 
+ * to the provided 'name' field (legacy/admin flows).
  */
 export function customerSnapshotFromInput(input: CustomerSnapshotInput) {
+  // Determine canonical name parts for normalization
+  let fullName = input.name.trim();
+  
+  if (input.firstName && input.lastName) {
+    fullName = `${input.firstName.trim()} ${input.lastName.trim()}`;
+  }
+
   return {
     // Raw values trimmed for display consistency
-    fullName: input.name.trim(),
+    fullName,
     // Optimized for fuzzy name matching in student portal
-    normalizedFullName: normalizeFullNameForLookup(input.name),
-    // Tokenized for name search (splits "John Smith" into ["John", "Smith", "John Smith"])
-    nameSearchTokens: buildNameSearchTokens(input.name),
+    normalizedFullName: normalizeFullNameForLookup(fullName),
+    // Tokenized for name search
+    nameSearchTokens: buildNameSearchTokens(fullName),
     // Original email for display
     email: input.email.trim(),
     // Original phone for display

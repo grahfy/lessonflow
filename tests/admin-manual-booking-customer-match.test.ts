@@ -19,6 +19,8 @@ function adminPost(body: Record<string, unknown>, token: string): NextRequest {
 
 function basePayload(startAt: string) {
   return {
+    firstName: "Taylor",
+    lastName: "Student",
     name: "Taylor Student",
     email: "taylor@example.com",
     phone: "0400123456",
