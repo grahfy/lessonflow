@@ -559,29 +559,10 @@ upload_to_koofr() {
   [[ -n "${KOOFR_WEBDAV_URL}" ]] || { log_error "Koofr: WebDAV URL not configured"; return 1; }
   [[ -n "${KOOFR_USERNAME}" ]] || { log_error "Koofr: Username not configured"; return 1; }
   [[ -n "${KOOFR_PASSWORD}" ]] || { log_error "Koofr: Password not configured"; return 1; }
-  
   log_info "Uploading ${bn} to Koofr..."
-  log_info "Creating folder if not exists..."
-  local mkdir_res
-  mkdir_res=$(curl -s -w "%{http_code}" -X MKCOL -u "${KOOFR_USERNAME}:${KOOFR_PASSWORD}" "${KOOFR_WEBDAV_URL}/${BACKUP_CLOUD_FOLDER}/" 2>/dev/null)
-  
-  if [[ ! "${mkdir_res: -3}" =~ ^(201|405|200)$ ]]; then
-    log_warn "Koofr folder creation returned: ${mkdir_res: -3}"
-  fi
-  
-  log_info "Uploading file to Koofr..."
-  local upload_res
-  upload_res=$(curl -s -w "%{http_code}" -T "${fp}" -u "${KOOFR_USERNAME}:${KOOFR_PASSWORD}" "${KOOFR_WEBDAV_URL}/${BACKUP_CLOUD_FOLDER}/${bn}" 2>/dev/null)
-  local http_code="${upload_res: -3}"
-  
-  if [[ "${http_code}" =~ ^(200|201|204)$ ]]; then
-    log_info "Koofr upload successful (HTTP ${http_code})"
-    return 0
-  else
-    log_error "Koofr upload failed (HTTP ${http_code})"
-    log_warn "Check your Koofr credentials and WebDAV URL"
-    return 1
-  fi
+  curl -s -X MKCOL -u "${KOOFR_USERNAME}:${KOOFR_PASSWORD}" "${KOOFR_WEBDAV_URL}/${BACKUP_CLOUD_FOLDER}/" >/dev/null 2>&1 || true
+  local http_code; http_code=$(curl -s -w "%{http_code}" -T "${fp}" -u "${KOOFR_USERNAME}:${KOOFR_PASSWORD}" "${KOOFR_WEBDAV_URL}/${BACKUP_CLOUD_FOLDER}/${bn}" -o /dev/null 2>/dev/null)
+  [[ "${http_code}" =~ ^(200|201|204)$ ]] && { log_info "Koofr upload OK (HTTP ${http_code})"; return 0; } || { log_error "Koofr upload failed (HTTP ${http_code})"; log_warn "Check credentials"; return 1; }
 }
 
 download_from_google_drive() {
