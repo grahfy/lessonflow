@@ -516,13 +516,28 @@ get_db_creds() {
 
 create_database_dump() {
   local output_file="$1"
-  get_db_creds || return 1
+  get_db_creds || { log_error "Failed to get database credentials from DATABASE_URL"; return 1; }
+  [[ -z "${DB_U:-}" ]] && { log_error "Database username is empty"; return 1; }
+  [[ -z "${DB_NAME:-}" ]] && { log_error "Database name is empty"; return 1; }
+  log_info "DB: ${DB_NAME}@${DB_H:-localhost}:${DB_PORT:-3306} as ${DB_U}"
   if command -v mysqldump >/dev/null 2>&1; then
-    MYSQL_PWD="${DB_P}" mysqldump -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" "${DB_NAME}" > "${output_file}" 2>/dev/null
+    log_info "Using mysqldump..."
+    if MYSQL_PWD="${DB_P}" mysqldump -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" "${DB_NAME}" > "${output_file}" 2>&1; then
+      return 0
+    else
+      log_error "mysqldump failed"
+      return 1
+    fi
   elif command -v mariadb-dump >/dev/null 2>&1; then
-    MYSQL_PWD="${DB_P}" mariadb-dump -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" "${DB_NAME}" > "${output_file}" 2>/dev/null
+    log_info "Using mariadb-dump..."
+    if MYSQL_PWD="${DB_P}" mariadb-dump -h "${DB_H:-localhost}" -P "${DB_PORT:-3306}" -u "${DB_U}" "${DB_NAME}" > "${output_file}" 2>&1; then
+      return 0
+    else
+      log_error "mariadb-dump failed"
+      return 1
+    fi
   else
-    log_error "No mysqldump or mariadb-dump found"
+    log_error "No mysqldump or mariadb-dump found in PATH"
     return 1
   fi
 }
