@@ -191,6 +191,18 @@ get_backup_meta() {
   fi
 }
 
+format_backup_meta() {
+  local meta="$1"
+  local result=""
+  [[ "${meta}" == *"Database"* ]] && result+="DB "
+  [[ "${meta}" == *"Environment"* ]] && result+="Env "
+  [[ "${meta}" == *"SEO"* ]] && result+="SEO "
+  [[ "${meta}" == *"Application"* ]] && result+="App "
+  [[ "${meta}" == *"Materials"* ]] && result+="Mat "
+  [[ "${meta}" == *"SharedData"* ]] && result+="Data "
+  echo "${result:-Unknown}"
+}
+
 
 
 
@@ -614,50 +626,50 @@ create_backup_archive() {
   local ts="$1" bn="backup-${ts}" td af; td="$(mktemp -d)"; af="${BACKUP_DIR}/${bn}.tar.xz"; mkdir -p "${td}/${bn}"; local c=""
   log_info "Creating backup: ${bn}"
   log_info "Staging directory: ${td}"
-  
+
   if [[ "${BACKUP_INCLUDE_SQL}" == "true" ]]; then
-    if run_step "SQL" create_database_dump "${td}/${bn}/database.sql"; then
-      c+="SQL "
+    if run_step "Database" create_database_dump "${td}/${bn}/database.sql"; then
+      c+="Database "
     else
-      log_warn "SQL backup failed (check database connection)"
+      log_warn "Database backup failed (check connection)"
     fi
   fi
-  
+
   if [[ "${BACKUP_INCLUDE_ENV}" == "true" && -f "${SHARED_DIR}/.env" ]]; then
-    run_step "Env" run_privileged_cmd cp "${SHARED_DIR}/.env" "${td}/${bn}/" && c+="Env " || log_warn "Env copy failed"
+    run_step "Environment" run_privileged_cmd cp "${SHARED_DIR}/.env" "${td}/${bn}/" && c+="Environment " || log_warn "Environment copy failed"
   fi
-  
+
   if [[ "${BACKUP_INCLUDE_SEO_CONFIG}" == "true" && -f "${SEO_CONFIG_FILE}" ]]; then
-    run_step "SEO" run_privileged_cmd cp "${SEO_CONFIG_FILE}" "${td}/${bn}/" && c+="SEO " || log_warn "SEO config copy failed"
+    run_step "SEO Config" run_privileged_cmd cp "${SEO_CONFIG_FILE}" "${td}/${bn}/" && c+="SEO " || log_warn "SEO config copy failed"
   fi
-  
+
   if [[ "${BACKUP_INCLUDE_WEBAPP}" == "true" && -d "${CURRENT_LINK}" ]]; then
     mkdir -p "${td}/${bn}/app"
-    if run_step "App" run_privileged_cmd rsync -a --exclude='node_modules' --exclude='.next' "${CURRENT_LINK}/" "${td}/${bn}/app/"; then
-      c+="App "
+    if run_step "Application" run_privileged_cmd rsync -a --exclude='node_modules' --exclude='.next' "${CURRENT_LINK}/" "${td}/${bn}/app/"; then
+      c+="Application "
     else
-      log_warn "App copy failed"
+      log_warn "Application copy failed"
     fi
   fi
-  
+
   if [[ "${BACKUP_INCLUDE_LEARNING_MATERIALS}" == "true" && -d "${REPO_ROOT}/.data" ]]; then
-    run_step "Mat" run_privileged_cmd cp -r "${REPO_ROOT}/.data" "${td}/${bn}/" && c+="Mat " || log_warn "Materials copy failed"
+    run_step "Materials" run_privileged_cmd cp -r "${REPO_ROOT}/.data" "${td}/${bn}/" && c+="Materials " || log_warn "Materials copy failed"
   fi
-  
+
   if [[ -d "${SHARED_DIR}/data" ]]; then
-    run_step "Data" run_privileged_cmd cp -r "${SHARED_DIR}/data" "${td}/${bn}/" && c+="Data " || log_warn "Shared data copy failed"
+    run_step "Shared Data" run_privileged_cmd cp -r "${SHARED_DIR}/data" "${td}/${bn}/" && c+="SharedData " || log_warn "Shared data copy failed"
   fi
-  
+
   log_info "Compressing archive..."
   if [[ ! -w "${BACKUP_DIR}" ]]; then
-    run_step "Tar" run_privileged_cmd tar -cJf "${af}" -C "${td}" "${bn}"
+    run_step "Archive" run_privileged_cmd tar -cJf "${af}" -C "${td}" "${bn}"
   else
-    run_step "Tar" tar -cJf "${af}" -C "${td}" "${bn}"
+    run_step "Archive" tar -cJf "${af}" -C "${td}" "${bn}"
   fi
-  
+
   echo "${c}" | run_privileged_cmd tee "${BACKUP_DIR}/${bn}.meta" >/dev/null
   run_privileged_cmd rm -rf "${td}"
-  
+
   if [[ -f "${af}" ]]; then
     local size; size=$(du -h "${af}" | cut -f1)
     log_info "Backup complete: ${size} (${c})"
@@ -824,7 +836,9 @@ restore_backup_tui() {
     if [[ "${src}" == "local" ]]; then
       while IFS= read -r b; do
         [[ -n "$b" ]] || continue; local l="${letters:$i:1}"
-        echo -e "  ${CYAN}[$l]${NC} $(basename "${b}") ${DIM}$(du -h "${b}" 2>/dev/null | cut -f1) $(get_backup_meta "$b")${NC}"
+        local meta; meta=$(get_backup_meta "$b")
+        local fmt_meta; fmt_meta=$(format_backup_meta "${meta}")
+        echo -e "  ${CYAN}[$l]${NC} $(basename "${b}") ${DIM}$(du -h "${b}" 2>/dev/null | cut -f1) ${fmt_meta}${NC}"
         bks+=("${b}"); ((i++)); [[ $i -ge 52 ]] && break
       done < <(list_local_backups)
     else
@@ -893,11 +907,12 @@ print_delete_backups_tui() {
       local status=""
       [[ "$is_local" == true ]] && status+="${GREEN}L${NC} " || status+="${DIM}·${NC} "
       [[ "$is_cloud" == true ]] && status+="${BLUE}C${NC} " || status+="${DIM}·${NC} "
-      
+
       local meta; meta=$(get_backup_meta "${BACKUP_DIR}/${bn}")
+      local fmt_meta; fmt_meta=$(format_backup_meta "${meta}")
       local tick="[ ]"; [[ "${selected[i]}" == true ]] && tick="[${GREEN}✔${NC}]"
 
-      printf "  ${CYAN}%s${NC} %b %-16s %b ${DIM}%s${NC}\n" "${l}" "${tick}" "${id}" "${status}" "${meta}"
+      printf "  ${CYAN}%s${NC} %b %-16s %b ${DIM}%s${NC}\n" "${l}" "${tick}" "${id}" "${status}" "${fmt_meta}"
     done
     
     (( count == 0 )) && echo -e "  ${YELLOW}No backups found${NC}"
@@ -957,9 +972,9 @@ print_delete_backups_tui() {
 print_backup_components_tui() {
   local ch; while true; do auto_size_tui_panel_width; tui_clear_screen; print_box_banner "Backup Components"
     echo -e "${DIM}Configure included parts.\n"; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"
-    print_tui_option_pair "S" "SQL" "$(bool_word "${BACKUP_INCLUDE_SQL}")" "SQL." "A" "App" "$(bool_word "${BACKUP_INCLUDE_WEBAPP}")" "App."
-    print_tui_option_pair "E" "Env" "$(bool_word "${BACKUP_INCLUDE_ENV}")" "Env." "M" "Mat" "$(bool_word "${BACKUP_INCLUDE_LEARNING_MATERIALS}")" "Mat."
-    print_tui_option_pair "O" "SEO" "$(bool_word "${BACKUP_INCLUDE_SEO_CONFIG}")" "SEO." "C" "Clean" "$(bool_word "${BACKUP_CLEAN_OLD}")" "Auto-del."
+    print_tui_option_pair "S" "Database" "$(bool_word "${BACKUP_INCLUDE_SQL}")" "Database dump." "A" "App" "$(bool_word "${BACKUP_INCLUDE_WEBAPP}")" "Application."
+    print_tui_option_pair "E" "Env" "$(bool_word "${BACKUP_INCLUDE_ENV}")" "Environment." "M" "Materials" "$(bool_word "${BACKUP_INCLUDE_LEARNING_MATERIALS}")" "Learning materials."
+    print_tui_option_pair "O" "SEO" "$(bool_word "${BACKUP_INCLUDE_SEO_CONFIG}")" "SEO config." "C" "Clean" "$(bool_word "${BACKUP_CLEAN_OLD}")" "Auto-del old."
     echo ""; print_tui_panel_rule "${MAINTENANCE_TUI_PANEL_WIDTH}"; print_tui_action_pair "V" "Save" "B" "Back"
     read -r -n 1 -s ch; case "${ch,,}" in s) BACKUP_INCLUDE_SQL=$(toggle_bool "${BACKUP_INCLUDE_SQL}") ;; a) BACKUP_INCLUDE_WEBAPP=$(toggle_bool "${BACKUP_INCLUDE_WEBAPP}") ;; e) BACKUP_INCLUDE_ENV=$(toggle_bool "${BACKUP_INCLUDE_ENV}") ;; m) BACKUP_INCLUDE_LEARNING_MATERIALS=$(toggle_bool "${BACKUP_INCLUDE_LEARNING_MATERIALS}") ;; o) BACKUP_INCLUDE_SEO_CONFIG=$(toggle_bool "${BACKUP_INCLUDE_SEO_CONFIG}") ;; c) BACKUP_CLEAN_OLD=$(toggle_bool "${BACKUP_CLEAN_OLD}") ;; v) save_maintenance_settings; log_info "Saved"; sleep 1; return 0 ;; b) return 0 ;; q) exit 0 ;; esac; done
 }
