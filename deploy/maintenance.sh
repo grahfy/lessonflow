@@ -645,7 +645,9 @@ create_backup_archive() {
   log_info "Staging directory: ${td}"
 
   if [[ "${BACKUP_INCLUDE_SQL}" == "true" ]]; then
-    if run_step "Database" create_database_dump "${td}/${bn}/database.sql"; then
+    log_info "Starting database backup..."
+    if create_database_dump "${td}/${bn}/database.sql"; then
+      log_info "Database backup completed"
       c+="Database "
     else
       log_warn "Database backup failed (check connection)"
