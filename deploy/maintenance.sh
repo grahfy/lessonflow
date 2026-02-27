@@ -691,10 +691,9 @@ download_backup_from_cloud() {
 }
 
 print_delete_backups_tui() {
-  ensure_sudo_for_deploy_ready
   local width="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
   local selected=() backups=() local_list=() cloud_list=() i
-  
+
   log_info "Loading backups..."
   local_list=($(list_local_backups | xargs -n1 basename || true))
   cloud_list=($(list_cloud_backups || true))
@@ -758,16 +757,18 @@ print_delete_backups_tui() {
         local mode="${ch}"
         local sel_count=0; for s in "${selected[@]}"; do [[ "$s" == true ]] && ((sel_count++)); done
         [[ $sel_count -eq 0 ]] && { log_warn "Nothing selected"; sleep 1; continue; }
-        
+
         echo -ne "\n  ${RED}${BOLD}Delete ${sel_count} backups? (y/N): ${NC}"
         local confirm; read -r -n 1 confirm; echo ""
         [[ "${confirm,,}" == "y" ]] || continue
-        
+
+        ensure_sudo_for_deploy_ready || { log_error "Sudo authentication failed"; sleep 2; continue; }
+
         for ((i=0; i<count; i++)); do
           [[ "${selected[i]}" == true ]] || continue
           local id="${backups[i]}"
           local bn="backup-${id}.tar.xz"
-          
+
           if [[ "$mode" == "1" || "$mode" == "3" ]]; then
             log_info "Deleting ${id} locally..."
             run_privileged_cmd rm -f "${BACKUP_DIR}/${bn}" "${BACKUP_DIR}/backup-${id}.meta" 2>/dev/null || true
