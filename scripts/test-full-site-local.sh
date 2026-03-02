@@ -85,29 +85,37 @@ fi
 
 # Start MySQL container if not already running (using default dev DB name from .env.example)
 DB_CONTAINER_NAME="lessonflow-dev-mysql"
-if ! docker ps --format '{{.Names}}' | grep -q "^${DB_CONTAINER_NAME}$"; then
-  log "Starting MySQL Docker container (${DB_CONTAINER_NAME})..."
+
+if docker ps -a --format '{{.Names}}' | grep -q "^${DB_CONTAINER_NAME}$"; then
+  if ! docker ps --format '{{.Names}}' | grep -q "^${DB_CONTAINER_NAME}$"; then
+    log "Starting existing MySQL Docker container (${DB_CONTAINER_NAME})..."
+    docker start "${DB_CONTAINER_NAME}"
+  else
+    log "MySQL Docker container (${DB_CONTAINER_NAME}) is already running."
+  fi
+else
+  log "Creating and starting new MySQL Docker container (${DB_CONTAINER_NAME})..."
   docker run -d \
     --name "${DB_CONTAINER_NAME}" \
     -e MYSQL_ROOT_PASSWORD=root \
     -e MYSQL_DATABASE=mgs_dev \
     -p 3306:3306 \
     mysql:8
-  
-  # Wait for MySQL to be ready by checking connection
-  log "Waiting for MySQL to start..."
-  MAX_RETRIES=30
-  RETRY_COUNT=0
-  while ! docker exec "${DB_CONTAINER_NAME}" mysqladmin ping -h localhost -u root -proot >/dev/null 2>&1; do
-    RETRY_COUNT=$((RETRY_COUNT + 1))
-    if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
-      log "Timeout waiting for MySQL to start"
-      exit 1
-    fi
-    sleep 1
-  done
-  log "MySQL is ready"
 fi
+
+# Wait for MySQL to be ready by checking connection
+log "Waiting for MySQL to start..."
+MAX_RETRIES=30
+RETRY_COUNT=0
+while ! docker exec "${DB_CONTAINER_NAME}" mysqladmin ping -h localhost -u root -proot >/dev/null 2>&1; do
+  RETRY_COUNT=$((RETRY_COUNT + 1))
+  if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+    log "Timeout waiting for MySQL to start"
+    exit 1
+  fi
+  sleep 1
+done
+log "MySQL is ready"
 
 # Run migrations using the DATABASE_URL from .env
 DATABASE_URL="${DB_URL}" npx prisma migrate deploy
@@ -132,6 +140,12 @@ if [[ "$NO_START" -eq 1 ]]; then
 
   log "Checks completed. Dev server start skipped (--no-start)."
   exit 0
+fi
+
+# Ensure the port is free before starting Next.js
+if command -v fuser >/dev/null 2>&1; then
+  log "Ensuring port ${PORT} is free..."
+  fuser -k "${PORT}/tcp" >/dev/null 2>&1 || true
 fi
 
 log "Starting local site at http://${HOST}:${PORT}"

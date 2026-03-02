@@ -92,39 +92,6 @@ type InvoiceProductPreset = {
   unitPriceCents: number;
 };
 
-const INVOICE_PRODUCT_PRESETS: InvoiceProductPreset[] = [
-  {
-    id: "trial_30min",
-    label: "30min Trial Lesson ($20)",
-    description: "30min Trial Lesson",
-    unitPriceCents: 2000
-  },
-  {
-    id: "pack_5x30",
-    label: "5 × 30 Minute Lessons ($200)",
-    description: "5 × 30 Minute Lessons",
-    unitPriceCents: 20000
-  },
-  {
-    id: "pack_10x30",
-    label: "10 × 30 Minute Lessons ($388)",
-    description: "10 × 30 Minute Lessons",
-    unitPriceCents: 38800
-  },
-  {
-    id: "pack_5x60",
-    label: "5 × 1 Hour Lessons ($375)",
-    description: "5 × 1 Hour Lessons",
-    unitPriceCents: 37500
-  },
-  {
-    id: "pack_10x60",
-    label: "10 × 1 Hour Lessons ($725)",
-    description: "10 × 1 Hour Lessons",
-    unitPriceCents: 72500
-  }
-];
-
 /**
  * Main admin invoices surface for list filters, lifecycle actions, reminders, and create flows.
  *
@@ -217,6 +184,7 @@ export function AdminInvoicesClient() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
+  const [presets, setPresets] = useState<InvoiceProductPreset[]>([]);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | InvoiceStatus>("");
   const [agingFilter, setAgingFilter] = useState<"" | InvoiceAgingBucket>("");
@@ -315,6 +283,20 @@ export function AdminInvoicesClient() {
   useEffect(() => {
     loadInvoices().catch((cause) => setError(cause instanceof Error ? cause.message : "Load failed"));
   }, [loadInvoices]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const response = await safeFetch("/api/admin/presets");
+        if (response.ok) {
+          const body = await response.json();
+          setPresets(body.presets || []);
+        }
+      } catch {
+        // Silent failure for presets; dropdown will just be empty or filtered.
+      }
+    })();
+  }, [safeFetch]);
 
   const selectedSummary = useMemo(() => {
     if (!selectedInvoice) {
@@ -1136,7 +1118,7 @@ export function AdminInvoicesClient() {
                   className="invoice-product-preset-select"
                 >
                   <option value="">Add lesson package preset...</option>
-                  {INVOICE_PRODUCT_PRESETS.map((preset) => (
+                  {presets.map((preset) => (
                     <option key={preset.id} value={preset.id}>
                       {preset.label}
                     </option>
@@ -1147,7 +1129,7 @@ export function AdminInvoicesClient() {
                   type="button"
                   disabled={!editingProductPresetId}
                   onClick={() => {
-                    const preset = INVOICE_PRODUCT_PRESETS.find((entry) => entry.id === editingProductPresetId);
+                    const preset = presets.find((entry) => entry.id === editingProductPresetId);
                     if (!preset) return;
                     addInvoiceProductPresetToEditor(preset);
                     setEditingProductPresetId("");
@@ -1321,7 +1303,7 @@ export function AdminInvoicesClient() {
                     className="invoice-product-preset-select"
                   >
                     <option value="">Select package preset</option>
-                    {INVOICE_PRODUCT_PRESETS.map((preset) => (
+                    {presets.map((preset) => (
                       <option key={preset.id} value={preset.id}>
                         {preset.label}
                       </option>
@@ -1332,7 +1314,7 @@ export function AdminInvoicesClient() {
                     type="button"
                     disabled={!createProductPresetId}
                     onClick={() => {
-                      const preset = INVOICE_PRODUCT_PRESETS.find((entry) => entry.id === createProductPresetId);
+                      const preset = presets.find((entry) => entry.id === createProductPresetId);
                       if (!preset) return;
                       applyCreateProductPreset(preset);
                     }}

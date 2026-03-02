@@ -9,6 +9,8 @@ import { prisma } from "@/lib/db";
 import { ensurePortalCredentialForCustomer } from "@/lib/student-portal/credentials";
 
 const createCustomerSchema = z.object({
+  firstName: z.string().trim().min(1).max(60),
+  lastName: z.string().trim().min(1).max(60),
   fullName: z.string().trim().min(2).max(120),
   email: z.string().trim().email().max(200),
   phone: auPhoneSchema,

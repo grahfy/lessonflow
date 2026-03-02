@@ -442,6 +442,21 @@ model InvoiceLineItem {
   @@index([invoiceId, sortOrder])
 }
 
+// Reusable lesson package configurations that admins can manage via the dashboard
+// to quick-fill invoice line items.
+model InvoiceProductPreset {
+  id             String   @id @default(cuid())
+  label          String
+  description    String
+  unitPriceCents Int
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+}
+
 // Append-only audit trail for invoice lifecycle changes (send, paid, reminders,
 // credit notes, delete/restore, etc).
 model InvoiceAuditLog {

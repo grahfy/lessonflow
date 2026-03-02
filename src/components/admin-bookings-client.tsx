@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { parseAudInputToCents } from "@/lib/invoices/currency";
 import { AdminBookingCalendar, AdminCalendarEvent } from "@/components/admin-booking-calendar";
 import { AdminDeployUpdatesButton } from "@/components/admin-deploy-updates-button";
 import { animateIn, animateOut } from "@/components/motion/tween-orchestrator";
@@ -128,6 +127,8 @@ type LearningMaterialRow = {
 };
 
 type CustomerForm = {
+  firstName: string;
+  lastName: string;
   fullName: string;
   email: string;
   phone: string;
@@ -147,6 +148,8 @@ type EventWithRow = AdminCalendarEvent & {
 };
 
 type DialogForm = {
+  firstName: string;
+  lastName: string;
   name: string;
   email: string;
   phone: string;
@@ -174,39 +177,6 @@ type InvoiceProductPreset = {
   description: string;
   unitPriceCents: number;
 };
-
-const INVOICE_PRODUCT_PRESETS: InvoiceProductPreset[] = [
-  {
-    id: "trial_30min",
-    label: "30min Trial Lesson ($20)",
-    description: "30min Trial Lesson",
-    unitPriceCents: 2000
-  },
-  {
-    id: "pack_5x30",
-    label: "5 × 30 Minute Lessons ($200)",
-    description: "5 × 30 Minute Lessons",
-    unitPriceCents: 20000
-  },
-  {
-    id: "pack_10x30",
-    label: "10 × 30 Minute Lessons ($388)",
-    description: "10 × 30 Minute Lessons",
-    unitPriceCents: 38800
-  },
-  {
-    id: "pack_5x60",
-    label: "5 × 1 Hour Lessons ($375)",
-    description: "5 × 1 Hour Lessons",
-    unitPriceCents: 37500
-  },
-  {
-    id: "pack_10x60",
-    label: "10 × 1 Hour Lessons ($725)",
-    description: "10 × 1 Hour Lessons",
-    unitPriceCents: 72500
-  }
-];
 
 type EditableLineItem = {
   key: string;
@@ -236,6 +206,8 @@ function defaultBookingInvoiceForm(): BookingInvoiceForm {
 
 function emptyCustomerForm(): CustomerForm {
   return {
+    firstName: "",
+    lastName: "",
     fullName: "",
     email: "",
     phone: "",
@@ -252,7 +224,13 @@ function emptyCustomerForm(): CustomerForm {
 }
 
 function customerFormFromRow(customer: CustomerRow): CustomerForm {
+  const nameParts = customer.fullName.split(" ");
+  const firstName = nameParts[0] || "";
+  const lastName = nameParts.slice(1).join(" ") || "";
+
   return {
+    firstName,
+    lastName,
     fullName: customer.fullName,
     email: customer.email,
     phone: toDigits(customer.phone, 10),
@@ -373,7 +351,8 @@ async function readApiErrorFromResponse(response: Response, fallback: string): P
 
 function validateDialogForm(form: DialogForm): string | null {
   const email = form.email.trim();
-  const name = form.name.trim();
+  const firstName = form.firstName.trim();
+  const lastName = form.lastName.trim();
   const phone = form.phone.trim();
   const houseNumber = form.houseNumber.trim();
   const streetName = form.streetName.trim();
@@ -381,8 +360,11 @@ function validateDialogForm(form: DialogForm): string | null {
   const suburb = form.suburb.trim();
   const postcode = form.postcode.trim();
 
-  if (!name) {
-    return "Name is required.";
+  if (!firstName) {
+    return "First name is required.";
+  }
+  if (!lastName) {
+    return "Last name is required.";
   }
   if (!email || !email.includes("@")) {
     return "A valid email address is required.";
@@ -409,7 +391,14 @@ function defaultFormFromEvent(event: EventWithRow): DialogForm {
   const row = event.row;
   const startAt = event.entityType === "booking" ? (row as BookingRow).startAt : (row as BookingRequestRow).requestedStartAt;
 
+  // Best effort to split name for the form if it's not already split in the row data
+  const nameParts = row.name.split(" ");
+  const firstName = nameParts[0] || "";
+  const lastName = nameParts.slice(1).join(" ") || "";
+
   return {
+    firstName,
+    lastName,
     name: row.name,
     email: row.email,
     phone: toDigits(row.phone, 10),
@@ -463,6 +452,7 @@ export function AdminBookingsClient() {
   const [portalCredentialBusyCustomerId, setPortalCredentialBusyCustomerId] = useState<string | null>(null);
   const [emailSubject, setEmailSubject] = useState("");
   const [emailMessage, setEmailMessage] = useState("");
+  const [presets, setPresets] = useState<InvoiceProductPreset[]>([]);
   const [invoiceForm, setInvoiceForm] = useState<BookingInvoiceForm>(defaultBookingInvoiceForm());
   const [editingLineItems, setEditingLineItems] = useState<EditableLineItem[]>([]);
   const [editingProductPresetId, setEditingProductPresetId] = useState("");
@@ -494,13 +484,6 @@ export function AdminBookingsClient() {
   const dialogSessionRef = useRef(0);
 
   const rangeLabel = useMemo(() => `${view.toUpperCase()} VIEW`, [view]);
-
-  function toCurrency(cents: number): string {
-    return new Intl.NumberFormat("en-AU", {
-      style: "currency",
-      currency: "AUD"
-    }).format(cents / 100);
-  }
 
   function toMoneyInput(cents: number): string {
     return (cents / 100).toFixed(2);
@@ -706,6 +689,20 @@ export function AdminBookingsClient() {
     void loadCustomers();
   }, [customersDialogPresence.isMounted, loadCustomers, manualDialogPresence.isMounted, materialsDialogPresence.isMounted]);
 
+  useEffect(() => {
+    void (async () => {
+      try {
+        const response = await safeFetch("/api/admin/presets");
+        if (response.ok) {
+          const body = await response.json();
+          setPresets(body.presets || []);
+        }
+      } catch {
+        // Silent failure for presets
+      }
+    })();
+  }, [safeFetch]);
+
   function openDialog(event: EventWithRow) {
     const dialogSession = dialogSessionRef.current + 1;
     dialogSessionRef.current = dialogSession;
@@ -897,7 +894,11 @@ export function AdminBookingsClient() {
 
   function applyCustomerToManual(customer: CustomerRow) {
     setManualCustomerId(customer.id);
-    setManualFieldValue("name", customer.fullName);
+    const nameParts = customer.fullName.split(" ");
+    const firstName = nameParts[0] || "";
+    const lastName = nameParts.slice(1).join(" ") || "";
+    setManualFieldValue("firstName", firstName);
+    setManualFieldValue("lastName", lastName);
     setManualFieldValue("email", customer.email);
     setManualFieldValue("phone", toDigits(customer.phone, 10));
     setManualFieldValue("unitNumber", customer.unitNumber ?? "");
@@ -931,7 +932,8 @@ export function AdminBookingsClient() {
   function validateManualStep(step: ManualStep): boolean {
     if (step === "customer") {
       return validateManualFields([
-        "input[name='name']",
+        "input[name='firstName']",
+        "input[name='lastName']",
         "input[name='email']",
         "input[name='phone']",
         "input[name='houseNumber']",
@@ -1349,7 +1351,9 @@ export function AdminBookingsClient() {
         ? Number.parseInt(dialogForm.customDurationMinutes || "", 10)
         : null;
     const payload = {
-      name: dialogForm.name.trim(),
+      firstName: dialogForm.firstName.trim(),
+      lastName: dialogForm.lastName.trim(),
+      name: `${dialogForm.firstName.trim()} ${dialogForm.lastName.trim()}`,
       email: dialogForm.email.trim(),
       phone: toDigits(dialogForm.phone.trim(), 10),
       unitNumber: dialogForm.unitNumber.trim() || null,
@@ -1534,19 +1538,28 @@ export function AdminBookingsClient() {
     setError("");
 
     const form = new FormData(formElement);
-    const fullName = String(form.get("name") || "").trim();
+    const firstName = String(form.get("firstName") || "").trim();
+    const lastName = String(form.get("lastName") || "").trim();
+    const fullName = `${firstName} ${lastName}`.trim();
     const phone = toDigits(String(form.get("phone") || ""), 10);
     const customDurationRaw = String(form.get("customDurationMinutes") || "");
     const customDurationMinutes =
       manualDurationChoice === "custom" && customDurationRaw ? Number.parseInt(customDurationRaw, 10) : undefined;
 
-    if (!fullName) {
+    if (!firstName) {
       setCreating(false);
-      setError("Name is required.");
+      setError("First name is required.");
+      return;
+    }
+    if (!lastName) {
+      setCreating(false);
+      setError("Last name is required.");
       return;
     }
 
     const payload = {
+      firstName,
+      lastName,
       name: fullName,
       email: String(form.get("email") || ""),
       phone,
@@ -1623,7 +1636,9 @@ export function AdminBookingsClient() {
     setError("");
 
     const payload = {
-      fullName: customerForm.fullName.trim(),
+      firstName: customerForm.firstName.trim(),
+      lastName: customerForm.lastName.trim(),
+      fullName: `${customerForm.firstName.trim()} ${customerForm.lastName.trim()}`,
       email: customerForm.email.trim(),
       phone: toDigits(customerForm.phone, 10),
       skillLevel: customerForm.skillLevel,
@@ -1913,7 +1928,8 @@ export function AdminBookingsClient() {
                         type="button"
                         onClick={() => {
                           setManualCustomerId("");
-                          setManualFieldValue("name", "");
+                          setManualFieldValue("firstName", "");
+                          setManualFieldValue("lastName", "");
                           setManualFieldValue("email", "");
                           setManualFieldValue("phone", "");
                           setManualFieldValue("unitNumber", "");
@@ -1937,9 +1953,13 @@ export function AdminBookingsClient() {
               <section className={`manual-section ${manualStep !== "customer" ? "is-step-hidden" : ""}`}>
                 <h3 className="manual-section-title">Student</h3>
                 <div className="manual-grid manual-grid-2">
-                  <div className="field manual-span-2">
-                    <label>Full Name *</label>
-                    <input name="name" required />
+                  <div className="field">
+                    <label>First Name *</label>
+                    <input name="firstName" required />
+                  </div>
+                  <div className="field">
+                    <label>Last Name *</label>
+                    <input name="lastName" required />
                   </div>
                 </div>
               </section>
@@ -2506,10 +2526,17 @@ export function AdminBookingsClient() {
                 <p className="helper-text dialog-status">Name, phone, email, and skill are primary. Address fields are optional.</p>
                 <div className="form-grid dialog-form-grid">
                   <div className="field">
-                    <label>Full Name *</label>
+                    <label>First Name *</label>
                     <input
-                      value={customerForm.fullName}
-                      onChange={(event) => setCustomerForm((prev) => ({ ...prev, fullName: event.target.value }))}
+                      value={customerForm.firstName}
+                      onChange={(event) => setCustomerForm((prev) => ({ ...prev, firstName: event.target.value }))}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Last Name *</label>
+                    <input
+                      value={customerForm.lastName}
+                      onChange={(event) => setCustomerForm((prev) => ({ ...prev, lastName: event.target.value }))}
                     />
                   </div>
                   <div className="field">
@@ -2708,7 +2735,7 @@ export function AdminBookingsClient() {
                             </button>
                           </div>
                           <div className="field">
-                            <label>Name</label>
+                            <label>Full Name</label>
                             <input value={selectedCustomer.fullName} readOnly />
                           </div>
                           <div className="field">
@@ -2740,10 +2767,17 @@ export function AdminBookingsClient() {
                       ) : (
                         <>
                           <div className="field">
-                            <label>Name</label>
+                            <label>First Name</label>
                             <input
-                              value={dialogForm.name}
-                              onChange={(event) => setDialogForm((prev) => (prev ? { ...prev, name: event.target.value } : prev))}
+                              value={dialogForm.firstName}
+                              onChange={(event) => setDialogForm((prev) => (prev ? { ...prev, firstName: event.target.value } : prev))}
+                            />
+                          </div>
+                          <div className="field">
+                            <label>Last Name</label>
+                            <input
+                              value={dialogForm.lastName}
+                              onChange={(event) => setDialogForm((prev) => (prev ? { ...prev, lastName: event.target.value } : prev))}
                             />
                           </div>
                           <div className="field">
@@ -3185,7 +3219,7 @@ export function AdminBookingsClient() {
                       onChange={(event) => {
                         const val = event.target.value;
                         setEditingProductPresetId(val);
-                        const preset = INVOICE_PRODUCT_PRESETS.find((entry) => entry.id === val);
+                        const preset = presets.find((entry) => entry.id === val);
                         if (preset) {
                           addInvoiceProductPresetToEditor(preset);
                           setEditingProductPresetId("");
@@ -3194,7 +3228,7 @@ export function AdminBookingsClient() {
                       className="invoice-product-preset-select"
                     >
                       <option value="">Add lesson package preset...</option>
-                      {INVOICE_PRODUCT_PRESETS.map((preset) => (
+                      {presets.map((preset) => (
                         <option key={preset.id} value={preset.id}>
                           {preset.label}
                         </option>
@@ -3205,7 +3239,7 @@ export function AdminBookingsClient() {
                       type="button"
                       disabled={!editingProductPresetId}
                       onClick={() => {
-                        const preset = INVOICE_PRODUCT_PRESETS.find((entry) => entry.id === editingProductPresetId);
+                        const preset = presets.find((entry) => entry.id === editingProductPresetId);
                         if (!preset) return;
                         addInvoiceProductPresetToEditor(preset);
                         setEditingProductPresetId("");

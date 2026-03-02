@@ -15,6 +15,8 @@ type Params = {
 };
 
 const updateCustomerSchema = z.object({
+  firstName: z.string().trim().min(1).max(60).optional(),
+  lastName: z.string().trim().min(1).max(60).optional(),
   fullName: z.string().trim().min(2).max(120).optional(),
   email: z.string().trim().email().max(200).optional(),
   phone: auPhoneSchema.optional(),

@@ -27,6 +27,8 @@ type ManualBookingInput = z.infer<typeof manualBookingSchema>;
 async function createCustomerFromBooking(input: ManualBookingInput) {
   return prisma.customer.create({
     data: customerSnapshotFromInput({
+      firstName: input.firstName,
+      lastName: input.lastName,
       name: input.name,
       email: input.email,
       phone: input.phone,
@@ -50,6 +52,8 @@ async function updateCustomerFromBooking(id: string, input: ManualBookingInput) 
   return prisma.customer.update({
     where: { id },
     data: customerSnapshotFromInput({
+      firstName: input.firstName,
+      lastName: input.lastName,
       name: input.name,
       email: input.email,
       phone: input.phone,

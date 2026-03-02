@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AdminDeployUpdatesButton } from "@/components/admin-deploy-updates-button";
+import { AdminPresetsEditor } from "@/components/admin-presets-editor";
 
 type EnvVarField = {
   key: string;
@@ -48,6 +49,7 @@ async function readJsonSafe<T>(response: Response): Promise<T | null> {
  */
 export function AdminSettingsClient() {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<"system" | "presets">("system");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -281,7 +283,28 @@ export function AdminSettingsClient() {
         </div>
       </div>
 
-      <div className="admin-card">
+      <div className="admin-card booking-row">
+        <div className="site-nav">
+          <button
+            className={`btn ${activeTab === "system" ? "btn-primary" : "btn-secondary"}`}
+            type="button"
+            onClick={() => setActiveTab("system")}
+          >
+            System
+          </button>
+          <button
+            className={`btn ${activeTab === "presets" ? "btn-primary" : "btn-secondary"}`}
+            type="button"
+            onClick={() => setActiveTab("presets")}
+          >
+            Lesson Presets
+          </button>
+        </div>
+      </div>
+
+      {activeTab === "system" ? (
+        <>
+          <div className="admin-card">
         <p className="helper-text">
           Edit supported environment settings and sync admin login credentials to the database. Saving writes the project <code>.env</code>; restart the app to apply most runtime changes.
         </p>
@@ -395,6 +418,10 @@ export function AdminSettingsClient() {
           </div>
         </form>
       ) : null}
+        </>
+      ) : (
+        <AdminPresetsEditor />
+      )}
     </div>
   );
 }
