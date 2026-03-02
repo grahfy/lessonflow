@@ -176,7 +176,7 @@ export function AdminInvoicesClient() {
     setTotalCount(payload.total || 0);
     setTotalPages(payload.totalPages || 1);
     return rows;
-  }, [agingFilter, outstandingOnly, page, pageSize, query, safeFetch, statusFilter]);
+  }, [agingFilter, handleApiError, outstandingOnly, page, pageSize, query, safeFetch, statusFilter]);
 
   useEffect(() => {
     void loadInvoices();

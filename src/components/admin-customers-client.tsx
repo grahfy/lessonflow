@@ -250,10 +250,9 @@ export function AdminCustomersClient() {
   }, [customerQuery]);
 
   // Reset to page 1 when debounced query changes
+  // This effect intentionally omits dependencies to prevent infinite re-render loops
   useEffect(() => {
     setPage(1);
-    // The effect intentionally only tracks debouncedCustomerQuery to prevent infinite loops
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
