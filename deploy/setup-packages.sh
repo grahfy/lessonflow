@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Melbourne Guitar School - Package Installation Script
+# LessonFlow - Package Installation Script
 # =============================================================================
 # Automatically detects OS and installs required packages:
 #   - Node.js 20 LTS
@@ -593,10 +593,10 @@ create_app_user() {
     fi
     
     # Create Capistrano-style release/shared directories used by deploy.sh.
-    run_cmd mkdir -p /var/www/melbourne-guitar-school/{releases,shared,data}
-    run_cmd chown -R www-data:www-data /var/www/melbourne-guitar-school
+    run_cmd mkdir -p /var/www/lessonflow/{releases,shared,data}
+    run_cmd chown -R www-data:www-data /var/www/lessonflow
     
-    log_info "Application directories created at /var/www/melbourne-guitar-school"
+    log_info "Application directories created at /var/www/lessonflow"
 }
 
 # =============================================================================
@@ -635,13 +635,13 @@ print_summary() {
     echo ""
     echo "2. Create database and user:"
     echo "   sudo mysql"
-    echo "   CREATE DATABASE melbourne_guitar_school CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+    echo "   CREATE DATABASE lessonflow CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
     echo "   CREATE USER 'mgs_user'@'localhost' IDENTIFIED BY 'your-password';"
-    echo "   GRANT ALL PRIVILEGES ON melbourne_guitar_school.* TO 'mgs_user'@'localhost';"
+    echo "   GRANT ALL PRIVILEGES ON lessonflow.* TO 'mgs_user'@'localhost';"
     echo "   FLUSH PRIVILEGES;"
     echo ""
     echo "3. Create environment file:"
-    echo "   sudo nano /var/www/melbourne-guitar-school/shared/.env"
+    echo "   sudo nano /var/www/lessonflow/shared/.env"
     echo ""
     echo "4. Deploy the application:"
     echo "   sudo ./deploy/deploy.sh --branch main"
@@ -657,7 +657,7 @@ print_summary() {
 main() {
     echo ""
     echo "=========================================="
-    echo "  Melbourne Guitar School"
+    echo "  LessonFlow"
     echo "  VPS Package Installer"
     echo "=========================================="
     echo ""

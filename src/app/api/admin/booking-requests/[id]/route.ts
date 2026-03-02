@@ -1,3 +1,4 @@
+import { APP_TIMEZONE } from "@/lib/time";
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@/generated/prisma/client";
 import { z } from "zod";
@@ -50,7 +51,7 @@ const requestEditSchema = z.object({
 
 function localTime(date: Date): string {
   return new Intl.DateTimeFormat("en-AU", {
-    timeZone: "Australia/Melbourne",
+    timeZone: APP_TIMEZONE,
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23"
@@ -185,7 +186,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
               startTimeLocal: localTime(bookingRequest.requestedStartAt),
               startDate: bookingRequest.requestedStartAt,
               recurrenceEndAt: bookingRequest.recurrenceEndAt,
-              timezone: "Australia/Melbourne",
+              timezone: APP_TIMEZONE,
               customerId
             }
           });
@@ -214,7 +215,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
               customDurationMinutes: bookingRequest.customDurationMinutes,
               startAt,
               endAt: getBookingEnd(startAt, bookingRequest.lessonDuration, bookingRequest.customDurationMinutes),
-              timezone: "Australia/Melbourne",
+              timezone: APP_TIMEZONE,
               requestId: bookingRequest.id,
               seriesId: series.id,
               customerId,
@@ -245,7 +246,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
                 bookingRequest.lessonDuration,
                 bookingRequest.customDurationMinutes
               ),
-              timezone: "Australia/Melbourne",
+              timezone: APP_TIMEZONE,
               requestId: bookingRequest.id,
               customerId,
               modifiedById: admin.id

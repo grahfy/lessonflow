@@ -166,6 +166,7 @@ export function CaptchaField(props: {
       <label htmlFor={inputId}>Security check</label>
       <div id={imageId} aria-live="polite">
         {props.captcha.captcha ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={props.captcha.captcha.imageDataUrl}
             alt="CAPTCHA letters, numbers, and symbols"

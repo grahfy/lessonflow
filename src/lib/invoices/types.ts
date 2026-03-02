@@ -8,7 +8,7 @@ export type InvoiceLineItemDraft = {
   quantity: number;
   unitPriceCents: number;
   taxMode: InvoiceTaxMode;
-  kind: "lesson_fee" | "educational_books" | "digital_guitar_lessons" | "custom";
+  kind: "lesson_fee" | "educational_books" | "digital_lessons" | "custom";
   sortOrder: number;
 };
 
@@ -34,6 +34,8 @@ export type CalculatedInvoiceTotals = {
  * Snapshot of customer-facing details that are embedded in the invoice record.
  */
 export type InvoiceCustomerSnapshot = {
+  customerFirstName: string;
+  customerLastName: string;
   customerName: string;
   customerEmail: string;
   customerPhone: string;

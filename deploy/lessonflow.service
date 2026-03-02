@@ -1,11 +1,11 @@
 # Melbourne Guitar School - Systemd Service
-# Install: sudo cp deploy/melbourne-guitar-school.service /etc/systemd/system/
-# Enable:  sudo systemctl enable melbourne-guitar-school
-# Start:   sudo systemctl start melbourne-guitar-school
+# Install: sudo cp deploy/lessonflow.service /etc/systemd/system/
+# Enable:  sudo systemctl enable lessonflow
+# Start:   sudo systemctl start lessonflow
 
 [Unit]
 Description=Melbourne Guitar School Next.js Application
-Documentation=https://github.com/your-org/melbourne-guitar-school-website
+Documentation=https://github.com/your-org/lessonflow-website
 After=network.target mysql.service
 Wants=mysql.service
 StartLimitIntervalSec=300
@@ -17,17 +17,17 @@ User=www-data
 Group=www-data
 # deploy.sh updates this symlink atomically to switch releases without editing
 # the unit file on every deploy.
-WorkingDirectory=/var/www/melbourne-guitar-school/current
+WorkingDirectory=/var/www/lessonflow/current
 
 # Environment
-EnvironmentFile=/var/www/melbourne-guitar-school/shared/.env
+EnvironmentFile=/var/www/lessonflow/shared/.env
 Environment=NODE_ENV=production
 Environment=PORT=3000
 
 # Executable
 # The standalone Next.js output embeds server code and reads static assets from
 # the deployed release path prepared by deploy.sh.
-ExecStart=/usr/bin/node /var/www/melbourne-guitar-school/current/.next/standalone/server.js
+ExecStart=/usr/bin/node /var/www/lessonflow/current/.next/standalone/server.js
 
 # Restart behavior
 Restart=on-failure
@@ -36,7 +36,7 @@ RestartSec=10
 # Logging
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=melbourne-guitar-school
+SyslogIdentifier=lessonflow
 
 # Security hardening
 # ReadWritePaths re-opens only the app deploy tree because ProtectSystem=strict
@@ -44,7 +44,7 @@ SyslogIdentifier=melbourne-guitar-school
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/www/melbourne-guitar-school
+ReadWritePaths=/var/www/lessonflow
 PrivateTmp=true
 
 # Resource limits

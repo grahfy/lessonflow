@@ -5,84 +5,67 @@ import { fileURLToPath } from "node:url";
 const currentFilePath = fileURLToPath(import.meta.url);
 const projectRoot = path.resolve(path.dirname(currentFilePath), "..");
 
-// Minimal parser for test env files. This intentionally avoids loading dotenv in
-// the test harness so bootstrap order stays explicit and dependency-free.
-const parseEnvFile = (filePath: string): Record<string, string> => {
-  const values: Record<string, string> = {};
-  const content = fs.readFileSync(filePath, "utf8");
+/**
+ * Loads test environment variables from .env.test.local or .env.test.
+ * Fallbacks are provided for required values if files are missing.
+ */
+function loadTestEnv() {
+  const envFiles = [".env.test.local", ".env.test"];
+  const env: Record<string, string> = { ...process.env } as Record<string, string>;
 
-  for (const rawLine of content.split(/\r?\n/)) {
-    const line = rawLine.trim();
-
-    if (!line || line.startsWith("#")) {
-      continue;
-    }
-
-    const separatorIndex = line.indexOf("=");
-    if (separatorIndex === -1) {
-      continue;
-    }
-
-    const key = line.slice(0, separatorIndex).trim();
-    let value = line.slice(separatorIndex + 1).trim();
-
-    if (
-      (value.startsWith("\"") && value.endsWith("\"")) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-
-    values[key] = value;
-  }
-
-  return values;
-};
-
-// Mirror Next.js-style precedence: test-specific files win, then local/default.
-for (const fileName of [".env.test.local", ".env.test", ".env.local", ".env"]) {
-  const filePath = path.join(projectRoot, fileName);
-
-  if (!fs.existsSync(filePath)) {
-    continue;
-  }
-
-  const fileValues = parseEnvFile(filePath);
-  for (const [key, value] of Object.entries(fileValues)) {
-    if (process.env[key] === undefined) {
-      process.env[key] = value;
+  for (const file of envFiles) {
+    const fullPath = path.join(projectRoot, file);
+    if (fs.existsSync(fullPath)) {
+      const content = fs.readFileSync(fullPath, "utf-8");
+      const lines = content.split("\n");
+      for (const line of lines) {
+        const match = line.match(/^\s*([^#\s][^=]*)\s*=\s*(.*)$/);
+        if (match) {
+          const key = match[1].trim();
+          let value = match[2].trim();
+          if (value.startsWith('"') && value.endsWith('"')) {
+            value = value.substring(1, value.length - 1);
+          } else if (value.startsWith("'") && value.endsWith("'")) {
+            value = value.substring(1, value.length - 1);
+          }
+          env[key] ??= value;
+        }
+      }
     }
   }
+
+  // Mandatory fallbacks for CI and environments without .env.test
+  env.DATABASE_URL ??= "mysql://root:root@127.0.0.1:3306/mgs_test";
+  env.ADMIN_EMAIL ??= "owner@example.com";
+  env.ADMIN_SESSION_SECRET ??= "test-admin-secret-at-least-32-chars-long-for-security";
+  env.STUDENT_SESSION_SECRET ??= "test-student-secret-at-least-32-chars-long-for-security";
+  env.STUDENT_PORTAL_PASSWORD_ENCRYPTION_KEY ??= "test-encryption-key-at-least-32-chars";
+  env.CRON_SECRET ??= "test-cron-secret";
+  env.NEXT_PUBLIC_SITE_URL ??= "http://localhost:3000";
+  
+  // Whitelabel defaults
+  env.NEXT_PUBLIC_BRAND_NAME ??= "Melbourne Guitar School";
+  env.NEXT_PUBLIC_PRIMARY_SUBJECT ??= "Guitar";
+  env.NEXT_PUBLIC_PRIMARY_LOCATION ??= "Northcote";
+  
+  env.SMTP_FROM ??= "Melbourne Guitar School <no-reply@example.com>";
+  env.INVOICE_BUSINESS_NAME ??= "Melbourne Guitar School";
+  env.INVOICE_BUSINESS_ABN ??= "12 345 678 901";
+  env.INVOICE_BANK_NAME ??= "Test Bank";
+  env.INVOICE_BANK_BSB ??= "000-000";
+  env.INVOICE_BANK_ACCOUNT_NAME ??= "Melbourne Guitar School";
+  env.INVOICE_BANK_ACCOUNT_NUMBER ??= "12345678";
+  env.INVOICE_PAYMENT_TERMS_DAYS ??= "14";
+  env.INVOICE_GST_REGISTERED ??= "true";
+  env.INVOICE_DEFAULT_TAX_MODE ??= "taxable";
+  env.INVOICE_CREDIT_NOTE_PREFIX ??= "MGSCN";
+
+  return env;
 }
 
-const env = process.env as Record<string, string | undefined>;
-// Provide deterministic defaults for tests that do not care about external
-// services, while still allowing CI/local overrides from env files above.
-env.NODE_ENV ??= "test";
-env.DATABASE_URL ??= "file:./test.db";
-env.NEXT_PUBLIC_SITE_URL ??= "http://127.0.0.1:3000";
-env.ADMIN_EMAIL ??= "owner@example.com";
-env.ADMIN_PASSWORD ??= "change-me";
-env.ADMIN_SESSION_SECRET ??= "test-session-secret";
-env.STUDENT_SESSION_SECRET ??= "test-student-session-secret";
-env.STUDENT_SESSION_MAX_AGE_SECONDS ??= "2592000";
-env.STUDENT_PORTAL_PASSWORD_ENCRYPTION_KEY ??= "test-student-portal-encryption-key";
-env.STUDENT_PORTAL_PASSWORD_LENGTH ??= "14";
-env.CRON_SECRET ??= "test-cron-secret";
-env.LEARNING_MATERIALS_STORAGE_DRIVER ??= "local";
-env.LEARNING_MATERIALS_LOCAL_ROOT ??= ".data/learning-materials-test";
-env.SMTP_HOST ??= "";
-env.SMTP_PORT ??= "587";
-env.SMTP_USER ??= "";
-env.SMTP_PASS ??= "";
-env.SMTP_FROM ??= "Melbourne Guitar School <no-reply@example.com>";
-env.INVOICE_BUSINESS_NAME ??= "Melbourne Guitar School";
-env.INVOICE_BUSINESS_ABN ??= "12345678901";
-env.INVOICE_BANK_NAME ??= "ANZ";
-env.INVOICE_BANK_BSB ??= "013001";
-env.INVOICE_BANK_ACCOUNT_NAME ??= "Melbourne Guitar School";
-env.INVOICE_BANK_ACCOUNT_NUMBER ??= "12345678";
-env.INVOICE_PAYMENT_TERMS_DAYS ??= "14";
-env.INVOICE_GST_REGISTERED ??= "true";
-env.INVOICE_DEFAULT_TAX_MODE ??= "taxable";
-env.INVOICE_CREDIT_NOTE_PREFIX ??= "MGSCN";
+const env = loadTestEnv();
+
+// Inject into process.env for all tests
+for (const [key, value] of Object.entries(env)) {
+  process.env[key] = value;
+}

@@ -107,8 +107,36 @@ function getTransporter() {
   return transporter;
 }
 
+import { renderTemplate } from "@/lib/email/render";
+import { PlaceholderContext } from "@/lib/email/placeholders";
+
+type SendTemplateEmailInput = {
+  to: string;
+  templateKey: string;
+  context: PlaceholderContext;
+  fallbackRenderer: (ctx: PlaceholderContext) => { subject: string; html: string };
+  bcc?: string | string[];
+  attachments?: Array<{
+    filename: string;
+    content: Buffer;
+    contentType?: string;
+  }>;
+};
+
+export async function sendTemplateEmail(input: SendTemplateEmailInput): Promise<SendEmailResult> {
+  const rendered = await renderTemplate(input.templateKey, input.context, input.fallbackRenderer);
+  
+  return sendEmail({
+    to: input.to,
+    subject: rendered.subject,
+    html: rendered.html,
+    bcc: input.bcc,
+    attachments: input.attachments
+  });
+}
+
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
-  const from = process.env.SMTP_FROM || "Melbourne Guitar School <no-reply@example.com>";
+  const from = process.env.SMTP_FROM || "LessonFlow <no-reply@example.com>";
   const tx = getTransporter();
   const ownerBcc = getCustomerAuditBccRecipient(input.to);
   const bcc = ownerBcc ? mergeBccValues(input.bcc, ownerBcc) : input.bcc;

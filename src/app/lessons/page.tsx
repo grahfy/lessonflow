@@ -4,57 +4,89 @@ import { TweenLink } from "@/components/motion/tween-link";
 import { PanelLayout } from "@/components/panel-layout";
 import { buildPublicPageMetadata } from "@/lib/seo";
 
+import { getContent } from "@/lib/cms";
+import { getSubjectLabel } from "@/lib/branding";
+
 export const metadata: Metadata = buildPublicPageMetadata({
-  title: "Guitar Lesson Paths | Creative Coaching for Every Level",
+  title: `${getSubjectLabel()} Lesson Paths | Creative Coaching for Every Level`,
   path: "/lessons",
   description:
-    "Structured, creative guitar coaching for beginners through advanced players. Learn songs faster, sharpen technique, and develop a more confident sound."
+    `Structured, creative ${getSubjectLabel().toLowerCase()} coaching for beginners through advanced players. Learn songs faster, sharpen technique, and develop a more confident sound.`
 });
 
-export default function LessonsPage() {
+export default async function LessonsPage() {
+  const heroContent = await getContent("/lessons", "hero", {
+    kicker: "Lesson Paths",
+    title: "A lesson path that meets you where you are and grows with your sound.",
+    lead: "Every program is tailored to your level, goals, and musical taste. We build technique, timing, fretboard fluency, and performance confidence through practical playing instead of disconnected exercises. The result is a lesson experience that feels creative, focused, and directly tied to the music you want to make.",
+    visualLabel: "Lesson",
+    visualClassName: "lessons-hero"
+  });
+
+  const bodyContent = await getContent("/lessons", "body", {
+    helperText: `Lessons can include song learning, rhythm ${getSubjectLabel().toLowerCase()}, lead ${getSubjectLabel().toLowerCase()}, improvisation, technique development, ear training, tone guidance, and smart practice planning. The focus is steady progress and musical confidence, not just collecting theory or random tips.`,
+    beginnerTitle: "Beginner",
+    beginnerBody: "Start strong with posture, tuning, chord changes, rhythm fundamentals, and songs you actually want to play. Build a foundation that makes practice feel clear, creative, and productive from day one.",
+    intermediateTitle: "Intermediate",
+    intermediateBody: "Build cleaner technique, stronger timing, better phrasing, and confident movement between rhythm and lead. Develop consistency so your playing sounds tighter, more musical, and more intentional.",
+    advancedTitle: "Advanced",
+    advancedBody: "Refine speed, improvisation, articulation, and advanced techniques for polished, performance-ready playing. Dial in the details that turn strong players into distinctive players."
+  });
+
+  const pricingContent = await getContent("/lessons", "pricing", {
+    title: `${getSubjectLabel()} Lesson Prices`,
+    min30Label: `30 minute ${getSubjectLabel()} lessons`,
+    min30Option1: "5 lessons - $200 ($40 each)",
+    min30Option2: "10 lessons - $388 ($38.80 each)",
+    min60Label: `1 Hour ${getSubjectLabel()} lessons`,
+    min60Option1: "5 lessons - $375 ($75 each)",
+    min60Option2: "10 lessons - $725 ($72.50 each)",
+    note: "Gift vouchers are available."
+  });
+
   return (
     <PanelLayout
-      kicker="Lesson Paths"
-      title="A lesson path that meets you where you are and grows with your sound."
-      lead="Every program is tailored to your level, goals, and musical taste. We build technique, timing, fretboard fluency, and performance confidence through practical playing instead of disconnected exercises. The result is a lesson experience that feels creative, focused, and directly tied to the music you want to make."
+      kicker={heroContent.kicker}
+      title={heroContent.title}
+      lead={heroContent.lead}
       viewClassName="view-lessons-page"
-      visualLabel="Lesson"
-      visualClassName="lessons-hero"
+      visualLabel={heroContent.visualLabel}
+      visualClassName={heroContent.visualClassName}
       leadJustified={true}
     >
       <p className="helper-text copy-justify" data-motion-item="lessons-helper-text">
-        Lessons can include song learning, rhythm guitar, lead guitar, improvisation, technique development, ear training, tone guidance, and smart practice planning. The focus is steady progress and musical confidence, not just collecting theory or random tips.
+        {bodyContent.helperText}
       </p>
       <div className="card-grid" data-motion-item="lessons-cards">
         <article className="info-card" data-motion-item="lessons-beginner-card">
-          <h3>Beginner</h3>
-          <p>Start strong with posture, tuning, chord changes, rhythm fundamentals, and songs you actually want to play. Build a foundation that makes practice feel clear, creative, and productive from day one.</p>
+          <h3>{bodyContent.beginnerTitle}</h3>
+          <p>{bodyContent.beginnerBody}</p>
         </article>
         <article className="info-card" data-motion-item="lessons-intermediate-card">
-          <h3>Intermediate</h3>
-          <p>Build cleaner technique, stronger timing, better phrasing, and confident movement between rhythm and lead. Develop consistency so your playing sounds tighter, more musical, and more intentional.</p>
+          <h3>{bodyContent.intermediateTitle}</h3>
+          <p>{bodyContent.intermediateBody}</p>
         </article>
         <article className="info-card" data-motion-item="lessons-advanced-card">
-          <h3>Advanced</h3>
-          <p>Refine speed, improvisation, articulation, and advanced techniques for polished, performance-ready playing. Dial in the details that turn strong players into distinctive players.</p>
+          <h3>{bodyContent.advancedTitle}</h3>
+          <p>{bodyContent.advancedBody}</p>
         </article>
       </div>
 
       <section className="lesson-pricing-card" data-motion-item="lessons-pricing" aria-label="Lesson pricing">
-        <h3>Guitar Lesson Prices</h3>
+        <h3>{pricingContent.title}</h3>
         <div className="lesson-pricing-grid">
           <div>
-            <h4>30 minute Guitar lessons</h4>
-            <p>5 lessons - $200 ($40 each)</p>
-            <p>10 lessons - $388 ($38.80 each)</p>
+            <h4>{pricingContent.min30Label}</h4>
+            <p>{pricingContent.min30Option1}</p>
+            <p>{pricingContent.min30Option2}</p>
           </div>
           <div>
-            <h4>1 Hour Guitar lessons</h4>
-            <p>5 lessons - $375 ($75 each)</p>
-            <p>10 lessons - $725 ($72.50 each)</p>
+            <h4>{pricingContent.min60Label}</h4>
+            <p>{pricingContent.min60Option1}</p>
+            <p>{pricingContent.min60Option2}</p>
           </div>
         </div>
-        <p className="lesson-pricing-note">Gift vouchers are available.</p>
+        <p className="lesson-pricing-note">{pricingContent.note}</p>
       </section>
 
       <div className="button-row" data-motion-item="lessons-actions">

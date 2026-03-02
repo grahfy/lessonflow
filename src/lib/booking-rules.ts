@@ -84,7 +84,7 @@ export const bookingRequestSchema = z
   .superRefine((data, ctx) => {
     const startAt = new Date(data.requestedStartAt);
     const now = new Date();
-    const currentYear = getCurrentCalendarYear(now);
+    const currentYear = getCurrentCalendarYear();
 
     // SECURITY: Prevent booking dates in the past
     if (!isDateInCalendarYear(startAt, currentYear)) {

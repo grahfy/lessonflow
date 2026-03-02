@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Melbourne Guitar School - Deployment Script
+# LessonFlow - Deployment Script
 # =============================================================================
 # Usage: ./deploy/deploy.sh [options]
 #
@@ -40,7 +40,7 @@ SOURCE_DIR="$(pwd)"
 ORIGINAL_ARGS=( "$@" )
 
 # Configuration
-APP_NAME="melbourne-guitar-school"
+APP_NAME="lessonflow"
 DEPLOY_DIR="/var/www/${APP_NAME}"
 RELEASES_DIR="${DEPLOY_DIR}/releases"
 SHARED_DIR="${DEPLOY_DIR}/shared"
@@ -110,7 +110,7 @@ NC='\033[0m' # No Color
 # Print usage information for CLI and automation contexts.
 show_usage() {
     cat <<'EOF'
-Melbourne Guitar School - Deployment Script
+LessonFlow - Deployment Script
 
 Usage: ./deploy/deploy.sh [options]
 
@@ -351,24 +351,48 @@ pick_env_editor() {
 }
 
 # Ensures the shared production .env file exists, bootstrapping it from the
-# repository .env.example when missing so first-time server deploys have a file
-# to edit before the release is built.
+# repository .env.example when missing. If it exists, it merges any missing
+# keys from the template to ensure updates include new config variables.
 ensure_shared_env_file() {
     local env_template_path="$1"
     local shared_env_path="${SHARED_DIR}/.env"
 
     mkdir -p "${SHARED_DIR}"
 
-    if [[ -f "${shared_env_path}" ]]; then
-        log_info "Shared .env found: ${shared_env_path}"
-    elif [[ -f "${env_template_path}" ]]; then
+    if [[ ! -f "${env_template_path}" ]]; then
+        log_warn "No .env template available at ${env_template_path}"
+        return 1
+    fi
+
+    if [[ ! -f "${shared_env_path}" ]]; then
         cp "${env_template_path}" "${shared_env_path}"
         chown www-data:www-data "${shared_env_path}" 2>/dev/null || true
         chmod 640 "${shared_env_path}" 2>/dev/null || true
         log_info "Created shared .env from template: ${shared_env_path}"
     else
-        log_warn "No shared .env file found and no template available at ${env_template_path}"
-        return 1
+        # Merge missing keys from template into existing shared env
+        local temp_env
+        temp_env="$(mktemp)"
+        cp "${shared_env_path}" "${temp_env}"
+        
+        local key=""
+        local value=""
+        while IFS='=' read -r key value || [[ -n "$key" ]]; do
+            # Skip comments and empty lines
+            [[ "$key" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "${key//[[:space:]]/}" ]] && continue
+            
+            # Remove whitespace and potential export prefix
+            key="${key#export }"
+            key="${key//[[:space:]]/}"
+            
+            if ! grep -q "^[[:space:]]*${key}=" "${shared_env_path}"; then
+                log_info "Adding missing config key to shared .env: ${key}"
+                echo "${key}=${value}" >> "${shared_env_path}"
+            fi
+        done < "${env_template_path}"
+        rm -f "${temp_env}"
+        log_info "Shared .env keys synchronized with template."
     fi
 
     # Re-apply runtime ownership in case the file was previously edited as root.
@@ -825,6 +849,9 @@ update_prisma() {
     else
         log_info "Skipping database migrations"
     fi
+
+    # Seed whitelabel defaults for CMS and templates
+    run_step "Seeding whitelabel defaults" npx tsx scripts/seed-whitelabel-defaults.ts
 }
 
 # Installs Nginx in a minimal mode through the shared package setup helper.
@@ -1096,7 +1123,8 @@ ensure_cron_installed_from_deploy() {
 # deploy/. This allows first-time server bootstrap before a full deploy.
 install_app_systemd_service_from_deploy() {
     local service_file="/etc/systemd/system/${APP_NAME}.service"
-    local service_source="${SCRIPT_DIR}/${APP_NAME}.service"
+    local service_source="${SCRIPT_DIR}/app.service.template"
+    local brand_name="${NEXT_PUBLIC_BRAND_NAME:-LessonFlow}"
 
     section "App Systemd Service Install"
 
@@ -1115,17 +1143,20 @@ install_app_systemd_service_from_deploy() {
         return 1
     fi
 
-    if [[ ! -f "${service_file}" ]]; then
-        log_info "Installing systemd service..."
-        cp "${service_source}" "${service_file}"
-        systemctl daemon-reload
-    elif ! cmp -s "${service_source}" "${service_file}"; then
-        log_info "Updating systemd service..."
-        cp "${service_source}" "${service_file}"
+    local tmp_service
+    tmp_service="$(mktemp)"
+    sed -e "s/{{APP_NAME}}/${APP_NAME}/g" \
+        -e "s/{{BRAND_NAME}}/${brand_name}/g" \
+        "${service_source}" > "${tmp_service}"
+
+    if [[ ! -f "${service_file}" ]] || ! cmp -s "${tmp_service}" "${service_file}"; then
+        log_info "Updating systemd service: ${service_file}"
+        cp "${tmp_service}" "${service_file}"
         systemctl daemon-reload
     else
         log_info "Systemd service already up to date"
     fi
+    rm -f "${tmp_service}"
 
     systemctl enable "${APP_NAME}" >/dev/null 2>&1 || true
 
@@ -1739,16 +1770,21 @@ install_or_update_managed_crontab_jobs() {
     fi
 
     local cron_runner="${CURRENT_LINK}/deploy/cron.sh"
-    local begin_marker="# BEGIN MELBOURNE_GUITAR_SCHOOL_MANAGED_CRON"
-    local end_marker="# END MELBOURNE_GUITAR_SCHOOL_MANAGED_CRON"
+    local begin_marker="# BEGIN LESSONFLOW_MANAGED_CRON"
+    local end_marker="# END LESSONFLOW_MANAGED_CRON"
+    local legacy_begin="# BEGIN MELBOURNE_GUITAR_SCHOOL_MANAGED_CRON"
+    local legacy_end="# END MELBOURNE_GUITAR_SCHOOL_MANAGED_CRON"
+    
     local existing=""
     local stripped=""
     local tmp_file=""
 
     existing="$(crontab -l 2>/dev/null || true)"
-    stripped="$(printf '%s\n' "${existing}" | awk -v begin="${begin_marker}" -v end="${end_marker}" '
-        $0 == begin { skip=1; next }
-        $0 == end { skip=0; next }
+    
+    # Strip both new and legacy blocks
+    stripped="$(printf '%s\n' "${existing}" | awk -v b1="${begin_marker}" -v e1="${end_marker}" -v b2="${legacy_begin}" -v e2="${legacy_end}" '
+        $0 == b1 || $0 == b2 { skip=1; next }
+        $0 == e1 || $0 == e2 { skip=0; next }
         !skip { print }
     ')"
 
@@ -1759,7 +1795,7 @@ install_or_update_managed_crontab_jobs() {
             echo
         fi
         printf '%s\n' "${begin_marker}"
-        echo "# Melbourne Guitar School managed cron jobs (updated by deploy.sh)"
+        echo "# LessonFlow managed cron jobs (updated by deploy.sh)"
         echo "0 20 * * * ${cron_runner} daily-bookings-digest"
         echo "30 20 * * * ${cron_runner} invoice-reminders"
         echo "45 20 * * * ${cron_runner} admin-reports-daily"
@@ -1854,7 +1890,7 @@ function getCommits() {
 }
 
 const payload = {
-  app: "melbourne-guitar-school",
+  app: "lessonflow",
   branch,
   release,
   appliedAt: new Date().toISOString(),
@@ -2353,9 +2389,55 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Detects if a legacy lessonflow installation exists and migrates it
+# to LessonFlow to ensure smooth updates on production servers.
+check_legacy_migration() {
+    local legacy_name="melbourne-guitar-school"
+    local legacy_dir="/var/www/${legacy_name}"
+    local legacy_service="${legacy_name}.service"
+    local legacy_nginx_avail="/etc/nginx/sites-available/${legacy_name}"
+    local legacy_nginx_enabled="/etc/nginx/sites-enabled/${legacy_name}"
+
+    if [[ -d "${legacy_dir}" && "${APP_NAME}" == "lessonflow" ]]; then
+        section "Legacy Migration Detection"
+        log_warn "Detected legacy deployment directory: ${legacy_dir}"
+        
+        if [[ ${EUID} -ne 0 ]]; then
+            log_error "Migration requires root privileges. Please re-run with sudo or --sudo-deploy."
+            exit 1
+        fi
+
+        log_info "Migrating ${legacy_dir} to ${DEPLOY_DIR}..."
+        mv "${legacy_dir}" "${DEPLOY_DIR}"
+        log_info "Directory migrated successfully."
+
+        # Stop/Disable old systemd service
+        if systemctl list-units --full --all | grep -q "${legacy_service}"; then
+            if systemctl is-active --quiet "${legacy_service}"; then
+                log_info "Stopping legacy service: ${legacy_service}"
+                systemctl stop "${legacy_service}"
+            fi
+            log_info "Disabling legacy service: ${legacy_service}"
+            systemctl disable "${legacy_service}"
+        fi
+
+        # Remove old Nginx site configs
+        if [[ -L "${legacy_nginx_enabled}" ]]; then
+            log_info "Removing legacy nginx symlink: ${legacy_nginx_enabled}"
+            rm -f "${legacy_nginx_enabled}"
+        fi
+        if [[ -f "${legacy_nginx_avail}" ]]; then
+            log_info "Removing legacy nginx available site: ${legacy_nginx_avail}"
+            rm -f "${legacy_nginx_avail}"
+        fi
+    fi
+}
+
 detect_tty_capabilities
 reexec_with_sudo_if_needed
 maybe_self_update_and_restart
+
+check_legacy_migration
 
 if [[ "${MGS_RETURN_TO_MENU_AFTER_SELF_UPDATE:-}" == "1" && "${IS_TTY}" == true && "${ROLLBACK}" == false ]]; then
     INTERACTIVE=true

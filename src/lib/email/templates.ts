@@ -1,3 +1,4 @@
+import { APP_TIMEZONE } from "@/lib/time";
 /**
  * Shared HTML email templates for admin and customer notifications.
  *
@@ -47,7 +48,7 @@ function fmt(date: Date): string {
   return new Intl.DateTimeFormat("en-AU", {
     dateStyle: "full",
     timeStyle: "short",
-    timeZone: "Australia/Melbourne"
+    timeZone: APP_TIMEZONE
   }).format(date);
 }
 
@@ -80,18 +81,25 @@ function nl2br(value: string): string {
   return escapeHtml(value).replace(/\n/g, "<br/>");
 }
 
+import { 
+  PUBLIC_BRAND_NAME, 
+  CONTACT_PHONE, 
+  CONTACT_ADDRESS, 
+  LOGO_URL 
+} from "@/lib/branding";
+
 /**
  * Resolves branding/signature values with env overrides for deployment-specific contact details.
  */
 function getEmailBranding() {
   const siteUrl = getPublicSiteUrl().replace(/\/+$/, "");
   return {
-    brandName: "Melbourne Guitar School",
+    brandName: PUBLIC_BRAND_NAME,
     siteUrl,
-    phone: process.env.CONTACT_PHONE || "0401 489 437",
+    phone: CONTACT_PHONE,
     email: process.env.CONTACT_EMAIL || getOwnerEmail(),
-    address: process.env.CONTACT_ADDRESS || "Rear 66/68 High St, Northcote VIC 3070",
-    logoUrl: `${siteUrl}/images/mgs-logo.webp`
+    address: CONTACT_ADDRESS,
+    logoUrl: LOGO_URL.startsWith("http") ? LOGO_URL : `${siteUrl}${LOGO_URL}`
   };
 }
 
@@ -404,7 +412,7 @@ export function ownerDailyDigestTemplate(input: {
   return {
     subject: `Daily bookings digest - ${new Intl.DateTimeFormat("en-AU", {
       dateStyle: "long",
-      timeZone: "Australia/Melbourne"
+      timeZone: APP_TIMEZONE
     }).format(input.date)}`,
     html: renderEmailLayout({
       title: "Today's bookings",
@@ -412,7 +420,7 @@ export function ownerDailyDigestTemplate(input: {
       contentHtml: `
         <p style="margin:0 0 12px;">Daily bookings digest for ${new Intl.DateTimeFormat("en-AU", {
           dateStyle: "long",
-          timeZone: "Australia/Melbourne"
+          timeZone: APP_TIMEZONE
         }).format(input.date)}.</p>
         <ul style="margin:0;padding-left:18px;">${items || "<li>No bookings for today.</li>"}</ul>
       `
@@ -446,7 +454,7 @@ export function ownerSystemUpdateTemplate(input: {
     html: renderEmailLayout({
       title: "System Update Applied",
       previewText: `System updated to ${input.shortCommit}`,
-      leadHtml: `The Melbourne Guitar School system was updated on ${fmt(input.appliedAt)}.`,
+      leadHtml: `The ${PUBLIC_BRAND_NAME} system was updated on ${fmt(input.appliedAt)}.`,
       contentHtml: `
         <p style="margin:0 0 10px;"><strong>Branch:</strong> ${escapeHtml(input.branch)}</p>
         <p style="margin:0 0 10px;"><strong>Commit:</strong> ${escapeHtml(input.commit)}</p>
@@ -479,7 +487,7 @@ export function ownerOperationsReportTemplate(input: {
     new Intl.DateTimeFormat("en-AU", {
       dateStyle: "medium",
       timeStyle: "short",
-      timeZone: "Australia/Melbourne"
+      timeZone: APP_TIMEZONE
     }).format(new Date(iso));
 
   const appointmentListHtml = (rows: Array<{ time: string; customerName: string }>, empty: string) =>
@@ -555,7 +563,7 @@ export function ownerOperationsReportTemplate(input: {
   return {
     subject: `${periodTitle} operations report - ${new Intl.DateTimeFormat("en-AU", {
       dateStyle: "medium",
-      timeZone: "Australia/Melbourne"
+      timeZone: APP_TIMEZONE
     }).format(input.generatedAt)}`,
     html: renderEmailLayout({
       title: `${periodTitle} operations report`,
@@ -563,7 +571,7 @@ export function ownerOperationsReportTemplate(input: {
       leadHtml: `${escapeHtml(input.report.label)}. Generated ${new Intl.DateTimeFormat("en-AU", {
         dateStyle: "medium",
         timeStyle: "short",
-        timeZone: "Australia/Melbourne"
+        timeZone: APP_TIMEZONE
       }).format(input.generatedAt)}.`,
       contentHtml: `
         <div style="display:grid;gap:12px;">

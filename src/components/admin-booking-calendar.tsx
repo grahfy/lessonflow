@@ -1,4 +1,5 @@
 "use client";
+import { APP_TIMEZONE } from "@/lib/time";
 
 /**
  * Admin booking calendar presentation component.
@@ -55,7 +56,7 @@ function eventTime(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
-    timeZone: "Australia/Melbourne"
+    timeZone: APP_TIMEZONE
   }).format(parseISO(iso));
 }
 

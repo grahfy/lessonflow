@@ -1,0 +1,46 @@
+# LessonFlow - Systemd Service Template
+# Replace {{APP_NAME}} and {{BRAND_NAME}} during deployment
+
+[Unit]
+Description={{BRAND_NAME}} LessonFlow Application
+After=network.target mysql.service
+Wants=mysql.service
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/{{APP_NAME}}/current
+
+# Environment
+EnvironmentFile=/var/www/{{APP_NAME}}/shared/.env
+Environment=NODE_ENV=production
+Environment=PORT=3000
+
+# Executable
+ExecStart=/usr/bin/node /var/www/{{APP_NAME}}/current/.next/standalone/server.js
+
+# Restart behavior
+Restart=on-failure
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier={{APP_NAME}}
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/{{APP_NAME}}
+PrivateTmp=true
+
+# Resource limits
+LimitNOFILE=65535
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target

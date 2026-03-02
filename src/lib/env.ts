@@ -2,7 +2,7 @@
  * Environment Variable Accessors
  * 
  * This module provides type-safe access to environment variables used throughout
- * the Melbourne Guitar School application. These variables configure critical
+ * the LessonFlow application. These variables configure critical
  * system behavior including admin credentials, site URLs, and security settings.
  * 
  * SECURITY CONSIDERATIONS:

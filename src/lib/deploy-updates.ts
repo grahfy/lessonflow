@@ -46,7 +46,7 @@ export async function readLatestDeployUpdate(): Promise<LatestDeployUpdate | nul
     }
 
     return {
-      app: String(parsed.app || "melbourne-guitar-school"),
+      app: String(parsed.app || "lessonflow"),
       branch: String(parsed.branch || "main"),
       release: String(parsed.release || ""),
       appliedAt: String(parsed.appliedAt),

@@ -25,7 +25,7 @@ The largest practical risk is UI architecture mismatch: current pages are intent
 - Existing policy text already encodes cancellation and voucher constraints that should inform booking/cancellation flows (`terms.html:40`).
 
 ### Pattern-Find Phase
-- No existing backend/API/auth/data-access implementation patterns were found in live code; patterns exist only as planning intent in `thoughts/plans/` (`thoughts/plans/booking-contact-admin-implementation-plan.md:40`, `thoughts/plans/melbourne-guitar-school-modern-website-implementation-plan.md:40`).
+- No existing backend/API/auth/data-access implementation patterns were found in live code; patterns exist only as planning intent in `thoughts/plans/` (`thoughts/plans/booking-contact-admin-implementation-plan.md:40`, `thoughts/plans/lessonflow-modern-website-implementation-plan.md:40`).
 - UI patterns are reusable for marketing pages (`.site-shell`, `.panel-copy`, `.list`, `.button-row`), but they are not suitable as-is for an admin operations console (`assets/css/styles.css:108`, `assets/css/styles.css:194`, `assets/css/styles.css:342`).
 
 ### Analyze Phase
@@ -62,15 +62,15 @@ The largest practical risk is UI architecture mismatch: current pages are intent
 - Make email dispatch event-driven from booking state changes to avoid inconsistent side effects.
 
 ## Historical Context (from thoughts/)
-- The prior modernization plan focuses on CMS-driven marketing content and initially excludes operational systems like portals/auth (`thoughts/plans/melbourne-guitar-school-modern-website-implementation-plan.md:35`).
+- The prior modernization plan focuses on CMS-driven marketing content and initially excludes operational systems like portals/auth (`thoughts/plans/lessonflow-modern-website-implementation-plan.md:35`).
 - The new booking plan extends that direction into transactional operations, introducing auth, persistence, and scheduling concerns (`thoughts/plans/booking-contact-admin-implementation-plan.md:40`).
 - This means implementation sequencing should avoid trying to deliver CMS + booking operations simultaneously in early phases.
 
 ## Related Research
 - `thoughts/plans/booking-contact-admin-implementation-plan.md`
 - `thoughts/tickets/2026-02-19-booking-contact-admin-system.md`
-- `thoughts/plans/melbourne-guitar-school-modern-website-implementation-plan.md`
-- `thoughts/tickets/2026-02-19-melbourne-guitar-school-modern-site.md`
+- `thoughts/plans/lessonflow-modern-website-implementation-plan.md`
+- `thoughts/tickets/2026-02-19-lessonflow-modern-site.md`
 
 ## Open Questions
 - Should pending requests block identical timeslots before approval?

@@ -57,6 +57,8 @@ export async function POST(request: Request) {
 
         const newCustomer = await db.customer.create({
           data: {
+            firstName,
+            lastName,
             fullName,
             normalizedFullName,
             nameSearchTokens: normalizedFullName,

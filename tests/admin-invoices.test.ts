@@ -41,6 +41,8 @@ describe("admin-invoices", () => {
     const token = createSessionToken(admin.email);
 
     const createReq = adminRequest("http://localhost/api/admin/invoices", "POST", token, {
+      customerFirstName: "Alex",
+      customerLastName: "Student",
       customerName: "Alex Student",
       customerEmail: "alex@example.com",
       customerPhone: "0400123456",
@@ -129,8 +131,8 @@ describe("admin-invoices", () => {
           sortOrder: 1
         },
         {
-          kind: "digital_guitar_lessons",
-          description: "Digital guitar lessons",
+          kind: "digital_lessons",
+          description: "Digital lessons",
           quantity: 1,
           unitPriceCents: 2000,
           taxMode: "taxable",
@@ -313,6 +315,8 @@ describe("admin-invoices", () => {
     const req = adminRequest("http://localhost/api/admin/invoices", "POST", token, {
       customerId: customerA.id,
       bookingId: booking.id,
+      customerFirstName: "Mismatch",
+      customerLastName: "A",
       customerName: customerA.fullName,
       customerEmail: customerA.email,
       customerPhone: customerA.phone,

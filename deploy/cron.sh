@@ -1,26 +1,36 @@
 #!/bin/bash
 # =============================================================================
-# Melbourne Guitar School - Cron Job Script
+# LessonFlow - Cron Job Script
 # =============================================================================
 # This script runs the scheduled jobs (digests, reminders, owner reports)
 # It's called by the system cron and makes authenticated requests to the API
 #
 # Install: Add to crontab with `sudo crontab -e`
 # Example crontab entries:
-#   0 20 * * * /var/www/melbourne-guitar-school/current/deploy/cron.sh daily-bookings-digest
-#   30 20 * * * /var/www/melbourne-guitar-school/current/deploy/cron.sh invoice-reminders
-#   45 20 * * * /var/www/melbourne-guitar-school/current/deploy/cron.sh admin-reports-daily
-#   0 8 * * 1 /var/www/melbourne-guitar-school/current/deploy/cron.sh admin-reports-weekly
-#   15 8 1 * * /var/www/melbourne-guitar-school/current/deploy/cron.sh admin-reports-monthly
-#   30 8 1 1 * /var/www/melbourne-guitar-school/current/deploy/cron.sh admin-reports-yearly
-#   0 2 * * * /var/www/melbourne-guitar-school/current/deploy/cron.sh generate-sitemap
+#   0 20 * * * /var/www/lessonflow/current/deploy/cron.sh daily-bookings-digest
+#   30 20 * * * /var/www/lessonflow/current/deploy/cron.sh invoice-reminders
+#   45 20 * * * /var/www/lessonflow/current/deploy/cron.sh admin-reports-daily
+#   0 8 * * 1 /var/www/lessonflow/current/deploy/cron.sh admin-reports-weekly
+#   15 8 1 * * /var/www/lessonflow/current/deploy/cron.sh admin-reports-monthly
+#   30 8 1 1 * /var/www/lessonflow/current/deploy/cron.sh admin-reports-yearly
+#   0 2 * * * /var/www/lessonflow/current/deploy/cron.sh generate-sitemap
 # =============================================================================
 
 set -euo pipefail
 
 # Configuration
-APP_NAME="melbourne-guitar-school"
-DEPLOY_DIR="/var/www/${APP_NAME}"
+APP_NAME="lessonflow"
+LEGACY_APP_NAME="melbourne-guitar-school"
+
+if [[ -d "/var/www/${APP_NAME}" ]]; then
+    DEPLOY_DIR="/var/www/${APP_NAME}"
+elif [[ -d "/var/www/${LEGACY_APP_NAME}" ]]; then
+    DEPLOY_DIR="/var/www/${LEGACY_APP_NAME}"
+    APP_NAME="${LEGACY_APP_NAME}"
+else
+    DEPLOY_DIR="/var/www/${APP_NAME}"
+fi
+
 SHARED_DIR="${DEPLOY_DIR}/shared"
 LOG_DIR="/var/log/${APP_NAME}"
 

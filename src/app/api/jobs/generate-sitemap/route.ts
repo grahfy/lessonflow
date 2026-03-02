@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { getCronSecret, getPublicSiteUrl, hasCronSecret } from "@/lib/env";
+import { PUBLIC_BRAND_NAME } from "@/lib/branding";
 
 type PageConfig = {
   enabled: boolean;
@@ -117,7 +118,7 @@ function generateSitemapXml(baseUrl: string, pages: Record<string, PageConfig>):
  * Generate robots.txt from configuration
  */
 function generateRobotsTxt(baseUrl: string, config: SeoConfig): string {
-  let txt = `# Robots.txt for Melbourne Guitar School\n`;
+  let txt = `# Robots.txt for ${PUBLIC_BRAND_NAME}\n`;
   txt += `# Generated: ${new Date().toISOString()}\n\n`;
 
   txt += `User-agent: ${config.robots.defaultUserAgent}\n\n`;

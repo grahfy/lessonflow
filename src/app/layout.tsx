@@ -3,6 +3,13 @@ import { PropsWithChildren } from "react";
 
 import { MotionProvider } from "@/components/motion/tween-orchestrator";
 import { PublicSiteFrame } from "@/components/public-site-frame";
+import { 
+  PUBLIC_BRAND_NAME, 
+  PRIMARY_SUBJECT, 
+  PRIMARY_LOCATION, 
+  LOGO_URL,
+  getSubjectLabel 
+} from "@/lib/branding";
 import "@/styles/globals.css";
 
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
@@ -10,65 +17,27 @@ const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
   title: {
-    default: "Melbourne Guitar School - Learn Guitar with Jon King",
-    template: "%s | Melbourne Guitar School",
+    default: `${PUBLIC_BRAND_NAME}: Creative ${getSubjectLabel()} Lessons in ${PRIMARY_LOCATION}`,
+    template: `%s | ${PUBLIC_BRAND_NAME}`,
   },
   description:
-    "Modern guitar lessons in Northcote, Melbourne with Jon King. Learn guitar for beginners to advanced players. Personalised in-person and online music lessons.",
+    `Modern ${PRIMARY_SUBJECT.toLowerCase()} lessons in ${PRIMARY_LOCATION}, Melbourne. Learn ${PRIMARY_SUBJECT.toLowerCase()} for beginners to advanced players. Personalised in-person and online music lessons.`,
   keywords: [
-    // Guitar lessons
-    "guitar lessons Melbourne",
-    "guitar lessons Northcote",
-    "guitar lessons Fairfield",
-    "guitar lessons Alphington",
-    "guitar lessons Ivanhoe",
-    "guitar lessons Preston",
-    "guitar lessons Thornbury",
-    "guitar lessons Reservoir",
-    "guitar teacher Melbourne",
-    "guitar teacher Northcote",
-    "learn guitar Melbourne",
-    "learn guitar Northcote",
-    "guitar classes Melbourne",
-    "beginner guitar lessons Melbourne",
-    "advanced guitar lessons Melbourne",
-    "acoustic guitar lessons",
-    "electric guitar lessons",
-    "kids guitar lessons Melbourne",
-    "adult guitar lessons Melbourne",
-    "guitar tuition Melbourne",
-    // Music lessons
-    "music lessons Melbourne",
-    "music lessons Northcote",
-    "music tuition Melbourne",
-    "music tutoring Northcote",
-    "music education Melbourne",
-    "music school Melbourne",
-    "music academy Melbourne",
-    // Lesson delivery
-    "online guitar lessons",
-    "online music lessons",
-    "in-person guitar lessons",
-    "in-person music lessons",
-    // Teacher - Jon King
-    "Jon King guitar teacher",
-    "Jon King music teacher",
-    "Jon King Melbourne",
-    "guitar teacher Jon King",
-    "music teacher Jon King",
-    // Genres
-    "rock guitar lessons Melbourne",
-    "blues guitar lessons Melbourne",
-    "jazz guitar lessons Melbourne",
-    "fingerstyle guitar lessons",
-    "classical guitar lessons Melbourne",
-    // School name
-    "guitar school Northcote",
+    `${PRIMARY_SUBJECT.toLowerCase()} lessons Melbourne`,
+    `${PRIMARY_SUBJECT.toLowerCase()} lessons ${PRIMARY_LOCATION}`,
+    `${PRIMARY_SUBJECT.toLowerCase()} teacher Melbourne`,
+    `${PRIMARY_SUBJECT.toLowerCase()} teacher ${PRIMARY_LOCATION}`,
+    `learn ${PRIMARY_SUBJECT.toLowerCase()} Melbourne`,
+    `learn ${PRIMARY_SUBJECT.toLowerCase()} ${PRIMARY_LOCATION}`,
+    `music school Melbourne`,
+    `music school ${PRIMARY_LOCATION}`,
+    `online ${PRIMARY_SUBJECT.toLowerCase()} lessons`,
+    `in-person ${PRIMARY_SUBJECT.toLowerCase()} lessons`,
   ],
-  authors: [{ name: "Melbourne Guitar School" }],
-  creator: "Melbourne Guitar School",
-  publisher: "Melbourne Guitar School",
-  applicationName: "Melbourne Guitar School",
+  authors: [{ name: PUBLIC_BRAND_NAME }],
+  creator: PUBLIC_BRAND_NAME,
+  publisher: PUBLIC_BRAND_NAME,
+  applicationName: PUBLIC_BRAND_NAME,
   alternates: {
     canonical: "/"
   },
@@ -81,24 +50,24 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_AU",
     url: baseUrl,
-    siteName: "Melbourne Guitar School",
-    title: "Melbourne Guitar School",
+    siteName: PUBLIC_BRAND_NAME,
+    title: PUBLIC_BRAND_NAME,
     description:
-      "Modern guitar lessons in Northcote for beginners through advanced players. Learn with an experienced teacher offering personalised lessons in-person and online.",
+      `Modern ${PRIMARY_SUBJECT.toLowerCase()} lessons in ${PRIMARY_LOCATION} for beginners through advanced players. Learn with an experienced teacher offering personalised lessons in-person and online.`,
     countryName: "Australia",
     images: [
       {
-        url: "/images/mgs-logo.webp",
-        alt: "Melbourne Guitar School"
+        url: LOGO_URL,
+        alt: PUBLIC_BRAND_NAME
       }
     ]
   },
   twitter: {
     card: "summary_large_image",
-    title: "Melbourne Guitar School",
+    title: PUBLIC_BRAND_NAME,
     description:
-      "Modern guitar lessons in Northcote for beginners through advanced players.",
-    images: ["/images/mgs-logo.webp"]
+      `Modern ${PRIMARY_SUBJECT.toLowerCase()} lessons in ${PRIMARY_LOCATION} for beginners through advanced players.`,
+    images: [LOGO_URL]
   },
   robots: {
     index: true,

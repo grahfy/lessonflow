@@ -1,0 +1,19 @@
+-- AlterTable
+ALTER TABLE `Booking` ADD COLUMN `firstName` VARCHAR(191) NOT NULL DEFAULT '',
+    ADD COLUMN `lastName` VARCHAR(191) NOT NULL DEFAULT '';
+
+-- AlterTable
+ALTER TABLE `BookingRequest` ADD COLUMN `firstName` VARCHAR(191) NOT NULL DEFAULT '',
+    ADD COLUMN `lastName` VARCHAR(191) NOT NULL DEFAULT '';
+
+-- AlterTable
+ALTER TABLE `BookingSeries` ADD COLUMN `firstName` VARCHAR(191) NOT NULL DEFAULT '',
+    ADD COLUMN `lastName` VARCHAR(191) NOT NULL DEFAULT '';
+
+-- AlterTable
+ALTER TABLE `Customer` ADD COLUMN `firstName` VARCHAR(191) NOT NULL DEFAULT '',
+    ADD COLUMN `lastName` VARCHAR(191) NOT NULL DEFAULT '';
+
+-- AlterTable
+ALTER TABLE `Invoice` ADD COLUMN `customerFirstName` VARCHAR(191) NOT NULL DEFAULT '',
+    ADD COLUMN `customerLastName` VARCHAR(191) NOT NULL DEFAULT '';

@@ -1,4 +1,5 @@
 "use client";
+import { APP_TIMEZONE } from "@/lib/time";
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
@@ -262,6 +263,7 @@ export function StudentPortalClient() {
         <div className="student-portal-header-copy">
           <div className="student-portal-header-visual">
             {/* Lightweight local SVG keeps the portal header visual fast to load. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               className="student-portal-header-illustration"
               src="/images/student-portal-music-books.svg"
@@ -547,7 +549,7 @@ function formatWhen(value: string): string {
   return new Intl.DateTimeFormat("en-AU", {
     dateStyle: "medium",
     timeStyle: "short",
-    timeZone: "Australia/Melbourne"
+    timeZone: APP_TIMEZONE
   }).format(date);
 }
 

@@ -1,11 +1,12 @@
 "use client";
+import { APP_TIMEZONE } from "@/lib/time";
 
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 
-import { AdminDeployUpdatesButton } from "@/components/admin-deploy-updates-button";
+import { AdminHeader } from "@/components/admin-header";
 import type {
   AdminManualIndex,
   AdminManualSection,
@@ -24,14 +25,8 @@ function formatDate(value: string): string {
   return new Intl.DateTimeFormat("en-AU", {
     dateStyle: "medium",
     timeStyle: "short",
-    timeZone: "Australia/Melbourne"
+    timeZone: APP_TIMEZONE
   }).format(new Date(value));
-}
-
-async function logout(router: ReturnType<typeof useRouter>) {
-  await fetch("/api/admin/logout", { method: "POST" }).catch(() => null);
-  router.push("/admin/login");
-  router.refresh();
 }
 
 function renderSectionRoutePills(section: { id: string; relatedRoutes: string[] }) {
@@ -83,27 +78,7 @@ export function AdminManualSectionClient({ index, section, previous, next }: Pro
 
   return (
     <div className="admin-shell" data-motion-root="admin" data-motion-primary="true">
-      <div className="admin-card booking-row admin-header-row">
-        <h1 className="admin-console-title">Manual</h1>
-        <div className="booking-row">
-          <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/bookings")}>
-            Bookings
-          </button>
-          <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/invoices")}>
-            Invoices
-          </button>
-          <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/reports")}>
-            Reports
-          </button>
-          <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/settings")}>
-            Settings
-          </button>
-          <AdminDeployUpdatesButton />
-          <button className="btn btn-secondary" type="button" onClick={() => void logout(router)}>
-            Sign out
-          </button>
-        </div>
-      </div>
+      <AdminHeader title="Manual" />
 
       <div className="admin-card admin-manual-layout">
         <aside className="admin-manual-toc">

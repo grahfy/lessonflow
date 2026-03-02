@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-
 import { getPublicSiteUrl } from "@/lib/env";
+import { PUBLIC_BRAND_NAME, LOGO_URL, PRIMARY_SUBJECT } from "@/lib/branding";
 
 type PublicPageMetadataInput = {
   title: string;
@@ -8,6 +8,16 @@ type PublicPageMetadataInput = {
   path: string;
   keywords?: string[];
 };
+
+/**
+ * Interpolates brand-level placeholders in SEO strings.
+ */
+function interpolateSeo(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/\{\{BRAND_NAME\}\}/g, PUBLIC_BRAND_NAME)
+    .replace(/\{\{SUBJECT\}\}/g, PRIMARY_SUBJECT);
+}
 
 /**
  * Resolves a stable absolute site URL for canonical links, Open Graph metadata,
@@ -27,33 +37,37 @@ export function buildPublicPageMetadata(input: PublicPageMetadataInput): Metadat
   const base = getSeoSiteUrl();
   const path = input.path === "/" ? "/" : `/${input.path.replace(/^\/+/, "")}`;
   const url = `${base}${path === "/" ? "" : path}`;
-  const imageUrl = `${base}/images/mgs-logo.webp`;
+  const imageUrl = LOGO_URL.startsWith("http") ? LOGO_URL : `${base}${LOGO_URL}`;
+
+  const title = interpolateSeo(input.title);
+  const description = interpolateSeo(input.description);
+  const keywords = (input.keywords || []).map(interpolateSeo);
 
   return {
-    title: input.title,
-    description: input.description,
-    keywords: input.keywords,
+    title,
+    description,
+    keywords,
     alternates: {
       canonical: path
     },
     openGraph: {
       type: "website",
-      siteName: "Melbourne Guitar School",
+      siteName: PUBLIC_BRAND_NAME,
       locale: "en_AU",
       url,
-      title: input.title,
-      description: input.description,
+      title,
+      description,
       images: [
         {
           url: imageUrl,
-          alt: "Melbourne Guitar School"
+          alt: PUBLIC_BRAND_NAME
         }
       ]
     },
     twitter: {
       card: "summary_large_image",
-      title: input.title,
-      description: input.description,
+      title,
+      description,
       images: [imageUrl]
     },
     robots: {

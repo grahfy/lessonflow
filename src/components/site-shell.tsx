@@ -5,6 +5,7 @@ import { PropsWithChildren } from "react";
 
 import { TweenLink } from "@/components/motion/tween-link";
 import { navItems } from "@/lib/site-data";
+import { PUBLIC_BRAND_NAME } from "@/lib/branding";
 
 type SiteShellProps = PropsWithChildren<{
   footerCopy: string;
@@ -24,7 +25,7 @@ export function SiteShell({ footerCopy, children }: SiteShellProps) {
       <header className="site-header">
         <TweenLink className="brand" href="/">
           <span className="brand-mark" aria-hidden="true"></span>
-          <span className="brand-text">Melbourne Guitar School</span>
+          <span className="brand-text">{PUBLIC_BRAND_NAME}</span>
         </TweenLink>
 
         <nav className="site-nav" aria-label="Primary Navigation">
@@ -48,7 +49,7 @@ export function SiteShell({ footerCopy, children }: SiteShellProps) {
 
       <footer className="site-footer">
         <p>{footerCopy}</p>
-        <p>Melbourne Guitar School {new Date().getFullYear()}</p>
+        <p>{PUBLIC_BRAND_NAME} {new Date().getFullYear()}</p>
       </footer>
     </div>
   );

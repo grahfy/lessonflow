@@ -451,7 +451,7 @@ Perform a final consistency review of comment style and coverage, then close the
 
 ### Phase 5: Deploy Scripts, Config Templates, Tests, And Prisma Comment Pass (Slice 2)
 - **Original Plan**: Continue Phase 5 coverage across remaining operational scripts and representative tests.
-- **Actual Implementation**: Added comment-only coverage to `deploy/cron.sh`, `deploy/setup-packages.sh`, `deploy/setup-ssl.sh`, `deploy/melbourne-guitar-school.service`, `scripts/test-full-site-local.sh`, `tests/api-contact.test.ts`, and `tests/student-portal-auth.test.ts`. Reviewed `scripts/prepare-test-db.cjs` and `scripts/reset-admin-password.sh` and left them unchanged because they already met the Phase 5 comment standard.
+- **Actual Implementation**: Added comment-only coverage to `deploy/cron.sh`, `deploy/setup-packages.sh`, `deploy/setup-ssl.sh`, `deploy/lessonflow.service`, `scripts/test-full-site-local.sh`, `tests/api-contact.test.ts`, and `tests/student-portal-auth.test.ts`. Reviewed `scripts/prepare-test-db.cjs` and `scripts/reset-admin-password.sh` and left them unchanged because they already met the Phase 5 comment standard.
 - **Reason for Deviation**: Phase 5 is still being executed in reviewable slices, and a full tests/Prisma sweep (especially migration SQL headers) remains too broad/risky for one batch.
 - **Impact Assessment**: Phase 5 now covers the major deploy/runtime scripts, cron/SSL flows, service template, local bootstrap script, and key Prisma-backed route/auth tests. Remaining Phase 5 work is primarily additional test-file coverage (if desired), manual readability checks, and any explicitly approved migration-header comments.
 - **Date/Time**: 2026-02-26

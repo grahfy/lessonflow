@@ -57,6 +57,7 @@ export function VideosGridModal({ videos }: VideosGridModalProps) {
               aria-label={`Open ${video.title} video popup`}
             >
               <div className="video-embed-frame" aria-hidden="true">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`}
                   alt=""

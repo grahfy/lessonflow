@@ -1,5 +1,5 @@
 #!/bin/bash
-# Maintenance Script for Melbourne Guitar School
+# Maintenance Script for LessonFlow
 # Comprehensive maintenance TUI for SEO management, backups, and system tasks.
 
 set -euo pipefail
@@ -15,11 +15,21 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UPDATE_SCRIPT="${SCRIPT_DIR}/update.sh"
 DEPLOY_SCRIPT="${SCRIPT_DIR}/deploy.sh"
 REPO_ROOT=""
-APP_NAME="melbourne-guitar-school"
-DEPLOY_DIR="/var/www/${APP_NAME}"
+APP_NAME="lessonflow"
+LEGACY_APP_NAME="melbourne-guitar-school"
+
+if [[ -d "/var/www/${APP_NAME}" ]]; then
+  DEPLOY_DIR="/var/www/${APP_NAME}"
+elif [[ -d "/var/www/${LEGACY_APP_NAME}" ]]; then
+  DEPLOY_DIR="/var/www/${LEGACY_APP_NAME}"
+  APP_NAME="${LEGACY_APP_NAME}"
+else
+  DEPLOY_DIR="/var/www/${APP_NAME}"
+fi
+
 SHARED_DIR="${DEPLOY_DIR}/shared"
 CURRENT_LINK="${DEPLOY_DIR}/current"
-LOG_DIR="/var/log/melbourne-guitar-school"
+LOG_DIR="/var/log/${APP_NAME}"
 BACKUP_DIR="${DEPLOY_DIR}/backups"
 
 # Runtime configuration
@@ -46,7 +56,7 @@ ROBOTS_FILE=""
 # Backup Configuration
 BACKUP_FREQUENCY="daily"
 BACKUP_CLOUD_PROVIDER="none"
-BACKUP_CLOUD_FOLDER="melbourne-guitar-school-backups"
+BACKUP_CLOUD_FOLDER="${APP_NAME}-backups"
 BACKUP_RETENTION_DAYS=30
 LAST_BACKUP_DATE=""
 BACKUP_AUTO_UPLOAD=false
@@ -420,25 +430,10 @@ get_load_average() { cut -d' ' -f1-3 /proc/loadavg; }
 get_hostname() { hostname 2>/dev/null || echo "unknown"; }
 get_kernel() { uname -r 2>/dev/null | cut -d- -f1 || echo "unknown"; }
 
-print_btop_header() {
-  local width="$1"
-  local ts; ts=$(date "+%Y-%m-%d %H:%M:%S")
-  local hn; hn=$(get_hostname)
-  local kern; kern=$(get_kernel)
-  
-  local title; title=$(gum style --foreground "33" --bold "⬡ Melbourne Guitar School")
-  local subtitle; subtitle=$(gum style --foreground "250" --italic "Maintenance Console")
-  local info; info=$(printf "Host: %s | Kernel: %s | Time: %s" "$(gum style --foreground "51" "$hn")" "$(gum style --foreground "178" "$kern")" "$(gum style --foreground "82" "$ts")")
-  
-  gum style --border rounded --border-foreground "33" --padding "0 2" --width "$width" "$(printf "%s\n%s\n\n%s" "$title" "$subtitle" "$info")"
-}
-
-# =============================================================================
 # Git & Paths
 # =============================================================================
 
-resolve_repo_root() {
-  local c=("${SCRIPT_DIR}/.." "/var/www/${APP_NAME}/current" "/var/www/${APP_NAME}" "${HOME}/melbourne-guitar-school")
+resolve_repo_root() {  local c=("${SCRIPT_DIR}/.." "/var/www/${APP_NAME}/current" "/var/www/${APP_NAME}" "${HOME}/lessonflow")
   local candidate
   for candidate in "${c[@]}"; do
     if [[ -d "${candidate}/.git" && -f "${candidate}/package.json" ]]; then
@@ -470,7 +465,7 @@ load_maintenance_settings() {
   if [[ -f "${cfg}" ]]; then
     BACKUP_FREQUENCY="$(grep '^BACKUP_FREQUENCY=' "${cfg}" | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//' || echo "daily")"
     BACKUP_CLOUD_PROVIDER="$(grep '^BACKUP_CLOUD_PROVIDER=' "${cfg}" | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//' || echo "none")"
-    BACKUP_CLOUD_FOLDER="$(grep '^BACKUP_CLOUD_FOLDER=' "${cfg}" | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//' || echo "melbourne-guitar-school-backups")"
+    BACKUP_CLOUD_FOLDER="$(grep '^BACKUP_CLOUD_FOLDER=' "${cfg}" | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//' || echo "${APP_NAME}-backups")"
     BACKUP_INCLUDE_SQL="$(grep '^BACKUP_INCLUDE_SQL=' "${cfg}" | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//' || echo "true")"
     BACKUP_INCLUDE_WEBAPP="$(grep '^BACKUP_INCLUDE_WEBAPP=' "${cfg}" | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//' || echo "true")"
     BACKUP_INCLUDE_ENV="$(grep '^BACKUP_INCLUDE_ENV=' "${cfg}" | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//' || echo "true")"
@@ -486,7 +481,7 @@ load_maintenance_settings() {
   KOOFR_USERNAME=$(get_env_val "KOOFR_USERNAME")
   KOOFR_PASSWORD=$(get_env_val "KOOFR_PASSWORD")
   [[ -z "${BACKUP_CLOUD_FOLDER:-}" || "${BACKUP_CLOUD_FOLDER}" == "null" ]] && BACKUP_CLOUD_FOLDER=$(get_env_val "BACKUP_CLOUD_FOLDER")
-  [[ -z "${BACKUP_CLOUD_FOLDER:-}" || "${BACKUP_CLOUD_FOLDER}" == "null" ]] && BACKUP_CLOUD_FOLDER="melbourne-guitar-school-backups"
+  [[ -z "${BACKUP_CLOUD_FOLDER:-}" || "${BACKUP_CLOUD_FOLDER}" == "null" ]] && BACKUP_CLOUD_FOLDER="${APP_NAME}-backups"
   [[ -z "${BACKUP_CLOUD_PROVIDER:-}" || "${BACKUP_CLOUD_PROVIDER}" == "null" ]] && BACKUP_CLOUD_PROVIDER="none"
   [[ -z "${BACKUP_AUTO_UPLOAD:-}" || "${BACKUP_AUTO_UPLOAD}" == "null" ]] && BACKUP_AUTO_UPLOAD="false"
   return 0
@@ -1009,7 +1004,7 @@ print_btop_header() {
   local hn; hn=$(get_hostname)
   local kern; kern=$(get_kernel)
   
-  local title; title=$(gum style --foreground "33" --bold "⬡ Melbourne Guitar School")
+  local title; title=$(gum style --foreground "33" --bold "⬡ LessonFlow")
   local subtitle; subtitle=$(gum style --foreground "250" --italic "Maintenance & Systems Management Console")
   local info; info=$(printf "Host: %s | Kernel: %s | Time: %s" "$(gum style --foreground "51" "$hn")" "$(gum style --foreground "178" "$kern")" "$(gum style --foreground "82" "$ts")")
   
@@ -1017,7 +1012,7 @@ print_btop_header() {
 }
 
 print_dashboard_header() {
-  printf "\033[H"
+  tui_clear_screen
   local cpu=$(get_cpu_usage) mem=$(get_memory_usage) disk=$(get_disk_usage "/") up=$(get_uptime) w="${MAINTENANCE_TUI_PANEL_WIDTH:-110}"
   [[ -z "${BRANCH:-}" ]] && BRANCH="$(current_branch_name 2>/dev/null || echo "main")"; local h=$(get_current_commit 2>/dev/null || echo "???") m=$(get_last_commit_msg 2>/dev/null || echo "...")
   
@@ -1165,7 +1160,7 @@ run_interactive_maintenance() {
 
 show_usage() {
   cat <<'EOF'
-Melbourne Guitar School - Maintenance Script
+LessonFlow - Maintenance Script
 Usage: ./deploy/maintenance.sh [options]
 Options:
   --interactive     Run interactive TUI mode

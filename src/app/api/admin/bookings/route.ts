@@ -1,3 +1,4 @@
+import { APP_TIMEZONE } from "@/lib/time";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -153,7 +154,7 @@ export async function GET(request: NextRequest) {
         endAt: booking.endAt.toISOString(),
         status: booking.status,
         color: bookingColor(booking.status),
-        title: booking.name,
+        title: booking.lastName ? `${booking.lastName}, ${booking.firstName}` : booking.name,
         row: booking
       })),
       ...requestRows.map((requestRow) => ({
@@ -163,7 +164,7 @@ export async function GET(request: NextRequest) {
         endAt: requestRow.requestedStartAt.toISOString(),
         status: requestRow.status,
         color: bookingRequestColor(requestRow.status),
-        title: requestRow.name,
+        title: requestRow.lastName ? `${requestRow.lastName}, ${requestRow.firstName}` : requestRow.name,
         row: requestRow
       }))
     ].sort((a, b) => a.startAt.localeCompare(b.startAt));
@@ -274,6 +275,8 @@ export async function POST(request: NextRequest) {
     // Persist a series record for recurrence metadata, then create the operational booking rows.
     const series = await prisma.bookingSeries.create({
       data: {
+        firstName: parsed.data.firstName,
+        lastName: parsed.data.lastName,
         name: parsed.data.name,
         email: parsed.data.email,
         phone: parsed.data.phone,
@@ -293,7 +296,7 @@ export async function POST(request: NextRequest) {
         startTimeLocal: startAt.toISOString().slice(11, 16),
         startDate: startAt,
         recurrenceEndAt: endAt,
-        timezone: "Australia/Melbourne",
+        timezone: APP_TIMEZONE,
         customerId
       }
     });
@@ -319,7 +322,7 @@ export async function POST(request: NextRequest) {
             customDurationMinutes: parsed.data.customDurationMinutes ?? null,
             startAt: start,
             endAt: getBookingEnd(start, parsed.data.lessonDuration, parsed.data.customDurationMinutes),
-            timezone: "Australia/Melbourne",
+            timezone: APP_TIMEZONE,
             notes: parsed.data.notes,
             seriesId: series.id,
             customerId,
@@ -331,6 +334,8 @@ export async function POST(request: NextRequest) {
   } else {
     await prisma.booking.create({
       data: {
+        firstName: parsed.data.firstName,
+        lastName: parsed.data.lastName,
         name: parsed.data.name,
         email: parsed.data.email,
         phone: parsed.data.phone,
@@ -348,7 +353,7 @@ export async function POST(request: NextRequest) {
         customDurationMinutes: parsed.data.customDurationMinutes ?? null,
         startAt,
         endAt: getBookingEnd(startAt, parsed.data.lessonDuration, parsed.data.customDurationMinutes),
-        timezone: "Australia/Melbourne",
+        timezone: APP_TIMEZONE,
         notes: parsed.data.notes,
         customerId,
         modifiedById: admin.id

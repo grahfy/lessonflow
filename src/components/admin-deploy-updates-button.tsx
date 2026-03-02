@@ -1,4 +1,5 @@
 "use client";
+import { APP_TIMEZONE } from "@/lib/time";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -38,7 +39,7 @@ function formatDateTime(value: string): string {
   return new Intl.DateTimeFormat("en-AU", {
     dateStyle: "medium",
     timeStyle: "short",
-    timeZone: "Australia/Melbourne"
+    timeZone: APP_TIMEZONE
   }).format(new Date(value));
 }
 

@@ -100,6 +100,8 @@ export function customerSnapshotFromInput(input: CustomerSnapshotInput) {
 
   return {
     // Raw values trimmed for display consistency
+    firstName: input.firstName?.trim() ?? "",
+    lastName: input.lastName?.trim() ?? "",
     fullName,
     // Optimized for fuzzy name matching in student portal
     normalizedFullName: normalizeFullNameForLookup(fullName),

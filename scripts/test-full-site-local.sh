@@ -12,6 +12,7 @@ HOST="${HOST:-0.0.0.0}"
 PORT="${PORT:-3000}"
 SKIP_INSTALL=0
 SKIP_TESTS=0
+SEED_DATA=0
 NO_START=0
 TESTS_FAILED=0
 
@@ -34,16 +35,21 @@ while [[ $# -gt 0 ]]; do
       SKIP_TESTS=1
       shift
       ;;
+    --seed)
+      SEED_DATA=1
+      shift
+      ;;
     --no-start)
       NO_START=1
       shift
       ;;
     --help|-h)
       cat <<'EOF'
-Usage: scripts/test-full-site-local.sh [--skip-install] [--skip-tests] [--no-start]
+Usage: scripts/test-full-site-local.sh [--skip-install] [--skip-tests] [--seed] [--no-start]
 
 --skip-install  Skip `npm ci`
 --skip-tests    Skip `npm test`
+--seed          Seed fake customers, invoices, and appointments
 --no-start      Do not start Next.js dev server after setup/checks
 EOF
       exit 0
@@ -120,6 +126,18 @@ log "MySQL is ready"
 # Run migrations using the DATABASE_URL from .env
 DATABASE_URL="${DB_URL}" npx prisma migrate deploy
 
+# Seed whitelabel defaults to ensure "old info" (MGS branding) is in the DB
+log "Seeding whitelabel defaults..."
+DATABASE_URL="${DB_URL}" npx tsx scripts/seed-whitelabel-defaults.ts
+
+if [[ "$SEED_DATA" -eq 1 ]]; then
+  log "Seeding fake customers, invoices, and appointments..."
+  DATABASE_URL="${DB_URL}" npx tsx scripts/seed-fake-data.ts
+  
+  log "Seeding invoice product presets..."
+  DATABASE_URL="${DB_URL}" npx tsx scripts/seed-invoice-presets.ts
+fi
+
 if [[ "$SKIP_TESTS" -eq 0 ]]; then
   # `npm test` may use the MySQL-oriented harness if TEST_DATABASE_URL is set;
   # otherwise this remains a convenience preflight and may fail in fresh setups.
@@ -149,4 +167,5 @@ if command -v fuser >/dev/null 2>&1; then
 fi
 
 log "Starting local site at http://${HOST}:${PORT}"
+log "NOTE: The site will default to 'Melbourne Guitar School' until you customize it in Admin Settings."
 npm run dev -- --hostname "$HOST" --port "$PORT"

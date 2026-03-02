@@ -242,7 +242,7 @@ Finalize production concerns and deliver an editor-friendly operational handoff.
 - Validate policy wording with owner before launch to avoid accidental legal wording changes.
 
 ## References
-- Ticket: `thoughts/tickets/2026-02-19-melbourne-guitar-school-modern-site.md`
+- Ticket: `thoughts/tickets/2026-02-19-lessonflow-modern-site.md`
 - Live content source: `https://www.melbourneguitarschool.com.au/`
 - Live content source: `https://www.melbourneguitarschool.com.au/new-gift-vouchers`
 - Live content source: `https://www.melbourneguitarschool.com.au/cancellation-policy`

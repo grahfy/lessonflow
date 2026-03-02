@@ -4,57 +4,63 @@ import { TweenLink } from "@/components/motion/tween-link";
 import { PanelLayout } from "@/components/panel-layout";
 import { VideosGridModal } from "@/components/videos-grid-modal";
 import { buildPublicPageMetadata } from "@/lib/seo";
+import { 
+  PUBLIC_BRAND_NAME, 
+  PRIMARY_SUBJECT,
+  getSubjectLabel 
+} from "@/lib/branding";
+import { getContent } from "@/lib/cms";
 
 export const metadata: Metadata = buildPublicPageMetadata({
-  title: "Videos & Music | Jon King Guitar Showcase",
+  title: `Videos & Music | ${getSubjectLabel()} Performance Showcase`,
   path: "/videos",
   description:
-    "Watch guitar performance videos featuring Jon King and explore original guitar-oriented music written, arranged, performed, mixed, and mastered by Jon King."
+    `Watch ${PRIMARY_SUBJECT.toLowerCase()} performance videos and explore original music written and performed by our team at ${PUBLIC_BRAND_NAME}.`
 });
 
 /**
- * Public media showcase page for Jon King's video and audio work.
- *
- * This page supports the marketing site by giving visitors a quick way to hear and see Jon's
- * playing style before booking guitar tuition.
+ * Public media showcase page for teacher video and audio work.
  */
-export default function VideosPage() {
-  /**
-   * YOUTUBE EMBEDS CONFIGURATION
-   * These IDs represent the curated performance showcase displayed in the modal grid.
-   * RATIONALE: Each video is selected to demonstrate a specific aspect of Jon's playing style
-   * (e.g., technique, expressiveness, gear tone) to prospective students.
-   * 
-   * UPDATED: 2026-02-27 - Replaced video 3 with a new performance (OQiUAlJGfBM) to keep the showcase fresh.
-   */
-  const youtubeEmbeds = [
-    { id: "0M9ZXR2yw0A", title: "Jon King Video Showcase 1" },
-    { id: "qPTGx0iQKoc", title: "Jon King Video Showcase 2" },
-    { id: "OQiUAlJGfBM", title: "Jon King Video Showcase 3" }
-  ] as const;
+export default async function VideosPage() {
+  const heroContent = await getContent("/videos", "hero", {
+    kicker: "Videos & Music",
+    title: `Watch and hear the sound behind the ${PRIMARY_SUBJECT.toLowerCase()} tuition.`,
+    lead: `This page showcases our ${PRIMARY_SUBJECT.toLowerCase()} performance videos and original music. It is a quick way to get a feel for our musical voice and approach before booking your lessons.`,
+    visualLabel: "Performance showcase",
+    visualClassName: "teacher-hero"
+  });
+
+  const bodyContent = await getContent("/videos", "body", {
+    helperText: "Original music showcased here is written, arranged, and performed by our teachers.",
+    videos: [
+      { id: "0M9ZXR2yw0A", title: "Video Showcase 1" },
+      { id: "qPTGx0iQKoc", title: "Video Showcase 2" },
+      { id: "OQiUAlJGfBM", title: "Video Showcase 3" }
+    ]
+  });
 
   return (
     <PanelLayout
-      kicker="Videos & Music"
-      title="Watch Jon King play and hear the sound behind the tuition."
-      lead="This page showcases Jon King’s guitar performance videos and original guitar-oriented music. It is a quick way to get a feel for his playing, musical voice, and production approach before booking guitar tuition."
+      kicker={heroContent.kicker}
+      title={heroContent.title}
+      lead={heroContent.lead}
       viewClassName="view-videos-page"
-      visualLabel="Performance showcase"
-      visualClassName="teacher-hero"
+      visualLabel={heroContent.visualLabel}
+      visualClassName={heroContent.visualClassName}
       leadJustified
     >
       <p className="helper-text copy-justify" data-motion-item="videos-helper-text">
-        Original music on SoundCloud is written, arranged, performed, mixed, and mastered by Jon King.
+        {bodyContent.helperText}
       </p>
 
-      <VideosGridModal videos={youtubeEmbeds} />
+      <VideosGridModal videos={bodyContent.videos} />
 
       <div className="button-row" data-motion-item="videos-actions">
         <TweenLink className="btn btn-primary" href="/book" data-motion-item="videos-action-book">
-          Book Guitar Tuition
+          Book {getSubjectLabel()} Tuition
         </TweenLink>
         <TweenLink className="btn btn-secondary" href="/teacher" data-motion-item="videos-action-teacher">
-          More About Jon King
+          Meet Your Teacher
         </TweenLink>
       </div>
     </PanelLayout>

@@ -23,6 +23,8 @@ type Params = {
 };
 
 const editSchema = z.object({
+  firstName: z.string().trim().min(1).max(60).optional(),
+  lastName: z.string().trim().min(1).max(60).optional(),
   name: z.string().trim().min(2).max(120).optional(),
   email: z.string().trim().email().max(200).optional(),
   phone: auPhoneSchema.optional(),
@@ -142,6 +144,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         parsed.data.customDurationMinutes === undefined
           ? existing.customDurationMinutes
           : parsed.data.customDurationMinutes;
+      const nextFirstName = parsed.data.firstName ?? existing.firstName;
+      const nextLastName = parsed.data.lastName ?? existing.lastName;
       const nextName = parsed.data.name ?? existing.name;
       const nextEmail = parsed.data.email ?? existing.email;
       const nextPhone = parsed.data.phone ?? existing.phone;
@@ -190,6 +194,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       await prisma.booking.update({
         where: { id },
         data: {
+          firstName: nextFirstName,
+          lastName: nextLastName,
           name: nextName,
           email: nextEmail,
           phone: nextPhone,

@@ -67,6 +67,31 @@ LessonFlow brings those workflows into one system so teachers and admins can spe
 - Deploy/update helper scripts for VPS/Droplet self-hosting
 - Cron/job endpoint support for scheduled automations
 
+## Customization & Whitelabeling
+
+LessonFlow is designed to be easily rebranded for any music school or subject.
+
+### 1. Branding & Identity
+Key school details are managed via environment variables. Use the **Setup Wizard** (`/setup`) or the **Admin Panel** (`/admin/settings` -> Branding) to configure:
+- **Brand Name:** e.g., "Sydney Piano Studio"
+- **Primary Subject:** e.g., "Piano"
+- **Primary Location:** e.g., "Sydney"
+- **Logos:** Custom URLs for site and invoice logos.
+
+### 2. Content Management (CMS)
+You can edit most public-facing text and images directly in the **Admin Panel** under the **Pages** tab. This allows you to customize:
+- Hero titles and lead text.
+- Experience metrics and highlights.
+- Promotional copy.
+
+### 3. Email & Invoice Templates
+Communication templates are fully customizable via the **Emails** and **Invoices** tabs in Admin Settings:
+- **Email Templates:** Edit subjects and bodies using placeholders like `{{customerName}}` and `{{lessonTime}}`.
+- **Invoices:** Customize accent colors, footer text, and header information for generated PDFs.
+
+### 4. Products & Fees
+Manage your own lesson packages and pricing in the **Products** tab. These presets will be available in the invoice creator for quick billing.
+
 ## Admin Screenshots
 
 Tracked admin screenshots already exist in the repository (including a Playwright-generated admin dashboard/bookings console capture).
@@ -159,7 +184,7 @@ Use `update.sh` for routine server maintenance and `deploy.sh` for direct releas
 - then calls `deploy.sh` with the selected options
 
 `deploy/deploy.sh` (release engine):
-- builds a timestamped release under `/var/www/melbourne-guitar-school/releases`
+- builds a timestamped release under `/var/www/lessonflow/releases`
 - links shared files/dirs (`shared/.env`, `shared/data`)
 - runs dependency install, Prisma generate, migrations, build, and service restarts
 - updates the `current` symlink atomically
@@ -192,7 +217,7 @@ cd lessonflow
 
 Both `deploy.sh` and `update.sh` now manage a shared env file at:
 
-- `/var/www/melbourne-guitar-school/shared/.env`
+- `/var/www/lessonflow/shared/.env`
 
 Behavior:
 - If the shared `.env` file does not exist, the scripts copy `.env.example` into place.
@@ -250,7 +275,7 @@ Notes:
 ```
 
 Notes:
-- Reads `DATABASE_URL` from `/var/www/melbourne-guitar-school/shared/.env`
+- Reads `DATABASE_URL` from `/var/www/lessonflow/shared/.env`
 - Only supports local DB hosts (`localhost` / `127.0.0.1`) for this helper
 - Creates the database only if it does not already exist
 - Does not create DB users/permissions (you must ensure the DB user exists and has access)
@@ -278,9 +303,9 @@ For this project’s Next.js deployment, PHP-FPM is typically not required. The 
 ```
 
 Notes:
-- Installs/updates `/etc/systemd/system/melbourne-guitar-school.service`
+- Installs/updates `/etc/systemd/system/lessonflow.service`
 - Runs `systemctl daemon-reload`
-- Enables the service and attempts to start it if `/var/www/melbourne-guitar-school/current` exists
+- Enables the service and attempts to start it if `/var/www/lessonflow/current` exists
 
 #### Install/update managed cron jobs (if needed)
 
@@ -312,7 +337,7 @@ Or direct deploy:
 ```
 
 What the deploy script handles:
-- creates a release directory under `/var/www/melbourne-guitar-school/releases`
+- creates a release directory under `/var/www/lessonflow/releases`
 - links shared resources (`.env`, `.data`)
 - installs dependencies (unless skipped)
 - generates Prisma client
@@ -496,7 +521,7 @@ Key groups:
 Protected job endpoints use:
 - header `x-cron-secret: <CRON_SECRET>`
 
-`deploy/cron.sh` reads `NEXT_PUBLIC_SITE_URL` and `CRON_SECRET` from the shared deploy `.env` file (`/var/www/melbourne-guitar-school/shared/.env`) so cron jobs use the same URL/secret as the running app.
+`deploy/cron.sh` reads `NEXT_PUBLIC_SITE_URL` and `CRON_SECRET` from the shared deploy `.env` file (`/var/www/lessonflow/shared/.env`) so cron jobs use the same URL/secret as the running app.
 
 Examples include:
 - daily bookings digest
@@ -509,9 +534,7 @@ See:
 
 ## Branding Note
 
-This repository still contains historical/internal names related to the original Melbourne Guitar School deployment (for example package/repo paths and deploy directories such as `/var/www/melbourne-guitar-school`).
-
-The product branding presented in this README is **LessonFlow**.
+This repository has been modularized to support whitelabeling. While historical references to the original "Melbourne Guitar School" deployment may exist in some internal paths, the application is fully configurable via the Admin Panel and Environment Variables.
 
 ## License
 

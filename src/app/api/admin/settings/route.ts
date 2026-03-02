@@ -11,7 +11,7 @@ import {
   type AdminSettingsSaveInput
 } from "@/lib/setup";
 
-const DEFAULT_SYSTEMD_SERVICE_NAME = "melbourne-guitar-school";
+const DEFAULT_SYSTEMD_SERVICE_NAME = "lessonflow";
 
 /**
  * Queues a delayed systemd restart so the current HTTP response can complete before the app process

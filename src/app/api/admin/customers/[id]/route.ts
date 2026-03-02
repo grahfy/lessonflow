@@ -79,6 +79,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     // Compute the full next-state customer values server-side so partial edits preserve lookup
     // normalization fields (email/phone/name tokens) consistently.
+    const nextFirstName = parsed.data.firstName ?? existing.firstName;
+    const nextLastName = parsed.data.lastName ?? existing.lastName;
     const nextEmail = parsed.data.email ?? existing.email;
     const nextPhone = parsed.data.phone ?? existing.phone;
     const nextFullName = parsed.data.fullName ?? existing.fullName;
@@ -110,6 +112,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const updated = await prisma.customer.update({
       where: { id },
       data: {
+        firstName: nextFirstName,
+        lastName: nextLastName,
         fullName: nextFullName,
         normalizedFullName,
         nameSearchTokens,

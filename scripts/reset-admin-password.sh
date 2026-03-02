@@ -7,7 +7,7 @@
 #
 # Key design choices:
 # - Loads runtime environment variables from the deployed shared env file
-#   (/var/www/melbourne-guitar-school/shared/.env by default) so DATABASE_URL and
+#   (/var/www/lessonflow/shared/.env by default) so DATABASE_URL and
 #   secrets match the production deployment.
 # - Uses Prisma + bcryptjs from the application install to update the stored
 #   password hash (changing ADMIN_PASSWORD in .env alone does not update the DB).
@@ -16,14 +16,14 @@
 # Usage examples:
 #   ./scripts/reset-admin-password.sh
 #   ./scripts/reset-admin-password.sh --email owner@example.com
-#   sudo ./scripts/reset-admin-password.sh --app-dir /var/www/melbourne-guitar-school/current
+#   sudo ./scripts/reset-admin-password.sh --app-dir /var/www/lessonflow/current
 #   sudo ./scripts/reset-admin-password.sh --list
 # =============================================================================
 
 set -euo pipefail
 
-ENV_FILE="/var/www/melbourne-guitar-school/shared/.env"
-APP_DIR="/var/www/melbourne-guitar-school/current"
+ENV_FILE="/var/www/lessonflow/shared/.env"
+APP_DIR="/var/www/lessonflow/current"
 TARGET_ADMIN_EMAIL=""
 NEW_PASSWORD_INPUT=""
 LIST_ONLY=false
@@ -39,8 +39,8 @@ Usage:
 Options:
   --email EMAIL       Admin email to reset (defaults to ADMIN_EMAIL from env file if present)
   --password VALUE    New password (not recommended; prompts securely by default)
-  --env-file PATH     Path to deployed .env file (default: /var/www/melbourne-guitar-school/shared/.env)
-  --app-dir PATH      Path to deployed app directory with node_modules (default: /var/www/melbourne-guitar-school/current)
+  --env-file PATH     Path to deployed .env file (default: /var/www/lessonflow/shared/.env)
+  --app-dir PATH      Path to deployed app directory with node_modules (default: /var/www/lessonflow/current)
   --list              List admin users from DB and exit
   --help, -h          Show this help text
 

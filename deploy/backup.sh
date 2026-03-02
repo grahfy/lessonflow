@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Melbourne Guitar School - Automatic Backup Script
+# LessonFlow - Automatic Backup Script
 # =============================================================================
 # This script is called by cron for automatic backups.
 # It creates backup archives and optionally uploads to cloud storage.
@@ -19,10 +19,21 @@ set -euo pipefail
 # Resolve paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-DEPLOY_DIR="/var/www/melbourne-guitar-school"
+APP_NAME="lessonflow"
+LEGACY_APP_NAME="melbourne-guitar-school"
+
+if [[ -d "/var/www/${APP_NAME}" ]]; then
+  DEPLOY_DIR="/var/www/${APP_NAME}"
+elif [[ -d "/var/www/${LEGACY_APP_NAME}" ]]; then
+  DEPLOY_DIR="/var/www/${LEGACY_APP_NAME}"
+  APP_NAME="${LEGACY_APP_NAME}"
+else
+  DEPLOY_DIR="/var/www/${APP_NAME}"
+fi
+
 SHARED_DIR="${DEPLOY_DIR}/shared"
 CURRENT_LINK="${DEPLOY_DIR}/current"
-LOG_DIR="/var/log/melbourne-guitar-school"
+LOG_DIR="/var/log/${APP_NAME}"
 BACKUP_DIR="${DEPLOY_DIR}/backups"
 SEO_CONFIG_FILE="${REPO_ROOT}/src/lib/seo-config.json"
 
@@ -30,7 +41,7 @@ SEO_CONFIG_FILE="${REPO_ROOT}/src/lib/seo-config.json"
 BACKUP_FREQUENCY="daily"
 CLOUD_UPLOAD=false
 BACKUP_CLOUD_PROVIDER="none"
-BACKUP_CLOUD_FOLDER="melbourne-guitar-school-backups"
+BACKUP_CLOUD_FOLDER="${APP_NAME}-backups"
 BACKUP_RETENTION_DAYS=30
 
 # Cloud credentials (loaded from .env)
@@ -61,7 +72,7 @@ log_error() {
 
 show_usage() {
   cat <<'EOF'
-Melbourne Guitar School - Automatic Backup Script
+LessonFlow - Automatic Backup Script
 
 Usage: ./deploy/backup.sh [options]
 
@@ -78,7 +89,7 @@ load_config() {
   if [[ -f "${SHARED_DIR}/.env" ]]; then
     # Cloud provider configuration
     BACKUP_CLOUD_PROVIDER="$(grep -o 'BACKUP_CLOUD_PROVIDER[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || echo "none")"
-    BACKUP_CLOUD_FOLDER="$(grep -o 'BACKUP_CLOUD_FOLDER[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || echo "melbourne-guitar-school-backups")"
+    BACKUP_CLOUD_FOLDER="$(grep -o 'BACKUP_CLOUD_FOLDER[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || echo "lessonflow-backups")"
     BACKUP_RETENTION_DAYS="$(grep -o 'BACKUP_RETENTION_DAYS[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || echo "30")"
     
     # Google Drive credentials

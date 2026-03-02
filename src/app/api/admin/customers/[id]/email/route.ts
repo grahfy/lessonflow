@@ -1,0 +1,102 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
+import { requireAdminFromRequest } from "@/lib/admin-route";
+import { jsonUnexpectedError } from "@/lib/api-errors";
+import { prisma } from "@/lib/db";
+import { sendEmail } from "@/lib/email/service";
+import { customerCustomMessageTemplate } from "@/lib/email/templates";
+
+type Params = {
+  params: Promise<{
+    id: string;
+  }>;
+};
+
+const sendEmailSchema = z.object({
+  subject: z.string().trim().min(1).max(200),
+  message: z.string().trim().min(1).max(4000)
+});
+
+/**
+ * GET: Returns recent email history for this customer based on their email address.
+ */
+export async function GET(request: NextRequest, { params }: Params) {
+  try {
+    const admin = await requireAdminFromRequest(request);
+    if (!admin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const customer = await prisma.customer.findUnique({
+      where: { id },
+      select: { email: true }
+    });
+
+    if (!customer) {
+      return NextResponse.json({ error: "Customer not found." }, { status: 404 });
+    }
+
+    const history = await prisma.outboundEmail.findMany({
+      where: {
+        toEmail: customer.email
+      },
+      orderBy: {
+        createdAt: "desc"
+      },
+      take: 50
+    });
+
+    return NextResponse.json({ history });
+  } catch (error) {
+    return jsonUnexpectedError(error, "Unable to load email history.");
+  }
+}
+
+/**
+ * POST: Sends a custom email to the customer.
+ */
+export async function POST(request: NextRequest, { params }: Params) {
+  try {
+    const admin = await requireAdminFromRequest(request);
+    if (!admin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const customer = await prisma.customer.findUnique({
+      where: { id }
+    });
+
+    if (!customer) {
+      return NextResponse.json({ error: "Customer not found." }, { status: 404 });
+    }
+
+    const body = await request.json().catch(() => null);
+    const parsed = sendEmailSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid email payload.", details: parsed.error.flatten() }, { status: 400 });
+    }
+
+    const template = customerCustomMessageTemplate({
+      name: customer.fullName,
+      subject: parsed.data.subject,
+      message: parsed.data.message
+    });
+
+    const result = await sendEmail({
+      to: customer.email,
+      subject: template.subject,
+      html: template.html
+    });
+
+    return NextResponse.json({ 
+      ok: true, 
+      status: result.status,
+      message: result.status === "sent" ? "Email sent successfully." : "Email queued for later delivery."
+    });
+  } catch (error) {
+    return jsonUnexpectedError(error, "Unable to send email.");
+  }
+}

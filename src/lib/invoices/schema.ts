@@ -17,7 +17,7 @@ export const invoiceAgingBucketSchema = z.enum(["current", "overdue_1_30", "over
 export const invoiceLineItemKindSchema = z.enum([
   "lesson_fee",
   "educational_books",
-  "digital_guitar_lessons",
+  "digital_lessons",
   "custom"
 ]);
 
@@ -27,7 +27,7 @@ export const invoiceLineItemKindSchema = z.enum([
 export const invoiceLineItemInputSchema = z.object({
   description: z.string().trim().min(1).max(200),
   quantity: z.number().int().min(1).max(999),
-  unitPriceCents: z.number().int().min(0).max(50_000_000),
+  unitPriceCents: z.number().int().min(-50_000_000).max(50_000_000),
   taxMode: invoiceTaxModeSchema.default("taxable"),
   kind: invoiceLineItemKindSchema.default("custom"),
   sortOrder: z.number().int().min(0).max(9_999).default(0)
@@ -39,6 +39,8 @@ export const invoiceLineItemInputSchema = z.object({
 export const createInvoiceSchema = z.object({
   bookingId: z.string().trim().min(1).optional(),
   customerId: z.string().trim().min(1).optional(),
+  customerFirstName: z.string().trim().min(1).max(60),
+  customerLastName: z.string().trim().min(1).max(60),
   customerName: z.string().trim().min(2).max(140),
   customerEmail: z.string().trim().email().max(200),
   customerPhone: z.string().trim().min(6).max(40),

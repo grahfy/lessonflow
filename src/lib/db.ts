@@ -2,7 +2,7 @@
  * Database Client - Prisma Singleton
  * 
  * This module provides a singleton instance of the Prisma ORM client for database
- * operations throughout the Melbourne Guitar School application.
+ * operations throughout the LessonFlow application.
  * 
  * STRUCTURE:
  * - Uses globalThis to maintain a single Prisma instance across hot reloads

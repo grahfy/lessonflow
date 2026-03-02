@@ -6,11 +6,21 @@ import { PanelLayout } from "@/components/panel-layout";
 import { getOwnerEmail } from "@/lib/env";
 import { buildPublicPageMetadata } from "@/lib/seo";
 
+import { getContent } from "@/lib/cms";
+import { 
+  PUBLIC_BRAND_NAME, 
+  PRIMARY_SUBJECT, 
+  PRIMARY_LOCATION,
+  CONTACT_PHONE,
+  CONTACT_ADDRESS,
+  getSubjectLabel
+} from "@/lib/branding";
+
 export const metadata: Metadata = buildPublicPageMetadata({
-  title: "Contact Melbourne Guitar School | Northcote Guitar Lessons",
+  title: `Contact ${PUBLIC_BRAND_NAME} | ${PRIMARY_LOCATION} ${getSubjectLabel()} Lessons`,
   path: "/contact",
   description:
-    "Contact Melbourne Guitar School to book private guitar tuition, ask questions, or discuss the right lesson path. Studio based in Northcote, Melbourne."
+    `Contact ${PUBLIC_BRAND_NAME} to book private ${PRIMARY_SUBJECT.toLowerCase()} tuition, ask questions, or discuss the right lesson path. Studio based in ${PRIMARY_LOCATION}, Melbourne.`
 });
 
 /**
@@ -18,45 +28,52 @@ export const metadata: Metadata = buildPublicPageMetadata({
  *
  * Contact details are rendered directly here for immediate access even if the contact form is not used.
  */
-export default function ContactPage() {
+export default async function ContactPage() {
   const contactEmail = getOwnerEmail();
+
+  const heroContent = await getContent("/contact", "hero", {
+    kicker: "Inquiries",
+    title: "Let’s map out the right next step for your playing.",
+    lead: `Reach out by call, text, or email for bookings, ${PRIMARY_SUBJECT.toLowerCase()} tuition options, pricing, vouchers, or general questions. We can help you choose the best place to begin based on your level, musical interests, and what kind of player you want to become.`,
+    visualLabel: `${getSubjectLabel()} lesson studio`,
+    visualClassName: "contact-hero"
+  });
+
+  const bodyContent = await getContent("/contact", "body", {
+    mapImage: "/images/google-map.webp",
+    mapTriggerText: "Google Maps Location",
+    mapCaption: `${PUBLIC_BRAND_NAME} Location & Directions\n\nAddress: ${CONTACT_ADDRESS}\n\nContact us for detailed directions to our ${PRIMARY_LOCATION} studio.`,
+    formatsLabel: `Lesson formats: In-person (${PRIMARY_LOCATION}) and online (Australia)`,
+    helperText: `If you are unsure where to start, send a quick message about your current level, the styles you enjoy, and what you want to achieve. We can help you choose the right ${PRIMARY_SUBJECT.toLowerCase()} tuition format and a practical, motivating first step.`
+  });
 
   return (
     <PanelLayout
-      kicker="Inquiries"
-      title="Let’s map out the right next step for your playing."
-      lead="Reach out by call, text, or email for bookings, guitar tuition options, pricing, vouchers, or general questions. We can help you choose the best place to begin based on your level, musical interests, and what kind of player you want to become."
+      kicker={heroContent.kicker}
+      title={heroContent.title}
+      lead={heroContent.lead}
       viewClassName="view-contact-page"
-      visualLabel="Guitar lesson studio"
-      visualClassName="contact-hero"
+      visualLabel={heroContent.visualLabel}
+      visualClassName={heroContent.visualClassName}
       leadJustified
     >
       <ul className="list" data-motion-item="contact-list">
         <li data-motion-item="map-button">
           <ImageModal
-            src="/images/google-map.webp"
-            alt="Melbourne Guitar School location map"
-            triggerText="Google Maps Location"
-            caption={
-              "Melbourne Guitar School Location & Directions\n\n" +
-              "Address: Rear 66/68 High St, Northcote\n\n" +
-              "We are located in the back alleyway off High Street, directly behind Vex Restaurant.\n\n" +
-              "How to Find Us:\n" +
-              "• On Foot: The entrance to the alleyway is on Westgarth Street, right next to Ultratune.\n" +
-              "• Driving & Parking: You can access the alleyway by car via 1 Cornwall Street, Northcote. There is usually plenty of street parking available on Cornwall Street.\n\n" +
-              "What to Look For:\n" +
-              "Keep an eye out for a black, double-story building with a roller door and a yellow MGS sign out front."
-            }
+            src={bodyContent.mapImage}
+            alt={`${PUBLIC_BRAND_NAME} location map`}
+            triggerText={bodyContent.mapTriggerText}
+            caption={bodyContent.mapCaption}
           />
         </li>
-        <li data-motion-item="contact-phone">Phone: 0401 489 437</li>
+        <li data-motion-item="contact-phone">Phone: {CONTACT_PHONE}</li>
         <li data-motion-item="contact-email">Email: {contactEmail}</li>
-        <li data-motion-item="contact-studio">Studio: Rear 66/68 High St, Northcote VIC 3070</li>
-        <li data-motion-item="contact-formats">Lesson formats: In-person (VIC) and online (Australia)</li>
+        <li data-motion-item="contact-studio">Studio: {CONTACT_ADDRESS}</li>
+        <li data-motion-item="contact-formats">{bodyContent.formatsLabel}</li>
       </ul>
 
       <p className="helper-text copy-justify" data-motion-item="contact-helper-copy">
-        If you are unsure where to start, send a quick message about your current level, the styles you enjoy, and what you want to achieve. We can help you choose the right guitar tuition format and a practical, motivating first step.
+        {bodyContent.helperText}
       </p>
 
       <ContactForm />

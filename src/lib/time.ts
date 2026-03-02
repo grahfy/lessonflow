@@ -1,36 +1,39 @@
 /**
- * Melbourne timezone identifier for all date/time operations.
- * UI: Used for displaying times in the booking calendar and admin panels.
- * LOGIC: Business operates in Melbourne, so all times must be in local context.
+ * Centralized time configuration.
+ * Business logic assumes a consistent local timezone for all operations
+ * (Bookings, Reports, Invoices).
  */
-const MELBOURNE_TZ = "Australia/Melbourne";
+
+export const APP_TIMEZONE = process.env.NEXT_PUBLIC_TIMEZONE || "Australia/Melbourne";
 
 /**
- * Gets the current calendar year in Melbourne timezone.
- * LOGIC: Used for filtering bookings and invoices by fiscal year.
+ * Gets the current calendar year in the configured timezone.
  */
-export function getCurrentCalendarYear(now: Date = new Date()): number {
-  const formatter = new Intl.DateTimeFormat("en-AU", {
-    timeZone: MELBOURNE_TZ,
-    year: "numeric"
-  });
-  return Number(formatter.format(now));
+export function getCurrentCalendarYear(): number {
+  return new Date(
+    new Date().toLocaleString("en-US", {
+      timeZone: APP_TIMEZONE,
+    })
+  ).getFullYear();
 }
 
 /**
- * Checks if a date falls within a specific calendar year in Melbourne timezone.
- * LOGIC: Used for year-based filtering in booking and invoice queries.
+ * Checks if a date falls within a specific calendar year in the configured timezone.
  */
 export function isDateInCalendarYear(date: Date, year: number): boolean {
-  const formatter = new Intl.DateTimeFormat("en-AU", {
-    timeZone: MELBOURNE_TZ,
-    year: "numeric"
-  });
-  return Number(formatter.format(date)) === year;
+  const dateYear = new Date(
+    date.toLocaleString("en-US", {
+      timeZone: APP_TIMEZONE,
+    })
+  ).getFullYear();
+  return dateYear === year;
 }
 
-export function melbourneNow(): Date {
-  return new Date();
+/**
+ * Returns the current date/time adjusted to the configured timezone.
+ */
+export function localNow(): Date {
+  return new Date(new Date().toLocaleString("en-US", { timeZone: APP_TIMEZONE }));
 }
 
-export const AUSTRALIA_MELBOURNE_TZ = MELBOURNE_TZ;
+export const SYSTEM_TIMEZONE = APP_TIMEZONE;

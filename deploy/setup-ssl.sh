@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Melbourne Guitar School - SSL Certificate Setup
+# LessonFlow - SSL Certificate Setup
 # =============================================================================
 # Sets up Let's Encrypt SSL certificate with automatic renewal
 #
@@ -83,7 +83,7 @@ log_info "Email: ${EMAIL}"
 # Ensure HTTP-only nginx config is active (no SSL refs that would fail before
 # certs exist). This lets certbot's nginx plugin validate and bootstrap the
 # first certificate even if the current site file was copied from the HTTPS template.
-NGINX_CONF="/etc/nginx/sites-available/melbourne-guitar-school"
+NGINX_CONF="/etc/nginx/sites-available/lessonflow"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HTTP_CONF="${SCRIPT_DIR}/nginx-http.conf"
 
@@ -151,7 +151,7 @@ fi
 # Update nginx config if it doesn't have SSL. In the normal flow certbot's nginx
 # plugin edits the site config directly, but this fallback keeps the template
 # usable if a minimal HTTP config was active during certificate issuance.
-NGINX_CONF="/etc/nginx/sites-available/melbourne-guitar-school"
+NGINX_CONF="/etc/nginx/sites-available/lessonflow"
 if [[ -f "${NGINX_CONF}" ]]; then
     if ! grep -q "ssl_certificate" "${NGINX_CONF}"; then
         log_info "Updating nginx configuration with SSL paths..."

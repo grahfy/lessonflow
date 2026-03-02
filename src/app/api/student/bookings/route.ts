@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Requested lesson time must be in the future." }, { status: 400 });
   }
 
-  const currentYear = getCurrentCalendarYear(now);
+  const currentYear = getCurrentCalendarYear();
   if (!isDateInCalendarYear(requestedStartAt, currentYear)) {
     return NextResponse.json(
       { error: `Requested lesson time must be within the current calendar year (${currentYear}).` },

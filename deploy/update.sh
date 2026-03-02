@@ -1,10 +1,10 @@
 #!/bin/bash
 # =============================================================================
-# Melbourne Guitar School - Update + Deploy Script
+# LessonFlow - Update + Deploy Script
 # =============================================================================
 # Pulls the latest git changes for a branch and then runs the deployment script.
 # Designed for server-side updates from a persistent git clone (for example
-# ~/melbourne-guitar-school) and intentionally mirrors the interactive deploy UI.
+# ~/lessonflow) and intentionally mirrors the interactive deploy UI.
 #
 # Usage: ./deploy/update.sh [options]
 #
@@ -45,7 +45,7 @@ ORIGINAL_ARGS=( "$@" )
 
 # Runtime configuration defaults. Branch defaults to the current checked-out
 # branch later so server operators can simply run ./deploy/update.sh.
-APP_NAME="melbourne-guitar-school"
+APP_NAME="lessonflow"
 DEPLOY_DIR="/var/www/${APP_NAME}"
 SHARED_DIR="${DEPLOY_DIR}/shared"
 CURRENT_LINK="${DEPLOY_DIR}/current"
@@ -112,7 +112,7 @@ NC='\033[0m'
 # Prints a concise usage block suitable for operators and automation logs.
 show_usage() {
   cat <<'EOF'
-Melbourne Guitar School - Update + Deploy Script
+LessonFlow - Update + Deploy Script
 
 Usage: ./deploy/update.sh [options]
 
@@ -945,7 +945,7 @@ install_or_update_managed_crontab_jobs_from_update() {
       echo
     fi
     printf '%s\n' "${begin_marker}"
-    echo "# Melbourne Guitar School managed cron jobs (updated by update.sh)"
+    echo "# LessonFlow managed cron jobs (updated by update.sh)"
     echo "0 20 * * * ${cron_runner} daily-bookings-digest"
     echo "30 20 * * * ${cron_runner} invoice-reminders"
     echo "45 20 * * * ${cron_runner} admin-reports-daily"

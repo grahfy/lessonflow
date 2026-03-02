@@ -7,6 +7,7 @@ import { jsonUnexpectedError } from "@/lib/api-errors";
 import { customerSnapshotFromInput, normalizeEmail, normalizePhone } from "@/lib/customer-match";
 import { prisma } from "@/lib/db";
 import { ensurePortalCredentialForCustomer } from "@/lib/student-portal/credentials";
+import { listCustomersQuerySchema } from "@/lib/customers/schema";
 
 const createCustomerSchema = z.object({
   firstName: z.string().trim().min(1).max(60),
@@ -35,40 +36,62 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const query = request.nextUrl.searchParams.get("q")?.trim() ?? "";
-    const limitRaw = Number.parseInt(request.nextUrl.searchParams.get("limit") ?? "100", 10);
-    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 250) : 100;
+    const parsed = listCustomersQuerySchema.safeParse({
+      q: request.nextUrl.searchParams.get("q") ?? undefined,
+      page: request.nextUrl.searchParams.get("page") ?? undefined,
+      pageSize: request.nextUrl.searchParams.get("pageSize") ?? request.nextUrl.searchParams.get("limit") ?? undefined,
+      isArchived: request.nextUrl.searchParams.get("isArchived") ?? undefined
+    });
+
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid query parameters.", details: parsed.error.flatten() }, { status: 400 });
+    }
+
+    const { q, page, pageSize, isArchived } = parsed.data;
+    const skip = (page - 1) * pageSize;
+
+    const where = {
+      isArchived: isArchived === "true",
+      ...(q
+        ? {
+            OR: [
+              { fullName: { contains: q } },
+              { email: { contains: q } },
+              { phone: { contains: q } }
+            ]
+          }
+        : {})
+    };
 
     // Include portal credential metadata so the admin UI can show/reveal/regenerate state without
     // making a second request per customer row.
-    const customers = await prisma.customer.findMany({
-      where: {
-        isArchived: false,
-        ...(query
-          ? {
-              OR: [
-                { fullName: { contains: query } },
-                { email: { contains: query } },
-                { phone: { contains: query } }
-              ]
+    const [customers, total] = await prisma.$transaction([
+      prisma.customer.findMany({
+        where,
+        orderBy: [{ fullName: "asc" }, { createdAt: "desc" }],
+        take: pageSize,
+        skip,
+        include: {
+          portalCredential: {
+            select: {
+              id: true,
+              generatedAt: true,
+              rotatedAt: true,
+              isActive: true
             }
-          : {})
-      },
-      orderBy: [{ fullName: "asc" }, { createdAt: "desc" }],
-      take: limit,
-      include: {
-        portalCredential: {
-          select: {
-            id: true,
-            generatedAt: true,
-            rotatedAt: true,
-            isActive: true
           }
         }
-      }
-    });
+      }),
+      prisma.customer.count({ where })
+    ]);
 
-    return NextResponse.json({ customers });
+    return NextResponse.json({ 
+      customers,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize)
+    });
   } catch (error) {
     return jsonUnexpectedError(error, "Unable to load customers.");
   }
@@ -113,6 +136,8 @@ export async function POST(request: NextRequest) {
 
     const created = await prisma.customer.create({
       data: customerSnapshotFromInput({
+        firstName: parsed.data.firstName,
+        lastName: parsed.data.lastName,
         name: parsed.data.fullName,
         email: parsed.data.email,
         phone: parsed.data.phone,

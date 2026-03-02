@@ -75,6 +75,8 @@ export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
       customerId: input.customerId ?? null,
       bookingId: input.bookingId ?? null,
       originalInvoiceId: input.originalInvoiceId ?? null,
+      customerFirstName: input.customerSnapshot.customerFirstName,
+      customerLastName: input.customerSnapshot.customerLastName,
       customerName: input.customerSnapshot.customerName,
       customerEmail: input.customerSnapshot.customerEmail,
       customerPhone: input.customerSnapshot.customerPhone,

@@ -3,18 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { AdminDeployUpdatesButton } from "@/components/admin-deploy-updates-button";
+import { AdminHeader } from "@/components/admin-header";
 import type { AdminManualIndex, AdminManualSectionIndex } from "@/lib/manual/content";
 
 type AdminManualClientProps = {
   content: AdminManualIndex;
 };
-
-async function logout(router: ReturnType<typeof useRouter>) {
-  await fetch("/api/admin/logout", { method: "POST" }).catch(() => null);
-  router.push("/admin/login");
-  router.refresh();
-}
 
 function sectionGroups(sections: AdminManualSectionIndex[]) {
   const allAdmins = sections.filter((section) => section.audience === "all_admins");
@@ -34,27 +28,7 @@ export function AdminManualClient({ content }: AdminManualClientProps) {
 
   return (
     <div className="admin-shell" data-motion-root="admin" data-motion-primary="true">
-      <div className="admin-card booking-row admin-header-row">
-        <h1 className="admin-console-title">Manual</h1>
-        <div className="booking-row">
-          <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/bookings")}>
-            Bookings
-          </button>
-          <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/invoices")}>
-            Invoices
-          </button>
-          <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/reports")}>
-            Reports
-          </button>
-          <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/settings")}>
-            Settings
-          </button>
-          <AdminDeployUpdatesButton />
-          <button className="btn btn-secondary" type="button" onClick={() => void logout(router)}>
-            Sign out
-          </button>
-        </div>
-      </div>
+      <AdminHeader title="Manual" />
 
       <div className="admin-card admin-manual-layout admin-manual-index-layout">
         <aside className="admin-manual-toc">

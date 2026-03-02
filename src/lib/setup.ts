@@ -123,8 +123,8 @@ export const CONFIGURABLE_ENV_VARS = [
   {
     key: "GMAIL_USER_EMAIL",
     title: "Gmail Sender Address",
-    description: "Gmail address used as the sender for outbound emails (for example melbourneguitarschool@gmail.com).",
-    placeholder: "melbourneguitarschool@gmail.com",
+    description: "Gmail address used as the sender for outbound emails (for example lessonflow@gmail.com).",
+    placeholder: "lessonflow@gmail.com",
     isRequired: false,
     isSecret: false,
     validation: (v: string) => {
@@ -178,7 +178,7 @@ export const CONFIGURABLE_ENV_VARS = [
     key: "SMTP_FROM",
     title: "SMTP From Address",
     description: "Sender name and email for outgoing emails.",
-    placeholder: "Melbourne Guitar School <no-reply@example.com>",
+    placeholder: "LessonFlow <no-reply@example.com>",
     isRequired: false,
     isSecret: false,
     validation: () => null
@@ -239,7 +239,7 @@ export const CONFIGURABLE_ENV_VARS = [
     key: "INVOICE_BUSINESS_NAME",
     title: "Business Name",
     description: "Business name for invoices.",
-    placeholder: "Melbourne Guitar School",
+    placeholder: "LessonFlow",
     isRequired: true,
     isSecret: false,
     validation: (v: string) => {
@@ -278,7 +278,7 @@ export const CONFIGURABLE_ENV_VARS = [
     key: "INVOICE_BANK_ACCOUNT_NAME",
     title: "Bank Account Name",
     description: "Account name for invoice payments.",
-    placeholder: "Melbourne Guitar School",
+    placeholder: "LessonFlow",
     isRequired: false,
     isSecret: false,
     validation: () => null
@@ -362,6 +362,96 @@ export const CONFIGURABLE_ENV_VARS = [
     title: "Credit Note Prefix",
     description: "Prefix for credit note numbers.",
     placeholder: "MGSCN",
+    isRequired: false,
+    isSecret: false,
+    validation: () => null
+  },
+  {
+    key: "NEXT_PUBLIC_BRAND_NAME",
+    title: "Brand Name",
+    description: "The public name of your music school.",
+    placeholder: "LessonFlow",
+    isRequired: true,
+    isSecret: false,
+    validation: (v: string) => (!v.trim() ? "Brand name is required" : null)
+  },
+  {
+    key: "NEXT_PUBLIC_PRIMARY_SUBJECT",
+    title: "Primary Subject",
+    description: "The main instrument or subject taught (e.g. Guitar, Piano).",
+    placeholder: "Guitar",
+    isRequired: true,
+    isSecret: false,
+    validation: (v: string) => (!v.trim() ? "Primary subject is required" : null)
+  },
+  {
+    key: "NEXT_PUBLIC_PRIMARY_LOCATION",
+    title: "Primary Location",
+    description: "The suburb or city where your studio is located.",
+    placeholder: "Northcote",
+    isRequired: true,
+    isSecret: false,
+    validation: (v: string) => (!v.trim() ? "Primary location is required" : null)
+  },
+  {
+    key: "NEXT_PUBLIC_CONTACT_PHONE",
+    title: "Contact Phone",
+    description: "Public contact phone number.",
+    placeholder: "0401 489 437",
+    isRequired: false,
+    isSecret: false,
+    validation: () => null
+  },
+  {
+    key: "NEXT_PUBLIC_CONTACT_ADDRESS",
+    title: "Contact Address",
+    description: "Full public address of your studio.",
+    placeholder: "Rear 66/68 High St, Northcote VIC 3070",
+    isRequired: false,
+    isSecret: false,
+    validation: () => null
+  },
+  {
+    key: "NEXT_PUBLIC_LOGO_URL",
+    title: "Logo URL",
+    description: "URL to your school logo image.",
+    placeholder: "/images/mgs-logo.webp",
+    isRequired: false,
+    isSecret: false,
+    validation: () => null
+  },
+  {
+    key: "NEXT_PUBLIC_INVOICE_LOGO_URL",
+    title: "Invoice Logo URL",
+    description: "URL to the logo shown on invoices.",
+    placeholder: "/images/company-logo-invoice.webp",
+    isRequired: false,
+    isSecret: false,
+    validation: () => null
+  },
+  {
+    key: "NEXT_PUBLIC_FAVICON_URL",
+    title: "Favicon URL",
+    description: "URL to your site favicon.",
+    placeholder: "/favicon.ico",
+    isRequired: false,
+    isSecret: false,
+    validation: () => null
+  },
+  {
+    key: "NEXT_PUBLIC_DEFAULT_CURRENCY",
+    title: "Default Currency",
+    description: "Default currency code (e.g. AUD, USD).",
+    placeholder: "AUD",
+    isRequired: false,
+    isSecret: false,
+    validation: () => null
+  },
+  {
+    key: "NEXT_PUBLIC_TIMEZONE",
+    title: "Timezone",
+    description: "The primary timezone for bookings and reports (e.g. Australia/Melbourne).",
+    placeholder: "Australia/Melbourne",
     isRequired: false,
     isSecret: false,
     validation: () => null

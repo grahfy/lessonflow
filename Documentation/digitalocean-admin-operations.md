@@ -29,9 +29,9 @@ After=network.target
 Type=simple
 User=www-data
 Group=www-data
-WorkingDirectory=/srv/melbourne_guitar_school_website
+WorkingDirectory=/srv/lessonflow_website
 Environment=NODE_ENV=production
-EnvironmentFile=/srv/melbourne_guitar_school_website/.env
+EnvironmentFile=/srv/lessonflow_website/.env
 ExecStart=/usr/bin/npm run start
 Restart=always
 RestartSec=5
@@ -114,7 +114,7 @@ Description=Run invoice reminder job for Melbourne Guitar School
 
 [Service]
 Type=oneshot
-EnvironmentFile=/srv/melbourne_guitar_school_website/.env
+EnvironmentFile=/srv/lessonflow_website/.env
 ExecStart=/usr/bin/curl -fsS -X POST \
   -H x-cron-secret:${CRON_SECRET} \
   https://your-domain.example/api/jobs/invoice-reminders
@@ -162,7 +162,7 @@ Then re-run setup checks and verify admin login.
 Normal production release:
 
 ```bash
-cd /var/www/melbourne-guitar-school/current
+cd /var/www/lessonflow/current
 sudo ./deploy/update.sh --branch main
 ```
 

@@ -1,0 +1,20 @@
+./thoughts/plans/melbourne-guitar-school-modern-website-implementation-plan.md:239:  - `0401 489 437`
+./thoughts/plans/melbourne-guitar-school-modern-website-implementation-plan.md:241:  - `Rear 66/68 High St, Northcote VIC 3070`
+./src/app/contact/page.tsx:42:              "Address: Rear 66/68 High St, Northcote\n\n" +
+./src/app/contact/page.tsx:52:        <li data-motion-item="contact-phone">Phone: 0401 489 437</li>
+./src/app/contact/page.tsx:54:        <li data-motion-item="contact-studio">Studio: Rear 66/68 High St, Northcote VIC 3070</li>
+./src/lib/email/templates.ts:91:    phone: process.env.CONTACT_PHONE || "0401 489 437",
+./src/lib/email/templates.ts:93:    address: process.env.CONTACT_ADDRESS || "Rear 66/68 High St, Northcote VIC 3070",
+./src/lib/invoices/template.ts:73:          <p style="margin:0;">Rear 66/68 High Street</p>
+./src/lib/invoices/template.ts:76:          <p style="margin:0;">Mobile: 0401 489 437</p>
+./src/lib/invoices/pdf.ts:85:  drawRightText("Rear 66/68 High Street", 11, false, y);
+./thoughts/plans/melbourne-guitar-school-modern-website-implementation-plan.md:239:  - `0401 489 437`
+./thoughts/plans/melbourne-guitar-school-modern-website-implementation-plan.md:241:  - `Rear 66/68 High St, Northcote VIC 3070`
+./src/app/contact/page.tsx:42:              "Address: Rear 66/68 High St, Northcote\n\n" +
+./src/app/contact/page.tsx:52:        <li data-motion-item="contact-phone">Phone: 0401 489 437</li>
+./src/app/contact/page.tsx:54:        <li data-motion-item="contact-studio">Studio: Rear 66/68 High St, Northcote VIC 3070</li>
+./src/lib/email/templates.ts:91:    phone: process.env.CONTACT_PHONE || "0401 489 437",
+./src/lib/email/templates.ts:93:    address: process.env.CONTACT_ADDRESS || "Rear 66/68 High St, Northcote VIC 3070",
+./src/lib/invoices/template.ts:73:          <p style="margin:0;">Rear 66/68 High Street</p>
+./src/lib/invoices/template.ts:76:          <p style="margin:0;">Mobile: 0401 489 437</p>
+./src/lib/invoices/pdf.ts:85:  drawRightText("Rear 66/68 High Street", 11, false, y);

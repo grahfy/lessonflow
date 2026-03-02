@@ -142,6 +142,8 @@ async function importStudents() {
     try {
       const customer = await prisma.customer.create({
         data: {
+          firstName,
+          lastName,
           fullName,
           normalizedFullName,
           nameSearchTokens: buildNameSearchTokens(fullName),

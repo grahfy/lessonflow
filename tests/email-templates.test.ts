@@ -32,12 +32,13 @@ describe("email-templates", () => {
   it("includes Melbourne Guitar School branded signature details", () => {
     const template = customerBookingReminderTemplate({
       name: "Alex",
-      when: new Date("2026-07-03T10:00:00.000Z")
+      when: new Date("2026-07-03T20:00:00Z")
     });
 
     expect(template.html).toContain("Melbourne Guitar School");
     expect(template.html).toContain("mgs-logo.webp");
     expect(template.html).toContain("Call or text:");
+
     expect(template.html).toContain("Email:");
     expect(template.html).toContain("Studio:");
   });

@@ -177,6 +177,8 @@ export async function POST(request: NextRequest) {
         customerId: parsed.data.customerId ?? null,
         bookingId: parsed.data.bookingId ?? null,
         customerSnapshot: {
+          customerFirstName: parsed.data.customerFirstName,
+          customerLastName: parsed.data.customerLastName,
           customerName: parsed.data.customerName,
           customerEmail: parsed.data.customerEmail,
           customerPhone: parsed.data.customerPhone,

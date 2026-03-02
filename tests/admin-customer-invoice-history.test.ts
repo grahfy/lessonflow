@@ -34,6 +34,8 @@ describe("admin-customer-invoice-history", () => {
 
     const customer = await prisma.customer.create({
       data: {
+        firstName: "Invoice",
+        lastName: "Student",
         fullName: "Invoice Student",
         email: "invoice.student@example.com",
         phone: "0400111000",
@@ -108,6 +110,8 @@ describe("admin-customer-invoice-history", () => {
 
     const customerA = await prisma.customer.create({
       data: {
+        firstName: "Customer",
+        lastName: "A",
         fullName: "Customer A",
         email: "customer-a@example.com",
         phone: "0400000001",
@@ -126,6 +130,8 @@ describe("admin-customer-invoice-history", () => {
 
     const customerB = await prisma.customer.create({
       data: {
+        firstName: "Customer",
+        lastName: "B",
         fullName: "Customer B",
         email: "customer-b@example.com",
         phone: "0400000002",

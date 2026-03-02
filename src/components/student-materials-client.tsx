@@ -1,4 +1,5 @@
 "use client";
+import { APP_TIMEZONE } from "@/lib/time";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -216,7 +217,7 @@ function formatWhen(value: string): string {
   return new Intl.DateTimeFormat("en-AU", {
     dateStyle: "medium",
     timeStyle: "short",
-    timeZone: "Australia/Melbourne"
+    timeZone: APP_TIMEZONE
   }).format(date);
 }
 

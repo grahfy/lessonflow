@@ -1,9 +1,10 @@
 "use client";
+import { APP_TIMEZONE } from "@/lib/time";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { AdminDeployUpdatesButton } from "@/components/admin-deploy-updates-button";
+import { AdminHeader } from "@/components/admin-header";
 
 type ReportPeriodKey = "daily" | "weekly" | "monthly" | "yearly";
 type TrendGrainKey = "daily" | "weekly" | "monthly" | "yearly";
@@ -107,12 +108,12 @@ function formatDate(date: Date, mode: ReportDateFormat, withTime = false): strin
   return new Intl.DateTimeFormat("en-AU", {
     dateStyle: "medium",
     ...(withTime ? { timeStyle: "short" } : {}),
-    timeZone: "Australia/Melbourne"
+    timeZone: APP_TIMEZONE
   }).format(date);
 }
 
 function toMelbourneDate(value: string): Date {
-  return new Date(new Date(value).toLocaleString("en-US", { timeZone: "Australia/Melbourne" }));
+  return new Date(new Date(value).toLocaleString("en-US", { timeZone: APP_TIMEZONE }));
 }
 
 function formatGeneratedAt(value: string, mode: ReportDateFormat): string {
@@ -127,7 +128,7 @@ function formatPeriodLabel(period: PeriodReport, mode: ReportDateFormat): string
     if (period.key === "daily") return `Today (${formatDate(start, mode)})`;
     if (period.key === "weekly") return `This week (${formatDate(start, mode)} - ${formatDate(end, mode)})`;
     if (period.key === "monthly") {
-      return `This month (${new Intl.DateTimeFormat("en-AU", { month: "long", year: "numeric", timeZone: "Australia/Melbourne" }).format(start)})`;
+      return `This month (${new Intl.DateTimeFormat("en-AU", { month: "long", year: "numeric", timeZone: APP_TIMEZONE }).format(start)})`;
     }
     return `This year (${start.getFullYear()})`;
   }
@@ -435,15 +436,6 @@ export function AdminReportsClient() {
     yearly: true
   });
 
-  async function logout() {
-    try {
-      await fetch("/api/admin/logout", { method: "POST" });
-    } finally {
-      router.push("/admin/login");
-      router.refresh();
-    }
-  }
-
   async function load(mode: "initial" | "refresh" = "initial", customRange?: { start: string; end: string } | null) {
     if (mode === "initial") setLoading(true);
     if (mode === "refresh") setRefreshing(true);
@@ -554,17 +546,7 @@ export function AdminReportsClient() {
 
   return (
     <div className="admin-shell" data-motion-root="admin" data-motion-primary="true">
-      <div className="admin-card booking-row admin-header-row">
-        <h1 className="admin-console-title">Reports Console</h1>
-        <div className="booking-row">
-          <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/bookings")}>Bookings</button>
-          <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/invoices")}>Invoices</button>
-          <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/manual")}>Manual</button>
-          <AdminDeployUpdatesButton />
-          <button className="btn btn-secondary" type="button" onClick={() => router.push("/admin/settings")}>Settings</button>
-          <button className="btn btn-secondary" type="button" onClick={() => void logout()}>Sign out</button>
-        </div>
-      </div>
+      <AdminHeader title="Reports Console" />
 
       <div className="admin-card report-toolbar-card">
         <div>

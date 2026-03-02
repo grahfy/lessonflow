@@ -25,6 +25,8 @@ async function seedInvoice(adminId: string, invoiceNumber: string) {
       invoiceNumber,
       status: "draft",
       taxMode: "taxable",
+      customerFirstName: "Alex",
+      customerLastName: "Student",
       customerName: "Alex Student",
       customerEmail: "alex@example.com",
       customerPhone: "0400123456",

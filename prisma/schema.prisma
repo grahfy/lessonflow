@@ -1,4 +1,4 @@
-// Prisma schema for the Melbourne Guitar School app.
+// Prisma schema for the LessonFlow app.
 // Production and test workflows now target MySQL (`provider = "mysql"`), so
 // helper scripts should provide a mysql:// DATABASE_URL for Prisma commands.
 // Historical migration note: a baseline migration was added for fresh MySQL
@@ -112,6 +112,8 @@ model ContactSubmission {
 model BookingRequest {
   id                    String               @id @default(cuid())
   status                BookingRequestStatus @default(pending)
+  firstName             String               @default("")
+  lastName              String               @default("")
   name                  String
   email                 String
   phone                 String
@@ -147,6 +149,8 @@ model BookingRequest {
 // bookings while preserving customer cadence details and an archive toggle.
 model BookingSeries {
   id                    String         @id @default(cuid())
+  firstName             String         @default("")
+  lastName              String         @default("")
   name                  String
   email                 String
   phone                 String
@@ -182,6 +186,8 @@ model BookingSeries {
 model Booking {
   id                    String             @id @default(cuid())
   status                BookingStatus      @default(approved)
+  firstName             String             @default("")
+  lastName              String             @default("")
   name                  String
   email                 String
   phone                 String
@@ -260,6 +266,8 @@ model AdminUser {
 // bookings, portal credentials, invoices, and learning materials attach here.
 model Customer {
   id                        String                             @id @default(cuid())
+  firstName                 String                             @default("")
+  lastName                  String                             @default("")
   fullName                  String
   normalizedFullName        String                             @default("")
   nameSearchTokens          String?
@@ -381,6 +389,8 @@ model Invoice {
   originalInvoiceId  String?
   originalInvoice    Invoice?            @relation("InvoiceCreditNotes", fields: [originalInvoiceId], references: [id], onDelete: SetNull)
   creditNotes        Invoice[]           @relation("InvoiceCreditNotes")
+  customerFirstName  String              @default("")
+  customerLastName   String              @default("")
   customerName       String
   customerEmail      String
   customerPhone      String
@@ -455,6 +465,41 @@ model InvoiceProductPreset {
   updatedAt      DateTime @updatedAt
 
   @@index([isActive, sortOrder])
+}
+
+// CMS data for public pages (titles, leads, metrics, hero images).
+model PublicPageContent {
+  id         String   @id @default(cuid())
+  pagePath   String // e.g., "/" or "/lessons"
+  sectionKey String // e.g., "hero" or "metrics"
+  content    Json // JSON object containing the section's fields
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([pagePath, sectionKey])
+  @@index([pagePath])
+}
+
+// Customizable subject and body for system emails.
+model EmailTemplate {
+  id          String   @id @default(cuid())
+  templateKey String   @unique // e.g., "customer_booking_reminder"
+  subject     String
+  htmlBody    String   @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Layout and style customization for generated invoices.
+model InvoiceTemplate {
+  id          String   @id @default(cuid())
+  isDefault   Boolean  @default(true)
+  logoUrl     String?
+  accentColor String?  @default("#2247d8")
+  footerText  String?  @db.Text
+  headerInfo  String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // Append-only audit trail for invoice lifecycle changes (send, paid, reminders,

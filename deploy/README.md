@@ -1,4 +1,4 @@
-# Melbourne Guitar School - VPS Deployment Guide
+# LessonFlow - VPS Deployment Guide
 
 Complete guide for deploying to a Virtual Private Server.
 
@@ -39,8 +39,8 @@ The `setup-packages.sh` script automatically detects your OS and installs all de
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/melbourne-guitar-school-website.git
-cd melbourne-guitar-school-website
+git clone https://github.com/your-org/lessonflow-website.git
+cd lessonflow-website
 
 # Run automated setup (detects OS automatically)
 sudo ./deploy/setup-packages.sh
@@ -80,7 +80,7 @@ After running the script, continue with [Database Setup](#database-setup).
 For day-to-day releases on a configured droplet:
 
 ```bash
-cd /var/www/melbourne-guitar-school/current
+cd /var/www/lessonflow/current
 sudo ./deploy/update.sh --branch main
 ```
 
@@ -214,9 +214,9 @@ sudo mysql
 ```
 
 ```sql
-CREATE DATABASE melbourne_guitar_school CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE lessonflow CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER 'mgs_user'@'localhost' IDENTIFIED BY 'your-secure-password';
-GRANT ALL PRIVILEGES ON melbourne_guitar_school.* TO 'mgs_user'@'localhost';
+GRANT ALL PRIVILEGES ON lessonflow.* TO 'mgs_user'@'localhost';
 FLUSH PRIVILEGES;
 EXIT;
 ```
@@ -224,15 +224,15 @@ EXIT;
 ### 2. Create Environment File
 
 ```bash
-sudo nano /var/www/melbourne-guitar-school/shared/.env
+sudo nano /var/www/lessonflow/shared/.env
 ```
 
 ```env
 # Database
-DATABASE_URL="mysql://mgs_user:your-secure-password@localhost:3306/melbourne_guitar_school"
+DATABASE_URL="mysql://mgs_user:your-secure-password@localhost:3306/lessonflow"
 
 # Site URL
-NEXT_PUBLIC_SITE_URL="https://melbourneguitarschool.com.au"
+NEXT_PUBLIC_SITE_URL="https://example.com"
 
 # Session Secrets (generate with: openssl rand -base64 32)
 ADMIN_SESSION_SECRET="your-admin-session-secret"
@@ -252,20 +252,20 @@ SMTP_HOST="smtp.example.com"
 SMTP_PORT="587"
 SMTP_USER="your-smtp-user"
 SMTP_PASS="your-smtp-password"
-SMTP_FROM="Melbourne Guitar School <no-reply@melbourneguitarschool.com.au>"
+SMTP_FROM="LessonFlow <no-reply@example.com>"
 
 # Gmail API OAuth2 (recommended fallback / preferred on hosts blocking SMTP ports)
 GMAIL_CLIENT_ID=""
 GMAIL_CLIENT_SECRET=""
 GMAIL_REFRESH_TOKEN=""
-GMAIL_USER_EMAIL="melbourneguitarschool@gmail.com"
+GMAIL_USER_EMAIL="admin@example.com"
 
 # Learning Materials Storage
 LEARNING_MATERIALS_STORAGE_DRIVER="local"
-LEARNING_MATERIALS_LOCAL_ROOT="/var/www/melbourne-guitar-school/data/learning-materials"
+LEARNING_MATERIALS_LOCAL_ROOT="/var/www/lessonflow/data/learning-materials"
 
 # Invoice Configuration
-INVOICE_BUSINESS_NAME="Melbourne Guitar School"
+INVOICE_BUSINESS_NAME="LessonFlow"
 INVOICE_BUSINESS_ABN="your-abn"
 INVOICE_BANK_NAME="Your Bank"
 INVOICE_BANK_BSB="xxx-xxx"
@@ -278,8 +278,8 @@ INVOICE_CREDIT_NOTE_PREFIX="MGSCN"
 ```
 
 ```bash
-sudo chmod 600 /var/www/melbourne-guitar-school/shared/.env
-sudo chown www-data:www-data /var/www/melbourne-guitar-school/shared/.env
+sudo chmod 600 /var/www/lessonflow/shared/.env
+sudo chown www-data:www-data /var/www/lessonflow/shared/.env
 ```
 
 ---
@@ -292,8 +292,8 @@ From your local machine or the server:
 
 ```bash
 # Clone or copy the application
-git clone https://github.com/your-org/melbourne-guitar-school-website.git
-cd melbourne-guitar-school-website
+git clone https://github.com/your-org/lessonflow-website.git
+cd lessonflow-website
 
 # Run deployment script (first time)
 # Tip: running without flags opens an interactive prompt in a TTY
@@ -303,7 +303,7 @@ sudo ./deploy/deploy.sh --branch main
 sudo ./deploy/deploy.sh --interactive
 
 # Optional: deploy and run SSL setup in one command
-sudo ./deploy/deploy.sh --branch main --ssl --domain melbourneguitarschool.com.au --email melbourneguitarschool@gmail.com
+sudo ./deploy/deploy.sh --branch main --ssl --domain example.com --email admin@example.com
 
 # Optional: update git + deploy in one interactive command (server clone workflow)
 sudo ./deploy/update.sh --interactive
@@ -325,17 +325,17 @@ Notes:
 ### 2. Install Systemd Service
 
 ```bash
-sudo cp deploy/melbourne-guitar-school.service /etc/systemd/system/
+sudo cp deploy/lessonflow.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable melbourne-guitar-school
-sudo systemctl start melbourne-guitar-school
+sudo systemctl enable lessonflow
+sudo systemctl start lessonflow
 ```
 
 ### 3. Install Nginx Configuration
 
 ```bash
-sudo cp deploy/nginx.conf /etc/nginx/sites-available/melbourne-guitar-school
-sudo ln -s /etc/nginx/sites-available/melbourne-guitar-school /etc/nginx/sites-enabled/
+sudo cp deploy/nginx.conf /etc/nginx/sites-available/lessonflow
+sudo ln -s /etc/nginx/sites-available/lessonflow /etc/nginx/sites-enabled/
 sudo rm /etc/nginx/sites-enabled/default  # Remove default site
 sudo nginx -t
 sudo systemctl reload nginx
@@ -344,7 +344,7 @@ sudo systemctl reload nginx
 ### 4. Run Database Migrations
 
 ```bash
-cd /var/www/melbourne-guitar-school/current
+cd /var/www/lessonflow/current
 sudo -u www-data npx prisma migrate deploy
 ```
 
@@ -352,7 +352,7 @@ If this is an existing database and you added the new baseline migration (`20260
 
 Safe recovery (baseline metadata only, do not execute baseline SQL on an existing DB):
 ```bash
-cd /var/www/melbourne-guitar-school/current
+cd /var/www/lessonflow/current
 sudo -u www-data npx prisma migrate resolve --applied 20260222_initial_schema
 sudo -u www-data npx prisma migrate deploy
 ```
@@ -361,7 +361,7 @@ sudo -u www-data npx prisma migrate deploy
 
 ### 5. Complete Setup Wizard
 
-Visit `https://melbourneguitarschool.com.au/setup` to:
+Visit `https://example.com/setup` to:
 - Verify configuration
 - Configure Gmail API or SMTP email delivery (the wizard shows a combined `Email delivery` check)
 - Create admin account
@@ -411,7 +411,7 @@ sudo ./deploy/setup-ssl.sh --email your@email.com --force
 If you prefer manual setup:
 
 ```bash
-sudo certbot --nginx -d melbourneguitarschool.com.au -d www.melbourneguitarschool.com.au
+sudo certbot --nginx -d example.com -d www.example.com
 ```
 
 ### Check Certificate Status
@@ -441,22 +441,22 @@ Managed entries installed by deploy:
 
 ```cron
 # Daily bookings digest at 8:00 PM UTC
-0 20 * * * /var/www/melbourne-guitar-school/current/deploy/cron.sh daily-bookings-digest
+0 20 * * * /var/www/lessonflow/current/deploy/cron.sh daily-bookings-digest
 
 # Invoice reminders at 8:30 PM UTC
-30 20 * * * /var/www/melbourne-guitar-school/current/deploy/cron.sh invoice-reminders
+30 20 * * * /var/www/lessonflow/current/deploy/cron.sh invoice-reminders
 
 # Daily owner report at 8:45 PM UTC
-45 20 * * * /var/www/melbourne-guitar-school/current/deploy/cron.sh admin-reports-daily
+45 20 * * * /var/www/lessonflow/current/deploy/cron.sh admin-reports-daily
 
 # Weekly owner report every Monday at 8:00 AM UTC
-0 8 * * 1 /var/www/melbourne-guitar-school/current/deploy/cron.sh admin-reports-weekly
+0 8 * * 1 /var/www/lessonflow/current/deploy/cron.sh admin-reports-weekly
 
 # Monthly owner report on the 1st at 8:15 AM UTC
-15 8 1 * * /var/www/melbourne-guitar-school/current/deploy/cron.sh admin-reports-monthly
+15 8 1 * * /var/www/lessonflow/current/deploy/cron.sh admin-reports-monthly
 
 # Yearly owner report on Jan 1 at 8:30 AM UTC
-30 8 1 1 * /var/www/melbourne-guitar-school/current/deploy/cron.sh admin-reports-yearly
+30 8 1 1 * /var/www/lessonflow/current/deploy/cron.sh admin-reports-yearly
 ```
 
 Adjust times as needed for your timezone (UTC 20:00 = 6:00 AM AEDT).
@@ -474,23 +474,23 @@ Cron management notes:
 
 ```bash
 # View logs
-sudo journalctl -u melbourne-guitar-school -f
+sudo journalctl -u lessonflow -f
 
 # View recent logs
-sudo journalctl -u melbourne-guitar-school --since "1 hour ago"
+sudo journalctl -u lessonflow --since "1 hour ago"
 ```
 
 ### Nginx Logs
 
 ```bash
-tail -f /var/log/nginx/melbourne-guitar-school.access.log
-tail -f /var/log/nginx/melbourne-guitar-school.error.log
+tail -f /var/log/nginx/lessonflow.access.log
+tail -f /var/log/nginx/lessonflow.error.log
 ```
 
 ### Cron Logs
 
 ```bash
-tail -f /var/log/melbourne-guitar-school/cron-$(date +%Y%m%d).log
+tail -f /var/log/lessonflow/cron-$(date +%Y%m%d).log
 ```
 
 ### Deploy Update Metadata (Admin "Latest Updates")
@@ -498,7 +498,7 @@ tail -f /var/log/melbourne-guitar-school/cron-$(date +%Y%m%d).log
 Successful deploys write a JSON summary of the applied commit(s) here:
 
 ```bash
-/var/www/melbourne-guitar-school/shared/data/deploy/latest-deploy-update.json
+/var/www/lessonflow/shared/data/deploy/latest-deploy-update.json
 ```
 
 That file is surfaced in the admin UI via the `Latest Updates` button and is auto-shown once after login when a new deployed commit is detected in the browser.
@@ -506,7 +506,7 @@ That file is surfaced in the admin UI via the `Latest Updates` button and is aut
 ### Service Status
 
 ```bash
-sudo systemctl status melbourne-guitar-school
+sudo systemctl status lessonflow
 ```
 
 ---
@@ -517,16 +517,16 @@ sudo systemctl status melbourne-guitar-school
 
 ```bash
 # Check logs
-sudo journalctl -u melbourne-guitar-school -n 50
+sudo journalctl -u lessonflow -n 50
 
 # Check if port is in use
 sudo lsof -i :3000
 
 # Verify environment file
-cat /var/www/melbourne-guitar-school/shared/.env
+cat /var/www/lessonflow/shared/.env
 
 # Test manually
-cd /var/www/melbourne-guitar-school/current
+cd /var/www/lessonflow/current
 sudo -u www-data node .next/standalone/server.js
 ```
 
@@ -534,7 +534,7 @@ sudo -u www-data node .next/standalone/server.js
 
 ```bash
 # Test MySQL connection
-mysql -u mgs_user -p melbourne_guitar_school
+mysql -u mgs_user -p lessonflow
 
 # Check DATABASE_URL format
 # Should be: mysql://user:password@localhost:3306/database_name
@@ -544,13 +544,13 @@ mysql -u mgs_user -p melbourne_guitar_school
 
 ```bash
 # Check if Node app is running
-sudo systemctl status melbourne-guitar-school
+sudo systemctl status lessonflow
 
 # Check Nginx config
 sudo nginx -t
 
 # Check error logs
-tail -f /var/log/nginx/melbourne-guitar-school.error.log
+tail -f /var/log/nginx/lessonflow.error.log
 ```
 
 ### Prisma Migration Baseline Error (`P3018` / MySQL `1050`)
@@ -565,7 +565,7 @@ Error: P3018 ... Database error code: 1050 ... already exists
 Do this (safe on existing databases):
 
 ```bash
-cd /var/www/melbourne-guitar-school/current
+cd /var/www/lessonflow/current
 sudo -u www-data npx prisma migrate resolve --applied 20260222_initial_schema
 sudo -u www-data npx prisma migrate deploy
 ```
@@ -589,7 +589,7 @@ sudo ./deploy/deploy.sh --rollback
 ssh user@your-server
 
 # Navigate to your persistent git clone (not the deployed current release)
-cd ~/melbourne-guitar-school
+cd ~/lessonflow
 
 # Update git clone + deploy (interactive)
 sudo ./deploy/update.sh
@@ -598,10 +598,10 @@ sudo ./deploy/update.sh
 sudo ./deploy/update.sh --skip-cron
 
 # Or specify branch + SSL in one command
-sudo ./deploy/update.sh --branch main --ssl --domain melbourneguitarschool.com.au --email melbourneguitarschool@gmail.com
+sudo ./deploy/update.sh --branch main --ssl --domain example.com --email admin@example.com
 
 # Or run non-interactively with SSL setup in one step
-sudo ./deploy/deploy.sh --branch main --ssl --domain melbourneguitarschool.com.au --email melbourneguitarschool@gmail.com
+sudo ./deploy/deploy.sh --branch main --ssl --domain example.com --email admin@example.com
 ```
 
 ### Zero-Downtime Deploys

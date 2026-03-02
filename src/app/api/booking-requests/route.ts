@@ -116,6 +116,8 @@ export async function POST(request: Request) {
     // Persist first so the admin can review the request even if outbound email delivery is degraded.
     const created = await prisma.bookingRequest.create({
       data: {
+        firstName: parsed.data.firstName,
+        lastName: parsed.data.lastName,
         name: parsed.data.name,
         email: parsed.data.email,
         phone: parsed.data.phone,
