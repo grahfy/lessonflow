@@ -1016,6 +1016,40 @@ ensure_managed_cron_jobs_installed_from_update() {
   return 0
 }
 
+# Delegates Prisma update (generate/migrate) to deploy.sh using the current
+# configuration and sudo settings.
+update_prisma_from_update() {
+  section "Prisma Update"
+
+  if [[ ! -x "${DEPLOY_SCRIPT}" ]]; then
+    log_error "deploy.sh not found or not executable at ${DEPLOY_SCRIPT}"
+    return 1
+  fi
+
+  local deploy_args=()
+  deploy_args+=( "--branch" "${BRANCH}" )
+  [[ "${DB_PUSH}" == true ]] && deploy_args+=( "--db-push" )
+  [[ "${NO_SPINNER}" == true ]] && deploy_args+=( "--no-spinner" )
+  [[ "${NO_COLOR}" == true ]] && deploy_args+=( "--no-color" )
+
+  # The 'D' action in deploy.sh triggers update_prisma via the interactive flow
+  # or specific bootstrap flags. Since we want to run ONLY update_prisma, we
+  # use the --interactive flag with a mocked input or just pass the bootstrap flag
+  # if we add one to deploy.sh.
+  #
+  # Refinement: I will add a --update-prisma flag to deploy.sh to make this 
+  # delegation cleaner and non-interactive.
+  
+  log_info "Delegating Prisma update to deploy.sh..."
+  
+  if should_use_sudo_for_deploy; then
+    ensure_sudo_for_deploy_ready
+    sudo "${DEPLOY_SCRIPT}" "${deploy_args[@]}" --update-prisma
+  else
+    "${DEPLOY_SCRIPT}" "${deploy_args[@]}" --update-prisma
+  fi
+}
+
 bool_word() {
   if [[ "$1" == true ]]; then
     echo "ON"
@@ -1397,6 +1431,7 @@ print_update_tui_menu() {
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
   print_tui_action_pair "J" "Install/update cron jobs" "N" "Install Nginx"
   print_tui_action_pair "P" "Install PHP-FPM (if needed)" "U" "Install/update app service"
+  print_tui_action_pair "D" "Update Prisma (gen/mig)"
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
   print_tui_action_pair "S" "Start update + deploy" "Q" "Cancel"
   print_tui_hint_line "Tip: deploy.sh runs migrations/nginx/restarts; this menu sets wrapper + pass-through flags."
@@ -1774,6 +1809,9 @@ run_interactive_setup() {
         ;;
       j)
         ensure_managed_cron_jobs_installed_from_update || true
+        ;;
+      d)
+        update_prisma_from_update || true
         ;;
       n)
         ensure_nginx_installed_from_update || true

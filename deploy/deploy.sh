@@ -73,6 +73,7 @@ INSTALL_PHP_FPM_IF_NEEDED=false
 INSTALL_CRON_IF_NEEDED=false
 INSTALL_APP_SERVICE_IF_NEEDED=false
 INSTALL_CRON_JOBS_IF_NEEDED=false
+UPDATE_PRISMA_ONLY=false
 SSL_SETUP=false
 SSL_DOMAIN=""
 SSL_EMAIL=""
@@ -685,6 +686,147 @@ setup_mysql_and_database_from_shared_env() {
     return 0
 }
 
+# Run database migrations.
+# This wrapper prefers `prisma migrate deploy` and only performs automatic
+# baseline recovery for explicitly recognized "existing schema" cases.
+# It intentionally does not execute baseline SQL against non-empty databases.
+run_migrations() {
+    # Check if migrations directory exists and has migrations
+    if [[ ! -d "prisma/migrations" || -z "$(ls -A prisma/migrations 2>/dev/null)" ]]; then
+        log_warn "No migrations found in prisma/migrations. Using db push instead."
+        npm exec --no -- prisma db push --accept-data-loss
+        return $?
+    fi
+    
+    log_info "Running database migrations..."
+
+    # Determine the first migration directory for safe baseline recovery on
+    # already-initialized databases.
+    local first_migration=""
+    local migration_dir=""
+    for migration_dir in prisma/migrations/*; do
+        [[ -d "${migration_dir}" ]] || continue
+        first_migration="$(basename "${migration_dir}")"
+        break
+    done
+
+    if [[ -z "${first_migration}" ]]; then
+        log_error "No migration directories found to baseline"
+        return 1
+    fi
+
+    # Try migrate deploy first and capture output so we can detect safe baseline
+    # recovery cases precisely instead of baselining on every migration failure.
+    local migrate_output=""
+    if migrate_output="$(npm exec --no -- prisma migrate deploy 2>&1)"; then
+        [[ -n "${migrate_output}" ]] && echo "${migrate_output}"
+        return 0
+    fi
+    local migrate_status=$?
+
+    [[ -n "${migrate_output}" ]] && echo "${migrate_output}"
+
+    local should_baseline=false
+
+    # Prisma P3005: database schema is not empty and needs baselining.
+    if printf '%s' "${migrate_output}" | grep -q "P3005"; then
+        should_baseline=true
+    fi
+
+    # Prisma P3018 + MySQL 1050/\"already exists\" for the first migration is also
+    # a safe baseline case (existing schema, newly-added baseline migration).
+    if [[ "${should_baseline}" == false ]] \
+        && printf '%s' "${migrate_output}" | grep -q "P3018" \
+        && printf '%s' "${migrate_output}" | grep -q "Migration name: ${first_migration}" \
+        && (printf '%s' "${migrate_output}" | grep -q "Database error code: 1050" \
+            || printf '%s' "${migrate_output}" | grep -q "already exists"); then
+        should_baseline=true
+    fi
+
+    if [[ "${should_baseline}" == false ]]; then
+        log_error "Migration failed for a non-baseline reason. Aborting automatic recovery."
+        return "${migrate_status}"
+    fi
+
+    log_warn "Migration failed, attempting to baseline existing database..."
+    log_info "Resolving migration as baseline: ${first_migration}"
+    npm exec --no -- prisma migrate resolve --applied "${first_migration}"
+
+    # IMPORTANT: Do not execute baseline SQL on an existing database. Baseline
+    # recovery only records the migration as applied, then Prisma applies any
+    # later migrations that are still pending.
+    log_info "Baseline marked as applied. Re-running prisma migrate deploy for remaining migrations..."
+    npm exec --no -- prisma migrate deploy
+}
+
+# Updates Prisma state: generates client and applies migrations or schema push.
+# Consolidates all Prisma ORM operations for deployment and manual maintenance.
+# Skips generation/migrations if no changes are detected since previous deploy.
+update_prisma() {
+    section "Prisma Update"
+    
+    # Check if we are in a release directory or the source root
+    if [[ ! -f package.json ]]; then
+        log_error "package.json not found in current directory. update_prisma must run from app root."
+        return 1
+    fi
+
+    local needs_update=false
+    local client_dir="src/generated/prisma"
+
+    # 1. Always update if the generated client is missing (fresh release)
+    if [[ ! -d "${client_dir}" ]] || [[ -z "$(ls -A "${client_dir}" 2>/dev/null)" ]]; then
+        log_info "Prisma client missing; update required."
+        needs_update=true
+    fi
+
+    # 2. Check for schema or migration changes if git metadata is available
+    if [[ "${needs_update}" == false ]] && [[ -n "${DEPLOY_GIT_REPO_ROOT}" && -n "${DEPLOY_TARGET_COMMIT_HASH}" ]]; then
+        local diff_range=""
+        if [[ -n "${DEPLOY_PREVIOUS_COMMIT_HASH}" ]]; then
+            diff_range="${DEPLOY_PREVIOUS_COMMIT_HASH}..${DEPLOY_TARGET_COMMIT_HASH}"
+        else
+            # First deploy with git tracking; assume update needed
+            needs_update=true
+        fi
+
+        if [[ "${needs_update}" == false && -n "${diff_range}" ]]; then
+            # Check if prisma/ directory or prisma version in package.json changed
+            if ! git -C "${DEPLOY_GIT_REPO_ROOT}" diff --quiet "${diff_range}" -- prisma/ package.json; then
+                log_info "Changes detected in prisma/ or package.json; update required."
+                needs_update=true
+            fi
+        fi
+    fi
+
+    # 3. Force update if DB_PUSH is enabled
+    if [[ "${DB_PUSH}" == true ]]; then
+        log_info "Database push requested; forcing Prisma update."
+        needs_update=true
+    fi
+
+    if [[ "${needs_update}" == false ]]; then
+        log_info "No changes detected in Prisma schema or migrations. Skipping update."
+        return 0
+    fi
+
+    # Ensure Prisma CLI is available before trying to use it
+    if ! npm list prisma >/dev/null 2>&1 && [[ ! -d "node_modules/prisma" ]]; then
+        run_npm_step_with_cache_repair "Installing Prisma CLI" npm install prisma --save-dev --ignore-scripts
+    fi
+
+    run_step "Generating Prisma client" npm exec --no -- prisma generate
+
+    if [[ "${DB_PUSH}" == true ]]; then
+        log_info "Pushing database schema (db push)..."
+        npm exec --no -- prisma db push --accept-data-loss
+    elif [[ "${SKIP_MIGRATE}" == false ]]; then
+        run_migrations
+    else
+        log_info "Skipping database migrations"
+    fi
+}
+
 # Installs Nginx in a minimal mode through the shared package setup helper.
 # This mirrors update.sh's targeted bootstrap action so operators can call the
 # same capability directly through deploy.sh in automation.
@@ -1282,7 +1424,7 @@ print_deploy_tui_menu() {
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     print_tui_action_pair "M" "Run MySQL + create DB" "N" "Install Nginx"
     print_tui_action_pair "P" "Install PHP-FPM (if needed)" "U" "Install/update app service"
-    print_tui_action_pair "J" "Install/update cron jobs"
+    print_tui_action_pair "D" "Update Prisma (gen/mig)" "J" "Install/update cron jobs"
     print_tui_action_pair "R" "Grab update + reload script"
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     print_tui_action_pair "S" "Start deploy" "Q" "Cancel"
@@ -1354,6 +1496,9 @@ run_interactive_setup() {
                 ;;
             j)
                 ensure_managed_cron_jobs_installed_from_deploy || true
+                ;;
+            d)
+                update_prisma || true
                 ;;
             m)
                 ensure_shared_env_file "${SCRIPT_DIR}/../.env.example" || true
@@ -2199,6 +2344,7 @@ while [[ $# -gt 0 ]]; do
         --install-cron) INSTALL_CRON_IF_NEEDED=true; shift ;;
         --install-app-service) INSTALL_APP_SERVICE_IF_NEEDED=true; shift ;;
         --install-cron-jobs) INSTALL_CRON_JOBS_IF_NEEDED=true; shift ;;
+        --update-prisma) UPDATE_PRISMA_ONLY=true; shift ;;
         --help|-h)
             show_usage
             exit 0
@@ -2239,6 +2385,17 @@ if [[ "${INTERACTIVE}" == true && "${ROLLBACK}" == false ]]; then
     fi
 elif [[ "${ROLLBACK}" == false ]]; then
     print_deploy_summary
+fi
+
+# Execute immediate bootstrap actions requested via CLI flags
+if [[ "${UPDATE_PRISMA_ONLY}" == true ]]; then
+    # We may need shared env if migrations are to be run
+    ensure_shared_env_file "${SOURCE_DIR}/.env.example" || true
+    if [[ -f "${SHARED_DIR}/.env" ]]; then
+        export $(grep -v '^#' "${SHARED_DIR}/.env" | xargs)
+    fi
+    update_prisma
+    exit 0
 fi
 
 # =============================================================================
@@ -2430,93 +2587,8 @@ if [[ "${SKIP_DEPS}" == false ]]; then
     run_npm_step_with_cache_repair "Installing production dependencies (npm ci)" npm ci --omit=dev --ignore-scripts
 fi
 
-# Always install Prisma CLI (needed for generate and migrate)
-run_npm_step_with_cache_repair "Installing Prisma CLI" npm install prisma --save-dev --ignore-scripts
-
-# Generate Prisma client
-run_step "Generating Prisma client" npm exec --no -- prisma generate
-
-# Run database migrations.
-# This wrapper prefers `prisma migrate deploy` and only performs automatic
-# baseline recovery for explicitly recognized "existing schema" cases.
-# It intentionally does not execute baseline SQL against non-empty databases.
-run_migrations() {
-    # Check if migrations directory exists and has migrations
-    if [[ ! -d "prisma/migrations" || -z "$(ls -A prisma/migrations 2>/dev/null)" ]]; then
-        log_warn "No migrations found in prisma/migrations. Using db push instead."
-        npm exec --no -- prisma db push --accept-data-loss
-        return $?
-    fi
-    
-    log_info "Running database migrations..."
-
-    # Determine the first migration directory for safe baseline recovery on
-    # already-initialized databases.
-    local first_migration=""
-    local migration_dir=""
-    for migration_dir in prisma/migrations/*; do
-        [[ -d "${migration_dir}" ]] || continue
-        first_migration="$(basename "${migration_dir}")"
-        break
-    done
-
-    if [[ -z "${first_migration}" ]]; then
-        log_error "No migration directories found to baseline"
-        return 1
-    fi
-
-    # Try migrate deploy first and capture output so we can detect safe baseline
-    # recovery cases precisely instead of baselining on every migration failure.
-    local migrate_output=""
-    if migrate_output="$(npm exec --no -- prisma migrate deploy 2>&1)"; then
-        [[ -n "${migrate_output}" ]] && echo "${migrate_output}"
-        return 0
-    fi
-    local migrate_status=$?
-
-    [[ -n "${migrate_output}" ]] && echo "${migrate_output}"
-
-    local should_baseline=false
-
-    # Prisma P3005: database schema is not empty and needs baselining.
-    if printf '%s' "${migrate_output}" | grep -q "P3005"; then
-        should_baseline=true
-    fi
-
-    # Prisma P3018 + MySQL 1050/\"already exists\" for the first migration is also
-    # a safe baseline case (existing schema, newly-added baseline migration).
-    if [[ "${should_baseline}" == false ]] \
-        && printf '%s' "${migrate_output}" | grep -q "P3018" \
-        && printf '%s' "${migrate_output}" | grep -q "Migration name: ${first_migration}" \
-        && (printf '%s' "${migrate_output}" | grep -q "Database error code: 1050" \
-            || printf '%s' "${migrate_output}" | grep -q "already exists"); then
-        should_baseline=true
-    fi
-
-    if [[ "${should_baseline}" == false ]]; then
-        log_error "Migration failed for a non-baseline reason. Aborting automatic recovery."
-        return "${migrate_status}"
-    fi
-
-    log_warn "Migration failed, attempting to baseline existing database..."
-    log_info "Resolving migration as baseline: ${first_migration}"
-    npm exec --no -- prisma migrate resolve --applied "${first_migration}"
-
-    # IMPORTANT: Do not execute baseline SQL on an existing database. Baseline
-    # recovery only records the migration as applied, then Prisma applies any
-    # later migrations that are still pending.
-    log_info "Baseline marked as applied. Re-running prisma migrate deploy for remaining migrations..."
-    npm exec --no -- prisma migrate deploy
-}
-
-if [[ "${DB_PUSH}" == true ]]; then
-    log_info "Pushing database schema (db push)..."
-    npm exec --no -- prisma db push --accept-data-loss
-elif [[ "${SKIP_MIGRATE}" == false ]]; then
-    run_migrations
-else
-    log_info "Skipping database migrations"
-fi
+# Consolidate Prisma update (generate client and run migrations)
+update_prisma
 
 # Reclaim package-manager cache before the build phase so the build has more
 # free disk space available on small VPS hosts.

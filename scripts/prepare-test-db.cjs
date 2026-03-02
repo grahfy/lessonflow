@@ -90,11 +90,11 @@ if (!allowDbPushFallback) {
 
 console.warn("");
 console.warn("test:prepare fallback: prisma migrate deploy failed for the test database.");
-console.warn("Attempting `prisma db push --skip-generate` for ephemeral test DB bootstrap.");
+console.warn("Attempting `prisma db push` for ephemeral test DB bootstrap.");
 console.warn("Set TEST_DB_PREPARE_ALLOW_DB_PUSH_FALLBACK=0 to disable this fallback.");
 console.warn("");
 
-const dbPushResult = runPrisma(["db", "push", "--skip-generate"]);
+const dbPushResult = runPrisma(["db", "push"]);
 if (dbPushResult.error) {
   console.error("Failed to run Prisma db push fallback:", dbPushResult.error.message);
   process.exit(1);

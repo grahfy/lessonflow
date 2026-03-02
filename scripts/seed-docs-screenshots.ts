@@ -1,39 +1,47 @@
 #!/usr/bin/env node
-const crypto = require("node:crypto");
-const fs = require("node:fs");
-const path = require("node:path");
-
-const bcrypt = require("bcryptjs");
-const { PrismaClient } = require("@prisma/client");
+import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import bcrypt from "bcryptjs";
+import { PrismaMariaDb } from "@prisma/adapter-mariadb";
+import { PrismaClient } from "../src/generated/prisma/client";
 
 const projectRoot = process.cwd();
 const checklistPath = path.join(projectRoot, "Documentation", "assets", "SCREENSHOT_SEED_CHECKLIST.md");
 
-function normalizeName(value) {
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error("DATABASE_URL environment variable is not set");
+}
+
+const adapter = new PrismaMariaDb(connectionString);
+const prisma = new PrismaClient({ adapter });
+
+function normalizeName(value: any) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function buildNameTokens(value) {
+function buildNameTokens(value: any) {
   const normalized = normalizeName(value);
   if (!normalized) return null;
   return [...new Set(normalized.split(" ").filter(Boolean))].join(" ");
 }
 
-function normalizeEmail(value) {
+function normalizeEmail(value: any) {
   return String(value || "").trim().toLowerCase();
 }
 
-function normalizePhone(value) {
+function normalizePhone(value: any) {
   return String(value || "").replace(/\D/g, "");
 }
 
-function deriveEncryptionKey(secret) {
+function deriveEncryptionKey(secret: any) {
   const trimmed = String(secret || "").trim();
   if (!trimmed) throw new Error("Missing encryption secret");
   return crypto.createHash("sha256").update(trimmed, "utf8").digest();
 }
 
-function encryptPortalSecret(plaintext) {
+function encryptPortalSecret(plaintext: any) {
   const explicit = process.env.STUDENT_PORTAL_PASSWORD_ENCRYPTION_KEY?.trim();
   const fallback = process.env.ADMIN_SESSION_SECRET || "dev-student-portal-encryption-key";
   const key = deriveEncryptionKey(explicit || fallback);
@@ -68,16 +76,16 @@ This project includes a deterministic screenshot seeder.
   console.log(`Wrote screenshot seed checklist to ${path.relative(projectRoot, checklistPath)}`);
 }
 
-function cents(amount) {
+function cents(amount: any) {
   return Math.round(amount * 100);
 }
 
-function makeAddress(input) {
+function makeAddress(input: any) {
   const unit = input.unitNumber ? `${input.unitNumber}/` : "";
   return `${unit}${input.houseNumber} ${input.streetName} ${input.streetType}, ${input.suburb} ${input.state} ${input.postcode}`.trim();
 }
 
-function lineCalc(quantity, unitPriceCents, taxMode) {
+function lineCalc(quantity: any, unitPriceCents: any, taxMode: any) {
   const subtotal = quantity * unitPriceCents;
   const gst = taxMode === "taxable" ? Math.round(subtotal / 11) : 0;
   return {
@@ -87,11 +95,11 @@ function lineCalc(quantity, unitPriceCents, taxMode) {
   };
 }
 
-function addMinutes(date, minutes) {
+function addMinutes(date: any, minutes: any) {
   return new Date(date.getTime() + minutes * 60_000);
 }
 
-function daysFromNow(days, hour, minute = 0) {
+function daysFromNow(days: any, hour: any, minute = 0) {
   const d = new Date();
   d.setDate(d.getDate() + days);
   d.setHours(hour, minute, 0, 0);
@@ -108,8 +116,6 @@ async function seed() {
   const adminPassword = process.env.DOCS_SCREENSHOTS_ADMIN_PASSWORD || "DocsDemoAdmin!23";
   const studentPassword = process.env.DOCS_SCREENSHOTS_STUDENT_PASSWORD || "StudentDemo!23";
   const now = new Date();
-
-  const prisma = new PrismaClient();
 
   try {
     console.log("Resetting docs demo data...");
@@ -467,7 +473,7 @@ async function seed() {
       taxMode,
       notes,
       lastReminderStage
-    }) {
+    }: any) {
       const unitPriceCents = cents(unitPrice);
       const calc = lineCalc(quantity, unitPriceCents, taxMode);
       return prisma.invoice.create({

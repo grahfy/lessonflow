@@ -1,4 +1,4 @@
-import { Booking, Customer } from "@prisma/client";
+import { Booking, Customer } from "@/generated/prisma/client";
 
 import { InvoiceCustomerSnapshot, InvoiceSellerSnapshot } from "@/lib/invoices/types";
 

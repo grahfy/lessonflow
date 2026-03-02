@@ -1,4 +1,4 @@
-import { Invoice, InvoiceLineItem } from "@prisma/client";
+import { Invoice, InvoiceLineItem } from "@/generated/prisma/client";
 
 import { sendCustomerInvoiceReminderEmail } from "@/lib/invoice-events";
 import { getInvoiceOverdueDays, getReminderStage } from "@/lib/invoices/aging";

@@ -10,7 +10,7 @@
  * - Session secret must be 32+ characters
  */
 
-import { AdminUser } from "@prisma/client";
+import { AdminUser } from "@/generated/prisma/client";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
 import { cookies } from "next/headers";

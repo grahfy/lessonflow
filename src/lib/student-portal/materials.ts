@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import path from "node:path";
-import { LearningMaterialType } from "@prisma/client";
+import { LearningMaterialType } from "@/generated/prisma/client";
 
 const AUDIO_MIME_TYPES = new Set([
   "audio/mpeg",

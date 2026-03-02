@@ -4,7 +4,7 @@
  * Centralizing template layout and branding here keeps email copy consistent across booking,
  * portal, invoice, reminder, and digest workflows while still allowing route-specific content.
  */
-import { BookingRequestStatus, LessonDuration, LessonMode, SkillLevel } from "@prisma/client";
+import { BookingRequestStatus, LessonDuration, LessonMode, SkillLevel } from "@/generated/prisma/client";
 import type { AdminReportPeriodKey, PeriodReport, TrendPoint } from "@/lib/admin-reports";
 
 import { getOwnerEmail, getPublicSiteUrl } from "@/lib/env";

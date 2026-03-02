@@ -1,4 +1,4 @@
-import { InvoiceTaxMode } from "@prisma/client";
+import { InvoiceTaxMode } from "@/generated/prisma/client";
 
 /**
  * Parses a boolean-like environment variable using conservative defaults.

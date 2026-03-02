@@ -144,6 +144,8 @@ describe("admin-manual-booking-customer-match", () => {
       adminPost(
         {
           ...basePayload(startAt),
+          firstName: "Taylor",
+          lastName: "Updated",
           name: "Taylor Updated",
           customerId: existing.id,
           updateCustomerFromBooking: true

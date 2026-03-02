@@ -1,4 +1,4 @@
-import { InvoiceStatus } from "@prisma/client";
+import { InvoiceStatus } from "@/generated/prisma/client";
 
 export type InvoiceAgingBucket = "current" | "overdue_1_30" | "overdue_31_plus";
 

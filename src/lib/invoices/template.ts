@@ -1,4 +1,4 @@
-import { Invoice, InvoiceLineItem } from "@prisma/client";
+import { Invoice, InvoiceLineItem } from "@/generated/prisma/client";
 
 /**
  * Escapes arbitrary text for safe HTML rendering.

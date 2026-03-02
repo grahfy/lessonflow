@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@/generated/prisma/client";
 
 /**
  * Extracts the numeric sequence from invoice numbers like MGS-2026-0004.

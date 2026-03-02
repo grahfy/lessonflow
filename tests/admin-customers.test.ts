@@ -38,6 +38,8 @@ describe("admin-customers", () => {
     const token = createSessionToken(admin.email);
 
     const createReq = adminRequest("http://localhost/api/admin/customers", "POST", token, {
+      firstName: "Alex",
+      lastName: "Student",
       fullName: "Alex Student",
       email: "alex@example.com",
       phone: "0400123456",

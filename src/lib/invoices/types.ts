@@ -1,4 +1,4 @@
-import { InvoiceTaxMode } from "@prisma/client";
+import { InvoiceTaxMode } from "@/generated/prisma/client";
 
 /**
  * Represents a single line item entered by admin before any GST calculations are applied.

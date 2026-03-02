@@ -5,7 +5,7 @@
  * workflow code focused on domain actions while `sendEmail()` handles transport selection and
  * outbound logging.
  */
-import { Booking, BookingRequestStatus } from "@prisma/client";
+import { Booking, BookingRequestStatus } from "@/generated/prisma/client";
 
 import { sendEmail } from "@/lib/email/service";
 import {

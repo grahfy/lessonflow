@@ -1,4 +1,4 @@
-import { Invoice, InvoiceLineItem } from "@prisma/client";
+import { Invoice, InvoiceLineItem } from "@/generated/prisma/client";
 
 import { sendEmail } from "@/lib/email/service";
 import { customerInvoiceReminderTemplate, customerInvoiceTemplate } from "@/lib/email/templates";

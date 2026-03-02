@@ -1,4 +1,4 @@
-import { BookingStatus, InvoiceStatus } from "@prisma/client";
+import { BookingStatus, InvoiceStatus } from "@/generated/prisma/client";
 import {
   differenceInCalendarDays,
   eachDayOfInterval,

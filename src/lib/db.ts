@@ -15,7 +15,8 @@
  * @see https://www.prisma.io/docs/guides/performance-and-optimization/connection-management
  */
 
-import { PrismaClient } from "@prisma/client";
+import { PrismaMariaDb } from "@prisma/adapter-mariadb";
+import { PrismaClient } from "../generated/prisma/client";
 
 /**
  * Global type augmentation to store Prisma instance across module reloads.
@@ -26,13 +27,23 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
+// Database connection URL from environment
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  throw new Error("DATABASE_URL environment variable is not set");
+}
+
 /**
  * Main Prisma client instance.
  * 
- * In development: stored in global to survive hot reloads
- * In production: creates new instance (global not needed in serverless)
+ * In Prisma 7, we must provide an adapter for direct database connections.
+ * In development: stored in global to survive hot reloads.
  */
-export const prisma = globalForPrisma.prisma ?? new PrismaClient();
+export const prisma = globalForPrisma.prisma ?? (() => {
+  const adapter = new PrismaMariaDb(connectionString);
+  return new PrismaClient({ adapter });
+})();
 
 /**
  * Development-mode optimization:

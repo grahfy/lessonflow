@@ -1,4 +1,4 @@
-import { CustomerPortalCredential, Prisma } from "@prisma/client";
+import { CustomerPortalCredential, Prisma } from "@/generated/prisma/client";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
 

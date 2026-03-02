@@ -58,6 +58,16 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     const eligibility = getInvoiceReminderEligibility(invoice);
+    if (!eligibility.isEligible) {
+      return NextResponse.json(
+        {
+          error: "Invoice is not eligible for a reminder at this time.",
+          details: eligibility
+        },
+        { status: 400 }
+      );
+    }
+
     const manualStage = eligibility.stage;
 
     // Manual reminders should work for any overdue sent invoice. We still preserve the automated

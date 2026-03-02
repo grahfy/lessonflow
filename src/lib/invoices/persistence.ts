@@ -1,4 +1,4 @@
-import { InvoiceDocumentType, InvoiceStatus, InvoiceTaxMode, Prisma } from "@prisma/client";
+import { InvoiceDocumentType, InvoiceStatus, InvoiceTaxMode, Prisma } from "@/generated/prisma/client";
 
 import { calculateInvoiceTotals } from "@/lib/invoices/calculate";
 import { getDefaultInvoiceTaxMode } from "@/lib/invoices/gst-policy";
