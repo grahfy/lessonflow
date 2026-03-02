@@ -8,6 +8,7 @@ import { Pagination } from "@/components/pagination";
 import { parseAudInputToCents } from "@/lib/invoices/currency";
 import { DEFAULT_CURRENCY } from "@/lib/branding";
 import { formatDateTime, toDateTimeLocalValue, toMoneyInput } from "@/lib/admin/formatters";
+import { useSafeFetch } from "@/lib/admin/use-safe-fetch";
 
 type InvoiceStatus = "draft" | "sent" | "paid" | "void";
 type InvoiceTaxMode = "taxable" | "gst_free";
@@ -146,16 +147,9 @@ export function AdminInvoicesClient() {
   const [createDueAt, setCreateDueAt] = useState(toDateTimeLocalValue(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()));
   const [createTaxMode, setCreateTaxMode] = useState<InvoiceTaxMode>("taxable");
 
-  const safeFetch = useCallback(async (...args: Parameters<typeof globalThis.fetch>): Promise<Response> => {
-    try {
-      return await globalThis.fetch(...args);
-    } catch {
-      return new Response(JSON.stringify({ error: "Network request failed. Please try again." }), {
-        status: 503,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-  }, []);
+  const { safeFetch, handleApiError } = useSafeFetch({
+    onError: setError
+  });
 
   const loadInvoices = useCallback(async (): Promise<InvoiceRow[]> => {
     setLoading(true);
@@ -172,11 +166,7 @@ export function AdminInvoicesClient() {
     const response = await safeFetch(`/api/admin/invoices?${params.toString()}`, { cache: "no-store" });
     setLoading(false);
     if (!response.ok) {
-      if (response.status === 401) {
-        window.location.assign("/admin/login");
-        return [];
-      }
-      setError("Unable to load invoices.");
+      await handleApiError(response, "Unable to load invoices.");
       return [];
     }
 

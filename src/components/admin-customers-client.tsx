@@ -7,7 +7,7 @@ import { usePresenceExit } from "@/components/motion/use-presence-exit";
 import { CustomerTable } from "@/components/admin/customers/customer-table";
 import { CustomerDialogWrapper } from "@/components/admin/customers/customer-dialog-wrapper";
 import { emptyCustomerForm, customerFormFromRow, type CustomerRow, type CustomerForm } from "@/components/admin/customers/customer-profile-dialog";
-import { readApiErrorFromResponse } from "@/lib/admin/utils";
+import { useSafeFetch } from "@/lib/admin/use-safe-fetch";
 import { type LearningMaterialBooking, type LearningMaterialRow } from "@/lib/admin/types";
 
 const PHONE_PATTERN = /^\d{10}$/;
@@ -62,34 +62,15 @@ export function AdminCustomersClient() {
   const searchInputId = useId();
   const openCustomerDialogRef = useRef<typeof openCustomerDialog | null>(null);
 
-  const safeFetch = useCallback(async (...args: Parameters<typeof globalThis.fetch>): Promise<Response> => {
-    try {
-      return await globalThis.fetch(...args);
-    } catch {
-      return new Response(JSON.stringify({ error: "Network request failed. Please try again." }), {
-        status: 503,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-  }, []);
-
-  const redirectToAdminLogin = useCallback(() => {
-    if (authRedirectingRef.current) return;
-    authRedirectingRef.current = true;
-    setError("");
-    window.location.assign("/admin/login");
-  }, []);
-
-  const handleApiError = useCallback(
-    async (response: Response, fallback: string) => {
-      if (response.status === 401 || response.status === 403) {
-        redirectToAdminLogin();
-        return;
-      }
-      setError(await readApiErrorFromResponse(response, fallback));
+  const { safeFetch, handleApiError } = useSafeFetch({
+    onAuthError: () => {
+      if (authRedirectingRef.current) return;
+      authRedirectingRef.current = true;
+      setError("");
+      window.location.assign("/admin/login");
     },
-    [redirectToAdminLogin]
-  );
+    onError: setError
+  });
 
   const loadCustomers = useCallback(async () => {
     setLoadingCustomers(true);
@@ -269,11 +250,11 @@ export function AdminCustomersClient() {
   }, [customerQuery]);
 
   // Reset to page 1 when debounced query changes
-  // This intentionally only depends on debouncedCustomerQuery to avoid infinite loops
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     setPage(1);
-  }, [debouncedCustomerQuery]);
+    // The effect intentionally only tracks debouncedCustomerQuery to prevent infinite loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!dialogPresence.isMounted || !dialogRootRef.current) return;

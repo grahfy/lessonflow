@@ -271,6 +271,10 @@ export function AdminSettingsClient() {
     }
   }
 
+  const handleSave = async () => {
+    await onSubmit({ preventDefault: () => {} } as FormEvent<HTMLFormElement>);
+  };
+
   const renderEnvFields = (tab: TabKey) => {
     const groupsInTab = groupedVars.filter(g => g.tab === tab);
     if (groupsInTab.length === 0) return null;
@@ -324,11 +328,7 @@ export function AdminSettingsClient() {
 
         <div className="field full">
           <div className="button-row">
-            <button className="btn btn-primary" type="button" disabled={saving} onClick={() => {
-              const form = document.createElement('form');
-              const event = { preventDefault: () => {}, currentTarget: form } as unknown as FormEvent<HTMLFormElement>;
-              void onSubmit(event);
-            }}>
+            <button className="btn btn-primary" type="button" disabled={saving} onClick={handleSave}>
               {saving ? "Saving..." : "Save Configuration"}
             </button>
           </div>
