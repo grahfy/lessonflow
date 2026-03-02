@@ -1,9 +1,8 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
 import { AdminManualSectionClient } from "@/components/admin-manual-section-client";
-import { getCurrentAdmin } from "@/lib/admin-auth";
+import { requireAdmin } from "@/lib/admin/server-auth";
 import { MANUAL_SECTION_MANIFEST, getAdminManualIndex, getAdminManualSection } from "@/lib/manual/content";
-import { isSetupComplete } from "@/lib/setup";
 
 export async function generateMetadata(props: { params: Promise<{ sectionId: string }> }) {
   const params = await props.params;
@@ -18,15 +17,7 @@ export async function generateMetadata(props: { params: Promise<{ sectionId: str
  * Each manual section has its own route so the UI stays readable for beginners.
  */
 export default async function AdminManualSectionPage(props: { params: Promise<{ sectionId: string }> }) {
-  const setupComplete = await isSetupComplete();
-  if (!setupComplete) {
-    redirect("/setup");
-  }
-
-  const admin = await getCurrentAdmin();
-  if (!admin) {
-    redirect("/admin/login");
-  }
+  await requireAdmin();
 
   const params = await props.params;
   const section = await getAdminManualSection(params.sectionId);
@@ -43,4 +34,3 @@ export default async function AdminManualSectionPage(props: { params: Promise<{ 
 
   return <AdminManualSectionClient index={manualIndex} section={section} previous={previous} next={next} />;
 }
-
