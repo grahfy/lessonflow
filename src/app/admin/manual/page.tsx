@@ -1,9 +1,6 @@
-import { redirect } from "next/navigation";
-
 import { AdminManualClient } from "@/components/admin-manual-client";
-import { getCurrentAdmin } from "@/lib/admin-auth";
+import { requireAdmin } from "@/lib/admin/server-auth";
 import { getAdminManualIndex } from "@/lib/manual/content";
-import { isSetupComplete } from "@/lib/setup";
 
 export const metadata = {
   title: "Booking Console Manual"
@@ -13,17 +10,7 @@ export const metadata = {
  * Protected in-app manual landing page for admin operators.
  */
 export default async function AdminManualPage() {
-  const setupComplete = await isSetupComplete();
-  if (!setupComplete) {
-    redirect("/setup");
-  }
-
-  const admin = await getCurrentAdmin();
-  if (!admin) {
-    redirect("/admin/login");
-  }
-
+  await requireAdmin();
   const manualIndex = await getAdminManualIndex();
-
   return <AdminManualClient content={manualIndex} />;
 }

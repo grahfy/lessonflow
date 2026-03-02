@@ -1,0 +1,63 @@
+import { APP_TIMEZONE } from "@/lib/time";
+
+export function toDateTimeLocalValue(iso: string): string {
+    const date = new Date(iso);
+    const offset = date.getTimezoneOffset();
+    const localDate = new Date(date.getTime() - offset * 60 * 1000);
+    return localDate.toISOString().slice(0, 16);
+}
+
+export function toMoneyInput(cents: number): string {
+    return (cents / 100).toFixed(2);
+}
+
+export function toCurrency(cents: number): string {
+    return new Intl.NumberFormat("en-AU", {
+        style: "currency",
+        currency: "AUD"
+    }).format(cents / 100);
+}
+
+export function formatDateTime(value: string) {
+    return new Date(value).toLocaleString("en-AU", {
+        timeZone: APP_TIMEZONE,
+        dateStyle: "medium",
+        timeStyle: "short",
+    });
+}
+
+export function formatBytes(sizeBytes: number): string {
+    if (sizeBytes < 1024) return `${sizeBytes} B`;
+    const kb = sizeBytes / 1024;
+    if (kb < 1024) return `${kb.toFixed(1)} KB`;
+    const mb = kb / 1024;
+    return `${mb.toFixed(1)} MB`;
+}
+
+export function readApiErrorMessage(payload: unknown, fallback: string): string {
+    if (typeof payload === "object" && payload !== null && "error" in payload) {
+        return String((payload as Record<string, unknown>).error);
+    }
+    return fallback;
+}
+
+export async function readApiErrorFromResponse(response: Response, fallback: string): Promise<string> {
+    const contentType = response.headers.get("content-type") || "";
+    let extracted: string = fallback;
+    if (contentType.includes("application/json")) {
+        try {
+            const json = await response.json();
+            extracted = readApiErrorMessage(json, fallback);
+        } catch {
+            // Ignored
+        }
+    } else {
+        try {
+            const text = await response.text();
+            if (text) extracted = text.slice(0, 100);
+        } catch {
+            // Ignored
+        }
+    }
+    return extracted;
+}

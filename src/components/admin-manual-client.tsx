@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { AdminHeader } from "@/components/admin-header";
 import type { AdminManualIndex, AdminManualSectionIndex } from "@/lib/manual/content";
@@ -23,7 +22,6 @@ function sectionGroups(sections: AdminManualSectionIndex[]) {
  * can pick a task quickly without scrolling a huge page.
  */
 export function AdminManualClient({ content }: AdminManualClientProps) {
-  const router = useRouter();
   const grouped = sectionGroups(content.sections);
 
   return (

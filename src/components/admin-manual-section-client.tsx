@@ -4,7 +4,6 @@ import { APP_TIMEZONE } from "@/lib/time";
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo } from "react";
-import { useRouter } from "next/navigation";
 
 import { AdminHeader } from "@/components/admin-header";
 import type {
@@ -64,8 +63,6 @@ function renderSectionScreenshots(screenshots: ManualScreenshot[]) {
 }
 
 export function AdminManualSectionClient({ index, section, previous, next }: Props) {
-  const router = useRouter();
-
   const sectionScreenshots = useMemo(() => {
     const screenshotById = new Map(index.screenshots.map((screenshot) => [screenshot.id, screenshot] as const));
     return section.screenshotIds

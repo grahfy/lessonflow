@@ -60,6 +60,7 @@ export function AdminCustomersClient() {
   const materialsUploadFormRef = useRef<HTMLFormElement | null>(null);
   const authRedirectingRef = useRef(false);
   const searchInputId = useId();
+  const openCustomerDialogRef = useRef<typeof openCustomerDialog | null>(null);
 
   const safeFetch = useCallback(async (...args: Parameters<typeof globalThis.fetch>): Promise<Response> => {
     try {
@@ -242,8 +243,8 @@ export function AdminCustomersClient() {
         const response = await fetch(`/api/admin/customers/${customerId}`);
         if (response.ok) {
           const data = await response.json();
-          if (data.customer) {
-            openCustomerDialog(data.customer, editMode);
+          if (data.customer && openCustomerDialogRef.current) {
+            openCustomerDialogRef.current(data.customer, editMode);
           }
         }
       } catch {
@@ -268,6 +269,8 @@ export function AdminCustomersClient() {
   }, [customerQuery]);
 
   // Reset to page 1 when debounced query changes
+  // This intentionally only depends on debouncedCustomerQuery to avoid infinite loops
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     setPage(1);
   }, [debouncedCustomerQuery]);
@@ -276,6 +279,9 @@ export function AdminCustomersClient() {
     if (!dialogPresence.isMounted || !dialogRootRef.current) return;
     void animateIn(dialogRootRef.current, { scope: "admin" });
   }, [dialogPresence.isMounted]);
+
+  // Set up ref for openCustomerDialog before useEffect runs
+  openCustomerDialogRef.current = openCustomerDialog;
 
   function openCustomerDialog(customer: CustomerRow | null, editMode = false) {
     setSelectedCustomer(customer);

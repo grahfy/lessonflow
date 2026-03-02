@@ -7,7 +7,7 @@ import { AdminHeader } from "@/components/admin-header";
 import { Pagination } from "@/components/pagination";
 import { parseAudInputToCents } from "@/lib/invoices/currency";
 import { DEFAULT_CURRENCY } from "@/lib/branding";
-import { APP_TIMEZONE } from "@/lib/time";
+import { formatDateTime, toDateTimeLocalValue, toMoneyInput } from "@/lib/admin/formatters";
 
 type InvoiceStatus = "draft" | "sent" | "paid" | "void";
 type InvoiceTaxMode = "taxable" | "gst_free";
@@ -93,28 +93,6 @@ function toCurrency(cents: number, currency: string = DEFAULT_CURRENCY): string 
     style: "currency",
     currency: currency
   }).format(cents / 100);
-}
-
-function toDateTimeLocalValue(iso: string): string {
-  const value = new Date(iso);
-  if (Number.isNaN(value.getTime())) {
-    return "";
-  }
-  const shifted = new Date(value.getTime() - value.getTimezoneOffset() * 60_000);
-  return shifted.toISOString().slice(0, 16);
-}
-
-function toMoneyInput(cents: number): string {
-  return (cents / 100).toFixed(2);
-}
-
-function formatDateTime(value: string): string {
-  const date = new Date(value);
-  return new Intl.DateTimeFormat("en-AU", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: APP_TIMEZONE
-  }).format(date);
 }
 
 interface CustomerListResponse {
