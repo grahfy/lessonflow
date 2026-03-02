@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { AdminHeader } from "@/components/admin-header";
 import { Pagination } from "@/components/pagination";
@@ -134,12 +134,13 @@ interface InvoiceListResponse {
  */
 export function AdminInvoicesClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(searchParams.get("q") || "");
   const [statusFilter, setStatusFilter] = useState<"" | InvoiceStatus>("");
   const [agingFilter, setAgingFilter] = useState<AgingBucket>("all");
   const [outstandingOnly, setOutstandingOnly] = useState(false);
@@ -217,6 +218,14 @@ export function AdminInvoicesClient() {
   useEffect(() => {
     setPage(1);
   }, [query, statusFilter, agingFilter, outstandingOnly]);
+
+  // Sync search params to local state if they change
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q !== null && q !== query) {
+      setQuery(q);
+    }
+  }, [searchParams, query]);
 
   useEffect(() => {
     void (async () => {
@@ -773,10 +782,9 @@ export function AdminInvoicesClient() {
               <div className="dialog-actions-row" style={{ display: "flex", gap: "8px", marginTop: "12px", alignItems: "flex-start" }}>
                 <button className="btn btn-secondary" onClick={addEditableLineItem}>ADD LINE ITEM</button>
                 <select className="btn btn-secondary" style={{ width: "auto" }} value={editingProductPresetId} onChange={e => addPresetToEditor(e.target.value)}>
-                  <option value="">Add lesson package preset...</option>
+                  <option value="">Add product preset...</option>
                   {presets.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
                 </select>
-                <button className="btn btn-secondary" style={{ width: "auto" }}>ADD PRODUCT PRESET</button>
 
                 <div className="invoice-total-stack" style={{ marginLeft: "auto", textAlign: "right" }}>
                   <div>Subtotal: {toCurrency(subtotalCents, selectedInvoice.currency)}</div>

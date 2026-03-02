@@ -2360,7 +2360,7 @@ export function AdminBookingsClient() {
                   void loadLearningMaterials(materialsCustomerId, bid || undefined);
                 }}
               >
-                <option value="">{materialsCustomerId ? "Whole student profile" : "Select customer first"}</option>
+                <option value="">{materialsCustomerId ? "General material (No specific appointment)" : "Select customer first"}</option>
                 {materialsBookings.map(b => (
                   <option key={b.id} value={b.id}>
                     {formatDateTime(b.startAt)} ({b.status})
@@ -2577,26 +2577,13 @@ export function AdminBookingsClient() {
                   }}
                   className="invoice-product-preset-select"
                 >
-                  <option value="">Add lesson package preset...</option>
+                  <option value="">Add product preset...</option>
                   {presets.map((preset) => (
                     <option key={preset.id} value={preset.id}>
                       {preset.label}
                     </option>
                   ))}
                 </select>
-                <button
-                  className="btn btn-secondary"
-                  type="button"
-                  disabled={!editingProductPresetId}
-                  onClick={() => {
-                    const preset = presets.find((entry) => entry.id === editingProductPresetId);
-                    if (!preset) return;
-                    addInvoiceProductPresetToEditor(preset);
-                    setEditingProductPresetId("");
-                  }}
-                >
-                  Add product preset
-                </button>
                 <button className="btn btn-secondary" type="button" onClick={() => addEditableLineItem()}>
                   Add line item
                 </button>

@@ -129,7 +129,7 @@ export function CustomerProfileDialog({
 }: Props) {
     return (
         <>
-            <div className="dialog-col">
+            <div className="dialog-col" style={{ minHeight: "650px" }}>
                 <h4>Contact & Profile</h4>
                 <div className="form-grid dialog-form-grid">
                     <div className="field">
@@ -282,7 +282,7 @@ export function CustomerProfileDialog({
                 </div>
             </div>
 
-            <div className="dialog-col is-notes">
+            <div className="dialog-col is-notes" style={{ minHeight: "650px" }}>
                 <h4>Portal Credentials</h4>
                 <div className="admin-card" style={{ background: 'rgba(0,0,0,0.03)', padding: '16px', border: '1px solid var(--line)' }}>
                     <p className="helper-text">Manage access to the student portal. Passwords are encrypted and can be revealed or rotated by admins.</p>

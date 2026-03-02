@@ -23,7 +23,7 @@ export function CustomerEmailDialog({
 }: Props) {
     return (
         <>
-            <div className="dialog-col">
+            <div className="dialog-col" style={{ minHeight: "650px" }}>
                 <h4>Email History</h4>
                 <div className="admin-card" style={{ background: 'rgba(0,0,0,0.03)', padding: '12px', border: '1px solid var(--line)', maxHeight: '500px', overflowY: 'auto' }}>
                     {loadingEmailHistory ? (
@@ -51,7 +51,7 @@ export function CustomerEmailDialog({
                 </div>
             </div>
 
-            <div className="dialog-col is-notes">
+            <div className="dialog-col is-notes" style={{ minHeight: "650px" }}>
                 <h4>Send Email</h4>
                 <div className="admin-card" style={{ background: 'rgba(0,0,0,0.03)', padding: '16px', border: '1px solid var(--line)' }}>
                     <div style={{ display: 'grid', gap: '12px' }}>

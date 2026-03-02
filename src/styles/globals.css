@@ -1447,7 +1447,7 @@ h1 {
 }
 
 .dialog-panel-wide {
-  width: min(1000px, 96vw);
+  width: min(1200px, 96vw);
 }
 
 .dialog-head {

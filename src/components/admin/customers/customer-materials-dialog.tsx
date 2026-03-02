@@ -32,7 +32,7 @@ export function CustomerMaterialsDialog({
 }: Props) {
     return (
         <>
-            <div className="dialog-col">
+            <div className="dialog-col" style={{ minHeight: "650px" }}>
                 <h4>Assigned Materials</h4>
                 <div className="admin-card" style={{ background: 'rgba(0,0,0,0.03)', padding: '12px', border: '1px solid var(--line)', maxHeight: '500px', overflowY: 'auto' }}>
                     {materialsLoading ? (
@@ -80,26 +80,28 @@ export function CustomerMaterialsDialog({
                 </div>
             </div>
 
-            <div className="dialog-col is-notes">
+            <div className="dialog-col is-notes" style={{ minHeight: "650px" }}>
                 <h4>Upload New Material</h4>
                 <div className="admin-card" style={{ background: 'rgba(0,0,0,0.03)', padding: '16px', border: '1px solid var(--line)' }}>
-                    <div className="field" style={{ marginBottom: '16px' }}>
-                        <label>Select appointment (optional)</label>
-                        <select
-                            value={materialsBookingId}
-                            onChange={e => {
-                                const bid = e.target.value;
-                                setMaterialsBookingId(bid);
-                                onBookingSelect(bid);
-                            }}
-                        >
-                            <option value="">Whole student profile</option>
-                            {materialsBookings.map(b => (
-                                <option key={b.id} value={b.id}>
-                                    {formatDateTime(b.startAt)} ({b.status})
-                                </option>
-                            ))}
-                        </select>
+                    <div className="form-grid dialog-form-grid" style={{ marginBottom: '16px' }}>
+                        <div className="field">
+                            <label>Select appointment (optional)</label>
+                            <select
+                                value={materialsBookingId}
+                                onChange={e => {
+                                    const bid = e.target.value;
+                                    setMaterialsBookingId(bid);
+                                    onBookingSelect(bid);
+                                }}
+                            >
+                                <option value="">General material (No specific appointment)</option>
+                                {materialsBookings.map(b => (
+                                    <option key={b.id} value={b.id}>
+                                        {formatDateTime(b.startAt)} ({b.status})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
 
                     <form
@@ -107,21 +109,37 @@ export function CustomerMaterialsDialog({
                         className="material-upload-form"
                         onSubmit={e => { e.preventDefault(); onUpload(); }}
                     >
-                        <div style={{ display: 'grid', gap: '12px' }}>
-                            <div className="field">
+                        <div className="form-grid dialog-form-grid" style={{ gridTemplateColumns: '1fr' }}>
+                            <div className="field full">
                                 <label>Material title</label>
                                 <input name="title" required placeholder="e.g. Pentatonic exercise week 1" />
                             </div>
-                            <div className="field">
+                            <div className="field full">
                                 <label>File</label>
-                                <input type="file" name="file" accept=".pdf,audio/*" required />
+                                <input 
+                                    type="file" 
+                                    name="file" 
+                                    accept=".pdf,audio/*" 
+                                    required 
+                                    style={{ 
+                                        padding: '12px', 
+                                        background: 'rgba(0,0,0,0.1)', 
+                                        borderRadius: '8px',
+                                        border: '1px dashed var(--line)',
+                                        width: '100%',
+                                        color: 'var(--ink-1)'
+                                    }} 
+                                />
                             </div>
+                        </div>
+                        <div className="dialog-actions" style={{ marginTop: '20px', padding: 0, border: 'none' }}>
                             <button
                                 className="btn btn-primary"
+                                style={{ width: '100%' }}
                                 type="submit"
                                 disabled={materialsUploading}
                             >
-                                {materialsUploading ? "UPLOADING..." : "UPLOAD MATERIAL"}
+                                {materialsUploading ? "Uploading..." : "Upload Material"}
                             </button>
                         </div>
                     </form>
