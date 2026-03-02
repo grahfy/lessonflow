@@ -52,6 +52,15 @@ type PortalPayload = {
 
 type LessonDurationChoice = "min30" | "min60";
 
+type SystemAnnouncement = {
+  appliedAt: string;
+  shortCommit: string;
+  commits: Array<{
+    subject: string;
+    authoredAt: string;
+  }>;
+};
+
 /**
  * Student portal dashboard showing lesson history, learning materials,
  * and self-service lesson request/cancellation actions.
@@ -62,6 +71,8 @@ export function StudentPortalClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [announcement, setAnnouncement] = useState<SystemAnnouncement | null>(null);
+  const [showAnnouncement, setShowAnnouncement] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [requestingBooking, setRequestingBooking] = useState(false);
   const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
@@ -90,6 +101,23 @@ export function StudentPortalClient() {
     const payload = (await response.json()) as PortalPayload;
     setData(payload);
     setLoading(false);
+
+    // Fetch system announcement if available.
+    try {
+      const announcementResponse = await fetch("/latest-announcement.json", { cache: "no-store" });
+      if (announcementResponse.ok) {
+        const announcementData = (await announcementResponse.json()) as SystemAnnouncement;
+        // Only show if the announcement is fresh (within last 3 days).
+        const appliedAt = new Date(announcementData.appliedAt).getTime();
+        const now = Date.now();
+        if (now - appliedAt < 3 * 24 * 60 * 60 * 1000) {
+          setAnnouncement(announcementData);
+          setShowAnnouncement(true);
+        }
+      }
+    } catch {
+      // Announcements are optional; fail silently.
+    }
   }, [router]);
 
   useEffect(() => {
@@ -209,6 +237,27 @@ export function StudentPortalClient() {
 
   return (
     <div className="student-portal-shell" data-motion-root="student-portal">
+      {showAnnouncement && announcement ? (
+        <div className="admin-card booking-row system-announcement-banner">
+          <div className="system-announcement-content">
+            <span className="student-chip is-success">New Update</span>
+            <strong>System updates were recently applied!</strong>
+            <ul className="system-announcement-list">
+              {announcement.commits.slice(0, 3).map((commit, idx) => (
+                <li key={idx}>{commit.subject}</li>
+              ))}
+            </ul>
+          </div>
+          <button 
+            className="btn btn-secondary btn-sm" 
+            type="button" 
+            onClick={() => setShowAnnouncement(false)}
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : null}
+
       <div className="admin-card booking-row student-portal-header">
         <div className="student-portal-header-copy">
           <div className="student-portal-header-visual">

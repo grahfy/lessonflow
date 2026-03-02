@@ -420,6 +420,45 @@ export function ownerDailyDigestTemplate(input: {
   };
 }
 
+/**
+ * Template for notifying the owner/admin about a successful system update.
+ */
+export function ownerSystemUpdateTemplate(input: {
+  appliedAt: Date;
+  commit: string;
+  shortCommit: string;
+  branch: string;
+  commits: Array<{
+    shortHash: string;
+    authorName: string;
+    subject: string;
+  }>;
+}) {
+  const items = input.commits
+    .map(
+      (row) =>
+        `<li style="margin-bottom: 8px;"><strong>${escapeHtml(row.shortHash)}</strong>: ${escapeHtml(row.subject)} <span style="color: #6d7c98; font-size: 12px;">(${escapeHtml(row.authorName)})</span></li>`
+    )
+    .join("");
+
+  return {
+    subject: `System Updated: ${input.shortCommit} on ${input.branch}`,
+    html: renderEmailLayout({
+      title: "System Update Applied",
+      previewText: `System updated to ${input.shortCommit}`,
+      leadHtml: `The Melbourne Guitar School system was updated on ${fmt(input.appliedAt)}.`,
+      contentHtml: `
+        <p style="margin:0 0 10px;"><strong>Branch:</strong> ${escapeHtml(input.branch)}</p>
+        <p style="margin:0 0 10px;"><strong>Commit:</strong> ${escapeHtml(input.commit)}</p>
+        <h3 style="margin:16px 0 8px;font-size:16px;color:#0f1f3a;">Recent Changes</h3>
+        <ul style="margin:0;padding-left:18px;list-style-type: disc;">
+          ${items || "<li>No commit details available.</li>"}
+        </ul>
+      `
+    })
+  };
+}
+
 function reportPeriodTitle(period: AdminReportPeriodKey): string {
   if (period === "daily") return "Daily";
   if (period === "weekly") return "Weekly";

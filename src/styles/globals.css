@@ -1795,6 +1795,39 @@ h1 {
   margin-left: auto;
 }
 
+.system-announcement-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: linear-gradient(140deg, rgba(107, 140, 255, 0.15), rgba(143, 114, 255, 0.15));
+  border-color: rgba(143, 114, 255, 0.4);
+  margin-bottom: 4px;
+}
+
+.system-announcement-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.88rem;
+}
+
+.system-announcement-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  gap: 16px;
+  color: var(--ink-1);
+}
+
+.system-announcement-list li::before {
+  content: "•";
+  margin-right: 6px;
+  color: var(--brand-0);
+}
+
 .student-materials-header {
   width: fit-content;
   max-width: 100%;
