@@ -46,7 +46,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     const customer = await prisma.customer.findUnique({
       where: { id }
     });
-    if (!customer || customer.isArchived) {
+    if (!customer) {
       return NextResponse.json({ error: "Customer not found." }, { status: 404 });
     }
 

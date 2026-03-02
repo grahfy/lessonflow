@@ -1443,6 +1443,7 @@ h1 {
   display: grid;
   overflow: hidden;
   max-height: min(90vh, 920px);
+  width: min(1000px, 96vw);
 }
 
 .dialog-panel-wide {

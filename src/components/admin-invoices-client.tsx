@@ -286,7 +286,7 @@ export function AdminInvoicesClient() {
   function addPresetToEditor(presetId: string) {
     const preset = presets.find(p => p.id === presetId);
     if (!preset) return;
-    
+
     setEditingLineItems((prev) => [
       ...prev,
       {
@@ -330,7 +330,7 @@ export function AdminInvoicesClient() {
     );
 
     if (invalid) {
-      setError(selectedInvoice.documentType === "invoice" 
+      setError(selectedInvoice.documentType === "invoice"
         ? "Each line item needs description, quantity >= 1, and unit price >= 0."
         : "Each line item needs description and quantity >= 1."
       );
@@ -339,7 +339,7 @@ export function AdminInvoicesClient() {
 
     const isCreditNote = selectedInvoice.documentType === "credit_note";
 
-    const body: any = {
+    const body: { action: string; notes: string | null; dueAt: string; lineItems?: typeof lineItemsPayload } = {
       action: "edit",
       notes: editingNotes.trim() || null,
       dueAt: new Date(editingDueAt).toISOString(),
@@ -385,7 +385,7 @@ export function AdminInvoicesClient() {
 
     setBusyAction(action);
     setError("");
-    
+
     let endpoint = `/api/admin/invoices/${invoice.id}`;
     let method = "PATCH";
     let body: string | undefined;
@@ -427,7 +427,7 @@ export function AdminInvoicesClient() {
     }
 
     const payload = await response.json().catch(() => ({}));
-    
+
     if (action === "delete") {
       setNotice("Invoice deleted.");
       if (selectedInvoice?.id === invoice.id) setSelectedInvoice(null);
@@ -450,17 +450,17 @@ export function AdminInvoicesClient() {
 
   async function sendDueReminders() {
     if (!window.confirm("Send automated overdue reminders to all eligible customers?")) return;
-    
+
     setBusyAction("bulk_reminders");
     setError("");
     const response = await safeFetch("/api/admin/invoices/reminders", { method: "POST" });
     setBusyAction(null);
-    
+
     if (!response.ok) {
       setError("Failed to send reminders.");
       return;
     }
-    
+
     const payload = await response.json();
     setNotice(payload.message || "Bulk reminders complete.");
     await loadInvoices();
@@ -538,7 +538,7 @@ export function AdminInvoicesClient() {
   const Separator = () => <div style={{ width: '1px', height: '24px', background: 'var(--line)', flexShrink: 0 }} />;
 
   return (
-    <div className="admin-shell" data-motion-root="admin" data-motion-primary="true">
+    <div className="admin-shell" data-motion-root="admin" data-motion-primary="true" style={{ height: '100dvh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       <AdminHeader title="Invoice Console" />
 
       <div className="admin-card invoice-toolbar">
@@ -566,11 +566,11 @@ export function AdminInvoicesClient() {
           </select>
         </div>
         <div className="field" style={{ flexDirection: 'row', alignItems: 'center', gap: '8px', paddingBottom: '10px' }}>
-          <input 
-            type="checkbox" 
-            id="outstandingOnly" 
-            checked={outstandingOnly} 
-            onChange={e => setOutstandingOnly(e.target.checked)} 
+          <input
+            type="checkbox"
+            id="outstandingOnly"
+            checked={outstandingOnly}
+            onChange={e => setOutstandingOnly(e.target.checked)}
           />
           <label htmlFor="outstandingOnly" style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}>Outstanding only</label>
         </div>
@@ -583,14 +583,14 @@ export function AdminInvoicesClient() {
       {notice ? <p className="notice success">{notice}</p> : null}
       {loading ? <p className="notice">Loading...</p> : null}
 
-      <div className="admin-card invoice-list-card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div className="customers-list" style={{ maxHeight: 'none', gap: '0', padding: 0 }}>
+      <div className="admin-card invoice-list-card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+        <div className="customers-list" style={{ flex: 1, overflowY: 'auto', maxHeight: 'none', gap: '0', padding: 0 }}>
           {invoices.length ? (
-            <div className="customer-item invoice-item invoice-list-header" style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              padding: '12px 16px', 
-              gap: '12px', 
+            <div className="customer-item invoice-item invoice-list-header" style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '12px 16px',
+              gap: '12px',
               width: '100%',
               border: 'none',
               borderBottom: '1px solid var(--line)',
@@ -616,11 +616,11 @@ export function AdminInvoicesClient() {
 
           <div style={{ display: 'grid', gap: '0', padding: '0' }}>
             {invoices.map((invoice) => (
-              <div 
-                key={invoice.id} 
-                className="customer-item invoice-item" 
-                style={{ 
-                  display: 'flex', 
+              <div
+                key={invoice.id}
+                className="customer-item invoice-item"
+                style={{
+                  display: 'flex',
                   alignItems: 'center',
                   padding: '12px 16px',
                   gap: '12px',
@@ -634,22 +634,22 @@ export function AdminInvoicesClient() {
                 onClick={() => openInvoice(invoice)}
               >
                 <div style={{ minWidth: '125px', fontWeight: 700, fontSize: '0.85rem', textAlign: 'left' }}>{invoice.invoiceNumber}</div>
-                
+
                 <Separator />
                 <div style={{ flex: '1.2', fontWeight: 600, color: 'var(--ink-0)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.85rem', textAlign: 'left' }}>
                   {invoice.customerLastName ? `${invoice.customerLastName}, ${invoice.customerFirstName}` : invoice.customerName}
                 </div>
-                
+
                 <Separator />
                 <div style={{ width: '100px', color: 'var(--ink-1)', fontSize: '0.8rem', textAlign: 'center' }}>
                   {invoice.overdueDays && invoice.overdueDays > 0 ? `Overdue ${invoice.overdueDays}d` : "Current"}
                 </div>
-                
+
                 <Separator />
                 <div style={{ width: '120px', color: 'var(--ink-1)', fontSize: '0.8rem', textAlign: 'center' }}>
                   Due {new Date(invoice.dueAt).toLocaleDateString("en-AU")}
                 </div>
-                
+
                 <Separator />
                 <div className="invoice-item-summary-inline" style={{ minWidth: '220px', justifyContent: 'center', textAlign: 'center', display: 'flex', gap: '4px' }}>
                   <span className="invoice-item-chip" style={{ fontSize: '0.8rem' }}>Invoice</span>
@@ -658,7 +658,7 @@ export function AdminInvoicesClient() {
                 </div>
 
                 <Separator />
-                
+
                 <div className="invoice-item-primary-actions" style={{ width: '280px', display: 'flex', justifyContent: 'flex-end', gap: '6px' }} onClick={e => e.stopPropagation()}>
                   <button type="button" className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.7rem', minWidth: '0', flex: '1' }} onClick={() => openInvoice(invoice)}>VIEW</button>
                   <button type="button" className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.7rem', minWidth: '0', flex: '1' }} onClick={() => void runInvoiceAction("download_pdf", invoice)}>PDF</button>
@@ -721,40 +721,40 @@ export function AdminInvoicesClient() {
               <div className="dialog-col is-notes">
                 <div className="field">
                   <label>Notes</label>
-                  <textarea 
-                    value={editingNotes} 
-                    onChange={e => setEditingNotes(e.target.value)} 
-                    placeholder="Internal or customer notes..." 
+                  <textarea
+                    value={editingNotes}
+                    onChange={e => setEditingNotes(e.target.value)}
+                    placeholder="Internal or customer notes..."
                     className="dialog-notes"
                     style={{ minHeight: "100px" }}
                   />
                 </div>
               </div>
             </div>
-            
+
             <div className="invoice-line-list">
               {editingLineItems.map((lineItem) => (
                 <div key={lineItem.key} className="invoice-line-item invoice-line-item-editable">
-                  <input 
-                    value={lineItem.description} 
+                  <input
+                    value={lineItem.description}
                     placeholder="Line item description"
                     readOnly={selectedInvoice.documentType === "credit_note"}
                     onChange={e => updateEditableLineItem(lineItem.key, { description: e.target.value })}
                   />
-                  <input 
+                  <input
                     type="number"
                     style={{ width: "60px" }}
-                    value={lineItem.quantity} 
+                    value={lineItem.quantity}
                     readOnly={selectedInvoice.documentType === "credit_note"}
                     onChange={e => updateEditableLineItem(lineItem.key, { quantity: e.target.value })}
                   />
-                  <input 
+                  <input
                     style={{ width: "100px" }}
-                    value={lineItem.unitPriceAud} 
+                    value={lineItem.unitPriceAud}
                     readOnly={selectedInvoice.documentType === "credit_note"}
                     onChange={e => updateEditableLineItem(lineItem.key, { unitPriceAud: e.target.value })}
                   />
-                  <select 
+                  <select
                     value={lineItem.taxMode}
                     disabled={selectedInvoice.documentType === "credit_note"}
                     onChange={e => updateEditableLineItem(lineItem.key, { taxMode: e.target.value as InvoiceTaxMode })}
@@ -768,7 +768,7 @@ export function AdminInvoicesClient() {
                 </div>
               ))}
             </div>
-            
+
             {selectedInvoice.documentType !== "credit_note" && (
               <div className="dialog-actions-row" style={{ display: "flex", gap: "8px", marginTop: "12px", alignItems: "flex-start" }}>
                 <button className="btn btn-secondary" onClick={addEditableLineItem}>ADD LINE ITEM</button>
@@ -777,7 +777,7 @@ export function AdminInvoicesClient() {
                   {presets.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
                 </select>
                 <button className="btn btn-secondary" style={{ width: "auto" }}>ADD PRODUCT PRESET</button>
-                
+
                 <div className="invoice-total-stack" style={{ marginLeft: "auto", textAlign: "right" }}>
                   <div>Subtotal: {toCurrency(subtotalCents, selectedInvoice.currency)}</div>
                   <div>GST: {toCurrency(gstCents, selectedInvoice.currency)}</div>
@@ -806,6 +806,9 @@ export function AdminInvoicesClient() {
               <button className="btn btn-secondary" disabled={!!busyAction} onClick={() => void runInvoiceAction("create_credit_note")}>CREATE CREDIT NOTE</button>
               <button className="btn btn-danger" disabled={!!busyAction} onClick={() => void runInvoiceAction("void")}>VOID</button>
               <button className="btn btn-danger" disabled={!!busyAction} onClick={() => void runInvoiceAction("delete")}>DELETE</button>
+              {selectedInvoice?.customerId ? (
+                <button className="btn btn-secondary" onClick={() => router.push(`/admin/customers?customerId=${selectedInvoice.customerId}`)}>VIEW CUSTOMER</button>
+              ) : null}
             </div>
           </div>
         </div>

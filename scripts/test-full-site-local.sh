@@ -49,7 +49,7 @@ Usage: scripts/test-full-site-local.sh [--skip-install] [--skip-tests] [--seed] 
 
 --skip-install  Skip `npm ci`
 --skip-tests    Skip `npm test`
---seed          Seed fake customers, invoices, and appointments
+    --seed          Clear existing customer/invoice data and seed fresh fake data
 --no-start      Do not start Next.js dev server after setup/checks
 EOF
       exit 0
@@ -126,11 +126,18 @@ log "MySQL is ready"
 # Run migrations using the DATABASE_URL from .env
 DATABASE_URL="${DB_URL}" npx prisma migrate deploy
 
+# Generate Prisma client
+log "Generating Prisma client..."
+DATABASE_URL="${DB_URL}" npx prisma generate
+
 # Seed whitelabel defaults to ensure "old info" (MGS branding) is in the DB
 log "Seeding whitelabel defaults..."
 DATABASE_URL="${DB_URL}" npx tsx scripts/seed-whitelabel-defaults.ts
 
 if [[ "$SEED_DATA" -eq 1 ]]; then
+  log "Clearing old customer data (cascades to bookings, invoices, etc.)..."
+  DATABASE_URL="${DB_URL}" npx tsx scripts/clear-customer-data.ts
+  
   log "Seeding fake customers, invoices, and appointments..."
   DATABASE_URL="${DB_URL}" npx tsx scripts/seed-fake-data.ts
   
