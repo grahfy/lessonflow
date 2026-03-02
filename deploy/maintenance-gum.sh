@@ -783,8 +783,13 @@ restore_backup() {
   fi
 
   if [[ "${rw}" == "true" && -d "${bd}/app" ]]; then
-    log_info "Application files ready in: ${bd}/app"
-    log_warn "Manual action required: cp -r ${bd}/app/* ${CURRENT_LINK}/"
+    log_info "Restoring application files..."
+    if gum confirm "Overwrite active application files in ${CURRENT_LINK}?"; then
+      run_step "Restoring files" run_privileged_cmd cp -r "${bd}/app/." "${CURRENT_LINK}/"
+      log_info "Application files restored"
+    else
+      log_warn "Application file restore skipped by user"
+    fi
   fi
 
   if [[ "${rm}" == "true" && -d "${bd}/learning-materials" ]]; then

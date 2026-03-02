@@ -575,7 +575,9 @@ run_restore_process() {
         [[ "$r_env" == "true" && -f "$bd/.env" ]] && run_task "Restoring Env" run_privileged_cmd cp "$bd/.env" "${SHARED_DIR}/.env"
         [[ "$r_seo" == "true" && -f "$bd/seo-config.json" ]] && run_task "Restoring SEO" run_privileged_cmd cp "$bd/seo-config.json" "$SEO_CONFIG_FILE"
         [[ "$r_mat" == "true" && -d "$bd/.data" ]] && run_task "Restoring Materials" run_privileged_cmd cp -r "$bd/.data" "${REPO_ROOT}/"
-        [[ "$r_app" == "true" && -d "$bd/app" ]] && center_style "Manual app copy required from $bd/app" --foreground 220
+        if [[ "$r_app" == "true" && -d "$bd/app" ]]; then
+            run_task "Restoring App Files" run_privileged_cmd cp -r "$bd/app/." "${CURRENT_LINK}/"
+        fi
         
         rm -rf "$td"
         notify_success "Restore process finished"
