@@ -24,8 +24,8 @@ export function CustomerEmailDialog({
     onSendEmail
 }: Props) {
     return (
-        <div className="dialog-layout" style={{ minHeight: '650px' }}>
-            <div className="dialog-col">
+        <div className="dialog-tab-stack" style={{ minHeight: '650px', marginTop: "12px" }}>
+            <div className="dialog-col dialog-tab-section">
                 <h3 className="manual-section-title">Email History</h3>
                 <AdminCard ghost style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid var(--line)', padding: '12px' }}>
                     {loadingEmailHistory ? (
@@ -53,21 +53,22 @@ export function CustomerEmailDialog({
                 </AdminCard>
             </div>
 
-            <div className="dialog-col is-notes">
+            <div className="dialog-col dialog-tab-section">
                 <h3 className="manual-section-title">Send Email</h3>
-                <AdminCard ghost style={{ border: '1px solid var(--line)', padding: '16px' }}>
-                    <AdminForm>
+                <AdminCard ghost style={{ border: '1px solid var(--line)', padding: '16px', width: "100%" }}>
+                    <AdminForm style={{ width: "100%" }}>
                         <AdminField label="Subject" required fullWidth>
                             <input
                                 placeholder="Email subject..."
                                 value={emailComposerSubject}
                                 onChange={e => setEmailComposerSubject(e.target.value)}
+                                style={{ width: "100%" }}
                             />
                         </AdminField>
                         <AdminField label="Message" required fullWidth>
                             <textarea
                                 placeholder="Type your message here..."
-                                style={{ minHeight: '180px', resize: 'vertical' }}
+                                style={{ width: "100%", minHeight: '220px', resize: 'vertical' }}
                                 value={emailComposerMessage}
                                 onChange={e => setEmailComposerMessage(e.target.value)}
                             />
@@ -77,7 +78,7 @@ export function CustomerEmailDialog({
                             type="button"
                             disabled={sendingEmail || !emailComposerSubject.trim() || !emailComposerMessage.trim()}
                             onClick={() => onSendEmail(emailComposerSubject, emailComposerMessage)}
-                            style={{ width: '100%', marginTop: '8px' }}
+                            style={{ width: "100%", marginTop: "8px", gridColumn: "1 / -1" }}
                         >
                             {sendingEmail ? "Sending..." : "Send Email"}
                         </button>

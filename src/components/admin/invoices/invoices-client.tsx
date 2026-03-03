@@ -10,7 +10,7 @@ import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { parseAudInputToCents } from "@/lib/invoices/currency";
 import { DEFAULT_CURRENCY } from "@/lib/branding";
-import { formatDateTime, toDateTimeLocalValue, toMoneyInput } from "@/lib/admin/formatters";
+import { toDateTimeLocalValue, toMoneyInput } from "@/lib/admin/formatters";
 
 import { useInvoices, type InvoiceRow, type InvoiceTaxMode } from "@/lib/admin/use-invoices";
 import { usePresets } from "@/lib/admin/use-presets";
@@ -100,28 +100,10 @@ export function AdminInvoicesClient() {
   });
 
   const { presets } = usePresets({ onAuthError, onError: setError });
-  const { customers: customerOptions, load: loadCustomers } = useCustomers({ pageSize: 1000, onAuthError, onError: setError });
-
-  // Effects
-  useEffect(() => {
-    void loadInvoices(query, page, outstandingOnly);
-  }, [query, page, outstandingOnly, loadInvoices]);
-
-  useEffect(() => {
-    const shouldOpenCreate = searchParams.get("openCreate") === "true";
-    const customerId = searchParams.get("customerId");
-    
-    if (shouldOpenCreate && !createOpen) {
-      setCreateOpen(true);
-      void loadCustomers();
-      if (customerId) {
-        setCreateSelectedCustomerId(customerId);
-      }
-    }
-  }, [searchParams, createOpen, loadCustomers]);
+  const { customers: customerOptions, load: loadCustomers } = useCustomers({ pageSize: 250, onAuthError, onError: setError });
 
   // Actions
-  const openDetail = (invoice: InvoiceRow) => {
+  const openDetail = useCallback((invoice: InvoiceRow) => {
     setSelectedInvoice(invoice);
     setEditingNotes(invoice.notes || "");
     setEditingDueAt(toDateTimeLocalValue(invoice.dueAt));
@@ -140,7 +122,62 @@ export function AdminInvoicesClient() {
     );
     setNotice("");
     setError("");
-  };
+  }, []);
+
+  // Effects
+  useEffect(() => {
+    void loadInvoices(query, page, outstandingOnly);
+  }, [query, page, outstandingOnly, loadInvoices]);
+
+  useEffect(() => {
+    const shouldOpenCreate = searchParams.get("openCreate") === "true";
+    const customerId = searchParams.get("customerId");
+    const openInvoiceId = searchParams.get("openInvoiceId");
+    const nextParams = new URLSearchParams(searchParams.toString());
+    let shouldReplace = false;
+
+    if (shouldOpenCreate && !createOpen) {
+      setCreateOpen(true);
+      void loadCustomers();
+      if (customerId) {
+        setCreateSelectedCustomerId(customerId);
+      }
+      nextParams.delete("openCreate");
+      nextParams.delete("customerId");
+      shouldReplace = true;
+    }
+
+    if (openInvoiceId) {
+      nextParams.delete("openInvoiceId");
+      shouldReplace = true;
+
+      void (async () => {
+        try {
+          const response = await fetch(`/api/admin/invoices/${openInvoiceId}`, { cache: "no-store" });
+          if (response.status === 401) {
+            onAuthError();
+            return;
+          }
+          if (!response.ok) {
+            setError("Invoice was created but could not be loaded.");
+            return;
+          }
+          const payload = await response.json() as { invoice?: InvoiceRow };
+          if (payload.invoice) {
+            openDetail(payload.invoice);
+            setNotice("Draft invoice opened.");
+          }
+        } catch {
+          setError("Unable to load the created invoice.");
+        }
+      })();
+    }
+
+    if (shouldReplace) {
+      const query = nextParams.toString();
+      router.replace(query ? `/admin/invoices?${query}` : "/admin/invoices", { scroll: false });
+    }
+  }, [searchParams, createOpen, loadCustomers, onAuthError, openDetail, router]);
 
   const closeDetail = () => setSelectedInvoice(null);
 
@@ -190,7 +227,6 @@ export function AdminInvoicesClient() {
     setError("");
 
     const lineItemsPayload = editingLineItems.map((li) => ({
-      id: li.id,
       kind: li.kind,
       description: li.description,
       quantity: Number.parseFloat(li.quantity) || 0,
@@ -204,7 +240,7 @@ export function AdminInvoicesClient() {
       customerFirstName: editingCustomerFirstName,
       customerLastName: editingCustomerLastName,
       customerName: `${editingCustomerFirstName} ${editingCustomerLastName}`.trim(),
-      lineItems: lineItemsPayload as any
+      lineItems: lineItemsPayload
     });
 
     setBusyAction(null);
@@ -318,7 +354,7 @@ export function AdminInvoicesClient() {
     <AdminShell title="Invoices" error={error} notice={notice}>
       <div 
         className="admin-layout-content" 
-        style={{ height: 'calc(100vh - 120px)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+        style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
       >
         <div className="admin-actions-bar">
           <div style={{ display: 'flex', gap: '10px' }}>
@@ -362,7 +398,7 @@ export function AdminInvoicesClient() {
           {invoices.map((inv) => (
             <div 
               key={inv.id} 
-              className="invoice-row-item customer-item invoice-item" 
+              className="invoice-row-item invoice-item" 
               style={{
                 display: 'flex',
                 alignItems: 'center',

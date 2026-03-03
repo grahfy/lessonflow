@@ -50,9 +50,9 @@ export interface UseInvoicesResult {
     totalCount: number;
     totalPages: number;
     load: (query?: string, page?: number, outstandingOnly?: boolean) => Promise<void>;
-    save: (id: string, payload: Partial<InvoiceRow>) => Promise<InvoiceRow | null>;
+    save: (id: string, payload: Record<string, unknown>) => Promise<InvoiceRow | null>;
     performAction: (id: string, action: string) => Promise<InvoiceRow | null>;
-    create: (payload: any) => Promise<InvoiceRow | null>;
+    create: (payload: Record<string, unknown>) => Promise<InvoiceRow | null>;
     sendBulkReminders: () => Promise<number | null>;
     remove: (id: string) => Promise<boolean>;
 }
@@ -85,8 +85,22 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
             }
             const data = await response.json();
             setInvoices(data.invoices || []);
-            setTotalCount(data.totalCount || 0);
-            setTotalPages(data.totalPages || 0);
+            const resolvedTotalCount =
+                typeof data.totalCount === "number"
+                    ? data.totalCount
+                    : typeof data.total === "number"
+                        ? data.total
+                        : Array.isArray(data.invoices)
+                            ? data.invoices.length
+                            : 0;
+            const resolvedTotalPages =
+                typeof data.totalPages === "number"
+                    ? data.totalPages
+                    : resolvedTotalCount > 0
+                        ? Math.max(1, Math.ceil(resolvedTotalCount / pageSize))
+                        : 0;
+            setTotalCount(resolvedTotalCount);
+            setTotalPages(resolvedTotalPages);
         } catch {
             if (onError) onError("Network error loading invoices.");
         } finally {
@@ -94,7 +108,7 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
         }
     }, [pageSize, safeFetch, handleApiError, onError]);
 
-    const save = useCallback(async (id: string, payload: Partial<InvoiceRow>): Promise<InvoiceRow | null> => {
+    const save = useCallback(async (id: string, payload: Record<string, unknown>): Promise<InvoiceRow | null> => {
         try {
             const response = await safeFetch(`/api/admin/invoices/${id}`, {
                 method: "PATCH",
@@ -144,7 +158,7 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
         }
     }, [safeFetch, handleApiError]);
 
-    const create = useCallback(async (payload: any): Promise<InvoiceRow | null> => {
+    const create = useCallback(async (payload: Record<string, unknown>): Promise<InvoiceRow | null> => {
         try {
             const response = await safeFetch("/api/admin/invoices", {
                 method: "POST",

@@ -120,8 +120,8 @@ export function CustomerDialogWrapper({
             {error ? <p className="notice error" style={{ marginTop: '12px' }}>{error}</p> : null}
             {notice ? <p className="notice success" style={{ marginTop: '12px' }}>{notice}</p> : null}
 
-            <div className="dialog-layout" style={{ marginTop: "12px" }}>
-                {activeTab === 'profile' && (
+            {activeTab === 'profile' && (
+                <div className="dialog-layout" style={{ marginTop: "12px" }}>
                     <CustomerProfileDialog
                         customer={selectedCustomer}
                         isEditing={rest.isEditing}
@@ -139,37 +139,37 @@ export function CustomerDialogWrapper({
                         onRevealPortalPassword={rest.onRevealPortalPassword}
                         onRegeneratePortalPassword={rest.onRegeneratePortalPassword}
                     />
-                )}
+                </div>
+            )}
 
-                {activeTab === 'emails' && (
-                    <CustomerEmailDialog
-                        loadingEmailHistory={rest.loadingEmailHistory}
-                        emailHistory={rest.emailHistory}
-                        emailComposerSubject={rest.emailComposerSubject}
-                        setEmailComposerSubject={rest.setEmailComposerSubject}
-                        emailComposerMessage={rest.emailComposerMessage}
-                        setEmailComposerMessage={rest.setEmailComposerMessage}
-                        sendingEmail={rest.sendingEmail}
-                        onSendEmail={rest.onSendEmail}
-                    />
-                )}
+            {activeTab === 'emails' && (
+                <CustomerEmailDialog
+                    loadingEmailHistory={rest.loadingEmailHistory}
+                    emailHistory={rest.emailHistory}
+                    emailComposerSubject={rest.emailComposerSubject}
+                    setEmailComposerSubject={rest.setEmailComposerSubject}
+                    emailComposerMessage={rest.emailComposerMessage}
+                    setEmailComposerMessage={rest.setEmailComposerMessage}
+                    sendingEmail={rest.sendingEmail}
+                    onSendEmail={rest.onSendEmail}
+                />
+            )}
 
-                {activeTab === 'materials' && (
-                    <CustomerMaterialsDialog
-                        materialsLoading={rest.materialsLoading}
-                        materialsList={rest.materialsList}
-                        materialsBookings={rest.materialsBookings}
-                        materialsBookingId={rest.materialsBookingId}
-                        setMaterialsBookingId={rest.setMaterialsBookingId}
-                        materialsUploading={rest.materialsUploading}
-                        materialsDeletingId={rest.materialsDeletingId}
-                        materialsUploadFormRef={rest.materialsUploadFormRef}
-                        onUpload={rest.onUploadMaterial}
-                        onDelete={rest.onDeleteMaterial}
-                        onBookingSelect={rest.onMaterialBookingSelect}
-                    />
-                )}
-            </div>
+            {activeTab === 'materials' && (
+                <CustomerMaterialsDialog
+                    materialsLoading={rest.materialsLoading}
+                    materialsList={rest.materialsList}
+                    materialsBookings={rest.materialsBookings}
+                    materialsBookingId={rest.materialsBookingId}
+                    setMaterialsBookingId={rest.setMaterialsBookingId}
+                    materialsUploading={rest.materialsUploading}
+                    materialsDeletingId={rest.materialsDeletingId}
+                    materialsUploadFormRef={rest.materialsUploadFormRef}
+                    onUpload={rest.onUploadMaterial}
+                    onDelete={rest.onDeleteMaterial}
+                    onBookingSelect={rest.onMaterialBookingSelect}
+                />
+            )}
         </AdminDialog>
     );
 }

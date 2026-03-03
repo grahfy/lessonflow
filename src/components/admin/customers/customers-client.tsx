@@ -234,7 +234,7 @@ export function AdminCustomersClient() {
     >
       <div 
         className="admin-layout-content" 
-        style={{ height: 'calc(100vh - 120px)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+        style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
       >
         <div className="admin-actions-bar">
           <button className="btn btn-primary" onClick={() => openCustomerDialog(null, true)}>

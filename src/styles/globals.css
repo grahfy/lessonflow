@@ -1208,21 +1208,42 @@ h1 {
   gap: 14px;
   min-height: 0;
   flex: 1;
+  overflow: hidden;
+}
+
+.admin-actions-bar {
+  flex-shrink: 0;
 }
 
 /* Ensure the pagination at the bottom doesn't shrink */
-.admin-card.invoice-list-card .pagination {
+.admin-card.invoice-list-card .pagination-container {
   flex-shrink: 0;
   margin-top: auto;
 }
+
 .admin-shell {
-  min-height: 100dvh;
+  height: 100dvh;
+  max-height: 100dvh;
   width: min(1300px, 100%);
   margin: 0 auto;
   padding: 20px;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 14px;
+  overflow: hidden;
+}
+
+.admin-shell-messages {
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+}
+
+.admin-shell-content {
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  overflow: hidden;
 }
 
 .notice {
@@ -1251,67 +1272,29 @@ h1 {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-.dialog-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.85); /* Darker backdrop */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-  backdrop-filter: blur(4px);
+.customer-item .customer-col-identity {
+  color: #9cc8ff;
 }
 
-.dialog-panel {
-  background: #0c1129;
-  border: 1px solid var(--line);
-  border-radius: 16px;
+.customer-item .customer-col-phone {
+  color: #f7a6dc;
+}
+
+.customer-item .customer-col-skill {
+  color: #80f2bf;
+}
+
+.customer-item .customer-col-portal {
+  color: #ffd87a;
+}
+
+.dialog-tab-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.dialog-tab-section {
   width: 100%;
-  max-width: 660px; /* Increased 10% from 600px */
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
-  position: relative;
-  padding: 32px;
-}
-
-.dialog-panel-wide {
-  max-width: 1210px; /* Increased 10% from 1100px */
-}
-
-/* Scrolling list layout refinements */
-.admin-layout-content {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  min-height: 0;
-  flex: 1;
-  height: calc(100vh - 140px); /* Fixed height to enable inner scrolling */
-}
-
-.admin-actions-bar {
-  flex-shrink: 0; /* Keep actions static */
-}
-
-/* Customer Table Column Colors */
-.customer-item > div:nth-child(1) { color: #60a5fa; font-weight: 600; } /* Name: Blue */
-.customer-item > div:nth-child(3) { color: #f472b6; } /* Phone: Pink */
-.customer-item > div:nth-child(5) { color: #34d399; } /* Skill: Green */
-.customer-item > div:nth-child(7) { color: #fbbf24; } /* Portal: Amber */
-
-/* Materials UI Refinements */
-.manual-section-title {
-  color: var(--ink-0);
-  font-size: 1.1rem;
-  margin-bottom: 16px;
-  letter-spacing: -0.01em;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 8px;
 }
 
 .admin-settings-section {
@@ -1589,7 +1572,7 @@ h1 {
 }
 
 .dialog-panel {
-  width: min(800px, 96vw);
+  width: min(880px, 97vw);
   max-height: min(88vh, 920px);
   overflow: auto;
   border-radius: 18px;
@@ -1603,11 +1586,11 @@ h1 {
   display: grid;
   overflow: hidden;
   max-height: min(90vh, 920px);
-  width: min(1000px, 96vw);
+  width: min(1100px, 97vw);
 }
 
 .dialog-panel-wide {
-  width: min(1200px, 96vw);
+  width: min(1320px, 97vw);
 }
 
 .dialog-head {
@@ -1809,6 +1792,12 @@ h1 {
   max-height: min(50vh, 480px);
   overflow: auto;
   padding-right: 2px;
+}
+
+.admin-list-scroll {
+  min-height: 0;
+  margin-top: 0;
+  padding-right: 0;
 }
 
 .customer-item {
@@ -2461,12 +2450,10 @@ h1 {
 }
 
 .invoice-list-card {
-  min-height: max(260px, calc(100dvh - 360px));
-  display: grid;
-  grid-template-rows: min-content minmax(0, 1fr);
+  min-height: 0;
 }
 
-.invoice-list-card .customers-list {
+.invoice-list-card .admin-list-scroll {
   max-height: none;
   min-height: 0;
   height: 100%;

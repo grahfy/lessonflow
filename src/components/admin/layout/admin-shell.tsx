@@ -26,11 +26,13 @@ export function AdminShell({ title, error, notice, loading, style, className, ch
     >
       <AdminHeader title={title} />
 
-      {error ? <p className="notice error">{error}</p> : null}
-      {notice ? <p className="notice success">{notice}</p> : null}
-      {loading ? <p className="notice">Loading...</p> : null}
+      <div className="admin-shell-messages">
+        {error ? <p className="notice error">{error}</p> : null}
+        {notice ? <p className="notice success">{notice}</p> : null}
+        {loading ? <p className="notice">Loading...</p> : null}
+      </div>
 
-      {children}
+      <div className="admin-shell-content">{children}</div>
     </div>
   );
 }

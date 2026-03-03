@@ -1,21 +1,22 @@
 "use client";
 
-import { RefObject, ReactNode, useState } from "react";
+import { RefObject } from "react";
 import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { AdminCard } from "@/components/admin/ui/admin-card";
-import { formatDateTime, formatBytes } from "@/lib/admin/formatters";
+import { formatDateTime } from "@/lib/admin/formatters";
 import { type BookingEvent } from "@/lib/admin/use-bookings";
 import { type EmailRecord } from "@/lib/admin/use-email-history";
-import { type LearningMaterialRow, AU_STATES } from "@/lib/admin/types";
+import { AU_STATES } from "@/lib/admin/types";
+import { type BookingDialogForm, type BookingMatchedCustomer } from "./types";
 
 interface BookingDetailDialogProps {
   isOpen: boolean;
   onClose: () => void;
   rootRef: RefObject<HTMLDivElement | null>;
   event: BookingEvent | null;
-  dialogForm: any;
-  setDialogForm: (form: any) => void;
+  dialogForm: BookingDialogForm | null;
+  setDialogForm: (form: BookingDialogForm) => void;
   busyAction: string | null;
   onSave: () => void;
   onDelete: () => void;
@@ -26,10 +27,11 @@ interface BookingDetailDialogProps {
   setActiveTab: (tab: "appointment" | "emails") => void;
 
   // Customer
-  selectedCustomer: any;
-  isEditingCustomer: boolean;
-  setIsEditingCustomer: (editing: boolean) => void;
-  onEditCustomer: () => void;
+  matchedCustomer: BookingMatchedCustomer | null;
+  hasHeuristicMatch: boolean;
+  onApplyMatchedCustomer: () => void;
+  onOpenMatchedCustomer: () => void | Promise<void>;
+  onDismissMatchedCustomer: () => void;
 
   // Email
   emailHistory: ReadonlyArray<EmailRecord>;
@@ -44,7 +46,7 @@ interface BookingDetailDialogProps {
   // Additional Actions
   onPerformAction: (action: string) => void;
   onOpenMaterials: () => void;
-  onOpenInvoice: () => void;
+  onOpenInvoice: () => void | Promise<void>;
 }
 
 export function BookingDetailDialog({
@@ -60,10 +62,11 @@ export function BookingDetailDialog({
   onMove,
   activeTab,
   setActiveTab,
-  selectedCustomer,
-  isEditingCustomer,
-  setIsEditingCustomer,
-  onEditCustomer,
+  matchedCustomer,
+  hasHeuristicMatch,
+  onApplyMatchedCustomer,
+  onOpenMatchedCustomer,
+  onDismissMatchedCustomer,
   emailHistory,
   loadingEmailHistory,
   sendingEmail,
@@ -78,7 +81,7 @@ export function BookingDetailDialog({
 }: BookingDetailDialogProps) {
   if (!event || !dialogForm) return null;
 
-  const updateForm = (patch: any) => setDialogForm({ ...dialogForm, ...patch });
+  const updateForm = (patch: Partial<BookingDialogForm>) => setDialogForm({ ...dialogForm, ...patch });
 
   return (
     <AdminDialog
@@ -123,79 +126,83 @@ export function BookingDetailDialog({
             <>
               <div className="dialog-col">
                 <h3 className="manual-section-title">Customer Details</h3>
-                {selectedCustomer && !isEditingCustomer ? (
-                  <AdminCard ghost style={{ marginBottom: '16px' }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                      <span style={{ fontWeight: 600, color: "var(--text-secondary)" }}>Read-only customer</span>
-                      <button type="button" className="btn btn-secondary" onClick={onEditCustomer}>Edit</button>
+                {matchedCustomer && (
+                  <AdminCard ghost style={{ marginBottom: '16px', border: hasHeuristicMatch ? '1px solid rgba(251, 191, 36, 0.5)' : '1px solid var(--line)' }}>
+                    <p className="helper-text" style={{ marginBottom: '8px' }}>
+                      {hasHeuristicMatch ? "Possible customer match found." : "Booking is linked to an existing customer."}
+                    </p>
+                    <div style={{ fontSize: '0.85rem', marginBottom: '10px' }}>
+                      <strong>{matchedCustomer.fullName}</strong>
+                      <div style={{ color: 'var(--ink-1)' }}>{matchedCustomer.email} · {matchedCustomer.phone}</div>
                     </div>
-                    <AdminForm className="dialog-form-grid">
-                      <AdminField label="Full Name">
-                        <input value={selectedCustomer.fullName} readOnly />
-                      </AdminField>
-                      <AdminField label="Email">
-                        <input value={selectedCustomer.email} readOnly />
-                      </AdminField>
-                      <AdminField label="Phone">
-                        <input value={selectedCustomer.phone} readOnly />
-                      </AdminField>
-                      <AdminField label="Address" fullWidth>
-                        <input value={selectedCustomer.address || ""} readOnly />
-                      </AdminField>
-                    </AdminForm>
+                    <div className="button-row">
+                      {hasHeuristicMatch && (
+                        <>
+                          <button type="button" className="btn btn-secondary" onClick={onApplyMatchedCustomer}>
+                            Use Matched Customer
+                          </button>
+                          <button type="button" className="btn btn-secondary" onClick={onDismissMatchedCustomer}>
+                            Keep Booking-Only Details
+                          </button>
+                        </>
+                      )}
+                      <button type="button" className="btn btn-secondary" onClick={onOpenMatchedCustomer}>
+                        Open Customer
+                      </button>
+                    </div>
                   </AdminCard>
-                ) : (
-                  <AdminForm className="dialog-form-grid">
-                    <AdminField label="First Name">
-                      <input value={dialogForm.firstName} onChange={e => updateForm({ firstName: e.target.value })} />
-                    </AdminField>
-                    <AdminField label="Last Name">
-                      <input value={dialogForm.lastName} onChange={e => updateForm({ lastName: e.target.value })} />
-                    </AdminField>
-                    <AdminField label="Email" fullWidth>
-                      <input value={dialogForm.email} onChange={e => updateForm({ email: e.target.value })} />
-                    </AdminField>
-                    <AdminField label="Phone">
-                      <input value={dialogForm.phone} maxLength={10} onChange={e => updateForm({ phone: e.target.value.replace(/\D/g, '').slice(0, 10) })} />
-                    </AdminField>
-                    <AdminField label="Unit">
-                      <input value={dialogForm.unitNumber} onChange={e => updateForm({ unitNumber: e.target.value })} />
-                    </AdminField>
-                    <AdminField label="House #">
-                      <input value={dialogForm.houseNumber} onChange={e => updateForm({ houseNumber: e.target.value })} />
-                    </AdminField>
-                    <AdminField label="Street Name">
-                      <input value={dialogForm.streetName} onChange={e => updateForm({ streetName: e.target.value })} />
-                    </AdminField>
-                    <AdminField label="Street Type">
-                      <select value={dialogForm.streetType} onChange={e => updateForm({ streetType: e.target.value })}>
-                        <option value="Street">Street</option>
-                        <option value="Road">Road</option>
-                        <option value="Avenue">Avenue</option>
-                        <option value="Drive">Drive</option>
-                        <option value="Lane">Lane</option>
-                        <option value="Court">Court</option>
-                        <option value="Crescent">Crescent</option>
-                        <option value="Place">Place</option>
-                        <option value="Boulevard">Boulevard</option>
-                        <option value="Terrace">Terrace</option>
-                        <option value="Parade">Parade</option>
-                        <option value="Close">Close</option>
-                      </select>
-                    </AdminField>
-                    <AdminField label="Suburb">
-                      <input value={dialogForm.suburb} onChange={e => updateForm({ suburb: e.target.value })} />
-                    </AdminField>
-                    <AdminField label="State">
-                      <select value={dialogForm.state} onChange={e => updateForm({ state: e.target.value })}>
-                        {AU_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    </AdminField>
-                    <AdminField label="Postcode">
-                      <input value={dialogForm.postcode} maxLength={4} onChange={e => updateForm({ postcode: e.target.value.replace(/\D/g, '').slice(0, 4) })} />
-                    </AdminField>
-                  </AdminForm>
                 )}
+
+                <AdminForm className="dialog-form-grid">
+                  <AdminField label="First Name">
+                    <input value={dialogForm.firstName} onChange={e => updateForm({ firstName: e.target.value })} />
+                  </AdminField>
+                  <AdminField label="Last Name">
+                    <input value={dialogForm.lastName} onChange={e => updateForm({ lastName: e.target.value })} />
+                  </AdminField>
+                  <AdminField label="Email" fullWidth>
+                    <input value={dialogForm.email} onChange={e => updateForm({ email: e.target.value })} />
+                  </AdminField>
+                  <AdminField label="Phone">
+                    <input value={dialogForm.phone} maxLength={10} onChange={e => updateForm({ phone: e.target.value.replace(/\D/g, '').slice(0, 10) })} />
+                  </AdminField>
+                  <AdminField label="Unit">
+                    <input value={dialogForm.unitNumber} onChange={e => updateForm({ unitNumber: e.target.value })} />
+                  </AdminField>
+                  <AdminField label="House #">
+                    <input value={dialogForm.houseNumber} onChange={e => updateForm({ houseNumber: e.target.value })} />
+                  </AdminField>
+                  <AdminField label="Street Name">
+                    <input value={dialogForm.streetName} onChange={e => updateForm({ streetName: e.target.value })} />
+                  </AdminField>
+                  <AdminField label="Street Type">
+                    <select value={dialogForm.streetType} onChange={e => updateForm({ streetType: e.target.value })}>
+                      <option value="Street">Street</option>
+                      <option value="Road">Road</option>
+                      <option value="Avenue">Avenue</option>
+                      <option value="Drive">Drive</option>
+                      <option value="Lane">Lane</option>
+                      <option value="Court">Court</option>
+                      <option value="Crescent">Crescent</option>
+                      <option value="Place">Place</option>
+                      <option value="Boulevard">Boulevard</option>
+                      <option value="Terrace">Terrace</option>
+                      <option value="Parade">Parade</option>
+                      <option value="Close">Close</option>
+                    </select>
+                  </AdminField>
+                  <AdminField label="Suburb">
+                    <input value={dialogForm.suburb} onChange={e => updateForm({ suburb: e.target.value })} />
+                  </AdminField>
+                  <AdminField label="State">
+                    <select value={dialogForm.state} onChange={e => updateForm({ state: e.target.value })}>
+                      {AU_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </AdminField>
+                  <AdminField label="Postcode">
+                    <input value={dialogForm.postcode} maxLength={4} onChange={e => updateForm({ postcode: e.target.value.replace(/\D/g, '').slice(0, 4) })} />
+                  </AdminField>
+                </AdminForm>
 
                 <h3 className="manual-section-title" style={{ marginTop: '20px' }}>Lesson Config</h3>
                 <AdminForm className="dialog-form-grid">
@@ -237,7 +244,11 @@ export function BookingDetailDialog({
                 <div className="button-row" style={{ flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
                   <button className="btn btn-secondary" onClick={onMove}>Move Lesson Time</button>
                   <button className="btn btn-secondary" onClick={onOpenMaterials}>Learning Materials</button>
-                  <button className="btn btn-secondary" onClick={onOpenInvoice}>Invoice / Billing</button>
+                  {event.entityType === "booking" && (
+                    <button className="btn btn-secondary" disabled={busyAction === "invoice"} onClick={onOpenInvoice}>
+                      {busyAction === "invoice" ? "Creating Invoice..." : "Invoice / Billing"}
+                    </button>
+                  )}
                   <button className="btn btn-danger" disabled={!!busyAction} onClick={onDelete}>Cancel Booking</button>
                 </div>
               </div>

@@ -77,24 +77,24 @@ export function CustomerTable({
                     }}
                     onClick={() => onOpenCustomerDialog(customer, false)}
                 >
-                    <div style={{ flex: '1', minWidth: '180px', display: 'flex', flexDirection: 'column' }}>
+                    <div className="customer-col-identity" style={{ flex: '1', minWidth: '180px', display: 'flex', flexDirection: 'column' }}>
                         <strong style={{ fontSize: '0.95rem' }}>{customer.lastName ? `${customer.lastName}, ${customer.firstName}` : customer.fullName}</strong>
                         <span style={{ fontSize: '0.8rem', color: 'var(--ink-1)' }}>{customer.email}</span>
                     </div>
 
                     <Separator />
-                    <div style={{ width: '110px', display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
+                    <div className="customer-col-phone" style={{ width: '110px', display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
                         <span style={{ fontSize: '0.85rem' }}>{customer.phone}</span>
                     </div>
 
                     <Separator />
-                    <div style={{ width: '120px', display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
+                    <div className="customer-col-skill" style={{ width: '120px', display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
                         <span style={{ fontSize: '0.85rem', textTransform: 'capitalize' }}>{customer.skillLevel}</span>
                         <span style={{ fontSize: '0.75rem', color: 'var(--ink-1)' }}>{customer.lessonMode === "in_person" ? "In-person" : "Video"}</span>
                     </div>
 
                     <Separator />
-                    <div style={{ flex: '0.8', minWidth: '150px', display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
+                    <div className="customer-col-portal" style={{ flex: '0.8', minWidth: '150px', display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
                         <span style={{ fontSize: '0.85rem' }}>
                             {customer.portalCredential ? `Active (since ${new Date(customer.portalCredential.generatedAt).toLocaleDateString("en-AU")})` : "Not generated"}
                         </span>

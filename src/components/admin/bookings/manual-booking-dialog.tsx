@@ -5,6 +5,7 @@ import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { type ManualStep, MANUAL_STEP_LABEL, MANUAL_STEP_ORDER, AU_STATES } from "@/lib/admin/types";
+import { type BookingMatchedCustomer } from "./types";
 
 interface ManualBookingDialogProps {
   isOpen: boolean;
@@ -15,16 +16,16 @@ interface ManualBookingDialogProps {
   setStep: (step: ManualStep) => void;
   customerQuery: string;
   setCustomerQuery: (query: string) => void;
-  customerOptions: any[];
+  customerOptions: BookingMatchedCustomer[];
   manualCustomerId: string;
   setManualCustomerId: (id: string) => void;
-  onApplyCustomer: (customer: any) => void;
+  onApplyCustomer: (customer: BookingMatchedCustomer) => void;
   onClearCustomer: () => void;
   updateCustomerFromBooking: boolean;
   setUpdateCustomerFromBooking: (val: boolean) => void;
   durationChoice: string;
   setDurationChoice: (val: string) => void;
-  manualMatch: any | null;
+  manualMatch: BookingMatchedCustomer | null;
   onResolveMatch: (resolution: "use_existing" | "update_existing" | "create_new") => void;
   onSave: () => void;
   busyAction: string | null;
@@ -101,8 +102,7 @@ export function ManualBookingDialog({
       </div>
 
       <form ref={formRef} onSubmit={e => e.preventDefault()}>
-        {step === 'customer' && (
-          <div className="manual-booking-scroll">
+        <div className="manual-booking-scroll" style={{ display: step === "customer" ? "block" : "none" }} aria-hidden={step !== "customer"}>
             <h3 className="manual-section-title">Customer Selection</h3>
             <AdminForm className="manual-grid manual-grid-3">
               <AdminField label="Search existing students">
@@ -141,6 +141,13 @@ export function ManualBookingDialog({
                   />{" "}
                   Update linked customer profile from this booking
                 </label>
+                {manualCustomerId && (
+                  <div style={{ marginTop: "8px" }}>
+                    <button type="button" className="btn btn-secondary" onClick={onClearCustomer}>
+                      Clear selected customer
+                    </button>
+                  </div>
+                )}
               </div>
             </AdminForm>
 
@@ -200,10 +207,8 @@ export function ManualBookingDialog({
               </AdminField>
             </AdminForm>
           </div>
-        )}
 
-        {step === 'lesson' && (
-          <div className="manual-booking-scroll">
+        <div className="manual-booking-scroll" style={{ display: step === "lesson" ? "block" : "none" }} aria-hidden={step !== "lesson"}>
             <h3 className="manual-section-title">Lesson Details</h3>
             <AdminForm className="manual-grid manual-grid-3">
               <AdminField label="Mode" required>
@@ -237,10 +242,8 @@ export function ManualBookingDialog({
               )}
             </AdminForm>
           </div>
-        )}
 
-        {step === 'schedule' && (
-          <div className="manual-booking-scroll">
+        <div className="manual-booking-scroll" style={{ display: step === "schedule" ? "block" : "none" }} aria-hidden={step !== "schedule"}>
             <h3 className="manual-section-title">Schedule & Confirm</h3>
             <AdminForm className="manual-grid manual-grid-2">
               <AdminField label="Start Time" required>
@@ -274,7 +277,6 @@ export function ManualBookingDialog({
               </AdminCard>
             )}
           </div>
-        )}
       </form>
     </AdminDialog>
   );
