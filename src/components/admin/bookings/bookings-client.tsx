@@ -131,23 +131,33 @@ export function AdminBookingsClient() {
   // Handlers
   const openDialog = useCallback(async (event: EventWithRow) => {
     setSelectedKey(event.id);
+    const row = event.row;
     setDialogForm({
-      notes: event.row.notes || "",
+      notes: row.notes || "",
       startAtLocal: event.startAt.slice(0, 16),
-      firstName: event.row.customerFirstName || "",
-      lastName: event.row.customerLastName || "",
-      email: event.row.customerEmail || "",
-      phone: event.row.customerPhone || "",
-      suburb: event.row.customerSuburb || "",
-      postcode: event.row.customerPostcode || ""
+      firstName: row.firstName || "",
+      lastName: row.lastName || "",
+      email: row.email || "",
+      phone: row.phone || "",
+      unitNumber: row.unitNumber || "",
+      houseNumber: row.houseNumber || "",
+      streetName: row.streetName || "",
+      streetType: row.streetType || "Street",
+      suburb: row.suburb || "",
+      state: row.state || "VIC",
+      postcode: row.postcode || "",
+      lessonMode: row.lessonMode || "in_person",
+      skillLevel: row.skillLevel || "beginner",
+      durationChoice: row.lessonDuration || "min30",
+      customDurationMinutes: row.customDurationMinutes || ""
     });
     setActiveTab("appointment");
     setIsEditingCustomer(false);
     setError("");
     setNotice("");
 
-    if (event.row.customerId) {
-      void loadEmailHistory(event.row.customerId);
+    if (row.customerId) {
+      void loadEmailHistory(row.customerId);
     }
 
     dialogPresence.show();
@@ -353,7 +363,6 @@ export function AdminBookingsClient() {
               <button className="btn btn-secondary btn-icon" onClick={goNext}>→</button>
             </div>
             <strong style={{ fontSize: '1.1rem', minWidth: '200px' }}>{rangeLabel}</strong>
-            <button className="btn btn-secondary" onClick={goToday}>TODAY</button>
           </div>
 
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>

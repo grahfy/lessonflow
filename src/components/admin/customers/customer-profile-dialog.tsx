@@ -129,6 +129,8 @@ export function CustomerProfileDialog({
     onRevealPortalPassword,
     onRegeneratePortalPassword
 }: Props) {
+    const updateForm = (patch: Partial<CustomerForm>) => setForm(prev => ({ ...prev, ...patch }));
+
     return (
         <>
             <div className="dialog-col" style={{ minHeight: "650px" }}>
@@ -138,14 +140,14 @@ export function CustomerProfileDialog({
                         <input
                             value={form.firstName}
                             readOnly={!isEditing}
-                            onChange={e => setForm(prev => ({ ...prev, firstName: e.target.value }))}
+                            onChange={e => updateForm({ firstName: e.target.value })}
                         />
                     </AdminField>
                     <AdminField label="Last Name" required>
                         <input
                             value={form.lastName}
                             readOnly={!isEditing}
-                            onChange={e => setForm(prev => ({ ...prev, lastName: e.target.value }))}
+                            onChange={e => updateForm({ lastName: e.target.value })}
                         />
                     </AdminField>
                     <AdminField label="Email" required fullWidth>
@@ -153,7 +155,7 @@ export function CustomerProfileDialog({
                             type="email"
                             value={form.email}
                             readOnly={!isEditing}
-                            onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
+                            onChange={e => updateForm({ email: e.target.value })}
                         />
                     </AdminField>
                     <AdminField label="Phone" required>
@@ -161,14 +163,14 @@ export function CustomerProfileDialog({
                             value={form.phone}
                             readOnly={!isEditing}
                             maxLength={10}
-                            onChange={e => setForm(prev => ({ ...prev, phone: toDigits(e.target.value, 10) }))}
+                            onChange={e => updateForm({ phone: toDigits(e.target.value, 10) })}
                         />
                     </AdminField>
                     <AdminField label="Skill Level">
                         {isEditing ? (
                             <select
                                 value={form.skillLevel}
-                                onChange={e => setForm(prev => ({ ...prev, skillLevel: e.target.value as CustomerForm["skillLevel"] }))}
+                                onChange={e => updateForm({ skillLevel: e.target.value as CustomerForm["skillLevel"] })}
                             >
                                 <option value="beginner">Beginner</option>
                                 <option value="intermediate">Intermediate</option>
@@ -182,7 +184,7 @@ export function CustomerProfileDialog({
                         {isEditing ? (
                             <select
                                 value={form.lessonMode}
-                                onChange={e => setForm(prev => ({ ...prev, lessonMode: e.target.value as CustomerForm["lessonMode"] }))}
+                                onChange={e => updateForm({ lessonMode: e.target.value as CustomerForm["lessonMode"] })}
                             >
                                 <option value="in_person">In Person</option>
                                 <option value="video">Video</option>
@@ -199,83 +201,79 @@ export function CustomerProfileDialog({
                         <input
                             value={form.unitNumber}
                             readOnly={!isEditing}
-                            onChange={e => setForm(prev => ({ ...prev, unitNumber: e.target.value }))}
+                            onChange={e => updateForm({ unitNumber: e.target.value })}
                         />
                     </AdminField>
                     <AdminField label="House Number" required>
                         <input
                             value={form.houseNumber}
                             readOnly={!isEditing}
-                            onChange={e => setForm(prev => ({ ...prev, houseNumber: e.target.value }))}
+                            onChange={e => updateForm({ houseNumber: e.target.value })}
                         />
                     </AdminField>
-                    <AdminField label="Street" required fullWidth>
+                    <AdminField label="Street Name" required>
+                        <input
+                            value={form.streetName}
+                            readOnly={!isEditing}
+                            onChange={e => updateForm({ streetName: e.target.value })}
+                        />
+                    </AdminField>
+                    <AdminField label="Street Type" required>
                         {isEditing ? (
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                <input
-                                    style={{ flex: 2 }}
-                                    placeholder="Name"
-                                    value={form.streetName}
-                                    onChange={e => setForm(prev => ({ ...prev, streetName: e.target.value }))}
-                                />
-                                <select
-                                    style={{ flex: 1 }}
-                                    value={form.streetType}
-                                    onChange={e => setForm(prev => ({ ...prev, streetType: e.target.value }))}
-                                >
-                                    <option value="Street">Street</option>
-                                    <option value="Road">Road</option>
-                                    <option value="Avenue">Avenue</option>
-                                    <option value="Drive">Drive</option>
-                                    <option value="Lane">Lane</option>
-                                    <option value="Court">Court</option>
-                                    <option value="Crescent">Crescent</option>
-                                    <option value="Place">Place</option>
-                                    <option value="Boulevard">Boulevard</option>
-                                    <option value="Terrace">Terrace</option>
-                                    <option value="Parade">Parade</option>
-                                    <option value="Close">Close</option>
-                                </select>
-                            </div>
+                            <select
+                                value={form.streetType}
+                                onChange={e => updateForm({ streetType: e.target.value })}
+                            >
+                                <option value="Street">Street</option>
+                                <option value="Road">Road</option>
+                                <option value="Avenue">Avenue</option>
+                                <option value="Drive">Drive</option>
+                                <option value="Lane">Lane</option>
+                                <option value="Court">Court</option>
+                                <option value="Crescent">Crescent</option>
+                                <option value="Place">Place</option>
+                                <option value="Boulevard">Boulevard</option>
+                                <option value="Terrace">Terrace</option>
+                                <option value="Parade">Parade</option>
+                                <option value="Close">Close</option>
+                            </select>
                         ) : (
-                            <input value={`${form.streetName} ${form.streetType}`} readOnly />
+                            <input value={form.streetType} readOnly />
                         )}
                     </AdminField>
                     <AdminField label="Suburb" required>
                         <input
                             value={form.suburb}
                             readOnly={!isEditing}
-                            onChange={e => setForm(prev => ({ ...prev, suburb: e.target.value }))}
+                            onChange={e => updateForm({ suburb: e.target.value })}
                         />
                     </AdminField>
-                    <AdminField label="State & Postcode" required>
+                    <AdminField label="State" required>
                         {isEditing ? (
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                <select
-                                    style={{ flex: 2 }}
-                                    value={form.state}
-                                    onChange={e => setForm(prev => ({ ...prev, state: e.target.value as AuState }))}
-                                >
-                                    {AU_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
-                                <input
-                                    style={{ width: '80px', flexShrink: 0 }}
-                                    maxLength={4}
-                                    placeholder="Postcode"
-                                    value={form.postcode}
-                                    onChange={e => setForm(prev => ({ ...prev, postcode: toDigits(e.target.value, 4) }))}
-                                />
-                            </div>
+                            <select
+                                value={form.state}
+                                onChange={e => updateForm({ state: e.target.value as AuState })}
+                            >
+                                {AU_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
                         ) : (
-                            <input value={`${form.state} ${form.postcode}`} readOnly />
+                            <input value={form.state} readOnly />
                         )}
+                    </AdminField>
+                    <AdminField label="Postcode" required>
+                        <input
+                            value={form.postcode}
+                            readOnly={!isEditing}
+                            maxLength={4}
+                            onChange={e => updateForm({ postcode: toDigits(e.target.value, 4) })}
+                        />
                     </AdminField>
                 </AdminForm>
             </div>
 
             <div className="dialog-col is-notes" style={{ minHeight: "650px" }}>
                 <h4>Portal Credentials</h4>
-                <AdminCard style={{ background: 'rgba(0,0,0,0.03)', padding: '16px', border: '1px solid var(--line)' }}>
+                <AdminCard ghost style={{ background: 'rgba(0,0,0,0.03)', padding: '16px', border: '1px solid var(--line)' }}>
                     <p className="helper-text">Manage access to the student portal. Passwords are encrypted and can be revealed or rotated by admins.</p>
 
                     <div style={{ marginTop: '16px', display: 'grid', gap: '12px' }}>

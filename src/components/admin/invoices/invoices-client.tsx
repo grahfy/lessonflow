@@ -244,7 +244,7 @@ export function AdminInvoicesClient() {
 
   const header = (
     <>
-      <div style={{ width: '100px', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Number</div>
+      <div style={{ width: '120px', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Number</div>
       <Separator />
       <div style={{ flex: '1', minWidth: '150px', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Customer</div>
       <Separator />
@@ -253,6 +253,8 @@ export function AdminInvoicesClient() {
       <div style={{ width: '120px', textAlign: 'right', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Total</div>
       <Separator />
       <div style={{ width: '120px', textAlign: 'right', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Due Date</div>
+      <Separator />
+      <div style={{ width: '220px', textAlign: 'right', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Actions</div>
     </>
   );
 
@@ -272,19 +274,17 @@ export function AdminInvoicesClient() {
             </button>
           </div>
 
-          <div className="search-box">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                <input type="checkbox" checked={outstandingOnly} onChange={(e) => { setOutstandingOnly(e.target.checked); setPage(1); }} />
-                Outstanding only
-              </label>
-              <input
-                type="text"
-                value={query}
-                placeholder="Search by number or customer..."
-                onChange={(e) => { setQuery(e.target.value); setPage(1); }}
-              />
-            </div>
+          <div className="search-box" style={{ gap: '12px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', cursor: 'pointer', whiteSpace: 'nowrap', textTransform: 'none', letterSpacing: 'normal' }}>
+              <input type="checkbox" checked={outstandingOnly} onChange={(e) => { setOutstandingOnly(e.target.checked); setPage(1); }} style={{ width: 'auto', margin: 0 }} />
+              Outstanding only
+            </label>
+            <input
+              type="text"
+              value={query}
+              placeholder="Search by number or customer..."
+              onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+            />
           </div>
         </div>
 
@@ -319,7 +319,7 @@ export function AdminInvoicesClient() {
               }}
               onClick={() => openDetail(inv)}
             >
-              <div style={{ width: '100px', fontWeight: 600 }}>{inv.invoiceNumber}</div>
+              <div style={{ width: '120px', fontWeight: 600 }}>{inv.invoiceNumber}</div>
               <Separator />
               <div style={{ flex: '1', minWidth: '150px' }}>
                 <div style={{ fontWeight: 500 }}>{inv.customerName}</div>
@@ -339,6 +339,38 @@ export function AdminInvoicesClient() {
                 {inv.overdueDays !== null && inv.status !== "paid" && inv.status !== "void" && (
                   <div style={{ color: 'var(--red)', fontSize: '0.7rem', fontWeight: 600 }}>{inv.overdueDays} DAYS OVERDUE</div>
                 )}
+              </div>
+              <Separator />
+              <div className="customer-item-actions" style={{ width: '220px', display: 'flex', justifyContent: 'flex-end', gap: '6px' }} onClick={e => e.stopPropagation()}>
+                <button
+                  className="btn btn-secondary"
+                  style={{ padding: '6px 10px', fontSize: '0.7rem', minWidth: '0', flex: '1' }}
+                  type="button"
+                  onClick={() => window.open(`/api/admin/invoices/${inv.id}/pdf`, '_blank')}
+                >
+                  PDF
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  style={{ padding: '6px 10px', fontSize: '0.7rem', minWidth: '0', flex: '1' }}
+                  type="button"
+                  onClick={() => openDetail(inv)}
+                >
+                  Edit
+                </button>
+                <button
+                  className="btn btn-danger"
+                  style={{ padding: '6px 10px', fontSize: '0.7rem', minWidth: '0', flex: '1' }}
+                  type="button"
+                  onClick={async () => {
+                    if (window.confirm("Delete this invoice permanently?")) {
+                      await performActionApi(inv.id, "delete");
+                      void loadInvoices(query, page, outstandingOnly);
+                    }
+                  }}
+                >
+                  Del
+                </button>
               </div>
             </div>
           ))}

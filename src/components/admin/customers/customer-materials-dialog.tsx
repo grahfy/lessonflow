@@ -34,8 +34,8 @@ export function CustomerMaterialsDialog({
     return (
         <div className="dialog-layout">
             <div className="dialog-col">
-                <h4>Materials List</h4>
-                <AdminCard style={{ background: 'rgba(0,0,0,0.03)', padding: '12px', border: '1px solid var(--line)', maxHeight: '500px', overflowY: 'auto' }}>
+                <h3 className="manual-section-title">Materials List</h3>
+                <AdminCard ghost style={{ border: '1px solid var(--line)', padding: '12px', maxHeight: '500px', overflowY: 'auto' }}>
                     {materialsLoading ? (
                         <p className="helper-text">Loading materials...</p>
                     ) : materialsList.length > 0 ? (
@@ -46,7 +46,7 @@ export function CustomerMaterialsDialog({
                                         <strong style={{ fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</strong>
                                         <span style={{ fontSize: '0.75rem', color: 'var(--ink-2)' }}>{m.mimeType} · {formatDateTime(m.createdAt)}</span>
                                     </div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--ink-1)' }}>{(m.sizeBytes / 1024 / 1024).toFixed(2)} MB</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--ink-1)', whiteSpace: 'nowrap' }}>{(m.sizeBytes / 1024 / 1024).toFixed(2)} MB</div>
                                     <div style={{ display: 'flex', gap: '4px' }}>
                                         <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '0.7rem' }} onClick={() => window.open(`/api/admin/learning-materials/${m.id}`, '_blank')}>VIEW</button>
                                         <button
@@ -68,8 +68,8 @@ export function CustomerMaterialsDialog({
             </div>
 
             <div className="dialog-col is-notes">
-                <h4>Upload New</h4>
-                <AdminCard style={{ background: 'rgba(0,0,0,0.03)', padding: '16px', border: '1px solid var(--line)' }}>
+                <h3 className="manual-section-title">Upload New</h3>
+                <AdminCard ghost style={{ border: '1px solid var(--line)', padding: '16px' }}>
                     <AdminForm>
                         <AdminField label="Associate with booking">
                             <select
@@ -89,7 +89,7 @@ export function CustomerMaterialsDialog({
                         </AdminField>
                         <form ref={materialsUploadFormRef}>
                             <AdminField label="Select file">
-                                <input type="file" name="file" className="btn btn-secondary" style={{ width: '100%', padding: '8px' }} />
+                                <input type="file" name="file" style={{ width: '100%', padding: '8px 0', fontSize: '0.85rem' }} />
                             </AdminField>
                         </form>
                         <button
@@ -97,6 +97,7 @@ export function CustomerMaterialsDialog({
                             type="button"
                             disabled={materialsUploading}
                             onClick={() => void onUpload()}
+                            style={{ marginTop: '8px' }}
                         >
                             {materialsUploading ? 'Uploading...' : 'Upload Material'}
                         </button>

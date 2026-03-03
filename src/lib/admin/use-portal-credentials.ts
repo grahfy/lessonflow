@@ -25,13 +25,15 @@ export function usePortalCredentials(options: UsePortalCredentialsOptions = {}):
     const [revealedPasswords, setRevealedPasswords] = useState<Record<string, string>>({});
     const [busyCustomerId, setBusyCustomerId] = useState<string | null>(null);
 
-    const { safeFetch, handleApiError } = useSafeFetch({ onAuthError, onError });
+    const { safeFetch, handleApiError, redirectToAdminLogin } = useSafeFetch({ onAuthError, onError });
 
     const reveal = useCallback(async (customerId: string): Promise<string | null> => {
         setBusyCustomerId(customerId);
         try {
             const response = await safeFetch(`/api/admin/customers/${customerId}/portal-credential`, {
-                method: "GET"
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "reveal" })
             });
 
             if (!response.ok) {
@@ -40,7 +42,7 @@ export function usePortalCredentials(options: UsePortalCredentialsOptions = {}):
             }
 
             const data = await response.json();
-            const password = data.cleartextPassword as string;
+            const password = data.password as string;
             setRevealedPasswords(prev => ({ ...prev, [customerId]: password }));
             return password;
         } catch {
@@ -54,7 +56,9 @@ export function usePortalCredentials(options: UsePortalCredentialsOptions = {}):
         setBusyCustomerId(customerId);
         try {
             const response = await safeFetch(`/api/admin/customers/${customerId}/portal-credential`, {
-                method: "POST"
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "regenerate" })
             });
 
             if (!response.ok) {
@@ -63,7 +67,7 @@ export function usePortalCredentials(options: UsePortalCredentialsOptions = {}):
             }
 
             const data = await response.json();
-            const password = data.cleartextPassword as string;
+            const password = data.password as string;
             setRevealedPasswords(prev => ({ ...prev, [customerId]: password }));
             return password;
         } catch {
