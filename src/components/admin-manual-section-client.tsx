@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useMemo } from "react";
 
-import { AdminHeader } from "@/components/admin-header";
+import { AdminShell } from "@/components/admin/layout/admin-shell";
 import type {
   AdminManualIndex,
   AdminManualSection,
@@ -74,9 +74,7 @@ export function AdminManualSectionClient({ index, section, previous, next }: Pro
   const technicalSections = index.sections.filter((entry) => entry.audience === "technical_owner");
 
   return (
-    <div className="admin-shell" data-motion-root="admin" data-motion-primary="true">
-      <AdminHeader title="Manual" />
-
+    <AdminShell title="Manual">
       <div className="admin-card admin-manual-layout">
         <aside className="admin-manual-toc">
           <div className="admin-manual-toc-panel">
@@ -154,6 +152,6 @@ export function AdminManualSectionClient({ index, section, previous, next }: Pro
           </section>
         </div>
       </div>
-    </div>
+    </AdminShell>
   );
 }

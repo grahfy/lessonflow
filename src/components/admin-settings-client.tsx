@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { AdminHeader } from "@/components/admin-header";
+import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminPresetsEditor } from "@/components/admin-presets-editor";
 import { AdminContentEditor } from "@/components/admin-content-editor";
 import { AdminEmailTemplateEditor } from "@/components/admin-email-template-editor";
@@ -338,9 +338,7 @@ export function AdminSettingsClient() {
   };
 
   return (
-    <div className="admin-shell" data-motion-root="admin" data-motion-primary="true">
-      <AdminHeader title="Admin Configuration" />
-
+    <AdminShell title="Admin Configuration" error={error} notice={notice} loading={loading}>
       <div className="admin-card booking-row">
         <div className="site-nav">
           <button className={`btn ${activeTab === "branding" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("branding")}>Branding</button>
@@ -351,10 +349,6 @@ export function AdminSettingsClient() {
           <button className={`btn ${activeTab === "system" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("system")}>System</button>
         </div>
       </div>
-
-      {error ? <p className="notice error">{error}</p> : null}
-      {notice ? <p className="notice success">{notice}</p> : null}
-      {loading ? <p className="notice">Loading...</p> : null}
 
       {!loading && (
         <>
@@ -395,6 +389,6 @@ export function AdminSettingsClient() {
           )}
         </>
       )}
-    </div>
+    </AdminShell>
   );
 }

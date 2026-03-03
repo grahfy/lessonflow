@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { AdminDeployUpdatesButton } from "@/components/admin-deploy-updates-button";
+import { ADMIN_NAV_ITEMS } from "@/lib/admin/config";
 
 interface AdminHeaderProps {
   title: string;
@@ -24,49 +25,17 @@ export function AdminHeader({ title }: AdminHeaderProps) {
         {title}
       </h1>
       <div className="booking-row">
-        <button
-          className="btn btn-secondary"
-          type="button"
-          onClick={() => router.push("/admin/bookings")}
-        >
-          Bookings
-        </button>
-        <button
-          className="btn btn-secondary"
-          type="button"
-          onClick={() => router.push("/admin/customers")}
-        >
-          Customers
-        </button>
-        <button
-          className="btn btn-secondary"
-          type="button"
-          onClick={() => router.push("/admin/invoices")}
-        >
-          Invoices
-        </button>
-        <button
-          className="btn btn-secondary"
-          type="button"
-          onClick={() => router.push("/admin/reports")}
-        >
-          Reports
-        </button>
-        <button
-          className="btn btn-secondary"
-          type="button"
-          onClick={() => router.push("/admin/manual")}
-        >
-          Manual
-        </button>
+        {ADMIN_NAV_ITEMS.map((item) => (
+          <button
+            key={item.href}
+            className="btn btn-secondary"
+            type="button"
+            onClick={() => router.push(item.href)}
+          >
+            {item.label}
+          </button>
+        ))}
         <AdminDeployUpdatesButton />
-        <button
-          className="btn btn-secondary"
-          type="button"
-          onClick={() => router.push("/admin/settings")}
-        >
-          Settings
-        </button>
         <button
           className="btn btn-secondary"
           type="button"

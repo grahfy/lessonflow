@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { AdminHeader } from "@/components/admin-header";
+import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { Pagination } from "@/components/pagination";
 import { parseAudInputToCents } from "@/lib/invoices/currency";
 import { DEFAULT_CURRENCY } from "@/lib/branding";
@@ -515,9 +515,13 @@ export function AdminInvoicesClient() {
   const Separator = () => <div style={{ width: '1px', height: '24px', background: 'var(--line)', flexShrink: 0 }} />;
 
   return (
-    <div className="admin-shell" data-motion-root="admin" data-motion-primary="true" style={{ height: '100dvh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-      <AdminHeader title="Invoice Console" />
-
+    <AdminShell
+      title="Invoice Console"
+      error={error}
+      notice={notice}
+      loading={loading}
+      style={{ height: '100dvh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+    >
       <div className="admin-card invoice-toolbar">
         <div className="field">
           <label>Search</label>
@@ -555,10 +559,6 @@ export function AdminInvoicesClient() {
         <button className="btn btn-secondary" disabled={busyAction === "bulk_reminders"} onClick={() => void sendDueReminders()}>SEND DUE REMINDERS</button>
         <button className="btn btn-primary" onClick={() => setCreateOpen(true)}>CREATE INVOICE</button>
       </div>
-
-      {error ? <p className="notice error">{error}</p> : null}
-      {notice ? <p className="notice success">{notice}</p> : null}
-      {loading ? <p className="notice">Loading...</p> : null}
 
       <div className="admin-card invoice-list-card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         {invoices.length ? (
@@ -846,6 +846,6 @@ style={{
           </div>
         </div>
       ) : null}
-    </div>
+    </AdminShell>
   );
 }

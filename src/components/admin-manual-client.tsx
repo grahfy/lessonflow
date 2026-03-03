@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { AdminHeader } from "@/components/admin-header";
+import { AdminShell } from "@/components/admin/layout/admin-shell";
 import type { AdminManualIndex, AdminManualSectionIndex } from "@/lib/manual/content";
 
 type AdminManualClientProps = {
@@ -25,9 +25,7 @@ export function AdminManualClient({ content }: AdminManualClientProps) {
   const grouped = sectionGroups(content.sections);
 
   return (
-    <div className="admin-shell" data-motion-root="admin" data-motion-primary="true">
-      <AdminHeader title="Manual" />
-
+    <AdminShell title="Manual">
       <div className="admin-card admin-manual-layout admin-manual-index-layout">
         <aside className="admin-manual-toc">
           <div className="admin-manual-toc-panel">
@@ -105,6 +103,6 @@ export function AdminManualClient({ content }: AdminManualClientProps) {
           ) : null}
         </div>
       </div>
-    </div>
+    </AdminShell>
   );
 }

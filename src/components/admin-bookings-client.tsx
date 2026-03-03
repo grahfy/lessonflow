@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AdminBookingCalendar, AdminCalendarEvent } from "@/components/admin-booking-calendar";
-import { AdminHeader } from "@/components/admin-header";
+import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { animateIn, animateOut } from "@/components/motion/tween-orchestrator";
 import { usePresenceExit } from "@/components/motion/use-presence-exit";
 
@@ -1706,9 +1706,13 @@ export function AdminBookingsClient() {
   const manualStepIndex = MANUAL_STEP_ORDER.indexOf(manualStep);
 
   return (
-    <div className="admin-shell" data-motion-root="admin" data-motion-primary="true">
-      <AdminHeader title="LessonFlow Booking Console" />
-
+    <AdminShell
+      title="LessonFlow Booking Console"
+      error={error && !manualDialogPresence.isMounted && !learningMaterialsDialogPresence.isMounted && !dialogPresence.isMounted && !emailDialogPresence.isMounted ? error : undefined}
+      notice={notice && !manualDialogPresence.isMounted && !learningMaterialsDialogPresence.isMounted && !dialogPresence.isMounted && !emailDialogPresence.isMounted ? notice : undefined}
+      loading={loading}
+      style={{ height: '100dvh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+    >
       <div className="admin-card booking-row admin-range-row" data-motion-item="admin-range-card">
         <strong data-motion-item="admin-range-label">{rangeLabel}</strong>
         <label className="admin-inline-field" data-motion-item="admin-view-select">
@@ -1746,10 +1750,6 @@ export function AdminBookingsClient() {
           </button>
         </div>
       </div>
-
-      {error && !manualDialogPresence.isMounted ? <p className="notice error" data-motion-item="admin-error-notice">{error}</p> : null}
-      {notice && !manualDialogPresence.isMounted ? <p className="notice success" data-motion-item="admin-success-notice">{notice}</p> : null}
-      {loading ? <p className="notice" data-motion-item="admin-loading-notice">Loading...</p> : null}
 
       <div className="admin-card" ref={calendarRootRef} data-motion-root="calendar" data-motion-item="admin-calendar-card">
         <AdminBookingCalendar
@@ -2637,6 +2637,6 @@ export function AdminBookingsClient() {
           </div>
         </div>
       ) : null}
-    </div>
+    </AdminShell>
   );
 }

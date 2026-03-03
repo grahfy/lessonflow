@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AdminHeader } from "@/components/admin-header";
+import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { animateIn, animateOut } from "@/components/motion/tween-orchestrator";
 import { usePresenceExit } from "@/components/motion/use-presence-exit";
 import { CustomerTable } from "@/components/admin/customers/customer-table";
@@ -498,9 +498,13 @@ export function AdminCustomersClient() {
   }
 
   return (
-    <div className="admin-shell" data-motion-root="admin" data-motion-primary="true" style={{ height: '100dvh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-      <AdminHeader title="Customer Directory" />
-
+    <AdminShell
+      title="Customer Directory"
+      error={error}
+      notice={notice}
+      loading={loadingCustomers && !customers.length}
+      style={{ height: '100dvh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+    >
       <div className="admin-card report-toolbar-card">
         <div>
           <p className="helper-text report-toolbar-title">Manage customer profiles and portal access</p>
@@ -529,10 +533,6 @@ export function AdminCustomersClient() {
           />
         </div>
       </div>
-
-      {error && !dialogPresence.isMounted ? <p className="notice error">{error}</p> : null}
-      {notice && !dialogPresence.isMounted ? <p className="notice success">{notice}</p> : null}
-      {loadingCustomers && !customers.length ? <p className="notice">Loading customers...</p> : null}
 
       <CustomerTable
         customers={customers}
@@ -606,7 +606,7 @@ export function AdminCustomersClient() {
           />
         ) : null
       }
-    </div >
+    </AdminShell>
   );
 }
 

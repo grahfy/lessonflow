@@ -4,7 +4,7 @@ import { APP_TIMEZONE } from "@/lib/time";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { AdminHeader } from "@/components/admin-header";
+import { AdminShell } from "@/components/admin/layout/admin-shell";
 
 type ReportPeriodKey = "daily" | "weekly" | "monthly" | "yearly";
 type TrendGrainKey = "daily" | "weekly" | "monthly" | "yearly";
@@ -545,9 +545,7 @@ export function AdminReportsClient() {
   );
 
   return (
-    <div className="admin-shell" data-motion-root="admin" data-motion-primary="true">
-      <AdminHeader title="Reports Console" />
-
+    <AdminShell title="Reports Console" error={error} notice={notice} loading={loading}>
       <div className="admin-card report-toolbar-card">
         <div>
           <p className="helper-text report-toolbar-title">Daily, weekly, monthly and yearly operational reporting</p>
@@ -651,10 +649,6 @@ export function AdminReportsClient() {
         </div>
       </div>
 
-      {error ? <p className="notice error">{error}</p> : null}
-      {notice ? <p className="notice success">{notice}</p> : null}
-      {loading ? <p className="notice">Loading reports...</p> : null}
-
       {dashboard ? (
         <>
           <div className="admin-card report-generated-card">
@@ -688,6 +682,6 @@ export function AdminReportsClient() {
           </div>
         </>
       ) : null}
-    </div>
+    </AdminShell>
   );
 }
