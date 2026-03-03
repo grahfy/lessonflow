@@ -9,6 +9,7 @@
 - **Accessibility:** Adhere to WCAG 2.1 Level AA standards. Use Radix UI primitives for accessible complex components.
 - **Feedback:** Provide immediate visual feedback for all user actions (e.g., loading states, success/error toasts).
 - **Simplicity:** Prioritize the most common tasks (e.g., booking an appointment, creating an invoice) by making them easily accessible.
+- **Admin Standardization:** Use the centralized admin UI library (`src/components/admin/ui`) and data hooks (`src/lib/admin/use-*`) for all administrative features to ensure a unified experience.
 
 ## Design & Aesthetics
 - **Styling:** Prefer standard CSS classes in `src/styles/globals.css`. Avoid inline styles unless necessary for dynamic values.
