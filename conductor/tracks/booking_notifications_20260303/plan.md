@@ -18,7 +18,7 @@ Create integration tests to verify the current behavior of all identified notifi
 - [x] Task: Write failing tests for customer notifications on status changes (Approve/Reject). [885ae21]
 - [x] Task: Implement/verify status change notification tests. [c7c91fa]
 - [x] Task: Write failing tests for customer notifications on booking moves. [d42fde5]
-- [~] Task: Implement/verify booking move notification tests.
+- [x] Task: Implement/verify booking move notification tests. [6b480cc]
 - [ ] Task: Conductor - User Manual Verification 'Baseline Testing' (Protocol in workflow.md)
 
 ## Phase 3: Consolidation & Refinement
