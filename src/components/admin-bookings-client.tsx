@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 
 import { AdminBookingCalendar, AdminCalendarEvent } from "@/components/admin-booking-calendar";
 import { AdminShell } from "@/components/admin/layout/admin-shell";
+import { AdminCard } from "@/components/admin/ui/admin-card";
 import { animateIn, animateOut } from "@/components/motion/tween-orchestrator";
 import { usePresenceExit } from "@/components/motion/use-presence-exit";
 
@@ -1713,7 +1714,7 @@ export function AdminBookingsClient() {
       loading={loading}
       style={{ height: '100dvh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
     >
-      <div className="admin-card booking-row admin-range-row" data-motion-item="admin-range-card">
+      <AdminCard className="booking-row admin-range-row" data-motion-item="admin-range-card">
         <strong data-motion-item="admin-range-label">{rangeLabel}</strong>
         <label className="admin-inline-field" data-motion-item="admin-view-select">
           View{" "}
@@ -1727,9 +1728,9 @@ export function AdminBookingsClient() {
         <label className="admin-inline-field" data-motion-item="admin-date-select">
           Base date <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
-      </div>
+      </AdminCard>
 
-      <div className="admin-card calendar-legend" data-motion-item="admin-legend-card">
+      <AdminCard className="calendar-legend" data-motion-item="admin-legend-card">
         <div className="legend-chip-row">
           <span className="legend-chip event-green" data-motion-item="legend-confirmed">Confirmed</span>
           <span className="legend-chip event-yellow" data-motion-item="legend-pending">Pending</span>
@@ -1749,9 +1750,9 @@ export function AdminBookingsClient() {
             Customer Learning Materials
           </button>
         </div>
-      </div>
+      </AdminCard>
 
-      <div className="admin-card" ref={calendarRootRef} data-motion-root="calendar" data-motion-item="admin-calendar-card">
+      <AdminCard ref={calendarRootRef} data-motion-root="calendar" data-motion-item="admin-calendar-card">
         <AdminBookingCalendar
           view={view}
           date={date}
@@ -1761,30 +1762,29 @@ export function AdminBookingsClient() {
         />
       </div>
 
-      {manualDialogPresence.isMounted ? (
-        <div
-          className="dialog-backdrop"
-          ref={manualDialogRootRef}
-          data-motion-root="admin"
-          data-motion-item="manual-dialog-backdrop"
-          onClick={() => void closeManualDialog()}
-        >
-          <div
-            className="dialog-panel dialog-panel-wide"
-            data-motion-item="manual-dialog-panel"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="manual-dialog-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="dialog-head">
-              <h3 id="manual-dialog-title">Add Manual Booking</h3>
-              <button className="btn btn-secondary" type="button" onClick={() => void closeManualDialog()}>CLOSE</button>
-            </div>
-            <p className="helper-text dialog-status">Select an existing customer first where possible. If you enter details manually, matching customers will be detected.</p>
-            
-            <div className="manual-steps">
-              {MANUAL_STEP_ORDER.map((step, index) => (
+      <AdminDialog
+        isOpen={manualDialogPresence.isMounted}
+        onClose={() => void closeManualDialog()}
+        title="Add Manual Booking"
+        rootRef={manualDialogRootRef}
+        wide
+        description="Select an existing customer first where possible. If you enter details manually, matching customers will be detected."
+        footer={(
+          <>
+            <button className="btn btn-secondary" type="button" onClick={() => void closeManualDialog()}>Cancel</button>
+            <button
+              className="btn btn-primary"
+              type="submit"
+              form="manual-booking-form"
+              disabled={creating || busyAction === "add_manual"}
+            >
+              {manualStep === "schedule" ? (creating || busyAction === "add_manual" ? "Adding..." : "Confirm Booking") : "Next Step"}
+            </button>
+          </>
+        )}
+      >
+        <div className="manual-steps">
+          {MANUAL_STEP_ORDER.map((step, index) => (
                 <div key={step} className={`manual-step-chip ${index === manualStepIndex ? "is-active" : ""} ${index < manualStepIndex ? "is-complete" : ""}`}>
                   <span>{index + 1}</span>
                   <strong>{MANUAL_STEP_LABEL[step]}</strong>
@@ -1792,496 +1792,428 @@ export function AdminBookingsClient() {
               ))}
             </div>
 
-            <form ref={manualFormRef} className="manual-booking-form" onSubmit={(e) => { e.preventDefault(); if (manualStep !== "schedule") goToNextManualStep(); else void addManualBooking(); }}>
-              <section className={`manual-section ${manualStep !== "customer" ? "is-step-hidden" : ""}`}>
-                <h3 className="manual-section-title">CUSTOMER</h3>
-                <div className="manual-grid manual-grid-3">
-                  <div className="field">
-                    <label>Search customer</label>
-                    <input value={customerQuery} placeholder="Filter by name, email, or phone" onChange={(e) => setCustomerQuery(e.target.value)} />
-                  </div>
-                  <div className="field manual-span-2">
-                    <label>Select existing customer</label>
-                    <select disabled={loadingCustomers} value={manualCustomerId} onChange={(e) => { const nextId = e.target.value; setManualCustomerId(nextId); const selected = customers.find(c => c.id === nextId); if (selected) applyCustomerToManual(selected); }}>
-                      <option value="">{loadingCustomers ? "Loading customers..." : "None selected"}</option>
-                      {visibleCustomers.map(c => <option key={c.id} value={c.id}>{c.lastName ? `${c.lastName}, ${c.firstName}` : c.fullName}</option>)}
-                    </select>
-                  </div>
-                  <div className="field manual-span-2">
-                    <label className="helper-toggle">
-                      <input type="checkbox" checked={manualUpdateCustomerFromBooking} onChange={e => setManualUpdateCustomerFromBooking(e.target.checked)} />
-                      Update linked customer profile from this booking
-                    </label>
-                  </div>
-                </div>
+        <form id="manual-booking-form" ref={manualFormRef} className="manual-booking-form" onSubmit={(e) => { e.preventDefault(); if (manualStep !== "schedule") goToNextManualStep(); else void addManualBooking(); }}>
+          <section className={`manual-section ${manualStep !== "customer" ? "is-step-hidden" : ""}`}>
+            <h3 className="manual-section-title">CUSTOMER</h3>
+            <AdminForm className="manual-grid manual-grid-3">
+              <AdminField label="Search customer">
+                <input value={customerQuery} placeholder="Filter by name, email, or phone" onChange={(e) => setCustomerQuery(e.target.value)} />
+              </AdminField>
+              <AdminField label="Select existing customer" fullWidth>
+                <select disabled={loadingCustomers} value={manualCustomerId} onChange={(e) => { const nextId = e.target.value; setManualCustomerId(nextId); const selected = customers.find(c => c.id === nextId); if (selected) applyCustomerToManual(selected); }}>
+                  <option value="">{loadingCustomers ? "Loading customers..." : "None selected"}</option>
+                  {visibleCustomers.map(c => <option key={c.id} value={c.id}>{c.lastName ? `${c.lastName}, ${c.firstName}` : c.fullName}</option>)}
+                </select>
+              </AdminField>
+              <div className="field manual-span-2">
+                <label className="helper-toggle">
+                  <input type="checkbox" checked={manualUpdateCustomerFromBooking} onChange={e => setManualUpdateCustomerFromBooking(e.target.checked)} />
+                  Update linked customer profile from this booking
+                </label>
+              </div>
+            </AdminForm>
 
-                <h3 className="manual-section-title">STUDENT</h3>
-                <div className="manual-grid manual-grid-2">
-                  <div className="field">
-                    <label>First Name *</label>
-                    <input name="firstName" required />
-                  </div>
-                  <div className="field">
-                    <label>Last Name *</label>
-                    <input name="lastName" required />
-                  </div>
-                </div>
+            <h3 className="manual-section-title">STUDENT</h3>
+            <AdminForm className="manual-grid manual-grid-2">
+              <AdminField label="First Name" required>
+                <input name="firstName" required />
+              </AdminField>
+              <AdminField label="Last Name" required>
+                <input name="lastName" required />
+              </AdminField>
+            </AdminForm>
 
-                <h3 className="manual-section-title">CONTACT</h3>
-                <div className="manual-grid manual-grid-2">
-                  <div className="field">
-                    <label>Email *</label>
-                    <input type="email" name="email" required />
-                  </div>
-                  <div className="field">
-                    <label>Phone *</label>
-                    <input name="phone" required placeholder="10 digits" maxLength={10} />
-                  </div>
-                </div>
+            <h3 className="manual-section-title">CONTACT</h3>
+            <AdminForm className="manual-grid manual-grid-2">
+              <AdminField label="Email" required>
+                <input type="email" name="email" required />
+              </AdminField>
+              <AdminField label="Phone" required>
+                <input name="phone" required placeholder="10 digits" maxLength={10} />
+              </AdminField>
+            </AdminForm>
 
-                <h3 className="manual-section-title">ADDRESS</h3>
-                <div className="manual-grid manual-grid-3">
-                  <div className="field">
-                    <label>Unit/Apartment</label>
-                    <input name="unitNumber" />
-                  </div>
-                  <div className="field">
-                    <label>House/Building Number *</label>
-                    <input name="houseNumber" required />
-                  </div>
-                  <div className="field">
-                    <label>Street Type *</label>
-                    <select name="streetType" required defaultValue="Street">
-                      <option value="Street">Street</option>
-                      <option value="Road">Road</option>
-                      <option value="Avenue">Avenue</option>
-                      <option value="Drive">Drive</option>
-                      <option value="Lane">Lane</option>
-                      <option value="Court">Court</option>
-                      <option value="Crescent">Crescent</option>
-                      <option value="Place">Place</option>
-                      <option value="Boulevard">Boulevard</option>
-                      <option value="Terrace">Terrace</option>
-                      <option value="Parade">Parade</option>
-                      <option value="Close">Close</option>
-                    </select>
-                  </div>
-                  <div className="field manual-span-2">
-                    <label>Street Name *</label>
-                    <input name="streetName" required />
-                  </div>
-                  <div className="field">
-                    <label>Suburb *</label>
-                    <input name="suburb" required />
-                  </div>
-                  <div className="field manual-span-2">
-                    <label>State *</label>
-                    <select name="state" required defaultValue="VIC">
-                      <option value="ACT">Australian Capital Territory</option>
-                      <option value="NSW">New South Wales</option>
-                      <option value="NT">Northern Territory</option>
-                      <option value="QLD">Queensland</option>
-                      <option value="SA">South Australia</option>
-                      <option value="TAS">Tasmania</option>
-                      <option value="VIC">Victoria</option>
-                      <option value="WA">Western Australia</option>
-                    </select>
-                  </div>
-                  <div className="field">
-                    <label>Postcode *</label>
-                    <input name="postcode" required placeholder="3000" maxLength={4} />
-                  </div>
-                </div>
-              </section>
+            <h3 className="manual-section-title">ADDRESS</h3>
+            <AdminForm className="manual-grid manual-grid-3">
+              <AdminField label="Unit/Apartment">
+                <input name="unitNumber" />
+              </AdminField>
+              <AdminField label="House/Building Number" required>
+                <input name="houseNumber" required />
+              </AdminField>
+              <AdminField label="Street Type" required>
+                <select name="streetType" required defaultValue="Street">
+                  <option value="Street">Street</option>
+                  <option value="Road">Road</option>
+                  <option value="Avenue">Avenue</option>
+                  <option value="Drive">Drive</option>
+                  <option value="Lane">Lane</option>
+                  <option value="Court">Court</option>
+                  <option value="Crescent">Crescent</option>
+                  <option value="Place">Place</option>
+                  <option value="Boulevard">Boulevard</option>
+                  <option value="Terrace">Terrace</option>
+                  <option value="Parade">Parade</option>
+                  <option value="Close">Close</option>
+                </select>
+              </AdminField>
+              <AdminField label="Street Name" required fullWidth>
+                <input name="streetName" required />
+              </AdminField>
+              <AdminField label="Suburb" required>
+                <input name="suburb" required />
+              </AdminField>
+              <AdminField label="State" required fullWidth>
+                <select name="state" required defaultValue="VIC">
+                  <option value="ACT">Australian Capital Territory</option>
+                  <option value="NSW">New South Wales</option>
+                  <option value="NT">Northern Territory</option>
+                  <option value="QLD">Queensland</option>
+                  <option value="SA">South Australia</option>
+                  <option value="TAS">Tasmania</option>
+                  <option value="VIC">Victoria</option>
+                  <option value="WA">Western Australia</option>
+                </select>
+              </AdminField>
+              <AdminField label="Postcode" required>
+                <input name="postcode" required placeholder="3000" maxLength={4} />
+              </AdminField>
+            </AdminForm>
+          </section>
 
-              <section className={`manual-section ${manualStep !== "lesson" ? "is-step-hidden" : ""}`}>
-                <h3 className="manual-section-title">LESSON</h3>
-                <div className="manual-grid manual-grid-3">
-                  <div className="field">
-                    <label>Mode *</label>
-                    <select name="lessonMode" required defaultValue="in_person">
-                      <option value="in_person">In-person</option>
-                      <option value="video">Video</option>
-                    </select>
-                  </div>
-                  <div className="field">
-                    <label>Skill Level *</label>
-                    <select name="skillLevel" required defaultValue="beginner">
-                      <option value="beginner">Beginner</option>
-                      <option value="intermediate">Intermediate</option>
-                      <option value="advanced">Advanced</option>
-                    </select>
-                  </div>
-                  <div className="field">
-                    <label>Duration *</label>
-                    <select value={manualDurationChoice} onChange={e => setManualDurationChoice(e.target.value as DurationChoice)} required>
-                      <option value="min30">30 minutes</option>
-                      <option value="min60">60 minutes</option>
-                      <option value="custom">Custom duration...</option>
-                    </select>
-                  </div>
-                  {manualDurationChoice === "custom" && (
-                    <div className="field">
-                      <label>Minutes *</label>
-                      <input name="customDurationMinutes" type="number" min={15} max={300} required placeholder="e.g. 45" />
-                    </div>
-                  )}
-                </div>
-              </section>
+          <section className={`manual-section ${manualStep !== "lesson" ? "is-step-hidden" : ""}`}>
+            <h3 className="manual-section-title">LESSON</h3>
+            <AdminForm className="manual-grid manual-grid-3">
+              <AdminField label="Mode" required>
+                <select name="lessonMode" required defaultValue="in_person">
+                  <option value="in_person">In-person</option>
+                  <option value="video">Video</option>
+                </select>
+              </AdminField>
+              <AdminField label="Skill Level" required>
+                <select name="skillLevel" required defaultValue="beginner">
+                  <option value="beginner">Beginner</option>
+                  <option value="intermediate">Intermediate</option>
+                  <option value="advanced">Advanced</option>
+                </select>
+              </AdminField>
+              <AdminField label="Duration" required>
+                <select value={manualDurationChoice} onChange={e => setManualDurationChoice(e.target.value as DurationChoice)} required>
+                  <option value="min30">30 minutes</option>
+                  <option value="min60">60 minutes</option>
+                  <option value="custom">Custom duration...</option>
+                </select>
+              </AdminField>
+              {manualDurationChoice === "custom" && (
+                <AdminField label="Minutes" required>
+                  <input name="customDurationMinutes" type="number" min={15} max={300} required placeholder="e.g. 45" />
+                </AdminField>
+              )}
+            </AdminForm>
+          </section>
 
-              <section className={`manual-section ${manualStep !== "schedule" ? "is-step-hidden" : ""}`}>
-                <h3 className="manual-section-title">SCHEDULE</h3>
-                <p className="helper-text">Review timing details, then confirm to create the booking.</p>
-                
-                {manualMatch ? (
-                  <div className="manual-section manual-match" style={{ marginBottom: '20px', padding: '16px', background: 'rgba(255, 227, 124, 0.1)', border: '1px solid var(--brand-warning)', borderRadius: '8px' }}>
-                    <h3 className="manual-section-title" style={{ color: 'var(--brand-warning)', marginTop: 0 }}>Existing Customer Match Found</h3>
-                    <p className="helper-text" style={{ marginBottom: '12px' }}>
-                      {manualMatch.lastName ? `${manualMatch.lastName}, ${manualMatch.firstName}` : manualMatch.fullName} · {manualMatch.email} · {manualMatch.phone}
-                    </p>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button className="btn btn-primary" type="button" disabled={creating} onClick={() => void resolveManualMatch("use_existing")}>USE EXISTING</button>
-                      <button className="btn btn-secondary" type="button" disabled={creating} onClick={() => void resolveManualMatch("update_existing")}>UPDATE & USE</button>
-                      <button className="btn btn-secondary" type="button" disabled={creating} onClick={() => void resolveManualMatch("create_new")}>IGNORE & CREATE NEW</button>
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="manual-grid manual-grid-2">
-                  <div className="field">
-                    <label>Start *</label>
-                    <input name="requestedStartAt" type="datetime-local" required />
-                  </div>
-                  <div className="field">
-                    <label>Recurrence end</label>
-                    <input name="recurrenceEndAt" type="datetime-local" />
-                  </div>
-                  <div className="field manual-span-2">
-                    <label className="helper-toggle">
-                      <input type="checkbox" name="isRecurring" />
-                      Weekly recurring
-                    </label>
-                  </div>
+          <section className={`manual-section ${manualStep !== "schedule" ? "is-step-hidden" : ""}`}>
+            <h3 className="manual-section-title">SCHEDULE</h3>
+            <p className="helper-text">Review timing details, then confirm to create the booking.</p>
+            
+            {manualMatch ? (
+              <AdminCard style={{ marginBottom: '20px', padding: '16px', background: 'rgba(255, 227, 124, 0.1)', border: '1px solid var(--brand-warning)', borderRadius: '8px' }}>
+                <h3 className="manual-section-title" style={{ color: 'var(--brand-warning)', marginTop: 0 }}>Existing Customer Match Found</h3>
+                <p className="helper-text" style={{ marginBottom: '12px' }}>
+                  {manualMatch.lastName ? `${manualMatch.lastName}, ${manualMatch.firstName}` : manualMatch.fullName} · {manualMatch.email} · {manualMatch.phone}
+                </p>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button className="btn btn-primary" type="button" disabled={creating} onClick={() => void resolveManualMatch("use_existing")}>USE EXISTING</button>
+                  <button className="btn btn-secondary" type="button" disabled={creating} onClick={() => void resolveManualMatch("update_existing")}>UPDATE & USE</button>
+                  <button className="btn btn-secondary" type="button" disabled={creating} onClick={() => void resolveManualMatch("create_new")}>IGNORE & CREATE NEW</button>
                 </div>
-              </section>
+              </AdminCard>
+            ) : null}
+
+            <AdminForm className="manual-grid manual-grid-2">
+              <AdminField label="Start" required>
+                <input name="requestedStartAt" type="datetime-local" required />
+              </AdminField>
+              <AdminField label="Recurrence end">
+                <input name="recurrenceEndAt" type="datetime-local" />
+              </AdminField>
+              <div className="field manual-span-2">
+                <label className="helper-toggle">
+                  <input type="checkbox" name="isRecurring" />
+                  Weekly recurring
+                </label>
+              </div>
+            </AdminForm>
+          </section>
 
               {error ? <p className="notice error">{error}</p> : null}
+        </form>
+      </AdminDialog>
 
-              <div className="manual-form-footer" style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <p className="helper-text">* Required fields</p>
-                <div className="manual-step-footer-actions" style={{ display: 'flex', gap: '8px' }}>
-                  {manualStep !== "customer" && <button className="btn btn-secondary" type="button" onClick={goToPreviousManualStep}>BACK</button>}
-                  {manualStep !== "schedule" ? (
-                    <button className="btn btn-primary" type="button" onClick={goToNextManualStep}>NEXT: {manualStep === "customer" ? "LESSON" : "SCHEDULE & CONFIRM"}</button>
-                  ) : (
-                    <button className="btn btn-primary" type="submit" disabled={creating || !!manualMatch}>{creating ? "ADDING..." : "ADD BOOKING"}</button>
-                  )}
-                </div>
-              </div>
-            </form>
+      <AdminDialog
+        isOpen={customerEditorPresence.isMounted}
+        onClose={() => void closeCustomerEditor()}
+        title={customerEditorMode === "create" ? "Create Customer" : "Edit Customer"}
+        rootRef={customerEditorRootRef}
+        compact
+        id="customer-editor-dialog"
+        footer={(
+          <>
+            <button className="btn btn-secondary" type="button" onClick={() => void closeCustomerEditor()}>Cancel</button>
+            <button className="btn btn-primary" type="button" disabled={savingCustomer} onClick={() => void saveCustomer()}>{savingCustomer ? "Saving..." : "Save customer"}</button>
+          </>
+        )}
+      >
+        <AdminForm className="dialog-form-grid">
+          <AdminField label="First Name" required>
+            <input value={customerForm.firstName} onChange={(e) => setCustomerForm(prev => ({ ...prev, firstName: e.target.value }))} />
+          </AdminField>
+          <AdminField label="Last Name" required>
+            <input value={customerForm.lastName} onChange={(e) => setCustomerForm(prev => ({ ...prev, lastName: e.target.value }))} />
+          </AdminField>
+          <AdminField label="Email" required fullWidth>
+            <input type="email" value={customerForm.email} onChange={(e) => setCustomerForm(prev => ({ ...prev, email: e.target.value }))} />
+          </AdminField>
+          <AdminField label="Phone" required>
+            <input value={customerForm.phone} maxLength={10} onChange={(e) => setCustomerForm(prev => ({ ...prev, phone: toDigits(e.target.value, 10) }))} />
+          </AdminField>
+        </AdminForm>
+      </AdminDialog>
+
+      <AdminDialog
+        isOpen={dialogPresence.isMounted && !!selectedEvent && !!dialogForm}
+        onClose={() => void closeDialog()}
+        title={selectedEvent?.title || ""}
+        wide
+        id="booking-dialog"
+        description={(
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+            <div>Status: <strong>{selectedEvent?.status}</strong></div>
+            
+            <div style={{ display: 'flex', gap: '4px', background: 'rgba(0,0,0,0.1)', padding: '2px', borderRadius: '6px' }}>
+              <button 
+                className={`btn ${activeTab === 'appointment' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ padding: '4px 12px', fontSize: '0.75rem', border: 'none', boxShadow: 'none' }}
+                type="button"
+                onClick={() => setActiveTab('appointment')}
+              >
+                Appointment
+              </button>
+              <button 
+                className={`btn ${activeTab === 'emails' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ padding: '4px 12px', fontSize: '0.75rem', border: 'none', boxShadow: 'none' }}
+                type="button"
+                onClick={() => setActiveTab('emails')}
+                disabled={!selectedCustomer}
+              >
+                Communication
+              </button>
+            </div>
           </div>
-        </div>
-      ) : null}
-
-      {customerEditorPresence.isMounted ? (
-        <div
-          className="dialog-backdrop is-secondary"
-          ref={customerEditorRootRef}
-          data-motion-root="admin"
-          data-motion-item="customer-editor-dialog-backdrop"
-          onClick={(e) => { e.stopPropagation(); void closeCustomerEditor(); }}
-        >
-          <div
-            className="dialog-panel dialog-panel-compact"
-            data-motion-item="customer-editor-dialog-panel"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="customer-editor-dialog-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="dialog-head">
-              <h3 id="customer-editor-dialog-title">{customerEditorMode === "create" ? "Create Customer" : "Edit Customer"}</h3>
-              <button className="btn btn-secondary" type="button" onClick={() => void closeCustomerEditor()}>Cancel</button>
-            </div>
-            <div className="form-grid dialog-form-grid">
-              <div className="field">
-                <label>First Name *</label>
-                <input value={customerForm.firstName} onChange={(e) => setCustomerForm(prev => ({ ...prev, firstName: e.target.value }))} />
-              </div>
-              <div className="field">
-                <label>Last Name *</label>
-                <input value={customerForm.lastName} onChange={(e) => setCustomerForm(prev => ({ ...prev, lastName: e.target.value }))} />
-              </div>
-              <div className="field full">
-                <label>Email *</label>
-                <input type="email" value={customerForm.email} onChange={(e) => setCustomerForm(prev => ({ ...prev, email: e.target.value }))} />
-              </div>
-              <div className="field">
-                <label>Phone *</label>
-                <input value={customerForm.phone} maxLength={10} onChange={(e) => setCustomerForm(prev => ({ ...prev, phone: toDigits(e.target.value, 10) }))} />
-              </div>
-            </div>
-            <div className="dialog-actions">
-              <button className="btn btn-secondary" type="button" onClick={() => void closeCustomerEditor()}>Cancel</button>
-              <button className="btn btn-primary" type="button" disabled={savingCustomer} onClick={() => void saveCustomer()}>{savingCustomer ? "Saving..." : "Save customer"}</button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {dialogPresence.isMounted && selectedEvent && dialogForm ? (
-        <div
-          className="dialog-backdrop"
-          ref={dialogRootRef}
-          data-motion-root="admin"
-          data-motion-item="booking-dialog-backdrop"
-          onClick={() => void closeDialog()}
-        >
-          <div className="dialog-panel booking-dialog-panel" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <div className="dialog-head">
-              <h3>{selectedEvent.title}</h3>
-              <button className="btn btn-secondary" type="button" onClick={() => void closeDialog()}>Close</button>
-            </div>
-            <div className="dialog-status" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>Status: <strong>{selectedEvent.status}</strong></div>
-              
-              <div style={{ display: 'flex', gap: '4px', background: 'rgba(0,0,0,0.1)', padding: '2px', borderRadius: '6px' }}>
-                <button 
-                  className={`btn ${activeTab === 'appointment' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ padding: '4px 12px', fontSize: '0.75rem', border: 'none', boxShadow: 'none' }}
-                  type="button"
-                  onClick={() => setActiveTab('appointment')}
-                >
-                  Appointment
+        )}
+        footer={(
+          <div className="dialog-actions-booking" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {activeTab === 'appointment' ? (
+              <>
+                <button className="btn btn-primary" type="button" disabled={!!busyAction} onClick={() => void saveDetails()}>Save details</button>
+                <button className="btn btn-secondary" type="button" disabled={!!busyAction} onClick={openMoveDialog}>
+                  {busyAction === "move" ? "Moving..." : selectedIsPending ? "Move request" : "Move booking"}
                 </button>
-                <button 
-                  className={`btn ${activeTab === 'emails' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ padding: '4px 12px', fontSize: '0.75rem', border: 'none', boxShadow: 'none' }}
+                {!selectedIsPending ? (
+                  <button className="btn btn-primary" type="button" disabled={!!busyAction} onClick={openInvoiceDialog}>
+                    Create invoice
+                  </button>
+                ) : null}
+                {selectedIsPending ? (
+                  <button
+                    className="btn btn-primary"
+                    type="button"
+                    disabled={!!busyAction}
+                    onClick={() => void approveSelected("approve")}
+                  >
+                    {busyAction === "approve" ? "Approving..." : "Approve request"}
+                  </button>
+                ) : null}
+                <button
+                  className="btn btn-secondary"
                   type="button"
-                  onClick={() => setActiveTab('emails')}
-                  disabled={!selectedCustomer}
+                  disabled={!!busyAction}
+                  onClick={() => void sendNotification("reminder")}
                 >
-                  Communication
+                  {busyAction === "reminder" ? "Sending..." : "Send reminder"}
                 </button>
-              </div>
-            </div>
-
-            <form className="dialog-form" onSubmit={(e) => e.preventDefault()}>
-              <div className="booking-dialog-scroll">
-                <div className="dialog-layout">
-                  {activeTab === 'appointment' ? (
-                    <>
-                      <div className="dialog-col">
-                        <h4>Customer details</h4>
-                        <div className="form-grid dialog-form-grid">
-                          {selectedCustomer && !isEditingCustomer ? (
-                            <>
-                              <div className="field full" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                                <span style={{ fontWeight: 600, color: "var(--text-secondary)" }}>Read-only customer</span>
-                                <button type="button" className="btn btn-secondary" onClick={() => { router.push(`/admin/customers?customerId=${selectedCustomer.id}&edit=true`); }}>Edit</button>
-                              </div>
-                              <div className="field">
-                                <label>First Name</label>
-                                <input value={selectedCustomer.firstName || selectedCustomer.fullName.split(' ')[0]} readOnly />
-                              </div>
-                              <div className="field">
-                                <label>Last Name</label>
-                                <input value={selectedCustomer.lastName || selectedCustomer.fullName.split(' ').slice(1).join(' ')} readOnly />
-                              </div>
-                              <div className="field full">
-                                <label>Email</label>
-                                <input value={selectedCustomer.email} readOnly />
-                              </div>
-                              <div className="field">
-                                <label>Phone</label>
-                                <input value={selectedCustomer.phone} readOnly />
-                              </div>
-                              <div className="field">
-                                <label>Suburb</label>
-                                <input value={selectedCustomer.suburb} readOnly />
-                              </div>
-                              <div className="field">
-                                <label>Postcode</label>
-                                <input value={selectedCustomer.postcode} readOnly />
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <div className="field">
-                                <label>First Name</label>
-                                <input value={dialogForm.firstName} onChange={(e) => setDialogForm(prev => (prev ? { ...prev, firstName: e.target.value } : prev))} />
-                              </div>
-                              <div className="field">
-                                <label>Last Name</label>
-                                <input value={dialogForm.lastName} onChange={(e) => setDialogForm(prev => (prev ? { ...prev, lastName: e.target.value } : prev))} />
-                              </div>
-                              <div className="field full">
-                                <label>Email</label>
-                                <input type="email" value={dialogForm.email} onChange={(e) => setDialogForm(prev => (prev ? { ...prev, email: e.target.value } : prev))} />
-                              </div>
-                              <div className="field">
-                                <label>Phone</label>
-                                <input value={dialogForm.phone} maxLength={10} onChange={(e) => setDialogForm(prev => (prev ? { ...prev, phone: toDigits(e.target.value, 10) } : prev))} />
-                              </div>
-                              <div className="field">
-                                <label>Suburb</label>
-                                <input value={dialogForm.suburb} onChange={(e) => setDialogForm(prev => (prev ? { ...prev, suburb: e.target.value } : prev))} />
-                              </div>
-                              <div className="field">
-                                <label>Postcode</label>
-                                <input value={dialogForm.postcode} maxLength={4} onChange={(e) => setDialogForm(prev => (prev ? { ...prev, postcode: e.target.value } : prev))} />
-                              </div>
-                            </>
-                          )}
-                          <div className="field">
-                            <label>Start</label>
-                            <input type="datetime-local" value={dialogForm.startAtLocal} onChange={(e) => setDialogForm(prev => (prev ? { ...prev, startAtLocal: e.target.value } : prev))} />
-                          </div>
-                        </div>
-                      </div>
-                      <div className="dialog-col is-notes">
-                        <h4>Notes</h4>
-                        <div className="field">
-                          <label>Lesson notes</label>
-                          <textarea className="dialog-notes" value={dialogForm.notes} onChange={(e) => setDialogForm(prev => (prev ? { ...prev, notes: e.target.value } : prev))} />
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="dialog-col">
-                        <h4>Email History</h4>
-                        <div className="admin-card" style={{ background: 'rgba(0,0,0,0.03)', padding: '12px', border: '1px solid var(--line)', maxHeight: '400px', overflowY: 'auto' }}>
-                          {loadingEmailHistory ? (
-                            <p className="helper-text">Loading history...</p>
-                          ) : emailHistory.length > 0 ? (
-                            <div style={{ display: 'grid', gap: '8px' }}>
-                              {emailHistory.map((email) => (
-                                <div key={email.id} style={{ padding: '12px', borderBottom: '1px solid var(--line)', fontSize: '0.85rem' }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                                    <strong style={{ color: 'var(--ink-0)' }}>{email.subject}</strong>
-                                    <span style={{ color: 'var(--ink-2)', fontSize: '0.75rem' }}>{formatDateTime(email.createdAt)}</span>
-                                  </div>
-                                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                    <span className={`invoice-item-chip invoice-item-chip-status invoice-item-chip-status-${email.status === 'sent' ? 'paid' : 'draft'}`} style={{ fontSize: '0.7rem', padding: '2px 8px' }}>
-                                      {email.status}
-                                    </span>
-                                    {email.error && <span style={{ color: 'var(--brand-danger)', fontSize: '0.75rem' }}>{email.error}</span>}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="helper-text">No email history found for this address.</p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="dialog-col is-notes">
-                        <h4>Send Email</h4>
-                        <div className="admin-card" style={{ background: 'rgba(0,0,0,0.03)', padding: '16px', border: '1px solid var(--line)' }}>
-                          <div style={{ display: 'grid', gap: '12px' }}>
-                            <div className="field">
-                              <label>Subject</label>
-                              <input 
-                                placeholder="Email subject"
-                                value={emailComposerSubject}
-                                onChange={e => setEmailComposerSubject(e.target.value)}
-                              />
-                            </div>
-                            <div className="field">
-                              <label>Message</label>
-                              <textarea 
-                                placeholder="Type your message to the student here..."
-                                style={{ minHeight: '160px', resize: 'vertical' }}
-                                value={emailComposerMessage}
-                                onChange={e => setEmailComposerMessage(e.target.value)}
-                              />
-                            </div>
-                            <button 
-                              className="btn btn-primary" 
-                              type="button"
-                              disabled={sendingEmail || !emailComposerSubject.trim() || !emailComposerMessage.trim()}
-                              onClick={() => void sendCustomerEmail()}
-                            >
-                              {sendingEmail ? "Sending..." : "Send Email"}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="dialog-actions dialog-actions-booking">
-                {activeTab === 'appointment' ? (
-                  <>
-                    <button className="btn btn-primary" type="button" disabled={!!busyAction} onClick={() => void saveDetails()}>Save details</button>
-                    <button className="btn btn-secondary" type="button" disabled={!!busyAction} onClick={openMoveDialog}>
-                      {busyAction === "move" ? "Moving..." : selectedIsPending ? "Move request" : "Move booking"}
-                    </button>
-                    {!selectedIsPending ? (
-                      <button className="btn btn-primary" type="button" disabled={!!busyAction} onClick={openInvoiceDialog}>
-                        Create invoice
-                      </button>
-                    ) : null}
-                    {selectedIsPending ? (
-                      <button
-                        className="btn btn-primary"
-                        type="button"
-                        disabled={!!busyAction}
-                        onClick={() => void approveSelected("approve")}
-                      >
-                        {busyAction === "approve" ? "Approving..." : "Approve request"}
-                      </button>
-                    ) : null}
-                    <button
-                      className="btn btn-secondary"
-                      type="button"
-                      disabled={!!busyAction}
-                      onClick={() => void sendNotification("reminder")}
-                    >
-                      {busyAction === "reminder" ? "Sending..." : "Send reminder"}
-                    </button>
-                    <button className="btn btn-danger" type="button" disabled={!!busyAction} onClick={() => void cancelSelected()}>
-                      {busyAction === "cancel" ? "Cancelling..." : selectedIsPending ? "Cancel request" : "Cancel booking"}
-                    </button>
-                    <button
-                      className="btn btn-danger"
-                      type="button"
-                      disabled={!!busyAction}
-                      onClick={() => void deleteSelected()}
-                    >
-                      {busyAction === "delete"
-                        ? "Deleting..."
-                        : selectedIsPending
-                          ? "Remove request entirely"
-                          : "Delete booking"}
-                    </button>
-                    {selectedIsPending ? (
-                      <button
-                        className="btn btn-danger"
-                        type="button"
-                        disabled={!!busyAction}
-                        onClick={() => void approveSelected("reject")}
-                      >
-                        {busyAction === "reject" ? "Rejecting..." : "Reject request"}
-                      </button>
-                    ) : null}
-                    {selectedSeriesId ? (
-                      <button className="btn btn-danger" type="button" disabled={!!busyAction} onClick={() => void removeSeries(selectedSeriesId)}>
-                        Remove series
-                      </button>
-                    ) : null}
-                  </>
-                ) : (
-                  <button className="btn btn-secondary" type="button" onClick={() => setActiveTab('appointment')}>Back to appointment</button>
-                )}
-              </div>
-            </form>
+                <button className="btn btn-danger" type="button" disabled={!!busyAction} onClick={() => void cancelSelected()}>
+                  {busyAction === "cancel" ? "Cancelling..." : selectedIsPending ? "Cancel request" : "Cancel booking"}
+                </button>
+                <button
+                  className="btn btn-danger"
+                  type="button"
+                  disabled={!!busyAction}
+                  onClick={() => void deleteSelected()}
+                >
+                  {busyAction === "delete"
+                    ? "Deleting..."
+                    : selectedIsPending
+                      ? "Remove request entirely"
+                      : "Delete booking"}
+                </button>
+                {selectedIsPending ? (
+                  <button
+                    className="btn btn-danger"
+                    type="button"
+                    disabled={!!busyAction}
+                    onClick={() => void approveSelected("reject")}
+                  >
+                    {busyAction === "reject" ? "Rejecting..." : "Reject request"}
+                  </button>
+                ) : null}
+                {selectedSeriesId ? (
+                  <button className="btn btn-danger" type="button" disabled={!!busyAction} onClick={() => void removeSeries(selectedSeriesId)}>
+                    Remove series
+                  </button>
+                ) : null}
+              </>
+            ) : (
+              <button className="btn btn-secondary" type="button" onClick={() => setActiveTab('appointment')}>Back to appointment</button>
+            )}
           </div>
-        </div>
-      ) : null}
+        )}
+      >
+        <form className="dialog-form" onSubmit={(e) => e.preventDefault()}>
+          <div className="booking-dialog-scroll">
+            <div className="dialog-layout">
+              {activeTab === 'appointment' ? (
+                <>
+                  <div className="dialog-col">
+                    <h4>Customer details</h4>
+                    {selectedCustomer && !isEditingCustomer ? (
+                      <AdminCard style={{ marginBottom: '16px' }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                          <span style={{ fontWeight: 600, color: "var(--text-secondary)" }}>Read-only customer</span>
+                          <button type="button" className="btn btn-secondary" onClick={() => { router.push(`/admin/customers?customerId=${selectedCustomer.id}&edit=true`); }}>Edit</button>
+                        </div>
+                        <AdminForm className="dialog-form-grid">
+                          <AdminField label="First Name">
+                            <input value={selectedCustomer.firstName || selectedCustomer.fullName.split(' ')[0]} readOnly />
+                          </AdminField>
+                          <AdminField label="Last Name">
+                            <input value={selectedCustomer.lastName || selectedCustomer.fullName.split(' ').slice(1).join(' ')} readOnly />
+                          </AdminField>
+                          <AdminField label="Email" fullWidth>
+                            <input value={selectedCustomer.email} readOnly />
+                          </AdminField>
+                          <AdminField label="Phone">
+                            <input value={selectedCustomer.phone} readOnly />
+                          </AdminField>
+                          <AdminField label="Suburb">
+                            <input value={selectedCustomer.suburb} readOnly />
+                          </AdminField>
+                          <AdminField label="Postcode">
+                            <input value={selectedCustomer.postcode} readOnly />
+                          </AdminField>
+                        </AdminForm>
+                      </AdminCard>
+                    ) : (
+                      <AdminForm className="dialog-form-grid">
+                        <AdminField label="First Name">
+                          <input value={dialogForm.firstName} onChange={(e) => setDialogForm(prev => (prev ? { ...prev, firstName: e.target.value } : prev))} />
+                        </AdminField>
+                        <AdminField label="Last Name">
+                          <input value={dialogForm.lastName} onChange={(e) => setDialogForm(prev => (prev ? { ...prev, lastName: e.target.value } : prev))} />
+                        </AdminField>
+                        <AdminField label="Email" fullWidth>
+                          <input type="email" value={dialogForm.email} onChange={(e) => setDialogForm(prev => (prev ? { ...prev, email: e.target.value } : prev))} />
+                        </AdminField>
+                        <AdminField label="Phone">
+                          <input value={dialogForm.phone} maxLength={10} onChange={(e) => setDialogForm(prev => (prev ? { ...prev, phone: toDigits(e.target.value, 10) } : prev))} />
+                        </AdminField>
+                        <AdminField label="Suburb">
+                          <input value={dialogForm.suburb} onChange={(e) => setDialogForm(prev => (prev ? { ...prev, suburb: e.target.value } : prev))} />
+                        </AdminField>
+                        <AdminField label="Postcode">
+                          <input value={dialogForm.postcode} maxLength={4} onChange={(e) => setDialogForm(prev => (prev ? { ...prev, postcode: e.target.value } : prev))} />
+                        </AdminField>
+                      </AdminForm>
+                    )}
+                    <AdminForm>
+                      <AdminField label="Start">
+                        <input type="datetime-local" value={dialogForm.startAtLocal} onChange={(e) => setDialogForm(prev => (prev ? { ...prev, startAtLocal: e.target.value } : prev))} />
+                      </AdminField>
+                    </AdminForm>
+                  </div>
+                  <div className="dialog-col is-notes">
+                    <h4>Notes</h4>
+                    <AdminField label="Lesson notes">
+                      <textarea className="dialog-notes" value={dialogForm.notes} onChange={(e) => setDialogForm(prev => (prev ? { ...prev, notes: e.target.value } : prev))} />
+                    </AdminField>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="dialog-col">
+                    <h4>Email History</h4>
+                    <AdminCard style={{ background: 'rgba(0,0,0,0.03)', padding: '12px', border: '1px solid var(--line)', maxHeight: '400px', overflowY: 'auto' }}>
+                      {loadingEmailHistory ? (
+                        <p className="helper-text">Loading history...</p>
+                      ) : emailHistory.length > 0 ? (
+                        <div style={{ display: 'grid', gap: '8px' }}>
+                          {emailHistory.map((email) => (
+                            <div key={email.id} style={{ padding: '12px', borderBottom: '1px solid var(--line)', fontSize: '0.85rem' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                <strong style={{ color: 'var(--ink-0)' }}>{email.subject}</strong>
+                                <span style={{ color: 'var(--ink-2)', fontSize: '0.75rem' }}>{formatDateTime(email.createdAt)}</span>
+                              </div>
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <span className={`invoice-item-chip invoice-item-chip-status invoice-item-chip-status-${email.status === 'sent' ? 'paid' : 'draft'}`} style={{ fontSize: '0.7rem', padding: '2px 8px' }}>
+                                  {email.status}
+                                </span>
+                                {email.error && <span style={{ color: 'var(--brand-danger)', fontSize: '0.75rem' }}>{email.error}</span>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="helper-text">No email history found for this address.</p>
+                      )}
+                    </AdminCard>
+                  </div>
+
+                  <div className="dialog-col is-notes">
+                    <h4>Send Email</h4>
+                    <AdminCard style={{ background: 'rgba(0,0,0,0.03)', padding: '16px', border: '1px solid var(--line)' }}>
+                      <AdminForm>
+                        <AdminField label="Subject">
+                          <input 
+                            placeholder="Email subject"
+                            value={emailComposerSubject}
+                            onChange={e => setEmailComposerSubject(e.target.value)}
+                          />
+                        </AdminField>
+                        <AdminField label="Message">
+                          <textarea 
+                            placeholder="Type your message to the student here..."
+                            style={{ minHeight: '160px', resize: 'vertical' }}
+                            value={emailComposerMessage}
+                            onChange={e => setEmailComposerMessage(e.target.value)}
+                          />
+                        </AdminField>
+                        <button 
+                          className="btn btn-primary" 
+                          type="button"
+                          disabled={sendingEmail || !emailComposerSubject.trim() || !emailComposerMessage.trim()}
+                          onClick={() => void sendCustomerEmail()}
+                        >
+                          {sendingEmail ? "Sending..." : "Send Email"}
+                        </button>
+                      </AdminForm>
+                    </AdminCard>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </form>
+      </AdminDialog>
 
       {materialsDialogPresence.isMounted ? (
         <div

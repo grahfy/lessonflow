@@ -1,11 +1,11 @@
 "use client";
-import { APP_TIMEZONE } from "@/lib/time";
 
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo } from "react";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
+import { AdminCard } from "@/components/admin/ui/admin-card";
 import type {
   AdminManualIndex,
   AdminManualSection,
@@ -13,60 +13,25 @@ import type {
   ManualScreenshot
 } from "@/lib/manual/content";
 
-type Props = {
+type AdminManualSectionClientProps = {
   index: AdminManualIndex;
   section: AdminManualSection;
   previous: AdminManualSectionIndex | null;
   next: AdminManualSectionIndex | null;
 };
 
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("en-AU", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: APP_TIMEZONE
-  }).format(new Date(value));
-}
-
-function renderSectionRoutePills(section: { id: string; relatedRoutes: string[] }) {
-  if (!section.relatedRoutes.length) return null;
-
-  return (
-    <div className="admin-manual-route-pills">
-      {section.relatedRoutes.map((route) => (
-        <span key={`${section.id}-${route}`} className="admin-manual-pill">
-          {route}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function renderSectionScreenshots(screenshots: ManualScreenshot[]) {
-  if (!screenshots.length) return null;
-
-  return (
-    <div className="admin-manual-inline-shot-grid">
-      {screenshots.map((shot) => (
-        <figure key={shot.id} className="admin-manual-shot">
-          <div className="admin-manual-shot-frame">
-            <Image src={shot.publicPath} alt={shot.alt} width={960} height={600} />
-          </div>
-          <figcaption>
-            <strong>{shot.alt}</strong>
-            <span>{shot.caption}</span>
-          </figcaption>
-        </figure>
-      ))}
-    </div>
-  );
-}
-
-export function AdminManualSectionClient({ index, section, previous, next }: Props) {
-  const sectionScreenshots = useMemo(() => {
-    const screenshotById = new Map(index.screenshots.map((screenshot) => [screenshot.id, screenshot] as const));
-    return section.screenshotIds
-      .map((id) => screenshotById.get(id))
+/**
+ * Main client for a specific manual guide page.
+ */
+export function AdminManualSectionClient({
+  index,
+  section,
+  previous,
+  next
+}: AdminManualSectionClientProps) {
+  const screenshots = useMemo(() => {
+    return (section.screenshotIds || [])
+      .map((id) => index.screenshots.find((s) => s.id === id))
       .filter((screenshot): screenshot is ManualScreenshot => Boolean(screenshot));
   }, [index.screenshots, section.screenshotIds]);
 
@@ -75,7 +40,7 @@ export function AdminManualSectionClient({ index, section, previous, next }: Pro
 
   return (
     <AdminShell title="Manual">
-      <div className="admin-card admin-manual-layout">
+      <AdminCard className="admin-manual-layout">
         <aside className="admin-manual-toc">
           <div className="admin-manual-toc-panel">
             <h2>Guides</h2>
@@ -98,12 +63,12 @@ export function AdminManualSectionClient({ index, section, previous, next }: Pro
               ))}
             </ol>
 
-            {technicalSections.length ? (
+            {technicalSections.length > 0 ? (
               <>
-                <h3>Technical owner</h3>
+                <h3>Technical & System</h3>
                 <ol className="admin-manual-list compact">
                   {technicalSections.map((entry) => (
-                    <li key={`toc-tech-${entry.id}`}>
+                    <li key={`toc-${entry.id}`}>
                       <Link className={entry.id === section.id ? "is-active" : ""} href={`/admin/manual/${entry.id}`}>
                         {entry.title}
                       </Link>
@@ -115,27 +80,29 @@ export function AdminManualSectionClient({ index, section, previous, next }: Pro
           </div>
         </aside>
 
-        <div className="admin-manual-content-column">
-          <section className="admin-manual-panel admin-manual-doc-section">
-            <div className="admin-manual-doc-head">
-              <div>
-                <div className="admin-manual-doc-kicker">
-                  <span className={`admin-manual-audience-badge ${section.audience === "technical_owner" ? "technical" : ""}`}>
-                    {section.audience === "technical_owner" ? "Technical owner" : "Admin guide"}
-                  </span>
-                </div>
-                <h2>{section.title}</h2>
-                <p className="helper-text">{section.summary}</p>
-                {renderSectionRoutePills(section)}
-              </div>
-              <div className="admin-manual-doc-meta">
-                <p className="helper-text">Updated: {formatDate(section.updatedAt)}</p>
-              </div>
-            </div>
+        <div className="admin-manual-content-wrapper">
+          <section className="admin-manual-content">
+            <h1>{section.title}</h1>
+            <p className="lead">{section.description}</p>
 
-            {renderSectionScreenshots(sectionScreenshots)}
+            <div className="admin-manual-html" dangerouslySetInnerHTML={{ __html: section.html }} />
 
-            <article className="admin-manual-markdown" dangerouslySetInnerHTML={{ __html: section.html }} />
+            {screenshots.length > 0 ? (
+              <div className="admin-manual-screenshots">
+                {screenshots.map((s) => (
+                  <figure key={s.id} className="admin-manual-screenshot-figure">
+                    <Image
+                      src={s.url}
+                      alt={s.alt}
+                      width={1200}
+                      height={800}
+                      className="admin-manual-screenshot-img"
+                    />
+                    <figcaption>{s.alt}</figcaption>
+                  </figure>
+                ))}
+              </div>
+            ) : null}
 
             <div className="admin-manual-section-nav">
               {previous ? (
@@ -151,7 +118,7 @@ export function AdminManualSectionClient({ index, section, previous, next }: Pro
             </div>
           </section>
         </div>
-      </div>
+      </AdminCard>
     </AdminShell>
   );
 }

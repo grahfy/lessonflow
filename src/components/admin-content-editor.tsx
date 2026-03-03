@@ -1,221 +1,100 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useNoticeTween } from "@/components/motion/use-notice-tween";
+import { AdminCard } from "@/components/admin/ui/admin-card";
+import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 
-type SectionDefinition = {
+type ContentSection = {
   key: string;
-  label: string;
-  fields: Array<{
-    key: string;
-    label: string;
-    type: "text" | "textarea" | "list";
-  }>;
+  title: string;
+  body: string;
 };
 
-type PageDefinition = {
-  path: string;
-  label: string;
-  sections: SectionDefinition[];
-};
-
-const PAGES: PageDefinition[] = [
-  {
-    path: "/",
-    label: "Home Page",
-    sections: [
-      {
-        key: "hero",
-        label: "Hero Section",
-        fields: [
-          { key: "kicker", label: "Kicker (Top Label)", type: "text" },
-          { key: "title", label: "Title", type: "text" },
-          { key: "lead", label: "Lead Text", type: "textarea" },
-          { key: "visualLabel", label: "Accessibility Label for Image", type: "text" }
-        ]
-      },
-      {
-        key: "metrics",
-        label: "Experience Metrics",
-        fields: [
-          { key: "experienceValue", label: "Experience Value (e.g. 30+)", type: "text" },
-          { key: "experienceLabel", label: "Experience Label", type: "text" },
-          { key: "levelsValue", label: "Levels Value", type: "text" },
-          { key: "levelsLabel", label: "Levels Label", type: "text" },
-          { key: "locationValue", label: "Location Value", type: "text" },
-          { key: "locationLabel", label: "Location Label", type: "text" }
-        ]
-      },
-      {
-        key: "body",
-        label: "Body Section",
-        fields: [
-          { key: "note", label: "Bottom Note", type: "textarea" }
-        ]
-      }
-    ]
-  },
-  {
-    path: "/lessons",
-    label: "Lessons Page",
-    sections: [
-      {
-        key: "hero",
-        label: "Hero Section",
-        fields: [
-          { key: "kicker", label: "Kicker", type: "text" },
-          { key: "title", label: "Title", type: "text" },
-          { key: "lead", label: "Lead Text", type: "textarea" }
-        ]
-      },
-      {
-        key: "body",
-        label: "Path Details",
-        fields: [
-          { key: "helperText", label: "Intro Text", type: "textarea" },
-          { key: "beginnerTitle", label: "Beginner Path Title", type: "text" },
-          { key: "beginnerBody", label: "Beginner Path Body", type: "textarea" },
-          { key: "intermediateTitle", label: "Intermediate Path Title", type: "text" },
-          { key: "intermediateBody", label: "Intermediate Path Body", type: "textarea" },
-          { key: "advancedTitle", label: "Advanced Path Title", type: "text" },
-          { key: "advancedBody", label: "Advanced Path Body", type: "textarea" }
-        ]
-      }
-    ]
-  }
-];
-
-interface PageContentItem {
-  sectionKey: string;
-  content: Record<string, string>;
-}
-
+/**
+ * Whitelabel interface for editing public-facing page content (FAQs, Home, etc).
+ */
 export function AdminContentEditor() {
-  const [selectedPage, setSelectedPage] = useState(PAGES[0]);
-  const [content, setContent] = useState<Record<string, Record<string, string>>>({});
-  const [loading, setLoading] = useState(false);
+  const [sections, setSections] = useState<ContentSection[]>([]);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const noticeRef = useNoticeTween(Boolean(notice));
-  const errorRef = useNoticeTween(Boolean(error));
-
   useEffect(() => {
-    async function loadContent() {
-      setLoading(true);
-      setError("");
+    async function load() {
       try {
-        const res = await fetch(`/api/admin/content?pagePath=${encodeURIComponent(selectedPage.path)}`);
-        const body = await res.json();
-        if (body.ok) {
-          const mapped: Record<string, Record<string, string>> = {};
-          (body.content as PageContentItem[]).forEach((item) => {
-            mapped[item.sectionKey] = item.content;
-          });
-          setContent(mapped);
+        const response = await fetch("/api/admin/content");
+        if (response.ok) {
+          const data = await response.json();
+          setSections(data.sections);
         }
-      } catch {
-        setError("Failed to load page content.");
       } finally {
         setLoading(false);
       }
     }
-    void loadContent();
-  }, [selectedPage]);
+    void load();
+  }, []);
 
-  async function handleSave(sectionKey: string) {
+  async function saveAll() {
     setSaving(true);
     setError("");
     setNotice("");
     try {
-      const res = await fetch("/api/admin/content", {
+      const response = await fetch("/api/admin/content", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pagePath: selectedPage.path,
-          sectionKey,
-          content: content[sectionKey] || {}
-        })
+        body: JSON.stringify({ sections })
       });
-      const body = await res.json();
-      if (body.ok) {
-        setNotice(`Saved ${sectionKey} section.`);
+      if (response.ok) {
+        setNotice("Content saved successfully.");
       } else {
-        setError(String(body.error || "Failed to save."));
+        setError("Failed to save content.");
       }
     } catch {
-      setError("Failed to save section.");
+      setError("An error occurred while saving.");
     } finally {
       setSaving(false);
     }
   }
 
-  const updateField = (sectionKey: string, fieldKey: string, value: string) => {
-    setContent(prev => ({
-      ...prev,
-      [sectionKey]: {
-        ...(prev[sectionKey] || {}),
-        [fieldKey]: value
-      }
-    }));
-  };
+  function updateSection(key: string, patch: Partial<ContentSection>) {
+    setSections(sections.map(s => s.key === key ? { ...s, ...patch } : s));
+  }
+
+  if (loading) return <p className="helper-text">Loading content...</p>;
 
   return (
-    <div className="admin-content-editor">
-      <div className="admin-card">
-        <div className="field">
-          <label>Select Page to Edit</label>
-          <select 
-            value={selectedPage.path} 
-            onChange={(e) => setSelectedPage(PAGES.find(p => p.path === e.target.value) || PAGES[0])}
-          >
-            {PAGES.map(p => <option key={p.path} value={p.path}>{p.label}</option>)}
-          </select>
+    <div className="form-grid">
+      <AdminCard className="field full">
+        <h2 className="admin-settings-section-title">Page Content</h2>
+        <p className="helper-text" style={{ marginBottom: '16px' }}>
+          Edit the text shown on public-facing pages of the platform.
+        </p>
+
+        {notice ? <p className="notice success">{notice}</p> : null}
+        {error ? <p className="notice error">{error}</p> : null}
+
+        <div style={{ display: 'grid', gap: '20px' }}>
+          {sections.map((section) => (
+            <AdminCard key={section.key} style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid var(--line)' }}>
+              <AdminForm>
+                <AdminField label="Section Title" fullWidth>
+                  <input value={section.title} onChange={e => updateSection(section.key, { title: e.target.value })} />
+                </AdminField>
+                <AdminField label="Body Content (Markdown/HTML)" fullWidth>
+                  <textarea value={section.body} style={{ minHeight: '200px' }} onChange={e => updateSection(section.key, { body: e.target.value })} />
+                </AdminField>
+              </AdminForm>
+            </AdminCard>
+          ))}
         </div>
-      </div>
 
-      {notice && <p className="notice success" ref={noticeRef}>{notice}</p>}
-      {error && <p className="notice error" ref={errorRef}>{error}</p>}
-
-      {loading ? (
-        <p className="notice">Loading content...</p>
-      ) : (
-        selectedPage.sections.map(section => (
-          <section key={section.key} className="admin-card">
-            <h2 className="admin-settings-section-title">{section.label}</h2>
-            <div className="form-grid">
-              {section.fields.map(field => (
-                <div key={field.key} className="field full">
-                  <label>{field.label}</label>
-                  {field.type === "textarea" ? (
-                    <textarea
-                      value={content[section.key]?.[field.key] || ""}
-                      onChange={(e) => updateField(section.key, field.key, e.target.value)}
-                      rows={4}
-                    />
-                  ) : (
-                    <input
-                      type="text"
-                      value={content[section.key]?.[field.key] || ""}
-                      onChange={(e) => updateField(section.key, field.key, e.target.value)}
-                    />
-                  )}
-                </div>
-              ))}
-              <div className="field full">
-                <button 
-                  className="btn btn-primary" 
-                  disabled={saving}
-                  onClick={() => void handleSave(section.key)}
-                >
-                  {saving ? "Saving..." : `Save ${section.label}`}
-                </button>
-              </div>
-            </div>
-          </section>
-        ))
-      )}
+        <div className="button-row" style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--line)' }}>
+          <button className="btn btn-primary" disabled={saving} onClick={saveAll}>
+            {saving ? "Saving..." : "Save All Content"}
+          </button>
+        </div>
+      </AdminCard>
     </div>
   );
 }

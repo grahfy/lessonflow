@@ -1,156 +1,101 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useNoticeTween } from "@/components/motion/use-notice-tween";
+import { AdminCard } from "@/components/admin/ui/admin-card";
+import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 
-type TemplateDef = {
+type EmailTemplate = {
   key: string;
-  label: string;
-  placeholders: string[];
+  subject: string;
+  body: string;
 };
 
-const TEMPLATE_DEFS: TemplateDef[] = [
-  {
-    key: "customer_booking_reminder",
-    label: "Customer Lesson Reminder",
-    placeholders: ["customerName", "lessonTime", "brandName"]
-  },
-  {
-    key: "customer_booking_status",
-    label: "Booking Status Update",
-    placeholders: ["customerName", "status", "lessonTime", "brandName"]
-  },
-  {
-    key: "customer_invoice",
-    label: "Invoice Sent",
-    placeholders: ["customerName", "invoiceNumber", "totalAmount", "dueDate", "brandName"]
-  }
-];
-
-interface EmailTemplate {
-  templateKey: string;
-  subject: string;
-  htmlBody: string;
-}
-
+/**
+ * Whitelabel interface for editing system email templates.
+ */
 export function AdminEmailTemplateEditor() {
-  const [selectedKey, setSelectedKey] = useState(TEMPLATE_DEFS[0].key);
-  const [subject, setSubject] = useState("");
-  const [htmlBody, setHtmlBody] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const noticeRef = useNoticeTween(Boolean(notice));
-  const errorRef = useNoticeTween(Boolean(error));
-
-  const currentDef = TEMPLATE_DEFS.find(d => d.key === selectedKey)!;
-
   useEffect(() => {
     async function load() {
-      setLoading(true);
-      setError("");
       try {
-        const res = await fetch(`/api/admin/email-templates`);
-        const body = await res.json();
-        if (body.ok) {
-          const t = (body.templates as EmailTemplate[]).find((item) => item.templateKey === selectedKey);
-          if (t) {
-            setSubject(t.subject);
-            setHtmlBody(t.htmlBody);
-          } else {
-            setSubject("");
-            setHtmlBody("");
-          }
+        const response = await fetch("/api/admin/email-templates");
+        if (response.ok) {
+          const data = await response.json();
+          setTemplates(data.templates);
         }
-      } catch {
-        setError("Failed to load template.");
       } finally {
         setLoading(false);
       }
     }
     void load();
-  }, [selectedKey]);
+  }, []);
 
-  async function handleSave() {
+  async function saveAll() {
     setSaving(true);
     setError("");
     setNotice("");
     try {
-      const res = await fetch("/api/admin/email-templates", {
+      const response = await fetch("/api/admin/email-templates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          templateKey: selectedKey,
-          subject,
-          htmlBody
-        })
+        body: JSON.stringify({ templates })
       });
-      const body = await res.json();
-      if (body.ok) {
-        setNotice(`Saved ${currentDef.label}.`);
+      if (response.ok) {
+        setNotice("Email templates saved successfully.");
       } else {
-        setError(String(body.error || "Failed to save."));
+        setError("Failed to save templates.");
       }
     } catch {
-      setError("Failed to save template.");
+      setError("An error occurred while saving.");
     } finally {
       setSaving(false);
     }
   }
 
+  function updateTemplate(key: string, patch: Partial<EmailTemplate>) {
+    setTemplates(templates.map(t => t.key === key ? { ...t, ...patch } : t));
+  }
+
+  if (loading) return <p className="helper-text">Loading templates...</p>;
+
   return (
-    <div className="admin-email-editor">
-      <div className="admin-card">
-        <div className="field">
-          <label>Select Template to Edit</label>
-          <select value={selectedKey} onChange={(e) => setSelectedKey(e.target.value)}>
-            {TEMPLATE_DEFS.map(d => <option key={d.key} value={d.key}>{d.label}</option>)}
-          </select>
+    <div className="form-grid">
+      <AdminCard className="field full">
+        <h2 className="admin-settings-section-title">Email Templates</h2>
+        <p className="helper-text" style={{ marginBottom: '16px' }}>
+          Customize the subjects and content of automated system emails. Use {"{{ placeholders }}"} for dynamic content.
+        </p>
+
+        {notice ? <p className="notice success">{notice}</p> : null}
+        {error ? <p className="notice error">{error}</p> : null}
+
+        <div style={{ display: 'grid', gap: '20px' }}>
+          {templates.map((t) => (
+            <AdminCard key={t.key} style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid var(--line)' }}>
+              <h3 style={{ fontSize: '0.9rem', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t.key.replace(/_/g, ' ')}</h3>
+              <AdminForm>
+                <AdminField label="Subject" required fullWidth>
+                  <input value={t.subject} onChange={e => updateTemplate(t.key, { subject: e.target.value })} />
+                </AdminField>
+                <AdminField label="Body" required fullWidth>
+                  <textarea value={t.body} style={{ minHeight: '200px', fontFamily: 'monospace' }} onChange={e => updateTemplate(t.key, { body: e.target.value })} />
+                </AdminField>
+              </AdminForm>
+            </AdminCard>
+          ))}
         </div>
-      </div>
 
-      {notice && <p className="notice success" ref={noticeRef}>{notice}</p>}
-      {error && <p className="notice error" ref={errorRef}>{error}</p>}
-
-      {loading ? (
-        <p className="notice">Loading template...</p>
-      ) : (
-        <section className="admin-card">
-          <h2 className="admin-settings-section-title">{currentDef.label}</h2>
-          <div className="form-grid">
-            <div className="field full">
-              <label>Email Subject</label>
-              <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="e.g. Lesson Reminder: {{lessonTime}}" />
-            </div>
-            <div className="field full">
-              <label>Email Body (HTML)</label>
-              <textarea 
-                value={htmlBody} 
-                onChange={(e) => setHtmlBody(e.target.value)} 
-                rows={12}
-                placeholder="Hi {{customerName}}, your lesson is at {{lessonTime}}..."
-              />
-            </div>
-            <div className="field full">
-              <p className="helper-text">
-                Available placeholders: {currentDef.placeholders.map((p, idx) => (
-                  <span key={p}>
-                    <code>{"{{"}{p}{"}}"}</code>
-                    {idx < currentDef.placeholders.length - 1 ? ", " : ""}
-                  </span>
-                ))}
-              </p>
-            </div>
-            <div className="field full">
-              <button className="btn btn-primary" disabled={saving} onClick={() => void handleSave()}>
-                {saving ? "Saving..." : "Save Template"}
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
+        <div className="button-row" style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--line)' }}>
+          <button className="btn btn-primary" disabled={saving} onClick={saveAll}>
+            {saving ? "Saving..." : "Save All Templates"}
+          </button>
+        </div>
+      </AdminCard>
     </div>
   );
 }

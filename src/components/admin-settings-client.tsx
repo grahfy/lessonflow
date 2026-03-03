@@ -4,6 +4,8 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
+import { AdminCard } from "@/components/admin/ui/admin-card";
+import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { AdminPresetsEditor } from "@/components/admin-presets-editor";
 import { AdminContentEditor } from "@/components/admin-content-editor";
 import { AdminEmailTemplateEditor } from "@/components/admin-email-template-editor";
@@ -280,12 +282,12 @@ export function AdminSettingsClient() {
     if (groupsInTab.length === 0) return null;
 
     return (
-      <div className="admin-card form-grid">
+      <AdminCard className="form-grid">
         {groupsInTab.map((group) => (
           <div key={group.title} className="field full">
             <div className="admin-settings-section">
               <h2 className="admin-settings-section-title">{group.title}</h2>
-              <div className="form-grid">
+              <AdminForm>
                 {group.items.map((envVar) => {
                   const fieldError = fieldErrors[envVar.key];
                   const isSecret = envVar.isSecret;
@@ -295,13 +297,14 @@ export function AdminSettingsClient() {
                       : envVar.placeholder;
 
                   return (
-                    <div key={envVar.key} className="field">
-                      <label htmlFor={`admin-setting-${envVar.key}`}>
-                        {envVar.title}
-                        {envVar.isRequired ? <span className="required-mark">*</span> : null}
-                        {envVar.isSecret ? <span className="secret-mark"> (secret)</span> : null}
-                      </label>
-                      <p className="field-description">{envVar.description}</p>
+                    <AdminField
+                      key={envVar.key}
+                      label={envVar.title}
+                      required={envVar.isRequired}
+                      description={envVar.description}
+                      error={fieldError}
+                      htmlFor={`admin-setting-${envVar.key}`}
+                    >
                       <input
                         id={`admin-setting-${envVar.key}`}
                         name={envVar.key}
@@ -317,11 +320,10 @@ export function AdminSettingsClient() {
                         className={fieldError ? "input-error" : ""}
                         autoComplete="off"
                       />
-                      {fieldError ? <p className="field-error">{fieldError}</p> : null}
-                    </div>
+                    </AdminField>
                   );
                 })}
-              </div>
+              </AdminForm>
             </div>
           </div>
         ))}
@@ -333,13 +335,13 @@ export function AdminSettingsClient() {
             </button>
           </div>
         </div>
-      </div>
+      </AdminCard>
     );
   };
 
   return (
     <AdminShell title="Admin Configuration" error={error} notice={notice} loading={loading}>
-      <div className="admin-card booking-row">
+      <AdminCard className="booking-row">
         <div className="site-nav">
           <button className={`btn ${activeTab === "branding" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("branding")}>Branding</button>
           <button className={`btn ${activeTab === "pages" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("pages")}>Pages</button>
@@ -348,7 +350,7 @@ export function AdminSettingsClient() {
           <button className={`btn ${activeTab === "products" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("products")}>Products</button>
           <button className={`btn ${activeTab === "system" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("system")}>System</button>
         </div>
-      </div>
+      </AdminCard>
 
       {!loading && (
         <>
@@ -365,17 +367,15 @@ export function AdminSettingsClient() {
           {activeTab === "system" && (
             <>
               {renderEnvFields("system")}
-              <div className="admin-card">
+              <AdminCard>
                 <h2 className="admin-settings-section-title">Admin Password</h2>
-                <div className="form-grid">
-                  <div className="field">
-                    <label>New Password</label>
+                <AdminForm>
+                  <AdminField label="New Password">
                     <input type="password" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} />
-                  </div>
-                  <div className="field">
-                    <label>Confirm Password</label>
+                  </AdminField>
+                  <AdminField label="Confirm Password">
                     <input type="password" value={confirmAdminPassword} onChange={e => setConfirmAdminPassword(e.target.value)} />
-                  </div>
+                  </AdminField>
                   <div className="field full">
                     <button className="btn btn-primary" onClick={() => {
                       const form = document.createElement('form');
@@ -383,8 +383,8 @@ export function AdminSettingsClient() {
                       void onSubmit(event);
                     }}>Update Credentials</button>
                   </div>
-                </div>
-              </div>
+                </AdminForm>
+              </AdminCard>
             </>
           )}
         </>

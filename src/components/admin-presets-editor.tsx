@@ -1,242 +1,142 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { parseAudInputToCents } from "@/lib/invoices/currency";
+import { toMoneyInput } from "@/lib/admin/formatters";
+import { AdminCard } from "@/components/admin/ui/admin-card";
+import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 
-type InvoiceProductPreset = {
+type ProductPreset = {
   id: string;
   label: string;
   description: string;
   unitPriceCents: number;
-  isActive: boolean;
-  sortOrder: number;
 };
 
 /**
- * Editor for invoice product presets (lesson packages).
+ * Interface for managing whitelabel product presets (items reused in invoices).
  */
 export function AdminPresetsEditor() {
-  const [presets, setPresets] = useState<InvoiceProductPreset[]>([]);
+  const [presets, setPresets] = useState<ProductPreset[]>([]);
+  const [newPreset, setNewPreset] = useState<Partial<ProductPreset>>({ label: "", description: "", unitPriceCents: 0 });
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  // Form state for creating/editing
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [formLabel, setFormLabel] = useState("");
-  const [formDescription, setFormDescription] = useState("");
-  const [formPriceDollars, setFormPriceDollars] = useState("");
-  const [formSortOrder, setFormSortOrder] = useState("0");
-
-  async function load() {
-    setLoading(true);
-    setError("");
-    try {
-      const response = await fetch("/api/admin/presets");
-      const body = await response.json();
-      if (!response.ok) {
-        throw new Error(body.error || "Failed to load presets.");
-      }
-      setPresets(body.presets || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load presets.");
-    } finally {
-      setLoading(false);
-    }
-  }
 
   useEffect(() => {
+    async function load() {
+      try {
+        const response = await fetch("/api/admin/presets");
+        if (response.ok) {
+          const data = await response.json();
+          setPresets(data.presets);
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
     void load();
   }, []);
 
-  function startEdit(preset: InvoiceProductPreset) {
-    setEditingId(preset.id);
-    setFormLabel(preset.label);
-    setFormDescription(preset.description);
-    setFormPriceDollars((preset.unitPriceCents / 100).toString());
-    setFormSortOrder(preset.sortOrder.toString());
-    setNotice("");
-    setError("");
-  }
-
-  function resetForm() {
-    setEditingId(null);
-    setFormLabel("");
-    setFormDescription("");
-    setFormPriceDollars("");
-    setFormSortOrder("0");
-  }
-
-  async function onSubmit(event: FormEvent) {
-    event.preventDefault();
+  async function saveAll() {
     setSaving(true);
     setError("");
     setNotice("");
-
-    const priceCents = Math.round(parseFloat(formPriceDollars) * 100);
-    if (isNaN(priceCents)) {
-      setError("Invalid price.");
-      setSaving(false);
-      return;
-    }
-
-    const payload = {
-      label: formLabel,
-      description: formDescription,
-      unitPriceCents: priceCents,
-      sortOrder: parseInt(formSortOrder, 10) || 0
-    };
-
     try {
-      const url = editingId ? `/api/admin/presets/${editingId}` : "/api/admin/presets";
-      const method = editingId ? "PATCH" : "POST";
-      const response = await fetch(url, {
-        method,
+      const response = await fetch("/api/admin/presets", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ presets })
       });
-      const body = await response.json();
-      if (!response.ok) {
-        throw new Error(body.error || "Failed to save preset.");
+      if (response.ok) {
+        setNotice("Presets saved successfully.");
+      } else {
+        setError("Failed to save presets.");
       }
-
-      setNotice(editingId ? "Preset updated." : "Preset created.");
-      resetForm();
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save preset.");
+    } catch {
+      setError("An error occurred while saving.");
     } finally {
       setSaving(false);
     }
   }
 
-  async function deletePreset(id: string) {
-    if (!window.confirm("Are you sure you want to delete this preset?")) {
-      return;
-    }
-
-    setError("");
-    setNotice("");
-    try {
-      const response = await fetch(`/api/admin/presets/${id}`, { method: "DELETE" });
-      if (!response.ok) {
-        const body = await response.json();
-        throw new Error(body.error || "Failed to delete preset.");
-      }
-      setNotice("Preset deleted.");
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete preset.");
-    }
+  function addPreset() {
+    if (!newPreset.label) return;
+    const id = `new-${Date.now()}`;
+    setPresets([...presets, { ...newPreset, id } as ProductPreset]);
+    setNewPreset({ label: "", description: "", unitPriceCents: 0 });
   }
 
+  function updatePreset(id: string, patch: Partial<ProductPreset>) {
+    setPresets(presets.map(p => p.id === id ? { ...p, ...patch } : p));
+  }
+
+  function deletePreset(id: string) {
+    if (!window.confirm("Remove this preset?")) return;
+    setPresets(presets.filter(p => p.id !== id));
+  }
+
+  if (loading) return <p className="helper-text">Loading presets...</p>;
+
   return (
-    <div className="admin-presets-editor">
-      <div className="admin-card">
-        <h2 className="admin-settings-section-title">Manage Lesson Presets</h2>
-        <p className="helper-text">
-          Define lesson packages that can be quickly added to invoices. Presets appear in the &quot;Add product preset&quot; dropdown in the invoice editor.
+    <div className="form-grid">
+      <AdminCard className="field full">
+        <h2 className="admin-settings-section-title">Product Presets</h2>
+        <p className="helper-text" style={{ marginBottom: '16px' }}>
+          Standardized price points and descriptions for common billing scenarios.
         </p>
-      </div>
 
-      {error ? <p className="notice error">{error}</p> : null}
-      {notice ? <p className="notice success">{notice}</p> : null}
+        {notice ? <p className="notice success">{notice}</p> : null}
+        {error ? <p className="notice error">{error}</p> : null}
 
-      <div className="admin-grid">
-        <section className="admin-card">
-          <h3>Current Presets</h3>
-          {loading ? (
-            <p className="notice">Loading presets...</p>
-          ) : presets.length === 0 ? (
-            <p className="helper-text">No presets found. Create one using the form.</p>
-          ) : (
-            <div className="list">
-              {presets.map((preset) => (
-                <div key={preset.id} className="booking-item">
-                  <div className="booking-row" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div>
-                      <strong>{preset.label}</strong>
-                      <p className="helper-text">{preset.description}</p>
-                      <p className="helper-text" style={{ color: "var(--ink-0)" }}>
-                        ${(preset.unitPriceCents / 100).toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="booking-row">
-                      <button className="btn btn-secondary" onClick={() => startEdit(preset)}>
-                        Edit
-                      </button>
-                      <button className="btn btn-danger" onClick={() => void deletePreset(preset.id)}>
-                        Delete
-                      </button>
-                    </div>
+        <div style={{ display: 'grid', gap: '16px' }}>
+          {presets.map((p) => (
+            <AdminCard key={p.id} style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid var(--line)' }}>
+              <AdminForm>
+                <AdminField label="Label" required>
+                  <input value={p.label} onChange={e => updatePreset(p.id, { label: e.target.value })} />
+                </AdminField>
+                <AdminField label="Price (AUD)" required>
+                  <input value={toMoneyInput(p.unitPriceCents)} onChange={e => updatePreset(p.id, { unitPriceCents: parseAudInputToCents(e.target.value) })} />
+                </AdminField>
+                <AdminField label="Default Description" fullWidth>
+                  <textarea value={p.description} style={{ minHeight: '60px' }} onChange={e => updatePreset(p.id, { description: e.target.value })} />
+                </AdminField>
+                <div className="field full">
+                  <div className="button-row">
+                    <button className="btn btn-danger" onClick={() => deletePreset(p.id)}>Delete Preset</button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
+              </AdminForm>
+            </AdminCard>
+          ))}
 
-        <section className="admin-card">
-          <h3>{editingId ? "Edit Preset" : "Add New Preset"}</h3>
-          <form className="form-grid" onSubmit={(e) => void onSubmit(e)}>
-            <div className="field full">
-              <label htmlFor="preset-label">Label (shown in dropdown)</label>
-              <input
-                id="preset-label"
-                type="text"
-                required
-                value={formLabel}
-                onChange={(e) => setFormLabel(e.target.value)}
-                placeholder="e.g. 5 × 1 Hour Lessons ($375)"
-              />
-            </div>
-            <div className="field full">
-              <label htmlFor="preset-description">Description (shown on invoice)</label>
-              <input
-                id="preset-description"
-                type="text"
-                required
-                value={formDescription}
-                onChange={(e) => setFormDescription(e.target.value)}
-                placeholder="e.g. 5 × 1 Hour Lessons"
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="preset-price">Price ($ AUD)</label>
-              <input
-                id="preset-price"
-                type="number"
-                step="0.01"
-                required
-                value={formPriceDollars}
-                onChange={(e) => setFormPriceDollars(e.target.value)}
-                placeholder="0.00"
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="preset-sort">Sort Order</label>
-              <input
-                id="preset-sort"
-                type="number"
-                value={formSortOrder}
-                onChange={(e) => setFormSortOrder(e.target.value)}
-              />
-            </div>
-            <div className="field full">
-              <div className="button-row">
-                <button className="btn btn-primary" type="submit" disabled={saving}>
-                  {saving ? "Saving..." : editingId ? "Update Preset" : "Create Preset"}
-                </button>
-                {editingId && (
-                  <button className="btn btn-secondary" type="button" onClick={resetForm}>
-                    Cancel
-                  </button>
-                )}
+          <AdminCard style={{ border: '1px dashed var(--line)', background: 'transparent' }}>
+            <h3 style={{ fontSize: '0.9rem', marginBottom: '12px' }}>Add New Preset</h3>
+            <AdminForm>
+              <AdminField label="Label">
+                <input placeholder="e.g. 10 Week Term" value={newPreset.label} onChange={e => setNewPreset(prev => ({ ...prev, label: e.target.value }))} />
+              </AdminField>
+              <AdminField label="Price (AUD)">
+                <input placeholder="0.00" value={toMoneyInput(newPreset.unitPriceCents || 0)} onChange={e => setNewPreset(prev => ({ ...prev, unitPriceCents: parseAudInputToCents(e.target.value) }))} />
+              </AdminField>
+              <AdminField label="Default Description" fullWidth>
+                <textarea placeholder="Line item text..." value={newPreset.description} style={{ minHeight: '60px' }} onChange={e => setNewPreset(prev => ({ ...prev, description: e.target.value }))} />
+              </AdminField>
+              <div className="field full">
+                <button className="btn btn-secondary" onClick={addPreset}>Add Preset</button>
               </div>
-            </div>
-          </form>
-        </section>
-      </div>
+            </AdminForm>
+          </AdminCard>
+        </div>
+
+        <div className="button-row" style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--line)' }}>
+          <button className="btn btn-primary" disabled={saving} onClick={saveAll}>
+            {saving ? "Saving..." : "Save All Presets"}
+          </button>
+        </div>
+      </AdminCard>
     </div>
   );
 }

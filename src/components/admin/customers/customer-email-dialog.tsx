@@ -1,12 +1,14 @@
 import { formatDateTime } from "@/lib/admin/utils";
+import { AdminCard } from "@/components/admin/ui/admin-card";
+import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 
 type Props = {
     loadingEmailHistory: boolean;
     emailHistory: ReadonlyArray<{ id: string; subject: string; status: string; error?: string; createdAt: string }>;
     emailComposerSubject: string;
-    setEmailComposerSubject: React.Dispatch<React.SetStateAction<string>>;
+    setEmailComposerSubject: (val: string) => void;
     emailComposerMessage: string;
-    setEmailComposerMessage: React.Dispatch<React.SetStateAction<string>>;
+    setEmailComposerMessage: (val: string) => void;
     sendingEmail: boolean;
     onSendEmail: () => void;
 };
@@ -22,10 +24,10 @@ export function CustomerEmailDialog({
     onSendEmail
 }: Props) {
     return (
-        <>
-            <div className="dialog-col" style={{ minHeight: "650px" }}>
+        <div className="dialog-layout">
+            <div className="dialog-col">
                 <h4>Email History</h4>
-                <div className="admin-card" style={{ background: 'rgba(0,0,0,0.03)', padding: '12px', border: '1px solid var(--line)', maxHeight: '500px', overflowY: 'auto' }}>
+                <AdminCard style={{ background: 'rgba(0,0,0,0.03)', padding: '12px', border: '1px solid var(--line)', maxHeight: '500px', overflowY: 'auto' }}>
                     {loadingEmailHistory ? (
                         <p className="helper-text">Loading history...</p>
                     ) : emailHistory.length > 0 ? (
@@ -48,30 +50,28 @@ export function CustomerEmailDialog({
                     ) : (
                         <p className="helper-text">No email history found for this address.</p>
                     )}
-                </div>
+                </AdminCard>
             </div>
 
-            <div className="dialog-col is-notes" style={{ minHeight: "650px" }}>
+            <div className="dialog-col is-notes">
                 <h4>Send Email</h4>
-                <div className="admin-card" style={{ background: 'rgba(0,0,0,0.03)', padding: '16px', border: '1px solid var(--line)' }}>
-                    <div style={{ display: 'grid', gap: '12px' }}>
-                        <div className="field">
-                            <label>Subject</label>
+                <AdminCard style={{ background: 'rgba(0,0,0,0.03)', padding: '16px', border: '1px solid var(--line)' }}>
+                    <AdminForm>
+                        <AdminField label="Subject" required fullWidth>
                             <input
                                 placeholder="Email subject"
                                 value={emailComposerSubject}
                                 onChange={e => setEmailComposerSubject(e.target.value)}
                             />
-                        </div>
-                        <div className="field">
-                            <label>Message</label>
+                        </AdminField>
+                        <AdminField label="Message" required fullWidth>
                             <textarea
                                 placeholder="Type your message to the student here..."
-                                style={{ minHeight: '200px', resize: 'vertical' }}
+                                style={{ minHeight: '160px', resize: 'vertical' }}
                                 value={emailComposerMessage}
                                 onChange={e => setEmailComposerMessage(e.target.value)}
                             />
-                        </div>
+                        </AdminField>
                         <button
                             className="btn btn-primary"
                             type="button"
@@ -80,9 +80,9 @@ export function CustomerEmailDialog({
                         >
                             {sendingEmail ? "Sending..." : "Send Email"}
                         </button>
-                    </div>
-                </div>
+                    </AdminForm>
+                </AdminCard>
             </div>
-        </>
+        </div>
     );
 }

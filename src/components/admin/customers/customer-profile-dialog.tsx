@@ -1,6 +1,8 @@
 import type { AuState } from "@/lib/admin/types";
 import { AU_STATES } from "@/lib/admin/types";
 import { formatDateTime, toAuState, toDigits } from "@/lib/admin/utils";
+import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
+import { AdminCard } from "@/components/admin/ui/admin-card";
 
 // Types derived from admin-customers-client.tsx
 export type CustomerRow = {
@@ -131,43 +133,38 @@ export function CustomerProfileDialog({
         <>
             <div className="dialog-col" style={{ minHeight: "650px" }}>
                 <h4>Contact & Profile</h4>
-                <div className="form-grid dialog-form-grid">
-                    <div className="field">
-                        <label>First Name *</label>
+                <AdminForm className="dialog-form-grid">
+                    <AdminField label="First Name" required>
                         <input
                             value={form.firstName}
                             readOnly={!isEditing}
                             onChange={e => setForm(prev => ({ ...prev, firstName: e.target.value }))}
                         />
-                    </div>
-                    <div className="field">
-                        <label>Last Name *</label>
+                    </AdminField>
+                    <AdminField label="Last Name" required>
                         <input
                             value={form.lastName}
                             readOnly={!isEditing}
                             onChange={e => setForm(prev => ({ ...prev, lastName: e.target.value }))}
                         />
-                    </div>
-                    <div className="field full">
-                        <label>Email *</label>
+                    </AdminField>
+                    <AdminField label="Email" required fullWidth>
                         <input
                             type="email"
                             value={form.email}
                             readOnly={!isEditing}
                             onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
                         />
-                    </div>
-                    <div className="field">
-                        <label>Phone *</label>
+                    </AdminField>
+                    <AdminField label="Phone" required>
                         <input
                             value={form.phone}
                             readOnly={!isEditing}
                             maxLength={10}
                             onChange={e => setForm(prev => ({ ...prev, phone: toDigits(e.target.value, 10) }))}
                         />
-                    </div>
-                    <div className="field">
-                        <label>Skill Level</label>
+                    </AdminField>
+                    <AdminField label="Skill Level">
                         {isEditing ? (
                             <select
                                 value={form.skillLevel}
@@ -180,9 +177,8 @@ export function CustomerProfileDialog({
                         ) : (
                             <input value={form.skillLevel} style={{ textTransform: 'capitalize' }} readOnly />
                         )}
-                    </div>
-                    <div className="field">
-                        <label>Lesson Mode</label>
+                    </AdminField>
+                    <AdminField label="Lesson Mode">
                         {isEditing ? (
                             <select
                                 value={form.lessonMode}
@@ -194,29 +190,26 @@ export function CustomerProfileDialog({
                         ) : (
                             <input value={form.lessonMode === "in_person" ? "In-person" : "Video"} readOnly />
                         )}
-                    </div>
-                </div>
+                    </AdminField>
+                </AdminForm>
 
                 <h4 style={{ marginTop: '20px' }}>Address</h4>
-                <div className="form-grid dialog-form-grid">
-                    <div className="field">
-                        <label>Unit / Apartment</label>
+                <AdminForm className="dialog-form-grid">
+                    <AdminField label="Unit / Apartment">
                         <input
                             value={form.unitNumber}
                             readOnly={!isEditing}
                             onChange={e => setForm(prev => ({ ...prev, unitNumber: e.target.value }))}
                         />
-                    </div>
-                    <div className="field">
-                        <label>House Number *</label>
+                    </AdminField>
+                    <AdminField label="House Number" required>
                         <input
                             value={form.houseNumber}
                             readOnly={!isEditing}
                             onChange={e => setForm(prev => ({ ...prev, houseNumber: e.target.value }))}
                         />
-                    </div>
-                    <div className="field full">
-                        <label>Street *</label>
+                    </AdminField>
+                    <AdminField label="Street" required fullWidth>
                         {isEditing ? (
                             <div style={{ display: 'flex', gap: '8px' }}>
                                 <input
@@ -247,17 +240,15 @@ export function CustomerProfileDialog({
                         ) : (
                             <input value={`${form.streetName} ${form.streetType}`} readOnly />
                         )}
-                    </div>
-                    <div className="field">
-                        <label>Suburb *</label>
+                    </AdminField>
+                    <AdminField label="Suburb" required>
                         <input
                             value={form.suburb}
                             readOnly={!isEditing}
                             onChange={e => setForm(prev => ({ ...prev, suburb: e.target.value }))}
                         />
-                    </div>
-                    <div className="field">
-                        <label>State & Postcode *</label>
+                    </AdminField>
+                    <AdminField label="State & Postcode" required>
                         {isEditing ? (
                             <div style={{ display: 'flex', gap: '8px' }}>
                                 <select
@@ -278,13 +269,13 @@ export function CustomerProfileDialog({
                         ) : (
                             <input value={`${form.state} ${form.postcode}`} readOnly />
                         )}
-                    </div>
-                </div>
+                    </AdminField>
+                </AdminForm>
             </div>
 
             <div className="dialog-col is-notes" style={{ minHeight: "650px" }}>
                 <h4>Portal Credentials</h4>
-                <div className="admin-card" style={{ background: 'rgba(0,0,0,0.03)', padding: '16px', border: '1px solid var(--line)' }}>
+                <AdminCard style={{ background: 'rgba(0,0,0,0.03)', padding: '16px', border: '1px solid var(--line)' }}>
                     <p className="helper-text">Manage access to the student portal. Passwords are encrypted and can be revealed or rotated by admins.</p>
 
                     <div style={{ marginTop: '16px', display: 'grid', gap: '12px' }}>
@@ -341,7 +332,7 @@ export function CustomerProfileDialog({
                             </button>
                         </div>
                     </div>
-                </div>
+                </AdminCard>
 
                 <h4 style={{ marginTop: '30px' }}>Actions</h4>
                 <div className="dialog-actions" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '10px' }}>

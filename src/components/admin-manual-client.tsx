@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
+import { AdminCard } from "@/components/admin/ui/admin-card";
 import type { AdminManualIndex, AdminManualSectionIndex } from "@/lib/manual/content";
 
 type AdminManualClientProps = {
@@ -10,13 +11,14 @@ type AdminManualClientProps = {
 };
 
 function sectionGroups(sections: AdminManualSectionIndex[]) {
-  const allAdmins = sections.filter((section) => section.audience === "all_admins");
-  const technicalOwner = sections.filter((section) => section.audience === "technical_owner");
-  return { allAdmins, technicalOwner };
+  return {
+    allAdmins: sections.filter((s) => s.audience === "all_admins"),
+    techOwners: sections.filter((s) => s.audience === "technical_owner")
+  };
 }
 
 /**
- * Beginner-friendly manual landing page.
+ * Main admin manual landing page client.
  *
  * This page intentionally avoids rendering the full docs content so new operators
  * can pick a task quickly without scrolling a huge page.
@@ -26,7 +28,7 @@ export function AdminManualClient({ content }: AdminManualClientProps) {
 
   return (
     <AdminShell title="Manual">
-      <div className="admin-card admin-manual-layout admin-manual-index-layout">
+      <AdminCard className="admin-manual-layout admin-manual-index-layout">
         <aside className="admin-manual-toc">
           <div className="admin-manual-toc-panel">
             <h2>Start Here</h2>
@@ -47,62 +49,39 @@ export function AdminManualClient({ content }: AdminManualClientProps) {
                 4. Invoices (billing)
               </Link>
             </div>
-            <p className="helper-text">
-              Tip: When you are stuck, open <Link href="/admin/manual/troubleshooting-faq">Troubleshooting and FAQs</Link>.
-            </p>
           </div>
         </aside>
 
-        <div className="admin-manual-content-column">
-          <section className="admin-manual-panel">
-            <h2>All Guides</h2>
-            <p className="helper-text">
-              Each guide is its own page so you can focus on one task at a time.
-            </p>
-            <div className="admin-manual-index-grid">
+        <div className="admin-manual-sections">
+          <section className="admin-manual-group">
+            <h2>Daily Operations</h2>
+            <p className="helper-text">Standard procedures for managing students and lessons.</p>
+            <div className="admin-manual-grid">
               {grouped.allAdmins.map((section) => (
-                <div key={section.id} className="admin-manual-index-card">
-                  <div className="admin-manual-index-card-head">
-                    <h3>{section.title}</h3>
-                    <span className="admin-manual-audience-badge">Admin guide</span>
-                  </div>
-                  <p className="helper-text">{section.summary}</p>
-                  <div className="admin-manual-index-card-actions">
-                    <Link className="btn btn-secondary" href={`/admin/manual/${section.id}`}>
-                      Open guide
-                    </Link>
-                  </div>
-                </div>
+                <Link key={section.id} href={`/admin/manual/${section.id}`} className="admin-manual-card">
+                  <h3>{section.title}</h3>
+                  <p>{section.description}</p>
+                </Link>
               ))}
             </div>
           </section>
 
-          {grouped.technicalOwner.length ? (
-            <section className="admin-manual-panel">
-              <h2>Technical Owner (Optional)</h2>
-              <p className="helper-text">
-                These sections are for the person who manages hosting, deploys, and automation.
-              </p>
-              <div className="admin-manual-index-grid">
-                {grouped.technicalOwner.map((section) => (
-                  <div key={section.id} className="admin-manual-index-card">
-                    <div className="admin-manual-index-card-head">
-                      <h3>{section.title}</h3>
-                      <span className="admin-manual-audience-badge technical">Technical owner</span>
-                    </div>
-                    <p className="helper-text">{section.summary}</p>
-                    <div className="admin-manual-index-card-actions">
-                      <Link className="btn btn-secondary" href={`/admin/manual/${section.id}`}>
-                        Open guide
-                      </Link>
-                    </div>
-                  </div>
+          {grouped.techOwners.length > 0 ? (
+            <section className="admin-manual-group">
+              <h2>Technical & System</h2>
+              <p className="helper-text">Advanced guides for school owners and technical admins.</p>
+              <div className="admin-manual-grid">
+                {grouped.techOwners.map((section) => (
+                  <Link key={section.id} href={`/admin/manual/${section.id}`} className="admin-manual-card">
+                    <h3>{section.title}</h3>
+                    <p>{section.description}</p>
+                  </Link>
                 ))}
               </div>
             </section>
           ) : null}
         </div>
-      </div>
+      </AdminCard>
     </AdminShell>
   );
 }

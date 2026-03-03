@@ -1,7 +1,8 @@
 import { RefObject } from "react";
-import { formatBytes, formatDateTime } from "@/lib/admin/utils";
-
+import { formatDateTime } from "@/lib/admin/utils";
 import { type LearningMaterialBooking, type LearningMaterialRow } from "@/lib/admin/types";
+import { AdminCard } from "@/components/admin/ui/admin-card";
+import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 
 type Props = {
     materialsLoading: boolean;
@@ -31,121 +32,77 @@ export function CustomerMaterialsDialog({
     onBookingSelect
 }: Props) {
     return (
-        <>
-            <div className="dialog-col" style={{ minHeight: "650px" }}>
-                <h4>Assigned Materials</h4>
-                <div className="admin-card" style={{ background: 'rgba(0,0,0,0.03)', padding: '12px', border: '1px solid var(--line)', maxHeight: '500px', overflowY: 'auto' }}>
+        <div className="dialog-layout">
+            <div className="dialog-col">
+                <h4>Materials List</h4>
+                <AdminCard style={{ background: 'rgba(0,0,0,0.03)', padding: '12px', border: '1px solid var(--line)', maxHeight: '500px', overflowY: 'auto' }}>
                     {materialsLoading ? (
                         <p className="helper-text">Loading materials...</p>
                     ) : materialsList.length > 0 ? (
-                        <div className="materials-grid">
-                            {materialsList.map(m => (
-                                <div key={m.id} className="material-card">
-                                    <div className="material-card-info">
-                                        <strong>{m.title}</strong>
-                                        <p className="helper-text">
-                                            {m.materialType.toUpperCase()} · {formatBytes(m.sizeBytes)} · {new Date(m.createdAt).toLocaleDateString("en-AU")}
-                                        </p>
-                                        {m.materialType === "audio" && m.previewUrl && (
-                                            <div style={{ marginTop: '8px' }}>
-                                                <audio className="material-audio-player" controls preload="metadata" src={m.previewUrl} />
-                                            </div>
-                                        )}
+                        <div style={{ display: 'grid', gap: '8px' }}>
+                            {materialsList.map((m) => (
+                                <div key={m.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid var(--line)', gap: '12px' }}>
+                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                        <strong style={{ fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.filename}</strong>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--ink-2)' }}>{m.contentType} · {formatDateTime(m.createdAt)}</span>
                                     </div>
-                                    <div className="material-card-actions">
-                                        {m.materialType === "pdf" && m.previewUrl && (
-                                            <a
-                                                className="btn btn-secondary btn-compact"
-                                                href={m.previewUrl}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                            >
-                                                PREVIEW
-                                            </a>
-                                        )}
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--ink-1)' }}>{(m.sizeBytes / 1024 / 1024).toFixed(2)} MB</div>
+                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                        <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '0.7rem' }} onClick={() => window.open(`/api/admin/learning-materials/${m.id}`, '_blank')}>VIEW</button>
                                         <button
-                                            type="button"
-                                            className="btn btn-danger btn-compact"
+                                            className="btn btn-danger"
+                                            style={{ padding: '4px 8px', fontSize: '0.7rem' }}
                                             disabled={materialsDeletingId === m.id}
-                                            onClick={() => onDelete(m)}
+                                            onClick={() => void onDelete(m)}
                                         >
-                                            {materialsDeletingId === m.id ? "..." : "DELETE"}
+                                            {materialsDeletingId === m.id ? '...' : 'DEL'}
                                         </button>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <p className="helper-text">No materials uploaded for the current selection.</p>
+                        <p className="helper-text">No materials found for this selection.</p>
                     )}
-                </div>
+                </AdminCard>
             </div>
 
-            <div className="dialog-col is-notes" style={{ minHeight: "650px" }}>
-                <h4>Upload New Material</h4>
-                <div className="admin-card" style={{ background: 'rgba(0,0,0,0.03)', padding: '16px', border: '1px solid var(--line)' }}>
-                    <div className="form-grid dialog-form-grid" style={{ marginBottom: '16px' }}>
-                        <div className="field">
-                            <label>Select appointment (optional)</label>
+            <div className="dialog-col is-notes">
+                <h4>Upload New</h4>
+                <AdminCard style={{ background: 'rgba(0,0,0,0.03)', padding: '16px', border: '1px solid var(--line)' }}>
+                    <AdminForm>
+                        <AdminField label="Associate with booking">
                             <select
                                 value={materialsBookingId}
                                 onChange={e => {
-                                    const bid = e.target.value;
-                                    setMaterialsBookingId(bid);
-                                    onBookingSelect(bid);
+                                    setMaterialsBookingId(e.target.value);
+                                    onBookingSelect(e.target.value);
                                 }}
                             >
-                                <option value="">General material (No specific appointment)</option>
+                                <option value="">Overall student materials (all lessons)</option>
                                 {materialsBookings.map(b => (
                                     <option key={b.id} value={b.id}>
-                                        {formatDateTime(b.startAt)} ({b.status})
+                                        {new Date(b.startAt).toLocaleDateString('en-AU')} {new Date(b.startAt).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })}
                                     </option>
                                 ))}
                             </select>
-                        </div>
-                    </div>
-
-                    <form
-                        ref={materialsUploadFormRef}
-                        className="material-upload-form"
-                        onSubmit={e => { e.preventDefault(); onUpload(); }}
-                    >
-                        <div className="form-grid dialog-form-grid" style={{ gridTemplateColumns: '1fr' }}>
-                            <div className="field full">
-                                <label>Material title</label>
-                                <input name="title" required placeholder="e.g. Pentatonic exercise week 1" />
-                            </div>
-                            <div className="field full">
-                                <label>File</label>
-                                <input 
-                                    type="file" 
-                                    name="file" 
-                                    accept=".pdf,audio/*" 
-                                    required 
-                                    style={{ 
-                                        padding: '12px', 
-                                        background: 'rgba(0,0,0,0.1)', 
-                                        borderRadius: '8px',
-                                        border: '1px dashed var(--line)',
-                                        width: '100%',
-                                        color: 'var(--ink-1)'
-                                    }} 
-                                />
-                            </div>
-                        </div>
-                        <div className="dialog-actions" style={{ marginTop: '20px', padding: 0, border: 'none' }}>
-                            <button
-                                className="btn btn-primary"
-                                style={{ width: '100%' }}
-                                type="submit"
-                                disabled={materialsUploading}
-                            >
-                                {materialsUploading ? "Uploading..." : "Upload Material"}
-                            </button>
-                        </div>
-                    </form>
-                </div>
+                        </AdminField>
+                        <form ref={materialsUploadFormRef}>
+                            <AdminField label="Select file">
+                                <input type="file" name="file" className="btn btn-secondary" style={{ width: '100%', padding: '8px' }} />
+                            </AdminField>
+                        </form>
+                        <button
+                            className="btn btn-primary"
+                            type="button"
+                            disabled={materialsUploading}
+                            onClick={() => void onUpload()}
+                        >
+                            {materialsUploading ? 'Uploading...' : 'Upload Material'}
+                        </button>
+                    </AdminForm>
+                </AdminCard>
             </div>
-        </>
+        </div>
     );
 }
