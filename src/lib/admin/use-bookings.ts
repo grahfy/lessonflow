@@ -23,25 +23,19 @@ export interface BookingEvent {
     row: any;
 }
 
-export interface UseBookingsOptions {
-    onAuthError?: () => void;
-    onError?: (message: string) => void;
-}
-
 export interface UseBookingsResult {
     events: BookingEvent[];
     loading: boolean;
     load: (view: string, date: string) => Promise<void>;
-    update: (id: string, payload: any) => Promise<boolean>;
-    remove: (id: string) => Promise<boolean>;
-    removeSeries: (seriesId: string) => Promise<boolean>;
+    update: (id: string, entityType: "booking" | "booking_request", action: string, payload: any) => Promise<boolean>;
+    remove: (id: string, entityType: "booking" | "booking_request") => Promise<boolean>;
     notify: (id: string, action: string, message?: string) => Promise<boolean>;
 }
 
 /**
  * Hook to manage admin booking operations.
  */
-export function useBookings(options: UseBookingsOptions = {}): UseBookingsResult {
+export function useBookings(options: { onAuthError?: () => void; onError?: (msg: string) => void } = {}): UseBookingsResult {
     const { onAuthError, onError } = options;
     const [events, setEvents] = useState<BookingEvent[]>([]);
     const [loading, setLoading] = useState(false);
@@ -57,25 +51,42 @@ export function useBookings(options: UseBookingsOptions = {}): UseBookingsResult
                 return;
             }
             const data = await response.json();
-            // The API already returns 'events' in the correct format
             setEvents(data.events || []);
         } catch {
             if (onError) onError("Network error loading bookings.");
         } finally {
             setLoading(false);
         }
-    }, [safeFetch, handleApiError]);
+    }, [safeFetch, handleApiError, onError]);
 
-    const update = useCallback(async (id: string, payload: any): Promise<boolean> => {
+    const update = useCallback(async (id: string, entityType: "booking" | "booking_request", action: string, payload: any): Promise<boolean> => {
+        const base = entityType === "booking" ? "bookings" : "booking-requests";
+        const endpoint = `/api/admin/${base}/${id}`;
+        
+        let body: any = { action, ...payload };
+        
+        // Handle API specific mappings
+        if (entityType === "booking_request") {
+            if (action === "move" && payload.newStartAt) {
+                body.requestedStartAt = new Date(payload.newStartAt).toISOString();
+            } else if (action === "edit" && payload.startAtLocal) {
+                body.requestedStartAt = new Date(payload.startAtLocal).toISOString();
+            }
+        } else if (entityType === "booking") {
+            if (action === "move" && payload.newStartAt) {
+                body.newStartAt = new Date(payload.newStartAt).toISOString();
+            }
+        }
+
         try {
-            const response = await safeFetch(`/api/admin/bookings/${id}`, {
+            const response = await safeFetch(endpoint, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(body)
             });
 
             if (!response.ok) {
-                await handleApiError(response, "Booking update failed.");
+                await handleApiError(response, "Action failed.");
                 return false;
             }
 
@@ -85,24 +96,12 @@ export function useBookings(options: UseBookingsOptions = {}): UseBookingsResult
         }
     }, [safeFetch, handleApiError]);
 
-    const remove = useCallback(async (id: string): Promise<boolean> => {
+    const remove = useCallback(async (id: string, entityType: "booking" | "booking_request"): Promise<boolean> => {
+        const base = entityType === "booking" ? "bookings" : "booking-requests";
         try {
-            const response = await safeFetch(`/api/admin/bookings/${id}`, { method: "DELETE" });
+            const response = await safeFetch(`/api/admin/${base}/${id}`, { method: "DELETE" });
             if (!response.ok) {
-                await handleApiError(response, "Unable to delete booking.");
-                return false;
-            }
-            return true;
-        } catch {
-            return false;
-        }
-    }, [safeFetch, handleApiError]);
-
-    const removeSeries = useCallback(async (seriesId: string): Promise<boolean> => {
-        try {
-            const response = await safeFetch(`/api/admin/series/${seriesId}`, { method: "DELETE" });
-            if (!response.ok) {
-                await handleApiError(response, "Unable to remove series.");
+                await handleApiError(response, "Unable to delete.");
                 return false;
             }
             return true;
@@ -136,7 +135,6 @@ export function useBookings(options: UseBookingsOptions = {}): UseBookingsResult
         load,
         update,
         remove,
-        removeSeries,
         notify
     };
 }

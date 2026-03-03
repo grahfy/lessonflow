@@ -60,6 +60,8 @@ export function AdminInvoicesClient() {
   const [editingDueAt, setEditingDueAt] = useState("");
   const [editingLineItems, setEditingLineItems] = useState<EditableLineItem[]>([]);
   const [editingProductPresetId, setEditingProductPresetId] = useState("");
+  const [editingCustomerFirstName, setEditingCustomerFirstName] = useState("");
+  const [editingCustomerLastName, setEditingCustomerLastName] = useState("");
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createSelectedCustomerId, setCreateSelectedCustomerId] = useState("");
@@ -102,6 +104,8 @@ export function AdminInvoicesClient() {
     setSelectedInvoice(invoice);
     setEditingNotes(invoice.notes || "");
     setEditingDueAt(toDateTimeLocalValue(invoice.dueAt));
+    setEditingCustomerFirstName(invoice.customerFirstName || invoice.customerName.split(' ')[0]);
+    setEditingCustomerLastName(invoice.customerLastName || invoice.customerName.split(' ').slice(1).join(' '));
     setEditingLineItems(
       invoice.lineItems.map((li) => ({
         key: li.id,
@@ -176,6 +180,9 @@ export function AdminInvoicesClient() {
     const result = await saveInvoiceApi(selectedInvoice.id, {
       notes: editingNotes,
       dueAt: new Date(editingDueAt).toISOString(),
+      customerFirstName: editingCustomerFirstName,
+      customerLastName: editingCustomerLastName,
+      customerName: `${editingCustomerFirstName} ${editingCustomerLastName}`.trim(),
       lineItems: lineItemsPayload as any
     });
 
@@ -198,13 +205,19 @@ export function AdminInvoicesClient() {
 
     if (result) {
       setSelectedInvoice(result);
-      setNotice(`Action '${action}' completed.`);
+      if (action === "send" || action === "remind") {
+        setNotice("Invoice notification sent.");
+        alert("Invoice has been sent to the customer.");
+      } else {
+        setNotice(`Action '${action}' completed.`);
+      }
       void loadInvoices(query, page, outstandingOnly);
     }
   }
 
   async function createInvoice() {
-    if (!createSelectedCustomerId) {
+    const customer = customerOptions.find(c => c.id === createSelectedCustomerId);
+    if (!customer) {
       setError("Please select a customer.");
       return;
     }
@@ -213,11 +226,32 @@ export function AdminInvoicesClient() {
 
     const payload = {
       customerId: createSelectedCustomerId,
+      customerFirstName: customer.firstName || customer.fullName.split(' ')[0],
+      customerLastName: customer.lastName || customer.fullName.split(' ').slice(1).join(' '),
+      customerName: customer.fullName,
+      customerEmail: customer.email,
+      customerPhone: customer.phone,
+      customerAddress: [
+        customer.unitNumber ? `${customer.unitNumber}/` : "",
+        customer.houseNumber,
+        customer.streetName,
+        customer.streetType,
+        customer.suburb,
+        customer.state,
+        customer.postcode
+      ].filter(Boolean).join(" "),
       basis: createInvoiceBasis,
       lessonPriceCents: parseAudInputToCents(createLessonPrice).cents || 0,
       standalonePriceCents: parseAudInputToCents(createStandalonePrice).cents || 0,
-      dueAt: createDueAt ? new Date(createDueAt).toISOString() : undefined,
-      taxMode: createTaxMode
+      dueAt: createDueAt ? new Date(createDueAt).toISOString() : new Date().toISOString(),
+      taxMode: createTaxMode,
+      lineItems: createInvoiceBasis === "standalone" ? [{
+        description: "Standard Lesson Fee",
+        quantity: 1,
+        unitPriceCents: parseAudInputToCents(createStandalonePrice).cents || 0,
+        kind: "lesson_fee",
+        taxMode: createTaxMode
+      }] : undefined
     };
 
     const result = await createInvoiceApi(payload);
@@ -317,7 +351,6 @@ export function AdminInvoicesClient() {
                 width: '100%',
                 border: 'none',
                 borderBottom: '1px solid var(--line)',
-                background: 'rgba(8, 11, 28, 0.84)',
                 borderRadius: 0,
               }}
               onClick={() => openDetail(inv)}
@@ -392,9 +425,15 @@ export function AdminInvoicesClient() {
           <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button className="btn btn-secondary" onClick={closeDetail}>CLOSE</button>
+              
               {selectedInvoice?.status === 'sent' && (
                 <button className="btn btn-primary" disabled={!!busyAction} onClick={() => void performAction('mark_paid')}>
                   {busyAction === 'mark_paid' ? 'SAVING...' : 'MARK AS PAID'}
+                </button>
+              )}
+              {selectedInvoice?.status === 'paid' && (
+                <button className="btn btn-secondary" disabled={!!busyAction} onClick={() => void performAction('mark_unpaid')}>
+                  {busyAction === 'mark_unpaid' ? 'SAVING...' : 'MARK AS UNPAID'}
                 </button>
               )}
               {selectedInvoice && (selectedInvoice.status === 'sent' || selectedInvoice.status === 'paid') && (
@@ -402,6 +441,13 @@ export function AdminInvoicesClient() {
                   {busyAction === 'void' ? 'VOIDING...' : 'VOID INVOICE'}
                 </button>
               )}
+              <button className="btn btn-danger" disabled={!!busyAction} onClick={async () => {
+                if (window.confirm("Delete this invoice permanently?")) {
+                  await removeInvoiceApi(selectedInvoice!.id);
+                  closeDetail();
+                  void loadInvoices(query, page, outstandingOnly);
+                }
+              }}>DELETE</button>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               {selectedInvoice?.status === 'draft' && (
@@ -410,8 +456,8 @@ export function AdminInvoicesClient() {
                 </button>
               )}
               {selectedInvoice?.status !== 'draft' && selectedInvoice?.status !== 'void' && (
-                <button className="btn btn-secondary" disabled={!!busyAction} onClick={() => void performAction('send')}>
-                  {busyAction === 'send' ? 'RESENDING...' : 'RESEND NOTIFICATION'}
+                <button className="btn btn-secondary" disabled={!!busyAction} onClick={() => void performAction('remind')}>
+                  {busyAction === 'remind' ? 'SENDING...' : 'RESEND NOTIFICATION'}
                 </button>
               )}
             </div>
@@ -426,10 +472,10 @@ export function AdminInvoicesClient() {
                 <AdminCard ghost style={{ marginBottom: '16px' }}>
                   <AdminForm className="dialog-form-grid">
                     <AdminField label="First Name">
-                      <input value={selectedInvoice.customerFirstName || selectedInvoice.customerName.split(' ')[0]} readOnly />
+                      <input value={editingCustomerFirstName} onChange={e => setEditingCustomerFirstName(e.target.value)} />
                     </AdminField>
                     <AdminField label="Last Name">
-                      <input value={selectedInvoice.customerLastName || selectedInvoice.customerName.split(' ').slice(1).join(' ')} readOnly />
+                      <input value={editingCustomerLastName} onChange={e => setEditingCustomerLastName(e.target.value)} />
                     </AdminField>
                     <AdminField label="Email" fullWidth>
                       <input value={selectedInvoice.customerEmail} readOnly />
@@ -445,7 +491,7 @@ export function AdminInvoicesClient() {
                     <button className="btn btn-secondary" disabled={!!busyAction} onClick={saveInvoiceEdits}>
                       {busyAction === 'save' ? 'SAVING...' : 'SAVE BASIC DETAILS'}
                     </button>
-                    <button className="btn btn-secondary" onClick={() => router.push(`/admin/customers?customerId=${selectedInvoice.customerId}`)}>VIEW CUSTOMER</button>
+                    <button className="btn btn-secondary" onClick={() => router.push(`/admin/customers?customerId=${selectedInvoice.customerId}&open=true`)}>VIEW CUSTOMER</button>
                   </div>
                 </AdminCard>
 
@@ -489,11 +535,25 @@ export function AdminInvoicesClient() {
                 <h3 className="manual-section-title">Actions & History</h3>
                 <AdminCard ghost>
                   <p className="helper-text">Manage the lifecycle of this invoice.</p>
+                  
+                  <div style={{ margin: '16px 0', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--line)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span>Status:</span>
+                      <span className={`status-badge status-${selectedInvoice.status}`}>{selectedInvoice.status}</span>
+                    </div>
+                    {selectedInvoice.status !== 'paid' && selectedInvoice.status !== 'void' && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--red)', fontWeight: 600 }}>
+                        <span>Outstanding:</span>
+                        <span>{selectedInvoice.overdueDays ?? 0} days</span>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="button-row" style={{ flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
                     <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => window.open(`/api/admin/invoices/${selectedInvoice.id}/pdf`, '_blank')}>VIEW PDF</button>
                     {selectedInvoice.status !== 'void' && (
-                      <button className="btn btn-secondary" style={{ width: '100%' }} disabled={!!busyAction} onClick={() => void performAction('send')}>
-                        RESEND NOTIFICATION
+                      <button className="btn btn-secondary" style={{ width: '100%' }} disabled={!!busyAction} onClick={() => void performAction('remind')}>
+                        {busyAction === 'remind' ? 'SENDING...' : 'RESEND NOTIFICATION'}
                       </button>
                     )}
                   </div>

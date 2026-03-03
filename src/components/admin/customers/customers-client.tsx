@@ -90,16 +90,6 @@ export function AdminCustomersClient() {
     regenerate: regeneratePortalPasswordApi
   } = usePortalCredentials({ onAuthError, onError: setError });
 
-  // Effects
-  useEffect(() => {
-    void loadCustomers(debouncedCustomerQuery, page);
-  }, [debouncedCustomerQuery, page, loadCustomers]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedCustomerQuery(customerQuery), 300);
-    return () => clearTimeout(timer);
-  }, [customerQuery]);
-
   // Dialog Handlers
   const openCustomerDialog = useCallback(async (customer: CustomerRow | null, editMode = false) => {
     setError("");
@@ -129,6 +119,28 @@ export function AdminCustomersClient() {
     setIsEditing(false);
     setCustomerForm(emptyCustomerForm());
   }, [dialogPresence]);
+
+  // Effects
+  useEffect(() => {
+    void loadCustomers(debouncedCustomerQuery, page);
+  }, [debouncedCustomerQuery, page, loadCustomers]);
+
+  useEffect(() => {
+    const customerId = searchParams.get("customerId");
+    const shouldOpen = searchParams.get("open") === "true";
+    
+    if (customerId && shouldOpen && customers.length > 0 && !selectedCustomer) {
+      const customer = customers.find(c => c.id === customerId);
+      if (customer) {
+        void openCustomerDialog(customer, false);
+      }
+    }
+  }, [searchParams, customers, selectedCustomer, openCustomerDialog]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedCustomerQuery(customerQuery), 300);
+    return () => clearTimeout(timer);
+  }, [customerQuery]);
 
   // Action Handlers
   async function saveCustomer() {

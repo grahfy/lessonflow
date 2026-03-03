@@ -31,6 +31,8 @@ export interface InvoiceRow {
     customerFirstName: string | null;
     customerLastName: string | null;
     customerEmail: string;
+    customerPhone: string;
+    customerAddress: string;
     customerId: string | null;
     notes: string | null;
     lineItems: InvoiceLineItem[];
@@ -97,7 +99,7 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
             const response = await safeFetch(`/api/admin/invoices/${id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({ action: "edit", ...payload })
             });
 
             if (!response.ok) {
@@ -105,7 +107,8 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
                 return null;
             }
 
-            return await response.json() as InvoiceRow;
+            const data = await response.json();
+            return (data.invoice || data) as InvoiceRow;
         } catch {
             return null;
         }
@@ -117,17 +120,16 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
 
         if (action === "send") endpoint = `/api/admin/invoices/${id}/send`;
         else if (action === "remind") endpoint = `/api/admin/invoices/${id}/remind`;
-        else if (action === "mark_paid") {
+        else if (action === "mark_paid" || action === "mark_unpaid" || action === "void" || action === "restore") {
             method = "PATCH";
             endpoint = `/api/admin/invoices/${id}`;
-            // For mark_paid via PATCH we'd need more logic, but the API has specific sub-routes
         }
 
         try {
             const response = await safeFetch(endpoint, {
                 method,
                 headers: { "Content-Type": "application/json" },
-                body: method === "POST" ? JSON.stringify({ action }) : undefined
+                body: method === "POST" ? JSON.stringify({ action }) : JSON.stringify({ action })
             });
 
             if (!response.ok) {
@@ -135,7 +137,6 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
                 return null;
             }
 
-            // Most actions return the updated invoice
             const data = await response.json();
             return (data.invoice || data) as InvoiceRow;
         } catch {
@@ -168,7 +169,7 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
             const response = await safeFetch("/api/admin/invoices/reminders", { 
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({}) // Schema needs an object
+                body: JSON.stringify({})
             });
             if (!response.ok) {
                 await handleApiError(response, "Unable to send bulk reminders.");

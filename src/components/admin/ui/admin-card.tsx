@@ -18,6 +18,7 @@ export const AdminCard = forwardRef<HTMLDivElement, AdminCardProps>(
       className
     ].filter(Boolean).join(" ");
 
+    // If ghost, we strip styles. Otherwise, we rely on CSS classes for opacity.
     const finalStyle = ghost ? { ...style, background: 'none', border: 'none', boxShadow: 'none', padding: 0 } : style;
 
     return (

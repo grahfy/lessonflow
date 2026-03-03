@@ -1,6 +1,6 @@
 "use client";
 
-import { RefObject, ReactNode } from "react";
+import { RefObject, ReactNode, useState } from "react";
 import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { AdminCard } from "@/components/admin/ui/admin-card";
@@ -19,6 +19,7 @@ interface BookingDetailDialogProps {
   busyAction: string | null;
   onSave: () => void;
   onDelete: () => void;
+  onMove: () => void;
   
   // Tabs
   activeTab: "appointment" | "emails";
@@ -56,6 +57,7 @@ export function BookingDetailDialog({
   busyAction,
   onSave,
   onDelete,
+  onMove,
   activeTab,
   setActiveTab,
   selectedCustomer,
@@ -233,6 +235,7 @@ export function BookingDetailDialog({
                   <textarea className="dialog-notes" value={dialogForm.notes} onChange={(e) => updateForm({ notes: e.target.value })} style={{ minHeight: '120px' }} />
                 </AdminField>
                 <div className="button-row" style={{ flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
+                  <button className="btn btn-secondary" onClick={onMove}>Move Lesson Time</button>
                   <button className="btn btn-secondary" onClick={onOpenMaterials}>Learning Materials</button>
                   <button className="btn btn-secondary" onClick={onOpenInvoice}>Invoice / Billing</button>
                   <button className="btn btn-danger" disabled={!!busyAction} onClick={onDelete}>Cancel Booking</button>

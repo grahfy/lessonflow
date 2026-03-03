@@ -9,6 +9,8 @@ import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AdminBookingCalendar } from "@/components/admin-booking-calendar";
 import { animateIn, animateOut } from "@/components/motion/tween-orchestrator";
 import { usePresenceExit } from "@/components/motion/use-presence-exit";
+import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 
 import { useBookings, type BookingEvent } from "@/lib/admin/use-bookings";
 import { useCustomers } from "@/lib/admin/use-customers";
@@ -59,6 +61,10 @@ export function AdminBookingsClient() {
   const [manualMatch, setManualMatch] = useState<any | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   
+  // Move State
+  const [isMoveOpen, setIsMoveOpen] = useState(false);
+  const [moveNewStart, setMoveNewStart] = useState("");
+
   // Email Composer State
   const [emailComposerSubject, setEmailComposerSubject] = useState("");
   const [emailComposerMessage, setEmailComposerMessage] = useState("");
@@ -125,8 +131,6 @@ export function AdminBookingsClient() {
     else next = addYears(d, 1);
     navigate(view, format(next, 'yyyy-MM-dd'));
   };
-
-  const goToday = () => navigate(view, format(new Date(), 'yyyy-MM-dd'));
 
   // Handlers
   const openDialog = useCallback(async (event: EventWithRow) => {
@@ -244,9 +248,10 @@ export function AdminBookingsClient() {
 
   // Action Logic
   async function saveBooking() {
-    if (!selectedKey || !dialogForm) return;
+    const event = events.find(e => e.id === selectedKey);
+    if (!selectedKey || !dialogForm || !event) return;
     setBusyAction("save");
-    const success = await updateBookingApi(selectedKey, dialogForm);
+    const success = await updateBookingApi(selectedKey, event.entityType, "edit", dialogForm);
     setBusyAction(null);
     if (success) {
       setNotice("Booking updated.");
@@ -255,13 +260,27 @@ export function AdminBookingsClient() {
   }
 
   async function deleteBooking() {
-    if (!selectedKey || !window.confirm("Are you sure you want to cancel this booking?")) return;
+    const event = events.find(e => e.id === selectedKey);
+    if (!selectedKey || !event || !window.confirm("Are you sure you want to cancel this booking?")) return;
     setBusyAction("delete");
-    const success = await removeBookingApi(selectedKey);
+    const success = await removeBookingApi(selectedKey, event.entityType);
     setBusyAction(null);
     if (success) {
       setNotice("Booking cancelled.");
       void closeDialog();
+      void loadBookings(view, dateStr);
+    }
+  }
+
+  async function moveBooking() {
+    const event = events.find(e => e.id === selectedKey);
+    if (!selectedKey || !event || !moveNewStart) return;
+    setBusyAction("move");
+    const success = await updateBookingApi(selectedKey, event.entityType, "move", { newStartAt: moveNewStart });
+    setBusyAction(null);
+    if (success) {
+      setNotice("Booking moved.");
+      setIsMoveOpen(false);
       void loadBookings(view, dateStr);
     }
   }
@@ -399,6 +418,13 @@ export function AdminBookingsClient() {
           busyAction={busyAction}
           onSave={saveBooking}
           onDelete={deleteBooking}
+          onMove={() => {
+            const event = events.find(e => e.id === selectedKey);
+            if (event) {
+              setMoveNewStart(event.startAt.slice(0, 16));
+              setIsMoveOpen(true);
+            }
+          }}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           selectedCustomer={null}
@@ -413,15 +439,46 @@ export function AdminBookingsClient() {
           emailMessage={emailComposerMessage}
           setEmailMessage={setEmailComposerMessage}
           onSendEmail={sendCustomEmail}
-          onPerformAction={(action) => void updateBookingApi(selectedKey!, { action })}
+          onPerformAction={async (action) => {
+            const event = events.find(e => e.id === selectedKey);
+            if (event) {
+              const success = await updateBookingApi(selectedKey!, event.entityType, action, {});
+              if (success) {
+                setNotice(`Booking ${action}ed.`);
+                void loadBookings(view, dateStr);
+              }
+            }
+          }}
           onOpenMaterials={openMaterialsDialog}
           onOpenInvoice={() => {
             const event = events.find(e => e.id === selectedKey);
             if (event?.row.customerName) {
-              router.push(`/admin/invoices?q=${encodeURIComponent(event.row.customerName)}`);
+              router.push(`/admin/invoices?q=${encodeURIComponent(event.row.customerName)}&openCreate=true&customerId=${event.row.customerId}`);
             }
           }}
         />
+      )}
+
+      {isMoveOpen && (
+        <AdminDialog
+          isOpen={true}
+          onClose={() => setIsMoveOpen(false)}
+          title="Move Lesson Time"
+          footer={
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
+              <button className="btn btn-secondary" onClick={() => setIsMoveOpen(false)}>CANCEL</button>
+              <button className="btn btn-primary" disabled={!!busyAction} onClick={moveBooking}>
+                {busyAction === 'move' ? 'MOVING...' : 'CONFIRM MOVE'}
+              </button>
+            </div>
+          }
+        >
+          <AdminForm>
+            <AdminField label="New Start Time" required>
+              <input type="datetime-local" value={moveNewStart} onChange={e => setMoveNewStart(e.target.value)} />
+            </AdminField>
+          </AdminForm>
+        </AdminDialog>
       )}
 
       {manualDialogPresence.isMounted && (
