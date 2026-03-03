@@ -25,8 +25,8 @@ Create integration tests to verify the current behavior of all identified notifi
 Address inconsistencies and improve error handling or logging based on audit findings.
 
 - [x] Task: Standardize error handling across all notification wrappers in `src/lib/booking-events.ts`. [d644b8d]
-- [x] Task: Ensure consistent audit logging for all outbound notifications. [b127241]
-- [~] Task: Refactor API routes to use consolidated notification helpers if redundant logic is found.
+- [x] Task: Ensure consistent audit logging for all outbound notifications. [3d0b191]
+- [x] Task: Refactor API routes to use consolidated notification helpers if redundant logic is found. [3d0b191]
 - [ ] Task: Conductor - User Manual Verification 'Consolidation & Refinement' (Protocol in workflow.md)
 
 ## Phase 4: Final Verification
