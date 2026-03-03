@@ -258,7 +258,11 @@ export function AdminInvoicesClient() {
 
   return (
     <AdminShell title="Invoices" error={error} notice={notice}>
-      <div className="admin-actions-bar">
+      <div 
+        className="admin-layout-content" 
+        style={{ height: 'calc(100vh - 120px)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+      >
+        <div className="admin-actions-bar">
         <div style={{ display: 'flex', gap: '10px' }}>
           <button className="btn btn-primary" onClick={() => { setCreateOpen(true); void loadCustomers(); }}>
             CREATE INVOICE
@@ -298,7 +302,23 @@ export function AdminInvoicesClient() {
         }}
       >
         {invoices.map((inv) => (
-          <div key={inv.id} className="invoice-row-item" onClick={() => openDetail(inv)}>
+          <div 
+            key={inv.id} 
+            className="invoice-row-item customer-item invoice-item" 
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '12px 16px',
+              gap: '12px',
+              cursor: 'pointer',
+              width: '100%',
+              border: 'none',
+              borderBottom: '1px solid var(--line)',
+              background: 'rgba(8, 11, 28, 0.84)',
+              borderRadius: 0,
+            }}
+            onClick={() => openDetail(inv)}
+          >
             <div style={{ width: '100px', fontWeight: 600 }}>{inv.invoiceNumber}</div>
             <Separator />
             <div style={{ flex: '1', minWidth: '150px' }}>
@@ -323,6 +343,7 @@ export function AdminInvoicesClient() {
           </div>
         ))}
       </AdminTable>
+      </div>
 
       <AdminDialog
         isOpen={!!selectedInvoice}

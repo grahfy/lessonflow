@@ -2,10 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { format, parseISO, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, addYears, subYears } from "date-fns";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminCard } from "@/components/admin/ui/admin-card";
+import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { AdminBookingCalendar } from "@/components/admin-booking-calendar";
+import { formatDateTime } from "@/lib/admin/formatters";
 import { animateIn, animateOut } from "@/components/motion/tween-orchestrator";
 import { usePresenceExit } from "@/components/motion/use-presence-exit";
 
@@ -39,7 +43,7 @@ export function AdminBookingsClient() {
   const searchParams = useSearchParams();
   
   const view = (searchParams.get("view") as CalendarView) || "week";
-  const date = searchParams.get("date") || new Date().toISOString().split("T")[0];
+  const dateStr = searchParams.get("date") || new Date().toISOString().split("T")[0];
 
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -91,8 +95,38 @@ export function AdminBookingsClient() {
 
   // Effects
   useEffect(() => {
-    void loadBookings(view, date);
-  }, [view, date, loadBookings]);
+    void loadBookings(view, dateStr);
+  }, [view, dateStr, loadBookings]);
+
+  // Navigation
+  const navigate = useCallback((newView: CalendarView, newDate: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("view", newView);
+    params.set("date", newDate);
+    router.push(`/admin/bookings?${params.toString()}`);
+  }, [router, searchParams]);
+
+  const goPrev = () => {
+    const d = parseISO(dateStr);
+    let next;
+    if (view === 'day') next = subDays(d, 1);
+    else if (view === 'week') next = subWeeks(d, 1);
+    else if (view === 'month') next = subMonths(d, 1);
+    else next = subYears(d, 1);
+    navigate(view, format(next, 'yyyy-MM-dd'));
+  };
+
+  const goNext = () => {
+    const d = parseISO(dateStr);
+    let next;
+    if (view === 'day') next = addDays(d, 1);
+    else if (view === 'week') next = addWeeks(d, 1);
+    else if (view === 'month') next = addMonths(d, 1);
+    else next = addYears(d, 1);
+    navigate(view, format(next, 'yyyy-MM-dd'));
+  };
+
+  const goToday = () => navigate(view, format(new Date(), 'yyyy-MM-dd'));
 
   // Handlers
   const openDialog = useCallback(async (event: EventWithRow) => {
@@ -165,7 +199,7 @@ export function AdminBookingsClient() {
     setBusyAction(null);
     if (success) {
       setNotice("Booking updated.");
-      void loadBookings(view, date);
+      void loadBookings(view, dateStr);
     }
   }
 
@@ -177,7 +211,7 @@ export function AdminBookingsClient() {
     if (success) {
       setNotice("Booking cancelled.");
       void closeDialog();
-      void loadBookings(view, date);
+      void loadBookings(view, dateStr);
     }
   }
 
@@ -200,7 +234,21 @@ export function AdminBookingsClient() {
     }
   }
 
-  const rangeLabel = useMemo(() => `${view.toUpperCase()} VIEW`, [view]);
+  const rangeLabel = useMemo(() => {
+    const d = parseISO(dateStr);
+    if (view === 'day') return format(d, 'EEEE, d MMMM yyyy');
+    if (view === 'week') return `Week of ${format(startOfWeek(d, { weekStartsOn: 1 }), 'd MMMM yyyy')}`;
+    if (view === 'month') return format(d, 'MMMM yyyy');
+    return format(d, 'yyyy');
+  }, [view, dateStr]);
+
+  function startOfWeek(date: Date, options: { weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 }) {
+    const day = date.getDay();
+    const diff = (day < options.weekStartsOn ? 7 : 0) + day - options.weekStartsOn;
+    const result = new Date(date);
+    result.setDate(date.getDate() - diff);
+    return result;
+  }
 
   return (
     <AdminShell 
@@ -213,9 +261,23 @@ export function AdminBookingsClient() {
         style={{ height: 'calc(100vh - 120px)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
       >
         <AdminCard className="booking-row admin-range-row">
-          <strong>{rangeLabel}</strong>
-          <div className="button-row">
-            <button className="btn btn-secondary" onClick={() => router.push(`/admin/bookings?view=${view}&date=${new Date().toISOString().split('T')[0]}`)}>TODAY</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div className="button-row" style={{ marginRight: '8px' }}>
+              <button className="btn btn-secondary btn-icon" onClick={goPrev}>←</button>
+              <button className="btn btn-secondary btn-icon" onClick={goNext}>→</button>
+            </div>
+            <strong style={{ fontSize: '1.1rem', minWidth: '200px' }}>{rangeLabel}</strong>
+            <button className="btn btn-secondary" onClick={goToday}>TODAY</button>
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div className="site-nav" style={{ margin: 0 }}>
+              <button className={`btn ${view === 'day' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => navigate('day', dateStr)}>DAY</button>
+              <button className={`btn ${view === 'week' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => navigate('week', dateStr)}>WEEK</button>
+              <button className={`btn ${view === 'month' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => navigate('month', dateStr)}>MONTH</button>
+              <button className={`btn ${view === 'year' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => navigate('year', dateStr)}>YEAR</button>
+            </div>
+            <div style={{ width: '1px', height: '24px', background: 'var(--line)' }} />
             <button className="btn btn-primary" onClick={openManualDialog}>ADD MANUAL BOOKING</button>
           </div>
         </AdminCard>
@@ -223,7 +285,7 @@ export function AdminBookingsClient() {
         <AdminCard noPadding style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           <AdminBookingCalendar
             view={view}
-            date={date}
+            date={dateStr}
             events={events as any}
             selectedEventId={selectedKey}
             onSelect={(event) => openDialog(event as any)}

@@ -49,10 +49,12 @@ export function AdminTable({
         </div>
       )}
       
-      <div className="customers-list" style={{ flex: 1, overflowY: 'auto', maxHeight: 'none', gap: '0', padding: 0, background: 'rgba(8, 11, 28, 0.84)' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0', padding: '0' }}>
+      <div className="customers-list" style={{ flex: 1, overflowY: 'auto', maxHeight: 'none', gap: '0', padding: 0, background: 'rgba(8, 11, 28, 0.84)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0', padding: '0', flex: 1 }}>
           {children}
-          {!loading && !children && <p className="helper-text" style={{ padding: '20px' }}>{emptyLabel}</p>}
+          {!loading && (!children || (Array.isArray(children) && children.length === 0)) && (
+            <p className="helper-text" style={{ padding: '20px' }}>{emptyLabel}</p>
+          )}
         </div>
       </div>
 

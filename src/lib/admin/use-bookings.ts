@@ -54,7 +54,13 @@ export function useBookings(options: UseBookingsOptions = {}): UseBookingsResult
                 return;
             }
             const data = await response.json();
-            setEvents(data.bookings || []);
+            const mapped = (data.bookings || []).map((b: any) => ({
+                ...b,
+                title: b.customerName || "Unknown",
+                color: b.status === "approved" ? "green" : b.status === "pending" ? "yellow" : "slate",
+                row: b // Keep original data in row
+            }));
+            setEvents(mapped);
         } catch {
             if (onError) onError("Network error loading bookings.");
         } finally {

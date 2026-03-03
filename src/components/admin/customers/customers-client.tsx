@@ -212,7 +212,11 @@ export function AdminCustomersClient() {
       error={error && !dialogPresence.isMounted ? error : undefined}
       notice={notice && !dialogPresence.isMounted ? notice : undefined}
     >
-      <div className="admin-actions-bar">
+      <div 
+        className="admin-layout-content" 
+        style={{ height: 'calc(100vh - 120px)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+      >
+        <div className="admin-actions-bar">
         <button className="btn btn-primary" onClick={() => openCustomerDialog(null, true)}>
           CREATE NEW CUSTOMER
         </button>
@@ -245,6 +249,7 @@ export function AdminCustomersClient() {
         onDeleteCustomer={deleteCustomer}
         onViewInvoices={(name) => router.push(`/admin/invoices?q=${encodeURIComponent(name)}`)}
       />
+      </div>
 
       {dialogPresence.isMounted && (
         <CustomerDialogWrapper
