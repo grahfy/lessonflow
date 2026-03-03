@@ -1,104 +1,48 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Local convenience script for a "full site" smoke run. It bootstraps env files,
-# prepares a local database, runs tests, and optionally starts `next dev`.
-# Note: this helper still uses a SQLite dev DB URL for local-only workflows and
-# is not the MySQL-backed test harness used by `npm test` in CI/server checks.
+# Get the project root directory (parent of scripts directory)
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 HOST="${HOST:-0.0.0.0}"
 PORT="${PORT:-3000}"
 SKIP_INSTALL=0
-AUDIT_FIX=0
-AUDIT_FIX_FORCE=0
 SKIP_TESTS=0
 SEED_DATA=0
 SEED_COUNT=50
 NO_START=0
+CLEANUP=0
 TESTS_FAILED=0
 
-log() {
-  printf '[local-full-site] %s\n' "$*"
-}
+log() { printf '[local-full-site] %s\n' "$*"; }
+error() { printf '[local-full-site] ERROR: %s\n' "$*" >&2; }
 
-if ! command -v npm >/dev/null 2>&1; then
-  echo "npm is required but not installed." >&2
-  exit 1
-fi
+cleanup() { if [[ "$CLEANUP" -eq 1 ]]; then docker-compose down --remove-orphans 2>/dev/null || true; fi; }
+trap 'cleanup' EXIT
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --skip-install)
-      SKIP_INSTALL=1
-      shift
-      ;;
-    --audit-fix)
-      AUDIT_FIX=1
-      shift
-      ;;
-    --audit-fix-force)
-      AUDIT_FIX_FORCE=1
-      shift
-      ;;
-    --skip-tests)
-      SKIP_TESTS=1
-      shift
-      ;;
-    --seed)
-      SEED_DATA=1
-      shift
-      ;;
-    --seed-count)
-      SEED_COUNT="$2"
-      shift 2
-      ;;
-    --no-start)
-      NO_START=1
-      shift
-      ;;
-    --help|-h)
-      cat <<'EOF'
-Usage: scripts/test-full-site-local.sh [--skip-install] [--audit-fix] [--audit-fix-force] [--skip-tests] [--seed] [--seed-count <n>] [--no-start]
-
---skip-install       Skip `npm ci`
---audit-fix          Run `npm audit fix` after installing dependencies
---audit-fix-force    Run `npm audit fix --force` after installing dependencies
---skip-tests         Skip `npm test`
---seed              Clear existing customer/invoice data and seed fresh fake data
---seed-count <n>    Number of fake customers to seed (default: 50)
---no-start          Do not start Next.js dev server after setup/checks
-EOF
-      exit 0
-      ;;
-    *)
-      echo "Unknown option: $1" >&2
-      exit 1
-      ;;
+    --skip-install) SKIP_INSTALL=1; shift;;
+    --skip-tests) SKIP_TESTS=1; shift;;
+    --seed) SEED_DATA=1; shift;;
+    --seed-count) SEED_COUNT="$2"; shift 2;;
+    --no-start) NO_START=1; shift;;
+    --cleanup) CLEANUP=1; shift;;
+    --help|-h) 
+      echo "Usage: scripts/test-full-site-local.sh [--skip-install] [--skip-tests] [--seed] [--seed-count <n>] [--no-start] [--cleanup]"
+      echo "Options:"
+      echo "  --skip-install       Skip \`npm ci\`"
+      echo "  --skip-tests         Skip \`npm test\`"
+      echo "  --seed              Clear existing customer/invoice data and seed fresh fake data"
+      echo "  --seed-count <n>    Number of fake customers to seed (default: 50)"
+      echo "  --no-start          Do not start Next.js dev server after setup/checks"
+      echo "  --cleanup           Stop Docker Compose services when script completes"
+      echo "  --help              Show this help message"
+      exit 0;;
+    *) echo "Unknown option: $1" >&2; exit 1;;
   esac
 done
-
-if [[ "$SKIP_INSTALL" -eq 0 ]]; then
-  log "Installing dependencies (npm ci)..."
-  npm ci --legacy-peer-deps --no-audit --no-fund --silent
-
-  if [[ "$AUDIT_FIX_FORCE" -eq 1 ]]; then
-    log "Running npm audit fix --force..."
-    npm audit fix --force
-  elif [[ "$AUDIT_FIX" -eq 1 ]]; then
-    log "Running npm audit fix..."
-    npm audit fix
-  else
-    log "Checking for security vulnerabilities..."
-    if npm audit --audit-level=moderate >/dev/null 2>&1; then
-      log "No moderate or high vulnerabilities found."
-    else
-      log "Found vulnerabilities, running npm audit fix..."
-      npm audit fix || true
-    fi
-  fi
-fi
 
 if [[ ! -f .env ]]; then
   log "Creating .env from .env.example"
@@ -110,75 +54,92 @@ if [[ ! -f .env.test.local && -f .env.test.example ]]; then
   cp .env.test.example .env.test.local
 fi
 
-# Local developer bootstrap: starts a MySQL Docker container if not running
-# and prepares the development database.
-log "Preparing development database..."
-
-# Extract MySQL host/port from DATABASE_URL in .env (expects localhost/127.0.0.1)
 DB_URL=$(grep "^DATABASE_URL=" .env | cut -d'"' -f2)
-
-# Check if MySQL is accessible at the configured URL
-if ! command -v docker >/dev/null 2>&1; then
-  log "Docker is required for local MySQL. Please install Docker or provide a MySQL instance."
-  exit 1
+TEST_DB_URL=""
+if [[ -f .env.test.local ]]; then TEST_DB_URL=$(grep "^TEST_DATABASE_URL=" .env.test.local | cut -d'"' -f2); fi
+if [[ -z "$TEST_DB_URL" ]]; then 
+  TEST_DB_URL="${DB_URL/mgs_dev/mgs_test}"
+  TEST_DB_URL="${TEST_DB_URL/3306/3307}"
 fi
 
-# Start MySQL container if not already running (using default dev DB name from .env.example)
-DB_CONTAINER_NAME="lessonflow-dev-mysql"
+log "Dev database: $DB_URL"
+log "Test database: $TEST_DB_URL"
 
-if docker ps -a --format '{{.Names}}' | grep -q "^${DB_CONTAINER_NAME}$"; then
-  if ! docker ps --format '{{.Names}}' | grep -q "^${DB_CONTAINER_NAME}$"; then
-    log "Starting existing MySQL Docker container (${DB_CONTAINER_NAME})..."
-    docker start "${DB_CONTAINER_NAME}"
+DOCKER_COMPOSE_CMD="docker-compose"
+if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then 
+  DOCKER_COMPOSE_CMD="docker compose"
+fi
+
+start_mariadb_service() {
+  local svc=$1
+  local port=$2
+  local db_name=$3
+  
+  log "Checking $svc..."
+  
+  # Check if container exists and is running
+  if docker ps --format "{{.Names}}" | grep -q "^${svc}$"; then
+    log "$svc is already running"
+    return 0
+  fi
+  
+  # Check if container exists but stopped
+  if docker ps -a --format "{{.Names}}" | grep -q "^${svc}$"; then
+    log "Starting existing $svc container..."
+    docker start "$svc"
   else
-    log "MySQL Docker container (${DB_CONTAINER_NAME}) is already running."
+    log "Creating new $svc container on port $port..."
+    if [[ "$svc" == "lessonflow-test-mysql" ]]; then
+      docker run -d --name "$svc" -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE="$db_name" -p ${port}:3306 mariadb:latest
+    else
+      docker run -d --name "$svc" -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE="$db_name" -p ${port}:3306 mariadb:latest
+    fi
   fi
-else
-  log "Creating and starting new MySQL Docker container (${DB_CONTAINER_NAME})..."
-  docker run -d \
-    --name "${DB_CONTAINER_NAME}" \
-    -e MYSQL_ROOT_PASSWORD=root \
-    -e MYSQL_DATABASE=mgs_dev \
-    -p 3306:3306 \
-    mysql:8
-fi
-
-# Wait for MySQL to be ready by checking connection
-log "Waiting for MySQL to start..."
-MAX_RETRIES=30
-RETRY_COUNT=0
-while ! docker exec "${DB_CONTAINER_NAME}" mysqladmin ping -h localhost -u root -proot >/dev/null 2>&1; do
-  RETRY_COUNT=$((RETRY_COUNT + 1))
-  if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
-    log "Timeout waiting for MySQL to start"
-    exit 1
+  
+  log "Waiting for $svc to be ready..."
+  local max_retries=30
+  local retry=0
+  while [[ $retry -lt $max_retries ]]; do
+    if docker exec $svc mysqladmin ping -h localhost -u root -proot >/dev/null 2>&1; then
+      break
+    fi
+    retry=$((retry + 1))
+    sleep 1
+  done
+  
+  if [[ $retry -ge $max_retries ]]; then
+    error "Timeout waiting for $svc"
+    return 1
   fi
-  sleep 1
-done
-log "MySQL is ready"
+  
+  log "$svc is ready"
+}
 
-# Run migrations using the DATABASE_URL from .env
+# Start dev database (port 3306)
+start_mariadb_service "lessonflow-dev-mysql" 3306 "mgs_dev" || exit 1
+
+# Start test database (port 3307)  
+start_mariadb_service "lessonflow-test-mysql" 3307 "mgs_test" || exit 1
+
+log "Running Prisma migrations on test database..."
+DATABASE_URL="${TEST_DB_URL}" npx prisma migrate deploy
+
+log "Running Prisma migrations on dev database..."
 DATABASE_URL="${DB_URL}" npx prisma migrate deploy
 
-# Generate Prisma client
 log "Generating Prisma client..."
-DATABASE_URL="${DB_URL}" npx prisma generate
+npx prisma generate
 
-# Seed whitelabel defaults to ensure "old info" (MGS branding) is in the DB
 log "Seeding whitelabel defaults..."
 DATABASE_URL="${DB_URL}" npx tsx scripts/seed-whitelabel-defaults.ts
 
 if [[ "$SEED_DATA" -eq 1 ]]; then
-  log "Clearing ALL data (admin, customers, bookings, invoices, etc.)..."
-  DATABASE_URL="${DB_URL}" npx tsx scripts/clear-customer-data.ts
-  DATABASE_URL="${DB_URL}" npx tsx scripts/clear-all-data.ts
-  
-  log "Seeding fake customers, invoices, and appointments ($SEED_COUNT customers)..."
+  log "Seeding fake data ($SEED_COUNT customers)..."
+  DATABASE_URL="${DB_URL}" npx tsx scripts/clear-customer-data.ts 2>/dev/null || true
+  DATABASE_URL="${DB_URL}" npx tsx scripts/clear-all-data.ts 2>/dev/null || true
   DATABASE_URL="${DB_URL}" npx tsx scripts/seed-fake-data.ts "$SEED_COUNT"
-  
-  log "Seeding invoice product presets..."
   DATABASE_URL="${DB_URL}" npx tsx scripts/seed-invoice-presets.ts
-
+  
   log "Default admin account created:"
   log "  URL: http://${HOST}:${PORT}/admin/login"
   log "  Email: admin@example.com"
@@ -186,11 +147,9 @@ if [[ "$SEED_DATA" -eq 1 ]]; then
 fi
 
 if [[ "$SKIP_TESTS" -eq 0 ]]; then
-  # `npm test` may use the MySQL-oriented harness if TEST_DATABASE_URL is set;
-  # otherwise this remains a convenience preflight and may fail in fresh setups.
   log "Running automated tests..."
-  if ! npm test; then
-    TESTS_FAILED=1
+  DATABASE_URL="$TEST_DB_URL" TEST_DATABASE_URL="$TEST_DB_URL" npm test || TESTS_FAILED=1
+  if [[ "$TESTS_FAILED" -eq 1 ]]; then
     log "Automated tests failed. Continuing so you can still test the site manually."
   fi
 fi
@@ -199,18 +158,9 @@ log "Cleaning stale Next.js artifacts..."
 npm run clean
 
 if [[ "$NO_START" -eq 1 ]]; then
-  if [[ "$TESTS_FAILED" -eq 1 ]]; then
-    exit 1
-  fi
-
+  if [[ "$TESTS_FAILED" -eq 1 ]]; then exit 1; fi
   log "Checks completed. Dev server start skipped (--no-start)."
   exit 0
-fi
-
-# Ensure the port is free before starting Next.js
-if command -v fuser >/dev/null 2>&1; then
-  log "Ensuring port ${PORT} is free..."
-  fuser -k "${PORT}/tcp" >/dev/null 2>&1 || true
 fi
 
 log "Starting local site at http://${HOST}:${PORT}"
