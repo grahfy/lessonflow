@@ -24,7 +24,7 @@ Create integration tests to verify the current behavior of all identified notifi
 ## Phase 3: Consolidation & Refinement
 Address inconsistencies and improve error handling or logging based on audit findings.
 
-- [ ] Task: Standardize error handling across all notification wrappers in `src/lib/booking-events.ts`.
+- [~] Task: Standardize error handling across all notification wrappers in `src/lib/booking-events.ts`.
 - [ ] Task: Ensure consistent audit logging for all outbound notifications.
 - [ ] Task: Refactor API routes to use consolidated notification helpers if redundant logic is found.
 - [ ] Task: Conductor - User Manual Verification 'Consolidation & Refinement' (Protocol in workflow.md)

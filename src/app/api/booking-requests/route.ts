@@ -3,17 +3,15 @@ import { NextResponse } from "next/server";
 import { bookingRequestSchema, formatBookingAddress } from "@/lib/booking-rules";
 import { verifyCaptchaGuard } from "@/lib/captcha";
 import { prisma } from "@/lib/db";
-import { ownerPendingBookingTemplate } from "@/lib/email/templates";
-import { sendEmail } from "@/lib/email/service";
-import { getOwnerEmail } from "@/lib/env";
+import { sendOwnerBookingEmail } from "@/lib/booking-events";
 import { logError, logEvent } from "@/lib/observability";
 
 const OWNER_BOOKING_EMAIL_TIMEOUT_MS = 12000;
 
-async function sendOwnerBookingEmailWithTimeout(input: Parameters<typeof sendEmail>[0]) {
+async function sendOwnerBookingEmailWithTimeout(input: Parameters<typeof sendOwnerBookingEmail>[0]) {
   return Promise.race([
-    sendEmail(input),
-    new Promise<Awaited<ReturnType<typeof sendEmail>>>((resolve) => {
+    sendOwnerBookingEmail(input),
+    new Promise<Awaited<ReturnType<typeof sendOwnerBookingEmail>>>((resolve) => {
       setTimeout(() => {
         resolve({
           status: "failed",
@@ -144,24 +142,8 @@ export async function POST(request: Request) {
     createdId = created.id;
     logEvent("booking_request.created", { id: created.id, email: created.email, recurring: created.isRecurring });
 
-    const template = ownerPendingBookingTemplate({
-      name: created.name,
-      email: created.email,
-      phone: created.phone,
-      address: created.address,
-      lessonMode: created.lessonMode,
-      skillLevel: created.skillLevel,
-      lessonDuration: created.lessonDuration,
-      customDurationMinutes: created.customDurationMinutes,
-      requestedStartAt: created.requestedStartAt,
-      isRecurring: created.isRecurring,
-      recurrenceEndAt: created.recurrenceEndAt
-    });
-
     const emailResult = await sendOwnerBookingEmailWithTimeout({
-      to: getOwnerEmail(),
-      subject: template.subject,
-      html: template.html
+      bookingRequest: created
     });
 
     // Mirror the contact route behavior: the request was saved, but owner notification delivery
