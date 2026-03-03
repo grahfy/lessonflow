@@ -22,6 +22,14 @@ export function AdminCustomersClient() {
   
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    if (notice) {
+      const timer = setTimeout(() => setNotice(""), 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [notice]);
+
   const [customerQuery, setCustomerQuery] = useState("");
   const [debouncedCustomerQuery, setDebouncedCustomerQuery] = useState("");
 

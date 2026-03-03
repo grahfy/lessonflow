@@ -1294,9 +1294,6 @@ h1 {
 .customer-item > div:nth-child(3) { color: #94a3b8; } /* Phone */
 .customer-item > div:nth-child(5) { color: #cbd5e1; } /* Skill */
 .customer-item > div:nth-child(7) { color: #94a3b8; } /* Portal */
-  min-height: 0;
-  width: 100%;
-}
 
 .admin-settings-section {
   display: grid;

@@ -46,6 +46,14 @@ export function AdminInvoicesClient() {
   
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    if (notice) {
+      const timer = setTimeout(() => setNotice(""), 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [notice]);
+
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
   // Search & Filter State
@@ -98,6 +106,19 @@ export function AdminInvoicesClient() {
   useEffect(() => {
     void loadInvoices(query, page, outstandingOnly);
   }, [query, page, outstandingOnly, loadInvoices]);
+
+  useEffect(() => {
+    const shouldOpenCreate = searchParams.get("openCreate") === "true";
+    const customerId = searchParams.get("customerId");
+    
+    if (shouldOpenCreate && !createOpen) {
+      setCreateOpen(true);
+      void loadCustomers();
+      if (customerId) {
+        setCreateSelectedCustomerId(customerId);
+      }
+    }
+  }, [searchParams, createOpen, loadCustomers]);
 
   // Actions
   const openDetail = (invoice: InvoiceRow) => {

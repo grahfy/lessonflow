@@ -32,7 +32,7 @@ export function CustomerMaterialsDialog({
     onBookingSelect
 }: Props) {
     return (
-        <div className="dialog-layout" style={{ minHeight: '550px' }}>
+        <div className="dialog-layout" style={{ minHeight: '650px' }}>
             <div className="dialog-col">
                 <h3 className="manual-section-title">Materials List</h3>
                 <AdminCard ghost style={{ border: '1px solid var(--line)', padding: '12px', maxHeight: '500px', overflowY: 'auto' }}>
@@ -60,7 +60,7 @@ export function CustomerMaterialsDialog({
                                         </div>
                                     </div>
                                     
-                                    {m.mimeType.startsWith('audio/') && (
+                                    {(m.mimeType.startsWith('audio/') || m.mimeType === 'audio/mpeg') && (
                                         <audio 
                                             controls 
                                             src={`/api/admin/learning-materials/${m.id}`} 
@@ -86,17 +86,18 @@ export function CustomerMaterialsDialog({
 
             <div className="dialog-col is-notes">
                 <h3 className="manual-section-title">Upload New</h3>
-                <AdminCard ghost style={{ border: '1px solid var(--line)', padding: '16px' }}>
-                    <AdminForm>
+                <AdminCard ghost style={{ border: '1px solid var(--line)', padding: '12px' }}>
+                    <AdminForm style={{ gap: '12px' }}>
                         <AdminField label="Associate with booking">
                             <select
                                 value={materialsBookingId}
+                                style={{ padding: '6px 10px', fontSize: '0.85rem' }}
                                 onChange={e => {
                                     setMaterialsBookingId(e.target.value);
                                     onBookingSelect(e.target.value);
                                 }}
                             >
-                                <option value="">Overall student materials (all lessons)</option>
+                                <option value="">Overall student (all lessons)</option>
                                 {materialsBookings.map(b => (
                                     <option key={b.id} value={b.id}>
                                         {new Date(b.startAt).toLocaleDateString('en-AU')} {new Date(b.startAt).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })}
@@ -106,7 +107,7 @@ export function CustomerMaterialsDialog({
                         </AdminField>
                         <form ref={materialsUploadFormRef}>
                             <AdminField label="Select file">
-                                <input type="file" name="file" accept={LEARNING_MATERIAL_ACCEPT + ",image/*"} style={{ width: '100%', padding: '8px 0', fontSize: '0.85rem' }} />
+                                <input type="file" name="file" accept={LEARNING_MATERIAL_ACCEPT + ",image/*"} style={{ width: '100%', padding: '4px 0', fontSize: '0.85rem' }} />
                             </AdminField>
                         </form>
                         <button
@@ -114,7 +115,7 @@ export function CustomerMaterialsDialog({
                             type="button"
                             disabled={materialsUploading}
                             onClick={() => void onUpload()}
-                            style={{ marginTop: '8px', width: '100%' }}
+                            style={{ width: '100%' }}
                         >
                             {materialsUploading ? 'Uploading...' : 'Upload Material'}
                         </button>

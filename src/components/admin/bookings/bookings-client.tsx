@@ -44,6 +44,14 @@ export function AdminBookingsClient() {
 
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    if (notice) {
+      const timer = setTimeout(() => setNotice(""), 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [notice]);
+
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
   // Dialog & Selection State
@@ -441,19 +449,26 @@ export function AdminBookingsClient() {
           onSendEmail={sendCustomEmail}
           onPerformAction={async (action) => {
             const event = events.find(e => e.id === selectedKey);
-            if (event) {
-              const success = await updateBookingApi(selectedKey!, event.entityType, action, {});
-              if (success) {
-                setNotice(`Booking ${action}ed.`);
-                void loadBookings(view, dateStr);
+            if (!event) return;
+            
+            setBusyAction(action);
+            const success = await updateBookingApi(selectedKey!, event.entityType, action, {});
+            setBusyAction(null);
+            
+            if (success) {
+              setNotice(`Booking ${action}ed.`);
+              if (action === 'approve' || action === 'reject') {
+                void closeDialog();
               }
+              void loadBookings(view, dateStr);
             }
           }}
           onOpenMaterials={openMaterialsDialog}
           onOpenInvoice={() => {
             const event = events.find(e => e.id === selectedKey);
             if (event?.row.customerName) {
-              router.push(`/admin/invoices?q=${encodeURIComponent(event.row.customerName)}&openCreate=true&customerId=${event.row.customerId}`);
+              const customerId = event.row.customerId || "";
+              router.push(`/admin/invoices?q=${encodeURIComponent(event.row.customerName)}&openCreate=true&customerId=${customerId}`);
             }
           }}
         />

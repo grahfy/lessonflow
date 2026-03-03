@@ -24,7 +24,7 @@ export function CustomerEmailDialog({
     onSendEmail
 }: Props) {
     return (
-        <div className="dialog-layout" style={{ minHeight: '550px' }}>
+        <div className="dialog-layout" style={{ minHeight: '650px' }}>
             <div className="dialog-col">
                 <h3 className="manual-section-title">Email History</h3>
                 <AdminCard ghost style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid var(--line)', padding: '12px' }}>

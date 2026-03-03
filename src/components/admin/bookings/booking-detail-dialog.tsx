@@ -4,7 +4,7 @@ import { RefObject, ReactNode, useState } from "react";
 import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { AdminCard } from "@/components/admin/ui/admin-card";
-import { formatDateTime } from "@/lib/admin/formatters";
+import { formatDateTime, formatBytes } from "@/lib/admin/formatters";
 import { type BookingEvent } from "@/lib/admin/use-bookings";
 import { type EmailRecord } from "@/lib/admin/use-email-history";
 import { type LearningMaterialRow, AU_STATES } from "@/lib/admin/types";
@@ -118,7 +118,7 @@ export function BookingDetailDialog({
       </div>
 
       <div className="booking-dialog-scroll">
-        <div className="dialog-layout" style={{ minHeight: '550px' }}>
+        <div className="dialog-layout" style={{ minHeight: '650px' }}>
           {activeTab === 'appointment' ? (
             <>
               <div className="dialog-col">
