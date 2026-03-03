@@ -7,10 +7,10 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Research & Mapping' (Protocol in workflow.md) [63f5eacbb899ec87e2603484b8e803da1964f3a3]
 
 ## Phase 2: Core Refactoring - Layouts & Configuration
-- [ ] Task: Standardize the primary admin layout (sidebar, header, navigation) and abstract it into a reusable layout component.
-- [ ] Task: Centralize admin-specific configuration (e.g., navigation menu items, role-based settings) into a single module.
-- [ ] Task: Update existing admin pages to use the new centralized layout and configuration.
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Core Refactoring - Layouts & Configuration' (Protocol in workflow.md)
+- [x] Task: Standardize the primary admin layout (sidebar, header, navigation) and abstract it into a reusable layout component.
+- [x] Task: Centralize admin-specific configuration (e.g., navigation menu items, role-based settings) into a single module.
+- [x] Task: Update existing admin pages to use the new centralized layout and configuration.
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Core Refactoring - Layouts & Configuration' (Protocol in workflow.md) [e63ef2ec7643d7a13a9ce5ac4f80f8800e0ea3e6]
 
 ## Phase 3: Core Refactoring - UI Components
 - [ ] Task: Create a library of reusable admin UI components (e.g., `DataTable`, `AdminForm`, `AdminModal`, `AdminCard`) based on the research from Phase 1.
