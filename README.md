@@ -1,7 +1,7 @@
 # LessonFlow
 
 <p align="center">
-  <img src="lessonflow_logo.jpg" alt="LessonFlow logo" />
+  <img src="lessonflow_logo.jpg" alt="LessonFlow logo" width="384"/>
 </p>
 
 LessonFlow is an MIT-licensed platform for individual music teachers and music schools who want to automate the admin work around lessons.
