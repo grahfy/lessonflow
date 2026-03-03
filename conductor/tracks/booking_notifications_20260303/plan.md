@@ -7,7 +7,7 @@ Identify and document all existing notification triggers and their current imple
 
 - [x] Task: Audit `src/lib/booking-events.ts` and document all public functions and their parameters. [f68f8d8]
 - [x] Task: Trace calls to `booking-events.ts` from API routes to identify all notification triggers. [746582b]
-- [ ] Task: Document the current state of error handling and audit logging for each trigger.
+- [~] Task: Document the current state of error handling and audit logging for each trigger.
 - [ ] Task: Conductor - User Manual Verification 'Research & Audit' (Protocol in workflow.md)
 
 ## Phase 2: Baseline Testing
