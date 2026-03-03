@@ -28,7 +28,7 @@ export default async function AdminManualSectionPage(props: { params: Promise<{ 
   const manualIndex = await getAdminManualIndex();
   const sectionPosition = manualIndex.sections.findIndex((entry) => entry.id === section.id);
   const previous = sectionPosition > 0 ? manualIndex.sections[sectionPosition - 1] : null;
-  const next = sectionPosition >= 0 && sectionPosition < manualIndex.sections.length - 1
+  const next = sectionPosition < manualIndex.sections.length - 1
     ? manualIndex.sections[sectionPosition + 1]
     : null;
 

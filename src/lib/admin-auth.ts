@@ -93,7 +93,7 @@ export async function ensureOwnerAdmin(): Promise<AdminUser> {
   const email = process.env.ADMIN_EMAIL || "owner@example.com";
   const displayName = "Owner";
   const password = process.env.ADMIN_PASSWORD || "change-me";
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await bcrypt.hash(password, 12);
 
   const existing = await prisma.adminUser.findUnique({
     where: { email }

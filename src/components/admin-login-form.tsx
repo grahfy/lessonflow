@@ -84,10 +84,12 @@ export function AdminLoginForm() {
             type={showPassword ? "text" : "password"}
             name="password"
             autoComplete="current-password"
+            aria-describedby="admin-password-toggle"
             required
           />
           <button
             type="button"
+            id="admin-password-toggle"
             className="btn btn-small password-visibility-toggle"
             aria-label={showPassword ? "Hide password" : "Show password"}
             aria-pressed={showPassword}
