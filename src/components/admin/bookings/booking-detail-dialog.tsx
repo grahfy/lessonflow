@@ -115,7 +115,7 @@ export function BookingDetailDialog({
               <div className="dialog-col">
                 <h4>Customer details</h4>
                 {selectedCustomer && !isEditingCustomer ? (
-                  <AdminCard style={{ marginBottom: '16px' }}>
+                  <AdminCard ghost style={{ marginBottom: '16px' }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                       <span style={{ fontWeight: 600, color: "var(--text-secondary)" }}>Read-only customer</span>
                       <button type="button" className="btn btn-secondary" onClick={onEditCustomer}>Edit</button>

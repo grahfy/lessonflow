@@ -263,189 +263,194 @@ export function AdminInvoicesClient() {
         style={{ height: 'calc(100vh - 120px)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
       >
         <div className="admin-actions-bar">
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn btn-primary" onClick={() => { setCreateOpen(true); void loadCustomers(); }}>
-            CREATE INVOICE
-          </button>
-          <button className="btn btn-secondary" disabled={busyAction === 'bulk-reminders'} onClick={sendBulkReminders}>
-            {busyAction === 'bulk-reminders' ? "SENDING..." : "SEND OVERDUE REMINDERS"}
-          </button>
-        </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="btn btn-primary" onClick={() => { setCreateOpen(true); void loadCustomers(); }}>
+              CREATE INVOICE
+            </button>
+            <button className="btn btn-secondary" disabled={busyAction === 'bulk-reminders'} onClick={sendBulkReminders}>
+              {busyAction === 'bulk-reminders' ? "SENDING..." : "SEND OVERDUE REMINDERS"}
+            </button>
+          </div>
 
-        <div className="search-box">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              <input type="checkbox" checked={outstandingOnly} onChange={(e) => { setOutstandingOnly(e.target.checked); setPage(1); }} />
-              Outstanding only
-            </label>
-            <input
-              type="text"
-              value={query}
-              placeholder="Search by number or customer..."
-              onChange={(e) => { setQuery(e.target.value); setPage(1); }}
-            />
+          <div className="search-box">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                <input type="checkbox" checked={outstandingOnly} onChange={(e) => { setOutstandingOnly(e.target.checked); setPage(1); }} />
+                Outstanding only
+              </label>
+              <input
+                type="text"
+                value={query}
+                placeholder="Search by number or customer..."
+                onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      <AdminTable
-        header={header}
-        loading={loading}
-        emptyLabel="No invoices found."
-        pagination={{
-          currentPage: page,
-          totalPages: totalPages,
-          totalCount: totalCount,
-          pageSize: pageSize,
-          onPageChange: setPage,
-          onPageSizeChange: setPageSize
-        }}
-      >
-        {invoices.map((inv) => (
-          <div 
-            key={inv.id} 
-            className="invoice-row-item customer-item invoice-item" 
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              padding: '12px 16px',
-              gap: '12px',
-              cursor: 'pointer',
-              width: '100%',
-              border: 'none',
-              borderBottom: '1px solid var(--line)',
-              background: 'rgba(8, 11, 28, 0.84)',
-              borderRadius: 0,
-            }}
-            onClick={() => openDetail(inv)}
-          >
-            <div style={{ width: '100px', fontWeight: 600 }}>{inv.invoiceNumber}</div>
-            <Separator />
-            <div style={{ flex: '1', minWidth: '150px' }}>
-              <div style={{ fontWeight: 500 }}>{inv.customerName}</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--ink-1)' }}>{inv.customerEmail}</div>
+        <AdminTable
+          header={header}
+          loading={loading}
+          emptyLabel="No invoices found."
+          pagination={{
+            currentPage: page,
+            totalPages: totalPages,
+            totalCount: totalCount,
+            pageSize: pageSize,
+            onPageChange: setPage,
+            onPageSizeChange: setPageSize
+          }}
+        >
+          {invoices.map((inv) => (
+            <div 
+              key={inv.id} 
+              className="invoice-row-item customer-item invoice-item" 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                padding: '12px 16px',
+                gap: '12px',
+                cursor: 'pointer',
+                width: '100%',
+                border: 'none',
+                borderBottom: '1px solid var(--line)',
+                background: 'rgba(8, 11, 28, 0.84)',
+                borderRadius: 0,
+              }}
+              onClick={() => openDetail(inv)}
+            >
+              <div style={{ width: '100px', fontWeight: 600 }}>{inv.invoiceNumber}</div>
+              <Separator />
+              <div style={{ flex: '1', minWidth: '150px' }}>
+                <div style={{ fontWeight: 500 }}>{inv.customerName}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--ink-1)' }}>{inv.customerEmail}</div>
+              </div>
+              <Separator />
+              <div style={{ width: '100px', textAlign: 'center' }}>
+                <span className={`status-badge status-${inv.status}`}>{inv.status}</span>
+              </div>
+              <Separator />
+              <div style={{ width: '120px', textAlign: 'right', fontWeight: 600 }}>
+                {toCurrency(inv.totalCents, inv.currency)}
+              </div>
+              <Separator />
+              <div style={{ width: '120px', textAlign: 'right', fontSize: '0.85rem' }}>
+                {new Date(inv.dueAt).toLocaleDateString("en-AU")}
+                {inv.overdueDays !== null && inv.status !== "paid" && inv.status !== "void" && (
+                  <div style={{ color: 'var(--red)', fontSize: '0.7rem', fontWeight: 600 }}>{inv.overdueDays} DAYS OVERDUE</div>
+                )}
+              </div>
             </div>
-            <Separator />
-            <div style={{ width: '100px', textAlign: 'center' }}>
-              <span className={`status-badge status-${inv.status}`}>{inv.status}</span>
-            </div>
-            <Separator />
-            <div style={{ width: '120px', textAlign: 'right', fontWeight: 600 }}>
-              {toCurrency(inv.totalCents, inv.currency)}
-            </div>
-            <Separator />
-            <div style={{ width: '120px', textAlign: 'right', fontSize: '0.85rem' }}>
-              {new Date(inv.dueAt).toLocaleDateString("en-AU")}
-              {inv.overdueDays !== null && inv.status !== "paid" && inv.status !== "void" && (
-                <div style={{ color: 'var(--red)', fontSize: '0.7rem', fontWeight: 600 }}>{inv.overdueDays} DAYS OVERDUE</div>
-              )}
-            </div>
-          </div>
-        ))}
-      </AdminTable>
+          ))}
+        </AdminTable>
       </div>
 
       <AdminDialog
         isOpen={!!selectedInvoice}
         onClose={closeDetail}
         title={`Invoice ${selectedInvoice?.invoiceNumber}`}
+        wide
         footer={
-          <>
-            <button className="btn btn-secondary" onClick={closeDetail}>CLOSE</button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button className="btn btn-secondary" onClick={closeDetail}>CLOSE</button>
+              {selectedInvoice?.status === 'sent' && (
+                <button className="btn btn-primary" disabled={!!busyAction} onClick={() => void performAction('mark_paid')}>
+                  {busyAction === 'mark_paid' ? 'SAVING...' : 'MARK AS PAID'}
+                </button>
+              )}
+              {selectedInvoice && (selectedInvoice.status === 'sent' || selectedInvoice.status === 'paid') && (
+                <button className="btn btn-danger" disabled={!!busyAction} onClick={() => void performAction('void')}>
+                  {busyAction === 'void' ? 'VOIDING...' : 'VOID INVOICE'}
+                </button>
+              )}
+            </div>
             {selectedInvoice?.status === 'draft' && (
               <button className="btn btn-primary" disabled={!!busyAction} onClick={() => void performAction('send')}>
                 {busyAction === 'send' ? 'SENDING...' : 'SEND TO CUSTOMER'}
               </button>
             )}
-            {selectedInvoice?.status === 'sent' && (
-              <button className="btn btn-primary" disabled={!!busyAction} onClick={() => void performAction('mark_paid')}>
-                {busyAction === 'mark_paid' ? 'SAVING...' : 'MARK AS PAID'}
-              </button>
-            )}
-            {selectedInvoice && (selectedInvoice.status === 'sent' || selectedInvoice.status === 'paid') && (
-              <button className="btn btn-danger" disabled={!!busyAction} onClick={() => void performAction('void')}>
-                {busyAction === 'void' ? 'VOIDING...' : 'VOID INVOICE'}
-              </button>
-            )}
-          </>
+          </div>
         }
       >
         {selectedInvoice && (
-          <div className="dialog-layout">
-            <div className="dialog-col">
-              <h4>Invoice Details</h4>
-              <AdminCard style={{ marginBottom: '16px' }}>
-                <AdminForm className="dialog-form-grid">
-                  <AdminField label="Customer">
-                    <input value={selectedInvoice.customerName} readOnly />
-                  </AdminField>
-                  <AdminField label="Email">
-                    <input value={selectedInvoice.customerEmail} readOnly />
-                  </AdminField>
-                  <AdminField label="Due Date">
-                    <input type="datetime-local" value={editingDueAt} onChange={(e) => setEditingDueAt(e.target.value)} />
-                  </AdminField>
-                  <AdminField label="Notes" fullWidth>
-                    <textarea value={editingNotes} onChange={(e) => setEditingNotes(e.target.value)} placeholder="Customer-facing notes..." />
-                  </AdminField>
-                </AdminForm>
-                <div className="button-row" style={{ marginTop: '12px' }}>
-                  <button className="btn btn-secondary" disabled={!!busyAction} onClick={saveInvoiceEdits}>
-                    {busyAction === 'save' ? 'SAVING...' : 'SAVE BASIC DETAILS'}
-                  </button>
-                  <button className="btn btn-secondary" onClick={() => router.push(`/admin/customers?customerId=${selectedInvoice.customerId}`)}>VIEW CUSTOMER</button>
-                </div>
-              </AdminCard>
+          <div className="booking-dialog-scroll">
+            <div className="dialog-layout">
+              <div className="dialog-col">
+                <h3 className="manual-section-title">Invoice Details</h3>
+                <AdminCard ghost style={{ marginBottom: '16px' }}>
+                  <AdminForm className="dialog-form-grid">
+                    <AdminField label="Customer">
+                      <input value={selectedInvoice.customerName} readOnly />
+                    </AdminField>
+                    <AdminField label="Email">
+                      <input value={selectedInvoice.customerEmail} readOnly />
+                    </AdminField>
+                    <AdminField label="Due Date">
+                      <input type="datetime-local" value={editingDueAt} onChange={(e) => setEditingDueAt(e.target.value)} />
+                    </AdminField>
+                    <AdminField label="Notes" fullWidth>
+                      <textarea value={editingNotes} onChange={(e) => setEditingNotes(e.target.value)} placeholder="Customer-facing notes..." style={{ minHeight: '80px' }} />
+                    </AdminField>
+                  </AdminForm>
+                  <div className="button-row" style={{ marginTop: '12px' }}>
+                    <button className="btn btn-secondary" disabled={!!busyAction} onClick={saveInvoiceEdits}>
+                      {busyAction === 'save' ? 'SAVING...' : 'SAVE BASIC DETAILS'}
+                    </button>
+                    <button className="btn btn-secondary" onClick={() => router.push(`/admin/customers?customerId=${selectedInvoice.customerId}`)}>VIEW CUSTOMER</button>
+                  </div>
+                </AdminCard>
 
-              <h4>Line Items</h4>
-              <AdminCard>
-                <div style={{ display: 'grid', gap: '12px' }}>
-                  {editingLineItems.map((li) => (
-                    <div key={li.key} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', borderBottom: '1px solid var(--line)', paddingBottom: '12px' }}>
-                      <div style={{ flex: 1 }}>
-                        <AdminField label="Description">
-                          <input value={li.description} onChange={(e) => updateLineItem(li.key, { description: e.target.value })} />
-                        </AdminField>
+                <h3 className="manual-section-title">Line Items</h3>
+                <AdminCard ghost>
+                  <div style={{ display: 'grid', gap: '12px' }}>
+                    {editingLineItems.map((li) => (
+                      <div key={li.key} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', borderBottom: '1px solid var(--line)', paddingBottom: '12px' }}>
+                        <div style={{ flex: 1 }}>
+                          <AdminField label="Description">
+                            <input value={li.description} onChange={(e) => updateLineItem(li.key, { description: e.target.value })} />
+                          </AdminField>
+                        </div>
+                        <div style={{ width: '60px' }}>
+                          <AdminField label="Qty">
+                            <input type="number" value={li.quantity} onChange={(e) => updateLineItem(li.key, { quantity: e.target.value })} />
+                          </AdminField>
+                        </div>
+                        <div style={{ width: '100px' }}>
+                          <AdminField label="Price">
+                            <input value={li.unitPriceAud} onChange={(e) => updateLineItem(li.key, { unitPriceAud: e.target.value })} />
+                          </AdminField>
+                        </div>
+                        <button className="btn btn-danger" style={{ marginTop: '24px', padding: '8px' }} onClick={() => removeLineItem(li.key)}>×</button>
                       </div>
-                      <div style={{ width: '60px' }}>
-                        <AdminField label="Qty">
-                          <input type="number" value={li.quantity} onChange={(e) => updateLineItem(li.key, { quantity: e.target.value })} />
-                        </AdminField>
+                    ))}
+                    <div className="button-row" style={{ marginTop: '8px' }}>
+                      <button className="btn btn-secondary" onClick={addLineItem}>+ ADD CUSTOM ITEM</button>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <select value={editingProductPresetId} onChange={(e) => addPresetToInvoice(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--line)', borderRadius: '8px', color: 'var(--ink-0)', padding: '8px' }}>
+                          <option value="">+ ADD FROM PRESET...</option>
+                          {presets.map(p => <option key={p.id} value={p.id}>{p.label} ({toCurrency(p.unitPriceCents, DEFAULT_CURRENCY)})</option>)}
+                        </select>
                       </div>
-                      <div style={{ width: '100px' }}>
-                        <AdminField label="Price">
-                          <input value={li.unitPriceAud} onChange={(e) => updateLineItem(li.key, { unitPriceAud: e.target.value })} />
-                        </AdminField>
-                      </div>
-                      <button className="btn btn-danger" style={{ marginTop: '24px', padding: '8px' }} onClick={() => removeLineItem(li.key)}>×</button>
-                    </div>
-                  ))}
-                  <div className="button-row" style={{ marginTop: '8px' }}>
-                    <button className="btn btn-secondary" onClick={addLineItem}>+ ADD CUSTOM ITEM</button>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <select value={editingProductPresetId} onChange={(e) => addPresetToInvoice(e.target.value)}>
-                        <option value="">+ ADD FROM PRESET...</option>
-                        {presets.map(p => <option key={p.id} value={p.id}>{p.label} ({toCurrency(p.unitPriceCents, DEFAULT_CURRENCY)})</option>)}
-                      </select>
                     </div>
                   </div>
-                </div>
-              </AdminCard>
-            </div>
+                </AdminCard>
+              </div>
 
-            <div className="dialog-col is-notes">
-              <h4>Actions & History</h4>
-              <AdminCard style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid var(--line)' }}>
-                <p className="helper-text">Manage the lifecycle of this invoice.</p>
-                <div className="button-row" style={{ flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
-                  <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => window.open(`/api/admin/invoices/${selectedInvoice.id}/pdf`, '_blank')}>VIEW PDF</button>
-                  {selectedInvoice.status !== 'void' && (
-                    <button className="btn btn-secondary" style={{ width: '100%' }} disabled={!!busyAction} onClick={() => void performAction('send')}>
-                      RESEND NOTIFICATION
-                    </button>
-                  )}
-                </div>
-              </AdminCard>
+              <div className="dialog-col is-notes">
+                <h3 className="manual-section-title">Actions & History</h3>
+                <AdminCard ghost>
+                  <p className="helper-text">Manage the lifecycle of this invoice.</p>
+                  <div className="button-row" style={{ flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
+                    <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => window.open(`/api/admin/invoices/${selectedInvoice.id}/pdf`, '_blank')}>VIEW PDF</button>
+                    {selectedInvoice.status !== 'void' && (
+                      <button className="btn btn-secondary" style={{ width: '100%' }} disabled={!!busyAction} onClick={() => void performAction('send')}>
+                        RESEND NOTIFICATION
+                      </button>
+                    )}
+                  </div>
+                </AdminCard>
+              </div>
             </div>
           </div>
         )}
@@ -456,17 +461,17 @@ export function AdminInvoicesClient() {
         onClose={() => setCreateOpen(false)}
         title="Create New Invoice"
         footer={
-          <>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
             <button className="btn btn-secondary" onClick={() => setCreateOpen(false)}>CANCEL</button>
             <button className="btn btn-primary" disabled={!!busyAction || !createSelectedCustomerId} onClick={createInvoice}>
               {busyAction === 'create' ? 'CREATING...' : 'CREATE INVOICE'}
             </button>
-          </>
+          </div>
         }
       >
         <AdminForm className="dialog-form-grid">
           <AdminField label="Select Customer" fullWidth required>
-            <select value={createSelectedCustomerId} onChange={(e) => setCreateSelectedCustomerId(e.target.value)}>
+            <select value={createSelectedCustomerId} onChange={(e) => setCreateSelectedCustomerId(e.target.value)} style={{ width: '100%' }}>
               <option value="">-- Choose student --</option>
               {customerOptions.map(c => <option key={c.id} value={c.id}>{c.lastName ? `${c.lastName}, ${c.firstName}` : c.fullName}</option>)}
             </select>

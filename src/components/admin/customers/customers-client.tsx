@@ -217,38 +217,38 @@ export function AdminCustomersClient() {
         style={{ height: 'calc(100vh - 120px)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
       >
         <div className="admin-actions-bar">
-        <button className="btn btn-primary" onClick={() => openCustomerDialog(null, true)}>
-          CREATE NEW CUSTOMER
-        </button>
-        <div className="search-box">
-          <label htmlFor={searchInputId}>Search</label>
-          <input
-            id={searchInputId}
-            type="text"
-            value={customerQuery}
-            placeholder="Search by name, email, or phone..."
-            onChange={(event) => setCustomerQuery(event.target.value)}
-          />
+          <button className="btn btn-primary" onClick={() => openCustomerDialog(null, true)}>
+            CREATE NEW CUSTOMER
+          </button>
+          <div className="search-box">
+            <label htmlFor={searchInputId}>Search</label>
+            <input
+              id={searchInputId}
+              type="text"
+              value={customerQuery}
+              placeholder="Search by name, email, or phone..."
+              onChange={(event) => setCustomerQuery(event.target.value)}
+            />
+          </div>
         </div>
-      </div>
 
-      <CustomerTable
-        customers={customers}
-        loadingCustomers={loadingCustomers}
-        deletingCustomerId={null}
-        page={page}
-        pageSize={pageSize}
-        totalCount={totalCount}
-        totalPages={totalPages}
-        onSetPage={setPage}
-        onSetPageSize={(size) => {
-          setPageSize(size);
-          setPage(1);
-        }}
-        onOpenCustomerDialog={openCustomerDialog}
-        onDeleteCustomer={deleteCustomer}
-        onViewInvoices={(name) => router.push(`/admin/invoices?q=${encodeURIComponent(name)}`)}
-      />
+        <CustomerTable
+          customers={customers}
+          loadingCustomers={loadingCustomers}
+          deletingCustomerId={null}
+          page={page}
+          pageSize={pageSize}
+          totalCount={totalCount}
+          totalPages={totalPages}
+          onSetPage={setPage}
+          onSetPageSize={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+          onOpenCustomerDialog={openCustomerDialog}
+          onDeleteCustomer={deleteCustomer}
+          onViewInvoices={(name) => router.push(`/admin/invoices?q=${encodeURIComponent(name)}`)}
+        />
       </div>
 
       {dialogPresence.isMounted && (
@@ -286,7 +286,7 @@ export function AdminCustomersClient() {
           setMaterialsBookingId={setMaterialsBookingId}
           materialsUploadFormRef={materialsUploadFormRef}
           onUploadMaterial={uploadMaterial}
-          onDeleteMaterial={(m) => deleteMaterial(m)}
+          onDeleteMaterial={(mId) => deleteMaterial(mId)}
           onMaterialBookingSelect={loadMaterials}
 
           // Portal Credentials

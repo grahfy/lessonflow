@@ -1133,16 +1133,97 @@ h1 {
   margin-bottom: 12px;
 }
 
+.admin-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 2px 0;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.search-box label {
+  color: var(--ink-1);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.search-box input {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink-0);
+  width: 240px;
+}
+
+.invoice-row-item:hover, .customer-item:hover {
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+.status-badge {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.status-paid, .status-approved {
+  background: rgba(76, 204, 135, 0.15);
+  color: #d5ffe7;
+  border: 1px solid rgba(76, 204, 135, 0.3);
+}
+
+.status-sent, .status-pending {
+  background: rgba(244, 183, 108, 0.15);
+  color: #ffe9ce;
+  border: 1px solid rgba(244, 183, 108, 0.3);
+}
+
+.status-void, .status-cancelled {
+  background: rgba(235, 87, 87, 0.15);
+  color: #ffe1e1;
+  border: 1px solid rgba(235, 87, 87, 0.3);
+}
+
+.status-draft {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink-1);
+  border: 1px solid var(--line);
+}
+
+.admin-layout-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  flex: 1;
+}
+
+/* Ensure the pagination at the bottom doesn't shrink */
+.admin-card.invoice-list-card .pagination {
+  flex-shrink: 0;
+  margin-top: auto;
+}
+
 .admin-shell {
   min-height: 100dvh;
   width: min(1300px, 100%);
   margin: 0 auto;
   padding: 20px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
-  align-content: start;
-  align-items: start;
-  grid-auto-rows: min-content;
 }
 
 .admin-card {

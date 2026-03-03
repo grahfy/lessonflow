@@ -1,67 +1,61 @@
 "use client";
 
-import type { PropsWithChildren, ReactNode, RefObject } from "react";
+import { type PropsWithChildren, type ReactNode, type RefObject } from "react";
 
 interface AdminDialogProps extends PropsWithChildren {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   rootRef?: RefObject<HTMLDivElement | null>;
-  wide?: boolean;
-  compact?: boolean;
-  footer?: ReactNode;
   description?: ReactNode;
+  footer?: ReactNode;
+  wide?: boolean;
   id?: string;
 }
 
 /**
- * Standard dialog for admin operations.
- * Handles backdrop, panel, header, and common styles.
+ * Standard modal/dialog for admin actions.
+ * Consistently handles backdrop, layout, and common header elements.
  */
-export function AdminDialog({
-  isOpen,
-  onClose,
-  title,
-  rootRef,
+export function AdminDialog({ 
+  isOpen, 
+  onClose, 
+  title, 
+  rootRef, 
+  description, 
+  footer, 
   wide,
-  compact,
-  footer,
-  description,
   id,
-  children
+  children 
 }: AdminDialogProps) {
   if (!isOpen) return null;
 
-  const panelClass = [
-    "dialog-panel",
-    wide ? "dialog-panel-wide" : "",
-    compact ? "dialog-panel-compact" : ""
-  ].filter(Boolean).join(" ");
-
-  const titleId = id ? `${id}-title` : undefined;
-
   return (
-    <div
-      className="dialog-backdrop"
-      ref={rootRef}
-      data-motion-root="admin"
+    <div 
+      className="dialog-backdrop" 
       onClick={onClose}
+      data-motion-root="admin"
     >
-      <div
-        className={panelClass}
+      <div 
+        ref={rootRef}
+        id={id}
+        className={`dialog-panel ${wide ? 'dialog-panel-wide' : ''}`}
+        onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={titleId}
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="dialog-head">
-          <h3 id={titleId}>{title}</h3>
-          <button className="btn btn-secondary" type="button" onClick={onClose}>CLOSE</button>
+          <h3>{title}</h3>
+          <button className="btn btn-secondary" type="button" onClick={onClose}>
+            Close
+          </button>
         </div>
         
-        {description && <p className="helper-text dialog-status">{description}</p>}
+        {description && <div className="dialog-status helper-text">{description}</div>}
 
-        {children}
+        <div style={{ marginTop: '16px' }}>
+          {children}
+        </div>
 
         {footer && <div className="dialog-actions">{footer}</div>}
       </div>

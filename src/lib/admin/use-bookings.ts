@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { useSafeFetch } from "./use-safe-fetch";
 
-export type BookingStatus = "pending" | "approved" | "cancelled";
+export type BookingStatus = "pending" | "approved" | "cancelled" | "rejected";
 
 export interface BookingEvent {
     id: string;
@@ -18,6 +18,9 @@ export interface BookingEvent {
     customDurationMinutes: number | null;
     isRecurring: boolean;
     seriesId: string | null;
+    color: "green" | "yellow" | "red" | "slate";
+    title: string;
+    row: any;
 }
 
 export interface UseBookingsOptions {
@@ -54,13 +57,8 @@ export function useBookings(options: UseBookingsOptions = {}): UseBookingsResult
                 return;
             }
             const data = await response.json();
-            const mapped = (data.bookings || []).map((b: any) => ({
-                ...b,
-                title: b.customerName || "Unknown",
-                color: b.status === "approved" ? "green" : b.status === "pending" ? "yellow" : "slate",
-                row: b // Keep original data in row
-            }));
-            setEvents(mapped);
+            // The API already returns 'events' in the correct format
+            setEvents(data.events || []);
         } catch {
             if (onError) onError("Network error loading bookings.");
         } finally {

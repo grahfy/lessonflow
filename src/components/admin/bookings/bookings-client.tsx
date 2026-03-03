@@ -6,19 +6,14 @@ import { format, parseISO, addDays, subDays, addWeeks, subWeeks, addMonths, subM
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminCard } from "@/components/admin/ui/admin-card";
-import { AdminDialog } from "@/components/admin/ui/admin-dialog";
-import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { AdminBookingCalendar } from "@/components/admin-booking-calendar";
-import { formatDateTime } from "@/lib/admin/formatters";
 import { animateIn, animateOut } from "@/components/motion/tween-orchestrator";
 import { usePresenceExit } from "@/components/motion/use-presence-exit";
 
 import { useBookings, type BookingEvent } from "@/lib/admin/use-bookings";
 import { useCustomers } from "@/lib/admin/use-customers";
-import { usePresets } from "@/lib/admin/use-presets";
 import { useEmailHistory } from "@/lib/admin/use-email-history";
 import { useLearningMaterials } from "@/lib/admin/use-learning-materials";
-import { usePortalCredentials } from "@/lib/admin/use-portal-credentials";
 
 import { BookingDetailDialog } from "./booking-detail-dialog";
 import { ManualBookingDialog } from "./manual-booking-dialog";
@@ -58,6 +53,10 @@ export function AdminBookingsClient() {
   // Manual Booking State
   const [manualStep, setManualStep] = useState<ManualStep>("customer");
   const [customerQuery, setCustomerQuery] = useState("");
+  const [manualCustomerId, setManualCustomerId] = useState("");
+  const [manualUpdateCustomerFromBooking, setManualUpdateCustomerFromBooking] = useState(true);
+  const [manualDurationChoice, setManualDurationChoice] = useState("min30");
+  const [manualMatch, setManualMatch] = useState<any | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   
   // Email Composer State
@@ -71,6 +70,7 @@ export function AdminBookingsClient() {
   const manualDialogRootRef = useRef<HTMLDivElement | null>(null);
   const materialsDialogRootRef = useRef<HTMLDivElement | null>(null);
   const materialsUploadFormRef = useRef<HTMLFormElement | null>(null);
+  const manualFormRef = useRef<HTMLFormElement | null>(null);
 
   const onAuthError = useCallback(() => window.location.assign("/admin/login"), []);
 
@@ -164,7 +164,9 @@ export function AdminBookingsClient() {
   const openManualDialog = useCallback(async () => {
     setManualStep("customer");
     setCustomerQuery("");
+    setManualCustomerId("");
     setSelectedCustomer(null);
+    setManualMatch(null);
     setError("");
     setNotice("");
     void loadCustomers();
@@ -190,6 +192,45 @@ export function AdminBookingsClient() {
     if (materialsDialogRootRef.current) await animateOut(materialsDialogRootRef.current);
     materialsDialogPresence.hide();
   }, [materialsDialogPresence]);
+
+  const applyCustomerToManual = useCallback((customer: any) => {
+    if (!manualFormRef.current) return;
+    const f = manualFormRef.current;
+    f.firstName.value = customer.firstName || customer.fullName.split(" ")[0];
+    f.lastName.value = customer.lastName || customer.fullName.split(" ").slice(1).join(" ");
+    f.email.value = customer.email;
+    f.phone.value = customer.phone;
+    f.unitNumber.value = customer.unitNumber || "";
+    f.houseNumber.value = customer.houseNumber || "";
+    f.streetName.value = customer.streetName || "";
+    f.streetType.value = customer.streetType || "Street";
+    f.suburb.value = customer.suburb || "";
+    f.state.value = customer.state || "VIC";
+    f.postcode.value = customer.postcode || "";
+    f.skillLevel.value = customer.skillLevel || "beginner";
+    f.lessonMode.value = customer.lessonMode || "in_person";
+    setSelectedCustomer(customer);
+  }, []);
+
+  const clearManualCustomer = useCallback(() => {
+    if (!manualFormRef.current) return;
+    const f = manualFormRef.current;
+    f.firstName.value = "";
+    f.lastName.value = "";
+    f.email.value = "";
+    f.phone.value = "";
+    f.unitNumber.value = "";
+    f.houseNumber.value = "";
+    f.streetName.value = "";
+    f.streetType.value = "Street";
+    f.suburb.value = "";
+    f.state.value = "VIC";
+    f.postcode.value = "";
+    f.skillLevel.value = "beginner";
+    f.lessonMode.value = "in_person";
+    setManualCustomerId("");
+    setSelectedCustomer(null);
+  }, []);
 
   // Action Logic
   async function saveBooking() {
@@ -231,6 +272,51 @@ export function AdminBookingsClient() {
     const success = await uploadMaterialApi(event.row.customerId, event.id, materialsUploadFormRef.current);
     if (success) {
       setNotice("Material uploaded.");
+    }
+  }
+
+  async function addManualBooking(resolution?: string) {
+    if (!manualFormRef.current) return;
+    setBusyAction("create");
+    setError("");
+
+    const formData = new FormData(manualFormRef.current);
+    const payload: any = Object.fromEntries(formData.entries());
+    
+    // Add additional fields
+    payload.manualCustomerId = manualCustomerId || undefined;
+    payload.resolution = resolution;
+    payload.isRecurring = formData.get("isRecurring") === "on";
+    payload.updateCustomerFromBooking = manualUpdateCustomerFromBooking;
+
+    try {
+      const response = await fetch("/api/admin/bookings/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.status === 409) {
+        const data = await response.json();
+        setManualMatch(data.match);
+        setManualStep("schedule");
+        setBusyAction(null);
+        return;
+      }
+
+      if (!response.ok) {
+        setError("Unable to create booking.");
+        setBusyAction(null);
+        return;
+      }
+
+      setNotice("Booking created.");
+      void closeManualDialog();
+      void loadBookings(view, dateStr);
+    } catch {
+      setError("Network error.");
+    } finally {
+      setBusyAction(null);
     }
   }
 
@@ -318,9 +404,14 @@ export function AdminBookingsClient() {
           emailMessage={emailComposerMessage}
           setEmailMessage={setEmailComposerMessage}
           onSendEmail={sendCustomEmail}
-          onPerformAction={() => {}}
+          onPerformAction={(action) => void updateBookingApi(selectedKey!, { action })}
           onOpenMaterials={openMaterialsDialog}
-          onOpenInvoice={() => {}}
+          onOpenInvoice={() => {
+            const event = events.find(e => e.id === selectedKey);
+            if (event?.row.customerName) {
+              router.push(`/admin/invoices?q=${encodeURIComponent(event.row.customerName)}`);
+            }
+          }}
         />
       )}
 
@@ -329,14 +420,23 @@ export function AdminBookingsClient() {
           isOpen={true}
           onClose={closeManualDialog}
           rootRef={manualDialogRootRef}
+          formRef={manualFormRef}
           step={manualStep}
           setStep={setManualStep}
           customerQuery={customerQuery}
           setCustomerQuery={setCustomerQuery}
           customerOptions={customerOptions}
-          selectedCustomer={selectedCustomer}
-          setSelectedCustomer={setSelectedCustomer}
-          onSave={() => {}}
+          manualCustomerId={manualCustomerId}
+          setManualCustomerId={setManualCustomerId}
+          onApplyCustomer={applyCustomerToManual}
+          onClearCustomer={clearManualCustomer}
+          updateCustomerFromBooking={manualUpdateCustomerFromBooking}
+          setUpdateCustomerFromBooking={setManualUpdateCustomerFromBooking}
+          durationChoice={manualDurationChoice}
+          setDurationChoice={setManualDurationChoice}
+          manualMatch={manualMatch}
+          onResolveMatch={(resolution) => void addManualBooking(resolution)}
+          onSave={() => void addManualBooking()}
           busyAction={busyAction}
         />
       )}

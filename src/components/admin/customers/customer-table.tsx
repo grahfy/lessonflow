@@ -62,7 +62,7 @@ export function CustomerTable({
             {customers.map((customer) => (
                 <div
                     key={customer.id}
-                    className="customer-item"
+                    className="customer-item invoice-row-item"
                     style={{
                         display: 'flex',
                         alignItems: 'center',
