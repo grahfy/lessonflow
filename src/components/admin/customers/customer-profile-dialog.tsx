@@ -300,9 +300,23 @@ export function CustomerProfileDialog({
                         )}
 
                         {customer && revealedPortalPasswords[customer.id] && (
-                            <div className="notice success" style={{ margin: '8px 0', padding: '10px' }}>
-                                <small style={{ display: 'block', marginBottom: '4px', textTransform: 'uppercase', opacity: 0.8 }}>Current Password</small>
-                                <code style={{ fontSize: '1.1rem', fontWeight: 700, letterSpacing: '0.5px' }}>{revealedPortalPasswords[customer.id]}</code>
+                            <div className="notice success" style={{ margin: '8px 0', padding: '12px', background: 'rgba(69, 204, 138, 0.1)', border: '1px solid rgba(69, 204, 138, 0.3)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                    <div>
+                                        <small style={{ display: 'block', marginBottom: '4px', textTransform: 'uppercase', opacity: 0.8, color: 'var(--ink-0)' }}>Current Password</small>
+                                        <code style={{ fontSize: '1.2rem', fontWeight: 700, letterSpacing: '0.5px', color: '#fff' }}>{revealedPortalPasswords[customer.id]}</code>
+                                    </div>
+                                    <button 
+                                        className="btn btn-secondary" 
+                                        style={{ padding: '4px 8px', fontSize: '0.7rem' }}
+                                        onClick={() => {
+                                            void navigator.clipboard.writeText(revealedPortalPasswords[customer.id]);
+                                            alert("Password copied to clipboard");
+                                        }}
+                                    >
+                                        Copy
+                                    </button>
+                                </div>
                             </div>
                         )}
 
@@ -310,7 +324,7 @@ export function CustomerProfileDialog({
                             <button
                                 className="btn btn-secondary"
                                 type="button"
-                                disabled={!customer || portalCredentialBusyCustomerId === customer.id || isEditing}
+                                disabled={!customer || !customer.portalCredential || portalCredentialBusyCustomerId === customer.id || isEditing}
                                 onClick={() => customer && onRevealPortalPassword()}
                             >
                                 {customer && portalCredentialBusyCustomerId === customer.id ? "..." : "Reveal Password"}
@@ -321,7 +335,9 @@ export function CustomerProfileDialog({
                                 disabled={!customer || portalCredentialBusyCustomerId === customer.id || isEditing}
                                 onClick={() => customer && onRegeneratePortalPassword()}
                             >
-                                {customer && portalCredentialBusyCustomerId === customer.id ? "..." : "Regenerate"}
+                                {customer && portalCredentialBusyCustomerId === customer.id 
+                                    ? "..." 
+                                    : (customer?.portalCredential ? "Regenerate" : "Generate Password")}
                             </button>
                         </div>
                     </div>

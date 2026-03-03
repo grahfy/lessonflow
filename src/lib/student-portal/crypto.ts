@@ -26,7 +26,7 @@ function getActiveEncryptionKey(): Buffer {
   }
 
   if (process.env.NODE_ENV === "production") {
-    throw new Error("STUDENT_PORTAL_PASSWORD_ENCRYPTION_KEY is required in production.");
+    throw new Error("Missing STUDENT_PORTAL_PASSWORD_ENCRYPTION_KEY. Please contact the administrator.");
   }
 
   const fallback = process.env.ADMIN_SESSION_SECRET || "dev-student-portal-encryption-key";

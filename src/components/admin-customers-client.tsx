@@ -466,24 +466,20 @@ export function AdminCustomersClient() {
         return;
       }
 
-      const body = (await response.json()) as { password: string };
+      const body = (await response.json()) as { password: string; credential: CustomerRow["portalCredential"] };
       setRevealedPortalPasswords((prev: Record<string, string>) => ({ ...prev, [customerId]: body.password }));
 
       if (action === "regenerate") {
         setNotice("Portal password regenerated.");
       }
 
-      // Refresh data
-      await loadCustomers();
+      // Locally update the customers list and selected customer to reflect metadata changes (e.g. rotatedAt)
+      const updateRow = (c: CustomerRow) => c.id === customerId ? { ...c, portalCredential: body.credential } : c;
+      
+      setCustomers(prev => prev.map(updateRow));
+      
       if (selectedCustomer?.id === customerId) {
-        const refreshed = await safeFetch(`/api/admin/customers/${customerId}`);
-        if (refreshed.ok) {
-          const data = await refreshed.json();
-          if (data.customer) {
-            setSelectedCustomer(data.customer);
-            setCustomerForm(customerFormFromRow(data.customer));
-          }
-        }
+        setSelectedCustomer(prev => prev ? { ...prev, portalCredential: body.credential } : null);
       }
     } catch {
       setError("Network error. Please try again.");
