@@ -98,7 +98,7 @@ After running, access the site at `http://localhost:3000`:
 
 Default admin credentials:
 - Email: `admin@example.com`
-- Password: `Password123!`
+- Password: `admin123`
 
 ## Manual Setup (Step by Step)
 
