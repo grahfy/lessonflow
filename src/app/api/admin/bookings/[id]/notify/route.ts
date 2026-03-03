@@ -47,11 +47,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       await sendCustomerReminderEmail({
         email: booking.email,
         name: booking.name,
-        when: booking.startAt
-      });
-
-      await prisma.bookingAuditLog.create({
-        data: {
+        when: booking.startAt,
+        audit: {
           bookingId: booking.id,
           actorId: admin.id,
           action: "reminder_sent"
@@ -71,11 +68,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       email: booking.email,
       name: booking.name,
       subject: parsed.data.subject,
-      message: parsed.data.message
-    });
-
-    await prisma.bookingAuditLog.create({
-      data: {
+      message: parsed.data.message,
+      audit: {
         bookingId: booking.id,
         actorId: admin.id,
         action: "custom_email_sent"

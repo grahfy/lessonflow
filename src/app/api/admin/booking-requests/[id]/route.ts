@@ -279,6 +279,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       });
 
       // Send customer email after transaction commit to avoid sending approvals that failed to persist.
+      // Audit log entry is recorded by the event wrapper.
       await sendCustomerBookingStatusEmail({
         email: approvalResult.updated.email,
         name: approvalResult.updated.name,
@@ -289,7 +290,15 @@ export async function PATCH(request: NextRequest, { params }: Params) {
               loginUrl: getStudentPortalLoginUrl(),
               generatedPassword: approvalResult.generatedPassword
             }
-          : null
+          : null,
+        audit: {
+          // Approvals create bookings; link audit to the first/primary booking created.
+          // For recurring approvals, several are created but one audit log entry covers the event.
+          // Traceability back to the request ID is preserved via details.
+          actorId: admin.id,
+          action: "approved",
+          details: `requestId=${id}`
+        }
       });
 
       return NextResponse.json({ ok: true });
@@ -312,7 +321,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         email: updated.email,
         name: updated.name,
         status: "cancelled",
-        when: updated.requestedStartAt
+        when: updated.requestedStartAt,
+        audit: {
+          actorId: admin.id,
+          action: "rejected",
+          details: `requestId=${id}`
+        }
       });
 
       return NextResponse.json({ ok: true });
@@ -335,7 +349,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         email: updated.email,
         name: updated.name,
         status: "cancelled",
-        when: updated.requestedStartAt
+        when: updated.requestedStartAt,
+        audit: {
+          actorId: admin.id,
+          action: "cancelled",
+          details: `requestId=${id}`
+        }
       });
 
       return NextResponse.json({ ok: true });

@@ -76,20 +76,18 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         }
       });
 
-      await prisma.bookingAuditLog.create({
-        data: {
-          bookingId: id,
-          actorId: admin.id,
-          action: "cancelled"
-        }
-      });
-
       // Reuse the customer-facing booking status template for cancellation notices.
+      // Audit log entry is handled by the event wrapper.
       await sendCustomerBookingStatusEmail({
         email: booking.email,
         name: booking.name,
         status: "cancelled",
-        when: booking.startAt
+        when: booking.startAt,
+        audit: {
+          bookingId: id,
+          actorId: admin.id,
+          action: "cancelled"
+        }
       });
 
       return NextResponse.json({ ok: true });
@@ -111,21 +109,19 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         }
       });
 
-      await prisma.bookingAuditLog.create({
-        data: {
+      // Send after the DB write succeeds so the customer email reflects persisted booking times.
+      // Audit log entry is handled by the event wrapper.
+      await sendCustomerBookingMovedEmail({
+        email: existing.email,
+        name: existing.name,
+        oldWhen,
+        newWhen: newStart,
+        audit: {
           bookingId: id,
           actorId: admin.id,
           action: "moved",
           details: `Moved to ${newStart.toISOString()}`
         }
-      });
-
-      // Send after the DB write succeeds so the customer email reflects persisted booking times.
-      await sendCustomerBookingMovedEmail({
-        email: existing.email,
-        name: existing.name,
-        oldWhen,
-        newWhen: newStart
       });
 
       return NextResponse.json({ ok: true });
