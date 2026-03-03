@@ -157,6 +157,6 @@ describe("booking-notifications", () => {
       where: { toEmail: "move@example.com" }
     });
     expect(outboundEmails.length).toBeGreaterThan(0);
-    expect(outboundEmails[0].subject.toLowerCase()).toContain("rescheduled");
+    expect(outboundEmails[0].subject.toLowerCase()).toContain("updated");
   });
 });
