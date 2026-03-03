@@ -5,7 +5,7 @@ This plan outlines the steps to audit, verify, and consolidate booking-related n
 ## Phase 1: Research & Audit
 Identify and document all existing notification triggers and their current implementations.
 
-- [ ] Task: Audit `src/lib/booking-events.ts` and document all public functions and their parameters.
+- [~] Task: Audit `src/lib/booking-events.ts` and document all public functions and their parameters.
 - [ ] Task: Trace calls to `booking-events.ts` from API routes to identify all notification triggers.
 - [ ] Task: Document the current state of error handling and audit logging for each trigger.
 - [ ] Task: Conductor - User Manual Verification 'Research & Audit' (Protocol in workflow.md)
