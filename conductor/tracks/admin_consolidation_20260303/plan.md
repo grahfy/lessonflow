@@ -35,3 +35,4 @@
 - [x] Task: Fix infinite re-render loops and UI state bugs [90066c5]
 - [x] Task: Resolve UI regressions in Bookings, Invoices, and Customers [4b0ba0e]
 - [x] Task: Restore manual booking logic and fix final UI bugs [29051bc]
+- [x] Task: Resolve functional bugs in dialogs and refine list UIs [b50209e]
