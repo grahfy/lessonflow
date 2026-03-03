@@ -10,7 +10,7 @@ Identify and document all existing notification triggers and their current imple
 - [x] Task: Document the current state of error handling and audit logging for each trigger. [6f8c4e8]
 - [x] Task: Conductor - User Manual Verification 'Research & Audit' (Protocol in workflow.md) [9ce7093]
 
-## Phase 2: Baseline Testing
+## Phase 2: Baseline Testing [checkpoint: faeca3c]
 Create integration tests to verify the current behavior of all identified notification flows.
 
 - [x] Task: Write failing tests for booking request submission owner notifications. [017c922]
@@ -19,7 +19,7 @@ Create integration tests to verify the current behavior of all identified notifi
 - [x] Task: Implement/verify status change notification tests. [c7c91fa]
 - [x] Task: Write failing tests for customer notifications on booking moves. [d42fde5]
 - [x] Task: Implement/verify booking move notification tests. [6b480cc]
-- [ ] Task: Conductor - User Manual Verification 'Baseline Testing' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Baseline Testing' (Protocol in workflow.md) [faeca3c]
 
 ## Phase 3: Consolidation & Refinement
 Address inconsistencies and improve error handling or logging based on audit findings.
