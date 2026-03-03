@@ -1,6 +1,6 @@
 import { RefObject } from "react";
 import { formatDateTime } from "@/lib/admin/utils";
-import { type LearningMaterialBooking, type LearningMaterialRow } from "@/lib/admin/types";
+import { type LearningMaterialBooking, type LearningMaterialRow, LEARNING_MATERIAL_ACCEPT } from "@/lib/admin/types";
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 
@@ -32,32 +32,49 @@ export function CustomerMaterialsDialog({
     onBookingSelect
 }: Props) {
     return (
-        <div className="dialog-layout">
+        <div className="dialog-layout" style={{ minHeight: '550px' }}>
             <div className="dialog-col">
                 <h3 className="manual-section-title">Materials List</h3>
                 <AdminCard ghost style={{ border: '1px solid var(--line)', padding: '12px', maxHeight: '500px', overflowY: 'auto' }}>
                     {materialsLoading ? (
                         <p className="helper-text">Loading materials...</p>
                     ) : materialsList.length > 0 ? (
-                        <div style={{ display: 'grid', gap: '8px' }}>
+                        <div style={{ display: 'grid', gap: '12px' }}>
                             {materialsList.map((m) => (
-                                <div key={m.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid var(--line)', gap: '12px' }}>
-                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                                        <strong style={{ fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</strong>
-                                        <span style={{ fontSize: '0.75rem', color: 'var(--ink-2)' }}>{m.mimeType} · {formatDateTime(m.createdAt)}</span>
+                                <div key={m.id} style={{ display: 'flex', flexDirection: 'column', padding: '12px', borderBottom: '1px solid var(--line)', gap: '8px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                            <strong style={{ fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</strong>
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--ink-2)' }}>{m.mimeType} · {(m.sizeBytes / 1024 / 1024).toFixed(2)} MB · {formatDateTime(m.createdAt)}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                            <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '0.7rem' }} onClick={() => window.open(`/api/admin/learning-materials/${m.id}`, '_blank')}>VIEW</button>
+                                            <button
+                                                className="btn btn-danger"
+                                                style={{ padding: '4px 8px', fontSize: '0.7rem' }}
+                                                disabled={materialsDeletingId === m.id}
+                                                onClick={() => void onDelete(m.id)}
+                                            >
+                                                {materialsDeletingId === m.id ? '...' : 'DEL'}
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--ink-1)', whiteSpace: 'nowrap' }}>{(m.sizeBytes / 1024 / 1024).toFixed(2)} MB</div>
-                                    <div style={{ display: 'flex', gap: '4px' }}>
-                                        <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '0.7rem' }} onClick={() => window.open(`/api/admin/learning-materials/${m.id}`, '_blank')}>VIEW</button>
-                                        <button
-                                            className="btn btn-danger"
-                                            style={{ padding: '4px 8px', fontSize: '0.7rem' }}
-                                            disabled={materialsDeletingId === m.id}
-                                            onClick={() => void onDelete(m.id)}
-                                        >
-                                            {materialsDeletingId === m.id ? '...' : 'DEL'}
-                                        </button>
-                                    </div>
+                                    
+                                    {m.mimeType.startsWith('audio/') && (
+                                        <audio 
+                                            controls 
+                                            src={`/api/admin/learning-materials/${m.id}`} 
+                                            style={{ width: '100%', height: '32px', marginTop: '4px' }}
+                                        />
+                                    )}
+                                    
+                                    {m.mimeType.startsWith('image/') && (
+                                        <img 
+                                            src={`/api/admin/learning-materials/${m.id}`} 
+                                            alt={m.title}
+                                            style={{ maxWidth: '100%', maxHeight: '120px', objectFit: 'contain', borderRadius: '4px', marginTop: '4px', border: '1px solid var(--line)' }}
+                                        />
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -89,7 +106,7 @@ export function CustomerMaterialsDialog({
                         </AdminField>
                         <form ref={materialsUploadFormRef}>
                             <AdminField label="Select file">
-                                <input type="file" name="file" style={{ width: '100%', padding: '8px 0', fontSize: '0.85rem' }} />
+                                <input type="file" name="file" accept={LEARNING_MATERIAL_ACCEPT + ",image/*"} style={{ width: '100%', padding: '8px 0', fontSize: '0.85rem' }} />
                             </AdminField>
                         </form>
                         <button
@@ -97,7 +114,7 @@ export function CustomerMaterialsDialog({
                             type="button"
                             disabled={materialsUploading}
                             onClick={() => void onUpload()}
-                            style={{ marginTop: '8px' }}
+                            style={{ marginTop: '8px', width: '100%' }}
                         >
                             {materialsUploading ? 'Uploading...' : 'Upload Material'}
                         </button>

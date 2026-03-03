@@ -64,7 +64,7 @@ export function AdminInvoicesClient() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createSelectedCustomerId, setCreateSelectedCustomerId] = useState("");
   const [createInvoiceBasis, setCreateInvoiceBasis] = useState<CreateInvoiceBasis>("lesson_based");
-  const [createLessonPrice, setCreateLessonPrice] = useState("0.00");
+  const [createLessonPrice, setCreateLessonPrice] = useState("60.00");
   const [createStandalonePrice, setCreateStandalonePrice] = useState("0.00");
   const [createDueAt, setCreateDueAt] = useState("");
   const [createTaxMode, setCreateTaxMode] = useState<InvoiceTaxMode>("taxable");
@@ -81,7 +81,8 @@ export function AdminInvoicesClient() {
     save: saveInvoiceApi, 
     performAction: performActionApi, 
     create: createInvoiceApi,
-    sendBulkReminders: sendBulkRemindersApi 
+    sendBulkReminders: sendBulkRemindersApi,
+    remove: removeInvoiceApi
   } = useInvoices({
     pageSize,
     onError: setError,
@@ -244,7 +245,7 @@ export function AdminInvoicesClient() {
 
   const header = (
     <>
-      <div style={{ width: '120px', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Number</div>
+      <div style={{ width: '140px', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Number</div>
       <Separator />
       <div style={{ flex: '1', minWidth: '150px', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Customer</div>
       <Separator />
@@ -274,17 +275,19 @@ export function AdminInvoicesClient() {
             </button>
           </div>
 
-          <div className="search-box" style={{ gap: '12px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', cursor: 'pointer', whiteSpace: 'nowrap', textTransform: 'none', letterSpacing: 'normal' }}>
-              <input type="checkbox" checked={outstandingOnly} onChange={(e) => { setOutstandingOnly(e.target.checked); setPage(1); }} style={{ width: 'auto', margin: 0 }} />
-              Outstanding only
-            </label>
-            <input
-              type="text"
-              value={query}
-              placeholder="Search by number or customer..."
-              onChange={(e) => { setQuery(e.target.value); setPage(1); }}
-            />
+          <div className="search-box">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                <input type="checkbox" checked={outstandingOnly} onChange={(e) => { setOutstandingOnly(e.target.checked); setPage(1); }} style={{ width: 'auto', margin: 0 }} />
+                Outstanding only
+              </label>
+              <input
+                type="text"
+                value={query}
+                placeholder="Search by number or customer..."
+                onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+              />
+            </div>
           </div>
         </div>
 
@@ -319,10 +322,10 @@ export function AdminInvoicesClient() {
               }}
               onClick={() => openDetail(inv)}
             >
-              <div style={{ width: '120px', fontWeight: 600 }}>{inv.invoiceNumber}</div>
+              <div style={{ width: '140px', fontWeight: 600 }}>{inv.invoiceNumber}</div>
               <Separator />
               <div style={{ flex: '1', minWidth: '150px' }}>
-                <div style={{ fontWeight: 500 }}>{inv.customerName}</div>
+                <div style={{ fontWeight: 500 }}>{inv.customerLastName ? `${inv.customerLastName}, ${inv.customerFirstName}` : inv.customerName}</div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--ink-1)' }}>{inv.customerEmail}</div>
               </div>
               <Separator />
@@ -362,14 +365,17 @@ export function AdminInvoicesClient() {
                   className="btn btn-danger"
                   style={{ padding: '6px 10px', fontSize: '0.7rem', minWidth: '0', flex: '1' }}
                   type="button"
+                  disabled={busyAction === `delete-${inv.id}`}
                   onClick={async () => {
                     if (window.confirm("Delete this invoice permanently?")) {
-                      await performActionApi(inv.id, "delete");
+                      setBusyAction(`delete-${inv.id}`);
+                      await removeInvoiceApi(inv.id);
+                      setBusyAction(null);
                       void loadInvoices(query, page, outstandingOnly);
                     }
                   }}
                 >
-                  Del
+                  {busyAction === `delete-${inv.id}` ? "..." : "Del"}
                 </button>
               </div>
             </div>
@@ -397,11 +403,18 @@ export function AdminInvoicesClient() {
                 </button>
               )}
             </div>
-            {selectedInvoice?.status === 'draft' && (
-              <button className="btn btn-primary" disabled={!!busyAction} onClick={() => void performAction('send')}>
-                {busyAction === 'send' ? 'SENDING...' : 'SEND TO CUSTOMER'}
-              </button>
-            )}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {selectedInvoice?.status === 'draft' && (
+                <button className="btn btn-primary" disabled={!!busyAction} onClick={() => void performAction('send')}>
+                  {busyAction === 'send' ? 'SENDING...' : 'SEND TO CUSTOMER'}
+                </button>
+              )}
+              {selectedInvoice?.status !== 'draft' && selectedInvoice?.status !== 'void' && (
+                <button className="btn btn-secondary" disabled={!!busyAction} onClick={() => void performAction('send')}>
+                  {busyAction === 'send' ? 'RESENDING...' : 'RESEND NOTIFICATION'}
+                </button>
+              )}
+            </div>
           </div>
         }
       >
@@ -412,10 +425,13 @@ export function AdminInvoicesClient() {
                 <h3 className="manual-section-title">Invoice Details</h3>
                 <AdminCard ghost style={{ marginBottom: '16px' }}>
                   <AdminForm className="dialog-form-grid">
-                    <AdminField label="Customer">
-                      <input value={selectedInvoice.customerName} readOnly />
+                    <AdminField label="First Name">
+                      <input value={selectedInvoice.customerFirstName || selectedInvoice.customerName.split(' ')[0]} readOnly />
                     </AdminField>
-                    <AdminField label="Email">
+                    <AdminField label="Last Name">
+                      <input value={selectedInvoice.customerLastName || selectedInvoice.customerName.split(' ').slice(1).join(' ')} readOnly />
+                    </AdminField>
+                    <AdminField label="Email" fullWidth>
                       <input value={selectedInvoice.customerEmail} readOnly />
                     </AdminField>
                     <AdminField label="Due Date">
@@ -492,6 +508,7 @@ export function AdminInvoicesClient() {
         isOpen={createOpen}
         onClose={() => setCreateOpen(false)}
         title="Create New Invoice"
+        wide
         footer={
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
             <button className="btn btn-secondary" onClick={() => setCreateOpen(false)}>CANCEL</button>
@@ -501,38 +518,55 @@ export function AdminInvoicesClient() {
           </div>
         }
       >
-        <AdminForm className="dialog-form-grid">
-          <AdminField label="Select Customer" fullWidth required>
-            <select value={createSelectedCustomerId} onChange={(e) => setCreateSelectedCustomerId(e.target.value)} style={{ width: '100%' }}>
-              <option value="">-- Choose student --</option>
-              {customerOptions.map(c => <option key={c.id} value={c.id}>{c.lastName ? `${c.lastName}, ${c.firstName}` : c.fullName}</option>)}
-            </select>
-          </AdminField>
-          <AdminField label="Invoice Basis">
-            <select value={createInvoiceBasis} onChange={(e) => setCreateInvoiceBasis(e.target.value as CreateInvoiceBasis)}>
-              <option value="lesson_based">Lessons (Calculated from bookings)</option>
-              <option value="standalone">Standalone (Manual line items)</option>
-            </select>
-          </AdminField>
-          <AdminField label="Tax Mode">
-            <select value={createTaxMode} onChange={(e) => setCreateTaxMode(e.target.value as InvoiceTaxMode)}>
-              <option value="taxable">Taxable (standard)</option>
-              <option value="gst_free">GST Free</option>
-            </select>
-          </AdminField>
-          {createInvoiceBasis === 'lesson_based' ? (
-            <AdminField label="Lesson Rate (AUD)">
-              <input value={createLessonPrice} onChange={(e) => setCreateLessonPrice(e.target.value)} />
-            </AdminField>
-          ) : (
-            <AdminField label="Initial Item Price (AUD)">
-              <input value={createStandalonePrice} onChange={(e) => setCreateStandalonePrice(e.target.value)} />
-            </AdminField>
-          )}
-          <AdminField label="Due Date (Optional)">
-            <input type="datetime-local" value={createDueAt} onChange={(e) => setCreateDueAt(e.target.value)} />
-          </AdminField>
-        </AdminForm>
+        <div className="dialog-layout">
+          <div className="dialog-col">
+            <h3 className="manual-section-title">Recipient & Basis</h3>
+            <AdminCard ghost style={{ marginBottom: '16px' }}>
+              <AdminForm className="dialog-form-grid">
+                <AdminField label="Select Customer" fullWidth required>
+                  <select value={createSelectedCustomerId} onChange={(e) => setCreateSelectedCustomerId(e.target.value)} style={{ width: '100%' }}>
+                    <option value="">-- Choose student --</option>
+                    {customerOptions.map(c => <option key={c.id} value={c.id}>{c.lastName ? `${c.lastName}, ${c.firstName}` : c.fullName}</option>)}
+                  </select>
+                </AdminField>
+                <AdminField label="Invoice Basis">
+                  <select value={createInvoiceBasis} onChange={(e) => setCreateInvoiceBasis(e.target.value as CreateInvoiceBasis)}>
+                    <option value="lesson_based">Lessons (Calculated from bookings)</option>
+                    <option value="standalone">Standalone (Manual line items)</option>
+                  </select>
+                </AdminField>
+                <AdminField label="Tax Mode">
+                  <select value={createTaxMode} onChange={(e) => setCreateTaxMode(e.target.value as InvoiceTaxMode)}>
+                    <option value="taxable">Taxable (standard)</option>
+                    <option value="gst_free">GST Free</option>
+                  </select>
+                </AdminField>
+                {createInvoiceBasis === 'lesson_based' ? (
+                  <AdminField label="Lesson Rate (AUD)">
+                    <input value={createLessonPrice} onChange={(e) => setCreateLessonPrice(e.target.value)} />
+                  </AdminField>
+                ) : (
+                  <AdminField label="Initial Item Price (AUD)">
+                    <input value={createStandalonePrice} onChange={(e) => setCreateStandalonePrice(e.target.value)} />
+                  </AdminField>
+                )}
+                <AdminField label="Due Date (Optional)">
+                  <input type="datetime-local" value={createDueAt} onChange={(e) => setCreateDueAt(e.target.value)} />
+                </AdminField>
+              </AdminForm>
+            </AdminCard>
+          </div>
+          <div className="dialog-col is-notes">
+            <h3 className="manual-section-title">Help</h3>
+            <AdminCard ghost>
+              <p className="helper-text">
+                {createInvoiceBasis === 'lesson_based' 
+                  ? "This will automatically pull all approved bookings for the selected customer that haven't been invoiced yet."
+                  : "This will create a blank invoice with one line item at the specified price. You can add more items after creation."}
+              </p>
+            </AdminCard>
+          </div>
+        </div>
       </AdminDialog>
     </AdminShell>
   );

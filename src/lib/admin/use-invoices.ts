@@ -52,6 +52,7 @@ export interface UseInvoicesResult {
     performAction: (id: string, action: string) => Promise<InvoiceRow | null>;
     create: (payload: any) => Promise<InvoiceRow | null>;
     sendBulkReminders: () => Promise<number | null>;
+    remove: (id: string) => Promise<boolean>;
 }
 
 /**
@@ -89,7 +90,7 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
         } finally {
             setLoading(false);
         }
-    }, [pageSize, safeFetch, handleApiError]);
+    }, [pageSize, safeFetch, handleApiError, onError]);
 
     const save = useCallback(async (id: string, payload: Partial<InvoiceRow>): Promise<InvoiceRow | null> => {
         try {
@@ -111,11 +112,22 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
     }, [safeFetch, handleApiError]);
 
     const performAction = useCallback(async (id: string, action: string): Promise<InvoiceRow | null> => {
+        let endpoint = `/api/admin/invoices/${id}`;
+        let method = "POST";
+
+        if (action === "send") endpoint = `/api/admin/invoices/${id}/send`;
+        else if (action === "remind") endpoint = `/api/admin/invoices/${id}/remind`;
+        else if (action === "mark_paid") {
+            method = "PATCH";
+            endpoint = `/api/admin/invoices/${id}`;
+            // For mark_paid via PATCH we'd need more logic, but the API has specific sub-routes
+        }
+
         try {
-            const response = await safeFetch(`/api/admin/invoices/${id}/actions`, {
-                method: "POST",
+            const response = await safeFetch(endpoint, {
+                method,
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action })
+                body: method === "POST" ? JSON.stringify({ action }) : undefined
             });
 
             if (!response.ok) {
@@ -123,7 +135,9 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
                 return null;
             }
 
-            return await response.json() as InvoiceRow;
+            // Most actions return the updated invoice
+            const data = await response.json();
+            return (data.invoice || data) as InvoiceRow;
         } catch {
             return null;
         }
@@ -142,7 +156,8 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
                 return null;
             }
 
-            return await response.json() as InvoiceRow;
+            const data = await response.json();
+            return data.invoice as InvoiceRow;
         } catch {
             return null;
         }
@@ -150,7 +165,11 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
 
     const sendBulkReminders = useCallback(async (): Promise<number | null> => {
         try {
-            const response = await safeFetch("/api/admin/invoices/bulk-reminders", { method: "POST" });
+            const response = await safeFetch("/api/admin/invoices/reminders", { 
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({}) // Schema needs an object
+            });
             if (!response.ok) {
                 await handleApiError(response, "Unable to send bulk reminders.");
                 return null;
@@ -159,6 +178,23 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
             return data.count;
         } catch {
             return null;
+        }
+    }, [safeFetch, handleApiError]);
+
+    const remove = useCallback(async (id: string): Promise<boolean> => {
+        try {
+            const response = await safeFetch(`/api/admin/invoices/${id}`, {
+                method: "DELETE"
+            });
+
+            if (!response.ok) {
+                await handleApiError(response, "Unable to delete invoice.");
+                return false;
+            }
+
+            return true;
+        } catch {
+            return false;
         }
     }, [safeFetch, handleApiError]);
 
@@ -171,6 +207,7 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
         save,
         performAction,
         create,
-        sendBulkReminders
+        sendBulkReminders,
+        remove
     };
 }

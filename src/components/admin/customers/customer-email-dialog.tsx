@@ -24,10 +24,10 @@ export function CustomerEmailDialog({
     onSendEmail
 }: Props) {
     return (
-        <div className="dialog-layout">
+        <div className="dialog-layout" style={{ minHeight: '550px' }}>
             <div className="dialog-col">
-                <h4>Email History</h4>
-                <AdminCard style={{ background: 'rgba(0,0,0,0.03)', padding: '12px', border: '1px solid var(--line)', maxHeight: '500px', overflowY: 'auto' }}>
+                <h3 className="manual-section-title">Email History</h3>
+                <AdminCard ghost style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid var(--line)', padding: '12px' }}>
                     {loadingEmailHistory ? (
                         <p className="helper-text">Loading history...</p>
                     ) : emailHistory.length > 0 ? (
@@ -39,10 +39,10 @@ export function CustomerEmailDialog({
                                         <span style={{ color: 'var(--ink-2)', fontSize: '0.75rem' }}>{formatDateTime(email.createdAt)}</span>
                                     </div>
                                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                        <span className={`invoice-item-chip invoice-item-chip-status invoice-item-chip-status-${email.status === 'sent' ? 'paid' : 'draft'}`} style={{ fontSize: '0.7rem', padding: '2px 8px' }}>
+                                        <span className={`status-badge status-${email.status.toLowerCase()}`} style={{ fontSize: '0.7rem', padding: '2px 8px' }}>
                                             {email.status}
                                         </span>
-                                        {email.error && <span style={{ color: 'var(--brand-danger)', fontSize: '0.75rem' }}>{email.error}</span>}
+                                        {email.error && <span style={{ color: 'var(--brand-danger)', fontSize: '0.75rem' }}>· {email.error}</span>}
                                     </div>
                                 </div>
                             ))}
@@ -54,20 +54,20 @@ export function CustomerEmailDialog({
             </div>
 
             <div className="dialog-col is-notes">
-                <h4>Send Email</h4>
-                <AdminCard style={{ background: 'rgba(0,0,0,0.03)', padding: '16px', border: '1px solid var(--line)' }}>
+                <h3 className="manual-section-title">Send Email</h3>
+                <AdminCard ghost style={{ border: '1px solid var(--line)', padding: '16px' }}>
                     <AdminForm>
                         <AdminField label="Subject" required fullWidth>
                             <input
-                                placeholder="Email subject"
+                                placeholder="Email subject..."
                                 value={emailComposerSubject}
                                 onChange={e => setEmailComposerSubject(e.target.value)}
                             />
                         </AdminField>
                         <AdminField label="Message" required fullWidth>
                             <textarea
-                                placeholder="Type your message to the student here..."
-                                style={{ minHeight: '160px', resize: 'vertical' }}
+                                placeholder="Type your message here..."
+                                style={{ minHeight: '180px', resize: 'vertical' }}
                                 value={emailComposerMessage}
                                 onChange={e => setEmailComposerMessage(e.target.value)}
                             />
@@ -77,6 +77,7 @@ export function CustomerEmailDialog({
                             type="button"
                             disabled={sendingEmail || !emailComposerSubject.trim() || !emailComposerMessage.trim()}
                             onClick={() => onSendEmail(emailComposerSubject, emailComposerMessage)}
+                            style={{ width: '100%', marginTop: '8px' }}
                         >
                             {sendingEmail ? "Sending..." : "Send Email"}
                         </button>

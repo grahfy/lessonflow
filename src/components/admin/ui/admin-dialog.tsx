@@ -35,6 +35,19 @@ export function AdminDialog({
       className="dialog-backdrop" 
       onClick={onClose}
       data-motion-root="admin"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0, 0, 0, 0.75)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: '20px'
+      }}
     >
       <div 
         ref={rootRef}
@@ -43,21 +56,46 @@ export function AdminDialog({
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        style={{
+          background: 'var(--brand-dark)',
+          border: '1px solid var(--line)',
+          borderRadius: '16px',
+          width: '100%',
+          maxWidth: wide ? '1100px' : '600px',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+          position: 'relative',
+          padding: '24px'
+        }}
       >
-        <div className="dialog-head">
-          <h3>{title}</h3>
+        <div className="dialog-head" style={{ marginBottom: '16px', flexShrink: 0 }}>
+          <h3 style={{ margin: 0 }}>{title}</h3>
           <button className="btn btn-secondary" type="button" onClick={onClose}>
             Close
           </button>
         </div>
         
-        {description && <div className="dialog-status helper-text">{description}</div>}
+        {description && <div className="dialog-status helper-text" style={{ marginBottom: '16px', flexShrink: 0 }}>{description}</div>}
 
-        <div style={{ marginTop: '16px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
           {children}
         </div>
 
-        {footer && <div className="dialog-actions">{footer}</div>}
+        {footer && (
+          <div 
+            className="dialog-actions" 
+            style={{ 
+              marginTop: '24px', 
+              paddingTop: '16px', 
+              borderTop: '1px solid var(--line)',
+              flexShrink: 0 
+            }}
+          >
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );

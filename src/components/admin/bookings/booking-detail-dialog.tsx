@@ -111,12 +111,12 @@ export function BookingDetailDialog({
       }
     >
       <div className="dialog-tabs" style={{ marginBottom: '16px' }}>
-        <button className={`btn ${activeTab === 'appointment' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('appointment')} style={{ borderRadius: '8px 0 0 8px' }}>Appointment</button>
-        <button className={`btn ${activeTab === 'emails' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('emails')} style={{ borderRadius: '0 8px 8px 0' }}>Communication</button>
+        <button className={`btn ${activeTab === 'appointment' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('appointment')} style={{ borderRadius: '8px 0 0 8px', minWidth: '140px' }}>Appointment</button>
+        <button className={`btn ${activeTab === 'emails' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('emails')} style={{ borderRadius: '0 8px 8px 0', minWidth: '140px' }}>Communication</button>
       </div>
 
       <div className="booking-dialog-scroll">
-        <div className="dialog-layout">
+        <div className="dialog-layout" style={{ minHeight: '550px' }}>
           {activeTab === 'appointment' ? (
             <>
               <div className="dialog-col">
@@ -240,47 +240,52 @@ export function BookingDetailDialog({
               </div>
             </>
           ) : (
-            <div className="dialog-col full">
-              <h3 className="manual-section-title">Email History</h3>
-              <AdminCard ghost style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid var(--line)', padding: '12px', marginBottom: '20px' }}>
-                {loadingEmailHistory ? (
-                  <p className="helper-text">Loading history...</p>
-                ) : (
-                  <div className="email-history-list">
-                    {emailHistory.length === 0 ? (
-                      <p className="helper-text">No emails recorded.</p>
-                    ) : (
-                      emailHistory.map(email => (
-                        <div key={email.id} className="email-history-item" style={{ borderBottom: '1px solid var(--line)', paddingBottom: '8px', marginBottom: '8px' }}>
-                          <div className="email-history-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <strong>{email.subject}</strong>
-                            <span className={`status-badge status-${email.status.toLowerCase()}`}>{email.status}</span>
+            <>
+              <div className="dialog-col">
+                <h3 className="manual-section-title">Email History</h3>
+                <AdminCard ghost style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid var(--line)', padding: '12px' }}>
+                  {loadingEmailHistory ? (
+                    <p className="helper-text">Loading history...</p>
+                  ) : (
+                    <div className="email-history-list">
+                      {emailHistory.length === 0 ? (
+                        <p className="helper-text">No emails recorded.</p>
+                      ) : (
+                        emailHistory.map(email => (
+                          <div key={email.id} className="email-history-item" style={{ borderBottom: '1px solid var(--line)', paddingBottom: '12px', marginBottom: '12px' }}>
+                            <div className="email-history-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                              <strong style={{ color: 'var(--ink-0)' }}>{email.subject}</strong>
+                              <span className={`status-badge status-${email.status.toLowerCase()}`}>{email.status}</span>
+                            </div>
+                            <div className="email-history-meta" style={{ fontSize: '0.75rem', color: 'var(--ink-2)' }}>
+                              {formatDateTime(email.createdAt)}
+                              {email.error && <span style={{ color: 'var(--brand-danger)', marginLeft: '8px' }}>· {email.error}</span>}
+                            </div>
                           </div>
-                          <div className="email-history-meta" style={{ fontSize: '0.75rem', color: 'var(--ink-2)' }}>
-                            {formatDateTime(email.createdAt)}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-              </AdminCard>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </AdminCard>
+              </div>
 
-              <h3 className="manual-section-title">Send Custom Email</h3>
-              <AdminCard ghost>
-                <AdminForm>
-                  <AdminField label="Subject">
-                    <input value={emailSubject} onChange={e => setEmailSubject(e.target.value)} />
-                  </AdminField>
-                  <AdminField label="Message">
-                    <textarea className="dialog-notes" value={emailMessage} onChange={e => setEmailMessage(e.target.value)} style={{ minHeight: '120px' }} />
-                  </AdminField>
-                  <button className="btn btn-primary" disabled={sendingEmail || !emailSubject || !emailMessage} onClick={onSendEmail}>
-                    {sendingEmail ? 'Sending...' : 'Send Email'}
-                  </button>
-                </AdminForm>
-              </AdminCard>
-            </div>
+              <div className="dialog-col is-notes">
+                <h3 className="manual-section-title">Send Custom Email</h3>
+                <AdminCard ghost>
+                  <AdminForm>
+                    <AdminField label="Subject" required fullWidth>
+                      <input placeholder="Email subject..." value={emailSubject} onChange={e => setEmailSubject(e.target.value)} />
+                    </AdminField>
+                    <AdminField label="Message" required fullWidth>
+                      <textarea className="dialog-notes" placeholder="Type message here..." value={emailMessage} onChange={e => setEmailMessage(e.target.value)} style={{ minHeight: '180px' }} />
+                    </AdminField>
+                    <button className="btn btn-primary" disabled={sendingEmail || !emailSubject.trim() || !emailMessage.trim()} onClick={onSendEmail} style={{ width: '100%', marginTop: '8px' }}>
+                      {sendingEmail ? 'Sending...' : 'Send Email'}
+                    </button>
+                  </AdminForm>
+                </AdminCard>
+              </div>
+            </>
           )}
         </div>
       </div>
