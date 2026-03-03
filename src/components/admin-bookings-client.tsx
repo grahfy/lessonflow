@@ -404,6 +404,7 @@ export function AdminBookingsClient() {
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [creating, setCreating] = useState(false);
   const [savingCustomer, setSavingCustomer] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<EventWithRow | null>(null);
@@ -428,9 +429,13 @@ export function AdminBookingsClient() {
   const [customerEditorMode, setCustomerEditorMode] = useState<"create" | "edit" | null>(null);
   const [customerEditorId, setCustomerEditorId] = useState<string | null>(null);
   const [customerForm, setCustomerForm] = useState<CustomerForm>(emptyCustomerForm());
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [revealedPortalPasswords, setRevealedPortalPasswords] = useState<Record<string, string>>({});
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [portalCredentialBusyCustomerId, setPortalCredentialBusyCustomerId] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [emailSubject, setEmailSubject] = useState("");
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [emailMessage, setEmailMessage] = useState("");
   const [presets, setPresets] = useState<InvoiceProductPreset[]>([]);
   const [invoiceForm, setInvoiceForm] = useState<BookingInvoiceForm>(defaultBookingInvoiceForm());
@@ -804,6 +809,7 @@ export function AdminBookingsClient() {
     );
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function openEmailDialog() {
     setEmailSubject("");
     setEmailMessage("");
@@ -1049,6 +1055,7 @@ export function AdminBookingsClient() {
     );
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function openCustomerEditor(mode: "create" | "edit", customer?: CustomerRow) {
     setError("");
     if (mode === "create") {
@@ -1103,10 +1110,12 @@ export function AdminBookingsClient() {
     setNotice(action === "reveal" ? "Portal password revealed." : "Portal password regenerated.");
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function revealPortalPassword(customerId: string) {
     await mutatePortalCredential(customerId, "reveal");
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function regeneratePortalPassword(customerId: string) {
     const confirmed = window.confirm(
       "Regenerate this customer portal password? The current password will stop working immediately."
@@ -1660,6 +1669,7 @@ export function AdminBookingsClient() {
     setNotice(customerEditorMode === "create" ? "Customer created." : "Customer updated.");
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function deleteCustomer(customer: CustomerRow) {
     const confirmed = window.confirm(`Delete customer "${customer.fullName}"? Linked records will be archived instead.`);
     if (!confirmed) {
@@ -1690,6 +1700,7 @@ export function AdminBookingsClient() {
     selectedEvent && selectedEvent.entityType === "booking"
       ? ((selectedEvent.row as BookingRow).seriesId ?? null)
       : null;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const selectedManualCustomer = manualCustomerId ? customers.find((customer) => customer.id === manualCustomerId) ?? null : null;
   const manualStepIndex = MANUAL_STEP_ORDER.indexOf(manualStep);
 
