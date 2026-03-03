@@ -22,6 +22,13 @@ export interface AdminSettings {
     envVars: EnvVarField[];
 }
 
+export interface UseSettingsOptions {
+    /** Called on auth error */
+    onAuthError?: () => void;
+    /** Called on other errors */
+    onError?: (message: string) => void;
+}
+
 export interface UseSettingsResult {
     settings: AdminSettings | null;
     loading: boolean;
@@ -33,13 +40,14 @@ export interface UseSettingsResult {
 /**
  * Hook to manage admin system settings and environment variables.
  */
-export function useSettings(onError?: (msg: string) => void): UseSettingsResult {
+export function useSettings(options: UseSettingsOptions = {}): UseSettingsResult {
+    const { onAuthError, onError } = options;
     const [settings, setSettings] = useState<AdminSettings | null>(null);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
 
     const { safeFetch, handleApiError, redirectToAdminLogin } = useSafeFetch({
-        onAuthError: () => redirectToAdminLogin(),
+        onAuthError,
         onError
     });
 
@@ -54,11 +62,11 @@ export function useSettings(onError?: (msg: string) => void): UseSettingsResult 
             const data = await response.json();
             setSettings(data);
         } catch {
-            if (onError) onError("Network error loading settings.");
+            return;
         } finally {
             setLoading(false);
         }
-    }, [safeFetch, handleApiError, onError]);
+    }, [safeFetch, handleApiError]);
 
     const save = useCallback(async (payload: any) => {
         setSaving(true);
@@ -80,12 +88,11 @@ export function useSettings(onError?: (msg: string) => void): UseSettingsResult 
 
             return await response.json();
         } catch {
-            if (onError) onError("Network error saving settings.");
             return null;
         } finally {
             setSaving(false);
         }
-    }, [safeFetch, handleApiError, onError]);
+    }, [safeFetch, handleApiError]);
 
     return {
         settings,

@@ -89,7 +89,7 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
         } finally {
             setLoading(false);
         }
-    }, [pageSize, safeFetch, handleApiError, onError]);
+    }, [pageSize, safeFetch, handleApiError]);
 
     const save = useCallback(async (id: string, payload: Partial<InvoiceRow>): Promise<InvoiceRow | null> => {
         try {
@@ -106,10 +106,9 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
 
             return await response.json() as InvoiceRow;
         } catch {
-            if (onError) onError("Network error saving invoice.");
             return null;
         }
-    }, [safeFetch, handleApiError, onError]);
+    }, [safeFetch, handleApiError]);
 
     const performAction = useCallback(async (id: string, action: string): Promise<InvoiceRow | null> => {
         try {
@@ -126,10 +125,9 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
 
             return await response.json() as InvoiceRow;
         } catch {
-            if (onError) onError(`Network error during ${action}.`);
             return null;
         }
-    }, [safeFetch, handleApiError, onError]);
+    }, [safeFetch, handleApiError]);
 
     const create = useCallback(async (payload: any): Promise<InvoiceRow | null> => {
         try {
@@ -146,10 +144,9 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
 
             return await response.json() as InvoiceRow;
         } catch {
-            if (onError) onError("Network error creating invoice.");
             return null;
         }
-    }, [safeFetch, handleApiError, onError]);
+    }, [safeFetch, handleApiError]);
 
     const sendBulkReminders = useCallback(async (): Promise<number | null> => {
         try {
@@ -161,10 +158,9 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
             const data = await response.json() as { count: number };
             return data.count;
         } catch {
-            if (onError) onError("Network error sending bulk reminders.");
             return null;
         }
-    }, [safeFetch, handleApiError, onError]);
+    }, [safeFetch, handleApiError]);
 
     return {
         invoices,

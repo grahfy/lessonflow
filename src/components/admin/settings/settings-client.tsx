@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
@@ -29,7 +29,9 @@ export function AdminSettingsClient() {
   const [adminPassword, setAdminPassword] = useState("");
   const [confirmAdminPassword, setConfirmAdminPassword] = useState("");
 
-  const { settings, loading, saving, load: loadSettings, save: saveSettingsApi } = useSettings(setError);
+  const onAuthError = useCallback(() => window.location.assign("/admin/login"), []);
+
+  const { settings, loading, saving, load: loadSettings, save: saveSettingsApi } = useSettings({ onAuthError, onError: setError });
 
   useEffect(() => {
     void loadSettings();

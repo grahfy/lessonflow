@@ -70,12 +70,11 @@ export function useEmailHistory(options: UseEmailHistoryOptions = {}): UseEmailH
             void load(customerId);
             return true;
         } catch {
-            if (onError) onError("Network error sending email.");
             return false;
         } finally {
             setSending(false);
         }
-    }, [safeFetch, handleApiError, load, onError]);
+    }, [safeFetch, handleApiError, load]);
 
     return {
         history,

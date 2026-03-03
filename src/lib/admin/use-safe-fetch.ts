@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useEffect } from "react";
 import { readApiErrorFromResponse } from "./utils";
 
 export interface UseSafeFetchOptions {
@@ -17,6 +17,15 @@ export interface UseSafeFetchOptions {
 export function useSafeFetch(options: UseSafeFetchOptions = {}) {
   const { onAuthError, onError } = options;
   const redirectingRef = useRef(false);
+  
+  // Use refs for handlers to keep safeFetch and handleApiError stable
+  const onAuthErrorRef = useRef(onAuthError);
+  const onErrorRef = useRef(onError);
+
+  useEffect(() => {
+    onAuthErrorRef.current = onAuthError;
+    onErrorRef.current = onError;
+  }, [onAuthError, onError]);
 
   const safeFetch = useCallback(
     async (...args: Parameters<typeof globalThis.fetch>): Promise<Response> => {
@@ -35,12 +44,12 @@ export function useSafeFetch(options: UseSafeFetchOptions = {}) {
   const redirectToAdminLogin = useCallback(() => {
     if (redirectingRef.current) return;
     redirectingRef.current = true;
-    if (onAuthError) {
-      onAuthError();
+    if (onAuthErrorRef.current) {
+      onAuthErrorRef.current();
     } else {
       window.location.assign("/admin/login");
     }
-  }, [onAuthError]);
+  }, []);
 
   const handleApiError = useCallback(
     async (response: Response, fallback: string) => {
@@ -49,11 +58,11 @@ export function useSafeFetch(options: UseSafeFetchOptions = {}) {
         return;
       }
       const message = await readApiErrorFromResponse(response, fallback);
-      if (onError) {
-        onError(message);
+      if (onErrorRef.current) {
+        onErrorRef.current(message);
       }
     },
-    [redirectToAdminLogin, onError]
+    [redirectToAdminLogin]
   );
 
   return {

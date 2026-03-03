@@ -60,7 +60,7 @@ export function useBookings(options: UseBookingsOptions = {}): UseBookingsResult
         } finally {
             setLoading(false);
         }
-    }, [safeFetch, handleApiError, onError]);
+    }, [safeFetch, handleApiError]);
 
     const update = useCallback(async (id: string, payload: any): Promise<boolean> => {
         try {
@@ -77,10 +77,9 @@ export function useBookings(options: UseBookingsOptions = {}): UseBookingsResult
 
             return true;
         } catch {
-            if (onError) onError("Network error updating booking.");
             return false;
         }
-    }, [safeFetch, handleApiError, onError]);
+    }, [safeFetch, handleApiError]);
 
     const remove = useCallback(async (id: string): Promise<boolean> => {
         try {
@@ -91,10 +90,9 @@ export function useBookings(options: UseBookingsOptions = {}): UseBookingsResult
             }
             return true;
         } catch {
-            if (onError) onError("Network error deleting booking.");
             return false;
         }
-    }, [safeFetch, handleApiError, onError]);
+    }, [safeFetch, handleApiError]);
 
     const removeSeries = useCallback(async (seriesId: string): Promise<boolean> => {
         try {
@@ -105,10 +103,9 @@ export function useBookings(options: UseBookingsOptions = {}): UseBookingsResult
             }
             return true;
         } catch {
-            if (onError) onError("Network error removing series.");
             return false;
         }
-    }, [safeFetch, handleApiError, onError]);
+    }, [safeFetch, handleApiError]);
 
     const notify = useCallback(async (id: string, action: string, message?: string): Promise<boolean> => {
         try {
@@ -125,10 +122,9 @@ export function useBookings(options: UseBookingsOptions = {}): UseBookingsResult
 
             return true;
         } catch {
-            if (onError) onError("Network error sending notification.");
             return false;
         }
-    }, [safeFetch, handleApiError, onError]);
+    }, [safeFetch, handleApiError]);
 
     return {
         events,

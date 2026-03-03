@@ -44,12 +44,11 @@ export function usePortalCredentials(options: UsePortalCredentialsOptions = {}):
             setRevealedPasswords(prev => ({ ...prev, [customerId]: password }));
             return password;
         } catch {
-            if (onError) onError("Network error revealing password.");
             return null;
         } finally {
             setBusyCustomerId(null);
         }
-    }, [safeFetch, handleApiError, onError]);
+    }, [safeFetch, handleApiError]);
 
     const regenerate = useCallback(async (customerId: string): Promise<string | null> => {
         setBusyCustomerId(customerId);
@@ -68,12 +67,11 @@ export function usePortalCredentials(options: UsePortalCredentialsOptions = {}):
             setRevealedPasswords(prev => ({ ...prev, [customerId]: password }));
             return password;
         } catch {
-            if (onError) onError("Network error regenerating password.");
             return null;
         } finally {
             setBusyCustomerId(null);
         }
-    }, [safeFetch, handleApiError, onError]);
+    }, [safeFetch, handleApiError]);
 
     return {
         revealedPasswords,

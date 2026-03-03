@@ -51,7 +51,7 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
         } finally {
             setLoading(false);
         }
-    }, [safeFetch, handleApiError, onError]);
+    }, [safeFetch, handleApiError]);
 
     const upload = useCallback(async (customerId: string, bookingId: string, form: HTMLFormElement): Promise<boolean> => {
         const formData = new FormData(form);
@@ -74,12 +74,11 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
             void load(customerId);
             return true;
         } catch {
-            if (onError) onError("Network error during upload.");
             return false;
         } finally {
             setUploading(false);
         }
-    }, [handleApiError, load, onError]);
+    }, [handleApiError, load]);
 
     const remove = useCallback(async (materialId: string): Promise<boolean> => {
         setDeletingId(materialId);
@@ -96,12 +95,11 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
             setMaterials(prev => prev.filter(m => m.id !== materialId));
             return true;
         } catch {
-            if (onError) onError("Network error deleting material.");
             return false;
         } finally {
             setDeletingId(null);
         }
-    }, [safeFetch, handleApiError, onError]);
+    }, [safeFetch, handleApiError]);
 
     return {
         materials,

@@ -62,7 +62,7 @@ export function useCustomers(options: UseCustomersOptions = {}): UseCustomersRes
         } finally {
             setLoading(false);
         }
-    }, [pageSize, safeFetch, handleApiError, onError]);
+    }, [pageSize, safeFetch, handleApiError]);
 
     const save = useCallback(async (customer: Partial<CustomerRow>, id?: string): Promise<CustomerRow | null> => {
         const method = id ? "PATCH" : "POST";
@@ -83,10 +83,9 @@ export function useCustomers(options: UseCustomersOptions = {}): UseCustomersRes
             const data = await response.json();
             return data.customer as CustomerRow;
         } catch {
-            if (onError) onError("Network error saving customer.");
             return null;
         }
-    }, [safeFetch, handleApiError, onError]);
+    }, [safeFetch, handleApiError]);
 
     const remove = useCallback(async (id: string): Promise<{ archived: boolean } | null> => {
         try {
@@ -101,10 +100,9 @@ export function useCustomers(options: UseCustomersOptions = {}): UseCustomersRes
 
             return await response.json() as { archived: boolean };
         } catch {
-            if (onError) onError("Network error deleting customer.");
             return null;
         }
-    }, [safeFetch, handleApiError, onError]);
+    }, [safeFetch, handleApiError]);
 
     return {
         customers,

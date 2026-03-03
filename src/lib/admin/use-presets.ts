@@ -52,7 +52,7 @@ export function usePresets(options: UsePresetsOptions = {}): UsePresetsResult {
         } finally {
             setLoading(false);
         }
-    }, [safeFetch, handleApiError, onError]);
+    }, [safeFetch, handleApiError]);
 
     const save = useCallback(async (preset: Partial<Preset>, id?: string): Promise<Preset | null> => {
         const method = id ? "PATCH" : "POST";
@@ -73,10 +73,9 @@ export function usePresets(options: UsePresetsOptions = {}): UsePresetsResult {
             const data = await response.json();
             return data.preset as Preset;
         } catch {
-            if (onError) onError("Network error saving preset.");
             return null;
         }
-    }, [safeFetch, handleApiError, onError]);
+    }, [safeFetch, handleApiError]);
 
     const remove = useCallback(async (id: string): Promise<boolean> => {
         try {
@@ -91,10 +90,9 @@ export function usePresets(options: UsePresetsOptions = {}): UsePresetsResult {
 
             return true;
         } catch {
-            if (onError) onError("Network error deleting preset.");
             return false;
         }
-    }, [safeFetch, handleApiError, onError]);
+    }, [safeFetch, handleApiError]);
 
     useEffect(() => {
         if (autoLoad) {

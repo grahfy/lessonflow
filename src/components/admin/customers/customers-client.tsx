@@ -47,6 +47,8 @@ export function AdminCustomersClient() {
   const dialogRootRef = useRef<HTMLDivElement | null>(null);
   const materialsUploadFormRef = useRef<HTMLFormElement | null>(null);
 
+  const onAuthError = useCallback(() => window.location.assign("/admin/login"), []);
+
   // Data Hooks
   const { 
     customers, 
@@ -59,7 +61,7 @@ export function AdminCustomersClient() {
   } = useCustomers({
     pageSize,
     onError: setError,
-    onAuthError: () => window.location.assign("/admin/login")
+    onAuthError
   });
 
   const {
@@ -68,7 +70,7 @@ export function AdminCustomersClient() {
     sending: sendingEmail,
     load: loadEmailHistory,
     send: sendEmailApi
-  } = useEmailHistory({ onError: setError });
+  } = useEmailHistory({ onAuthError, onError: setError });
 
   const {
     materials: materialsList,
@@ -79,14 +81,14 @@ export function AdminCustomersClient() {
     load: loadMaterials,
     upload: uploadMaterialApi,
     remove: removeMaterialApi
-  } = useLearningMaterials({ onError: setError });
+  } = useLearningMaterials({ onAuthError, onError: setError });
 
   const {
     revealedPasswords: revealedPortalPasswords,
     busyCustomerId: portalCredentialBusyCustomerId,
     reveal: revealPortalPasswordApi,
     regenerate: regeneratePortalPasswordApi
-  } = usePortalCredentials({ onError: setError });
+  } = usePortalCredentials({ onAuthError, onError: setError });
 
   // Effects
   useEffect(() => {

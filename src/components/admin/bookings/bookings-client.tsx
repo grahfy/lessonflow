@@ -68,6 +68,8 @@ export function AdminBookingsClient() {
   const materialsDialogRootRef = useRef<HTMLDivElement | null>(null);
   const materialsUploadFormRef = useRef<HTMLFormElement | null>(null);
 
+  const onAuthError = useCallback(() => window.location.assign("/admin/login"), []);
+
   // Data Hooks
   const { 
     events: rawEvents, 
@@ -78,14 +80,14 @@ export function AdminBookingsClient() {
     notify: notifyBookingApi
   } = useBookings({
     onError: setError,
-    onAuthError: () => window.location.assign("/admin/login")
+    onAuthError
   });
 
   const events = useMemo(() => rawEvents as any as EventWithRow[], [rawEvents]);
 
-  const { customers: customerOptions, load: loadCustomers } = useCustomers({ pageSize: 1000 });
-  const { history: emailHistory, loading: loadingEmailHistory, sending: sendingEmail, load: loadEmailHistory, send: sendEmailApi } = useEmailHistory({ onError: setError });
-  const { materials: materialsList, loading: materialsLoading, uploading: materialsUploading, load: loadMaterials, upload: uploadMaterialApi, remove: removeMaterialApi } = useLearningMaterials({ onError: setError });
+  const { customers: customerOptions, load: loadCustomers } = useCustomers({ pageSize: 1000, onAuthError, onError: setError });
+  const { history: emailHistory, loading: loadingEmailHistory, sending: sendingEmail, load: loadEmailHistory, send: sendEmailApi } = useEmailHistory({ onAuthError, onError: setError });
+  const { materials: materialsList, loading: materialsLoading, uploading: materialsUploading, load: loadMaterials, upload: uploadMaterialApi, remove: removeMaterialApi } = useLearningMaterials({ onAuthError, onError: setError });
 
   // Effects
   useEffect(() => {

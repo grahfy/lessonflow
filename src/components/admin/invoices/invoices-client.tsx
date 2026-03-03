@@ -69,6 +69,8 @@ export function AdminInvoicesClient() {
   const [createDueAt, setCreateDueAt] = useState("");
   const [createTaxMode, setCreateTaxMode] = useState<InvoiceTaxMode>("taxable");
 
+  const onAuthError = useCallback(() => window.location.assign("/admin/login"), []);
+
   // Data Hooks
   const { 
     invoices, 
@@ -83,11 +85,11 @@ export function AdminInvoicesClient() {
   } = useInvoices({
     pageSize,
     onError: setError,
-    onAuthError: () => window.location.assign("/admin/login")
+    onAuthError
   });
 
-  const { presets } = usePresets({ onError: setError });
-  const { customers: customerOptions, load: loadCustomers } = useCustomers({ pageSize: 1000 });
+  const { presets } = usePresets({ onAuthError, onError: setError });
+  const { customers: customerOptions, load: loadCustomers } = useCustomers({ pageSize: 1000, onAuthError, onError: setError });
 
   // Effects
   useEffect(() => {
