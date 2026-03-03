@@ -5,7 +5,7 @@
  * workflow code focused on domain actions while `sendEmail()` handles transport selection and
  * outbound logging.
  */
-import { Booking, BookingRequestStatus, LessonMode, LessonDuration, SkillLevel } from "@/generated/prisma/client";
+import { Booking, BookingRequestStatus, LessonMode, LessonDuration, SkillLevel, AuditAction } from "@/generated/prisma/client";
 
 import { sendEmail, SendEmailResult } from "@/lib/email/service";
 import {
@@ -16,6 +16,7 @@ import {
   ownerPendingBookingTemplate
 } from "@/lib/email/templates";
 import { getOwnerEmail } from "@/lib/env";
+import { prisma } from "@/lib/db";
 
 export async function sendOwnerBookingEmail(input: {
   bookingRequest: {
@@ -40,6 +41,25 @@ export async function sendOwnerBookingEmail(input: {
   });
 }
 
+type AuditInput = {
+  bookingId: string;
+  actorId: string;
+  action: AuditAction;
+  details?: string;
+};
+
+async function recordAudit(audit: AuditInput | undefined) {
+  if (!audit) return;
+  await prisma.bookingAuditLog.create({
+    data: {
+      bookingId: audit.bookingId,
+      actorId: audit.actorId,
+      action: audit.action,
+      details: audit.details
+    }
+  });
+}
+
 export async function sendCustomerBookingStatusEmail(input: {
   email: string;
   name: string;
@@ -49,6 +69,7 @@ export async function sendCustomerBookingStatusEmail(input: {
     loginUrl: string;
     generatedPassword: string;
   } | null;
+  audit?: AuditInput;
 }): Promise<SendEmailResult> {
   // Approval emails may include one-time portal credentials. The template builder hides that
   // branching so callers only pass `portalAccess` when credentials were generated.
@@ -58,11 +79,17 @@ export async function sendCustomerBookingStatusEmail(input: {
     when: input.when,
     portalAccess: input.portalAccess ?? null
   });
-  return sendEmail({
+  const result = await sendEmail({
     to: input.email,
     subject: template.subject,
     html: template.html
   });
+
+  if (result.status === "sent" || result.status === "queued_no_smtp") {
+    await recordAudit(input.audit);
+  }
+
+  return result;
 }
 
 export async function sendCustomerBookingMovedEmail(input: {
@@ -70,6 +97,7 @@ export async function sendCustomerBookingMovedEmail(input: {
   name: string;
   oldWhen: Date;
   newWhen: Date;
+  audit?: AuditInput;
 }): Promise<SendEmailResult> {
   // Include both times so customers can verify the reschedule without cross-referencing older mail.
   const template = customerBookingMovedTemplate({
@@ -77,28 +105,41 @@ export async function sendCustomerBookingMovedEmail(input: {
     oldWhen: input.oldWhen,
     newWhen: input.newWhen
   });
-  return sendEmail({
+  const result = await sendEmail({
     to: input.email,
     subject: template.subject,
     html: template.html
   });
+
+  if (result.status === "sent" || result.status === "queued_no_smtp") {
+    await recordAudit(input.audit);
+  }
+
+  return result;
 }
 
 export async function sendCustomerReminderEmail(input: {
   email: string;
   name: string;
   when: Date;
+  audit?: AuditInput;
 }): Promise<SendEmailResult> {
   // Reminder sends intentionally reuse the same template/delivery path as automated reminder jobs.
   const template = customerBookingReminderTemplate({
     name: input.name,
     when: input.when
   });
-  return sendEmail({
+  const result = await sendEmail({
     to: input.email,
     subject: template.subject,
     html: template.html
   });
+
+  if (result.status === "sent" || result.status === "queued_no_smtp") {
+    await recordAudit(input.audit);
+  }
+
+  return result;
 }
 
 export async function sendCustomerCustomEmail(input: {
@@ -106,6 +147,7 @@ export async function sendCustomerCustomEmail(input: {
   name: string;
   subject: string;
   message: string;
+  audit?: AuditInput;
 }): Promise<SendEmailResult> {
   // Custom messages still go through the shared delivery service to keep audit logging and
   // transport fallback behavior (SMTP/Gmail/queue) consistent.
@@ -114,11 +156,17 @@ export async function sendCustomerCustomEmail(input: {
     subject: input.subject,
     message: input.message
   });
-  return sendEmail({
+  const result = await sendEmail({
     to: input.email,
     subject: template.subject,
     html: template.html
   });
+
+  if (result.status === "sent" || result.status === "queued_no_smtp") {
+    await recordAudit(input.audit);
+  }
+
+  return result;
 }
 
 /**
