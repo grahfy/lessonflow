@@ -18,4 +18,5 @@
 ## Technical Standards
 - **Integrity:** Ensure financial data (invoices) is denormalized at creation to preserve historical accuracy.
 - **Safety:** Implement strict validation for all user inputs using Zod.
-- **Traceability:** Maintain audit trails for all significant entities (bookings, invoices, credentials).
+- **Traceability:** Maintain audit trails for all significant entities (bookings, invoices, credentials). Standardize notification triggers to automatically record audit log entries upon successful delivery.
+- **Consistency:** All notification functions should return a unified result type (e.g., `SendEmailResult`) to allow callers to handle delivery status consistently.
