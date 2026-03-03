@@ -32,3 +32,4 @@
 
 ## Phase: Review Fixes
 - [x] Task: Apply review suggestions [93e00c8]
+- [x] Task: Fix infinite re-render loops and UI state bugs [90066c5]
