@@ -4,5 +4,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: Consolidate and verify booking request notification workflows**
+- [x] **Track: Consolidate and verify booking request notification workflows**
   *Link: [./tracks/booking_notifications_20260303/](./tracks/booking_notifications_20260303/)*
