@@ -1,9 +1,9 @@
 # Implementation Plan: Admin Code Consolidation
 
 ## Phase 1: Research & Mapping
-- [ ] Task: Audit the existing `src/app/admin/` directory to identify duplicated UI code, data handling patterns, and layout inconsistencies.
-- [ ] Task: Map dependencies and shared logic across all admin pages.
-- [ ] Task: Identify critical workflows (e.g., booking approval, invoicing) to ensure they are protected during refactoring.
+- [x] Task: Audit the existing `src/app/admin/` directory to identify duplicated UI code, data handling patterns, and layout inconsistencies.
+- [x] Task: Map dependencies and shared logic across all admin pages.
+- [x] Task: Identify critical workflows (e.g., booking approval, invoicing) to ensure they are protected during refactoring.
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Research & Mapping' (Protocol in workflow.md)
 
 ## Phase 2: Core Refactoring - Layouts & Configuration
