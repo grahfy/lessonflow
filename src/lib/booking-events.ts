@@ -42,7 +42,7 @@ export async function sendOwnerBookingEmail(input: {
 }
 
 type AuditInput = {
-  bookingId: string;
+  bookingId?: string;
   actorId: string;
   action: AuditAction;
   details?: string;
