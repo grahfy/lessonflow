@@ -122,6 +122,6 @@ describe("booking-notifications", () => {
       where: { toEmail: "approve@example.com" }
     });
     expect(outboundEmails.length).toBeGreaterThan(0);
-    expect(outboundEmails[0].subject.toLowerCase()).toContain("confirmed");
+    expect(outboundEmails[0].subject.toLowerCase()).toContain("approved");
   });
 });
