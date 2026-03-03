@@ -15,7 +15,7 @@ Create integration tests to verify the current behavior of all identified notifi
 
 - [x] Task: Write failing tests for booking request submission owner notifications. [017c922]
 - [x] Task: Implement/verify owner notification tests. [00207d7]
-- [~] Task: Write failing tests for customer notifications on status changes (Approve/Reject).
+- [x] Task: Write failing tests for customer notifications on status changes (Approve/Reject). [885ae21]
 - [ ] Task: Implement/verify status change notification tests.
 - [ ] Task: Write failing tests for customer notifications on booking moves.
 - [ ] Task: Implement/verify booking move notification tests.
