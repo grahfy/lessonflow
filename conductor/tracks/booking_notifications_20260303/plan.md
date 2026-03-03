@@ -32,6 +32,6 @@ Address inconsistencies and improve error handling or logging based on audit fin
 ## Phase 4: Final Verification
 Ensure the entire notification system is robust and well-tested.
 
-- [ ] Task: Verify >80% test coverage for notification-related logic.
+- [~] Task: Verify >80% test coverage for notification-related logic.
 - [ ] Task: Perform final E2E manual verification of all notification flows.
 - [ ] Task: Conductor - User Manual Verification 'Final Verification' (Protocol in workflow.md)

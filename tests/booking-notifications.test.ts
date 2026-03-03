@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { POST } from "@/app/api/booking-requests/route";
 import { PATCH as patchBookingRequest } from "@/app/api/admin/booking-requests/[id]/route";
 import { PATCH as patchBooking } from "@/app/api/admin/bookings/[id]/route";
+import { POST as notifyBooking } from "@/app/api/admin/bookings/[id]/notify/route";
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
 
 function adminRequest(url: string, body: Record<string, unknown>, token: string): NextRequest {
@@ -158,5 +159,85 @@ describe("booking-notifications", () => {
     });
     expect(outboundEmails.length).toBeGreaterThan(0);
     expect(outboundEmails[0].subject.toLowerCase()).toContain("updated");
+  });
+
+  it("records an outbound email for the customer when a manual reminder is sent", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const booking = await prisma.booking.create({
+      data: {
+        name: "Remind Me",
+        email: "remind@example.com",
+        phone: "0400-000-000",
+        address: "123 Fake St",
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min30",
+        startAt: new Date("2026-06-01T09:00:00.000Z"),
+        endAt: new Date("2026-06-01T09:30:00.000Z"),
+        timezone: "Australia/Melbourne"
+      }
+    });
+
+    const request = new NextRequest(`http://localhost/api/admin/bookings/${booking.id}/notify`, {
+      method: "POST",
+      body: JSON.stringify({ action: "reminder" }),
+      headers: {
+        "content-type": "application/json",
+        cookie: `${getSessionCookieName()}=${token}`
+      }
+    });
+
+    const response = await notifyBooking(request, { params: Promise.resolve({ id: booking.id }) });
+    expect(response.status).toBe(200);
+
+    const outboundEmails = await prisma.outboundEmail.findMany({
+      where: { toEmail: "remind@example.com" }
+    });
+    expect(outboundEmails.length).toBeGreaterThan(0);
+    expect(outboundEmails[0].subject.toLowerCase()).toContain("reminder");
+  });
+
+  it("records an outbound email for the customer when a custom email is sent", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const booking = await prisma.booking.create({
+      data: {
+        name: "Custom Me",
+        email: "custom@example.com",
+        phone: "0400-000-000",
+        address: "123 Fake St",
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min30",
+        startAt: new Date("2026-06-01T09:00:00.000Z"),
+        endAt: new Date("2026-06-01T09:30:00.000Z"),
+        timezone: "Australia/Melbourne"
+      }
+    });
+
+    const request = new NextRequest(`http://localhost/api/admin/bookings/${booking.id}/notify`, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "custom",
+        subject: "Special Note",
+        message: "This is a custom message"
+      }),
+      headers: {
+        "content-type": "application/json",
+        cookie: `${getSessionCookieName()}=${token}`
+      }
+    });
+
+    const response = await notifyBooking(request, { params: Promise.resolve({ id: booking.id }) });
+    expect(response.status).toBe(200);
+
+    const outboundEmails = await prisma.outboundEmail.findMany({
+      where: { toEmail: "custom@example.com" }
+    });
+    expect(outboundEmails.length).toBeGreaterThan(0);
+    expect(outboundEmails[0].subject).toBe("Special Note");
   });
 });
