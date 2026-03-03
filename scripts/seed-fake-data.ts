@@ -89,7 +89,7 @@ async function seedFakeData() {
   let admin = await prisma.adminUser.findFirst();
   if (!admin) {
     console.log("Creating default admin user...");
-    const passwordHash = await bcrypt.hash('Password123!', 12);
+    const passwordHash = await bcrypt.hash('admin123', 12);
     admin = await prisma.adminUser.create({
       data: {
         email: 'admin@example.com',

@@ -140,7 +140,7 @@ if [[ "$SEED_DATA" -eq 1 ]]; then
   DATABASE_URL="${DB_URL}" npx tsx scripts/seed-fake-data.ts "$SEED_COUNT"
   DATABASE_URL="${DB_URL}" npx tsx scripts/seed-invoice-presets.ts
   
-  log "Default admin account created:"
+  log "Default admin account:"
   log "  URL: http://${HOST}:${PORT}/admin/login"
   log "  Email: admin@example.com"
   log "  Password: Password123!"

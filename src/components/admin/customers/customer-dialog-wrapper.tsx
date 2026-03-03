@@ -99,6 +99,7 @@ export function CustomerDialogWrapper({
 
                     <div style={{ display: 'flex', gap: '4px', background: 'rgba(0,0,0,0.1)', padding: '2px', borderRadius: '6px' }}>
                         <button
+                            type="button"
                             className={`btn ${activeTab === 'profile' ? 'btn-primary' : 'btn-secondary'}`}
                             style={{ flex: 1, padding: '4px 12px', fontSize: '0.75rem', border: 'none', boxShadow: 'none', minWidth: '140px' }}
                             onClick={() => setActiveTab('profile')}
@@ -106,6 +107,7 @@ export function CustomerDialogWrapper({
                             Profile & Address
                         </button>
                         <button
+                            type="button"
                             className={`btn ${activeTab === 'emails' ? 'btn-primary' : 'btn-secondary'}`}
                             style={{ flex: 1, padding: '4px 12px', fontSize: '0.75rem', border: 'none', boxShadow: 'none', minWidth: '140px' }}
                             onClick={() => setActiveTab('emails')}
@@ -114,6 +116,7 @@ export function CustomerDialogWrapper({
                             Communication
                         </button>
                         <button
+                            type="button"
                             className={`btn ${activeTab === 'materials' ? 'btn-primary' : 'btn-secondary'}`}
                             style={{ flex: 1, padding: '4px 12px', fontSize: '0.75rem', border: 'none', boxShadow: 'none', minWidth: '140px' }}
                             onClick={() => setActiveTab('materials')}

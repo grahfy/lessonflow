@@ -65,6 +65,11 @@ function Log {
     Write-Host "[local-full-site] $Message"
 }
 
+if (-not $SkipInstall) {
+    Log "Installing dependencies..."
+    npm ci --no-fund --no-audit --loglevel=error
+}
+
 function Test-DockerAvailable {
     try {
         $dockerProcess = Start-Process -FilePath "docker" -ArgumentList "info" -Wait -PassThru -NoNewWindow -ErrorAction Stop
@@ -114,15 +119,15 @@ function Start-MariaDBContainer {
         $running = docker ps --format "{{.Names}}" | Where-Object { $_ -eq $ContainerName }
         if (-not $running) {
             Log "Starting existing container: $ContainerName"
-            docker start $ContainerName
+            docker start $ContainerName > $null
         } else {
             Log "Container already running: $ContainerName"
-            return 0  # Already running, no need to wait
+            return 0
         }
     } else {
         Log "Creating and starting container: $ContainerName on port $HostPort"
         $portMapping = $HostPort.ToString() + ":3306"
-        docker run -d --name $ContainerName -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=$DatabaseName -p $portMapping mariadb:latest
+        docker run -d --name $ContainerName -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=$DatabaseName -p $portMapping mariadb:latest > $null
     }
     
     Log "Waiting for $ContainerName to be ready..."
@@ -196,26 +201,32 @@ if (-not $dockerAvailable) {
 }
 
 if ($dockerAvailable) {
-    # Start dev database (port 3306)
     Start-MariaDBContainer -ContainerName "lessonflow-dev-mysql" -DatabaseName "mgs_dev" -HostPort 3306
-
-    # Start test database (port 3307)
     Start-MariaDBContainer -ContainerName "lessonflow-test-mysql" -DatabaseName "mgs_test" -HostPort 3307
 }
 
 # Run migrations on test database
 Log "Running Prisma migrations on test database..."
 $env:DATABASE_URL = $TEST_DB_URL
-npx prisma migrate deploy
+npx prisma migrate deploy > $null
 
 # Run migrations on dev database
 Log "Running Prisma migrations on dev database..."
 $env:DATABASE_URL = $DB_URL
-npx prisma migrate deploy
+npx prisma migrate deploy > $null
 
 # Generate Prisma client
 Log "Generating Prisma client..."
-npx prisma generate
+$env:DATABASE_URL = $TEST_DB_URL
+npx prisma generate > $null
+
+$env:DATABASE_URL = $DB_URL
+
+if ($Seed) {
+    Log "Clearing existing data..."
+    npx tsx scripts/clear-customer-data.ts 2>$null
+    npx tsx scripts/clear-all-data.ts 2>$null
+}
 
 # Seed whitelabel defaults
 Log "Seeding whitelabel defaults..."
@@ -223,15 +234,13 @@ npx tsx scripts/seed-whitelabel-defaults.ts
 
 if ($Seed) {
     Log "Seeding fake data ($SeedCount customers)..."
-    npx tsx scripts/clear-customer-data.ts 2>$null
-    npx tsx scripts/clear-all-data.ts 2>$null
     npx tsx scripts/seed-fake-data.ts $SeedCount
     npx tsx scripts/seed-invoice-presets.ts
-    
+
     Log "Default admin account:"
-    Log "  URL: http://${LISTEN_HOST}:${PORT}/admin/login"
+    Log "  URL: http://localhost:${PORT}/admin/login"
     Log "  Email: admin@example.com"
-    Log "  Password: Password123!"
+    Log "  Password: admin123"
 }
 
 if (-not $SkipTests) {
@@ -247,7 +256,7 @@ if (-not $SkipTests) {
 }
 
 Log "Cleaning stale Next.js artifacts..."
-npm run clean
+npm run clean --silent
 
 if ($NoStart) {
     if ($TESTS_FAILED) { exit 1 }
@@ -264,7 +273,22 @@ if ($portInUse) {
     Start-Sleep -Seconds 1
 }
 
+# Reset DATABASE_URL back to dev database for the dev server
+$env:DATABASE_URL = $DB_URL
+
 Log "Starting local site at http://${LISTEN_HOST}:${PORT}"
 Log "NOTE: The site will default to 'Melbourne Guitar School' until you customize it in Admin Settings."
 
-$de
+# Start Next.js dev server
+$devServer = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "npm run dev" -PassThru -NoNewWindow
+
+Log "Dev server started (PID: $($devServer.Id))"
+Log "Press Ctrl+C to stop the server"
+
+# Wait for the dev server process
+try {
+    $devServer.WaitForExit()
+} catch {
+    Log "Dev server stopped"
+    Stop-Process -Id $devServer.Id -Force -ErrorAction SilentlyContinue
+}

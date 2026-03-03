@@ -17,7 +17,7 @@ if (!testDatabaseUrl) {
 const args = process.argv.slice(2);
 
 const isWin = process.platform === "win32";
-const npmCmd = isWin ? "npm" : "npx";
+const npmCmd = isWin ? "npx.cmd" : "npx";
 
 // Vitest/test helpers usually read DATABASE_URL, so map the explicit test URL to
 // that variable only for the child process instead of mutating the parent shell.

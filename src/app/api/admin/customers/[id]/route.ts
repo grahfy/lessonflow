@@ -44,7 +44,17 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     const { id } = await params;
     const customer = await prisma.customer.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        portalCredential: {
+          select: {
+            id: true,
+            generatedAt: true,
+            rotatedAt: true,
+            isActive: true
+          }
+        }
+      }
     });
     if (!customer) {
       return NextResponse.json({ error: "Customer not found." }, { status: 404 });

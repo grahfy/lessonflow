@@ -58,9 +58,26 @@ export function AdminLoginForm() {
 
     setLoading(false);
     if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
-      setError(body?.error || "Login failed. Check your email and password.");
-      await captcha.regenerate();
+      const body = (await response.json().catch(() => null)) as { error?: string; code?: string } | null;
+      const errorCode = body?.code;
+      const errorMessage = body?.error || "Login failed. Check your email and password.";
+      
+      // Check if this is a CAPTCHA-related error
+      const isCaptchaError = errorCode && [
+        "HONEYPOT_FILLED",
+        "CAPTCHA_RATE_LIMITED",
+        "MISSING",
+        "NOT_FOUND",
+        "EXPIRED",
+        "INVALID"
+      ].includes(errorCode);
+      
+      if (isCaptchaError) {
+        // Use onServerError to auto-refresh the CAPTCHA challenge
+        captcha.onServerError(errorMessage);
+      } else {
+        setError(errorMessage);
+      }
       return;
     }
     await captcha.regenerate();

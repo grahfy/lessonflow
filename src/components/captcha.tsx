@@ -24,6 +24,7 @@ export type CaptchaController = {
   validateAnswer: () => boolean;
   handleChange: (value: string) => void;
   getPayload: () => { captchaToken: string; captchaAnswer: string };
+  onServerError: (serverError: string) => void;
 };
 
 /**
@@ -113,6 +114,16 @@ export function useCaptcha(): CaptchaController {
     };
   }
 
+  /**
+   * Handles server-side CAPTCHA errors by refreshing the challenge.
+   * Call this when the server returns a CAPTCHA-related error.
+   */
+  function onServerError(serverError: string) {
+    setError(serverError);
+    // Auto-refresh the CAPTCHA challenge on server error
+    void regenerate();
+  }
+
   return {
     captcha,
     userAnswer,
@@ -121,7 +132,8 @@ export function useCaptcha(): CaptchaController {
     regenerate,
     validateAnswer,
     handleChange,
-    getPayload
+    getPayload,
+    onServerError
   };
 }
 

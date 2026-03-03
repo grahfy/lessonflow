@@ -3,8 +3,6 @@
 /**
  * Prepares the test database for Vitest runs using the current Prisma schema.
  *
- * The schema provider is MySQL, so tests need a real MySQL-compatible database.
- * We intentionally do not auto-start Docker here because CI/local environments vary.
  * Instead, this script accepts an externally provided test DB URL and runs Prisma
  * migrations against it with a clear error message when configuration is missing.
  */
@@ -58,7 +56,7 @@ const prismaEnv = {
  */
 function runPrisma(args) {
   const isWin = process.platform === "win32";
-  const npmCmd = isWin ? "npm" : "npx";
+  const npmCmd = isWin ? "npx.cmd" : "npx";
   return spawnSync(npmCmd, ["prisma", ...args], {
     stdio: "inherit",
     env: prismaEnv,

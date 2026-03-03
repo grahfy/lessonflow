@@ -64,6 +64,7 @@ export function CustomerMaterialsDialog({
                                             </a>
                                         )}
                                         <button
+                                            type="button"
                                             className="btn btn-danger btn-compact"
                                             disabled={materialsDeletingId === m.id}
                                             onClick={() => onDelete(m)}

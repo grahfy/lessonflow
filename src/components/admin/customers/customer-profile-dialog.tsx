@@ -309,6 +309,7 @@ export function CustomerProfileDialog({
                         <div className="button-row" style={{ marginTop: '8px' }}>
                             <button
                                 className="btn btn-secondary"
+                                type="button"
                                 disabled={!customer || portalCredentialBusyCustomerId === customer.id || isEditing}
                                 onClick={() => customer && onRevealPortalPassword()}
                             >
@@ -316,6 +317,7 @@ export function CustomerProfileDialog({
                             </button>
                             <button
                                 className="btn btn-secondary"
+                                type="button"
                                 disabled={!customer || portalCredentialBusyCustomerId === customer.id || isEditing}
                                 onClick={() => customer && onRegeneratePortalPassword()}
                             >

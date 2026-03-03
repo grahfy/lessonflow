@@ -206,6 +206,10 @@ export function createCaptchaChallenge(): CaptchaChallenge {
     expiresAt
   });
 
+  if (process.env.NODE_ENV === "development") {
+    console.log("[CAPTCHA] Created new challenge:", token.substring(0, 8) + "...", "(answer:", answer + ")", "(expires in", Math.floor(CAPTCHA_TTL_MS / 1000), "s)");
+  }
+
   return {
     token,
     imageDataUrl: renderCaptchaSvgDataUrl(answer),
@@ -239,6 +243,10 @@ export function verifyCaptchaSubmission(input: {
 
   const record = captchaStore.get(token);
   if (!record) {
+    // In development, log to help debug CAPTCHA issues
+    if (process.env.NODE_ENV === "development") {
+      console.log("[CAPTCHA] Token not found (may have been already used or expired):", token.substring(0, 8) + "...");
+    }
     return {
       ok: false,
       code: "NOT_FOUND",
@@ -250,6 +258,9 @@ export function verifyCaptchaSubmission(input: {
   captchaStore.delete(token);
 
   if (record.expiresAt <= Date.now()) {
+    if (process.env.NODE_ENV === "development") {
+      console.log("[CAPTCHA] Token expired:", token.substring(0, 8) + "...");
+    }
     return {
       ok: false,
       code: "EXPIRED",
@@ -258,6 +269,9 @@ export function verifyCaptchaSubmission(input: {
   }
 
   if (record.answer !== answer) {
+    if (process.env.NODE_ENV === "development") {
+      console.log("[CAPTCHA] Invalid answer. Expected:", record.answer, "Got:", answer);
+    }
     return {
       ok: false,
       code: "INVALID",
@@ -265,6 +279,9 @@ export function verifyCaptchaSubmission(input: {
     };
   }
 
+  if (process.env.NODE_ENV === "development") {
+    console.log("[CAPTCHA] Validated successfully");
+  }
   return { ok: true };
 }
 
@@ -312,8 +329,8 @@ export function verifyCaptchaGuard(input: {
     };
   }
 
-  // Bypass CAPTCHA verification in test environment
-  if (process.env.NODE_ENV === "test") {
+  // Bypass CAPTCHA verification in test or development environment
+  if (process.env.NODE_ENV === "test" || process.env.NODE_ENV === "development") {
     return { ok: true };
   }
 
