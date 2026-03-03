@@ -14,7 +14,7 @@ Identify and document all existing notification triggers and their current imple
 Create integration tests to verify the current behavior of all identified notification flows.
 
 - [x] Task: Write failing tests for booking request submission owner notifications. [017c922]
-- [~] Task: Implement/verify owner notification tests.
+- [x] Task: Implement/verify owner notification tests. [00207d7]
 - [ ] Task: Write failing tests for customer notifications on status changes (Approve/Reject).
 - [ ] Task: Implement/verify status change notification tests.
 - [ ] Task: Write failing tests for customer notifications on booking moves.
