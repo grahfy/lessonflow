@@ -21,13 +21,13 @@ Create integration tests to verify the current behavior of all identified notifi
 - [x] Task: Implement/verify booking move notification tests. [6b480cc]
 - [x] Task: Conductor - User Manual Verification 'Baseline Testing' (Protocol in workflow.md) [faeca3c]
 
-## Phase 3: Consolidation & Refinement
+## Phase 3: Consolidation & Refinement [checkpoint: 9aa1e63]
 Address inconsistencies and improve error handling or logging based on audit findings.
 
 - [x] Task: Standardize error handling across all notification wrappers in `src/lib/booking-events.ts`. [d644b8d]
 - [x] Task: Ensure consistent audit logging for all outbound notifications. [3d0b191]
 - [x] Task: Refactor API routes to use consolidated notification helpers if redundant logic is found. [3d0b191]
-- [ ] Task: Conductor - User Manual Verification 'Consolidation & Refinement' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Consolidation & Refinement' (Protocol in workflow.md) [9aa1e63]
 
 ## Phase 4: Final Verification
 Ensure the entire notification system is robust and well-tested.
