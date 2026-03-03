@@ -1,84 +1,114 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { useSafeFetch } from "./use-safe-fetch";
+import { type LearningMaterialBooking, type LearningMaterialRow } from "./types";
 
-export interface LearningMaterialRow {
-    id: string;
-    filename: string;
-    fileSize: number;
-    mimeType: string;
-    uploadedAt: string;
-}
-
-export interface LearningMaterialBooking {
-    id: string;
-    startAt: string;
-    status: string;
+export interface UseLearningMaterialsOptions {
+    /** Called on auth error */
+    onAuthError?: () => void;
+    /** Called on other errors */
+    onError?: (message: string) => void;
 }
 
 export interface UseLearningMaterialsResult {
     materials: LearningMaterialRow[];
     bookings: LearningMaterialBooking[];
     loading: boolean;
-    load: (customerId: string, bookingId?: string) => Promise<void>;
-    upload: (customerId: string, file: File, bookingId?: string) => Promise<boolean>;
+    uploading: boolean;
+    deletingId: string | null;
+    load: (customerId: string) => Promise<void>;
+    upload: (customerId: string, bookingId: string, form: HTMLFormElement) => Promise<boolean>;
     remove: (materialId: string) => Promise<boolean>;
 }
 
 /**
- * Hook to manage customer learning materials.
+ * Hook to manage learning materials for students.
  */
-export function useLearningMaterials(): UseLearningMaterialsResult {
+export function useLearningMaterials(options: UseLearningMaterialsOptions = {}): UseLearningMaterialsResult {
+    const { onAuthError, onError } = options;
     const [materials, setMaterials] = useState<LearningMaterialRow[]>([]);
     const [bookings, setBookings] = useState<LearningMaterialBooking[]>([]);
     const [loading, setLoading] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
-    const load = useCallback(async (customerId: string, bookingId?: string) => {
+    const { safeFetch, handleApiError } = useSafeFetch({ onAuthError, onError });
+
+    const load = useCallback(async (customerId: string) => {
         setLoading(true);
-        const params = new URLSearchParams();
-        if (bookingId) params.set("bookingId", bookingId);
-        const query = params.toString();
-
         try {
-            const response = await fetch(
-                `/api/admin/customers/${customerId}/learning-materials${query ? `?${query}` : ""}`,
-                { cache: "no-store" }
-            );
-            if (response.ok) {
-                const payload = await response.json();
-                setMaterials(payload.materials || []);
-                setBookings(payload.bookings || []);
+            const response = await safeFetch(`/api/admin/customers/${customerId}/learning-materials`, { cache: "no-store" });
+            if (!response.ok) {
+                await handleApiError(response, "Unable to load learning materials.");
+                return;
             }
+            const data = await response.json();
+            setMaterials(data.materials || []);
+            setBookings(data.bookings || []);
         } catch {
-            // Silent error
+            if (onError) onError("Network error loading learning materials.");
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [safeFetch, handleApiError, onError]);
 
-    const upload = useCallback(async (customerId: string, file: File, bookingId?: string): Promise<boolean> => {
-        const form = new FormData();
-        form.append("file", file);
-        if (bookingId) form.append("bookingId", bookingId);
+    const upload = useCallback(async (customerId: string, bookingId: string, form: HTMLFormElement): Promise<boolean> => {
+        const formData = new FormData(form);
+        if (bookingId) {
+            formData.append("bookingId", bookingId);
+        }
 
-        const response = await fetch(`/api/admin/customers/${customerId}/learning-materials`, {
-            method: "POST",
-            body: form
-        });
-        return response.ok;
-    }, []);
+        setUploading(true);
+        try {
+            const response = await fetch(`/api/admin/customers/${customerId}/learning-materials`, {
+                method: "POST",
+                body: formData
+            });
+
+            if (!response.ok) {
+                await handleApiError(response, "Upload failed.");
+                return false;
+            }
+
+            void load(customerId);
+            return true;
+        } catch {
+            if (onError) onError("Network error during upload.");
+            return false;
+        } finally {
+            setUploading(false);
+        }
+    }, [handleApiError, load, onError]);
 
     const remove = useCallback(async (materialId: string): Promise<boolean> => {
-        const response = await fetch(`/api/admin/learning-materials/${materialId}`, {
-            method: "DELETE"
-        });
-        return response.ok;
-    }, []);
+        setDeletingId(materialId);
+        try {
+            const response = await safeFetch(`/api/admin/learning-materials/${materialId}`, {
+                method: "DELETE"
+            });
+
+            if (!response.ok) {
+                await handleApiError(response, "Unable to delete learning material.");
+                return false;
+            }
+
+            setMaterials(prev => prev.filter(m => m.id !== materialId));
+            return true;
+        } catch {
+            if (onError) onError("Network error deleting material.");
+            return false;
+        } finally {
+            setDeletingId(null);
+        }
+    }, [safeFetch, handleApiError, onError]);
 
     return {
         materials,
         bookings,
         loading,
+        uploading,
+        deletingId,
         load,
         upload,
         remove

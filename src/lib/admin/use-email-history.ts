@@ -1,57 +1,86 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { useSafeFetch } from "./use-safe-fetch";
 
-export interface EmailHistoryEntry {
+export interface EmailRecord {
     id: string;
     subject: string;
+    status: string;
+    error?: string;
     createdAt: string;
-    status: "pending" | "sent" | "failed";
+}
+
+export interface UseEmailHistoryOptions {
+    /** Called on auth error */
+    onAuthError?: () => void;
+    /** Called on other errors */
+    onError?: (message: string) => void;
 }
 
 export interface UseEmailHistoryResult {
-    history: EmailHistoryEntry[];
+    history: ReadonlyArray<EmailRecord>;
     loading: boolean;
+    sending: boolean;
     load: (customerId: string) => Promise<void>;
     send: (customerId: string, subject: string, message: string) => Promise<boolean>;
 }
 
 /**
- * Hook to load and send customer emails.
+ * Hook to manage email communication history and sending for customers.
  */
-export function useEmailHistory(): UseEmailHistoryResult {
-    const [history, setHistory] = useState<EmailHistoryEntry[]>([]);
+export function useEmailHistory(options: UseEmailHistoryOptions = {}): UseEmailHistoryResult {
+    const { onAuthError, onError } = options;
+    const [history, setHistory] = useState<ReadonlyArray<EmailRecord>>([]);
     const [loading, setLoading] = useState(false);
+    const [sending, setSending] = useState(false);
+
+    const { safeFetch, handleApiError } = useSafeFetch({ onAuthError, onError });
 
     const load = useCallback(async (customerId: string) => {
         setLoading(true);
         try {
-            const response = await fetch(`/api/admin/customers/${customerId}/email`, {
-                cache: "no-store"
-            });
+            const response = await safeFetch(`/api/admin/customers/${customerId}/email`, { cache: "no-store" });
             if (response.ok) {
                 const data = await response.json();
                 setHistory(data.history || []);
             }
         } catch {
-            // Silent error
+            // Silent error for history loading
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [safeFetch]);
 
     const send = useCallback(async (customerId: string, subject: string, message: string): Promise<boolean> => {
-        const response = await fetch(`/api/admin/customers/${customerId}/email`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ subject, message })
-        });
-        return response.ok;
-    }, []);
+        setSending(true);
+        try {
+            const response = await safeFetch(`/api/admin/customers/${customerId}/email`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ subject, message })
+            });
+
+            if (!response.ok) {
+                await handleApiError(response, "Unable to send email.");
+                return false;
+            }
+
+            // Reload history after successful send
+            void load(customerId);
+            return true;
+        } catch {
+            if (onError) onError("Network error sending email.");
+            return false;
+        } finally {
+            setSending(false);
+        }
+    }, [safeFetch, handleApiError, load, onError]);
 
     return {
         history,
         loading,
+        sending,
         load,
         send
     };

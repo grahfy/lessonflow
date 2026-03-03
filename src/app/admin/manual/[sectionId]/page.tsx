@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { AdminManualSectionClient } from "@/components/admin-manual-section-client";
+import { AdminManualSectionClient } from "@/components/admin/manual/manual-section-client";
 import { requireAdmin } from "@/lib/admin/server-auth";
 import { MANUAL_SECTION_MANIFEST, getAdminManualIndex, getAdminManualSection } from "@/lib/manual/content";
 

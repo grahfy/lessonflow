@@ -40,7 +40,7 @@ type Props = {
     emailComposerMessage: string;
     setEmailComposerMessage: React.Dispatch<React.SetStateAction<string>>;
     sendingEmail: boolean;
-    onSendEmail: () => void;
+    onSendEmail: (subject: string, message: string) => void;
 
     // Materials Props
     materialsLoading: boolean;
@@ -52,7 +52,7 @@ type Props = {
     materialsDeletingId: string | null;
     materialsUploadFormRef: RefObject<HTMLFormElement | null>;
     onUploadMaterial: () => void;
-    onDeleteMaterial: (material: LearningMaterialRow) => void;
+    onDeleteMaterial: (id: string) => void;
     onMaterialBookingSelect: (bookingId: string) => void;
 };
 

@@ -1,69 +1,83 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { useSafeFetch } from "./use-safe-fetch";
 
-export interface PortalCredential {
-    username: string;
-    password: string;
-    generatedAt: string;
-    rotatedAt: string | null;
+export interface UsePortalCredentialsOptions {
+    /** Called on auth error */
+    onAuthError?: () => void;
+    /** Called on other errors */
+    onError?: (message: string) => void;
 }
 
 export interface UsePortalCredentialsResult {
-    credential: PortalCredential | null;
-    loading: boolean;
-    reveal: (customerId: string) => Promise<PortalCredential | null>;
-    regenerate: (customerId: string) => Promise<PortalCredential | null>;
+    revealedPasswords: Record<string, string>;
+    busyCustomerId: string | null;
+    reveal: (customerId: string) => Promise<string | null>;
+    regenerate: (customerId: string) => Promise<string | null>;
 }
 
 /**
- * Hook to manage customer portal credentials.
+ * Hook to manage student portal credentials from the admin console.
  */
-export function usePortalCredentials(): UsePortalCredentialsResult {
-    const [credential, setCredential] = useState<PortalCredential | null>(null);
-    const [loading, setLoading] = useState(false);
+export function usePortalCredentials(options: UsePortalCredentialsOptions = {}): UsePortalCredentialsResult {
+    const { onAuthError, onError } = options;
+    const [revealedPasswords, setRevealedPasswords] = useState<Record<string, string>>({});
+    const [busyCustomerId, setBusyCustomerId] = useState<string | null>(null);
 
-    const reveal = useCallback(async (customerId: string): Promise<PortalCredential | null> => {
-        setLoading(true);
+    const { safeFetch, handleApiError } = useSafeFetch({ onAuthError, onError });
+
+    const reveal = useCallback(async (customerId: string): Promise<string | null> => {
+        setBusyCustomerId(customerId);
         try {
-            const response = await fetch(`/api/admin/customers/${customerId}/portal-credential`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "reveal" })
+            const response = await safeFetch(`/api/admin/customers/${customerId}/portal-credential`, {
+                method: "GET"
             });
-            if (response.ok) {
-                const data = await response.json();
-                setCredential(data.credential);
-                return data.credential;
+
+            if (!response.ok) {
+                await handleApiError(response, "Unable to reveal portal password.");
+                return null;
             }
+
+            const data = await response.json();
+            const password = data.cleartextPassword as string;
+            setRevealedPasswords(prev => ({ ...prev, [customerId]: password }));
+            return password;
+        } catch {
+            if (onError) onError("Network error revealing password.");
             return null;
         } finally {
-            setLoading(false);
+            setBusyCustomerId(null);
         }
-    }, []);
+    }, [safeFetch, handleApiError, onError]);
 
-    const regenerate = useCallback(async (customerId: string): Promise<PortalCredential | null> => {
-        setLoading(true);
+    const regenerate = useCallback(async (customerId: string): Promise<string | null> => {
+        setBusyCustomerId(customerId);
         try {
-            const response = await fetch(`/api/admin/customers/${customerId}/portal-credential`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "regenerate" })
+            const response = await safeFetch(`/api/admin/customers/${customerId}/portal-credential`, {
+                method: "POST"
             });
-            if (response.ok) {
-                const data = await response.json();
-                setCredential(data.credential);
-                return data.credential;
+
+            if (!response.ok) {
+                await handleApiError(response, "Unable to regenerate portal password.");
+                return null;
             }
+
+            const data = await response.json();
+            const password = data.cleartextPassword as string;
+            setRevealedPasswords(prev => ({ ...prev, [customerId]: password }));
+            return password;
+        } catch {
+            if (onError) onError("Network error regenerating password.");
             return null;
         } finally {
-            setLoading(false);
+            setBusyCustomerId(null);
         }
-    }, []);
+    }, [safeFetch, handleApiError, onError]);
 
     return {
-        credential,
-        loading,
+        revealedPasswords,
+        busyCustomerId,
         reveal,
         regenerate
     };

@@ -1,4 +1,4 @@
-import { AdminCustomersClient } from "@/components/admin-customers-client";
+import { AdminCustomersClient } from "@/components/admin/customers/customers-client";
 import { requireAdmin } from "@/lib/admin/server-auth";
 
 export const metadata = {

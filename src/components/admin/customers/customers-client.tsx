@@ -1,0 +1,301 @@
+"use client";
+
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+
+import { AdminShell } from "@/components/admin/layout/admin-shell";
+import { animateIn, animateOut } from "@/components/motion/tween-orchestrator";
+import { usePresenceExit } from "@/components/motion/use-presence-exit";
+import { CustomerTable } from "@/components/admin/customers/customer-table";
+import { CustomerDialogWrapper } from "@/components/admin/customers/customer-dialog-wrapper";
+import { emptyCustomerForm, customerFormFromRow, type CustomerRow, type CustomerForm } from "@/components/admin/customers/customer-profile-dialog";
+
+import { useCustomers } from "@/lib/admin/use-customers";
+import { useEmailHistory } from "@/lib/admin/use-email-history";
+import { useLearningMaterials } from "@/lib/admin/use-learning-materials";
+import { usePortalCredentials } from "@/lib/admin/use-portal-credentials";
+
+export function AdminCustomersClient() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const searchInputId = useId();
+  
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [customerQuery, setCustomerQuery] = useState("");
+  const [debouncedCustomerQuery, setDebouncedCustomerQuery] = useState("");
+
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+
+  // UI State
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerRow | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [customerForm, setCustomerForm] = useState<CustomerForm>(emptyCustomerForm());
+  const [activeTab, setActiveTab] = useState<"profile" | "emails" | "materials">("profile");
+  const [savingCustomer, setSavingCustomer] = useState(false);
+
+  // Email Composer State
+  const [emailComposerSubject, setEmailComposerSubject] = useState("");
+  const [emailComposerMessage, setEmailComposerMessage] = useState("");
+
+  // Materials State
+  const [materialsBookingId, setMaterialsBookingId] = useState("");
+
+  const dialogPresence = usePresenceExit();
+  const dialogRootRef = useRef<HTMLDivElement | null>(null);
+  const materialsUploadFormRef = useRef<HTMLFormElement | null>(null);
+
+  // Data Hooks
+  const { 
+    customers, 
+    loading: loadingCustomers, 
+    total: totalCount, 
+    totalPages, 
+    load: loadCustomers, 
+    save: saveCustomerApi, 
+    remove: removeCustomerApi 
+  } = useCustomers({
+    pageSize,
+    onError: setError,
+    onAuthError: () => window.location.assign("/admin/login")
+  });
+
+  const {
+    history: emailHistory,
+    loading: loadingEmailHistory,
+    sending: sendingEmail,
+    load: loadEmailHistory,
+    send: sendEmailApi
+  } = useEmailHistory({ onError: setError });
+
+  const {
+    materials: materialsList,
+    bookings: materialsBookings,
+    loading: materialsLoading,
+    uploading: materialsUploading,
+    deletingId: materialsDeletingId,
+    load: loadMaterials,
+    upload: uploadMaterialApi,
+    remove: removeMaterialApi
+  } = useLearningMaterials({ onError: setError });
+
+  const {
+    revealedPasswords: revealedPortalPasswords,
+    busyCustomerId: portalCredentialBusyCustomerId,
+    reveal: revealPortalPasswordApi,
+    regenerate: regeneratePortalPasswordApi
+  } = usePortalCredentials({ onError: setError });
+
+  // Effects
+  useEffect(() => {
+    void loadCustomers(debouncedCustomerQuery, page);
+  }, [debouncedCustomerQuery, page, loadCustomers]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedCustomerQuery(customerQuery), 300);
+    return () => clearTimeout(timer);
+  }, [customerQuery]);
+
+  // Dialog Handlers
+  const openCustomerDialog = useCallback(async (customer: CustomerRow | null, editMode = false) => {
+    setError("");
+    setNotice("");
+    setSelectedCustomer(customer);
+    setIsEditing(editMode);
+    setCustomerForm(customer ? customerFormFromRow(customer) : emptyCustomerForm());
+    setActiveTab("profile");
+
+    if (customer) {
+      void loadEmailHistory(customer.id);
+      void loadMaterials(customer.id);
+    }
+
+    dialogPresence.show();
+    if (dialogRootRef.current) {
+      animateIn(dialogRootRef.current);
+    }
+  }, [dialogPresence, loadEmailHistory, loadMaterials]);
+
+  const closeCustomerDialog = useCallback(async () => {
+    if (dialogRootRef.current) {
+      await animateOut(dialogRootRef.current);
+    }
+    dialogPresence.hide();
+    setSelectedCustomer(null);
+    setIsEditing(false);
+    setCustomerForm(emptyCustomerForm());
+  }, [dialogPresence]);
+
+  // Action Handlers
+  async function saveCustomer() {
+    setError("");
+    setNotice("");
+    setSavingCustomer(true);
+
+    const payload = {
+      ...customerForm,
+      fullName: `${customerForm.firstName.trim()} ${customerForm.lastName.trim()}`
+    };
+
+    const result = await saveCustomerApi(payload, selectedCustomer?.id);
+    setSavingCustomer(false);
+
+    if (result) {
+      setNotice(selectedCustomer ? "Customer updated." : "Customer created.");
+      void loadCustomers(debouncedCustomerQuery, page);
+      
+      if (selectedCustomer) {
+        setSelectedCustomer(result);
+        setCustomerForm(customerFormFromRow(result));
+        setIsEditing(false);
+      } else {
+        void closeCustomerDialog();
+      }
+    }
+  }
+
+  async function deleteCustomer(customer: CustomerRow) {
+    if (!window.confirm(`Are you sure you want to delete ${customer.fullName}? This will archive the customer if they have linked bookings.`)) {
+      return;
+    }
+
+    setError("");
+    setNotice("");
+    const result = await removeCustomerApi(customer.id);
+    
+    if (result) {
+      setNotice(result.archived ? "Customer archived (has linked bookings)." : "Customer deleted.");
+      if (selectedCustomer?.id === customer.id) {
+        void closeCustomerDialog();
+      }
+      void loadCustomers(debouncedCustomerQuery, page);
+    }
+  }
+
+  async function sendCustomerEmail(subject: string, message: string) {
+    if (!selectedCustomer) return;
+    setError("");
+    const success = await sendEmailApi(selectedCustomer.id, subject, message);
+    if (success) {
+      setNotice("Email sent successfully.");
+      setEmailComposerSubject("");
+      setEmailComposerMessage("");
+    }
+  }
+
+  async function uploadMaterial() {
+    if (!selectedCustomer || !materialsUploadFormRef.current) return;
+    setError("");
+    const success = await uploadMaterialApi(selectedCustomer.id, materialsBookingId, materialsUploadFormRef.current);
+    if (success) {
+      setNotice("Material uploaded.");
+      materialsUploadFormRef.current.reset();
+    }
+  }
+
+  async function deleteMaterial(materialId: string) {
+    if (!window.confirm("Are you sure you want to delete this material?")) return;
+    setError("");
+    const success = await removeMaterialApi(materialId);
+    if (success) {
+      setNotice("Material deleted.");
+    }
+  }
+
+  return (
+    <AdminShell 
+      title="Customers" 
+      error={error && !dialogPresence.isMounted ? error : undefined}
+      notice={notice && !dialogPresence.isMounted ? notice : undefined}
+    >
+      <div className="admin-actions-bar">
+        <button className="btn btn-primary" onClick={() => openCustomerDialog(null, true)}>
+          CREATE NEW CUSTOMER
+        </button>
+        <div className="search-box">
+          <label htmlFor={searchInputId}>Search</label>
+          <input
+            id={searchInputId}
+            type="text"
+            value={customerQuery}
+            placeholder="Search by name, email, or phone..."
+            onChange={(event) => setCustomerQuery(event.target.value)}
+          />
+        </div>
+      </div>
+
+      <CustomerTable
+        customers={customers}
+        loadingCustomers={loadingCustomers}
+        deletingCustomerId={null}
+        page={page}
+        pageSize={pageSize}
+        totalCount={totalCount}
+        totalPages={totalPages}
+        onSetPage={setPage}
+        onSetPageSize={(size) => {
+          setPageSize(size);
+          setPage(1);
+        }}
+        onOpenCustomerDialog={openCustomerDialog}
+        onDeleteCustomer={deleteCustomer}
+        onViewInvoices={(name) => router.push(`/admin/invoices?q=${encodeURIComponent(name)}`)}
+      />
+
+      {dialogPresence.isMounted && (
+        <CustomerDialogWrapper
+          dialogRootRef={dialogRootRef}
+          selectedCustomer={selectedCustomer}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isEditing={isEditing}
+          customerForm={customerForm}
+          setCustomerForm={setCustomerForm}
+          savingCustomer={savingCustomer}
+          onSaveCustomer={saveCustomer}
+          onClose={closeCustomerDialog}
+          error={error}
+          notice={notice}
+          
+          // Email History
+          loadingEmailHistory={loadingEmailHistory}
+          emailHistory={emailHistory}
+          emailComposerSubject={emailComposerSubject}
+          setEmailComposerSubject={setEmailComposerSubject}
+          emailComposerMessage={emailComposerMessage}
+          setEmailComposerMessage={setEmailComposerMessage}
+          sendingEmail={sendingEmail}
+          onSendEmail={sendCustomerEmail}
+
+          // Learning Materials
+          materialsList={materialsList}
+          materialsBookings={materialsBookings}
+          materialsLoading={materialsLoading}
+          materialsUploading={materialsUploading}
+          materialsDeletingId={materialsDeletingId}
+          materialsBookingId={materialsBookingId}
+          setMaterialsBookingId={setMaterialsBookingId}
+          materialsUploadFormRef={materialsUploadFormRef}
+          onUploadMaterial={uploadMaterial}
+          onDeleteMaterial={(m) => deleteMaterial(m)}
+          onMaterialBookingSelect={loadMaterials}
+
+          // Portal Credentials
+          revealedPortalPasswords={revealedPortalPasswords}
+          portalCredentialBusyCustomerId={portalCredentialBusyCustomerId}
+          onRevealPortalPassword={() => selectedCustomer && revealPortalPasswordApi(selectedCustomer.id)}
+          onRegeneratePortalPassword={() => selectedCustomer && regeneratePortalPasswordApi(selectedCustomer.id)}
+          
+          // Action handlers for profile tab
+          onCancelEdit={() => setIsEditing(false)}
+          onStartEdit={() => setIsEditing(true)}
+          onDeleteCustomer={() => selectedCustomer && deleteCustomer(selectedCustomer)}
+          onViewBillingHistory={() => selectedCustomer && router.push(`/admin/invoices?q=${encodeURIComponent(selectedCustomer.fullName)}`)}
+          deletingCustomerId={null}
+        />
+      )}
+    </AdminShell>
+  );
+}

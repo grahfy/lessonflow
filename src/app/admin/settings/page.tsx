@@ -1,4 +1,4 @@
-import { AdminSettingsClient } from "@/components/admin-settings-client";
+import { AdminSettingsClient } from "@/components/admin/settings/settings-client";
 import { requireAdmin } from "@/lib/admin/server-auth";
 
 export const metadata = {

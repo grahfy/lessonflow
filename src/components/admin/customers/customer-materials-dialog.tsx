@@ -14,7 +14,7 @@ type Props = {
     materialsDeletingId: string | null;
     materialsUploadFormRef: RefObject<HTMLFormElement | null>;
     onUpload: () => void;
-    onDelete: (material: LearningMaterialRow) => void;
+    onDelete: (id: string) => void;
     onBookingSelect: (bookingId: string) => void;
 };
 
@@ -53,7 +53,7 @@ export function CustomerMaterialsDialog({
                                             className="btn btn-danger"
                                             style={{ padding: '4px 8px', fontSize: '0.7rem' }}
                                             disabled={materialsDeletingId === m.id}
-                                            onClick={() => void onDelete(m)}
+                                            onClick={() => void onDelete(m.id)}
                                         >
                                             {materialsDeletingId === m.id ? '...' : 'DEL'}
                                         </button>

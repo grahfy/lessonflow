@@ -10,7 +10,7 @@ type Props = {
     emailComposerMessage: string;
     setEmailComposerMessage: (val: string) => void;
     sendingEmail: boolean;
-    onSendEmail: () => void;
+    onSendEmail: (subject: string, message: string) => void;
 };
 
 export function CustomerEmailDialog({
@@ -76,7 +76,7 @@ export function CustomerEmailDialog({
                             className="btn btn-primary"
                             type="button"
                             disabled={sendingEmail || !emailComposerSubject.trim() || !emailComposerMessage.trim()}
-                            onClick={onSendEmail}
+                            onClick={() => onSendEmail(emailComposerSubject, emailComposerMessage)}
                         >
                             {sendingEmail ? "Sending..." : "Send Email"}
                         </button>

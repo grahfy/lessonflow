@@ -1,4 +1,4 @@
-import { AdminBookingsClient } from "@/components/admin-bookings-client";
+import { AdminBookingsClient } from "@/components/admin/bookings/bookings-client";
 import { requireAdmin } from "@/lib/admin/server-auth";
 
 export const metadata = {

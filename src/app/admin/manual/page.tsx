@@ -1,4 +1,4 @@
-import { AdminManualClient } from "@/components/admin-manual-client";
+import { AdminManualClient } from "@/components/admin/manual/manual-client";
 import { requireAdmin } from "@/lib/admin/server-auth";
 import { getAdminManualIndex } from "@/lib/manual/content";
 
