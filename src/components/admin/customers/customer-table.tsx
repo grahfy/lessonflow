@@ -34,36 +34,33 @@ export function CustomerTable({
     onViewInvoices
 }: Props) {
     return (
-        <div className="admin-card invoice-list-card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-            <div className="customers-list" style={{ flex: 1, overflowY: 'auto', maxHeight: 'none', gap: '0', padding: 0 }}>
-                {customers.length ? (
-                    <div className="customer-item customer-list-header" style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '12px 16px',
-                        gap: '12px',
-                        width: '100%',
-                        border: 'none',
-                        borderBottom: '1px solid var(--line)',
-                        background: 'var(--admin-card-bg)',
-                        borderRadius: 0,
-                        position: 'sticky',
-                        top: 0,
-                        zIndex: 10
-                    }}>
-                        <div style={{ flex: '1', minWidth: '180px', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Customer / Email</div>
-                        <Separator />
-                        <div style={{ width: '110px', textAlign: 'center', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Phone</div>
-                        <Separator />
-                        <div style={{ width: '120px', textAlign: 'center', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Skill / Mode</div>
-                        <Separator />
-                        <div style={{ flex: '0.8', minWidth: '150px', textAlign: 'center', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Portal Status</div>
-                        <Separator />
-                        <div style={{ width: '240px', textAlign: 'right', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Actions</div>
-                    </div>
-                ) : null}
-
-                <div style={{ display: 'grid', gap: '0', padding: '0' }}>
+      <div className="admin-card invoice-list-card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+          {customers.length ? (
+              <div className="customer-item customer-list-header" style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '12px 16px',
+                  gap: '12px',
+                  width: '100%',
+                  border: 'none',
+                  borderBottom: '1px solid var(--line)',
+                  background: 'rgba(8, 11, 28, 0.84)',
+                  borderRadius: 0,
+                  flexShrink: 0
+              }}>
+                  <div style={{ flex: '1', minWidth: '180px', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Customer / Email</div>
+                  <Separator />
+                  <div style={{ width: '110px', textAlign: 'center', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Phone</div>
+                  <Separator />
+                  <div style={{ width: '120px', textAlign: 'center', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Skill / Mode</div>
+                  <Separator />
+                  <div style={{ flex: '0.8', minWidth: '150px', textAlign: 'center', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Portal Status</div>
+                  <Separator />
+                  <div style={{ width: '240px', textAlign: 'right', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Actions</div>
+              </div>
+          ) : null}
+          <div className="customers-list" style={{ flex: 1, overflowY: 'auto', maxHeight: 'none', gap: '0', padding: 0, background: 'rgba(8, 11, 28, 0.84)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0', padding: '0' }}>
                     {customers.length ? (
                         customers.map((customer) => (
                             <div
@@ -78,7 +75,8 @@ export function CustomerTable({
                                     width: '100%',
                                     borderRadius: 0,
                                     border: 'none',
-                                    borderBottom: '1px solid var(--line)'
+                                    borderBottom: '1px solid var(--line)',
+                                    background: 'rgba(8, 11, 28, 0.84)'
                                 }}
                                 onClick={() => onOpenCustomerDialog(customer, false)}
                             >

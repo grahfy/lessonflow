@@ -561,9 +561,8 @@ export function AdminInvoicesClient() {
       {loading ? <p className="notice">Loading...</p> : null}
 
       <div className="admin-card invoice-list-card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-        <div className="customers-list" style={{ flex: 1, overflowY: 'auto', maxHeight: 'none', gap: '0', padding: 0 }}>
-          {invoices.length ? (
-            <div className="customer-item invoice-item invoice-list-header" style={{
+        {invoices.length ? (
+          <div className="customer-item invoice-item invoice-list-header" style={{
               display: 'flex',
               alignItems: 'center',
               padding: '12px 16px',
@@ -571,11 +570,9 @@ export function AdminInvoicesClient() {
               width: '100%',
               border: 'none',
               borderBottom: '1px solid var(--line)',
-              background: 'var(--admin-card-bg)',
+              background: 'rgba(8, 11, 28, 0.84)',
               borderRadius: 0,
-              position: 'sticky',
-              top: 0,
-              zIndex: 10
+              flexShrink: 0
             }}>
               <div style={{ minWidth: '125px', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Invoice #</div>
               <Separator />
@@ -589,14 +586,14 @@ export function AdminInvoicesClient() {
               <Separator />
               <div style={{ width: '280px', textAlign: 'right', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Actions</div>
             </div>
-          ) : null}
-
-          <div style={{ display: 'grid', gap: '0', padding: '0' }}>
+        ) : null}
+        <div className="customers-list" style={{ flex: 1, overflowY: 'auto', maxHeight: 'none', gap: '0', padding: 0, background: 'rgba(8, 11, 28, 0.84)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0', padding: '0' }}>
             {invoices.map((invoice) => (
               <div
                 key={invoice.id}
                 className="customer-item invoice-item"
-                style={{
+style={{
                   display: 'flex',
                   alignItems: 'center',
                   padding: '12px 16px',
@@ -606,7 +603,8 @@ export function AdminInvoicesClient() {
                   border: 'none',
                   borderBottom: '1px solid var(--line)',
                   minHeight: '52px',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  background: 'rgba(8, 11, 28, 0.84)'
                 }}
                 onClick={() => openInvoice(invoice)}
               >

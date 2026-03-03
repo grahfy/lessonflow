@@ -62,13 +62,15 @@ export function AdminCustomersClient() {
   const searchInputId = useId();
   const openCustomerDialogRef = useRef<typeof openCustomerDialog | null>(null);
 
+  const handleAuthError = useCallback(() => {
+    if (authRedirectingRef.current) return;
+    authRedirectingRef.current = true;
+    setError("");
+    window.location.assign("/admin/login");
+  }, []); // Empty deps - authRedirectingRef.current and setError are stable
+
   const { safeFetch, handleApiError } = useSafeFetch({
-    onAuthError: () => {
-      if (authRedirectingRef.current) return;
-      authRedirectingRef.current = true;
-      setError("");
-      window.location.assign("/admin/login");
-    },
+    onAuthError: handleAuthError,
     onError: setError
   });
 
