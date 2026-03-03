@@ -33,3 +33,4 @@
 ## Phase: Review Fixes
 - [x] Task: Apply review suggestions [93e00c8]
 - [x] Task: Fix infinite re-render loops and UI state bugs [90066c5]
+- [x] Task: Resolve UI regressions in Bookings, Invoices, and Customers [4b0ba0e]
