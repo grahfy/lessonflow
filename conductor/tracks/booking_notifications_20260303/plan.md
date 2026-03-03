@@ -13,7 +13,7 @@ Identify and document all existing notification triggers and their current imple
 ## Phase 2: Baseline Testing
 Create integration tests to verify the current behavior of all identified notification flows.
 
-- [ ] Task: Write failing tests for booking request submission owner notifications.
+- [~] Task: Write failing tests for booking request submission owner notifications.
 - [ ] Task: Implement/verify owner notification tests.
 - [ ] Task: Write failing tests for customer notifications on status changes (Approve/Reject).
 - [ ] Task: Implement/verify status change notification tests.
