@@ -2,13 +2,13 @@
 
 This plan outlines the steps to audit, verify, and consolidate booking-related notification workflows in LessonFlow.
 
-## Phase 1: Research & Audit
+## Phase 1: Research & Audit [checkpoint: 9ce7093]
 Identify and document all existing notification triggers and their current implementations.
 
 - [x] Task: Audit `src/lib/booking-events.ts` and document all public functions and their parameters. [f68f8d8]
 - [x] Task: Trace calls to `booking-events.ts` from API routes to identify all notification triggers. [746582b]
 - [x] Task: Document the current state of error handling and audit logging for each trigger. [6f8c4e8]
-- [ ] Task: Conductor - User Manual Verification 'Research & Audit' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Research & Audit' (Protocol in workflow.md) [9ce7093]
 
 ## Phase 2: Baseline Testing
 Create integration tests to verify the current behavior of all identified notification flows.
