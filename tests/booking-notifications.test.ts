@@ -5,6 +5,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { POST } from "@/app/api/booking-requests/route";
 import { PATCH as patchBookingRequest } from "@/app/api/admin/booking-requests/[id]/route";
+import { PATCH as patchBooking } from "@/app/api/admin/bookings/[id]/route";
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
 
 function adminRequest(url: string, body: Record<string, unknown>, token: string): NextRequest {
@@ -123,5 +124,39 @@ describe("booking-notifications", () => {
     });
     expect(outboundEmails.length).toBeGreaterThan(0);
     expect(outboundEmails[0].subject.toLowerCase()).toContain("approved");
+  });
+
+  it("records an outbound email for the customer when a booking is moved", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const booking = await prisma.booking.create({
+      data: {
+        name: "Move Me",
+        email: "move@example.com",
+        phone: "0400-000-000",
+        address: "123 Fake St",
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min30",
+        startAt: new Date("2026-06-01T09:00:00.000Z"),
+        endAt: new Date("2026-06-01T09:30:00.000Z"),
+        timezone: "Australia/Melbourne"
+      }
+    });
+
+    const request = adminRequest(`http://localhost/api/admin/bookings/${booking.id}`, {
+      action: "move",
+      newStartAt: "2026-06-01T10:00:00.000Z"
+    }, token);
+
+    const response = await patchBooking(request, { params: Promise.resolve({ id: booking.id }) });
+    expect(response.status).toBe(200);
+
+    const outboundEmails = await prisma.outboundEmail.findMany({
+      where: { toEmail: "move@example.com" }
+    });
+    expect(outboundEmails.length).toBeGreaterThan(0);
+    expect(outboundEmails[0].subject.toLowerCase()).toContain("rescheduled");
   });
 });
