@@ -1,12 +1,13 @@
 # LessonFlow
 
 <p align="center">
-  <img src="public/images/lessonflow-logo.svg" alt="LessonFlow logo" width="640" />
+  <img src="public/images/lessonflow_logo.jpg" alt="LessonFlow logo" />
 </p>
 
 LessonFlow is an MIT-licensed platform for individual music teachers and music schools who want to automate the admin work around lessons.
 
 It combines appointment workflows, invoicing, reporting, and a student portal with learning materials that can be:
+
 - assigned to a specific student,
 - linked to a specific appointment, or
 - stored as general (not appointment-linked) resources.
@@ -14,6 +15,7 @@ It combines appointment workflows, invoicing, reporting, and a student portal wi
 ## What LessonFlow Solves
 
 Music teaching businesses often juggle multiple tools for:
+
 - booking requests,
 - calendars,
 - customer records,
@@ -72,24 +74,31 @@ LessonFlow brings those workflows into one system so teachers and admins can spe
 LessonFlow is designed to be easily rebranded for any music school or subject.
 
 ### 1. Branding & Identity
+
 Key school details are managed via environment variables. Use the **Setup Wizard** (`/setup`) or the **Admin Panel** (`/admin/settings` -> Branding) to configure:
+
 - **Brand Name:** e.g., "Sydney Piano Studio"
 - **Primary Subject:** e.g., "Piano"
 - **Primary Location:** e.g., "Sydney"
 - **Logos:** Custom URLs for site and invoice logos.
 
 ### 2. Content Management (CMS)
+
 You can edit most public-facing text and images directly in the **Admin Panel** under the **Pages** tab. This allows you to customize:
+
 - Hero titles and lead text.
 - Experience metrics and highlights.
 - Promotional copy.
 
 ### 3. Email & Invoice Templates
+
 Communication templates are fully customizable via the **Emails** and **Invoices** tabs in Admin Settings:
+
 - **Email Templates:** Edit subjects and bodies using placeholders like `{{customerName}}` and `{{lessonTime}}`.
 - **Invoices:** Customize accent colors, footer text, and header information for generated PDFs.
 
 ### 4. Products & Fees
+
 Manage your own lesson packages and pricing in the **Products** tab. These presets will be available in the invoice creator for quick billing.
 
 ## Admin Screenshots
@@ -142,6 +151,7 @@ Tracked admin screenshots already exist in the repository (including a Playwrigh
 ### Important Routes
 
 Public:
+
 - `/`
 - `/lessons`
 - `/teacher`
@@ -151,6 +161,7 @@ Public:
 - `/terms`
 
 Admin:
+
 - `/setup`
 - `/admin/login`
 - `/admin/bookings`
@@ -160,6 +171,7 @@ Admin:
 - `/admin/manual`
 
 Student:
+
 - `/student/login`
 - `/student/portal`
 - `/student/materials`
@@ -176,6 +188,7 @@ This project is designed to be self-hosted. The recommended entry points for pro
 Use `update.sh` for routine server maintenance and `deploy.sh` for direct release execution.
 
 `deploy/update.sh` (wrapper):
+
 - runs from your persistent git clone on the server
 - can `fetch`/`pull` the selected branch (ff-only)
 - shows an interactive two-column TUI for workflow + deploy pass-through settings
@@ -184,6 +197,7 @@ Use `update.sh` for routine server maintenance and `deploy.sh` for direct releas
 - then calls `deploy.sh` with the selected options
 
 `deploy/deploy.sh` (release engine):
+
 - builds a timestamped release under `/var/www/lessonflow/releases`
 - links shared files/dirs (`shared/.env`, `shared/data`)
 - runs dependency install, Prisma generate, migrations, build, and service restarts
@@ -191,6 +205,7 @@ Use `update.sh` for routine server maintenance and `deploy.sh` for direct releas
 - can be run directly for first installs or advanced/manual workflows
 
 Interactive TUI notes:
+
 - `update.sh` includes a remote update alert line (above “Update Workflow Options”) that highlights a newer remote commit hash + one-line subject when available.
 - `update.sh` handles update/deploy orchestration and wrapper-level helper actions, while MySQL+DB bootstrap is handled directly in `deploy.sh`.
 - `deploy.sh` supports immediate bootstrap actions `J` (managed cron jobs), `M` (MySQL+DB), `N` (Nginx), `P` (PHP-FPM-if-needed), `U` (app systemd service), plus workflow toggles for `MySQL + create DB`, `Install cron/crond`, and `Install Nginx`.
@@ -198,11 +213,13 @@ Interactive TUI notes:
 ### 1. Server prerequisites
 
 Recommended target:
+
 - Ubuntu/Debian VM or DigitalOcean Droplet (other Linux distros may work)
 - sudo/root access
 - domain name (optional at first, recommended for production)
 
 You will also need:
+
 - Git
 - a clone of this repository on the server
 
@@ -220,6 +237,7 @@ Both `deploy.sh` and `update.sh` now manage a shared env file at:
 - `/var/www/lessonflow/shared/.env`
 
 Behavior:
+
 - If the shared `.env` file does not exist, the scripts copy `.env.example` into place.
 - In interactive runs, the scripts can open the shared `.env` in a terminal editor.
 - `update.sh` and `deploy.sh` both include an explicit TUI action to edit the shared `.env` on demand.
@@ -234,6 +252,7 @@ Use `update.sh` (wrapper) for most server bootstrap tasks and `deploy.sh` (direc
 `update.sh` is usually the best day-to-day entry point because it handles `git fetch/pull` before invoking `deploy.sh`, while `deploy.sh` remains the place for MySQL+DB bootstrap from the shared `.env`.
 
 Recommended order on a fresh VPS/Droplet:
+
 1. Edit shared `.env` (`./deploy/update.sh --interactive` or `./deploy/deploy.sh --interactive`)
 2. Install cron/crond scheduler (if missing)
 3. Install Nginx (if missing)
@@ -254,6 +273,7 @@ Recommended order on a fresh VPS/Droplet:
 ```
 
 Notes:
+
 - Installs `cron` or `cronie` depending on the Linux distribution
 - Enables + starts `cron` / `crond` (best effort)
 
@@ -275,6 +295,7 @@ Notes:
 ```
 
 Notes:
+
 - Reads `DATABASE_URL` from `/var/www/lessonflow/shared/.env`
 - Only supports local DB hosts (`localhost` / `127.0.0.1`) for this helper
 - Creates the database only if it does not already exist
@@ -303,6 +324,7 @@ For this project’s Next.js deployment, PHP-FPM is typically not required. The 
 ```
 
 Notes:
+
 - Installs/updates `/etc/systemd/system/lessonflow.service`
 - Runs `systemctl daemon-reload`
 - Enables the service and attempts to start it if `/var/www/lessonflow/current` exists
@@ -318,6 +340,7 @@ Notes:
 ```
 
 Notes:
+
 - Installs/updates the managed root crontab block used by LessonFlow scheduled jobs
 - Restarts `cron` / `crond` (best effort)
 - Can be run before the first deploy, but jobs will only execute successfully once `current/deploy/cron.sh` exists
@@ -337,6 +360,7 @@ Or direct deploy:
 ```
 
 What the deploy script handles:
+
 - creates a release directory under `/var/www/lessonflow/releases`
 - links shared resources (`.env`, `.data`)
 - installs dependencies (unless skipped)
@@ -347,6 +371,7 @@ What the deploy script handles:
 - restarts services and syncs managed cron jobs (unless skipped)
 
 Interactive `deploy.sh` notes:
+
 - Option `10` opens the shared production `.env` editor (and bootstraps the file from `.env.example` if missing).
 - Options `11-13` are bootstrap workflow toggles that run during `Start deploy`:
   - `11` MySQL + create DB
@@ -371,12 +396,14 @@ Or non-interactive:
 ```
 
 `update.sh`:
+
 - fetches/pulls latest git changes (ff-only)
 - provides immediate helper actions (Nginx/PHP-FPM/systemd service/cron jobs)
 - passes selected bootstrap workflow toggles through to `deploy.sh` during deploy runs (to avoid duplicate setup routines)
 - delegates the actual release deploy to `deploy.sh`
 
 Interactive `update.sh` notes:
+
 - Shows a cached remote update check alert (when the selected remote branch has a newer commit than local).
 - Option `10` opens the shared `.env` editor.
 - Options `11-15` are bootstrap workflow toggles (cron, app service, cron jobs, Nginx, PHP-FPM) that run during `Start update/deploy` when enabled.
@@ -509,6 +536,7 @@ npm run prisma:studio
 Use `.env.example` as the starting template.
 
 Key groups:
+
 - Database: `DATABASE_URL` (MySQL)
 - Sessions/security: `ADMIN_SESSION_SECRET`, `STUDENT_SESSION_SECRET`, `CRON_SECRET`
 - Student portal: password encryption key + session settings
@@ -519,16 +547,19 @@ Key groups:
 ## Scheduled Jobs / Automation
 
 Protected job endpoints use:
+
 - header `x-cron-secret: <CRON_SECRET>`
 
 `deploy/cron.sh` reads `NEXT_PUBLIC_SITE_URL` and `CRON_SECRET` from the shared deploy `.env` file (`/var/www/lessonflow/shared/.env`) so cron jobs use the same URL/secret as the running app.
 
 Examples include:
+
 - daily bookings digest
 - invoice reminders
 - admin operations reports (daily/weekly/monthly/yearly)
 
 See:
+
 - `vercel.json`
 - `Documentation/digitalocean-admin-operations.md`
 
