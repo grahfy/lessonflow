@@ -1,8 +1,22 @@
 import { addDays } from "date-fns";
 import { beforeEach, describe, expect, it } from "vitest";
+import { NextRequest } from "next/server";
 
 import { prisma } from "@/lib/db";
 import { POST } from "@/app/api/booking-requests/route";
+import { PATCH as patchBookingRequest } from "@/app/api/admin/booking-requests/[id]/route";
+import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
+
+function adminRequest(url: string, body: Record<string, unknown>, token: string): NextRequest {
+  return new NextRequest(url, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+    headers: {
+      "content-type": "application/json",
+      cookie: `${getSessionCookieName()}=${token}`
+    }
+  });
+}
 
 describe("booking-notifications", () => {
   beforeEach(async () => {
@@ -47,5 +61,67 @@ describe("booking-notifications", () => {
     const ownerEmail = outboundEmails.find(e => e.subject.toLowerCase().includes("new booking request"));
     expect(ownerEmail).toBeDefined();
     expect(ownerEmail?.toEmail).toBe("admin@example.com");
+  });
+
+  it("records an outbound email for the customer when a booking request is rejected", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const bookingRequest = await prisma.bookingRequest.create({
+      data: {
+        name: "Reject Me",
+        email: "reject@example.com",
+        phone: "0400-000-000",
+        address: "123 Fake St",
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min30",
+        requestedStartAt: addDays(new Date(), 7)
+      }
+    });
+
+    const request = adminRequest(`http://localhost/api/admin/booking-requests/${bookingRequest.id}`, {
+      action: "reject"
+    }, token);
+
+    const response = await patchBookingRequest(request, { params: Promise.resolve({ id: bookingRequest.id }) });
+    expect(response.status).toBe(200);
+
+    const outboundEmails = await prisma.outboundEmail.findMany({
+      where: { toEmail: "reject@example.com" }
+    });
+    expect(outboundEmails.length).toBeGreaterThan(0);
+    expect(outboundEmails[0].subject.toLowerCase()).toContain("booking");
+  });
+
+  it("records an outbound email for the customer when a booking request is approved", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const bookingRequest = await prisma.bookingRequest.create({
+      data: {
+        name: "Approve Me",
+        email: "approve@example.com",
+        phone: "0400-000-000",
+        address: "123 Fake St",
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min30",
+        requestedStartAt: addDays(new Date(), 7)
+      }
+    });
+
+    const request = adminRequest(`http://localhost/api/admin/booking-requests/${bookingRequest.id}`, {
+      action: "approve"
+    }, token);
+
+    const response = await patchBookingRequest(request, { params: Promise.resolve({ id: bookingRequest.id }) });
+    expect(response.status).toBe(200);
+
+    const outboundEmails = await prisma.outboundEmail.findMany({
+      where: { toEmail: "approve@example.com" }
+    });
+    expect(outboundEmails.length).toBeGreaterThan(0);
+    expect(outboundEmails[0].subject.toLowerCase()).toContain("confirmed");
   });
 });
