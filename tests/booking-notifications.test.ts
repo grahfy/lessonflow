@@ -6,6 +6,7 @@ import { POST } from "@/app/api/booking-requests/route";
 
 describe("booking-notifications", () => {
   beforeEach(async () => {
+    process.env.ADMIN_EMAIL = "admin@example.com";
     await prisma.outboundEmail.deleteMany();
     await prisma.booking.deleteMany();
     await prisma.bookingSeries.deleteMany();
@@ -45,6 +46,6 @@ describe("booking-notifications", () => {
     
     const ownerEmail = outboundEmails.find(e => e.subject.toLowerCase().includes("new booking request"));
     expect(ownerEmail).toBeDefined();
-    expect(ownerEmail?.to).toBe(process.env.ADMIN_EMAIL || "admin@example.com");
+    expect(ownerEmail?.toEmail).toBe("admin@example.com");
   });
 });
