@@ -8,6 +8,8 @@ import { useRouter } from "next/navigation";
 import { AdminBookingCalendar, AdminCalendarEvent } from "@/components/admin-booking-calendar";
 import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminCard } from "@/components/admin/ui/admin-card";
+import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { animateIn, animateOut } from "@/components/motion/tween-orchestrator";
 import { usePresenceExit } from "@/components/motion/use-presence-exit";
 
@@ -1709,8 +1711,8 @@ export function AdminBookingsClient() {
   return (
     <AdminShell
       title="LessonFlow Booking Console"
-      error={error && !manualDialogPresence.isMounted && !learningMaterialsDialogPresence.isMounted && !dialogPresence.isMounted && !emailDialogPresence.isMounted ? error : undefined}
-      notice={notice && !manualDialogPresence.isMounted && !learningMaterialsDialogPresence.isMounted && !dialogPresence.isMounted && !emailDialogPresence.isMounted ? notice : undefined}
+      error={error && !manualDialogPresence.isMounted && !materialsDialogPresence.isMounted && !dialogPresence.isMounted && !emailDialogPresence.isMounted ? error : undefined}
+      notice={notice && !manualDialogPresence.isMounted && !materialsDialogPresence.isMounted && !dialogPresence.isMounted && !emailDialogPresence.isMounted ? notice : undefined}
       loading={loading}
       style={{ height: '100dvh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
     >
@@ -1760,7 +1762,7 @@ export function AdminBookingsClient() {
           selectedEventId={selectedKey}
           onSelect={(event) => openDialog(event as EventWithRow)}
         />
-      </div>
+      </AdminCard>
 
       <AdminDialog
         isOpen={manualDialogPresence.isMounted}
@@ -2079,7 +2081,8 @@ export function AdminBookingsClient() {
           </div>
         )}
       >
-        <form className="dialog-form" onSubmit={(e) => e.preventDefault()}>
+        {dialogForm && (
+          <form className="dialog-form" onSubmit={(e) => e.preventDefault()}>
           <div className="booking-dialog-scroll">
             <div className="dialog-layout">
               {activeTab === 'appointment' ? (
@@ -2213,6 +2216,7 @@ export function AdminBookingsClient() {
             </div>
           </div>
         </form>
+        )}
       </AdminDialog>
 
       {materialsDialogPresence.isMounted ? (

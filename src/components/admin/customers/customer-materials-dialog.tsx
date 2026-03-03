@@ -43,8 +43,8 @@ export function CustomerMaterialsDialog({
                             {materialsList.map((m) => (
                                 <div key={m.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid var(--line)', gap: '12px' }}>
                                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                                        <strong style={{ fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.filename}</strong>
-                                        <span style={{ fontSize: '0.75rem', color: 'var(--ink-2)' }}>{m.contentType} · {formatDateTime(m.createdAt)}</span>
+                                        <strong style={{ fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</strong>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--ink-2)' }}>{m.mimeType} · {formatDateTime(m.createdAt)}</span>
                                     </div>
                                     <div style={{ fontSize: '0.8rem', color: 'var(--ink-1)' }}>{(m.sizeBytes / 1024 / 1024).toFixed(2)} MB</div>
                                     <div style={{ display: 'flex', gap: '4px' }}>

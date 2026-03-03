@@ -83,7 +83,7 @@ export function AdminManualSectionClient({
         <div className="admin-manual-content-wrapper">
           <section className="admin-manual-content">
             <h1>{section.title}</h1>
-            <p className="lead">{section.description}</p>
+            <p className="lead">{section.summary}</p>
 
             <div className="admin-manual-html" dangerouslySetInnerHTML={{ __html: section.html }} />
 
@@ -92,7 +92,7 @@ export function AdminManualSectionClient({
                 {screenshots.map((s) => (
                   <figure key={s.id} className="admin-manual-screenshot-figure">
                     <Image
-                      src={s.url}
+                      src={s.publicPath}
                       alt={s.alt}
                       width={1200}
                       height={800}

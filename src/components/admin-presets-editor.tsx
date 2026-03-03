@@ -98,7 +98,7 @@ export function AdminPresetsEditor() {
                   <input value={p.label} onChange={e => updatePreset(p.id, { label: e.target.value })} />
                 </AdminField>
                 <AdminField label="Price (AUD)" required>
-                  <input value={toMoneyInput(p.unitPriceCents)} onChange={e => updatePreset(p.id, { unitPriceCents: parseAudInputToCents(e.target.value) })} />
+                  <input value={toMoneyInput(p.unitPriceCents)} onChange={e => updatePreset(p.id, { unitPriceCents: parseAudInputToCents(e.target.value).cents || 0 })} />
                 </AdminField>
                 <AdminField label="Default Description" fullWidth>
                   <textarea value={p.description} style={{ minHeight: '60px' }} onChange={e => updatePreset(p.id, { description: e.target.value })} />
@@ -119,7 +119,7 @@ export function AdminPresetsEditor() {
                 <input placeholder="e.g. 10 Week Term" value={newPreset.label} onChange={e => setNewPreset(prev => ({ ...prev, label: e.target.value }))} />
               </AdminField>
               <AdminField label="Price (AUD)">
-                <input placeholder="0.00" value={toMoneyInput(newPreset.unitPriceCents || 0)} onChange={e => setNewPreset(prev => ({ ...prev, unitPriceCents: parseAudInputToCents(e.target.value) }))} />
+                <input placeholder="0.00" value={toMoneyInput(newPreset.unitPriceCents || 0)} onChange={e => setNewPreset(prev => ({ ...prev, unitPriceCents: parseAudInputToCents(e.target.value).cents || 0 }))} />
               </AdminField>
               <AdminField label="Default Description" fullWidth>
                 <textarea placeholder="Line item text..." value={newPreset.description} style={{ minHeight: '60px' }} onChange={e => setNewPreset(prev => ({ ...prev, description: e.target.value }))} />

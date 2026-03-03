@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
+import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AdminTable, AdminTableSeparator as Separator } from "@/components/admin/ui/admin-table";
 import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
@@ -87,12 +88,12 @@ function toCurrency(cents: number, currency: string) {
 export function AdminInvoicesClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { safeFetch, handleApiError } = useSafeFetch();
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busyAction, setBusyAction] = useState<string | null>(null);
+
+  const { safeFetch, handleApiError } = useSafeFetch({ onError: setError });
 
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -131,8 +132,7 @@ export function AdminInvoicesClient() {
       const response = await safeFetch(`/api/admin/invoices?${params.toString()}`);
       if (!response) return;
       if (!response.ok) {
-        await handleApiError(response, "Unable to load invoices.", setError);
-        return;
+        await handleApiError(response, "Unable to load invoices.");
       }
       const data = await response.json() as InvoicesResponse;
       setInvoices(data.invoices);
@@ -270,8 +270,7 @@ export function AdminInvoicesClient() {
       });
       if (!response) return;
       if (!response.ok) {
-        await handleApiError(response, "Unable to save invoice edits.", setError);
-        return;
+        await handleApiError(response, "Unable to save invoice edits.");
       }
       const updated = await response.json() as InvoiceRow;
       setInvoices((prev) => prev.map((inv) => (inv.id === updated.id ? updated : inv)));
@@ -308,7 +307,7 @@ export function AdminInvoicesClient() {
       });
       if (!response) return;
       if (!response.ok) {
-        await handleApiError(response, `Unable to perform ${action}.`, setError);
+        await handleApiError(response, `Unable to perform ${action}.`);
         return;
       }
       const updated = await response.json() as InvoiceRow;
@@ -347,7 +346,7 @@ export function AdminInvoicesClient() {
       });
       if (!response) return;
       if (!response.ok) {
-        await handleApiError(response, "Unable to create invoice.", setError);
+        await handleApiError(response, "Unable to create invoice.");
         return;
       }
       const newInvoice = await response.json() as InvoiceRow;
@@ -372,7 +371,7 @@ export function AdminInvoicesClient() {
       const response = await safeFetch("/api/admin/invoices/bulk-reminders", { method: "POST" });
       if (!response) return;
       if (!response.ok) {
-        await handleApiError(response, "Unable to send bulk reminders.", setError);
+        await handleApiError(response, "Unable to send bulk reminders.");
         return;
       }
       const data = await response.json() as { count: number };

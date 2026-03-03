@@ -60,7 +60,7 @@ export function AdminManualClient({ content }: AdminManualClientProps) {
               {grouped.allAdmins.map((section) => (
                 <Link key={section.id} href={`/admin/manual/${section.id}`} className="admin-manual-card">
                   <h3>{section.title}</h3>
-                  <p>{section.description}</p>
+                  <p>{section.summary}</p>
                 </Link>
               ))}
             </div>
@@ -74,7 +74,7 @@ export function AdminManualClient({ content }: AdminManualClientProps) {
                 {grouped.techOwners.map((section) => (
                   <Link key={section.id} href={`/admin/manual/${section.id}`} className="admin-manual-card">
                     <h3>{section.title}</h3>
-                    <p>{section.description}</p>
+                    <p>{section.summary}</p>
                   </Link>
                 ))}
               </div>

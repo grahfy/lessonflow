@@ -17,13 +17,13 @@ const createCustomerSchema = z.object({
   phone: auPhoneSchema,
   skillLevel: skillLevelSchema.default("beginner"),
   lessonMode: lessonModeSchema.default("in_person"),
-  unitNumber: z.string().trim().regex(/^\d{1,5}$/).optional().nullable(),
-  houseNumber: z.string().trim().regex(/^\d{1,5}$/).optional(),
-  streetName: z.string().trim().max(120).optional(),
-  streetType: z.string().trim().max(40).optional(),
-  suburb: z.string().trim().max(80).optional(),
-  state: auStateSchema.optional(),
-  postcode: auPostcodeSchema.optional()
+  unitNumber: z.string().trim().max(20).optional().nullable(),
+  houseNumber: z.string().trim().max(20).optional().default(""),
+  streetName: z.string().trim().max(120).optional().default(""),
+  streetType: z.string().trim().max(40).optional().default(""),
+  suburb: z.string().trim().max(80).optional().default(""),
+  state: auStateSchema.optional().default("VIC"),
+  postcode: auPostcodeSchema.optional().default("3000")
 });
 
 /**

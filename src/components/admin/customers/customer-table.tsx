@@ -1,4 +1,20 @@
 import { AdminTable, AdminTableSeparator as Separator } from "@/components/admin/ui/admin-table";
+import { type CustomerRow } from "./customer-profile-dialog";
+
+interface Props {
+    customers: CustomerRow[];
+    loadingCustomers: boolean;
+    deletingCustomerId: string | null;
+    page: number;
+    pageSize: number;
+    totalCount: number;
+    totalPages: number;
+    onSetPage: (page: number) => void;
+    onSetPageSize: (size: number) => void;
+    onOpenCustomerDialog: (customer: CustomerRow, edit: boolean) => void;
+    onDeleteCustomer: (customer: CustomerRow) => void;
+    onViewInvoices: (name: string) => void;
+}
 
 export function CustomerTable({
     customers,
