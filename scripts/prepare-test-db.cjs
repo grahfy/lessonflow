@@ -57,9 +57,12 @@ const prismaEnv = {
  * Returns the spawn result for status/error handling.
  */
 function runPrisma(args) {
-  return spawnSync("npx", ["prisma", ...args], {
+  const isWin = process.platform === "win32";
+  const npmCmd = isWin ? "npm" : "npx";
+  return spawnSync(npmCmd, ["prisma", ...args], {
     stdio: "inherit",
-    env: prismaEnv
+    env: prismaEnv,
+    shell: true
   });
 }
 

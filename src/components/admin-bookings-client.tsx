@@ -74,6 +74,7 @@ type BookingRequestRow = {
   status: "pending" | "rejected" | "approved" | "cancelled";
   requestedStartAt: string;
   notes: string | null;
+  customerId: string | null;
 };
 
 type CustomerRow = {

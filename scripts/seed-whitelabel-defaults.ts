@@ -1,7 +1,23 @@
 import { prisma } from "../src/lib/db";
+import bcrypt from "bcryptjs";
 
 async function main() {
   console.log("🌱 Seeding whitelabel defaults...");
+
+  // 0. Seed Admin User (if none exists)
+  const adminCount = await prisma.adminUser.count();
+  if (adminCount === 0) {
+    const passwordHash = await bcrypt.hash("admin123", 12);
+    await prisma.adminUser.create({
+      data: {
+        email: "admin@example.com",
+        displayName: "Admin",
+        passwordHash,
+        isActive: true
+      }
+    });
+    console.log("✅ Seeded default admin user (admin@example.com / admin123)");
+  }
 
   // 1. Seed Invoice Template
   const existingInvoiceTemplate = await prisma.invoiceTemplate.findFirst({ where: { isDefault: true } });

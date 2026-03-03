@@ -16,14 +16,18 @@ if (!testDatabaseUrl) {
 
 const args = process.argv.slice(2);
 
+const isWin = process.platform === "win32";
+const npmCmd = isWin ? "npm" : "npx";
+
 // Vitest/test helpers usually read DATABASE_URL, so map the explicit test URL to
 // that variable only for the child process instead of mutating the parent shell.
-const result = spawnSync("npx", ["vitest", ...args], {
+const result = spawnSync(npmCmd, ["vitest", ...args], {
   stdio: "inherit",
   env: {
     ...process.env,
     DATABASE_URL: testDatabaseUrl
-  }
+  },
+  shell: true
 });
 
 if (result.error) {

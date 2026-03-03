@@ -11,8 +11,11 @@ cd "$ROOT_DIR"
 HOST="${HOST:-0.0.0.0}"
 PORT="${PORT:-3000}"
 SKIP_INSTALL=0
+AUDIT_FIX=0
+AUDIT_FIX_FORCE=0
 SKIP_TESTS=0
 SEED_DATA=0
+SEED_COUNT=50
 NO_START=0
 TESTS_FAILED=0
 
@@ -31,6 +34,14 @@ while [[ $# -gt 0 ]]; do
       SKIP_INSTALL=1
       shift
       ;;
+    --audit-fix)
+      AUDIT_FIX=1
+      shift
+      ;;
+    --audit-fix-force)
+      AUDIT_FIX_FORCE=1
+      shift
+      ;;
     --skip-tests)
       SKIP_TESTS=1
       shift
@@ -39,18 +50,25 @@ while [[ $# -gt 0 ]]; do
       SEED_DATA=1
       shift
       ;;
+    --seed-count)
+      SEED_COUNT="$2"
+      shift 2
+      ;;
     --no-start)
       NO_START=1
       shift
       ;;
     --help|-h)
       cat <<'EOF'
-Usage: scripts/test-full-site-local.sh [--skip-install] [--skip-tests] [--seed] [--no-start]
+Usage: scripts/test-full-site-local.sh [--skip-install] [--audit-fix] [--audit-fix-force] [--skip-tests] [--seed] [--seed-count <n>] [--no-start]
 
---skip-install  Skip `npm ci`
---skip-tests    Skip `npm test`
-    --seed          Clear existing customer/invoice data and seed fresh fake data
---no-start      Do not start Next.js dev server after setup/checks
+--skip-install       Skip `npm ci`
+--audit-fix          Run `npm audit fix` after installing dependencies
+--audit-fix-force    Run `npm audit fix --force` after installing dependencies
+--skip-tests         Skip `npm test`
+--seed              Clear existing customer/invoice data and seed fresh fake data
+--seed-count <n>    Number of fake customers to seed (default: 50)
+--no-start          Do not start Next.js dev server after setup/checks
 EOF
       exit 0
       ;;
@@ -63,7 +81,23 @@ done
 
 if [[ "$SKIP_INSTALL" -eq 0 ]]; then
   log "Installing dependencies (npm ci)..."
-  npm ci
+  npm ci --legacy-peer-deps --no-audit --no-fund --silent
+
+  if [[ "$AUDIT_FIX_FORCE" -eq 1 ]]; then
+    log "Running npm audit fix --force..."
+    npm audit fix --force
+  elif [[ "$AUDIT_FIX" -eq 1 ]]; then
+    log "Running npm audit fix..."
+    npm audit fix
+  else
+    log "Checking for security vulnerabilities..."
+    if npm audit --audit-level=moderate >/dev/null 2>&1; then
+      log "No moderate or high vulnerabilities found."
+    else
+      log "Found vulnerabilities, running npm audit fix..."
+      npm audit fix || true
+    fi
+  fi
 fi
 
 if [[ ! -f .env ]]; then
@@ -135,14 +169,20 @@ log "Seeding whitelabel defaults..."
 DATABASE_URL="${DB_URL}" npx tsx scripts/seed-whitelabel-defaults.ts
 
 if [[ "$SEED_DATA" -eq 1 ]]; then
-  log "Clearing old customer data (cascades to bookings, invoices, etc.)..."
+  log "Clearing ALL data (admin, customers, bookings, invoices, etc.)..."
   DATABASE_URL="${DB_URL}" npx tsx scripts/clear-customer-data.ts
+  DATABASE_URL="${DB_URL}" npx tsx scripts/clear-all-data.ts
   
-  log "Seeding fake customers, invoices, and appointments..."
-  DATABASE_URL="${DB_URL}" npx tsx scripts/seed-fake-data.ts
+  log "Seeding fake customers, invoices, and appointments ($SEED_COUNT customers)..."
+  DATABASE_URL="${DB_URL}" npx tsx scripts/seed-fake-data.ts "$SEED_COUNT"
   
   log "Seeding invoice product presets..."
   DATABASE_URL="${DB_URL}" npx tsx scripts/seed-invoice-presets.ts
+
+  log "Default admin account created:"
+  log "  URL: http://${HOST}:${PORT}/admin/login"
+  log "  Email: admin@example.com"
+  log "  Password: Password123!"
 fi
 
 if [[ "$SKIP_TESTS" -eq 0 ]]; then
