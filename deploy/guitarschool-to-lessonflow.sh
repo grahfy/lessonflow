@@ -321,6 +321,30 @@ cleanup_repo_maintenance_conf() {
   run_cmd rm -f "${LEGACY_MAINTENANCE_CONF}"
 }
 
+print_handoff_stuck_recovery_guidance() {
+  section "Handoff Recovery"
+  echo "If post-migration handoff appears stuck, run these in a second SSH session:"
+  echo ""
+  echo "  ps -ef | rg 'guitarschool-to-lessonflow|update.sh|deploy.sh|prisma'"
+  echo "  sudo mysql -e \"SHOW FULL PROCESSLIST;\""
+  echo ""
+  echo "If you see \"Waiting for table metadata lock\", kill the blocker:"
+  echo ""
+  echo "  sudo mysql -e \"KILL <blocking_id>;\""
+  echo ""
+  echo "Quick check:"
+  echo ""
+  echo "  ls -ld /var/www/lessonflow /var/www/lessonflow/current"
+  echo ""
+  echo "Then rerun deployment (usually no need to rerun one-time migration):"
+  echo ""
+  echo "  cd ~/melbourne-guitar-school"
+  echo "  git pull --ff-only origin main"
+  echo "  sudo ./deploy/update.sh --branch main --allow-dirty --no-spinner"
+  echo ""
+  echo "If you paste SHOW FULL PROCESSLIST output, we can identify the blocker id."
+}
+
 post_migration_handoff() {
   section "Post-Migration Handoff"
 
@@ -330,7 +354,18 @@ post_migration_handoff() {
     return 0
   fi
 
-  run_shell "${cmd}"
+  if [[ "${MODE}" == "execute" ]]; then
+    log_info "If this phase appears stuck, use the recovery commands below in a second SSH session."
+    print_handoff_stuck_recovery_guidance
+  fi
+
+  if ! run_shell "${cmd}"; then
+    log_error "Post-migration handoff failed."
+    if [[ "${MODE}" == "execute" ]]; then
+      print_handoff_stuck_recovery_guidance
+    fi
+    return 1
+  fi
 }
 
 verify_state() {

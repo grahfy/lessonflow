@@ -46,6 +46,42 @@ Options:
    - pulls latest branch changes before deploy
    - runs non-interactively for shared `.env` review prompt
 
+## Troubleshooting: Migration Appears Stuck
+
+Most commonly this is either:
+
+- A DB metadata lock during `prisma migrate deploy`
+- Waiting on a self-update/key reload prompt in a previous flow
+
+Run these in a second SSH session:
+
+```bash
+ps -ef | rg 'guitarschool-to-lessonflow|update.sh|deploy.sh|prisma'
+sudo mysql -e "SHOW FULL PROCESSLIST;"
+```
+
+If you see `Waiting for table metadata lock`, kill the blocker:
+
+```bash
+sudo mysql -e "KILL <blocking_id>;"
+```
+
+Quick check:
+
+```bash
+ls -ld /var/www/lessonflow /var/www/lessonflow/current
+```
+
+Then rerun deployment (usually no need to rerun one-time migration):
+
+```bash
+cd ~/melbourne-guitar-school
+git pull --ff-only origin main
+sudo ./deploy/update.sh --branch main --allow-dirty --no-spinner
+```
+
+If you paste the output of `SHOW FULL PROCESSLIST;`, we can identify the blocking session id.
+
 ## Post-Migration Validation
 
 Run:
