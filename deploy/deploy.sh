@@ -2857,11 +2857,82 @@ check_legacy_migration() {
     log_info "Legacy migration checks complete."
 }
 
+# Repairs stale/broken current symlink drift after runtime rename so systemd
+# WorkingDirectory and cron runner paths always resolve under /var/www/lessonflow.
+repair_current_symlink_drift() {
+    local legacy_dir="/var/www/melbourne-guitar-school"
+    local current_link="${CURRENT_LINK}"
+    local raw_target=""
+    local resolved_target=""
+    local rewritten_target=""
+    local latest_release=""
+
+    if [[ "${APP_NAME}" != "lessonflow" ]]; then
+        return 0
+    fi
+
+    section "Current Symlink Drift Check"
+
+    if [[ -L "${current_link}" ]]; then
+        raw_target="$(readlink "${current_link}" 2>/dev/null || true)"
+        resolved_target="$(readlink -f "${current_link}" 2>/dev/null || true)"
+
+        if [[ -n "${raw_target}" && "${raw_target}" == "${legacy_dir}/"* ]]; then
+            rewritten_target="${raw_target/#${legacy_dir}/${DEPLOY_DIR}}"
+
+            if [[ -e "${rewritten_target}" ]]; then
+                log_warn "Detected stale legacy current symlink target."
+                log_info "Relinking current: ${raw_target} -> ${rewritten_target}"
+                ln -sfn "${rewritten_target}" "${current_link}"
+                return 0
+            fi
+
+            latest_release="$(ls -1dt "${RELEASES_DIR}"/* 2>/dev/null | head -n 1 || true)"
+            if [[ -n "${latest_release}" ]]; then
+                log_warn "Legacy symlink target missing. Relinking current to latest release: ${latest_release}"
+                ln -sfn "${latest_release}" "${current_link}"
+                return 0
+            fi
+
+            log_warn "Legacy current symlink target missing and no releases are available yet."
+            return 0
+        fi
+
+        if [[ -z "${resolved_target}" ]]; then
+            latest_release="$(ls -1dt "${RELEASES_DIR}"/* 2>/dev/null | head -n 1 || true)"
+            if [[ -n "${latest_release}" ]]; then
+                log_warn "Current symlink is broken; relinking to latest release: ${latest_release}"
+                ln -sfn "${latest_release}" "${current_link}"
+            else
+                log_warn "Current symlink is broken and no releases are available yet."
+            fi
+            return 0
+        fi
+
+        log_info "Current symlink already valid: ${raw_target}"
+        return 0
+    fi
+
+    if [[ -e "${current_link}" ]]; then
+        log_warn "Current path exists but is not a symlink: ${current_link}"
+        return 0
+    fi
+
+    latest_release="$(ls -1dt "${RELEASES_DIR}"/* 2>/dev/null | head -n 1 || true)"
+    if [[ -n "${latest_release}" ]]; then
+        log_warn "Current symlink missing; linking to latest release: ${latest_release}"
+        ln -sfn "${latest_release}" "${current_link}"
+    else
+        log_info "Current symlink missing and no releases are available yet."
+    fi
+}
+
 detect_tty_capabilities
 reexec_with_sudo_if_needed
 maybe_self_update_and_restart
 
 check_legacy_migration
+repair_current_symlink_drift
 auto_enable_bootstrap_defaults_deploy
 
 if [[ "${MGS_RETURN_TO_MENU_AFTER_SELF_UPDATE:-}" == "1" && "${IS_TTY}" == true && "${ROLLBACK}" == false ]]; then

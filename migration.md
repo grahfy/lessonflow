@@ -48,6 +48,7 @@ Options:
    - runs non-interactively for shared `.env` review prompt
    - suppresses self-update keypress pauses for scripted migration handoff
    - times out stalled handoff runs, captures diagnostics, attempts metadata-lock blocker kill, then retries once
+9. Repairs stale/broken `/var/www/lessonflow/current` symlink targets that still point to `/var/www/melbourne-guitar-school/...`
 
 ## Troubleshooting: Migration Appears Stuck
 
@@ -93,8 +94,16 @@ Run:
 sudo systemctl status lessonflow --no-pager
 sudo nginx -t
 readlink -f /var/www/lessonflow/current
+readlink /var/www/lessonflow/current
 sudo crontab -l | grep /var/www/lessonflow/current/deploy/cron.sh
 curl -I https://melbourneguitarschool.com.au
+```
+
+Expected symlink format:
+
+```bash
+readlink /var/www/lessonflow/current
+# /var/www/lessonflow/releases/<timestamp>
 ```
 
 ## Future Deploys

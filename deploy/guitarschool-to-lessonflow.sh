@@ -197,6 +197,75 @@ migrate_directory() {
   fi
 }
 
+latest_release_dir() {
+  local latest=""
+  if [[ -d "${TARGET_DEPLOY_DIR}/releases" ]]; then
+    latest="$(ls -1dt "${TARGET_DEPLOY_DIR}"/releases/* 2>/dev/null | head -n 1 || true)"
+  fi
+  echo "${latest}"
+}
+
+repair_current_symlink_after_runtime_rename() {
+  section "Current Symlink"
+
+  local current_link="${TARGET_DEPLOY_DIR}/current"
+  local raw_target=""
+  local resolved_target=""
+  local rewritten_target=""
+  local latest_release=""
+
+  if [[ -L "${current_link}" ]]; then
+    raw_target="$(readlink "${current_link}" 2>/dev/null || true)"
+    resolved_target="$(readlink -f "${current_link}" 2>/dev/null || true)"
+
+    if [[ -n "${raw_target}" && "${raw_target}" == "${LEGACY_DEPLOY_DIR}/"* ]]; then
+      rewritten_target="${raw_target/#${LEGACY_DEPLOY_DIR}/${TARGET_DEPLOY_DIR}}"
+      if [[ -e "${rewritten_target}" ]]; then
+        log_info "Repairing stale current symlink target: ${raw_target} -> ${rewritten_target}"
+        run_cmd ln -sfn "${rewritten_target}" "${current_link}"
+        return 0
+      fi
+
+      latest_release="$(latest_release_dir)"
+      if [[ -n "${latest_release}" ]]; then
+        log_warn "Legacy symlink target missing; relinking current to latest release: ${latest_release}"
+        run_cmd ln -sfn "${latest_release}" "${current_link}"
+        return 0
+      fi
+
+      log_warn "Legacy current symlink detected but no release fallback exists yet."
+      return 0
+    fi
+
+    if [[ -z "${resolved_target}" ]]; then
+      latest_release="$(latest_release_dir)"
+      if [[ -n "${latest_release}" ]]; then
+        log_warn "Current symlink is broken; relinking to latest release: ${latest_release}"
+        run_cmd ln -sfn "${latest_release}" "${current_link}"
+      else
+        log_warn "Current symlink is broken and no releases exist yet."
+      fi
+      return 0
+    fi
+
+    log_info "Current symlink already valid: ${raw_target}"
+    return 0
+  fi
+
+  if [[ -e "${current_link}" ]]; then
+    log_warn "Current path exists but is not a symlink: ${current_link}"
+    return 0
+  fi
+
+  latest_release="$(latest_release_dir)"
+  if [[ -n "${latest_release}" ]]; then
+    log_warn "Current symlink missing; linking to latest release: ${latest_release}"
+    run_cmd ln -sfn "${latest_release}" "${current_link}"
+  else
+    log_info "Current symlink missing and no releases exist yet; deploy handoff will create it."
+  fi
+}
+
 migrate_systemd() {
   section "Systemd"
 
@@ -496,6 +565,19 @@ verify_state() {
   section "Verification"
 
   run_shell "ls -ld '${TARGET_DEPLOY_DIR}' '${TARGET_DEPLOY_DIR}/current' 2>/dev/null || true"
+  run_shell "readlink '${TARGET_DEPLOY_DIR}/current' 2>/dev/null || true"
+  run_shell "readlink -f '${TARGET_DEPLOY_DIR}/current' 2>/dev/null || true"
+
+  if [[ "${MODE}" == "execute" ]]; then
+    local current_link="${TARGET_DEPLOY_DIR}/current"
+    if [[ -L "${current_link}" ]]; then
+      if [[ -z "$(readlink -f "${current_link}" 2>/dev/null || true)" ]]; then
+        log_error "Current symlink remains unresolved after migration: ${current_link}"
+        return 1
+      fi
+    fi
+  fi
+
   if command -v systemctl >/dev/null 2>&1; then
     run_shell "systemctl is-enabled '${TARGET_APP_NAME}' 2>/dev/null || true"
     run_shell "systemctl is-active '${TARGET_APP_NAME}' 2>/dev/null || true"
@@ -551,6 +633,7 @@ ensure_execute_permissions
 preflight_checks
 prepare_backup_root
 migrate_directory
+repair_current_symlink_after_runtime_rename
 migrate_systemd
 migrate_nginx
 migrate_crontab
