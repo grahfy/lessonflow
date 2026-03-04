@@ -31,6 +31,7 @@ Options:
 - `--execute`
 - `--skip-deploy`
 - `--branch <name>`
+- `--handoff-timeout-seconds <N>` (`1200` default, `0` disables timeout)
 - `--no-color`
 
 ## What the Script Does
@@ -45,6 +46,8 @@ Options:
 8. Runs post-migration handoff via `deploy/update.sh` unless `--skip-deploy` is set
    - pulls latest branch changes before deploy
    - runs non-interactively for shared `.env` review prompt
+   - suppresses self-update keypress pauses for scripted migration handoff
+   - times out stalled handoff runs, captures diagnostics, attempts metadata-lock blocker kill, then retries once
 
 ## Troubleshooting: Migration Appears Stuck
 

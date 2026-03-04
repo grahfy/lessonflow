@@ -12,6 +12,8 @@
 #   --execute           Apply migration changes
 #   --skip-deploy       Skip post-migration update.sh handoff
 #   --branch BRANCH     Branch for post-migration handoff (default: main)
+#   --handoff-timeout-seconds N
+#                      Max seconds to wait for update.sh handoff before timeout diagnostics (default: 1200, 0 disables timeout)
 #   --no-color          Disable ANSI colors
 #   --help, -h          Show usage
 # =============================================================================
@@ -40,6 +42,7 @@ LEGACY_MAINTENANCE_CONF="/home/grahf/melbourne-guitar-school/.maintenance.conf"
 MODE="dry-run"
 SKIP_DEPLOY=false
 BRANCH="main"
+HANDOFF_TIMEOUT_SECONDS=1200
 NO_COLOR=false
 
 RED='\033[0;31m'
@@ -62,6 +65,8 @@ Options:
   --execute           Apply migration changes
   --skip-deploy       Skip post-migration update.sh handoff
   --branch BRANCH     Branch for post-migration handoff (default: main)
+  --handoff-timeout-seconds N
+                     Max seconds to wait for update.sh handoff before timeout diagnostics (default: 1200, 0 disables timeout)
   --no-color          Disable ANSI colors
   --help, -h          Show usage
 USAGE
@@ -321,6 +326,33 @@ cleanup_repo_maintenance_conf() {
   run_cmd rm -f "${LEGACY_MAINTENANCE_CONF}"
 }
 
+mysql_cli_for_recovery() {
+  if command -v mysql >/dev/null 2>&1; then
+    echo "mysql"
+    return 0
+  fi
+  if command -v mariadb >/dev/null 2>&1; then
+    echo "mariadb"
+    return 0
+  fi
+  return 1
+}
+
+run_handoff_cmd() {
+  local cmd="$1"
+  if [[ "${MODE}" == "dry-run" ]]; then
+    echo "[dry-run] ${cmd}"
+    return 0
+  fi
+
+  if [[ "${HANDOFF_TIMEOUT_SECONDS}" =~ ^[0-9]+$ ]] && (( HANDOFF_TIMEOUT_SECONDS > 0 )) && command -v timeout >/dev/null 2>&1; then
+    timeout --foreground "${HANDOFF_TIMEOUT_SECONDS}s" bash -lc "${cmd}"
+    return $?
+  fi
+
+  bash -lc "${cmd}"
+}
+
 print_handoff_stuck_recovery_guidance() {
   section "Handoff Recovery"
   echo "If post-migration handoff appears stuck, run these in a second SSH session:"
@@ -345,27 +377,119 @@ print_handoff_stuck_recovery_guidance() {
   echo "If you paste SHOW FULL PROCESSLIST output, we can identify the blocker id."
 }
 
+collect_handoff_diagnostics() {
+  section "Handoff Diagnostics"
+
+  if command -v rg >/dev/null 2>&1; then
+    run_shell "ps -ef | rg 'guitarschool-to-lessonflow|update.sh|deploy.sh|prisma' || true"
+  else
+    run_shell "ps -ef | grep -E 'guitarschool-to-lessonflow|update\\.sh|deploy\\.sh|prisma' || true"
+  fi
+
+  local mysql_bin=""
+  if mysql_bin="$(mysql_cli_for_recovery)"; then
+    if [[ "${MODE}" == "dry-run" ]]; then
+      echo "[dry-run] ${mysql_bin} -e \"SHOW FULL PROCESSLIST;\""
+    else
+      if ! "${mysql_bin}" -e "SHOW FULL PROCESSLIST;"; then
+        log_warn "Could not read SHOW FULL PROCESSLIST with ${mysql_bin}."
+      fi
+    fi
+  else
+    log_warn "mysql/mariadb CLI not found; skipping DB process diagnostics."
+  fi
+}
+
+recover_metadata_lock_blockers() {
+  local mysql_bin=""
+  local blockers_query=""
+  local kill_id=""
+  local blockers=""
+  local killed_any=false
+
+  if [[ "${MODE}" != "execute" ]]; then
+    return 1
+  fi
+
+  if ! mysql_bin="$(mysql_cli_for_recovery)"; then
+    log_warn "mysql/mariadb CLI not found; cannot auto-recover metadata locks."
+    return 1
+  fi
+
+  blockers_query="SELECT DISTINCT bt.PROCESSLIST_ID
+FROM performance_schema.metadata_locks waiting
+JOIN performance_schema.metadata_locks blocking
+  ON waiting.OBJECT_TYPE = blocking.OBJECT_TYPE
+ AND waiting.OBJECT_SCHEMA <=> blocking.OBJECT_SCHEMA
+ AND waiting.OBJECT_NAME <=> blocking.OBJECT_NAME
+ AND waiting.LOCK_TYPE = blocking.LOCK_TYPE
+ AND waiting.LOCK_DURATION = blocking.LOCK_DURATION
+ AND waiting.OWNER_THREAD_ID <> blocking.OWNER_THREAD_ID
+JOIN performance_schema.threads wt ON wt.THREAD_ID = waiting.OWNER_THREAD_ID
+JOIN performance_schema.threads bt ON bt.THREAD_ID = blocking.OWNER_THREAD_ID
+WHERE waiting.LOCK_STATUS = 'PENDING'
+  AND blocking.LOCK_STATUS = 'GRANTED'
+  AND wt.PROCESSLIST_STATE LIKE '%metadata lock%'
+  AND bt.PROCESSLIST_ID IS NOT NULL;"
+
+  blockers="$("${mysql_bin}" --batch --skip-column-names -e "${blockers_query}" 2>/dev/null | awk '/^[0-9]+$/ { print $1 }' || true)"
+  if [[ -z "${blockers}" ]]; then
+    log_warn "No metadata-lock blockers detected for automatic kill."
+    return 1
+  fi
+
+  section "Metadata Lock Recovery"
+  while IFS= read -r kill_id; do
+    [[ -n "${kill_id}" ]] || continue
+    if "${mysql_bin}" -e "KILL ${kill_id};" >/dev/null 2>&1; then
+      log_info "Killed blocking DB session id: ${kill_id}"
+      killed_any=true
+    else
+      log_warn "Failed to kill DB session id: ${kill_id}"
+    fi
+  done <<< "${blockers}"
+
+  [[ "${killed_any}" == true ]]
+}
+
 post_migration_handoff() {
   section "Post-Migration Handoff"
 
-  local cmd="cd '${REPO_ROOT}' && MGS_SKIP_DEPLOY_SHARED_ENV_REVIEW_PROMPT=1 ./deploy/update.sh --branch '${BRANCH}' --install-app-service --install-cron-jobs --allow-dirty --no-spinner"
+  local cmd="cd '${REPO_ROOT}' && MGS_SKIP_DEPLOY_SHARED_ENV_REVIEW_PROMPT=1 MGS_SKIP_SELF_UPDATE_KEYPRESS=1 ./deploy/update.sh --branch '${BRANCH}' --install-app-service --install-cron-jobs --allow-dirty --no-spinner"
+  local attempt=1
+  local max_attempts=2
+  local status=0
   if [[ "${SKIP_DEPLOY}" == true ]]; then
     log_info "Skipping deploy handoff (--skip-deploy set)."
     return 0
   fi
 
-  if [[ "${MODE}" == "execute" ]]; then
-    log_info "If this phase appears stuck, use the recovery commands below in a second SSH session."
-    print_handoff_stuck_recovery_guidance
-  fi
-
-  if ! run_shell "${cmd}"; then
-    log_error "Post-migration handoff failed."
-    if [[ "${MODE}" == "execute" ]]; then
-      print_handoff_stuck_recovery_guidance
+  while (( attempt <= max_attempts )); do
+    if run_handoff_cmd "${cmd}"; then
+      return 0
     fi
-    return 1
-  fi
+
+    status=$?
+    log_error "Post-migration handoff failed (attempt ${attempt}/${max_attempts}, exit=${status})."
+
+    if [[ "${MODE}" == "execute" ]]; then
+      if [[ "${status}" -eq 124 ]]; then
+        log_warn "Post-migration handoff timed out after ${HANDOFF_TIMEOUT_SECONDS}s."
+      fi
+      collect_handoff_diagnostics
+      print_handoff_stuck_recovery_guidance
+
+      if recover_metadata_lock_blockers && (( attempt < max_attempts )); then
+        log_info "Retrying post-migration handoff after metadata lock recovery..."
+        attempt=$((attempt + 1))
+        continue
+      fi
+    fi
+
+    return "${status}"
+  done
+
+  return 1
 }
 
 verify_state() {
@@ -390,6 +514,7 @@ while [[ $# -gt 0 ]]; do
     --execute) MODE="execute"; shift ;;
     --skip-deploy) SKIP_DEPLOY=true; shift ;;
     --branch) BRANCH="$2"; shift 2 ;;
+    --handoff-timeout-seconds) HANDOFF_TIMEOUT_SECONDS="$2"; shift 2 ;;
     --no-color) NO_COLOR=true; shift ;;
     --help|-h)
       show_usage
@@ -407,10 +532,20 @@ if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then
   RED='' GREEN='' YELLOW='' BLUE='' BOLD='' NC=''
 fi
 
+if [[ ! "${HANDOFF_TIMEOUT_SECONDS}" =~ ^[0-9]+$ ]]; then
+  log_error "--handoff-timeout-seconds must be a non-negative integer."
+  exit 1
+fi
+
 section "Mode"
 log_info "Mode: ${MODE}"
 log_info "Repo root: ${REPO_ROOT}"
 log_info "Branch for post-migration deploy: ${BRANCH}"
+if (( HANDOFF_TIMEOUT_SECONDS > 0 )); then
+  log_info "Handoff timeout: ${HANDOFF_TIMEOUT_SECONDS}s"
+else
+  log_info "Handoff timeout: disabled"
+fi
 
 ensure_execute_permissions
 preflight_checks

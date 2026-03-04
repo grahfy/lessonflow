@@ -2311,7 +2311,7 @@ maybe_self_update_and_restart() {
         if [[ -n "${commit_details}" ]]; then
             section "Git Changes"
             echo "${commit_details}"
-            if [[ "${IS_TTY}" == true ]]; then
+            if [[ "${IS_TTY}" == true && "${MGS_SKIP_SELF_UPDATE_KEYPRESS:-0}" != "1" ]]; then
                 echo ""
                 read -r -n 1 -s -p "Press any key to reload deploy menu with the new script..." _
                 echo ""

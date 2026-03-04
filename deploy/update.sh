@@ -384,7 +384,7 @@ maybe_restart_after_self_update() {
   if [[ -n "${commit_details}" ]]; then
     section "Git Changes"
     echo "${commit_details}"
-    if [[ "${IS_TTY}" == true ]]; then
+    if [[ "${IS_TTY}" == true && "${MGS_SKIP_SELF_UPDATE_KEYPRESS:-0}" != "1" ]]; then
       echo ""
       read -r -n 1 -s -p "Press any key to reload update menu with the new script..." _
       echo ""
@@ -2014,6 +2014,9 @@ run_deploy() {
     # and deploy.sh uses them before npm/prisma/build steps begin.
     local sudo_env_args=()
     sudo_env_args+=( "MGS_SKIP_DEPLOY_SHARED_ENV_REVIEW_PROMPT=1" )
+    if [[ "${MGS_SKIP_SELF_UPDATE_KEYPRESS:-0}" == "1" ]]; then
+      sudo_env_args+=( "MGS_SKIP_SELF_UPDATE_KEYPRESS=1" )
+    fi
     if [[ -n "${NODE_OPTIONS:-}" ]]; then
       sudo_env_args+=( "NODE_OPTIONS=${NODE_OPTIONS}" )
     fi
