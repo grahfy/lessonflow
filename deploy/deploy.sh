@@ -17,6 +17,7 @@
 #   --install-cron    Install cron/crond scheduler (if needed) and enable/start service
 #   --install-app-service  Install/update the app systemd unit and enable service
 #   --install-cron-jobs  Install/update managed cron jobs and restart cron (best effort)
+#   --no-auto-bootstrap  Disable automatic bootstrap detection for missing host setup
 #   --ssl             Run SSL setup after deployment
 #   --domain DOMAIN   Domain for SSL certificate
 #   --email EMAIL     Email for SSL certificate
@@ -73,6 +74,7 @@ INSTALL_PHP_FPM_IF_NEEDED=false
 INSTALL_CRON_IF_NEEDED=false
 INSTALL_APP_SERVICE_IF_NEEDED=false
 INSTALL_CRON_JOBS_IF_NEEDED=false
+AUTO_BOOTSTRAP=true
 UPDATE_PRISMA_ONLY=false
 SSL_SETUP=false
 SSL_DOMAIN=""
@@ -127,6 +129,7 @@ Options:
   --install-cron    Install cron/crond scheduler (if needed) and enable/start service
   --install-app-service  Install/update the app systemd unit and enable service
   --install-cron-jobs  Install/update managed cron jobs and restart cron (best effort)
+  --no-auto-bootstrap  Disable automatic bootstrap detection for missing host setup
   --ssl             Run SSL setup after deployment
   --domain DOMAIN   Domain for SSL certificate
   --email EMAIL     Email for SSL certificate
@@ -576,6 +579,127 @@ mysql_cli_bin() {
     return 1
 }
 
+# Returns the preferred MySQL dump binary available on the host.
+mysql_dump_bin() {
+    if command -v mysqldump >/dev/null 2>&1; then
+        echo "mysqldump"
+        return 0
+    fi
+    if command -v mariadb-dump >/dev/null 2>&1; then
+        echo "mariadb-dump"
+        return 0
+    fi
+    return 1
+}
+
+# Returns true when this deploy run will mutate schema state and therefore needs
+# a protective SQL backup before Prisma migration/db push.
+database_backup_required_for_deploy() {
+    if [[ "${DB_PUSH}" == true ]]; then
+        return 0
+    fi
+    if [[ "${SKIP_MIGRATE}" == false ]]; then
+        return 0
+    fi
+    return 1
+}
+
+# Creates a compressed SQL dump before Prisma schema mutations. The backup is
+# stored under shared/data so it survives release rotations and rollback events.
+backup_database_before_schema_change() {
+    local shared_env_path="${SHARED_DIR}/.env"
+    local database_url=""
+    local mysql_bin=""
+    local dump_bin=""
+    local backup_dir=""
+    local timestamp=""
+    local backup_file=""
+    local restore_note=""
+
+    if ! database_backup_required_for_deploy; then
+        return 0
+    fi
+
+    section "Database Backup"
+
+    if [[ ! -f "${shared_env_path}" ]]; then
+        log_error "Shared .env not found at ${shared_env_path}"
+        return 1
+    fi
+
+    database_url="$(read_env_file_value "${shared_env_path}" "DATABASE_URL" || true)"
+    if [[ -z "${database_url}" ]]; then
+        log_error "DATABASE_URL is missing in ${shared_env_path}"
+        return 1
+    fi
+
+    if ! parse_mysql_database_url "${database_url}"; then
+        log_error "Unable to parse DATABASE_URL from ${shared_env_path}."
+        return 1
+    fi
+
+    if ! mysql_bin="$(mysql_cli_bin)"; then
+        log_error "MySQL/MariaDB CLI is required to validate DB connectivity before migration."
+        return 1
+    fi
+
+    if ! dump_bin="$(mysql_dump_bin)"; then
+        log_error "mysqldump or mariadb-dump is required before migration."
+        return 1
+    fi
+
+    log_info "Checking database connectivity (${DB_URL_HOST}:${DB_URL_PORT}/${DB_URL_NAME})..."
+    if [[ -n "${DB_URL_PASS}" ]]; then
+        if ! MYSQL_PWD="${DB_URL_PASS}" "${mysql_bin}" -h "${DB_URL_HOST}" -P "${DB_URL_PORT}" -u "${DB_URL_USER}" -e "SELECT 1" "${DB_URL_NAME}" >/dev/null 2>&1; then
+            log_error "Database connectivity check failed; aborting before schema change."
+            return 1
+        fi
+    else
+        if ! "${mysql_bin}" -h "${DB_URL_HOST}" -P "${DB_URL_PORT}" -u "${DB_URL_USER}" -e "SELECT 1" "${DB_URL_NAME}" >/dev/null 2>&1; then
+            log_error "Database connectivity check failed; aborting before schema change."
+            return 1
+        fi
+    fi
+
+    timestamp="$(date +%Y%m%d%H%M%S)"
+    backup_dir="${SHARED_DIR}/data/deploy/db-backups"
+    backup_file="${backup_dir}/pre-schema-${timestamp}.sql.gz"
+    restore_note="${backup_dir}/pre-schema-${timestamp}.restore.txt"
+
+    mkdir -p "${backup_dir}"
+    chown -R www-data:www-data "${SHARED_DIR}/data" >/dev/null 2>&1 || true
+
+    log_info "Creating DB backup: ${backup_file}"
+    if [[ -n "${DB_URL_PASS}" ]]; then
+        if ! MYSQL_PWD="${DB_URL_PASS}" "${dump_bin}" -h "${DB_URL_HOST}" -P "${DB_URL_PORT}" -u "${DB_URL_USER}" --single-transaction --quick --lock-tables=false "${DB_URL_NAME}" | gzip -9 > "${backup_file}"; then
+            log_error "Database backup failed; aborting deploy."
+            return 1
+        fi
+    else
+        if ! "${dump_bin}" -h "${DB_URL_HOST}" -P "${DB_URL_PORT}" -u "${DB_URL_USER}" --single-transaction --quick --lock-tables=false "${DB_URL_NAME}" | gzip -9 > "${backup_file}"; then
+            log_error "Database backup failed; aborting deploy."
+            return 1
+        fi
+    fi
+
+    if [[ ! -s "${backup_file}" ]]; then
+        log_error "Database backup file is empty; aborting deploy."
+        return 1
+    fi
+
+    {
+        echo "Backup file: ${backup_file}"
+        echo "Restore command:"
+        echo "  gunzip -c \"${backup_file}\" | ${mysql_bin} -h \"${DB_URL_HOST}\" -P \"${DB_URL_PORT}\" -u \"${DB_URL_USER}\" \"${DB_URL_NAME}\""
+    } > "${restore_note}"
+
+    chmod 640 "${backup_file}" "${restore_note}" 2>/dev/null || true
+    chown www-data:www-data "${backup_file}" "${restore_note}" 2>/dev/null || true
+    log_info "Database backup complete."
+    log_info "Restore note: ${restore_note}"
+    return 0
+}
+
 # Installs local MySQL/MariaDB packages in DB-only mode when the CLI is absent.
 # deploy.sh re-execs as root early, so this helper intentionally runs commands
 # directly instead of relying on update.sh's sudo wrapper helpers.
@@ -842,9 +966,11 @@ update_prisma() {
     run_step "Generating Prisma client" npm exec --no -- prisma generate
 
     if [[ "${DB_PUSH}" == true ]]; then
+        backup_database_before_schema_change
         log_info "Pushing database schema (db push)..."
         npm exec --no -- prisma db push --accept-data-loss
     elif [[ "${SKIP_MIGRATE}" == false ]]; then
+        backup_database_before_schema_change
         run_migrations
     else
         log_info "Skipping database migrations"
@@ -1124,6 +1250,7 @@ ensure_cron_installed_from_deploy() {
 install_app_systemd_service_from_deploy() {
     local service_file="/etc/systemd/system/${APP_NAME}.service"
     local service_source="${SCRIPT_DIR}/app.service.template"
+    local static_service_source="${SCRIPT_DIR}/${APP_NAME}.service"
     local brand_name="${NEXT_PUBLIC_BRAND_NAME:-LessonFlow}"
 
     section "App Systemd Service Install"
@@ -1138,16 +1265,21 @@ install_app_systemd_service_from_deploy() {
         return 1
     fi
 
-    if [[ ! -f "${service_source}" ]]; then
-        log_error "Service template not found: ${service_source}"
-        return 1
-    fi
-
     local tmp_service
     tmp_service="$(mktemp)"
-    sed -e "s/{{APP_NAME}}/${APP_NAME}/g" \
-        -e "s/{{BRAND_NAME}}/${brand_name}/g" \
-        "${service_source}" > "${tmp_service}"
+    if [[ -f "${static_service_source}" ]]; then
+        cp "${static_service_source}" "${tmp_service}"
+    else
+        if [[ ! -f "${service_source}" ]]; then
+            log_error "Service template not found: ${service_source}"
+            rm -f "${tmp_service}"
+            return 1
+        fi
+
+        sed -e "s/{{APP_NAME}}/${APP_NAME}/g" \
+            -e "s/{{BRAND_NAME}}/${brand_name}/g" \
+            "${service_source}" > "${tmp_service}"
+    fi
 
     if [[ ! -f "${service_file}" ]] || ! cmp -s "${tmp_service}" "${service_file}"; then
         log_info "Updating systemd service: ${service_file}"
@@ -1201,6 +1333,82 @@ ensure_managed_cron_jobs_installed_from_deploy() {
     install_or_update_managed_crontab_jobs
     restart_cron_scheduler_if_present
     return 0
+}
+
+# Checks whether the managed lessonflow cron block already exists in root's
+# crontab. Used by auto-bootstrap detection to avoid redundant installs.
+managed_cron_block_present_in_root() {
+    if ! command -v crontab >/dev/null 2>&1; then
+        return 1
+    fi
+
+    crontab -l 2>/dev/null | grep -q '^# BEGIN LESSONFLOW_MANAGED_CRON$'
+}
+
+# Auto-enables bootstrap/install flags when common production prerequisites are
+# missing, so standard deploy runs can also recover first-time VPS setup drift.
+auto_enable_bootstrap_defaults_deploy() {
+    local changed=false
+    local enabled_flags=()
+
+    if [[ "${AUTO_BOOTSTRAP}" != true ]]; then
+        return 0
+    fi
+
+    if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+        SETUP_PACKAGES=true
+        changed=true
+        enabled_flags+=( "setup-packages(node/npm)" )
+    fi
+
+    if ! mysql_cli_bin >/dev/null 2>&1; then
+        SETUP_PACKAGES=true
+        changed=true
+        enabled_flags+=( "setup-packages(mysql-client)" )
+    fi
+
+    if ! command -v nginx >/dev/null 2>&1; then
+        INSTALL_NGINX_IF_NEEDED=true
+        changed=true
+        enabled_flags+=( "install-nginx" )
+    fi
+
+    if ! command -v crontab >/dev/null 2>&1; then
+        INSTALL_CRON_IF_NEEDED=true
+        changed=true
+        enabled_flags+=( "install-cron" )
+    fi
+
+    if command -v systemctl >/dev/null 2>&1; then
+        if ! systemctl list-unit-files --type=service 2>/dev/null | grep -q "^${APP_NAME}\\.service"; then
+            INSTALL_APP_SERVICE_IF_NEEDED=true
+            changed=true
+            enabled_flags+=( "install-app-service" )
+        fi
+
+        if ! cron_scheduler_service_name >/dev/null 2>&1; then
+            INSTALL_CRON_IF_NEEDED=true
+            changed=true
+            enabled_flags+=( "install-cron" )
+        fi
+    fi
+
+    if [[ ! -d "${DEPLOY_DIR}" || ! -L "${CURRENT_LINK}" ]]; then
+        INSTALL_APP_SERVICE_IF_NEEDED=true
+        INSTALL_CRON_JOBS_IF_NEEDED=true
+        changed=true
+        enabled_flags+=( "install-app-service" "install-cron-jobs" )
+    fi
+
+    if ! managed_cron_block_present_in_root; then
+        INSTALL_CRON_JOBS_IF_NEEDED=true
+        changed=true
+        enabled_flags+=( "install-cron-jobs" )
+    fi
+
+    if [[ "${changed}" == true ]]; then
+        log_info "Auto-bootstrap enabled missing setup flags: ${enabled_flags[*]}"
+    fi
 }
 
 # Prompt for a value while supporting a visible default for common deploy fields.
@@ -1569,6 +1777,7 @@ print_deploy_summary() {
     print_summary_row "App" "${APP_NAME}"
     print_summary_row "Branch" "${BRANCH}"
     print_summary_row "Database mode" "$(deploy_migration_mode_label)"
+    print_summary_row "Auto bootstrap" "$(bool_word "${AUTO_BOOTSTRAP}")"
     print_summary_row "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")"
     print_summary_row "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")"
     print_summary_row "Package setup" "$(bool_word "${SETUP_PACKAGES}")"
@@ -1786,7 +1995,7 @@ install_or_update_managed_crontab_jobs() {
         $0 == b1 || $0 == b2 { skip=1; next }
         $0 == e1 || $0 == e2 { skip=0; next }
         !skip { print }
-    ')"
+    ' | sed '/\/var\/www\/melbourne-guitar-school\/current\/deploy\/cron\.sh/d')"
 
     tmp_file="$(mktemp)"
     {
@@ -2380,6 +2589,7 @@ while [[ $# -gt 0 ]]; do
         --install-cron) INSTALL_CRON_IF_NEEDED=true; shift ;;
         --install-app-service) INSTALL_APP_SERVICE_IF_NEEDED=true; shift ;;
         --install-cron-jobs) INSTALL_CRON_JOBS_IF_NEEDED=true; shift ;;
+        --no-auto-bootstrap) AUTO_BOOTSTRAP=false; shift ;;
         --update-prisma) UPDATE_PRISMA_ONLY=true; shift ;;
         --help|-h)
             show_usage
@@ -2389,29 +2599,53 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Detects if a legacy lessonflow installation exists and migrates it
-# to LessonFlow to ensure smooth updates on production servers.
+# Detects legacy deployment naming and migrates host paths/service/nginx/cron to
+# lessonflow so future update.sh/deploy.sh runs stay on the current runtime.
 check_legacy_migration() {
     local legacy_name="melbourne-guitar-school"
     local legacy_dir="/var/www/${legacy_name}"
     local legacy_service="${legacy_name}.service"
+    local legacy_service_file="/etc/systemd/system/${legacy_service}"
+    local target_service_file="/etc/systemd/system/${APP_NAME}.service"
     local legacy_nginx_avail="/etc/nginx/sites-available/${legacy_name}"
     local legacy_nginx_enabled="/etc/nginx/sites-enabled/${legacy_name}"
+    local target_nginx_avail="/etc/nginx/sites-available/${APP_NAME}"
+    local target_nginx_enabled="/etc/nginx/sites-enabled/${APP_NAME}"
+    local existing=""
+    local migrated=""
+    local tmp_file=""
 
-    if [[ -d "${legacy_dir}" && "${APP_NAME}" == "lessonflow" ]]; then
-        section "Legacy Migration Detection"
+    if [[ "${APP_NAME}" != "lessonflow" ]]; then
+        return 0
+    fi
+
+    if [[ -d "${legacy_dir}" && -d "${DEPLOY_DIR}" ]]; then
+        log_error "Both legacy and target deploy directories exist:"
+        log_error "  legacy: ${legacy_dir}"
+        log_error "  target: ${DEPLOY_DIR}"
+        log_error "Resolve this manually to avoid accidental data loss."
+        exit 1
+    fi
+
+    if [[ ! -d "${legacy_dir}" && ! -f "${legacy_service_file}" && ! -f "${legacy_nginx_avail}" && ! -L "${legacy_nginx_enabled}" ]]; then
+        return 0
+    fi
+
+    section "Legacy Migration Detection"
+
+    if [[ ${EUID} -ne 0 ]]; then
+        log_error "Migration requires root privileges. Please re-run with sudo or --sudo-deploy."
+        exit 1
+    fi
+
+    if [[ -d "${legacy_dir}" ]]; then
         log_warn "Detected legacy deployment directory: ${legacy_dir}"
-        
-        if [[ ${EUID} -ne 0 ]]; then
-            log_error "Migration requires root privileges. Please re-run with sudo or --sudo-deploy."
-            exit 1
-        fi
-
         log_info "Migrating ${legacy_dir} to ${DEPLOY_DIR}..."
         mv "${legacy_dir}" "${DEPLOY_DIR}"
         log_info "Directory migrated successfully."
+    fi
 
-        # Stop/Disable old systemd service
+    if command -v systemctl >/dev/null 2>&1; then
         if systemctl list-units --full --all | grep -q "${legacy_service}"; then
             if systemctl is-active --quiet "${legacy_service}"; then
                 log_info "Stopping legacy service: ${legacy_service}"
@@ -2420,17 +2654,69 @@ check_legacy_migration() {
             log_info "Disabling legacy service: ${legacy_service}"
             systemctl disable "${legacy_service}"
         fi
+    fi
 
-        # Remove old Nginx site configs
-        if [[ -L "${legacy_nginx_enabled}" ]]; then
-            log_info "Removing legacy nginx symlink: ${legacy_nginx_enabled}"
-            rm -f "${legacy_nginx_enabled}"
+    if [[ -f "${legacy_service_file}" && ! -f "${target_service_file}" ]]; then
+        if [[ -f "${SCRIPT_DIR}/lessonflow.service" ]]; then
+            log_info "Installing lessonflow service unit from deploy/lessonflow.service"
+            cp "${SCRIPT_DIR}/lessonflow.service" "${target_service_file}"
+        else
+            log_info "Converting legacy service unit to lessonflow naming"
+            sed \
+                -e "s/melbourne-guitar-school/lessonflow/g" \
+                "${legacy_service_file}" > "${target_service_file}"
         fi
-        if [[ -f "${legacy_nginx_avail}" ]]; then
-            log_info "Removing legacy nginx available site: ${legacy_nginx_avail}"
-            rm -f "${legacy_nginx_avail}"
+        if command -v systemctl >/dev/null 2>&1; then
+            systemctl daemon-reload >/dev/null 2>&1 || true
         fi
     fi
+
+    if [[ -f "${legacy_nginx_avail}" && ! -f "${target_nginx_avail}" ]]; then
+        log_info "Converting nginx site ${legacy_name} -> ${APP_NAME}"
+        sed \
+            -e "s/melbourne_guitar_school/lessonflow/g" \
+            -e "s#/var/www/melbourne-guitar-school#/var/www/lessonflow#g" \
+            -e "s/melbourne-guitar-school/lessonflow/g" \
+            "${legacy_nginx_avail}" > "${target_nginx_avail}"
+    fi
+
+    if [[ -f "${target_nginx_avail}" ]]; then
+        ln -sfn "${target_nginx_avail}" "${target_nginx_enabled}"
+    fi
+
+    if [[ -L "${legacy_nginx_enabled}" ]]; then
+        log_info "Removing legacy nginx symlink: ${legacy_nginx_enabled}"
+        rm -f "${legacy_nginx_enabled}"
+    fi
+
+    if [[ -f "${legacy_nginx_avail}" ]]; then
+        log_info "Removing legacy nginx site file: ${legacy_nginx_avail}"
+        rm -f "${legacy_nginx_avail}"
+    fi
+
+    if command -v crontab >/dev/null 2>&1; then
+        existing="$(crontab -l 2>/dev/null || true)"
+        migrated="$(printf '%s\n' "${existing}" | awk '
+            $0 == "# BEGIN MELBOURNE_GUITAR_SCHOOL_MANAGED_CRON" { skip=1; next }
+            $0 == "# END MELBOURNE_GUITAR_SCHOOL_MANAGED_CRON" { skip=0; next }
+            !skip { print }
+        ' | sed \
+            -e "s#/var/www/melbourne-guitar-school/current/deploy/cron.sh#/var/www/lessonflow/current/deploy/cron.sh#g")"
+
+        tmp_file="$(mktemp)"
+        printf '%s\n' "${migrated}" > "${tmp_file}"
+        crontab "${tmp_file}" || true
+        rm -f "${tmp_file}"
+    fi
+
+    if [[ -f "${target_nginx_avail}" ]] && command -v nginx >/dev/null 2>&1; then
+        if ! nginx -t >/dev/null 2>&1; then
+            log_error "Nginx config test failed after legacy migration conversion."
+            exit 1
+        fi
+    fi
+
+    log_info "Legacy migration checks complete."
 }
 
 detect_tty_capabilities
@@ -2438,6 +2724,7 @@ reexec_with_sudo_if_needed
 maybe_self_update_and_restart
 
 check_legacy_migration
+auto_enable_bootstrap_defaults_deploy
 
 if [[ "${MGS_RETURN_TO_MENU_AFTER_SELF_UPDATE:-}" == "1" && "${IS_TTY}" == true && "${ROLLBACK}" == false ]]; then
     INTERACTIVE=true
@@ -2720,6 +3007,20 @@ chmod -R 755 "${NEW_RELEASE_DIR}"
 # Ensure systemd service is installed
 SERVICE_FILE="/etc/systemd/system/${APP_NAME}.service"
 SERVICE_SOURCE="${NEW_RELEASE_DIR}/deploy/${APP_NAME}.service"
+SERVICE_SOURCE_IS_TEMP=false
+if [[ ! -f "${SERVICE_SOURCE}" ]]; then
+    if [[ -f "${NEW_RELEASE_DIR}/deploy/app.service.template" ]]; then
+        SERVICE_SOURCE="$(mktemp)"
+        SERVICE_SOURCE_IS_TEMP=true
+        sed -e "s/{{APP_NAME}}/${APP_NAME}/g" \
+            -e "s/{{BRAND_NAME}}/${NEXT_PUBLIC_BRAND_NAME:-LessonFlow}/g" \
+            "${NEW_RELEASE_DIR}/deploy/app.service.template" > "${SERVICE_SOURCE}"
+    else
+        log_error "No systemd service source found in release deploy/ directory."
+        exit 1
+    fi
+fi
+
 if [[ ! -f "${SERVICE_FILE}" ]]; then
     log_info "Installing systemd service..."
     cp "${SERVICE_SOURCE}" "${SERVICE_FILE}"
@@ -2731,6 +3032,10 @@ elif ! cmp -s "${SERVICE_SOURCE}" "${SERVICE_FILE}"; then
     systemctl daemon-reload
 else
     log_info "Systemd service already up to date"
+fi
+
+if [[ "${SERVICE_SOURCE_IS_TEMP}" == true ]]; then
+    rm -f "${SERVICE_SOURCE}" || true
 fi
 
 # Ensure nginx config is installed/updated (use HTTPS template after certs exist).

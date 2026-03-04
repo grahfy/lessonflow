@@ -29,6 +29,7 @@
 #   --install-cron       Install cron/crond scheduler (if needed) and enable/start service
 #   --install-app-service  Install/update the app systemd unit and enable service
 #   --install-cron-jobs  Install/update managed cron jobs and restart cron (best effort)
+#   --no-auto-bootstrap  Disable automatic bootstrap detection for missing host setup
 #   --no-spinner         Disable spinner UI
 #   --no-color           Disable colored output
 #   --help, -h           Show usage
@@ -72,6 +73,7 @@ INSTALL_PHP_FPM_IF_NEEDED=false
 INSTALL_CRON_IF_NEEDED=false
 INSTALL_APP_SERVICE_IF_NEEDED=false
 INSTALL_CRON_JOBS_IF_NEEDED=false
+AUTO_BOOTSTRAP=true
 NO_SPINNER=false
 NO_COLOR=false
 IS_TTY=false
@@ -137,6 +139,7 @@ Options:
   --install-cron       Install cron/crond scheduler (if needed) and enable/start service
   --install-app-service  Install/update the app systemd unit and enable service
   --install-cron-jobs  Install/update managed cron jobs and restart cron (best effort)
+  --no-auto-bootstrap  Disable automatic bootstrap detection for missing host setup
   --no-spinner         Disable spinner UI
   --no-color           Disable colored output
   --help, -h           Show usage
@@ -920,8 +923,10 @@ install_app_systemd_service_from_update() {
 # bootstrap cron jobs directly from update.sh without running a full deploy.
 install_or_update_managed_crontab_jobs_from_update() {
   local cron_runner="${CURRENT_LINK}/deploy/cron.sh"
-  local begin_marker="# BEGIN MELBOURNE_GUITAR_SCHOOL_MANAGED_CRON"
-  local end_marker="# END MELBOURNE_GUITAR_SCHOOL_MANAGED_CRON"
+  local begin_marker="# BEGIN LESSONFLOW_MANAGED_CRON"
+  local end_marker="# END LESSONFLOW_MANAGED_CRON"
+  local legacy_begin="# BEGIN MELBOURNE_GUITAR_SCHOOL_MANAGED_CRON"
+  local legacy_end="# END MELBOURNE_GUITAR_SCHOOL_MANAGED_CRON"
   local existing=""
   local stripped=""
   local tmp_file=""
@@ -932,11 +937,11 @@ install_or_update_managed_crontab_jobs_from_update() {
   fi
 
   existing="$(run_server_setup_cmd crontab -l 2>/dev/null || true)"
-  stripped="$(printf '%s\n' "${existing}" | awk -v begin="${begin_marker}" -v end="${end_marker}" '
-    $0 == begin { skip=1; next }
-    $0 == end { skip=0; next }
+  stripped="$(printf '%s\n' "${existing}" | awk -v b1="${begin_marker}" -v e1="${end_marker}" -v b2="${legacy_begin}" -v e2="${legacy_end}" '
+    $0 == b1 || $0 == b2 { skip=1; next }
+    $0 == e1 || $0 == e2 { skip=0; next }
     !skip { print }
-  ')"
+  ' | sed '/\/var\/www\/melbourne-guitar-school\/current\/deploy\/cron\.sh/d')"
 
   tmp_file="$(mktemp)"
   {
@@ -1016,6 +1021,80 @@ ensure_managed_cron_jobs_installed_from_update() {
   return 0
 }
 
+# Checks for the lessonflow managed cron block in root crontab without forcing
+# an interactive sudo prompt during auto-bootstrap detection.
+managed_cron_block_present_from_update() {
+  local cron_dump=""
+
+  if ! command -v crontab >/dev/null 2>&1; then
+    return 1
+  fi
+
+  if [[ ${EUID} -eq 0 ]]; then
+    cron_dump="$(crontab -l 2>/dev/null || true)"
+  elif should_use_sudo_for_deploy; then
+    cron_dump="$(sudo -n crontab -l 2>/dev/null || true)"
+  else
+    cron_dump="$(crontab -l 2>/dev/null || true)"
+  fi
+
+  printf '%s\n' "${cron_dump}" | grep -q '^# BEGIN LESSONFLOW_MANAGED_CRON$'
+}
+
+# Auto-enables bootstrap toggles when required host wiring is missing. This
+# keeps regular update runs capable of repairing first-run VPS drift.
+auto_enable_bootstrap_defaults_from_update() {
+  local changed=false
+  local enabled_flags=()
+
+  if [[ "${AUTO_BOOTSTRAP}" != true ]]; then
+    return 0
+  fi
+
+  if ! command -v nginx >/dev/null 2>&1; then
+    INSTALL_NGINX_IF_NEEDED=true
+    changed=true
+    enabled_flags+=( "install-nginx" )
+  fi
+
+  if ! command -v crontab >/dev/null 2>&1; then
+    INSTALL_CRON_IF_NEEDED=true
+    changed=true
+    enabled_flags+=( "install-cron" )
+  fi
+
+  if command -v systemctl >/dev/null 2>&1; then
+    if ! systemctl list-unit-files --type=service 2>/dev/null | grep -q "^${APP_NAME}\\.service"; then
+      INSTALL_APP_SERVICE_IF_NEEDED=true
+      changed=true
+      enabled_flags+=( "install-app-service" )
+    fi
+
+    if ! cron_scheduler_service_name_from_update >/dev/null 2>&1; then
+      INSTALL_CRON_IF_NEEDED=true
+      changed=true
+      enabled_flags+=( "install-cron" )
+    fi
+  fi
+
+  if [[ ! -d "${DEPLOY_DIR}" || ! -L "${CURRENT_LINK}" ]]; then
+    INSTALL_APP_SERVICE_IF_NEEDED=true
+    INSTALL_CRON_JOBS_IF_NEEDED=true
+    changed=true
+    enabled_flags+=( "install-app-service" "install-cron-jobs" )
+  fi
+
+  if ! managed_cron_block_present_from_update; then
+    INSTALL_CRON_JOBS_IF_NEEDED=true
+    changed=true
+    enabled_flags+=( "install-cron-jobs" )
+  fi
+
+  if [[ "${changed}" == true ]]; then
+    log_info "Auto-bootstrap enabled missing setup flags: ${enabled_flags[*]}"
+  fi
+}
+
 # Delegates Prisma update (generate/migrate) to deploy.sh using the current
 # configuration and sudo settings.
 update_prisma_from_update() {
@@ -1028,6 +1107,7 @@ update_prisma_from_update() {
 
   local deploy_args=()
   deploy_args+=( "--branch" "${BRANCH}" )
+  [[ "${AUTO_BOOTSTRAP}" == false ]] && deploy_args+=( "--no-auto-bootstrap" )
   [[ "${DB_PUSH}" == true ]] && deploy_args+=( "--db-push" )
   [[ "${NO_SPINNER}" == true ]] && deploy_args+=( "--no-spinner" )
   [[ "${NO_COLOR}" == true ]] && deploy_args+=( "--no-color" )
@@ -1863,6 +1943,7 @@ print_summary() {
   print_summary_row "Git pull" "${will_pull}"
   print_summary_row "Run deploy" "${will_deploy}"
   print_summary_row "Allow dirty" "$(bool_word "${ALLOW_DIRTY}")"
+  print_summary_row "Auto bootstrap" "$(bool_word "${AUTO_BOOTSTRAP}")"
   print_summary_row "Sudo mode" "$(update_sudo_mode_label)"
   print_summary_row "Install cron" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")"
   print_summary_row "Install service" "$(bool_word "${INSTALL_APP_SERVICE_IF_NEEDED}")"
@@ -1905,6 +1986,7 @@ run_deploy() {
     [[ -n "${effective_ssl_email}" ]] || effective_ssl_email="melbourneguitarschool@gmail.com"
   fi
   deploy_args+=( "--branch" "${BRANCH}" )
+  [[ "${AUTO_BOOTSTRAP}" == false ]] && deploy_args+=( "--no-auto-bootstrap" )
   [[ "${SKIP_DEPS}" == true ]] && deploy_args+=( "--skip-deps" )
   [[ "${SKIP_CRON_SETUP}" == true ]] && deploy_args+=( "--skip-cron" )
   [[ "${SKIP_MIGRATE}" == true ]] && deploy_args+=( "--skip-migrate" )
@@ -2029,6 +2111,7 @@ while [[ $# -gt 0 ]]; do
     --install-cron) INSTALL_CRON_IF_NEEDED=true; shift ;;
     --install-app-service) INSTALL_APP_SERVICE_IF_NEEDED=true; shift ;;
     --install-cron-jobs) INSTALL_CRON_JOBS_IF_NEEDED=true; shift ;;
+    --no-auto-bootstrap) AUTO_BOOTSTRAP=false; shift ;;
     --no-spinner) NO_SPINNER=true; shift ;;
     --no-color) NO_COLOR=true; shift ;;
     --help|-h) show_usage; exit 0 ;;
@@ -2080,6 +2163,7 @@ if [[ -z "${BRANCH}" ]]; then
 fi
 
 detect_previous_deploy_defaults_from_host
+auto_enable_bootstrap_defaults_from_update
 
 if [[ "${DB_PUSH}" == true ]]; then
   SKIP_MIGRATE=true

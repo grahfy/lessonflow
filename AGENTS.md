@@ -188,3 +188,9 @@ Include:
 - **Icons**: Lucide React
 - **Testing**: Vitest + Playwright
 - **Linting**: ESLint with Next.js config
+
+## Deployment Environment Policy
+- Docker/Compose are for local development and testing only.
+- Production runs on a low-power VPS using `systemd + nginx + MySQL/MariaDB`.
+- Do not propose Docker as the production runtime path in deploy scripts or runbooks.
+- Keep production deployment automation Docker-independent.

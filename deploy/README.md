@@ -92,6 +92,19 @@ Notes:
 - `update.sh` / `deploy.sh` now show pulled commit details and pause for a keypress if a `git pull` updates the deploy script itself, then they return to the TUI main menu.
 - Admins can confirm deployed commits in the app using the `Latest Updates` popup after login.
 
+### Legacy Runtime Migration (One-Time)
+
+If production still uses legacy runtime naming (`/var/www/melbourne-guitar-school`),
+run the one-time migration helper before normal update runs:
+
+```bash
+cd ~/melbourne-guitar-school
+sudo ./deploy/guitarschool-to-lessonflow.sh --dry-run
+sudo ./deploy/guitarschool-to-lessonflow.sh --execute --branch main
+```
+
+Detailed migration steps are documented in [`migration.md`](../migration.md).
+
 ---
 
 ## Manual Server Setup
