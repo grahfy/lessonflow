@@ -615,7 +615,16 @@ backup_database_before_schema_change() {
     local timestamp=""
     local backup_file=""
     local restore_note=""
-    local dump_args=()
+    local dump_args_base=()
+    local dump_args_attempt=()
+    local dump_stderr_file=""
+    local dump_temp_file=""
+    local dump_stderr_excerpt=""
+    local no_tablespaces_supported=false
+    local use_no_tablespaces=false
+    local dump_success=false
+    local retry_attempt=1
+    local max_attempts=3
 
     if ! database_backup_required_for_deploy; then
         return 0
@@ -649,9 +658,10 @@ backup_database_before_schema_change() {
         return 1
     fi
 
-    dump_args=( --single-transaction --quick --lock-tables=false )
+    dump_args_base=( --single-transaction --quick --lock-tables=false )
     if "${dump_bin}" --help 2>/dev/null | grep -q -- '--no-tablespaces'; then
-        dump_args+=( --no-tablespaces )
+        no_tablespaces_supported=true
+        use_no_tablespaces=true
     fi
 
     log_info "Checking database connectivity (${DB_URL_HOST}:${DB_URL_PORT}/${DB_URL_NAME})..."
@@ -675,22 +685,102 @@ backup_database_before_schema_change() {
     mkdir -p "${backup_dir}"
     chown -R www-data:www-data "${SHARED_DIR}/data" >/dev/null 2>&1 || true
 
-    log_info "Creating DB backup: ${backup_file}"
-    if [[ -n "${DB_URL_PASS}" ]]; then
-        if ! MYSQL_PWD="${DB_URL_PASS}" "${dump_bin}" -h "${DB_URL_HOST}" -P "${DB_URL_PORT}" -u "${DB_URL_USER}" "${dump_args[@]}" "${DB_URL_NAME}" | gzip -9 > "${backup_file}"; then
-            log_error "Database backup failed; aborting deploy."
-            return 1
+    rm -f "${backup_file}" 2>/dev/null || true
+
+    while (( retry_attempt <= max_attempts )); do
+        dump_args_attempt=( "${dump_args_base[@]}" )
+        if [[ "${use_no_tablespaces}" == true ]]; then
+            dump_args_attempt+=( --no-tablespaces )
         fi
-    else
-        if ! "${dump_bin}" -h "${DB_URL_HOST}" -P "${DB_URL_PORT}" -u "${DB_URL_USER}" "${dump_args[@]}" "${DB_URL_NAME}" | gzip -9 > "${backup_file}"; then
-            log_error "Database backup failed; aborting deploy."
-            return 1
+
+        dump_stderr_file="$(mktemp)"
+        dump_temp_file="$(mktemp "${backup_file}.attempt${retry_attempt}.XXXXXX")"
+
+        log_info "Creating DB backup (attempt ${retry_attempt}/${max_attempts}): ${backup_file}"
+
+        if [[ -n "${DB_URL_PASS}" ]]; then
+            if ! MYSQL_PWD="${DB_URL_PASS}" "${dump_bin}" -h "${DB_URL_HOST}" -P "${DB_URL_PORT}" -u "${DB_URL_USER}" "${dump_args_attempt[@]}" "${DB_URL_NAME}" 2>"${dump_stderr_file}" | gzip -9 > "${dump_temp_file}"; then
+                dump_stderr_excerpt="$(head -n 1 "${dump_stderr_file}" 2>/dev/null || true)"
+
+                if [[ "${use_no_tablespaces}" == true ]] \
+                    && grep -Eqi 'unknown option.*no-tablespaces|unrecognized option.*no-tablespaces' "${dump_stderr_file}"; then
+                    log_warn "Dump client rejected --no-tablespaces; retrying without it."
+                    use_no_tablespaces=false
+                    rm -f "${dump_stderr_file}" "${dump_temp_file}"
+                    retry_attempt=$((retry_attempt + 1))
+                    continue
+                fi
+
+                if [[ "${use_no_tablespaces}" != true && "${no_tablespaces_supported}" == true ]] \
+                    && grep -Eqi 'PROCESS privilege|dump tablespaces|tablespace' "${dump_stderr_file}"; then
+                    log_warn "Tablespace privilege error detected; retrying with --no-tablespaces."
+                    use_no_tablespaces=true
+                    rm -f "${dump_stderr_file}" "${dump_temp_file}"
+                    retry_attempt=$((retry_attempt + 1))
+                    continue
+                fi
+
+                rm -f "${dump_stderr_file}" "${dump_temp_file}"
+                break
+            fi
+        else
+            if ! "${dump_bin}" -h "${DB_URL_HOST}" -P "${DB_URL_PORT}" -u "${DB_URL_USER}" "${dump_args_attempt[@]}" "${DB_URL_NAME}" 2>"${dump_stderr_file}" | gzip -9 > "${dump_temp_file}"; then
+                dump_stderr_excerpt="$(head -n 1 "${dump_stderr_file}" 2>/dev/null || true)"
+
+                if [[ "${use_no_tablespaces}" == true ]] \
+                    && grep -Eqi 'unknown option.*no-tablespaces|unrecognized option.*no-tablespaces' "${dump_stderr_file}"; then
+                    log_warn "Dump client rejected --no-tablespaces; retrying without it."
+                    use_no_tablespaces=false
+                    rm -f "${dump_stderr_file}" "${dump_temp_file}"
+                    retry_attempt=$((retry_attempt + 1))
+                    continue
+                fi
+
+                if [[ "${use_no_tablespaces}" != true && "${no_tablespaces_supported}" == true ]] \
+                    && grep -Eqi 'PROCESS privilege|dump tablespaces|tablespace' "${dump_stderr_file}"; then
+                    log_warn "Tablespace privilege error detected; retrying with --no-tablespaces."
+                    use_no_tablespaces=true
+                    rm -f "${dump_stderr_file}" "${dump_temp_file}"
+                    retry_attempt=$((retry_attempt + 1))
+                    continue
+                fi
+
+                rm -f "${dump_stderr_file}" "${dump_temp_file}"
+                break
+            fi
         fi
+
+        if [[ ! -s "${dump_temp_file}" ]]; then
+            dump_stderr_excerpt="dump output file was empty"
+            rm -f "${dump_stderr_file}" "${dump_temp_file}"
+            break
+        fi
+
+        if [[ "${use_no_tablespaces}" != true && "${no_tablespaces_supported}" == true ]] \
+            && grep -Eqi 'PROCESS privilege|dump tablespaces|tablespace' "${dump_stderr_file}"; then
+            log_warn "Tablespace privilege warning detected; retrying with --no-tablespaces."
+            use_no_tablespaces=true
+            rm -f "${dump_stderr_file}" "${dump_temp_file}"
+            retry_attempt=$((retry_attempt + 1))
+            continue
+        fi
+
+        mv -f "${dump_temp_file}" "${backup_file}"
+        rm -f "${dump_stderr_file}"
+        dump_success=true
+        break
+    done
+
+    if [[ "${dump_success}" != true ]]; then
+        if [[ -n "${dump_stderr_excerpt}" ]]; then
+            log_error "Database backup failed: ${dump_stderr_excerpt}"
+        fi
+        log_error "Database backup failed; aborting deploy."
+        return 1
     fi
 
-    if [[ ! -s "${backup_file}" ]]; then
-        log_error "Database backup file is empty; aborting deploy."
-        return 1
+    if [[ "${use_no_tablespaces}" == true ]]; then
+        log_info "Database backup used --no-tablespaces compatibility mode."
     fi
 
     {
@@ -1374,8 +1464,8 @@ ensure_managed_cron_jobs_installed_from_deploy() {
     fi
 
     if [[ ! -x "${cron_runner}" ]]; then
-        log_warn "Cron runner not found yet: ${cron_runner}"
-        log_warn "Installing cron entries anyway; they will work after the first successful deploy creates current/."
+        log_info "Cron runner not available yet (${cron_runner}); deferring managed cron install until post-release sync."
+        return 0
     fi
 
     install_or_update_managed_crontab_jobs

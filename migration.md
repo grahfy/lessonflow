@@ -43,6 +43,8 @@ Options:
 6. Updates `BACKUP_CLOUD_FOLDER` from `melbourne-guitar-school-backups` to `lessonflow-backups` when present
 7. Removes `/home/grahf/melbourne-guitar-school/.maintenance.conf` (after backup)
 8. Runs post-migration handoff via `deploy/update.sh` unless `--skip-deploy` is set
+   - pulls latest branch changes before deploy
+   - runs non-interactively for shared `.env` review prompt
 
 ## Post-Migration Validation
 

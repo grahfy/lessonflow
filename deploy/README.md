@@ -90,6 +90,7 @@ Recommended defaults:
 
 Notes:
 - `update.sh` / `deploy.sh` now show pulled commit details and pause for a keypress if a `git pull` updates the deploy script itself, then they return to the TUI main menu.
+- The one-time migration helper now hands off to `deploy/update.sh` with automatic `git fetch/pull` (no `--skip-pull`) so the latest deploy logic is used.
 - Admins can confirm deployed commits in the app using the `Latest Updates` popup after login.
 
 ### Legacy Runtime Migration (One-Time)
@@ -332,6 +333,8 @@ Notes:
 - `deploy.sh` and `update.sh` banners now render dynamically and include the app version from `package.json`, so longer titles do not break the right border.
 - `deploy/deploy.sh` (and therefore `deploy/update.sh`) now re-syncs the repo Nginx site config on every deploy, runs `nginx -t`, and restarts Nginx after a successful deploy.
 - `deploy/deploy.sh` now writes deploy commit metadata to shared data so admins can view post-deploy commit notes in the in-app `Latest Updates` popup.
+- `deploy/deploy.sh` now auto-retries schema backup dumps with tablespace compatibility handling and only continues when a valid SQL dump file is produced.
+- Managed cron bootstrap now defers job installation until a runnable `current/deploy/cron.sh` exists, avoiding first-run "runner not found" noise.
 - Keep production Nginx changes in `deploy/nginx.conf` / `deploy/nginx-http.conf`; local edits under `/etc/nginx/sites-available/` will be overwritten by the next deploy/update.
 - Admin/student login endpoints are rate-limited strictly, but general `/admin` and `/api/admin` console traffic now uses a higher limit to avoid intermittent operator-facing `503` errors during normal use.
 

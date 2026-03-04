@@ -324,7 +324,7 @@ cleanup_repo_maintenance_conf() {
 post_migration_handoff() {
   section "Post-Migration Handoff"
 
-  local cmd="cd '${REPO_ROOT}' && ./deploy/update.sh --skip-pull --branch '${BRANCH}' --install-app-service --install-cron-jobs --allow-dirty --no-spinner"
+  local cmd="cd '${REPO_ROOT}' && MGS_SKIP_DEPLOY_SHARED_ENV_REVIEW_PROMPT=1 ./deploy/update.sh --branch '${BRANCH}' --install-app-service --install-cron-jobs --allow-dirty --no-spinner"
   if [[ "${SKIP_DEPLOY}" == true ]]; then
     log_info "Skipping deploy handoff (--skip-deploy set)."
     return 0
