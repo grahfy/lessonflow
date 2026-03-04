@@ -53,21 +53,34 @@ function encode(data: object): string {
  * @returns Payload if valid, null if invalid/expired
  */
 function decode(token: string): { email: string; exp: number } | null {
-  const [payload, signature] = token.split(".");
-  if (!payload || !signature) {
+  try {
+    const [payload, signature] = token.split(".");
+    if (!payload || !signature) {
+      return null;
+    }
+    if (signPayload(payload) !== signature) {
+      return null;
+    }
+
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+      email?: unknown;
+      exp?: unknown;
+    };
+
+    if (typeof parsed.email !== "string" || typeof parsed.exp !== "number") {
+      return null;
+    }
+    if (!parsed.exp || Date.now() > parsed.exp) {
+      return null;
+    }
+
+    return {
+      email: parsed.email,
+      exp: parsed.exp
+    };
+  } catch {
     return null;
   }
-  if (signPayload(payload) !== signature) {
-    return null;
-  }
-  const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
-    email: string;
-    exp: number;
-  };
-  if (!parsed.exp || Date.now() > parsed.exp) {
-    return null;
-  }
-  return parsed;
 }
 
 /**
@@ -139,7 +152,7 @@ export async function verifyAdminPassword(email: string, password: string): Prom
 }
 
 /**
- * Retrieves admin from session token (does not verify active status).
+ * Retrieves an active admin from session token.
  */
 export async function getAdminFromToken(token?: string | null): Promise<AdminUser | null> {
   if (!token) {
@@ -149,8 +162,11 @@ export async function getAdminFromToken(token?: string | null): Promise<AdminUse
   if (!data) {
     return null;
   }
-  return prisma.adminUser.findUnique({
-    where: { email: data.email }
+  return prisma.adminUser.findFirst({
+    where: {
+      email: data.email,
+      isActive: true
+    }
   });
 }
 

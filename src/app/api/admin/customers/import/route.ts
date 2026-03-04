@@ -1,94 +1,194 @@
-import { NextResponse } from 'next/server';
-import { prisma as db } from '@/lib/db';
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
+import { requireAdminFromRequest } from "@/lib/admin-route";
+import { jsonUnexpectedError } from "@/lib/api-errors";
+import { customerSnapshotFromInput } from "@/lib/customer-match";
+import { prisma } from "@/lib/db";
+import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
 
-export async function POST(request: Request) {
+const MAX_IMPORT_ROWS = 1000;
+const MAX_IMPORT_BYTES = 1024 * 1024;
+
+const importPayloadSchema = z.object({
+  customers: z.array(z.record(z.string(), z.unknown())).min(1).max(MAX_IMPORT_ROWS)
+});
+
+type CsvRow = Record<string, unknown>;
+
+function readRowString(row: CsvRow, keys: string[]): string {
+  for (const key of keys) {
+    const value = row[key];
+    if (typeof value === "string") {
+      return value.trim();
+    }
+    if (typeof value === "number" || typeof value === "boolean") {
+      return String(value).trim();
+    }
+  }
+  return "";
+}
+
+function normalizeSkillLevel(raw: string): "beginner" | "intermediate" | "advanced" {
+  const value = raw.trim().toLowerCase();
+  if (value === "intermediate" || value === "advanced") {
+    return value;
+  }
+  return "beginner";
+}
+
+function normalizeLessonMode(raw: string): "in_person" | "video" {
+  const value = raw.trim().toLowerCase();
+  if (value === "video" || value === "online" || value === "virtual") {
+    return "video";
+  }
+  return "in_person";
+}
+
+export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { customers } = body;
+    const admin = await requireAdminFromRequest(request);
+    if (!admin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    if (!Array.isArray(customers) || customers.length === 0) {
+    const contentLengthHeader = request.headers.get("content-length");
+    const contentLength = contentLengthHeader ? Number.parseInt(contentLengthHeader, 10) : 0;
+    if (Number.isFinite(contentLength) && contentLength > MAX_IMPORT_BYTES) {
       return NextResponse.json(
-        { error: 'No customers provided or invalid format' },
+        { error: `Import payload too large. Maximum ${MAX_IMPORT_BYTES} bytes.` },
+        { status: 413 }
+      );
+    }
+
+    const rateLimit = consumeRateLimit({
+      key: `admin-customers-import:${getRequestIp(request)}`,
+      limit: 10,
+      windowMs: 10 * 60 * 1000
+    });
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many import attempts. Please try again shortly." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimit.retryAfterSeconds)
+          }
+        }
+      );
+    }
+
+    const body = await request.json().catch(() => null);
+    const parsed = importPayloadSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid import payload.", details: parsed.error.flatten() },
         { status: 400 }
       );
     }
 
-    const createdCustomers = [];
-    const errors = [];
+    const createdCustomerIds: string[] = [];
+    const errors: string[] = [];
+    const seenNormalizedEmails = new Set<string>();
+    const seenNormalizedPhones = new Set<string>();
 
-    for (const [index, row] of customers.entries()) {
-      try {
-        const firstName = row.first_name || row['First Name'] || '';
-        const lastName = row.last_name || row['Last Name'] || '';
-        const email = row.email || row['Email'] || '';
+    for (const [index, row] of parsed.data.customers.entries()) {
+      const rowNumber = index + 1;
+      const firstName = readRowString(row, ["first_name", "firstName", "First Name", "firstname", "FirstName"]);
+      const lastName = readRowString(row, ["last_name", "lastName", "Last Name", "lastname", "LastName"]);
+      const email = readRowString(row, ["email", "Email", "email_address", "Email Address"]);
+      const phone = readRowString(row, ["phone", "Phone", "mobile", "Mobile", "phone_number", "Phone Number"]);
 
-        if (!firstName && !lastName) {
-           throw new Error('Customer must have a first or last name');
+      if (!firstName && !lastName) {
+        errors.push(`Row ${rowNumber}: Customer must have a first or last name.`);
+        continue;
+      }
+      if (!email && !phone) {
+        errors.push(`Row ${rowNumber}: Provide at least one contact field (email or phone).`);
+        continue;
+      }
+      if (email && !z.string().email().safeParse(email).success) {
+        errors.push(`Row ${rowNumber}: Email is invalid.`);
+        continue;
+      }
+
+      const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+      const customerData = customerSnapshotFromInput({
+        firstName,
+        lastName,
+        name: fullName || firstName || lastName,
+        email,
+        phone,
+        skillLevel: normalizeSkillLevel(readRowString(row, ["skill_level", "skillLevel", "Skill Level"])),
+        lessonMode: normalizeLessonMode(readRowString(row, ["lesson_mode", "lessonMode", "Lesson Mode"])),
+        unitNumber: readRowString(row, ["unit_number", "unitNumber", "Unit Number"]) || null,
+        houseNumber: readRowString(row, ["house_number", "houseNumber", "House Number"]),
+        streetName: readRowString(row, ["street_name", "streetName", "Street Name"]),
+        streetType: readRowString(row, ["street_type", "streetType", "Street Type"]),
+        suburb: readRowString(row, ["suburb", "Suburb", "city", "City"]),
+        state: readRowString(row, ["state", "State"]) || "VIC",
+        postcode: readRowString(row, ["postcode", "Postcode", "zip", "Zip"])
+      });
+
+      const dedupeClauses: Array<{ normalizedEmail?: string; normalizedPhone?: string }> = [];
+      if (customerData.normalizedEmail) {
+        if (seenNormalizedEmails.has(customerData.normalizedEmail)) {
+          errors.push(`Row ${rowNumber}: Duplicate email in import payload.`);
+          continue;
         }
-
-        const fullName = [firstName, lastName].filter(Boolean).join(' ');
-        const normalizedFullName = fullName.trim().toLowerCase();
-        const normalizedEmail = email ? email.trim().toLowerCase() : '';
-
-        // Generate random Melbourne address as requested
-        const dummyAddress = {
-          unitNumber: '',
-          houseNumber: String(Math.floor(Math.random() * 99) + 1),
-          streetName: ['Collins', 'Bourke', 'Lonsdale', 'Swanston', 'Flinders', 'Elizabeth'][Math.floor(Math.random() * 6)],
-          streetType: 'Street',
-          suburb: 'Melbourne',
-          state: 'VIC',
-          postcode: '3000',
-        };
-
-        // Create random dummy phone number 04XX XXX XXX
-        const dummyPhone = `04${Math.floor(10 + Math.random() * 90)} ${Math.floor(100 + Math.random() * 899)} ${Math.floor(100 + Math.random() * 899)}`;
-        const normalizedPhone = dummyPhone.replace(/\s+/g, '');
-
-        const existingCustomer = normalizedEmail 
-            ? await db.customer.findFirst({ where: { normalizedEmail } })
-            : null;
-
-        if (existingCustomer) {
-            errors.push(`Row ${index + 1}: Customer with email ${email} already exists.`);
-            continue;
+        dedupeClauses.push({ normalizedEmail: customerData.normalizedEmail });
+      }
+      if (customerData.normalizedPhone) {
+        if (seenNormalizedPhones.has(customerData.normalizedPhone)) {
+          errors.push(`Row ${rowNumber}: Duplicate phone in import payload.`);
+          continue;
         }
+        dedupeClauses.push({ normalizedPhone: customerData.normalizedPhone });
+      }
+      if (dedupeClauses.length === 0) {
+        errors.push(`Row ${rowNumber}: Contact details could not be normalized.`);
+        continue;
+      }
 
-        const newCustomer = await db.customer.create({
-          data: {
-            firstName,
-            lastName,
-            fullName,
-            normalizedFullName,
-            nameSearchTokens: normalizedFullName,
-            email: email || '',
-            normalizedEmail,
-            phone: dummyPhone,
-            normalizedPhone,
-            skillLevel: 'beginner',
-            lessonMode: 'in_person',
-            isArchived: false,
-            ...dummyAddress,
-          },
-        });
+      const existingCustomer = await prisma.customer.findFirst({
+        where: {
+          isArchived: false,
+          OR: dedupeClauses
+        },
+        select: {
+          fullName: true
+        }
+      });
+      if (existingCustomer) {
+        errors.push(`Row ${rowNumber}: Matching customer already exists (${existingCustomer.fullName}).`);
+        continue;
+      }
 
-        createdCustomers.push(newCustomer);
-      } catch (err: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
-        errors.push(`Row ${index + 1}: ${err.message || 'Failed to process row'}`);
+      const created = await prisma.customer.create({
+        data: {
+          ...customerData,
+          isArchived: false
+        },
+        select: {
+          id: true
+        }
+      });
+
+      createdCustomerIds.push(created.id);
+      if (customerData.normalizedEmail) {
+        seenNormalizedEmails.add(customerData.normalizedEmail);
+      }
+      if (customerData.normalizedPhone) {
+        seenNormalizedPhones.add(customerData.normalizedPhone);
       }
     }
 
     return NextResponse.json({
       success: true,
-      importedCount: createdCustomers.length,
-      errors: errors.length > 0 ? errors : undefined,
+      importedCount: createdCustomerIds.length,
+      errors: errors.length > 0 ? errors : undefined
     });
-  } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
-    console.error('Customer import failed:', error);
-    return NextResponse.json(
-      { error: 'Internal Server Error' },
-      { status: 500 }
-    );
+  } catch (error) {
+    return jsonUnexpectedError(error, "Customer import failed.");
   }
 }
