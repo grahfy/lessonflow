@@ -1,67 +1,17 @@
-# 01 Getting Started
+# 01. Getting Started
 
-## What This App Is
-This web app runs Melbourne Guitar School’s day-to-day operations:
-- bookings and lesson requests
-- customers and contact details
-- invoices, reminders, and payment tracking
-- learning materials (student portal)
-- reports and owner summaries
+This chapter is written for music teachers, private studio operators, and music school administration teams using LessonFlow to run lesson scheduling, student communication, and billing with confidence.
 
-If you are brand new, you can learn the basics in 15 minutes by following the first 4 guides in order.
+<div class="manual-callout info">
+<strong>Goal:</strong> Build operator confidence quickly by understanding how LessonFlow is structured and what must be checked before live administration begins.
+</div>
 
-## Where You Work (Most Days)
-You will mainly use two admin screens:
-- `Bookings` (`/admin/bookings`): schedule, lesson requests, moving/cancelling, customer actions
-- `Invoices` (`/admin/invoices`): creating/sending invoices, reminders, recording payment, credit notes
+LessonFlow is an operational system that links scheduling, customer identity, billing, communication, and reporting into one continuous workflow. The platform is most effective when an operator thinks in lifecycle terms rather than isolated pages. A booking request is not just a calendar event; it is the first step in a chain that may include customer updates, lesson notes, invoice generation, reminder follow-up, and payment reconciliation.
 
-Other admin screens:
-- `Reports` (`/admin/reports`): daily/weekly/monthly/yearly summaries and comparisons
-- `Settings` (`/admin/settings`): system settings (used carefully)
-- `Manual` (`/admin/manual`): these guides (in-app)
+On your first day, focus on orientation instead of speed. Confirm you can access all major admin areas, understand the difference between pending and confirmed records, and identify where high-risk actions exist. In practice, the highest-risk actions are customer deletion, invoice deletion, and misapplied status transitions. The manual repeatedly emphasizes those controls because stable operations depend on preserving audit history and avoiding accidental data loss.
 
-## Before You Start
-You need:
-- the admin login email and password
-- a basic understanding of your lesson process:
-  - when to approve requests
-  - how to handle moves/cancellations
-  - when to invoice and when to follow up
+A practical onboarding flow starts by logging in, opening the bookings console, and inspecting current pending requests. From there, move into the customer directory to understand profile completeness standards. After that, review invoices and status transitions so you know what actions are valid at each state. Finish by checking reports and settings so you can recognize normal dashboard behavior and configuration surfaces.
 
-## Quick Start (First Day)
-1. Log in at `/admin/login`.
-2. Open `Bookings` and click a few items on the calendar so you understand how the detail dialog works.
-3. Open `Customers` inside `Bookings` and search for a known customer.
-4. Open `Invoices` and practice:
-   - filtering by `Outstanding only`
-   - opening an invoice with `View`
-   - downloading a PDF with `Download PDF`
+When you begin live operations, treat every user-facing action as a communication event. If a booking is moved, the customer experience changes. If an invoice is marked paid incorrectly, financial reporting becomes unreliable. If a portal credential is regenerated without context, support overhead increases. LessonFlow works best when each action is performed with clear intent and confirmed outcome.
 
-## Daily Routine (Simple Checklist)
-1. `Bookings`:
-   - approve or reject new requests
-   - check today’s bookings
-   - move or cancel bookings as needed
-2. `Invoices`:
-   - send invoices for completed/confirmed lessons
-   - send reminders for overdue invoices
-   - mark payments as paid when received
-
-## Common Beginner Mistakes (And How To Avoid Them)
-- You edit a booking but forget the last step:
-  - After changing details, click `Save details`
-  - After changing date/time, click `Move booking`
-- You try to delete something important:
-  - Sent/paid invoices should not be deleted. Use `Create credit note` instead.
-- You assume an email was delivered:
-  - If email delivery is not configured, actions can be recorded but not delivered. See `06-Email-and-Notifications.md`.
-
-## If You Get Stuck
-Start here:
-- [02-Admin-Login-and-Access.md](02-Admin-Login-and-Access.md)
-- [08-Troubleshooting-and-FAQs.md](08-Troubleshooting-and-FAQs.md)
-
-## Next Guides
-- [02-Admin-Login-and-Access.md](02-Admin-Login-and-Access.md)
-- [03-Booking-Management.md](03-Booking-Management.md)
-- [05-Invoice-Management.md](05-Invoice-Management.md)
+During your first week, keep this chapter open alongside chapters 03 and 05. Doing so reinforces a consistent daily rhythm: schedule health first, billing health second, then communication and escalation checks. That rhythm is the core operational pattern across all school sizes.

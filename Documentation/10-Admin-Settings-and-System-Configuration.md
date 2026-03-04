@@ -1,77 +1,17 @@
-# 10 Admin Settings and System Configuration
+# 10. Admin Settings and System Configuration
 
-## What This Screen Is
-`/admin/settings` is the “settings page” for the whole app.
+This chapter is written for music teachers, private studio operators, and music school administration teams using LessonFlow to run lesson scheduling, student communication, and billing with confidence.
 
-Use it to change supported settings without editing server files manually.
+<div class="manual-callout warning">
+<strong>High Impact Surface:</strong> Settings changes can affect authentication, email behavior, scheduled jobs, and invoice defaults. Treat this area as controlled operations, not casual editing.
+</div>
 
-This page:
-- saves settings to the server `.env`
-- keeps the admin login credentials in sync with the database
-- may restart the service after saving (so changes take effect)
+Settings in LessonFlow expose environment-backed operational controls. Because these values influence core behavior, every configuration change should be planned, applied deliberately, and verified through concrete post-change checks.
 
-## Before You Change Anything
-1. Open `/admin/settings`.
-2. Decide: is this a day-to-day change (safe), or a technical change (be careful)?
+Before editing any setting, capture the current value and define expected outcome. Apply one logical change at a time. Saving multiple unrelated changes in one pass makes rollback and diagnosis harder when behavior is unexpected.
 
-Examples:
-- Day-to-day: invoice defaults, business details, contact info
-- Technical: site URL, email credentials, security secrets
+After each save, validate impacted flows directly. If authentication values changed, verify admin login. If communication settings changed, verify message delivery behavior. If billing defaults changed, verify invoice creation reflects intended defaults. Verification is mandatory because apparent save success does not guarantee operational correctness.
 
-## Safety Rules (Beginner-Friendly)
-- Change one thing at a time.
-- If a secret field is already set, you can leave it blank to keep the current value.
-- After saving, you may be logged out (this is normal if you changed the owner email).
-- Many changes only fully apply after a restart. The app tries to restart automatically.
+Secret values require strict handling. They should remain in secure configuration stores and never appear in documentation, screenshots, or team chat history. Rotation events should include a structured verification action and an operational log entry.
 
-## Common Tasks (Step-by-Step)
-
-### A) Update a Normal Setting
-1. Change the field you want.
-2. Leave everything else as-is.
-3. Click `Save settings`.
-4. Test the workflow you changed (for example, send a test invoice).
-
-### B) Keep Current Secret Values
-If you see a secret field that says it is already set:
-- leave it blank if you are not changing it
-
-Blank means “keep what is currently configured”.
-
-### C) Change the Admin Login Email or Password
-1. Find `Owner Email`.
-2. Change it if you want the admin login email to change.
-3. If you want to keep the current password:
-   - leave the new password field blank
-4. If you want to change the password:
-   - enter a new password and save
-
-After saving:
-- you may be logged out
-- sign in again with the new email/password
-
-### D) Save and Confirm
-1. Click `Save settings`.
-2. Wait for the success message.
-3. If it says a restart happened (or you were logged out), that is expected.
-4. Re-test what you changed.
-
-## Visual Reference
-![Admin settings page](assets/admin-settings-page.png)
-
-## Common Mistakes
-- Changing owner email and then trying to sign in with the old email
-- Changing email settings and not testing a real send (invoice send is the easiest test)
-
-## Troubleshooting
-- “Saved, but nothing changed”:
-  - refresh the page and try again
-  - a restart may be required
-- Can’t log in after changing email/password:
-  - use the new owner email/password
-  - if stuck, use the server password reset script (technical owner)
-
-## Next Guides
-- [02-Admin-Login-and-Access.md](02-Admin-Login-and-Access.md)
-- [06-Email-and-Notifications.md](06-Email-and-Notifications.md)
-- [11-Admin-Reports-Dashboard.md](11-Admin-Reports-Dashboard.md)
+If a change introduces uncertainty, revert to known-good values before continuing. Controlled rollback is safer than compounding uncertain edits.

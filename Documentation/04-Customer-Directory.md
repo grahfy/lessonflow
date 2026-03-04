@@ -1,79 +1,17 @@
-# 04 Customer Directory
+# 04. Customer Directory
 
-## What This Is
-The customer directory is a simple “address book” for the school.
+This chapter is written for music teachers, private studio operators, and music school administration teams using LessonFlow to run lesson scheduling, student communication, and billing with confidence.
 
-Use it to:
-- find existing customers quickly
-- avoid duplicate entries
-- keep phone/email accurate
-- jump to invoice history
-- manage student portal credentials (if needed)
+Customer records in LessonFlow are operational anchors. Every booking, portal login, and invoice reference ultimately depends on correct customer identity data. For that reason, customer management is not just data entry; it is lifecycle integrity management.
 
-## Where To Find It
-1. Open `/admin/bookings`.
-2. Click `Customers`.
+Before creating a new customer, always perform duplicate checks by name, email, and phone. Duplicate records create downstream confusion in portal credentials, booking history, and billing reconciliation. If you suspect a near-duplicate, pause and validate before saving. Preventing duplication is easier and safer than repairing it later.
 
-## Common Tasks (Step-by-Step)
+When creating a customer, prioritize completeness over speed. Contact methods, address fields, lesson preferences, and skill-level context all affect scheduling and communication quality. Incomplete records force assumptions at later stages, which increases both support load and error risk.
 
-### A) Find a Customer (Always Search First)
-1. Open `Customers`.
-2. Use the `Search` field.
-3. Try:
-   - email (best)
-   - phone number
-   - last name
-4. If you find the customer, click `Edit` to confirm details are correct.
+Editing existing customer records should follow a conservative principle: change only what is confirmed, and preserve context where appropriate. If a customer updates phone or email, confirm the new value before replacing the old one. If a record participates in active invoices or upcoming bookings, ensure edits do not break expected communications.
 
-### B) Create a New Customer
-Only create a new customer if search finds nothing.
-1. Click `Create New Customer`.
-2. Enter:
-   - full name
-   - email
-   - phone
-3. Click `Save customer`.
+Portal credential support workflows rely on consistent identity matching. If a student cannot log in, check for spelling variation, postcode mismatch, and stale credentials in that order. Regeneration should be used when identity is confirmed and access remains blocked. Regeneration without validation can create avoidable support loops.
 
-### C) Edit Customer Details
-1. Find the customer row.
-2. Click `Edit`.
-3. Update the fields.
-4. Click `Save customer`.
+Archive or deletion actions should be rare and justified. A record should only be removed when it is truly invalid, duplicate, or policy-expired, and the operator understands implications for history and reporting. In most operational scenarios, preserving data with clear status context is preferable to destructive removal.
 
-Tip:
-- If a customer changes email or phone, update it here. This keeps invoices and contact messages consistent.
-
-### D) Open Invoice History for a Customer
-1. In the customer row, click `Invoices`.
-2. You will be redirected to `/admin/invoices` with filters set for that customer.
-
-### E) Delete / Archive (Use Carefully)
-1. Find the customer row.
-2. Click `Delete`.
-3. Confirm.
-
-Use this only when:
-- the customer is a duplicate entry
-- the record is clearly incorrect/test data
-
-Avoid deleting real customers unless you are sure it will not affect history you need.
-
-## Visual Reference
-![Customer directory list](assets/customer-directory-list.png)
-![Create customer editor dialog](assets/customer-editor-create.png)
-
-## Common Beginner Mistakes
-- Creating duplicates (for example “Jon Smith” and “John Smith”)
-  - Fix: search by email/phone before creating
-- Deleting an active customer instead of editing
-  - Fix: use `Edit` for corrections
-
-## Troubleshooting
-- Customer not found:
-  - search by email (best)
-  - search by phone digits
-  - check spelling differences
-
-## Next Guides
-- [03-Booking-Management.md](03-Booking-Management.md)
-- [05-Invoice-Management.md](05-Invoice-Management.md)
+High-quality customer records reduce friction across all other admin functions. When this chapter is followed consistently, booking reliability improves, invoice delivery quality improves, and student support response time decreases.

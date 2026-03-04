@@ -1,75 +1,15 @@
-# 12 Student Portal and Learning Materials
+# 12. Student Portal and Learning Materials
 
-## What This Is
-The student portal is the student-facing area of the website.
+This chapter is written for music teachers, private studio operators, and music school administration teams using LessonFlow to run lesson scheduling, student communication, and billing with confidence.
 
-Students can:
-- log in with their portal password
-- see upcoming and previous appointments
-- preview or download learning materials (PDF/audio)
-- view general learning materials (not linked to a specific appointment)
+Student portal operations in LessonFlow connect customer identity, appointment visibility, and assigned learning resources. Admin support quality in this area directly affects student confidence and reduces repetitive support requests.
 
-Admins can:
-- help students log in (reveal/regenerate password)
-- upload learning materials
+Students authenticate using full name, four-digit postcode, password, and CAPTCHA response. If login fails, support should follow a strict sequence: verify spelling and postcode first, then verify credential freshness, then regenerate credentials only when identity is confirmed.
 
-## What You Need (Admin)
-- The student must exist in the customer directory.
-- The student must have at least one approved booking (for portal access to make sense).
-- You need to know how to securely share a password (avoid public channels).
+Inside the portal, students can review upcoming and previous appointments, submit lesson requests, cancel eligible appointments, and access learning materials. Because this experience is directly student-facing, data accuracy in customer and booking records is critical.
 
-## Student Login (What To Tell Them)
-1. Go to `/student/login`.
-2. Enter:
-   - full name
-   - postcode
-   - portal password
-3. After sign-in, they land on `/student/portal`.
+Learning materials should be attached with clear titles and correct type metadata so students can identify what to preview versus download. When materials appear missing, confirm whether the file was linked to a specific booking or stored as general material, then verify access via an authenticated session.
 
-## If a Student Can’t Log In (Admin Steps)
-1. Open `/admin/bookings`.
-2. Click `Customers`.
-3. Find the student.
-4. Use:
-   - `Reveal password` (read the current password), or
-   - `Regenerate password` (make a new one)
-5. Share the password securely with the student.
+Booking requests from the portal enter pending approval workflow and must be reviewed with the same care as public intake requests. Cancellation actions from students should be interpreted in policy context and communicated clearly when fee rules apply.
 
-Important:
-- If you regenerate, the old password stops working immediately.
-
-## Upload Learning Materials (Admin)
-1. Open `/admin/bookings`.
-2. Open `Customer Learning Materials`.
-3. Select a customer.
-4. Upload a file.
-5. Optional: link it to an appointment.
-6. Save.
-
-You can also upload “general” materials not linked to any appointment.
-
-## Preview vs Download (What Students See)
-- PDFs usually preview inside the browser.
-- Audio usually plays in the browser.
-- If preview does not work (browser limitation), use `Download`.
-
-## Visual Reference
-![Student portal login page](assets/student-login-page.png)
-![Student portal dashboard page](assets/student-portal-page.png)
-
-## Common Beginner Mistakes
-- Uploading materials to the wrong customer
-  - Fix: double-check the selected customer name
-- Regenerating passwords without warning the student
-  - Fix: tell them the old password will stop working
-
-## Troubleshooting
-- Student cannot log in:
-  - confirm the full name/postcode match the customer record
-  - reveal/regenerate password
-- Upload fails:
-  - file may be too large
-
-## Next Guides
-- [03-Booking-Management.md](03-Booking-Management.md)
-- [06-Email-and-Notifications.md](06-Email-and-Notifications.md)
+Support outcome quality improves when operators treat portal incidents as identity-and-state checks, not just front-end issues.

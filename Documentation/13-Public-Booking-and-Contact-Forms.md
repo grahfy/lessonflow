@@ -1,72 +1,13 @@
-# 13 Public Booking and Contact Forms
+# 13. Public Booking and Contact Forms
 
-## What This Covers
-These are the two public forms on the website:
-- `/book` for booking requests
-- `/contact` for general enquiries
+This chapter is written for music teachers, private studio operators, and music school administration teams using LessonFlow to run lesson scheduling, student communication, and billing with confidence.
 
-This guide explains what the visitor sees and what the admin should do next.
+Public forms are the top of the LessonFlow intake funnel and should be handled as structured operational inputs rather than informal inquiries. A public booking request becomes an internal pending workflow item, while contact submissions become follow-up tasks with variable conversion potential.
 
-## Public Booking Requests (`/book`)
+The booking form is designed to capture enough context for scheduling decisions without requiring immediate admin intervention at submission time. Once a request is received, operators should validate identity details, lesson preferences, and timing feasibility before approval. Requests should move forward only when execution is realistic.
 
-### What the Visitor Sees
-1. They fill in the booking request form.
-2. They click `Request Booking`.
-3. They should see a confirmation pop-up that says the request is pending.
+Contact form submissions should be triaged for urgency and intent. Some messages are general questions, while others represent latent booking intent. Effective operators classify quickly and route responses accordingly.
 
-If they report it “stuck on Submitting…”:
-- tell them to refresh and try again
-- then check the admin bookings console to see if it saved anyway
+Follow-up should always include record quality checks. If a public request is actionable, ensure customer profile creation or matching is done correctly before downstream booking and billing actions begin. If details are incomplete, communicate for clarification before committing schedule or financial steps.
 
-### What the Admin Does Next
-1. Open `/admin/bookings`.
-2. Turn on `Pending` filter.
-3. Click the request.
-4. Choose one:
-   - `Approve request` to create a confirmed booking
-   - `Reject request` to decline
-   - `Cancel` if it should not proceed
-   - `Remove request entirely` to delete it permanently
-5. Optional: message the customer using notify/email actions.
-
-## Public Contact Form (`/contact`)
-
-### What the Visitor Sees
-1. They submit the form.
-2. The app shows a confirmation message.
-
-### What the Admin Does Next
-- The owner/admin receives the message email (if email delivery is configured), or it may be queued if not.
-- If needed, respond manually.
-
-## If Email Delivery Is Not Working
-Sometimes the website can still save a submission even if email sending fails.
-
-This means:
-- the booking request/contact message may exist in the system
-- but email notifications might not arrive
-
-When in doubt:
-1. Check `/admin/bookings` for pending requests.
-2. If necessary, contact the customer manually.
-
-## Visual Reference
-![Public booking page](assets/public-book-page.png)
-![Public contact page](assets/public-contact-page.png)
-
-## Common Beginner Mistakes
-- Assuming the request failed just because an email did not arrive
-  - Fix: check `/admin/bookings` for the saved request
-
-## Troubleshooting
-- Booking request stuck on `Submitting...`:
-  - refresh and retry
-  - check admin bookings for a saved request
-- Visitor did not receive an email:
-  - confirm email delivery configuration
-  - respond manually if required
-
-## Next Guides
-- [03-Booking-Management.md](03-Booking-Management.md)
-- [06-Email-and-Notifications.md](06-Email-and-Notifications.md)
-- [08-Troubleshooting-and-FAQs.md](08-Troubleshooting-and-FAQs.md)
+High-quality intake handling creates smoother downstream workflow in bookings, customer management, and invoicing. Poor intake handling amplifies rework across the entire system.

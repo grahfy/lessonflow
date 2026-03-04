@@ -1,70 +1,13 @@
-# 02 Admin Login and Access
+# 02. Admin Login and Access
 
-## What This Is
-This guide shows how to sign in, sign out, and what to do if access fails.
+This chapter is written for music teachers, private studio operators, and music school administration teams using LessonFlow to run lesson scheduling, student communication, and billing with confidence.
 
-Most problems come down to:
-- wrong email/password
-- expired session
-- a stale browser tab (open a new tab)
+Administrative access in LessonFlow is intentionally strict because the same session can change customer data, billing status, and notification behavior. Operators should view login as an operational control point, not just a gate screen. Every sign-in event should be deliberate, and every sign-out should be complete.
 
-## What You Need
-- Admin email
-- Admin password
-- 10 seconds of uninterrupted time (avoid refreshing while signing in)
+The standard login path is `/admin/login`, where the operator provides admin email, password, and CAPTCHA response. CAPTCHA exists to reduce automated abuse before server-side credential checks run. If login fails, do not repeatedly retry without diagnosis. First verify email spelling, then confirm password source, and then refresh the CAPTCHA challenge to rule out expired or stale input.
 
-If you do not have credentials, ask the owner/technical admin.
+Session cookies control authenticated access across admin routes. If a cookie expires or becomes invalid, LessonFlow will redirect back to login. This behavior is expected and should be treated as a normal security boundary, not as application instability. When this happens during work, re-authenticate and return to the relevant workflow rather than attempting browser-level workaround behavior.
 
-## Sign In (Step-by-Step)
-1. Go to `/admin/login`.
-2. Enter:
-   - `Admin email`
-   - `Password`
-3. Complete the quick captcha (a simple maths question).
-4. Click `Sign in`.
-5. You should land on `/admin/bookings`.
+Credential handling should follow strict operational hygiene. Passwords should live only in approved credential storage, never in plain text notes, chat logs, or documentation files. When staffing changes occur, rotate credentials promptly and confirm successful access with a controlled verification login. If credential changes include email identity updates, coordinate the change window so operators are not interrupted mid-workflow.
 
-Tip:
-- If you mistyped the password, use the show/hide password toggle to double-check.
-
-## Sign Out
-1. In any admin screen (`Bookings`, `Invoices`, `Reports`, `Settings`, `Manual`), click `Sign out`.
-2. Close the browser tab if you are on a shared device.
-
-## Visual Reference
-![Admin login page](assets/admin-login-page.png)
-
-## What “Session Expired” Means
-If the app asks you to sign in again, it usually means:
-- you were signed in earlier
-- your session timed out
-- or the browser lost the session cookie
-
-Fix:
-- go back to `/admin/login` and sign in again
-
-## Common Beginner Mistakes
-- Copy/paste adds a trailing space to the email
-  - delete the last character and re-type it
-- You keep re-trying the same tab after a long time
-  - open a new tab and sign in again
-- You sign in on HTTP instead of HTTPS (rare, but possible)
-  - always use the normal site domain with HTTPS
-
-## Troubleshooting (Quick)
-- `Login failed. Check your email and password.`
-  - confirm you are using the correct email
-  - re-type the password carefully
-  - try a new tab
-- You sign in, then it jumps back to login
-  - your session may have expired; sign in again
-  - if it keeps happening, tell the technical owner (proxy/cookie issue)
-
-## Security Notes (Plain English)
-- Do not share passwords in text messages
-- Sign out on shared devices
-- If you think the password leaked, rotate it immediately
-
-## Next Guides
-- [03-Booking-Management.md](03-Booking-Management.md)
-- [08-Troubleshooting-and-FAQs.md](08-Troubleshooting-and-FAQs.md)
+Sign-out is mandatory at the end of each active admin session, especially on shared or multi-user devices. A complete sign-out ensures the next user cannot inherit administrative state. In operational audits, incomplete sign-out is one of the most common preventable risks.
