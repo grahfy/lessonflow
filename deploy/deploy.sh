@@ -615,6 +615,7 @@ backup_database_before_schema_change() {
     local timestamp=""
     local backup_file=""
     local restore_note=""
+    local dump_args=()
 
     if ! database_backup_required_for_deploy; then
         return 0
@@ -648,6 +649,11 @@ backup_database_before_schema_change() {
         return 1
     fi
 
+    dump_args=( --single-transaction --quick --lock-tables=false )
+    if "${dump_bin}" --help 2>/dev/null | grep -q -- '--no-tablespaces'; then
+        dump_args+=( --no-tablespaces )
+    fi
+
     log_info "Checking database connectivity (${DB_URL_HOST}:${DB_URL_PORT}/${DB_URL_NAME})..."
     if [[ -n "${DB_URL_PASS}" ]]; then
         if ! MYSQL_PWD="${DB_URL_PASS}" "${mysql_bin}" -h "${DB_URL_HOST}" -P "${DB_URL_PORT}" -u "${DB_URL_USER}" -e "SELECT 1" "${DB_URL_NAME}" >/dev/null 2>&1; then
@@ -671,12 +677,12 @@ backup_database_before_schema_change() {
 
     log_info "Creating DB backup: ${backup_file}"
     if [[ -n "${DB_URL_PASS}" ]]; then
-        if ! MYSQL_PWD="${DB_URL_PASS}" "${dump_bin}" -h "${DB_URL_HOST}" -P "${DB_URL_PORT}" -u "${DB_URL_USER}" --single-transaction --quick --lock-tables=false "${DB_URL_NAME}" | gzip -9 > "${backup_file}"; then
+        if ! MYSQL_PWD="${DB_URL_PASS}" "${dump_bin}" -h "${DB_URL_HOST}" -P "${DB_URL_PORT}" -u "${DB_URL_USER}" "${dump_args[@]}" "${DB_URL_NAME}" | gzip -9 > "${backup_file}"; then
             log_error "Database backup failed; aborting deploy."
             return 1
         fi
     else
-        if ! "${dump_bin}" -h "${DB_URL_HOST}" -P "${DB_URL_PORT}" -u "${DB_URL_USER}" --single-transaction --quick --lock-tables=false "${DB_URL_NAME}" | gzip -9 > "${backup_file}"; then
+        if ! "${dump_bin}" -h "${DB_URL_HOST}" -P "${DB_URL_PORT}" -u "${DB_URL_USER}" "${dump_args[@]}" "${DB_URL_NAME}" | gzip -9 > "${backup_file}"; then
             log_error "Database backup failed; aborting deploy."
             return 1
         fi
