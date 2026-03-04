@@ -256,13 +256,13 @@ migrate_crontab() {
   local tmp_file
 
   existing="$(crontab -l 2>/dev/null || true)"
-  stripped="$(printf '%s\n' "${existing}" | awk '
+  stripped="$(printf '%s\n' "${existing}" | awk -v legacy_runner="${LEGACY_CRON_RUNNER}" -v target_runner="${TARGET_CRON_RUNNER}" '
     $0 == "# BEGIN LESSONFLOW_MANAGED_CRON" { skip=1; next }
     $0 == "# END LESSONFLOW_MANAGED_CRON" { skip=0; next }
     $0 == "# BEGIN MELBOURNE_GUITAR_SCHOOL_MANAGED_CRON" { skip=1; next }
     $0 == "# END MELBOURNE_GUITAR_SCHOOL_MANAGED_CRON" { skip=0; next }
-    !skip { print }
-  ' | sed "/$(printf '%s' "${LEGACY_CRON_RUNNER}" | sed 's/[.[\\*^$()+?{|]/\\&/g')/d" | sed "/$(printf '%s' "${TARGET_CRON_RUNNER}" | sed 's/[.[\\*^$()+?{|]/\\&/g')/d")"
+    !skip && index($0, legacy_runner) == 0 && index($0, target_runner) == 0 { print }
+  ')"
 
   tmp_file="$(mktemp)"
   {
@@ -395,4 +395,3 @@ if [[ "${MODE}" == "dry-run" ]]; then
 else
   log_info "Migration complete."
 fi
-
