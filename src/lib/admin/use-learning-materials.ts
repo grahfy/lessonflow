@@ -51,7 +51,7 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
         } finally {
             setLoading(false);
         }
-    }, [safeFetch, handleApiError]);
+    }, [safeFetch, handleApiError, onError]);
 
     const upload = useCallback(async (customerId: string, bookingId: string, form: HTMLFormElement): Promise<boolean> => {
         const formData = new FormData(form);

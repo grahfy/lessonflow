@@ -191,22 +191,24 @@ export function CaptchaField(props: {
           </div>
         )}
       </div>
-      <input
-        id={inputId}
-        name={`${props.idPrefix}Captcha`}
-        type="text"
-        inputMode="text"
-        autoCapitalize="characters"
-        autoComplete="off"
-        required
-        maxLength={12}
-        aria-describedby={imageId}
-        value={props.captcha.userAnswer}
-        onChange={(event) => props.captcha.handleChange(event.currentTarget.value)}
-      />
-      <button type="button" className="btn btn-small" onClick={() => void props.captcha.regenerate()}>
-        New image
-      </button>
+      <div className="captcha-controls-row">
+        <input
+          id={inputId}
+          name={`${props.idPrefix}Captcha`}
+          type="text"
+          inputMode="text"
+          autoCapitalize="characters"
+          autoComplete="off"
+          required
+          maxLength={12}
+          aria-describedby={imageId}
+          value={props.captcha.userAnswer}
+          onChange={(event) => props.captcha.handleChange(event.currentTarget.value)}
+        />
+        <button type="button" className="btn btn-small" onClick={() => void props.captcha.regenerate()}>
+          New image
+        </button>
+      </div>
       {props.captcha.error ? <p className="helper-text" role="alert">{props.captcha.error}</p> : null}
       {props.captcha.captcha ? <p className="helper-text">{props.captcha.captcha.prompt}</p> : null}
     </div>

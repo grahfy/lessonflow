@@ -68,13 +68,13 @@ export function ManualBookingDialog({
       title="Add Manual Booking"
       wide
       footer={
-        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+        <div className="manual-dialog-footer">
           <div>
             {step !== 'customer' && (
               <button className="btn btn-secondary" onClick={() => setStep(MANUAL_STEP_ORDER[stepIndex - 1])}>Back</button>
             )}
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="manual-dialog-footer-right">
             <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
             {step === 'schedule' ? (
               <button className="btn btn-primary" disabled={!!busyAction} onClick={onSave}>
@@ -89,7 +89,7 @@ export function ManualBookingDialog({
         </div>
       }
     >
-      <div className="manual-steps" style={{ marginBottom: '24px' }}>
+      <div className="manual-steps manual-steps-row">
         {MANUAL_STEP_ORDER.map((s, idx) => (
           <div
             key={s}
@@ -142,7 +142,7 @@ export function ManualBookingDialog({
                   Update linked customer profile from this booking
                 </label>
                 {manualCustomerId && (
-                  <div style={{ marginTop: "8px" }}>
+                  <div className="manual-clear-row">
                     <button type="button" className="btn btn-secondary" onClick={onClearCustomer}>
                       Clear selected customer
                     </button>
@@ -151,7 +151,7 @@ export function ManualBookingDialog({
               </div>
             </AdminForm>
 
-            <h3 className="manual-section-title" style={{ marginTop: '24px' }}>Student Details</h3>
+            <h3 className="manual-section-title manual-subsection-heading">Student Details</h3>
             <AdminForm className="manual-grid manual-grid-2">
               <AdminField label="First Name" required>
                 <input name="firstName" required />
@@ -167,7 +167,7 @@ export function ManualBookingDialog({
               </AdminField>
             </AdminForm>
 
-            <h3 className="manual-section-title" style={{ marginTop: '24px' }}>Address</h3>
+            <h3 className="manual-section-title manual-subsection-heading">Address</h3>
             <AdminForm className="manual-grid manual-grid-3">
               <AdminField label="Unit">
                 <input name="unitNumber" maxLength={5} onInput={e => e.currentTarget.value = toDigits(e.currentTarget.value, 5)} />
@@ -250,8 +250,8 @@ export function ManualBookingDialog({
                 <input name="requestedStartAt" type="datetime-local" required />
               </AdminField>
               <AdminField label="Weekly Recurring">
-                <div style={{ display: 'flex', alignItems: 'center', height: '40px' }}>
-                  <input type="checkbox" name="isRecurring" style={{ width: 'auto', margin: 0 }} />
+                <div className="manual-recurring-toggle">
+                  <input type="checkbox" name="isRecurring" className="manual-inline-checkbox" />
                 </div>
               </AdminField>
               <AdminField label="Recurrence End (Optional)">
@@ -260,10 +260,10 @@ export function ManualBookingDialog({
             </AdminForm>
 
             {manualMatch && (
-              <AdminCard style={{ marginTop: '24px', border: '1px solid var(--yellow)', background: 'rgba(255, 193, 7, 0.05)' }}>
-                <h4 style={{ color: 'var(--yellow)', marginBottom: '8px' }}>Duplicate Student Detected</h4>
+              <AdminCard className="manual-match-card">
+                <h4 className="manual-match-title">Duplicate Student Detected</h4>
                 <p className="helper-text">{manualMatch.fullName} · {manualMatch.email} · {manualMatch.phone}</p>
-                <div className="button-row" style={{ marginTop: '16px' }}>
+                <div className="button-row manual-match-actions">
                   <button 
                     className="btn btn-primary" 
                     onClick={() => onResolveMatch(updateCustomerFromBooking ? "update_existing" : "use_existing")}

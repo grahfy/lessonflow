@@ -4,6 +4,7 @@ import { requireAdminFromRequest } from "@/lib/admin-route";
 import { prisma } from "@/lib/db";
 import { applyInvoiceTaxMode, calculateInvoiceTotals } from "@/lib/invoices/calculate";
 import { updateInvoiceSchema } from "@/lib/invoices/schema";
+import { allowedStatusesForAction, canApplyInvoiceAction, type InvoiceLifecycleAction, type InvoiceLifecycleStatus } from "@/lib/invoices/transitions";
 import { InvoiceLineItemDraft } from "@/lib/invoices/types";
 
 type Params = {
@@ -103,6 +104,24 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       }
     });
     return NextResponse.json({ invoice: restored });
+  }
+
+  if (parsed.data.action === "mark_paid" || parsed.data.action === "mark_unpaid" || parsed.data.action === "void") {
+    const action: InvoiceLifecycleAction = parsed.data.action;
+    const currentStatus = existing.status as InvoiceLifecycleStatus;
+    if (!canApplyInvoiceAction(currentStatus, action)) {
+      return NextResponse.json(
+        {
+          error: "Invalid invoice transition.",
+          details: {
+            action,
+            status: existing.status,
+            allowedFrom: allowedStatusesForAction(action)
+          }
+        },
+        { status: 400 }
+      );
+    }
   }
 
   if (parsed.data.action === "mark_paid") {

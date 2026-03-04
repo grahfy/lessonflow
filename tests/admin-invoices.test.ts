@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 
 import { POST as createBookingInvoice } from "@/app/api/admin/bookings/[id]/invoice/route";
 import { PATCH as patchInvoice } from "@/app/api/admin/invoices/[id]/route";
+import { POST as sendInvoice } from "@/app/api/admin/invoices/[id]/send/route";
 import { GET, POST } from "@/app/api/admin/invoices/route";
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
@@ -36,10 +37,11 @@ describe("admin-invoices", () => {
     expect(res.status).toBe(401);
   });
 
-  it("creates invoices and excludes paid invoices from outstanding filter", async () => {
+  it("creates overdue invoices and excludes paid invoices from overdue filter", async () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);
 
+    const overdueDueAt = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
     const createReq = adminRequest("http://localhost/api/admin/invoices", "POST", token, {
       customerFirstName: "Alex",
       customerLastName: "Student",
@@ -48,7 +50,7 @@ describe("admin-invoices", () => {
       customerPhone: "0400123456",
       customerAddress: "10 Main Street, Northcote VIC 3070",
       taxMode: "taxable",
-      dueAt: "2026-08-01T10:00:00.000Z",
+      dueAt: overdueDueAt,
       lineItems: [
         {
           kind: "lesson_fee",
@@ -69,6 +71,10 @@ describe("admin-invoices", () => {
     expect(outstandingBeforeRes.status).toBe(200);
     const outstandingBeforeBody = (await outstandingBeforeRes.json()) as { invoices: Array<{ id: string }> };
     expect(outstandingBeforeBody.invoices.some((invoice) => invoice.id === createdBody.invoice.id)).toBe(true);
+
+    const sendReq = adminRequest(`http://localhost/api/admin/invoices/${createdBody.invoice.id}/send`, "POST", token);
+    const sendRes = await sendInvoice(sendReq, { params: Promise.resolve({ id: createdBody.invoice.id }) });
+    expect(sendRes.status).toBe(200);
 
     const markPaidReq = adminRequest(`http://localhost/api/admin/invoices/${createdBody.invoice.id}`, "PATCH", token, {
       action: "mark_paid"
@@ -247,6 +253,179 @@ describe("admin-invoices", () => {
     expect(body.invoices.length).toBe(1);
     expect(body.invoices[0].invoiceNumber).toBe("MGS-2026-8802");
     expect(body.invoices[0].agingBucket).toBe("overdue_31_plus");
+  });
+
+  it("sorts invoices by requested field and direction", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const createInvoiceRow = async (input: {
+      invoiceNumber: string;
+      customerFirstName: string;
+      customerLastName: string;
+      customerName: string;
+      status: "draft" | "sent" | "paid" | "void";
+      totalCents: number;
+      dueAt: Date;
+    }) => {
+      await prisma.invoice.create({
+        data: {
+          invoiceNumber: input.invoiceNumber,
+          status: input.status,
+          taxMode: "taxable",
+          customerFirstName: input.customerFirstName,
+          customerLastName: input.customerLastName,
+          customerName: input.customerName,
+          customerEmail: `${input.customerFirstName.toLowerCase()}@example.com`,
+          customerPhone: "0400000000",
+          customerAddress: "1 Main Street",
+          sellerBusinessName: "Melbourne Guitar School",
+          sellerAbn: "12345678901",
+          sellerEmail: "no-reply@example.com",
+          bankName: "ANZ",
+          bankBsb: "013001",
+          bankAccountName: "Melbourne Guitar School",
+          bankAccountNumber: "12345678",
+          subtotalCents: input.totalCents,
+          gstCents: 0,
+          totalCents: input.totalCents,
+          issuedAt: new Date("2026-02-01T00:00:00.000Z"),
+          dueAt: input.dueAt,
+          createdById: admin.id,
+          updatedById: admin.id,
+          lineItems: {
+            create: {
+              kind: "lesson_fee",
+              description: "Lesson",
+              quantity: 1,
+              unitPriceCents: input.totalCents,
+              taxMode: "taxable",
+              lineSubtotalCents: input.totalCents,
+              lineGstCents: 0,
+              lineTotalCents: input.totalCents,
+              sortOrder: 0
+            }
+          }
+        }
+      });
+    };
+
+    await createInvoiceRow({
+      invoiceNumber: "MGS-2026-1001",
+      customerFirstName: "Amy",
+      customerLastName: "Baker",
+      customerName: "Amy Baker",
+      status: "draft",
+      totalCents: 4000,
+      dueAt: new Date("2026-06-01T00:00:00.000Z")
+    });
+    await createInvoiceRow({
+      invoiceNumber: "MGS-2026-1003",
+      customerFirstName: "Zoe",
+      customerLastName: "Adams",
+      customerName: "Zoe Adams",
+      status: "paid",
+      totalCents: 7000,
+      dueAt: new Date("2026-04-01T00:00:00.000Z")
+    });
+    await createInvoiceRow({
+      invoiceNumber: "MGS-2026-1002",
+      customerFirstName: "Ben",
+      customerLastName: "Carter",
+      customerName: "Ben Carter",
+      status: "sent",
+      totalCents: 5000,
+      dueAt: new Date("2026-05-01T00:00:00.000Z")
+    });
+    await createInvoiceRow({
+      invoiceNumber: "MGS-2026-1004",
+      customerFirstName: "Mia",
+      customerLastName: "Doyle",
+      customerName: "Mia Doyle",
+      status: "void",
+      totalCents: 3000,
+      dueAt: new Date("2026-03-01T00:00:00.000Z")
+    });
+
+    const fetchInvoiceNumbers = async (
+      sortBy: "invoice_number" | "customer_last_name" | "status" | "total" | "due_date",
+      sortDir: "asc" | "desc"
+    ) => {
+      const req = adminRequest(
+        `http://localhost/api/admin/invoices?page=1&pageSize=100&sortBy=${sortBy}&sortDir=${sortDir}`,
+        "GET",
+        token
+      );
+      const res = await GET(req);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { invoices: Array<{ invoiceNumber: string }> };
+      return body.invoices.map((invoice) => invoice.invoiceNumber);
+    };
+
+    expect(await fetchInvoiceNumbers("invoice_number", "asc")).toEqual([
+      "MGS-2026-1001",
+      "MGS-2026-1002",
+      "MGS-2026-1003",
+      "MGS-2026-1004"
+    ]);
+    expect(await fetchInvoiceNumbers("invoice_number", "desc")).toEqual([
+      "MGS-2026-1004",
+      "MGS-2026-1003",
+      "MGS-2026-1002",
+      "MGS-2026-1001"
+    ]);
+
+    expect(await fetchInvoiceNumbers("customer_last_name", "asc")).toEqual([
+      "MGS-2026-1003",
+      "MGS-2026-1001",
+      "MGS-2026-1002",
+      "MGS-2026-1004"
+    ]);
+    expect(await fetchInvoiceNumbers("customer_last_name", "desc")).toEqual([
+      "MGS-2026-1004",
+      "MGS-2026-1002",
+      "MGS-2026-1001",
+      "MGS-2026-1003"
+    ]);
+
+    expect(await fetchInvoiceNumbers("status", "asc")).toEqual([
+      "MGS-2026-1001",
+      "MGS-2026-1002",
+      "MGS-2026-1003",
+      "MGS-2026-1004"
+    ]);
+    expect(await fetchInvoiceNumbers("status", "desc")).toEqual([
+      "MGS-2026-1004",
+      "MGS-2026-1003",
+      "MGS-2026-1002",
+      "MGS-2026-1001"
+    ]);
+
+    expect(await fetchInvoiceNumbers("total", "asc")).toEqual([
+      "MGS-2026-1004",
+      "MGS-2026-1001",
+      "MGS-2026-1002",
+      "MGS-2026-1003"
+    ]);
+    expect(await fetchInvoiceNumbers("total", "desc")).toEqual([
+      "MGS-2026-1003",
+      "MGS-2026-1002",
+      "MGS-2026-1001",
+      "MGS-2026-1004"
+    ]);
+
+    expect(await fetchInvoiceNumbers("due_date", "asc")).toEqual([
+      "MGS-2026-1004",
+      "MGS-2026-1003",
+      "MGS-2026-1002",
+      "MGS-2026-1001"
+    ]);
+    expect(await fetchInvoiceNumbers("due_date", "desc")).toEqual([
+      "MGS-2026-1001",
+      "MGS-2026-1002",
+      "MGS-2026-1003",
+      "MGS-2026-1004"
+    ]);
   });
 
   it("rejects global create when booking and customer do not match", async () => {

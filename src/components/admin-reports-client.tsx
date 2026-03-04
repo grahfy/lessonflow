@@ -5,10 +5,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
+import { Tooltip } from "@/components/admin/ui/tooltip";
 
 type ReportPeriodKey = "daily" | "weekly" | "monthly" | "yearly";
 type TrendGrainKey = "daily" | "weekly" | "monthly" | "yearly";
 type ReportDateFormat = "readable" | "ddmmyy";
+type ReportChartStyle = "bar" | "line" | "area";
 
 type PeriodReport = {
   key: ReportPeriodKey;
@@ -116,10 +118,6 @@ function toMelbourneDate(value: string): Date {
   return new Date(new Date(value).toLocaleString("en-US", { timeZone: APP_TIMEZONE }));
 }
 
-function formatGeneratedAt(value: string, mode: ReportDateFormat): string {
-  return formatDate(toMelbourneDate(value), mode, true);
-}
-
 function formatPeriodLabel(period: PeriodReport, mode: ReportDateFormat): string {
   const start = toMelbourneDate(period.start);
   const end = toMelbourneDate(period.end);
@@ -153,6 +151,18 @@ function formatPreviousLabel(
   if (period.key === "weekly") return `Previous week (${formatDate(start, mode)} - ${formatDate(end, mode)})`;
   if (period.key === "monthly") return `Previous month (${formatDate(start, mode)} - ${formatDate(end, mode)})`;
   return `Previous year (${formatDate(start, mode)} - ${formatDate(end, mode)})`;
+}
+
+function splitComparisonLabel(label: string): { primary: string; secondary?: string } {
+  const openParenIndex = label.indexOf("(");
+  const closeParenIndex = label.lastIndexOf(")");
+  if (openParenIndex > 0 && closeParenIndex > openParenIndex) {
+    return {
+      primary: label.slice(0, openParenIndex).trim(),
+      secondary: label.slice(openParenIndex, closeParenIndex + 1).trim()
+    };
+  }
+  return { primary: label };
 }
 
 function parseTrendKey(key: string): Date {
@@ -196,6 +206,7 @@ function MiniBarChart({
   dateFormat,
   valueKey,
   strokeClass,
+  chartStyle,
   emptyLabel,
   moneyValues = false
 }: {
@@ -204,14 +215,15 @@ function MiniBarChart({
   dateFormat: ReportDateFormat;
   valueKey: "appointments" | "earningsNetCents";
   strokeClass: string;
+  chartStyle: ReportChartStyle;
   emptyLabel: string;
   moneyValues?: boolean;
 }) {
   const width = 560;
-  const height = 160;
+  const height = 188;
   const padX = 14;
-  const top = 12;
-  const bottom = 28;
+  const top = 14;
+  const bottom = 34;
   const chartHeight = height - top - bottom;
 
   const values = points.map((point) => point[valueKey]);
@@ -222,29 +234,51 @@ function MiniBarChart({
   }
 
   const slotWidth = (width - padX * 2) / points.length;
-  const barWidth = Math.max(4, Math.min(20, slotWidth * 0.55));
+  const barWidth = Math.max(6, Math.min(24, slotWidth * 0.56));
   const labelStep = points.length > 10 ? Math.ceil(points.length / 6) : 1;
   const firstLabel = formatTrendLabel(points[0], grain, dateFormat);
   const lastLabel = formatTrendLabel(points[points.length - 1], grain, dateFormat);
+  const pointsWithCoords = points.map((point, index) => {
+    const value = point[valueKey];
+    const normalized = maxValue <= 0 ? 0 : Math.max(0, value) / maxValue;
+    const barHeight = normalized * chartHeight;
+    const x = padX + slotWidth * index + slotWidth / 2;
+    const y = height - bottom - barHeight;
+    return {
+      point,
+      value,
+      x,
+      y,
+      label: formatTrendLabel(point, grain, dateFormat)
+    };
+  });
+  const linePath = pointsWithCoords.map((entry, index) => `${index === 0 ? "M" : "L"} ${entry.x} ${entry.y}`).join(" ");
+  const areaPath = pointsWithCoords.length
+    ? `${linePath} L ${pointsWithCoords[pointsWithCoords.length - 1].x} ${height - bottom} L ${pointsWithCoords[0].x} ${height - bottom} Z`
+    : "";
 
   return (
     <div className="report-chart-shell">
       <svg viewBox={`0 0 ${width} ${height}`} className="report-chart-svg" role="img" aria-label={emptyLabel}>
         <line x1={padX} y1={height - bottom} x2={width - padX} y2={height - bottom} className="report-chart-axis" />
-        {points.map((point, index) => {
-          const value = point[valueKey];
-          const normalized = maxValue <= 0 ? 0 : Math.max(0, value) / maxValue;
-          const barHeight = normalized * chartHeight;
-          const x = padX + slotWidth * index + (slotWidth - barWidth) / 2;
-          const y = height - bottom - barHeight;
+        {chartStyle === "area" && areaPath ? <path d={areaPath} className={`${strokeClass} report-area-fill`} /> : null}
+        {(chartStyle === "line" || chartStyle === "area") && linePath ? <path d={linePath} className={`${strokeClass} report-line-stroke`} /> : null}
+        {pointsWithCoords.map((entry, index) => {
+          const { point, value, x, y, label } = entry;
+          const barX = padX + slotWidth * index + (slotWidth - barWidth) / 2;
+          const barY = y;
+          const barHeight = height - bottom - y;
           const showLabel = index % labelStep === 0 || index === points.length - 1;
-          const label = formatTrendLabel(point, grain, dateFormat);
           const tooltip = moneyValues ? `${label}: ${formatAud(value)}` : `${label}: ${value}`;
 
           return (
             <g key={`${point.key}-${valueKey}`}>
               <title>{tooltip}</title>
-              <rect x={x} y={y} width={barWidth} height={Math.max(barHeight, 2)} rx={3} className={strokeClass} />
+              {chartStyle === "bar" ? (
+                <rect x={barX} y={barY} width={barWidth} height={Math.max(barHeight, 2)} rx={3} className={strokeClass} />
+              ) : (
+                <circle cx={x} cy={y} r={3} className={`${strokeClass} report-line-point`} />
+              )}
               {showLabel ? (
                 <text x={padX + slotWidth * index + slotWidth / 2} y={height - 10} textAnchor="middle" className="report-chart-label">
                   {label}
@@ -262,7 +296,19 @@ function MiniBarChart({
   );
 }
 
-function TrendPanel({ title, points, grain, dateFormat }: { title: string; points: TrendPoint[]; grain: TrendGrainKey; dateFormat: ReportDateFormat }) {
+function TrendPanel({
+  title,
+  points,
+  grain,
+  dateFormat,
+  chartStyle
+}: {
+  title: string;
+  points: TrendPoint[];
+  grain: TrendGrainKey;
+  dateFormat: ReportDateFormat;
+  chartStyle: ReportChartStyle;
+}) {
   return (
     <section className="admin-card report-chart-card">
       <div className="report-card-header-row">
@@ -279,6 +325,7 @@ function TrendPanel({ title, points, grain, dateFormat }: { title: string; point
           dateFormat={dateFormat}
           valueKey="appointments"
           strokeClass="report-bar report-bar-appointments"
+          chartStyle={chartStyle}
           emptyLabel={`${title} appointments trend`}
         />
       </div>
@@ -292,6 +339,7 @@ function TrendPanel({ title, points, grain, dateFormat }: { title: string; point
           dateFormat={dateFormat}
           valueKey="earningsNetCents"
           strokeClass="report-bar report-bar-earnings"
+          chartStyle={chartStyle}
           emptyLabel={`${title} earnings trend`}
           moneyValues
         />
@@ -301,6 +349,7 @@ function TrendPanel({ title, points, grain, dateFormat }: { title: string; point
 }
 
 function PeriodCard({ period, dateFormat }: { period: PeriodReport; dateFormat: ReportDateFormat }) {
+  const previousPeriodLabel = splitComparisonLabel(formatPreviousLabel(period, dateFormat));
   const stats = useMemo(
     () => [
       { label: "Confirmed appointments", value: String(period.appointments.confirmedCount) },
@@ -336,7 +385,10 @@ function PeriodCard({ period, dateFormat }: { period: PeriodReport; dateFormat: 
       <div className="report-comparison-panel">
         <div className="report-comparison-row">
           <span className="report-comparison-label">Compared with</span>
-          <span>{formatPreviousLabel(period, dateFormat)}</span>
+          <span className="report-comparison-value">
+            <span>{previousPeriodLabel.primary}</span>
+            {previousPeriodLabel.secondary ? <span className="report-comparison-subvalue">{previousPeriodLabel.secondary}</span> : null}
+          </span>
         </div>
         <div className="report-comparison-row">
           <span className="report-comparison-label">Appointments delta</span>
@@ -356,6 +408,7 @@ function PeriodCard({ period, dateFormat }: { period: PeriodReport; dateFormat: 
 }
 
 function CustomRangeCard({ period, dateFormat }: { period: CustomRangeReport; dateFormat: ReportDateFormat }) {
+  const previousPeriodLabel = splitComparisonLabel(formatPreviousLabel(period, dateFormat));
   const stats = useMemo(
     () => [
       { label: "Confirmed appointments", value: String(period.appointments.confirmedCount) },
@@ -396,7 +449,10 @@ function CustomRangeCard({ period, dateFormat }: { period: CustomRangeReport; da
       <div className="report-comparison-panel">
         <div className="report-comparison-row">
           <span className="report-comparison-label">Compared with</span>
-          <span>{formatPreviousLabel(period, dateFormat)}</span>
+          <span className="report-comparison-value">
+            <span>{previousPeriodLabel.primary}</span>
+            {previousPeriodLabel.secondary ? <span className="report-comparison-subvalue">{previousPeriodLabel.secondary}</span> : null}
+          </span>
         </div>
         <div className="report-comparison-row">
           <span className="report-comparison-label">Appointments delta</span>
@@ -426,6 +482,7 @@ export function AdminReportsClient() {
   const [notice, setNotice] = useState("");
   const [dashboard, setDashboard] = useState<AdminReportsDashboard | null>(null);
   const [dateFormat, setDateFormat] = useState<ReportDateFormat>("readable");
+  const [chartStyle, setChartStyle] = useState<ReportChartStyle>("bar");
   const [rangeStart, setRangeStart] = useState("");
   const [rangeEnd, setRangeEnd] = useState("");
   const [sendingReportPeriod, setSendingReportPeriod] = useState<"daily" | "monthly" | "yearly" | null>(null);
@@ -545,143 +602,178 @@ export function AdminReportsClient() {
   );
 
   return (
-    <AdminShell title="Reports Console" error={error} notice={notice} loading={loading}>
-      <div className="admin-card report-toolbar-card">
-        <div>
-          <p className="helper-text report-toolbar-title">Daily, weekly, monthly and yearly operational reporting</p>
-          <p className="helper-text">
-            Includes appointment activity, outstanding invoices, paid earnings and comparisons to previous periods.
-          </p>
+    <AdminShell title="Reports Console" error={error} notice={notice} loading={loading} className="admin-shell-reports">
+      <div className="admin-layout-content report-layout-content">
+        <div className="admin-card report-toolbar-card">
+          <div>
+            <p className="helper-text report-toolbar-title">Daily, weekly, monthly and yearly operational reporting</p>
+            <p className="helper-text">
+              Includes appointment activity, outstanding invoices, paid earnings and comparisons to previous periods.
+            </p>
+          </div>
+          <div className="button-row">
+            <Tooltip content="Reload dashboard figures and chart data immediately.">
+              <button className="btn btn-secondary" type="button" onClick={() => void load("refresh")} disabled={loading || refreshing}>
+                {refreshing ? "Refreshing..." : "Refresh reports"}
+              </button>
+            </Tooltip>
+            <Tooltip content="Email the latest daily report to the owner account.">
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={() => void sendReportEmail("daily")}
+                disabled={loading || refreshing || sendingReportPeriod !== null}
+              >
+                {sendingReportPeriod === "daily" ? "Sending Today..." : "Send Today Report"}
+              </button>
+            </Tooltip>
+            <Tooltip content="Email the latest monthly summary to the owner account.">
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={() => void sendReportEmail("monthly")}
+                disabled={loading || refreshing || sendingReportPeriod !== null}
+              >
+                {sendingReportPeriod === "monthly" ? "Sending Month..." : "Send Month Report"}
+              </button>
+            </Tooltip>
+            <Tooltip content="Email the yearly summary to the owner account.">
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={() => void sendReportEmail("yearly")}
+                disabled={loading || refreshing || sendingReportPeriod !== null}
+              >
+                {sendingReportPeriod === "yearly" ? "Sending Year..." : "Send Year Report"}
+              </button>
+            </Tooltip>
+          </div>
         </div>
-        <div className="button-row">
-          <button className="btn btn-secondary" type="button" onClick={() => void load("refresh")} disabled={loading || refreshing}>
-            {refreshing ? "Refreshing..." : "Refresh reports"}
-          </button>
-          <button
-            className="btn btn-secondary"
-            type="button"
-            onClick={() => void sendReportEmail("daily")}
-            disabled={loading || refreshing || sendingReportPeriod !== null}
-          >
-            {sendingReportPeriod === "daily" ? "Sending Today..." : "Send Today Report"}
-          </button>
-          <button
-            className="btn btn-secondary"
-            type="button"
-            onClick={() => void sendReportEmail("monthly")}
-            disabled={loading || refreshing || sendingReportPeriod !== null}
-          >
-            {sendingReportPeriod === "monthly" ? "Sending Month..." : "Send Month Report"}
-          </button>
-          <button
-            className="btn btn-secondary"
-            type="button"
-            onClick={() => void sendReportEmail("yearly")}
-            disabled={loading || refreshing || sendingReportPeriod !== null}
-          >
-            {sendingReportPeriod === "yearly" ? "Sending Year..." : "Send Year Report"}
-          </button>
-        </div>
-      </div>
 
-      <div className="admin-card report-controls-card">
-        <div className="field report-format-field">
-          <label>Date format</label>
-          <select value={dateFormat} onChange={(event) => setDateFormat(event.target.value as ReportDateFormat)}>
-            <option value="readable">Readable (e.g. 25 Feb 2026)</option>
-            <option value="ddmmyy">DD/MM/YY</option>
-          </select>
-        </div>
-        <div className="field report-compare-field report-custom-range-field">
-          <label>Custom date range (admin)</label>
-          <div className="report-date-range-row">
-            <div className="field">
-              <label>Start</label>
-              <input
-                type="date"
-                value={rangeStart}
-                max={rangeEnd || undefined}
-                onChange={(event) => setRangeStart(event.target.value)}
-              />
+        <div className="admin-card report-controls-card">
+          <div className="report-controls-primary">
+            <div className="field report-format-field">
+              <label>Date format</label>
+              <Tooltip content="Switch between human-readable dates and compact DD/MM/YY format.">
+                <select value={dateFormat} onChange={(event) => setDateFormat(event.target.value as ReportDateFormat)}>
+                  <option value="readable">Readable (e.g. 25 Feb 2026)</option>
+                  <option value="ddmmyy">DD/MM/YY</option>
+                </select>
+              </Tooltip>
             </div>
-            <div className="field">
-              <label>End</label>
-              <input
-                type="date"
-                value={rangeEnd}
-                min={rangeStart || undefined}
-                onChange={(event) => setRangeEnd(event.target.value)}
-              />
-            </div>
-            <div className="button-row report-date-range-actions">
-              <button className="btn btn-secondary" type="button" onClick={applyCustomRange} disabled={loading || refreshing}>
-                Apply Range
-              </button>
-              <button className="btn btn-secondary" type="button" onClick={clearCustomRange} disabled={loading || refreshing || (!rangeStart && !rangeEnd)}>
-                Clear Range
-              </button>
+            <div className="field report-chart-style-field">
+              <label>Chart type</label>
+              <Tooltip content="Choose bar, line, or area style for trend visualisation.">
+                <select value={chartStyle} onChange={(event) => setChartStyle(event.target.value as ReportChartStyle)}>
+                  <option value="bar">Bar charts</option>
+                  <option value="line">Line charts</option>
+                  <option value="area">Area charts</option>
+                </select>
+              </Tooltip>
             </div>
           </div>
-          <p className="helper-text">
-            Adds a custom range summary card while keeping the standard daily/weekly/monthly/yearly reports below.
-          </p>
+          <div className="field report-compare-field report-custom-range-field">
+            <div className="report-custom-range-head">
+              <label>Custom date range (admin)</label>
+            </div>
+            <div className="report-date-range-row">
+              <div className="report-date-field">
+                <label>Start</label>
+                <Tooltip content="Pick the first day for a custom report window.">
+                  <input
+                    type="date"
+                    aria-label="Custom range start date"
+                    value={rangeStart}
+                    max={rangeEnd || undefined}
+                    onChange={(event) => setRangeStart(event.target.value)}
+                  />
+                </Tooltip>
+              </div>
+              <div className="report-date-field">
+                <label>End</label>
+                <Tooltip content="Pick the last day for a custom report window.">
+                  <input
+                    type="date"
+                    aria-label="Custom range end date"
+                    value={rangeEnd}
+                    min={rangeStart || undefined}
+                    onChange={(event) => setRangeEnd(event.target.value)}
+                  />
+                </Tooltip>
+              </div>
+              <div className="button-row report-date-range-actions">
+                <Tooltip content="Build a custom summary while keeping daily/weekly/monthly/yearly cards below.">
+                  <button className="btn btn-secondary" type="button" onClick={applyCustomRange} disabled={loading || refreshing}>
+                    Apply Range
+                  </button>
+                </Tooltip>
+                <Tooltip content="Remove the custom range and return to standard report windows only.">
+                  <button className="btn btn-secondary" type="button" onClick={clearCustomRange} disabled={loading || refreshing || (!rangeStart && !rangeEnd)}>
+                    Clear Range
+                  </button>
+                </Tooltip>
+              </div>
+            </div>
+            <p className="helper-text">
+              Adds a custom range summary card while keeping the standard daily/weekly/monthly/yearly reports below.
+            </p>
+          </div>
+          <div className="field report-compare-field report-compare-toggle-field">
+            <label>Compare views (admin)</label>
+            <div className="report-toggle-group">
+              {(["daily", "weekly", "monthly", "yearly"] as TrendGrainKey[]).map((key) => (
+                <Tooltip key={key} content={`Show or hide the ${periodTitle(key).toLowerCase()} trend panel below.`}>
+                  <label className="report-toggle-pill">
+                    <input
+                      type="checkbox"
+                      checked={visibleComparisons[key]}
+                      onChange={(event) =>
+                        setVisibleComparisons((prev) => ({
+                          ...prev,
+                          [key]: event.target.checked
+                        }))
+                      }
+                    />
+                    {periodTitle(key)}
+                  </label>
+                </Tooltip>
+              ))}
+            </div>
+            <p className="helper-text">Toggle daily / weekly / monthly / yearly charts to compare periods side-by-side in admin.</p>
+          </div>
         </div>
-        <div className="field report-compare-field report-compare-toggle-field">
-          <label>Compare views (admin)</label>
-          <div className="report-toggle-group">
-            {(["daily", "weekly", "monthly", "yearly"] as TrendGrainKey[]).map((key) => (
-              <label key={key} className="report-toggle-pill">
-                <input
-                  type="checkbox"
-                  checked={visibleComparisons[key]}
-                  onChange={(event) =>
-                    setVisibleComparisons((prev) => ({
-                      ...prev,
-                      [key]: event.target.checked
-                    }))
-                  }
+
+        {dashboard ? (
+          <>
+            {dashboard.customRange ? (
+              <div className="reports-period-grid">
+                <CustomRangeCard period={dashboard.customRange} dateFormat={dateFormat} />
+              </div>
+            ) : null}
+
+            <div className="reports-period-grid reports-period-grid-4">
+              <PeriodCard period={dashboard.periods.daily} dateFormat={dateFormat} />
+              <PeriodCard period={dashboard.periods.weekly} dateFormat={dateFormat} />
+              <PeriodCard period={dashboard.periods.monthly} dateFormat={dateFormat} />
+              <PeriodCard period={dashboard.periods.yearly} dateFormat={dateFormat} />
+            </div>
+
+            <div className="reports-chart-grid">
+              {visibleTrendKeys.length === 0 ? <p className="notice">Select at least one comparison view to display charts.</p> : null}
+              {visibleTrendKeys.map((key) => (
+                <TrendPanel
+                  key={key}
+                  title={trendTitle(key, !!dashboard.customRange)}
+                  points={dashboard.trends[key]}
+                  grain={key}
+                  dateFormat={dateFormat}
+                  chartStyle={chartStyle}
                 />
-                {periodTitle(key)}
-              </label>
-            ))}
-          </div>
-          <p className="helper-text">Toggle daily / weekly / monthly / yearly charts to compare periods side-by-side in admin.</p>
-        </div>
-      </div>
-
-      {dashboard ? (
-        <>
-          <div className="admin-card report-generated-card">
-            <p className="helper-text">Generated at {formatGeneratedAt(dashboard.generatedAt, dateFormat)} (Australia/Melbourne)</p>
-          </div>
-
-          {dashboard.customRange ? (
-            <div className="reports-period-grid">
-              <CustomRangeCard period={dashboard.customRange} dateFormat={dateFormat} />
+              ))}
             </div>
-          ) : null}
-
-          <div className="reports-period-grid reports-period-grid-4">
-            <PeriodCard period={dashboard.periods.daily} dateFormat={dateFormat} />
-            <PeriodCard period={dashboard.periods.weekly} dateFormat={dateFormat} />
-            <PeriodCard period={dashboard.periods.monthly} dateFormat={dateFormat} />
-            <PeriodCard period={dashboard.periods.yearly} dateFormat={dateFormat} />
-          </div>
-
-          <div className="reports-chart-grid">
-            {visibleTrendKeys.length === 0 ? <p className="notice">Select at least one comparison view to display charts.</p> : null}
-            {visibleTrendKeys.map((key) => (
-              <TrendPanel
-                key={key}
-                title={trendTitle(key, !!dashboard.customRange)}
-                points={dashboard.trends[key]}
-                grain={key}
-                dateFormat={dateFormat}
-              />
-            ))}
-          </div>
-        </>
-      ) : null}
+          </>
+        ) : null}
+      </div>
     </AdminShell>
   );
 }

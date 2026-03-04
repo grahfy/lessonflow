@@ -71,7 +71,7 @@ export default async function TeacherPage() {
         </p>
       )}
 
-      <div className="button-row" data-motion-item="teacher-actions">
+      <div className="button-row button-row-justify" data-motion-item="teacher-actions">
         <TweenLink className="btn btn-primary" href="/book" data-motion-item="teacher-action-book">
           Book a Lesson Today
         </TweenLink>

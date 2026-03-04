@@ -10,6 +10,14 @@ export const invoiceTaxModeSchema = z.enum(["taxable", "gst_free"]);
  */
 export const invoiceStatusSchema = z.enum(["draft", "sent", "paid", "void"]);
 export const invoiceAgingBucketSchema = z.enum(["current", "overdue_1_30", "overdue_31_plus"]);
+export const invoiceSortBySchema = z.enum([
+  "invoice_number",
+  "customer_last_name",
+  "status",
+  "total",
+  "due_date"
+]);
+export const invoiceSortDirectionSchema = z.enum(["asc", "desc"]);
 
 /**
  * Temporary catalog options requested for the initial invoicing rollout.
@@ -94,6 +102,8 @@ export const updateInvoiceSchema = z
  */
 export const listInvoicesQuerySchema = z.object({
   q: z.string().trim().max(200).optional(),
+  sortBy: invoiceSortBySchema.default("invoice_number"),
+  sortDir: invoiceSortDirectionSchema.default("desc"),
   status: invoiceStatusSchema.optional(),
   agingBucket: invoiceAgingBucketSchema.optional(),
   customerId: z.string().trim().min(1).optional(),
@@ -135,3 +145,5 @@ export type UpdateInvoiceInput = z.infer<typeof updateInvoiceSchema>;
 export type CreateBookingInvoiceInput = z.infer<typeof createBookingInvoiceSchema>;
 export type CreateCreditNoteInput = z.infer<typeof createCreditNoteSchema>;
 export type SendInvoiceRemindersInput = z.infer<typeof sendInvoiceRemindersSchema>;
+export type InvoiceSortBy = z.infer<typeof invoiceSortBySchema>;
+export type InvoiceSortDirection = z.infer<typeof invoiceSortDirectionSchema>;

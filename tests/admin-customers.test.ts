@@ -127,4 +127,100 @@ describe("admin-customers", () => {
     });
     expect(archived.isArchived).toBe(true);
   });
+
+  it("sorts customer lists by customer name and skill/mode in both directions", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    await prisma.customer.createMany({
+      data: [
+        {
+          firstName: "Charlie",
+          lastName: "Student",
+          fullName: "Charlie Student",
+          normalizedFullName: "charlie student",
+          email: "charlie@example.com",
+          phone: "0400000001",
+          normalizedEmail: "charlie@example.com",
+          normalizedPhone: "0400000001",
+          skillLevel: "intermediate",
+          lessonMode: "video"
+        },
+        {
+          firstName: "Alice",
+          lastName: "Student",
+          fullName: "Alice Student",
+          normalizedFullName: "alice student",
+          email: "alice@example.com",
+          phone: "0400000002",
+          normalizedEmail: "alice@example.com",
+          normalizedPhone: "0400000002",
+          skillLevel: "beginner",
+          lessonMode: "video"
+        },
+        {
+          firstName: "Bob",
+          lastName: "Student",
+          fullName: "Bob Student",
+          normalizedFullName: "bob student",
+          email: "bob@example.com",
+          phone: "0400000003",
+          normalizedEmail: "bob@example.com",
+          normalizedPhone: "0400000003",
+          skillLevel: "beginner",
+          lessonMode: "in_person"
+        },
+        {
+          firstName: "Dylan",
+          lastName: "Student",
+          fullName: "Dylan Student",
+          normalizedFullName: "dylan student",
+          email: "dylan@example.com",
+          phone: "0400000004",
+          normalizedEmail: "dylan@example.com",
+          normalizedPhone: "0400000004",
+          skillLevel: "advanced",
+          lessonMode: "in_person"
+        }
+      ]
+    });
+
+    const fetchNames = async (sortBy: "customer" | "skill_mode", sortDir: "asc" | "desc") => {
+      const req = adminRequest(
+        `http://localhost/api/admin/customers?page=1&pageSize=250&sortBy=${sortBy}&sortDir=${sortDir}`,
+        "GET",
+        token
+      );
+      const res = await GET(req);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { customers: Array<{ fullName: string }> };
+      return body.customers.map((row) => row.fullName);
+    };
+
+    expect(await fetchNames("customer", "asc")).toEqual([
+      "Alice Student",
+      "Bob Student",
+      "Charlie Student",
+      "Dylan Student"
+    ]);
+    expect(await fetchNames("customer", "desc")).toEqual([
+      "Dylan Student",
+      "Charlie Student",
+      "Bob Student",
+      "Alice Student"
+    ]);
+
+    expect(await fetchNames("skill_mode", "asc")).toEqual([
+      "Bob Student",
+      "Alice Student",
+      "Charlie Student",
+      "Dylan Student"
+    ]);
+    expect(await fetchNames("skill_mode", "desc")).toEqual([
+      "Dylan Student",
+      "Charlie Student",
+      "Alice Student",
+      "Bob Student"
+    ]);
+  });
 });

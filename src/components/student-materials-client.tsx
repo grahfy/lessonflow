@@ -1,44 +1,21 @@
 "use client";
 import { APP_TIMEZONE } from "@/lib/time";
+import { Tooltip } from "@/components/admin/ui/tooltip";
+import {
+  parseStudentPortalPayload,
+  type StudentPortalMaterial,
+  type StudentPortalPayload
+} from "@/lib/student-portal/contracts";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-type PortalMaterial = {
-  id: string;
-  title: string;
-  materialType: "audio" | "pdf";
-  mimeType: string;
-  sizeBytes: number;
-  createdAt: string;
-  downloadUrl: string;
-  previewUrl: string;
-};
-
-type PortalBooking = {
-  id: string;
-  lessonMode: "in_person" | "video";
-  startAt: string;
-  materials: PortalMaterial[];
-};
-
-type PortalPayload = {
-  student: {
-    id: string;
-    fullName: string;
-    postcode: string;
-  };
-  upcoming: PortalBooking[];
-  previous: PortalBooking[];
-  standaloneMaterials?: PortalMaterial[];
-};
-
 type StudentMaterialEntry = {
   bookingId: string | null;
   bookingStartAt: string | null;
   lessonMode: "in_person" | "video" | null;
-  material: PortalMaterial;
+  material: StudentPortalMaterial;
 };
 
 /**
@@ -47,7 +24,7 @@ type StudentMaterialEntry = {
  */
 export function StudentMaterialsClient() {
   const router = useRouter();
-  const [data, setData] = useState<PortalPayload | null>(null);
+  const [data, setData] = useState<StudentPortalPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [loggingOut, setLoggingOut] = useState(false);
@@ -71,7 +48,15 @@ export function StudentMaterialsClient() {
       setError("Unable to load learning materials right now.");
       return;
     }
-    const payload = (await response.json()) as PortalPayload;
+    const payloadBody = await response.json().catch(() => null);
+    let payload: StudentPortalPayload;
+    try {
+      payload = parseStudentPortalPayload(payloadBody);
+    } catch {
+      setLoading(false);
+      setError("Unable to load learning materials right now.");
+      return;
+    }
     setData(payload);
     setLoading(false);
   }, [router]);
@@ -107,12 +92,16 @@ export function StudentMaterialsClient() {
           <p className="helper-text">All assigned learning materials.</p>
         </div>
         <div className="student-portal-header-actions">
-          <Link className="btn btn-secondary" href="/student/portal">
-            Back to portal
-          </Link>
-          <button className="btn btn-secondary" type="button" onClick={() => void logout()} disabled={loggingOut}>
-            {loggingOut ? "Signing out..." : "Sign out"}
-          </button>
+          <Tooltip content="Return to your student dashboard with upcoming and previous lessons.">
+            <Link className="btn btn-secondary" href="/student/portal">
+              Back to portal
+            </Link>
+          </Tooltip>
+          <Tooltip content="Sign out of the student portal on this device.">
+            <button className="btn btn-secondary" type="button" onClick={() => void logout()} disabled={loggingOut}>
+              {loggingOut ? "Signing out..." : "Sign out"}
+            </button>
+          </Tooltip>
         </div>
       </div>
 
@@ -158,13 +147,17 @@ export function StudentMaterialsClient() {
                         {entry.material.materialType === "audio" ? (
                           <audio className="material-audio-player material-audio-player-student" controls preload="metadata" src={entry.material.previewUrl} />
                         ) : (
-                          <a className="btn btn-secondary" href={entry.material.previewUrl} target="_blank" rel="noreferrer">
-                            Preview
-                          </a>
+                          <Tooltip content="Preview this file in a new browser tab.">
+                            <a className="btn btn-secondary" href={entry.material.previewUrl} target="_blank" rel="noreferrer">
+                              Preview
+                            </a>
+                          </Tooltip>
                         )}
-                        <a className="btn btn-secondary" href={entry.material.downloadUrl}>
-                          Download
-                        </a>
+                        <Tooltip content="Download this file to your device.">
+                          <a className="btn btn-secondary" href={entry.material.downloadUrl}>
+                            Download
+                          </a>
+                        </Tooltip>
                       </td>
                     </tr>
                   ))}
@@ -183,7 +176,7 @@ export function StudentMaterialsClient() {
 /**
  * Merges all booking-linked materials into one chronological list.
  */
-function collectAllStudentMaterials(payload: PortalPayload): StudentMaterialEntry[] {
+function collectAllStudentMaterials(payload: StudentPortalPayload): StudentMaterialEntry[] {
   const rows: StudentMaterialEntry[] = [];
   const allBookings = [...payload.upcoming, ...payload.previous];
   for (const booking of allBookings) {

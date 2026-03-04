@@ -89,7 +89,7 @@ export default async function LessonsPage() {
         <p className="lesson-pricing-note">{pricingContent.note}</p>
       </section>
 
-      <div className="button-row" data-motion-item="lessons-actions">
+      <div className="button-row button-row-justify" data-motion-item="lessons-actions">
         <TweenLink className="btn btn-primary" href="/book" data-motion-item="lessons-action-start">
           Book Your First Lesson
         </TweenLink>

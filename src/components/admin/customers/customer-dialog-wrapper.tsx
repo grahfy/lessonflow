@@ -67,7 +67,7 @@ export function CustomerDialogWrapper({
     ...rest
 }: Props) {
     const description = (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+        <div className="customer-dialog-description">
             <div>
                 {selectedCustomer ? (
                     <>Profile: <strong>{selectedCustomer.fullName}</strong> · ID: <code>{selectedCustomer.id}</code></>
@@ -76,11 +76,10 @@ export function CustomerDialogWrapper({
                 )}
             </div>
 
-            <div style={{ display: 'flex', gap: '4px', background: 'rgba(0,0,0,0.1)', padding: '2px', borderRadius: '6px' }}>
+            <div className="customer-dialog-tabs">
                 <button
                     type="button"
                     className={`btn ${activeTab === 'profile' ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ flex: 1, padding: '4px 12px', fontSize: '0.75rem', border: 'none', boxShadow: 'none', minWidth: '140px' }}
                     onClick={() => setActiveTab('profile')}
                 >
                     Profile & Address
@@ -88,7 +87,6 @@ export function CustomerDialogWrapper({
                 <button
                     type="button"
                     className={`btn ${activeTab === 'emails' ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ flex: 1, padding: '4px 12px', fontSize: '0.75rem', border: 'none', boxShadow: 'none', minWidth: '140px' }}
                     onClick={() => setActiveTab('emails')}
                     disabled={!selectedCustomer}
                 >
@@ -97,7 +95,6 @@ export function CustomerDialogWrapper({
                 <button
                     type="button"
                     className={`btn ${activeTab === 'materials' ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ flex: 1, padding: '4px 12px', fontSize: '0.75rem', border: 'none', boxShadow: 'none', minWidth: '140px' }}
                     onClick={() => setActiveTab('materials')}
                     disabled={!selectedCustomer}
                 >
@@ -117,11 +114,11 @@ export function CustomerDialogWrapper({
             description={description}
             id="customer-dialog"
         >
-            {error ? <p className="notice error" style={{ marginTop: '12px' }}>{error}</p> : null}
-            {notice ? <p className="notice success" style={{ marginTop: '12px' }}>{notice}</p> : null}
+            {error ? <p className="notice error customer-dialog-notice">{error}</p> : null}
+            {notice ? <p className="notice success customer-dialog-notice">{notice}</p> : null}
 
             {activeTab === 'profile' && (
-                <div className="dialog-layout" style={{ marginTop: "12px" }}>
+                <div className="dialog-layout customer-dialog-panel">
                     <CustomerProfileDialog
                         customer={selectedCustomer}
                         isEditing={rest.isEditing}

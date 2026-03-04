@@ -31,29 +31,18 @@ export function AdminTable({
   pagination 
 }: AdminTableProps) {
   return (
-    <div className="admin-card invoice-list-card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+    <div className="admin-card invoice-list-card admin-table-card">
       {header && (
-        <div className="customer-item invoice-item invoice-list-header" style={{
-          display: 'flex',
-          alignItems: 'center',
-          padding: '12px 16px',
-          gap: '12px',
-          width: '100%',
-          border: 'none',
-          borderBottom: '1px solid var(--line)',
-          background: 'rgba(8, 11, 28, 0.84)',
-          borderRadius: 0,
-          flexShrink: 0
-        }}>
+        <div className="invoice-list-header admin-table-header-row">
           {header}
         </div>
       )}
       
-      <div className="admin-list-scroll" style={{ flex: 1, overflowY: 'auto', maxHeight: 'none', gap: '0', padding: 0, background: 'rgba(8, 11, 28, 0.84)', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0', padding: '0', flex: 1 }}>
+      <div className="admin-list-scroll admin-table-scroll">
+        <div className="admin-table-body">
           {children}
           {!loading && (!children || (Array.isArray(children) && children.length === 0)) && (
-            <p className="helper-text" style={{ padding: '20px' }}>{emptyLabel}</p>
+            <p className="helper-text admin-table-empty">{emptyLabel}</p>
           )}
         </div>
       </div>
@@ -73,4 +62,4 @@ export function AdminTable({
   );
 }
 
-export const AdminTableSeparator = () => <div style={{ width: '1px', height: '24px', background: 'var(--line)', flexShrink: 0 }} />;
+export const AdminTableSeparator = () => <div className="admin-table-separator" />;

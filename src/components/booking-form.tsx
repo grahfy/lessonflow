@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { Tooltip } from "@/components/admin/ui/tooltip";
 import { CaptchaField, useCaptcha } from "@/components/captcha";
 
 type BookingState =
@@ -203,35 +204,37 @@ export function BookingForm() {
       </div>
       <div className="field field-compact" data-motion-item="booking-field">
         <label htmlFor="book-phone">Phone *</label>
-        <input
-          id="book-phone"
-          name="phone"
-          required
-          maxLength={10}
-          inputMode="numeric"
-          pattern="[0-9]{10}"
-          placeholder="10 digits"
-          title="Phone must be exactly 10 digits"
-          onInput={(event) => {
-            event.currentTarget.value = event.currentTarget.value.replace(/\D/g, "").slice(0, 10);
-          }}
-        />
+        <Tooltip content="Enter a 10-digit Australian phone number without spaces.">
+          <input
+            id="book-phone"
+            name="phone"
+            required
+            maxLength={10}
+            inputMode="numeric"
+            pattern="[0-9]{10}"
+            placeholder="10 digits"
+            onInput={(event) => {
+              event.currentTarget.value = event.currentTarget.value.replace(/\D/g, "").slice(0, 10);
+            }}
+          />
+        </Tooltip>
       </div>
       <div className="field field-compact" data-motion-item="booking-field">
         <label htmlFor="book-postcode">Postcode *</label>
-        <input
-          id="book-postcode"
-          name="postcode"
-          required
-          maxLength={4}
-          inputMode="numeric"
-          pattern="[0-9]{4}"
-          placeholder="3000"
-          title="Postcode must be 4 digits"
-          onInput={(event) => {
-            event.currentTarget.value = event.currentTarget.value.replace(/\D/g, "").slice(0, 4);
-          }}
-        />
+        <Tooltip content="Enter your 4-digit Australian postcode.">
+          <input
+            id="book-postcode"
+            name="postcode"
+            required
+            maxLength={4}
+            inputMode="numeric"
+            pattern="[0-9]{4}"
+            placeholder="3000"
+            onInput={(event) => {
+              event.currentTarget.value = event.currentTarget.value.replace(/\D/g, "").slice(0, 4);
+            }}
+          />
+        </Tooltip>
       </div>
       <div className="field" data-motion-item="booking-field">
         <label htmlFor="book-mode">Mode *</label>
@@ -300,9 +303,11 @@ export function BookingForm() {
       <CaptchaField idPrefix="booking" captcha={captcha} motionItem="booking-captcha-field" />
 
       <div className="button-row" data-motion-item="booking-actions">
-        <button className="btn btn-primary" type="submit" disabled={loading}>
-          {loading ? "Submitting..." : "Request Booking"}
-        </button>
+        <Tooltip content="Submit this booking request. We will confirm availability after review.">
+          <button className="btn btn-primary" type="submit" disabled={loading}>
+            {loading ? "Submitting..." : "Request Booking"}
+          </button>
+        </Tooltip>
       </div>
       <p className="helper-text form-required-note" data-motion-item="booking-required-note">
         * Required fields

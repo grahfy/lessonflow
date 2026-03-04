@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
@@ -8,13 +8,16 @@ import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AdminTable, AdminTableSeparator as Separator } from "@/components/admin/ui/admin-table";
 import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
+import { Tooltip } from "@/components/admin/ui/tooltip";
 import { parseAudInputToCents } from "@/lib/invoices/currency";
 import { DEFAULT_CURRENCY } from "@/lib/branding";
 import { toDateTimeLocalValue, toMoneyInput } from "@/lib/admin/formatters";
 
-import { useInvoices, type InvoiceRow, type InvoiceTaxMode } from "@/lib/admin/use-invoices";
+import { useInvoices, type InvoiceAction, type InvoiceRow, type InvoiceTaxMode } from "@/lib/admin/use-invoices";
 import { usePresets } from "@/lib/admin/use-presets";
 import { useCustomers } from "@/lib/admin/use-customers";
+import { type InvoiceSortBy, type InvoiceSortDirection } from "@/lib/invoices/schema";
+import { canApplyInvoiceAction } from "@/lib/invoices/transitions";
 
 type EditableLineItem = {
   key: string;
@@ -28,6 +31,20 @@ type EditableLineItem = {
 };
 
 type CreateInvoiceBasis = "lesson_based" | "standalone";
+type InvoiceDisplayStatus = InvoiceRow["status"] | "overdue";
+
+function getDisplayStatus(invoice: InvoiceRow, overdueOnly: boolean): InvoiceDisplayStatus {
+  if (
+    overdueOnly &&
+    invoice.overdueDays !== null &&
+    invoice.overdueDays > 1 &&
+    invoice.status !== "paid" &&
+    invoice.status !== "void"
+  ) {
+    return "overdue";
+  }
+  return invoice.status;
+}
 
 function toCurrency(cents: number, currency: string) {
   return new Intl.NumberFormat("en-AU", {
@@ -43,6 +60,8 @@ function toCurrency(cents: number, currency: string) {
 export function AdminInvoicesClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const searchInputId = useId();
+  const sortSelectId = useId();
   
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -60,7 +79,9 @@ export function AdminInvoicesClient() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [query, setQuery] = useState(searchParams.get("q") || "");
-  const [outstandingOnly, setOutstandingOnly] = useState(false);
+  const [overdueOnly, setOverdueOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<InvoiceSortBy>("invoice_number");
+  const [sortDir, setSortDir] = useState<InvoiceSortDirection>("desc");
 
   // Dialog State
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceRow | null>(null);
@@ -126,8 +147,8 @@ export function AdminInvoicesClient() {
 
   // Effects
   useEffect(() => {
-    void loadInvoices(query, page, outstandingOnly);
-  }, [query, page, outstandingOnly, loadInvoices]);
+    void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
+  }, [query, page, overdueOnly, sortBy, sortDir, loadInvoices]);
 
   useEffect(() => {
     const shouldOpenCreate = searchParams.get("openCreate") === "true";
@@ -247,11 +268,11 @@ export function AdminInvoicesClient() {
     if (result) {
       setSelectedInvoice(result);
       setNotice("Invoice saved successfully.");
-      void loadInvoices(query, page, outstandingOnly);
+      void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
     }
   }
 
-  async function performAction(action: string) {
+  async function performAction(action: InvoiceAction) {
     if (!selectedInvoice) return;
     if (action === "void" && !window.confirm("Are you sure you want to void this invoice? This cannot be undone.")) return;
 
@@ -268,7 +289,7 @@ export function AdminInvoicesClient() {
       } else {
         setNotice(`Action '${action}' completed.`);
       }
-      void loadInvoices(query, page, outstandingOnly);
+      void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
     }
   }
 
@@ -317,7 +338,7 @@ export function AdminInvoicesClient() {
     if (result) {
       setCreateOpen(false);
       setNotice("Invoice created.");
-      void loadInvoices(query, page, outstandingOnly);
+      void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
     }
   }
 
@@ -330,54 +351,108 @@ export function AdminInvoicesClient() {
 
     if (count !== null) {
       setNotice(`Sent ${count} overdue reminders.`);
-      void loadInvoices(query, page, outstandingOnly);
+      void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
     }
   }
 
+  const canMarkAsPaid = selectedInvoice
+    ? canApplyInvoiceAction(selectedInvoice.status, "mark_paid")
+    : false;
+  const canMarkAsUnpaid = selectedInvoice
+    ? canApplyInvoiceAction(selectedInvoice.status, "mark_unpaid")
+    : false;
+  const canVoidInvoice = selectedInvoice
+    ? canApplyInvoiceAction(selectedInvoice.status, "void")
+    : false;
+  const selectedInvoiceDisplayStatus = selectedInvoice ? getDisplayStatus(selectedInvoice, overdueOnly) : null;
+
+  const openLinkedCustomer = () => {
+    if (!selectedInvoice?.customerId) return;
+    closeDetail();
+    router.push(`/admin/customers?customerId=${selectedInvoice.customerId}&open=true`);
+  };
+
   const header = (
     <>
-      <div style={{ width: '140px', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Number</div>
+      <div className="admin-list-col admin-list-col-number">Number</div>
       <Separator />
-      <div style={{ flex: '1', minWidth: '150px', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Customer</div>
+      <div className="admin-list-col admin-list-col-customer">Customer</div>
       <Separator />
-      <div style={{ width: '100px', textAlign: 'center', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Status</div>
+      <div className="admin-list-col admin-list-col-status">Status</div>
       <Separator />
-      <div style={{ width: '120px', textAlign: 'right', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Total</div>
+      <div className="admin-list-col admin-list-col-total">Total</div>
       <Separator />
-      <div style={{ width: '120px', textAlign: 'right', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Due Date</div>
+      <div className="admin-list-col admin-list-col-due">Due Date</div>
       <Separator />
-      <div style={{ width: '220px', textAlign: 'right', fontSize: '0.75rem', color: 'var(--ink-2)', textTransform: 'uppercase', fontWeight: 600 }}>Actions</div>
+      <div className="admin-list-col admin-list-col-actions">Actions</div>
     </>
   );
 
   return (
-    <AdminShell title="Invoices" error={error} notice={notice}>
-      <div 
-        className="admin-layout-content" 
-        style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
-      >
+    <AdminShell title="Invoices" error={error} notice={notice} className="admin-shell-invoices">
+      <div className="admin-layout-content">
         <div className="admin-actions-bar">
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button className="btn btn-primary" onClick={() => { setCreateOpen(true); void loadCustomers(); }}>
-              CREATE INVOICE
-            </button>
-            <button className="btn btn-secondary" disabled={busyAction === 'bulk-reminders'} onClick={sendBulkReminders}>
-              {busyAction === 'bulk-reminders' ? "SENDING..." : "SEND OVERDUE REMINDERS"}
-            </button>
+          <div className="admin-actions-group">
+            <Tooltip content="Create a new invoice for a selected customer.">
+              <button className="btn btn-primary" onClick={() => { setCreateOpen(true); void loadCustomers(); }}>
+                CREATE INVOICE
+              </button>
+            </Tooltip>
+            <Tooltip content="Send reminders for all eligible overdue invoices in one action.">
+              <button className="btn btn-secondary" disabled={busyAction === 'bulk-reminders'} onClick={sendBulkReminders}>
+                {busyAction === 'bulk-reminders' ? "SENDING..." : "SEND OVERDUE REMINDERS"}
+              </button>
+            </Tooltip>
+            <label className="admin-inline-checkbox">
+              <input
+                type="checkbox"
+                checked={overdueOnly}
+                onChange={(e) => {
+                  setOverdueOnly(e.target.checked);
+                  setPage(1);
+                }}
+              />
+              Overdue only
+            </label>
           </div>
 
           <div className="search-box">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                <input type="checkbox" checked={outstandingOnly} onChange={(e) => { setOutstandingOnly(e.target.checked); setPage(1); }} style={{ width: 'auto', margin: 0 }} />
-                Outstanding only
-              </label>
+            <div className="admin-search-inline-row">
+              <label htmlFor={searchInputId}>Search</label>
               <input
+                id={searchInputId}
                 type="text"
                 value={query}
                 placeholder="Search by number or customer..."
                 onChange={(e) => { setQuery(e.target.value); setPage(1); }}
               />
+              <label htmlFor={sortSelectId} className="admin-inline-field">
+                Sort by
+              </label>
+              <select
+                id={sortSelectId}
+                value={sortBy}
+                onChange={(e) => {
+                  setSortBy(e.target.value as InvoiceSortBy);
+                  setPage(1);
+                }}
+              >
+                <option value="invoice_number">Invoice Number</option>
+                <option value="customer_last_name">Customer (Last Name)</option>
+                <option value="status">Status</option>
+                <option value="total">Total</option>
+                <option value="due_date">Due Date</option>
+              </select>
+              <button
+                type="button"
+                className="btn btn-secondary admin-sort-direction-btn"
+                onClick={() => {
+                  setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+                  setPage(1);
+                }}
+              >
+                {sortDir === "asc" ? "ASC" : "DESC"}
+              </button>
             </div>
           </div>
         </div>
@@ -398,75 +473,77 @@ export function AdminInvoicesClient() {
           {invoices.map((inv) => (
             <div 
               key={inv.id} 
-              className="invoice-row-item invoice-item" 
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '12px 16px',
-                gap: '12px',
-                cursor: 'pointer',
-                width: '100%',
-                border: 'none',
-                borderBottom: '1px solid var(--line)',
-                borderRadius: 0,
-              }}
+              className="invoice-row-item invoice-item invoice-table-row"
               onClick={() => openDetail(inv)}
             >
-              <div style={{ width: '140px', fontWeight: 600 }}>{inv.invoiceNumber}</div>
-              <Separator />
-              <div style={{ flex: '1', minWidth: '150px' }}>
-                <div style={{ fontWeight: 500 }}>{inv.customerLastName ? `${inv.customerLastName}, ${inv.customerFirstName}` : inv.customerName}</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--ink-1)' }}>{inv.customerEmail}</div>
+              <div className="admin-list-cell admin-list-col-number">
+                <span className="admin-mobile-label">Number</span>
+                <span className="admin-list-strong">{inv.invoiceNumber}</span>
               </div>
               <Separator />
-              <div style={{ width: '100px', textAlign: 'center' }}>
-                <span className={`status-badge status-${inv.status}`}>{inv.status}</span>
+              <div className="admin-list-cell admin-list-col-customer">
+                <span className="admin-mobile-label">Customer</span>
+                <div className="admin-list-strong">{inv.customerLastName ? `${inv.customerLastName}, ${inv.customerFirstName}` : inv.customerName}</div>
+                <div className="admin-list-subtext">{inv.customerEmail}</div>
               </div>
               <Separator />
-              <div style={{ width: '120px', textAlign: 'right', fontWeight: 600 }}>
+              <div className="admin-list-cell admin-list-col-status">
+                <span className="admin-mobile-label">Status</span>
+                <span className={`status-badge status-${getDisplayStatus(inv, overdueOnly)}`}>
+                  {getDisplayStatus(inv, overdueOnly)}
+                </span>
+              </div>
+              <Separator />
+              <div className="admin-list-cell admin-list-col-total">
+                <span className="admin-mobile-label">Total</span>
                 {toCurrency(inv.totalCents, inv.currency)}
               </div>
               <Separator />
-              <div style={{ width: '120px', textAlign: 'right', fontSize: '0.85rem' }}>
+              <div className="admin-list-cell admin-list-col-due">
+                <span className="admin-mobile-label">Due Date</span>
                 {new Date(inv.dueAt).toLocaleDateString("en-AU")}
                 {inv.overdueDays !== null && inv.status !== "paid" && inv.status !== "void" && (
-                  <div style={{ color: 'var(--red)', fontSize: '0.7rem', fontWeight: 600 }}>{inv.overdueDays} DAYS OVERDUE</div>
+                  <div className="admin-list-overdue">{inv.overdueDays} DAYS OVERDUE</div>
                 )}
               </div>
               <Separator />
-              <div className="customer-item-actions" style={{ width: '220px', display: 'flex', justifyContent: 'flex-end', gap: '6px' }} onClick={e => e.stopPropagation()}>
-                <button
-                  className="btn btn-secondary"
-                  style={{ padding: '6px 10px', fontSize: '0.7rem', minWidth: '0', flex: '1' }}
-                  type="button"
-                  onClick={() => window.open(`/api/admin/invoices/${inv.id}/pdf`, '_blank')}
-                >
-                  PDF
-                </button>
-                <button
-                  className="btn btn-secondary"
-                  style={{ padding: '6px 10px', fontSize: '0.7rem', minWidth: '0', flex: '1' }}
-                  type="button"
-                  onClick={() => openDetail(inv)}
-                >
-                  Edit
-                </button>
-                <button
-                  className="btn btn-danger"
-                  style={{ padding: '6px 10px', fontSize: '0.7rem', minWidth: '0', flex: '1' }}
-                  type="button"
-                  disabled={busyAction === `delete-${inv.id}`}
-                  onClick={async () => {
-                    if (window.confirm("Delete this invoice permanently?")) {
-                      setBusyAction(`delete-${inv.id}`);
-                      await removeInvoiceApi(inv.id);
-                      setBusyAction(null);
-                      void loadInvoices(query, page, outstandingOnly);
-                    }
-                  }}
-                >
-                  {busyAction === `delete-${inv.id}` ? "..." : "Del"}
-                </button>
+              <div className="customer-item-actions admin-list-actions admin-list-col-actions" onClick={e => e.stopPropagation()}>
+                <span className="admin-mobile-label">Actions</span>
+                <Tooltip content="Open this invoice as a PDF in a new tab.">
+                  <button
+                    className="btn btn-secondary admin-list-action-btn"
+                    type="button"
+                    onClick={() => window.open(`/api/admin/invoices/${inv.id}/pdf`, '_blank')}
+                  >
+                    PDF
+                  </button>
+                </Tooltip>
+                <Tooltip content="Open invoice details for editing and lifecycle actions.">
+                  <button
+                    className="btn btn-secondary admin-list-action-btn"
+                    type="button"
+                    onClick={() => openDetail(inv)}
+                  >
+                    Edit
+                  </button>
+                </Tooltip>
+                <Tooltip content="Delete this invoice record permanently where allowed.">
+                  <button
+                    className="btn btn-danger admin-list-action-btn"
+                    type="button"
+                    disabled={busyAction === `delete-${inv.id}`}
+                    onClick={async () => {
+                      if (window.confirm("Delete this invoice permanently?")) {
+                        setBusyAction(`delete-${inv.id}`);
+                        await removeInvoiceApi(inv.id);
+                        setBusyAction(null);
+                        void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
+                      }
+                    }}
+                  >
+                    {busyAction === `delete-${inv.id}` ? "..." : "Del"}
+                  </button>
+                </Tooltip>
               </div>
             </div>
           ))}
@@ -481,41 +558,55 @@ export function AdminInvoicesClient() {
         footer={
           <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="btn btn-secondary" onClick={closeDetail}>CLOSE</button>
+              <Tooltip content="Close invoice details and return to the invoice list.">
+                <button className="btn btn-secondary" onClick={closeDetail}>CLOSE</button>
+              </Tooltip>
               
-              {selectedInvoice?.status === 'sent' && (
-                <button className="btn btn-primary" disabled={!!busyAction} onClick={() => void performAction('mark_paid')}>
-                  {busyAction === 'mark_paid' ? 'SAVING...' : 'MARK AS PAID'}
-                </button>
+              {canMarkAsPaid && (
+                <Tooltip content="Record payment and move this invoice to paid status.">
+                  <button className="btn btn-primary" disabled={!!busyAction} onClick={() => void performAction('mark_paid')}>
+                    {busyAction === 'mark_paid' ? 'SAVING...' : 'MARK AS PAID'}
+                  </button>
+                </Tooltip>
               )}
-              {selectedInvoice?.status === 'paid' && (
-                <button className="btn btn-secondary" disabled={!!busyAction} onClick={() => void performAction('mark_unpaid')}>
-                  {busyAction === 'mark_unpaid' ? 'SAVING...' : 'MARK AS UNPAID'}
-                </button>
+              {canMarkAsUnpaid && (
+                <Tooltip content="Move this invoice back to unpaid status.">
+                  <button className="btn btn-secondary" disabled={!!busyAction} onClick={() => void performAction('mark_unpaid')}>
+                    {busyAction === 'mark_unpaid' ? 'SAVING...' : 'MARK AS UNPAID'}
+                  </button>
+                </Tooltip>
               )}
-              {selectedInvoice && (selectedInvoice.status === 'sent' || selectedInvoice.status === 'paid') && (
-                <button className="btn btn-danger" disabled={!!busyAction} onClick={() => void performAction('void')}>
-                  {busyAction === 'void' ? 'VOIDING...' : 'VOID INVOICE'}
-                </button>
+              {canVoidInvoice && (
+                <Tooltip content="Void this invoice so it is no longer collectible.">
+                  <button className="btn btn-danger" disabled={!!busyAction} onClick={() => void performAction('void')}>
+                    {busyAction === 'void' ? 'VOIDING...' : 'VOID INVOICE'}
+                  </button>
+                </Tooltip>
               )}
-              <button className="btn btn-danger" disabled={!!busyAction} onClick={async () => {
-                if (window.confirm("Delete this invoice permanently?")) {
-                  await removeInvoiceApi(selectedInvoice!.id);
-                  closeDetail();
-                  void loadInvoices(query, page, outstandingOnly);
-                }
-              }}>DELETE</button>
+              <Tooltip content="Permanently delete this invoice record when allowed.">
+                <button className="btn btn-danger" disabled={!!busyAction} onClick={async () => {
+                  if (window.confirm("Delete this invoice permanently?")) {
+                    await removeInvoiceApi(selectedInvoice!.id);
+                    closeDetail();
+                    void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
+                  }
+                }}>DELETE</button>
+              </Tooltip>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               {selectedInvoice?.status === 'draft' && (
-                <button className="btn btn-primary" disabled={!!busyAction} onClick={() => void performAction('send')}>
-                  {busyAction === 'send' ? 'SENDING...' : 'SEND TO CUSTOMER'}
-                </button>
+                <Tooltip content="Email this invoice to the customer and mark it as sent.">
+                  <button className="btn btn-primary" disabled={!!busyAction} onClick={() => void performAction('send')}>
+                    {busyAction === 'send' ? 'SENDING...' : 'SEND TO CUSTOMER'}
+                  </button>
+                </Tooltip>
               )}
               {selectedInvoice?.status !== 'draft' && selectedInvoice?.status !== 'void' && (
-                <button className="btn btn-secondary" disabled={!!busyAction} onClick={() => void performAction('remind')}>
-                  {busyAction === 'remind' ? 'SENDING...' : 'RESEND NOTIFICATION'}
-                </button>
+                <Tooltip content="Resend invoice notification to the customer.">
+                  <button className="btn btn-secondary" disabled={!!busyAction} onClick={() => void performAction('remind')}>
+                    {busyAction === 'remind' ? 'SENDING...' : 'RESEND NOTIFICATION'}
+                  </button>
+                </Tooltip>
               )}
             </div>
           </div>
@@ -545,10 +636,14 @@ export function AdminInvoicesClient() {
                     </AdminField>
                   </AdminForm>
                   <div className="button-row" style={{ marginTop: '12px' }}>
-                    <button className="btn btn-secondary" disabled={!!busyAction} onClick={saveInvoiceEdits}>
-                      {busyAction === 'save' ? 'SAVING...' : 'SAVE BASIC DETAILS'}
-                    </button>
-                    <button className="btn btn-secondary" onClick={() => router.push(`/admin/customers?customerId=${selectedInvoice.customerId}&open=true`)}>VIEW CUSTOMER</button>
+                    <Tooltip content="Save edits to recipient details, due date, notes, and line items.">
+                      <button className="btn btn-secondary" disabled={!!busyAction} onClick={saveInvoiceEdits}>
+                        {busyAction === 'save' ? 'SAVING...' : 'SAVE BASIC DETAILS'}
+                      </button>
+                    </Tooltip>
+                    <Tooltip content="Open this invoice's customer profile in the customers page.">
+                      <button className="btn btn-secondary" onClick={openLinkedCustomer}>VIEW CUSTOMER</button>
+                    </Tooltip>
                   </div>
                 </AdminCard>
 
@@ -572,11 +667,15 @@ export function AdminInvoicesClient() {
                             <input value={li.unitPriceAud} onChange={(e) => updateLineItem(li.key, { unitPriceAud: e.target.value })} />
                           </AdminField>
                         </div>
-                        <button className="btn btn-danger" style={{ marginTop: '24px', padding: '8px' }} onClick={() => removeLineItem(li.key)}>×</button>
+                        <Tooltip content="Remove this line item from the invoice.">
+                          <button className="btn btn-danger" style={{ marginTop: '24px', padding: '8px' }} onClick={() => removeLineItem(li.key)}>×</button>
+                        </Tooltip>
                       </div>
                     ))}
                     <div className="button-row" style={{ marginTop: '8px' }}>
-                      <button className="btn btn-secondary" onClick={addLineItem}>+ ADD CUSTOM ITEM</button>
+                      <Tooltip content="Add a blank line item that you can customize manually.">
+                        <button className="btn btn-secondary" onClick={addLineItem}>+ ADD CUSTOM ITEM</button>
+                      </Tooltip>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <select value={editingProductPresetId} onChange={(e) => addPresetToInvoice(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--line)', borderRadius: '8px', color: 'var(--ink-0)', padding: '8px' }}>
                           <option value="">+ ADD FROM PRESET...</option>
@@ -596,7 +695,9 @@ export function AdminInvoicesClient() {
                   <div style={{ margin: '16px 0', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--line)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                       <span>Status:</span>
-                      <span className={`status-badge status-${selectedInvoice.status}`}>{selectedInvoice.status}</span>
+                      <span className={`status-badge status-${selectedInvoiceDisplayStatus ?? selectedInvoice.status}`}>
+                        {selectedInvoiceDisplayStatus ?? selectedInvoice.status}
+                      </span>
                     </div>
                     {selectedInvoice.status !== 'paid' && selectedInvoice.status !== 'void' && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--red)', fontWeight: 600 }}>
@@ -606,13 +707,16 @@ export function AdminInvoicesClient() {
                     )}
                   </div>
 
+                  {selectedInvoice.status === 'draft' && (
+                    <p className="helper-text" style={{ marginBottom: '12px' }}>
+                      Mark as Paid becomes available after sending the invoice.
+                    </p>
+                  )}
+
                   <div className="button-row" style={{ flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
-                    <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => window.open(`/api/admin/invoices/${selectedInvoice.id}/pdf`, '_blank')}>VIEW PDF</button>
-                    {selectedInvoice.status !== 'void' && (
-                      <button className="btn btn-secondary" style={{ width: '100%' }} disabled={!!busyAction} onClick={() => void performAction('remind')}>
-                        {busyAction === 'remind' ? 'SENDING...' : 'RESEND NOTIFICATION'}
-                      </button>
-                    )}
+                    <Tooltip content="Open the printable invoice PDF in a new browser tab.">
+                      <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => window.open(`/api/admin/invoices/${selectedInvoice.id}/pdf`, '_blank')}>VIEW PDF</button>
+                    </Tooltip>
                   </div>
                 </AdminCard>
               </div>
@@ -628,10 +732,14 @@ export function AdminInvoicesClient() {
         wide
         footer={
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
-            <button className="btn btn-secondary" onClick={() => setCreateOpen(false)}>CANCEL</button>
-            <button className="btn btn-primary" disabled={!!busyAction || !createSelectedCustomerId} onClick={createInvoice}>
-              {busyAction === 'create' ? 'CREATING...' : 'CREATE INVOICE'}
-            </button>
+            <Tooltip content="Close the create invoice dialog without saving.">
+              <button className="btn btn-secondary" onClick={() => setCreateOpen(false)}>CANCEL</button>
+            </Tooltip>
+            <Tooltip content="Create a new invoice from the selected customer and pricing options.">
+              <button className="btn btn-primary" disabled={!!busyAction || !createSelectedCustomerId} onClick={createInvoice}>
+                {busyAction === 'create' ? 'CREATING...' : 'CREATE INVOICE'}
+              </button>
+            </Tooltip>
           </div>
         }
       >

@@ -34,7 +34,15 @@ export interface UseSettingsResult {
     loading: boolean;
     saving: boolean;
     load: () => Promise<void>;
-    save: (payload: any) => Promise<{ ok: boolean; message?: string; fieldErrors?: Record<string, string>; requiresReauth?: boolean; nextPath?: string } | null>;
+    save: (payload: Record<string, unknown>) => Promise<SaveSettingsResponse | null>;
+}
+
+export interface SaveSettingsResponse {
+    ok: boolean;
+    message?: string;
+    fieldErrors?: Record<string, string>;
+    requiresReauth?: boolean;
+    nextPath?: string;
 }
 
 /**
@@ -46,7 +54,7 @@ export function useSettings(options: UseSettingsOptions = {}): UseSettingsResult
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
 
-    const { safeFetch, handleApiError, redirectToAdminLogin } = useSafeFetch({
+    const { safeFetch, handleApiError } = useSafeFetch({
         onAuthError,
         onError
     });
@@ -68,7 +76,7 @@ export function useSettings(options: UseSettingsOptions = {}): UseSettingsResult
         }
     }, [safeFetch, handleApiError]);
 
-    const save = useCallback(async (payload: any) => {
+    const save = useCallback(async (payload: Record<string, unknown>): Promise<SaveSettingsResponse | null> => {
         setSaving(true);
         try {
             const response = await safeFetch("/api/admin/settings", {
@@ -78,7 +86,7 @@ export function useSettings(options: UseSettingsOptions = {}): UseSettingsResult
             });
 
             if (response.status === 400) {
-                return await response.json();
+                return (await response.json()) as SaveSettingsResponse;
             }
 
             if (!response.ok) {
@@ -86,7 +94,7 @@ export function useSettings(options: UseSettingsOptions = {}): UseSettingsResult
                 return null;
             }
 
-            return await response.json();
+            return (await response.json()) as SaveSettingsResponse;
         } catch {
             return null;
         } finally {

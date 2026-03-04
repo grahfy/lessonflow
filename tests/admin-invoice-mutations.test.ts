@@ -117,6 +117,10 @@ describe("admin-invoice-mutations", () => {
     const pdfBuffer = await pdfRes.arrayBuffer();
     expect(pdfBuffer.byteLength).toBeGreaterThan(0);
 
+    const sendReq = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}/send`, "POST", token);
+    const sendRes = await sendInvoice(sendReq, { params: Promise.resolve({ id: invoice.id }) });
+    expect(sendRes.status).toBe(200);
+
     const markPaidReq = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}`, "PATCH", token, {
       action: "mark_paid"
     });
@@ -137,5 +141,47 @@ describe("admin-invoice-mutations", () => {
     expect(creditBody.invoice.documentType).toBe("credit_note");
     expect(creditBody.invoice.totalCents).toBeLessThan(0);
     expect(creditBody.invoice.originalInvoiceId).toBe(invoice.id);
+  });
+
+  it("rejects invalid invoice transitions and keeps status unchanged", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+    const invoice = await seedInvoice(admin.id, "MGS-2026-9910");
+
+    const markPaidFromDraftReq = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}`, "PATCH", token, {
+      action: "mark_paid"
+    });
+    const markPaidFromDraftRes = await PATCH(markPaidFromDraftReq, { params: Promise.resolve({ id: invoice.id }) });
+    expect(markPaidFromDraftRes.status).toBe(400);
+    const markPaidFromDraftBody = (await markPaidFromDraftRes.json()) as {
+      error: string;
+      details: { action: string; status: string; allowedFrom: string[] };
+    };
+    expect(markPaidFromDraftBody.error).toBe("Invalid invoice transition.");
+    expect(markPaidFromDraftBody.details.action).toBe("mark_paid");
+    expect(markPaidFromDraftBody.details.status).toBe("draft");
+    expect(markPaidFromDraftBody.details.allowedFrom).toEqual(["sent"]);
+
+    const sendReq = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}/send`, "POST", token);
+    const sendRes = await sendInvoice(sendReq, { params: Promise.resolve({ id: invoice.id }) });
+    expect(sendRes.status).toBe(200);
+
+    const markUnpaidFromSentReq = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}`, "PATCH", token, {
+      action: "mark_unpaid"
+    });
+    const markUnpaidFromSentRes = await PATCH(markUnpaidFromSentReq, { params: Promise.resolve({ id: invoice.id }) });
+    expect(markUnpaidFromSentRes.status).toBe(400);
+
+    const voidFromDraftInvoice = await seedInvoice(admin.id, "MGS-2026-9911");
+    const voidFromDraftReq = adminRequest(`http://localhost/api/admin/invoices/${voidFromDraftInvoice.id}`, "PATCH", token, {
+      action: "void"
+    });
+    const voidFromDraftRes = await PATCH(voidFromDraftReq, { params: Promise.resolve({ id: voidFromDraftInvoice.id }) });
+    expect(voidFromDraftRes.status).toBe(400);
+
+    const draftReloaded = await prisma.invoice.findUniqueOrThrow({ where: { id: voidFromDraftInvoice.id } });
+    expect(draftReloaded.status).toBe("draft");
+    const sentReloaded = await prisma.invoice.findUniqueOrThrow({ where: { id: invoice.id } });
+    expect(sentReloaded.status).toBe("sent");
   });
 });

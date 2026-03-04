@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@/generated/prisma/client";
 
 import { lessonModeSchema, skillLevelSchema, auPostcodeSchema, auPhoneSchema, auStateSchema } from "@/lib/booking-rules";
 import { requireAdminFromRequest } from "@/lib/admin-route";
@@ -38,6 +39,8 @@ export async function GET(request: NextRequest) {
 
     const parsed = listCustomersQuerySchema.safeParse({
       q: request.nextUrl.searchParams.get("q") ?? undefined,
+      sortBy: request.nextUrl.searchParams.get("sortBy") ?? undefined,
+      sortDir: request.nextUrl.searchParams.get("sortDir") ?? undefined,
       page: request.nextUrl.searchParams.get("page") ?? undefined,
       pageSize: request.nextUrl.searchParams.get("pageSize") ?? request.nextUrl.searchParams.get("limit") ?? undefined,
       isArchived: request.nextUrl.searchParams.get("isArchived") ?? undefined
@@ -47,7 +50,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid query parameters.", details: parsed.error.flatten() }, { status: 400 });
     }
 
-    const { q, page, pageSize, isArchived } = parsed.data;
+    const { q, sortBy, sortDir, page, pageSize, isArchived } = parsed.data;
     const skip = (page - 1) * pageSize;
 
     const where = {
@@ -63,12 +66,17 @@ export async function GET(request: NextRequest) {
         : {})
     };
 
+    const orderBy: Prisma.CustomerOrderByWithRelationInput[] =
+      sortBy === "skill_mode"
+        ? [{ skillLevel: sortDir }, { lessonMode: sortDir }, { fullName: "asc" }, { createdAt: "desc" }]
+        : [{ fullName: sortDir }, { createdAt: "desc" }];
+
     // Include portal credential metadata so the admin UI can show/reveal/regenerate state without
     // making a second request per customer row.
     const [customers, total] = await prisma.$transaction([
       prisma.customer.findMany({
         where,
-        orderBy: [{ fullName: "asc" }, { createdAt: "desc" }],
+        orderBy,
         take: pageSize,
         skip,
         include: {

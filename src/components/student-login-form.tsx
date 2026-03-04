@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { Tooltip } from "@/components/admin/ui/tooltip";
 import { CaptchaField, useCaptcha } from "@/components/captcha";
 import { useNoticeTween } from "@/components/motion/use-notice-tween";
 
@@ -69,30 +70,35 @@ export function StudentLoginForm() {
         <label htmlFor="student-full-name">Full name</label>
         <input id="student-full-name" name="fullName" autoComplete="name" required />
       </div>
-      <div className="field field-compact" data-motion-item="student-login-postcode-field">
-        <label htmlFor="student-postcode">Postcode</label>
-        <input
-          id="student-postcode"
-          name="postcode"
-          required
-          maxLength={4}
-          inputMode="numeric"
-          pattern="[0-9]{4}"
-          title="Postcode must be exactly 4 digits."
-          onInput={(event) => {
-            event.currentTarget.value = event.currentTarget.value.replace(/\D/g, "").slice(0, 4);
-          }}
-        />
-      </div>
-      <div className="field full" data-motion-item="student-login-password-field">
-        <label htmlFor="student-password">Password</label>
-        <input id="student-password" type="password" name="password" autoComplete="current-password" required />
+      <div className="student-login-credentials-row" data-motion-item="student-login-credentials-row">
+        <div className="field field-compact" data-motion-item="student-login-postcode-field">
+          <label htmlFor="student-postcode">Postcode</label>
+          <Tooltip content="Enter your 4-digit Australian postcode.">
+            <input
+              id="student-postcode"
+              name="postcode"
+              required
+              maxLength={4}
+              inputMode="numeric"
+              pattern="[0-9]{4}"
+              onInput={(event) => {
+                event.currentTarget.value = event.currentTarget.value.replace(/\D/g, "").slice(0, 4);
+              }}
+            />
+          </Tooltip>
+        </div>
+        <div className="field" data-motion-item="student-login-password-field">
+          <label htmlFor="student-password">Password</label>
+          <input id="student-password" type="password" name="password" autoComplete="current-password" required />
+        </div>
       </div>
       <CaptchaField idPrefix="student-login" captcha={captcha} motionItem="student-login-captcha-field" />
       <div className="button-row" data-motion-item="student-login-actions">
-        <button className="btn btn-primary" type="submit" disabled={loading}>
-          {loading ? "Signing in..." : "Sign in to portal"}
-        </button>
+        <Tooltip content="Sign in using your full name, postcode, and portal password.">
+          <button className="btn btn-primary" type="submit" disabled={loading}>
+            {loading ? "Signing in..." : "Sign in to portal"}
+          </button>
+        </Tooltip>
       </div>
       {error ? (
         <p className="notice error" ref={errorNoticeRef} data-motion-item="student-login-error-notice">

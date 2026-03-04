@@ -11,6 +11,7 @@ import { animateIn, animateOut } from "@/components/motion/tween-orchestrator";
 import { usePresenceExit } from "@/components/motion/use-presence-exit";
 import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
+import { Tooltip } from "@/components/admin/ui/tooltip";
 
 import { useBookings, type BookingEvent } from "@/lib/admin/use-bookings";
 import { useCustomers } from "@/lib/admin/use-customers";
@@ -490,34 +491,46 @@ export function AdminBookingsClient() {
       title="Bookings"
       error={error}
       notice={notice}
+      className="admin-shell-bookings"
     >
-      <div 
-        className="admin-layout-content" 
-        style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
-      >
+      <div className="admin-layout-content">
         <AdminCard className="booking-row admin-range-row">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div className="button-row" style={{ marginRight: '8px' }}>
-              <button className="btn btn-secondary btn-icon" onClick={goPrev}>←</button>
-              <button className="btn btn-secondary btn-icon" onClick={goNext}>→</button>
+          <div className="admin-range-primary">
+            <div className="button-row admin-range-nav-buttons">
+              <Tooltip content="Go to the previous date range.">
+                <button className="btn btn-secondary btn-icon" onClick={goPrev}>←</button>
+              </Tooltip>
+              <Tooltip content="Go to the next date range.">
+                <button className="btn btn-secondary btn-icon" onClick={goNext}>→</button>
+              </Tooltip>
             </div>
-            <strong style={{ fontSize: '1.1rem', minWidth: '200px' }}>{rangeLabel}</strong>
+            <strong className="admin-range-label">{rangeLabel}</strong>
           </div>
 
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <div className="site-nav" style={{ margin: 0 }}>
-              <button className={`btn ${view === 'day' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => navigate('day', dateStr)}>DAY</button>
-              <button className={`btn ${view === 'week' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => navigate('week', dateStr)}>WEEK</button>
-              <button className={`btn ${view === 'month' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => navigate('month', dateStr)}>MONTH</button>
-              <button className={`btn ${view === 'year' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => navigate('year', dateStr)}>YEAR</button>
+          <div className="admin-range-actions">
+            <div className="site-nav admin-range-view-nav">
+              <Tooltip content="Switch to a single-day booking timeline.">
+                <button className={`btn ${view === 'day' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => navigate('day', dateStr)}>DAY</button>
+              </Tooltip>
+              <Tooltip content="Switch to week view for lesson planning.">
+                <button className={`btn ${view === 'week' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => navigate('week', dateStr)}>WEEK</button>
+              </Tooltip>
+              <Tooltip content="Switch to month view for broader scheduling.">
+                <button className={`btn ${view === 'month' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => navigate('month', dateStr)}>MONTH</button>
+              </Tooltip>
+              <Tooltip content="Switch to year view for long-range planning.">
+                <button className={`btn ${view === 'year' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => navigate('year', dateStr)}>YEAR</button>
+              </Tooltip>
             </div>
-            <div style={{ width: '1px', height: '24px', background: 'var(--line)' }} />
-            <button className="btn btn-primary" onClick={openManualDialog}>ADD MANUAL BOOKING</button>
+            <div className="admin-range-divider" />
+            <Tooltip content="Create a new booking directly from the admin calendar.">
+              <button className="btn btn-primary" onClick={openManualDialog}>ADD MANUAL BOOKING</button>
+            </Tooltip>
           </div>
         </AdminCard>
 
-        <AdminCard noPadding style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-              <AdminBookingCalendar
+        <AdminCard noPadding className="admin-bookings-calendar-card">
+          <AdminBookingCalendar
             view={view}
             date={dateStr}
             events={events}
@@ -638,10 +651,14 @@ export function AdminBookingsClient() {
           title="Move Lesson Time"
           footer={
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
-              <button className="btn btn-secondary" onClick={() => setIsMoveOpen(false)}>CANCEL</button>
-              <button className="btn btn-primary" disabled={!!busyAction} onClick={moveBooking}>
-                {busyAction === 'move' ? 'MOVING...' : 'CONFIRM MOVE'}
-              </button>
+              <Tooltip content="Close this dialog without changing the booking time.">
+                <button className="btn btn-secondary" onClick={() => setIsMoveOpen(false)}>CANCEL</button>
+              </Tooltip>
+              <Tooltip content="Apply the new lesson start time for this booking.">
+                <button className="btn btn-primary" disabled={!!busyAction} onClick={moveBooking}>
+                  {busyAction === 'move' ? 'MOVING...' : 'CONFIRM MOVE'}
+                </button>
+              </Tooltip>
             </div>
           }
         >

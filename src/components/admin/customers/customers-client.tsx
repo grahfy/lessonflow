@@ -14,6 +14,7 @@ import { useCustomers } from "@/lib/admin/use-customers";
 import { useEmailHistory } from "@/lib/admin/use-email-history";
 import { useLearningMaterials } from "@/lib/admin/use-learning-materials";
 import { usePortalCredentials } from "@/lib/admin/use-portal-credentials";
+import { type CustomersSortBy, type CustomersSortDirection } from "@/lib/customers/schema";
 
 export function AdminCustomersClient() {
   const router = useRouter();
@@ -32,6 +33,8 @@ export function AdminCustomersClient() {
 
   const [customerQuery, setCustomerQuery] = useState("");
   const [debouncedCustomerQuery, setDebouncedCustomerQuery] = useState("");
+  const [sortBy, setSortBy] = useState<CustomersSortBy>("customer");
+  const [sortDir, setSortDir] = useState<CustomersSortDirection>("asc");
 
   // Pagination State
   const [page, setPage] = useState(1);
@@ -126,12 +129,13 @@ export function AdminCustomersClient() {
     setSelectedCustomer(null);
     setIsEditing(false);
     setCustomerForm(emptyCustomerForm());
-  }, [dialogPresence]);
+    router.replace("/admin/customers", { scroll: false });
+  }, [dialogPresence, router]);
 
   // Effects
   useEffect(() => {
-    void loadCustomers(debouncedCustomerQuery, page);
-  }, [debouncedCustomerQuery, page, loadCustomers]);
+    void loadCustomers(debouncedCustomerQuery, page, sortBy, sortDir);
+  }, [debouncedCustomerQuery, page, sortBy, sortDir, loadCustomers]);
 
   useEffect(() => {
     const customerId = searchParams.get("customerId");
@@ -142,8 +146,9 @@ export function AdminCustomersClient() {
       if (customer) {
         void openCustomerDialog(customer, false);
       }
+      router.replace("/admin/customers", { scroll: false });
     }
-  }, [searchParams, customers, selectedCustomer, openCustomerDialog]);
+  }, [searchParams, customers, selectedCustomer, openCustomerDialog, router]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedCustomerQuery(customerQuery), 300);
@@ -166,7 +171,7 @@ export function AdminCustomersClient() {
 
     if (result) {
       setNotice(selectedCustomer ? "Customer updated." : "Customer created.");
-      void loadCustomers(debouncedCustomerQuery, page);
+      void loadCustomers(debouncedCustomerQuery, page, sortBy, sortDir);
       
       if (selectedCustomer) {
         setSelectedCustomer(result);
@@ -192,7 +197,7 @@ export function AdminCustomersClient() {
       if (selectedCustomer?.id === customer.id) {
         void closeCustomerDialog();
       }
-      void loadCustomers(debouncedCustomerQuery, page);
+      void loadCustomers(debouncedCustomerQuery, page, sortBy, sortDir);
     }
   }
 
@@ -231,11 +236,9 @@ export function AdminCustomersClient() {
       title="Customers" 
       error={error && !dialogPresence.isMounted ? error : undefined}
       notice={notice && !dialogPresence.isMounted ? notice : undefined}
+      className="admin-shell-customers"
     >
-      <div 
-        className="admin-layout-content" 
-        style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
-      >
+      <div className="admin-layout-content">
         <div className="admin-actions-bar">
           <button className="btn btn-primary" onClick={() => openCustomerDialog(null, true)}>
             CREATE NEW CUSTOMER
@@ -249,6 +252,29 @@ export function AdminCustomersClient() {
               placeholder="Search by name, email, or phone..."
               onChange={(event) => setCustomerQuery(event.target.value)}
             />
+            <div className="admin-sort-inline-row">
+              <span className="admin-inline-field">SORT BY</span>
+              <select
+                value={sortBy}
+                onChange={(event) => {
+                  setSortBy(event.target.value as CustomersSortBy);
+                  setPage(1);
+                }}
+              >
+                <option value="customer">Customer</option>
+                <option value="skill_mode">Skill / Mode</option>
+              </select>
+              <button
+                type="button"
+                className="btn btn-secondary admin-sort-direction-btn"
+                onClick={() => {
+                  setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+                  setPage(1);
+                }}
+              >
+                {sortDir === "asc" ? "ASC" : "DESC"}
+              </button>
+            </div>
           </div>
         </div>
 

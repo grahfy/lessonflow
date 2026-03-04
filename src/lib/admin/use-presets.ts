@@ -52,7 +52,7 @@ export function usePresets(options: UsePresetsOptions = {}): UsePresetsResult {
         } finally {
             setLoading(false);
         }
-    }, [safeFetch, handleApiError]);
+    }, [safeFetch, handleApiError, onError]);
 
     const save = useCallback(async (preset: Partial<Preset>, id?: string): Promise<Preset | null> => {
         const method = id ? "PATCH" : "POST";

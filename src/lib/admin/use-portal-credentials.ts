@@ -25,7 +25,7 @@ export function usePortalCredentials(options: UsePortalCredentialsOptions = {}):
     const [revealedPasswords, setRevealedPasswords] = useState<Record<string, string>>({});
     const [busyCustomerId, setBusyCustomerId] = useState<string | null>(null);
 
-    const { safeFetch, handleApiError, redirectToAdminLogin } = useSafeFetch({ onAuthError, onError });
+    const { safeFetch, handleApiError } = useSafeFetch({ onAuthError, onError });
 
     const reveal = useCallback(async (customerId: string): Promise<string | null> => {
         setBusyCustomerId(customerId);

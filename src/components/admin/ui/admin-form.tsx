@@ -2,8 +2,7 @@
 
 import { forwardRef, type HTMLAttributes, type PropsWithChildren } from "react";
 
-interface AdminFormProps extends PropsWithChildren<HTMLAttributes<HTMLDivElement>> {
-}
+type AdminFormProps = PropsWithChildren<HTMLAttributes<HTMLDivElement>>;
 
 /**
  * Standard form grid for admin sections.

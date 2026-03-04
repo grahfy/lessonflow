@@ -55,7 +55,7 @@ export default async function VideosPage() {
 
       <VideosGridModal videos={bodyContent.videos} />
 
-      <div className="button-row" data-motion-item="videos-actions">
+      <div className="button-row button-row-justify" data-motion-item="videos-actions">
         <TweenLink className="btn btn-primary" href="/book" data-motion-item="videos-action-book">
           Book {getSubjectLabel()} Tuition
         </TweenLink>

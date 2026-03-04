@@ -3,6 +3,7 @@ import { PropsWithChildren } from "react";
 
 import { MotionProvider } from "@/components/motion/tween-orchestrator";
 import { PublicSiteFrame } from "@/components/public-site-frame";
+import { GlobalTooltipProvider } from "@/components/ui/global-tooltip-provider";
 import { 
   PUBLIC_BRAND_NAME, 
   PRIMARY_SUBJECT, 
@@ -86,9 +87,11 @@ export default function RootLayout({ children }: PropsWithChildren) {
   return (
     <html lang="en">
       <body>
-        <MotionProvider>
-          <PublicSiteFrame>{children}</PublicSiteFrame>
-        </MotionProvider>
+        <GlobalTooltipProvider>
+          <MotionProvider>
+            <PublicSiteFrame>{children}</PublicSiteFrame>
+          </MotionProvider>
+        </GlobalTooltipProvider>
       </body>
     </html>
   );

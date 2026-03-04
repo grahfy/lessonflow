@@ -2,6 +2,8 @@
 
 import { useCallback, useState } from "react";
 import { useSafeFetch } from "./use-safe-fetch";
+import { type InvoiceSortBy, type InvoiceSortDirection } from "@/lib/invoices/schema";
+import { type InvoiceLifecycleAction } from "@/lib/invoices/transitions";
 
 export type InvoiceStatus = "draft" | "sent" | "paid" | "void";
 export type InvoiceTaxMode = "taxable" | "gst_free";
@@ -49,13 +51,21 @@ export interface UseInvoicesResult {
     loading: boolean;
     totalCount: number;
     totalPages: number;
-    load: (query?: string, page?: number, outstandingOnly?: boolean) => Promise<void>;
+    load: (
+        query?: string,
+        page?: number,
+        outstandingOnly?: boolean,
+        sortBy?: InvoiceSortBy,
+        sortDir?: InvoiceSortDirection
+    ) => Promise<void>;
     save: (id: string, payload: Record<string, unknown>) => Promise<InvoiceRow | null>;
-    performAction: (id: string, action: string) => Promise<InvoiceRow | null>;
+    performAction: (id: string, action: InvoiceAction) => Promise<InvoiceRow | null>;
     create: (payload: Record<string, unknown>) => Promise<InvoiceRow | null>;
     sendBulkReminders: () => Promise<number | null>;
     remove: (id: string) => Promise<boolean>;
 }
+
+export type InvoiceAction = "send" | "remind" | "restore" | InvoiceLifecycleAction;
 
 /**
  * Hook to manage admin invoice data operations.
@@ -69,14 +79,22 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
 
     const { safeFetch, handleApiError } = useSafeFetch({ onAuthError, onError });
 
-    const load = useCallback(async (query = "", page = 1, outstandingOnly = false) => {
+    const load = useCallback(async (
+        query = "",
+        page = 1,
+        outstandingOnly = false,
+        sortBy: InvoiceSortBy = "invoice_number",
+        sortDir: InvoiceSortDirection = "desc"
+    ) => {
         setLoading(true);
         try {
             const params = new URLSearchParams({
                 page: page.toString(),
                 pageSize: pageSize.toString(),
                 q: query,
-                outstanding: outstandingOnly ? "true" : "false"
+                outstanding: outstandingOnly ? "true" : "false",
+                sortBy,
+                sortDir
             });
             const response = await safeFetch(`/api/admin/invoices?${params.toString()}`);
             if (!response.ok) {
@@ -128,7 +146,7 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
         }
     }, [safeFetch, handleApiError]);
 
-    const performAction = useCallback(async (id: string, action: string): Promise<InvoiceRow | null> => {
+    const performAction = useCallback(async (id: string, action: InvoiceAction): Promise<InvoiceRow | null> => {
         let endpoint = `/api/admin/invoices/${id}`;
         let method = "POST";
 

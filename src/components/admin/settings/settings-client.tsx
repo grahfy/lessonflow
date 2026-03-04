@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
@@ -243,51 +243,53 @@ export function AdminSettingsClient() {
   };
 
   return (
-    <AdminShell title="Admin Configuration" error={error} notice={notice} loading={loading}>
-      <AdminCard className="booking-row">
-        <div className="site-nav">
-          <button className={`btn ${activeTab === "branding" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("branding")}>Branding</button>
-          <button className={`btn ${activeTab === "pages" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("pages")}>Pages</button>
-          <button className={`btn ${activeTab === "emails" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("emails")}>Emails</button>
-          <button className={`btn ${activeTab === "invoices" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("invoices")}>Invoices</button>
-          <button className={`btn ${activeTab === "products" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("products")}>Products</button>
-          <button className={`btn ${activeTab === "system" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("system")}>System</button>
-        </div>
-      </AdminCard>
+    <AdminShell title="Admin Configuration" error={error} notice={notice} loading={loading} className="admin-shell-settings">
+      <div className="admin-layout-content is-scrollable">
+        <AdminCard className="booking-row">
+          <div className="site-nav">
+            <button className={`btn ${activeTab === "branding" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("branding")}>Branding</button>
+            <button className={`btn ${activeTab === "pages" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("pages")}>Pages</button>
+            <button className={`btn ${activeTab === "emails" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("emails")}>Emails</button>
+            <button className={`btn ${activeTab === "invoices" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("invoices")}>Invoices</button>
+            <button className={`btn ${activeTab === "products" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("products")}>Products</button>
+            <button className={`btn ${activeTab === "system" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("system")}>System</button>
+          </div>
+        </AdminCard>
 
-      {!loading && (
-        <>
-          {activeTab === "branding" && renderEnvFields("branding")}
-          {activeTab === "pages" && <AdminContentEditor />}
-          {activeTab === "emails" && <AdminEmailTemplateEditor />}
-          {activeTab === "invoices" && (
-            <>
-              {renderEnvFields("invoices")}
-              <AdminInvoiceTemplateEditor />
-            </>
-          )}
-          {activeTab === "products" && <AdminPresetsEditor />}
-          {activeTab === "system" && (
-            <>
-              {renderEnvFields("system")}
-              <AdminCard>
-                <h2 className="admin-settings-section-title">Admin Password</h2>
-                <AdminForm>
-                  <AdminField label="New Password">
-                    <input type="password" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} />
-                  </AdminField>
-                  <AdminField label="Confirm Password">
-                    <input type="password" value={confirmAdminPassword} onChange={e => setConfirmAdminPassword(e.target.value)} />
-                  </AdminField>
-                  <div className="field full">
-                    <button className="btn btn-primary" onClick={handleSave}>Update Credentials</button>
-                  </div>
-                </AdminForm>
-              </AdminCard>
-            </>
-          )}
-        </>
-      )}
+        {!loading && (
+          <>
+            {activeTab === "branding" && renderEnvFields("branding")}
+            {activeTab === "pages" && <AdminContentEditor />}
+            {activeTab === "emails" && <AdminEmailTemplateEditor />}
+            {activeTab === "invoices" && (
+              <>
+                {renderEnvFields("invoices")}
+                <AdminInvoiceTemplateEditor />
+              </>
+            )}
+            {activeTab === "products" && <AdminPresetsEditor />}
+            {activeTab === "system" && (
+              <>
+                {renderEnvFields("system")}
+                <AdminCard>
+                  <h2 className="admin-settings-section-title">Admin Password</h2>
+                  <AdminForm>
+                    <AdminField label="New Password">
+                      <input type="password" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} />
+                    </AdminField>
+                    <AdminField label="Confirm Password">
+                      <input type="password" value={confirmAdminPassword} onChange={e => setConfirmAdminPassword(e.target.value)} />
+                    </AdminField>
+                    <div className="field full">
+                      <button className="btn btn-primary" onClick={handleSave}>Update Credentials</button>
+                    </div>
+                  </AdminForm>
+                </AdminCard>
+              </>
+            )}
+          </>
+        )}
+      </div>
     </AdminShell>
   );
 }

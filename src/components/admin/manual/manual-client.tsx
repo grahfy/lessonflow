@@ -27,7 +27,7 @@ export function AdminManualClient({ content }: AdminManualClientProps) {
   const grouped = sectionGroups(content.sections);
 
   return (
-    <AdminShell title="Manual">
+    <AdminShell title="Manual" className="admin-shell-manual admin-shell-manual-page">
       <AdminCard className="admin-manual-layout admin-manual-index-layout">
         <aside className="admin-manual-toc">
           <div className="admin-manual-toc-panel">
@@ -52,29 +52,54 @@ export function AdminManualClient({ content }: AdminManualClientProps) {
           </div>
         </aside>
 
-        <div className="admin-manual-sections">
-          <section className="admin-manual-group">
+        <div className="admin-manual-content-column">
+          <section className="admin-manual-panel admin-manual-hero">
+            <p className="admin-manual-hero-kicker">Operations Manual</p>
+            <h2>LessonFlow Admin Handbook</h2>
+            <p className="helper-text">
+              Updated procedural guide for bookings, customers, invoicing, reporting, student portal support, and technical operations.
+            </p>
+            <div className="admin-manual-route-pills">
+              <span className="admin-manual-pill">Version: 2026.03</span>
+              <span className="admin-manual-pill">Scope: Admin + Student + Public flows</span>
+              <span className="admin-manual-pill">Includes screenshot-backed steps</span>
+            </div>
+          </section>
+
+          <section className="admin-manual-panel">
             <h2>Daily Operations</h2>
             <p className="helper-text">Standard procedures for managing students and lessons.</p>
-            <div className="admin-manual-grid">
+            <div className="admin-manual-index-grid">
               {grouped.allAdmins.map((section) => (
-                <Link key={section.id} href={`/admin/manual/${section.id}`} className="admin-manual-card">
-                  <h3>{section.title}</h3>
+                <Link key={section.id} href={`/admin/manual/${section.id}`} className="admin-manual-index-card">
+                  <div className="admin-manual-index-card-head">
+                    <h3>{section.title}</h3>
+                    <span className="admin-manual-audience-badge">All Admins</span>
+                  </div>
                   <p>{section.summary}</p>
+                  <div className="admin-manual-index-card-actions">
+                    <span className="btn btn-secondary">Open Section</span>
+                  </div>
                 </Link>
               ))}
             </div>
           </section>
 
           {grouped.techOwners.length > 0 ? (
-            <section className="admin-manual-group">
+            <section className="admin-manual-panel">
               <h2>Technical & System</h2>
               <p className="helper-text">Advanced guides for school owners and technical admins.</p>
-              <div className="admin-manual-grid">
+              <div className="admin-manual-index-grid">
                 {grouped.techOwners.map((section) => (
-                  <Link key={section.id} href={`/admin/manual/${section.id}`} className="admin-manual-card">
-                    <h3>{section.title}</h3>
+                  <Link key={section.id} href={`/admin/manual/${section.id}`} className="admin-manual-index-card">
+                    <div className="admin-manual-index-card-head">
+                      <h3>{section.title}</h3>
+                      <span className="admin-manual-audience-badge technical">Technical Owner</span>
+                    </div>
                     <p>{section.summary}</p>
+                    <div className="admin-manual-index-card-actions">
+                      <span className="btn btn-secondary">Open Section</span>
+                    </div>
                   </Link>
                 ))}
               </div>

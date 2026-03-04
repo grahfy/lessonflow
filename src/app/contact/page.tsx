@@ -58,7 +58,7 @@ export default async function ContactPage() {
       leadJustified
     >
       <ul className="list" data-motion-item="contact-list">
-        <li data-motion-item="map-button">
+        <li className="map-trigger-item" data-motion-item="map-button">
           <ImageModal
             src={bodyContent.mapImage}
             alt={`${PUBLIC_BRAND_NAME} location map`}

@@ -21,6 +21,8 @@ export async function GET(request: NextRequest) {
 
     const parsed = listInvoicesQuerySchema.safeParse({
       q: request.nextUrl.searchParams.get("q") ?? undefined,
+      sortBy: request.nextUrl.searchParams.get("sortBy") ?? undefined,
+      sortDir: request.nextUrl.searchParams.get("sortDir") ?? undefined,
       status: request.nextUrl.searchParams.get("status") ?? undefined,
       agingBucket: request.nextUrl.searchParams.get("agingBucket") ?? undefined,
       customerId: request.nextUrl.searchParams.get("customerId") ?? undefined,
@@ -45,10 +47,17 @@ export async function GET(request: NextRequest) {
       where.customerId = parsed.data.customerId;
     }
     if (parsed.data.outstanding === "true") {
+      const now = new Date();
+      const nowUtcDayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      const overdueCutoff = new Date(nowUtcDayStart.getTime() - 24 * 60 * 60 * 1000);
       where.status = {
         notIn: ["paid", "void"]
       };
       where.documentType = "invoice";
+      // "Overdue only" means invoices with overdueDays > 1 (strictly more than one day overdue).
+      where.dueAt = {
+        lt: overdueCutoff
+      };
     }
     if (parsed.data.q) {
       where.OR = [
@@ -78,12 +87,35 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const orderBy: Prisma.InvoiceOrderByWithRelationInput[] = (() => {
+      const { sortBy, sortDir } = parsed.data;
+      if (sortBy === "customer_last_name") {
+        return [
+          { customerLastName: sortDir },
+          { customerFirstName: sortDir },
+          { customerName: sortDir },
+          { invoiceNumber: "desc" }
+        ];
+      }
+      if (sortBy === "status") {
+        return [{ status: sortDir }, { dueAt: "asc" }, { invoiceNumber: "desc" }];
+      }
+      if (sortBy === "total") {
+        return [{ totalCents: sortDir }, { invoiceNumber: "desc" }];
+      }
+      if (sortBy === "due_date") {
+        return [{ dueAt: sortDir }, { invoiceNumber: "desc" }];
+      }
+
+      return [{ invoiceNumber: sortDir }];
+    })();
+
     const skip = (parsed.data.page - 1) * parsed.data.pageSize;
     // Fetch rows and total count in one transaction so pagination metadata matches the same filter snapshot.
     const [invoices, total] = await prisma.$transaction([
       prisma.invoice.findMany({
         where,
-        orderBy: [{ issuedAt: "desc" }, { createdAt: "desc" }],
+        orderBy,
         include: {
           lineItems: {
             orderBy: {

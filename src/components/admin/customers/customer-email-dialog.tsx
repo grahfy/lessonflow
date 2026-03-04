@@ -24,25 +24,25 @@ export function CustomerEmailDialog({
     onSendEmail
 }: Props) {
     return (
-        <div className="dialog-tab-stack" style={{ minHeight: '650px', marginTop: "12px" }}>
+        <div className="dialog-tab-stack customer-tab-panel">
             <div className="dialog-col dialog-tab-section">
                 <h3 className="manual-section-title">Email History</h3>
-                <AdminCard ghost style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid var(--line)', padding: '12px' }}>
+                <AdminCard ghost className="customer-email-history-card">
                     {loadingEmailHistory ? (
                         <p className="helper-text">Loading history...</p>
                     ) : emailHistory.length > 0 ? (
-                        <div style={{ display: 'grid', gap: '8px' }}>
+                        <div className="customer-email-history-list">
                             {emailHistory.map((email) => (
-                                <div key={email.id} style={{ padding: '12px', borderBottom: '1px solid var(--line)', fontSize: '0.85rem' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                                        <strong style={{ color: 'var(--ink-0)' }}>{email.subject}</strong>
-                                        <span style={{ color: 'var(--ink-2)', fontSize: '0.75rem' }}>{formatDateTime(email.createdAt)}</span>
+                                <div key={email.id} className="customer-email-history-item">
+                                    <div className="customer-email-history-head">
+                                        <strong>{email.subject}</strong>
+                                        <span>{formatDateTime(email.createdAt)}</span>
                                     </div>
-                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                        <span className={`status-badge status-${email.status.toLowerCase()}`} style={{ fontSize: '0.7rem', padding: '2px 8px' }}>
+                                    <div className="customer-email-history-meta">
+                                        <span className={`status-badge status-${email.status.toLowerCase()}`}>
                                             {email.status}
                                         </span>
-                                        {email.error && <span style={{ color: 'var(--brand-danger)', fontSize: '0.75rem' }}>· {email.error}</span>}
+                                        {email.error && <span className="customer-email-history-error">· {email.error}</span>}
                                     </div>
                                 </div>
                             ))}
@@ -55,33 +55,44 @@ export function CustomerEmailDialog({
 
             <div className="dialog-col dialog-tab-section">
                 <h3 className="manual-section-title">Send Email</h3>
-                <AdminCard ghost style={{ border: '1px solid var(--line)', padding: '16px', width: "100%" }}>
-                    <AdminForm style={{ width: "100%" }}>
+                <AdminCard ghost className="customer-email-composer-card">
+                    <AdminForm className="customer-email-composer-form">
                         <AdminField label="Subject" required fullWidth>
                             <input
                                 placeholder="Email subject..."
                                 value={emailComposerSubject}
                                 onChange={e => setEmailComposerSubject(e.target.value)}
-                                style={{ width: "100%" }}
                             />
                         </AdminField>
                         <AdminField label="Message" required fullWidth>
                             <textarea
                                 placeholder="Type your message here..."
-                                style={{ width: "100%", minHeight: '220px', resize: 'vertical' }}
+                                className="customer-email-message-input"
                                 value={emailComposerMessage}
                                 onChange={e => setEmailComposerMessage(e.target.value)}
                             />
                         </AdminField>
-                        <button
-                            className="btn btn-primary"
-                            type="button"
-                            disabled={sendingEmail || !emailComposerSubject.trim() || !emailComposerMessage.trim()}
-                            onClick={() => onSendEmail(emailComposerSubject, emailComposerMessage)}
-                            style={{ width: "100%", marginTop: "8px", gridColumn: "1 / -1" }}
-                        >
-                            {sendingEmail ? "Sending..." : "Send Email"}
-                        </button>
+                        <div className="button-row button-row-justify customer-email-actions">
+                            <button
+                                className="btn btn-secondary"
+                                type="button"
+                                disabled={sendingEmail || (!emailComposerSubject.trim() && !emailComposerMessage.trim())}
+                                onClick={() => {
+                                    setEmailComposerSubject("");
+                                    setEmailComposerMessage("");
+                                }}
+                            >
+                                Clear Draft
+                            </button>
+                            <button
+                                className="btn btn-primary"
+                                type="button"
+                                disabled={sendingEmail || !emailComposerSubject.trim() || !emailComposerMessage.trim()}
+                                onClick={() => onSendEmail(emailComposerSubject, emailComposerMessage)}
+                            >
+                                {sendingEmail ? "Sending..." : "Send Email"}
+                            </button>
+                        </div>
                     </AdminForm>
                 </AdminCard>
             </div>

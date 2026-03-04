@@ -65,7 +65,7 @@ export default async function VouchersPage() {
         {bodyContent.helperText}
       </p>
 
-      <div className="button-row" data-motion-item="vouchers-actions">
+      <div className="button-row button-row-justify" data-motion-item="vouchers-actions">
         <a
           className="btn btn-primary"
           href={bodyContent.orderUrl}

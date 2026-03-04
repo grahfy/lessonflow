@@ -6,6 +6,7 @@ import { GET as downloadMaterial } from "@/app/api/student/learning-materials/[i
 import { GET as studentPortal } from "@/app/api/student/portal/route";
 import { customerSnapshotFromInput } from "@/lib/customer-match";
 import { prisma } from "@/lib/db";
+import { studentPortalPayloadSchema } from "@/lib/student-portal/contracts";
 import { createMaterialStorageDriver } from "@/lib/student-portal/material-storage";
 import { createStudentSessionToken, getStudentSessionCookieName } from "@/lib/student-portal/session";
 
@@ -112,10 +113,7 @@ describe("student-portal-data", () => {
     });
     const portalResponse = await studentPortal(portalRequest);
     expect(portalResponse.status).toBe(200);
-    const payload = (await portalResponse.json()) as {
-      upcoming: Array<{ id: string; materials: Array<{ id: string; downloadUrl: string }> }>;
-      previous: Array<{ id: string }>;
-    };
+    const payload = studentPortalPayloadSchema.parse(await portalResponse.json());
     expect(payload.upcoming.map((row) => row.id)).toContain(upcomingBooking.id);
     expect(payload.previous.map((row) => row.id)).toContain(previousBooking.id);
     expect(payload.upcoming[0]?.materials[0]?.id).toBe(material.id);

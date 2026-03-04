@@ -49,9 +49,8 @@ export default async function TermsPage() {
           </li>
         ))}
       </ul>
-...
 
-      <div className="button-row" data-motion-item="terms-actions">
+      <div className="button-row button-row-justify" data-motion-item="terms-actions">
         <TweenLink className="btn btn-primary" href="/contact" data-motion-item="terms-action-contact">
           Ask a Question
         </TweenLink>

@@ -133,7 +133,7 @@ export function CustomerProfileDialog({
 
     return (
         <>
-            <div className="dialog-col" style={{ minHeight: "650px" }}>
+            <div className="dialog-col customer-tab-section customer-profile-panel">
                 <h4>Contact & Profile</h4>
                 <AdminForm className="dialog-form-grid">
                     <AdminField label="First Name" required>
@@ -195,7 +195,7 @@ export function CustomerProfileDialog({
                     </AdminField>
                 </AdminForm>
 
-                <h4 style={{ marginTop: '20px' }}>Address</h4>
+                <h4 className="customer-profile-subhead">Address</h4>
                 <AdminForm className="dialog-form-grid">
                     <AdminField label="Unit / Apartment">
                         <input
@@ -271,7 +271,7 @@ export function CustomerProfileDialog({
                 </AdminForm>
             </div>
 
-            <div className="dialog-col is-notes" style={{ minHeight: "650px" }}>
+            <div className="dialog-col is-notes customer-tab-section customer-profile-panel">
                 <h4>Portal Credentials</h4>
                 <AdminCard ghost style={{ background: 'rgba(0,0,0,0.03)', padding: '16px', border: '1px solid var(--line)' }}>
                     <p className="helper-text">Manage access to the student portal. Passwords are encrypted and can be revealed or rotated by admins.</p>

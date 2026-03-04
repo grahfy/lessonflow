@@ -6,6 +6,10 @@ import { PATCH as cancelStudentBooking } from "@/app/api/student/bookings/[id]/r
 import { POST as createStudentBooking } from "@/app/api/student/bookings/route";
 import { customerSnapshotFromInput } from "@/lib/customer-match";
 import { prisma } from "@/lib/db";
+import {
+  studentPortalBookingRequestResponseSchema,
+  studentPortalCancelBookingResponseSchema
+} from "@/lib/student-portal/contracts";
 import { createStudentSessionToken, getStudentSessionCookieName } from "@/lib/student-portal/session";
 
 describe("student-portal-booking-actions", () => {
@@ -54,6 +58,8 @@ describe("student-portal-booking-actions", () => {
     });
     const response = await createStudentBooking(request);
     expect(response.status).toBe(201);
+    const createPayload = studentPortalBookingRequestResponseSchema.parse(await response.json());
+    expect(createPayload.request.status).toBe("pending");
 
     const created = await prisma.bookingRequest.findFirstOrThrow({
       where: {
@@ -117,6 +123,8 @@ describe("student-portal-booking-actions", () => {
       params: Promise.resolve({ id: booking.id })
     });
     expect(response.status).toBe(200);
+    const cancelPayload = studentPortalCancelBookingResponseSchema.parse(await response.json());
+    expect(cancelPayload.booking.status).toBe("cancelled");
 
     const cancelled = await prisma.booking.findUniqueOrThrow({
       where: {

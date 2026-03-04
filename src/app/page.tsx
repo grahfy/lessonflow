@@ -49,20 +49,16 @@ export default async function HomePage() {
       visualClassName={heroContent.visualClassName}
       leadJustified={true}
       actions={
-        <div className="home-actions" data-motion-item="home-actions">
-          <div className="home-actions-primary" data-motion-item="home-action-book">
-            <TweenLink className="btn btn-primary" href="/book">
-              Book Your {getSubjectLabel()} Lesson Today
-            </TweenLink>
-          </div>
-          <div className="home-actions-secondary">
-            <TweenLink className="btn btn-secondary" href="/videos" data-motion-item="home-action-videos">
-              Watch Videos
-            </TweenLink>
-            <TweenLink className="btn btn-secondary" href="/lessons" data-motion-item="home-action-lessons">
-              Explore Lesson Paths
-            </TweenLink>
-          </div>
+        <div className="home-actions home-actions-justified" data-motion-item="home-actions">
+          <TweenLink className="btn btn-primary" href="/book" data-motion-item="home-action-book">
+            Book Your {getSubjectLabel()} Lesson Today
+          </TweenLink>
+          <TweenLink className="btn btn-secondary" href="/videos" data-motion-item="home-action-videos">
+            Watch Videos
+          </TweenLink>
+          <TweenLink className="btn btn-secondary" href="/lessons" data-motion-item="home-action-lessons">
+            Explore Lesson Paths
+          </TweenLink>
         </div>
       }
     >

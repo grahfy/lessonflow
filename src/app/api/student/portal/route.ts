@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db";
+import {
+  mapStudentPortalBooking,
+  mapStudentPortalMaterial,
+  mapStudentPortalPendingRequest,
+  studentPortalPayloadSchema
+} from "@/lib/student-portal/contracts";
 import { requireStudentFromRequest } from "@/lib/student-portal/session";
 
 /**
@@ -60,54 +66,14 @@ export async function GET(request: NextRequest) {
   // Split into upcoming/previous here so all student-facing clients can reuse the same route shape.
   const upcoming = bookings
     .filter((booking) => booking.startAt >= now && booking.status !== "cancelled")
-    .map((booking) => ({
-      id: booking.id,
-      status: booking.status,
-      lessonMode: booking.lessonMode,
-      skillLevel: booking.skillLevel,
-      lessonDuration: booking.lessonDuration,
-      customDurationMinutes: booking.customDurationMinutes,
-      startAt: booking.startAt.toISOString(),
-      endAt: booking.endAt.toISOString(),
-      notes: booking.notes,
-      materials: booking.learningMaterials.map((material) => ({
-        id: material.id,
-        title: material.title,
-        materialType: material.materialType,
-        mimeType: material.mimeType,
-        sizeBytes: material.sizeBytes,
-        createdAt: material.createdAt.toISOString(),
-        downloadUrl: `/api/student/learning-materials/${material.id}/download`,
-        previewUrl: `/api/student/learning-materials/${material.id}/download?disposition=inline`
-      }))
-    }));
+    .map(mapStudentPortalBooking);
 
   const previous = bookings
     .filter((booking) => booking.startAt < now || booking.status === "cancelled")
     .sort((a, b) => b.startAt.getTime() - a.startAt.getTime())
-    .map((booking) => ({
-      id: booking.id,
-      status: booking.status,
-      lessonMode: booking.lessonMode,
-      skillLevel: booking.skillLevel,
-      lessonDuration: booking.lessonDuration,
-      customDurationMinutes: booking.customDurationMinutes,
-      startAt: booking.startAt.toISOString(),
-      endAt: booking.endAt.toISOString(),
-      notes: booking.notes,
-      materials: booking.learningMaterials.map((material) => ({
-        id: material.id,
-        title: material.title,
-        materialType: material.materialType,
-        mimeType: material.mimeType,
-        sizeBytes: material.sizeBytes,
-        createdAt: material.createdAt.toISOString(),
-        downloadUrl: `/api/student/learning-materials/${material.id}/download`,
-        previewUrl: `/api/student/learning-materials/${material.id}/download?disposition=inline`
-      }))
-    }));
+    .map(mapStudentPortalBooking);
 
-  return NextResponse.json({
+  const payload = studentPortalPayloadSchema.parse({
     student: {
       id: student.id,
       fullName: student.fullName,
@@ -116,23 +82,9 @@ export async function GET(request: NextRequest) {
     now: now.toISOString(),
     upcoming,
     previous,
-    standaloneMaterials: standaloneMaterials.map((material) => ({
-      id: material.id,
-      title: material.title,
-      materialType: material.materialType,
-      mimeType: material.mimeType,
-      sizeBytes: material.sizeBytes,
-      createdAt: material.createdAt.toISOString(),
-      downloadUrl: `/api/student/learning-materials/${material.id}/download`,
-      previewUrl: `/api/student/learning-materials/${material.id}/download?disposition=inline`
-    })),
-    pendingRequests: pendingRequests.map((requestRow) => ({
-      id: requestRow.id,
-      requestedStartAt: requestRow.requestedStartAt.toISOString(),
-      lessonMode: requestRow.lessonMode,
-      lessonDuration: requestRow.lessonDuration,
-      customDurationMinutes: requestRow.customDurationMinutes,
-      status: requestRow.status
-    }))
+    standaloneMaterials: standaloneMaterials.map(mapStudentPortalMaterial),
+    pendingRequests: pendingRequests.map(mapStudentPortalPendingRequest)
   });
+
+  return NextResponse.json(payload);
 }

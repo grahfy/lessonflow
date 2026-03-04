@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db";
 import { logEvent } from "@/lib/observability";
+import { studentPortalCancelBookingResponseSchema } from "@/lib/student-portal/contracts";
 import { requireStudentFromRequest } from "@/lib/student-portal/session";
 
 type Params = {
@@ -60,11 +61,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     startAt: cancelled.startAt.toISOString()
   });
 
-  return NextResponse.json({
+  const payload = studentPortalCancelBookingResponseSchema.parse({
     booking: {
       id: cancelled.id,
       status: cancelled.status,
       cancelledAt: cancelled.cancelledAt?.toISOString() || null
     }
   });
+
+  return NextResponse.json(payload);
 }

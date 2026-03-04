@@ -20,14 +20,16 @@ export interface BookingEvent {
     seriesId: string | null;
     color: "green" | "yellow" | "red" | "slate";
     title: string;
-    row: any;
+    row: Record<string, unknown>;
 }
+
+type BookingUpdatePayload = Record<string, unknown>;
 
 export interface UseBookingsResult {
     events: BookingEvent[];
     loading: boolean;
     load: (view: string, date: string) => Promise<void>;
-    update: (id: string, entityType: "booking" | "booking_request", action: string, payload: any) => Promise<boolean>;
+    update: (id: string, entityType: "booking" | "booking_request", action: string, payload: BookingUpdatePayload) => Promise<boolean>;
     remove: (id: string, entityType: "booking" | "booking_request") => Promise<boolean>;
     notify: (id: string, action: string, message?: string) => Promise<boolean>;
 }
@@ -59,22 +61,24 @@ export function useBookings(options: { onAuthError?: () => void; onError?: (msg:
         }
     }, [safeFetch, handleApiError, onError]);
 
-    const update = useCallback(async (id: string, entityType: "booking" | "booking_request", action: string, payload: any): Promise<boolean> => {
+    const update = useCallback(async (id: string, entityType: "booking" | "booking_request", action: string, payload: BookingUpdatePayload): Promise<boolean> => {
         const base = entityType === "booking" ? "bookings" : "booking-requests";
         const endpoint = `/api/admin/${base}/${id}`;
         
-        let body: any = { action, ...payload };
+        const body: Record<string, unknown> = { action, ...payload };
+        const payloadNewStartAt = typeof payload.newStartAt === "string" ? payload.newStartAt : null;
+        const payloadStartAtLocal = typeof payload.startAtLocal === "string" ? payload.startAtLocal : null;
         
         // Handle API specific mappings
         if (entityType === "booking_request") {
-            if (action === "move" && payload.newStartAt) {
-                body.requestedStartAt = new Date(payload.newStartAt).toISOString();
-            } else if (action === "edit" && payload.startAtLocal) {
-                body.requestedStartAt = new Date(payload.startAtLocal).toISOString();
+            if (action === "move" && payloadNewStartAt) {
+                body.requestedStartAt = new Date(payloadNewStartAt).toISOString();
+            } else if (action === "edit" && payloadStartAtLocal) {
+                body.requestedStartAt = new Date(payloadStartAtLocal).toISOString();
             }
         } else if (entityType === "booking") {
-            if (action === "move" && payload.newStartAt) {
-                body.newStartAt = new Date(payload.newStartAt).toISOString();
+            if (action === "move" && payloadNewStartAt) {
+                body.newStartAt = new Date(payloadNewStartAt).toISOString();
             }
         }
 

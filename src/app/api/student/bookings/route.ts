@@ -1,22 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 
-import { formatBookingAddress, lessonDurationSchema, lessonModeSchema } from "@/lib/booking-rules";
+import { formatBookingAddress } from "@/lib/booking-rules";
 import { prisma } from "@/lib/db";
 import { ownerPendingBookingTemplate } from "@/lib/email/templates";
 import { sendEmail } from "@/lib/email/service";
 import { getOwnerEmail } from "@/lib/env";
 import { logEvent } from "@/lib/observability";
+import {
+  studentPortalBookingRequestInputSchema,
+  studentPortalBookingRequestResponseSchema
+} from "@/lib/student-portal/contracts";
 import { requireStudentFromRequest } from "@/lib/student-portal/session";
 import { getCurrentCalendarYear, isDateInCalendarYear } from "@/lib/time";
-
-const createStudentBookingSchema = z.object({
-  requestedStartAt: z.string().datetime({ offset: true }),
-  lessonMode: lessonModeSchema.optional(),
-  lessonDuration: lessonDurationSchema.default("min60"),
-  customDurationMinutes: z.coerce.number().int().min(15).max(300).nullable().optional(),
-  notes: z.string().trim().max(1000).optional()
-});
 
 /**
  * Creates a pending booking request for the authenticated student.
@@ -29,7 +24,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => null);
-  const parsed = createStudentBookingSchema.safeParse(body);
+  const parsed = studentPortalBookingRequestInputSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid booking request payload.", details: parsed.error.flatten() }, { status: 400 });
   }
@@ -111,14 +106,13 @@ export async function POST(request: NextRequest) {
     html: template.html
   });
 
-  return NextResponse.json(
-    {
-      request: {
-        id: created.id,
-        status: created.status,
-        requestedStartAt: created.requestedStartAt.toISOString()
-      }
-    },
-    { status: 201 }
-  );
+  const responsePayload = studentPortalBookingRequestResponseSchema.parse({
+    request: {
+      id: created.id,
+      status: created.status,
+      requestedStartAt: created.requestedStartAt.toISOString()
+    }
+  });
+
+  return NextResponse.json(responsePayload, { status: 201 });
 }

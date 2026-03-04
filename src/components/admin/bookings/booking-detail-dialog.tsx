@@ -4,6 +4,7 @@ import { RefObject } from "react";
 import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { AdminCard } from "@/components/admin/ui/admin-card";
+import { Tooltip } from "@/components/admin/ui/tooltip";
 import { formatDateTime } from "@/lib/admin/formatters";
 import { type BookingEvent } from "@/lib/admin/use-bookings";
 import { type EmailRecord } from "@/lib/admin/use-email-history";
@@ -88,67 +89,117 @@ export function BookingDetailDialog({
       isOpen={isOpen}
       onClose={onClose}
       rootRef={rootRef}
+      id="booking-detail-dialog"
       title={event.entityType === 'booking' ? "Edit Booking" : "Booking Request"}
       description={`Status: ${event.status} / Type: ${event.entityType === 'booking' ? "Confirmed" : "Request"}`}
       wide
+      bodyClassName="booking-dialog-body-lock"
+      lockBodyScrollArea
       footer={
-        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-          <div>
-            <button className="btn btn-secondary" onClick={onClose}>Close</button>
+        <div className="dialog-footer-row">
+          <div className="dialog-footer-left">
+            <Tooltip content="Close this booking dialog without applying new changes.">
+              <button className="btn btn-secondary" onClick={onClose}>Close</button>
+            </Tooltip>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="dialog-footer-right">
             {activeTab === 'appointment' ? (
               <>
-                <button className="btn btn-primary" disabled={!!busyAction} onClick={onSave}>
-                  {busyAction === 'save' ? 'Saving...' : 'Save Changes'}
-                </button>
-                {event.status === 'pending' && (
-                  <button className="btn btn-primary" disabled={!!busyAction} onClick={() => onPerformAction('approve')}>
-                    Approve Request
+                <Tooltip content="Save edits to booking details, schedule, and notes.">
+                  <button className="btn btn-primary" disabled={!!busyAction} onClick={onSave}>
+                    {busyAction === 'save' ? 'Saving...' : 'Save Changes'}
                   </button>
+                </Tooltip>
+                {event.status === 'pending' && (
+                  <Tooltip content="Approve this pending request and convert it into a confirmed booking.">
+                    <button className="btn btn-primary" disabled={!!busyAction} onClick={() => onPerformAction('approve')}>
+                      Approve Request
+                    </button>
+                  </Tooltip>
                 )}
               </>
             ) : (
-              <button className="btn btn-secondary" onClick={() => setActiveTab('appointment')}>Back to appointment</button>
+              <>
+                <Tooltip content="Send this custom email to the booking contact.">
+                  <button
+                    className="btn btn-primary"
+                    disabled={sendingEmail || !emailSubject.trim() || !emailMessage.trim()}
+                    onClick={onSendEmail}
+                  >
+                    {sendingEmail ? "Sending..." : "Send Email"}
+                  </button>
+                </Tooltip>
+                <Tooltip content="Clear the current subject/message draft fields.">
+                  <button
+                    className="btn btn-danger"
+                    disabled={sendingEmail || (!emailSubject.trim() && !emailMessage.trim())}
+                    onClick={() => {
+                      setEmailSubject("");
+                      setEmailMessage("");
+                    }}
+                  >
+                    Clear Draft
+                  </button>
+                </Tooltip>
+                <Tooltip content="Return to appointment details and actions.">
+                  <button className="btn btn-secondary" onClick={() => setActiveTab("appointment")}>
+                    Back to Appointment
+                  </button>
+                </Tooltip>
+              </>
             )}
           </div>
         </div>
       }
     >
-      <div className="dialog-tabs" style={{ marginBottom: '16px' }}>
-        <button className={`btn ${activeTab === 'appointment' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('appointment')} style={{ borderRadius: '8px 0 0 8px', minWidth: '140px' }}>Appointment</button>
-        <button className={`btn ${activeTab === 'emails' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('emails')} style={{ borderRadius: '0 8px 8px 0', minWidth: '140px' }}>Communication</button>
+      <div className="dialog-tabs dialog-tabs-booking">
+        <div className="dialog-tabs-left">
+          <Tooltip content="View and edit appointment details for this booking.">
+            <button className={`btn ${activeTab === "appointment" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("appointment")}>
+              Appointment
+            </button>
+          </Tooltip>
+          <Tooltip content="View email history and send a custom message to the student.">
+            <button className={`btn ${activeTab === "emails" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("emails")}>
+              Communication
+            </button>
+          </Tooltip>
+        </div>
+        {matchedCustomer ? (
+          <Tooltip content="Open the linked customer profile in the customer directory.">
+            <button type="button" className="btn btn-secondary" onClick={onOpenMatchedCustomer}>
+              Open Customer
+            </button>
+          </Tooltip>
+        ) : null}
       </div>
 
-      <div className="booking-dialog-scroll">
-        <div className="dialog-layout" style={{ minHeight: '650px' }}>
+      <div className="dialog-layout booking-dialog-layout">
           {activeTab === 'appointment' ? (
             <>
               <div className="dialog-col">
-                <h3 className="manual-section-title">Customer Details</h3>
-                {matchedCustomer && (
-                  <AdminCard ghost style={{ marginBottom: '16px', border: hasHeuristicMatch ? '1px solid rgba(251, 191, 36, 0.5)' : '1px solid var(--line)' }}>
-                    <p className="helper-text" style={{ marginBottom: '8px' }}>
+                <div className="dialog-section-heading">
+                  <h3 className="manual-section-title">Customer Details</h3>
+                  {matchedCustomer ? (
+                    <span className="helper-text">
                       {hasHeuristicMatch ? "Possible customer match found." : "Booking is linked to an existing customer."}
-                    </p>
-                    <div style={{ fontSize: '0.85rem', marginBottom: '10px' }}>
-                      <strong>{matchedCustomer.fullName}</strong>
-                      <div style={{ color: 'var(--ink-1)' }}>{matchedCustomer.email} · {matchedCustomer.phone}</div>
-                    </div>
+                    </span>
+                  ) : null}
+                </div>
+                {hasHeuristicMatch && matchedCustomer && (
+                  <AdminCard
+                    ghost
+                    className="booking-customer-match-card booking-customer-match-card-heuristic"
+                  >
                     <div className="button-row">
-                      {hasHeuristicMatch && (
-                        <>
-                          <button type="button" className="btn btn-secondary" onClick={onApplyMatchedCustomer}>
-                            Use Matched Customer
-                          </button>
-                          <button type="button" className="btn btn-secondary" onClick={onDismissMatchedCustomer}>
-                            Keep Booking-Only Details
-                          </button>
-                        </>
-                      )}
-                      <button type="button" className="btn btn-secondary" onClick={onOpenMatchedCustomer}>
-                        Open Customer
+                      <button type="button" className="btn btn-secondary" onClick={onApplyMatchedCustomer}>
+                        Use Matched Customer
                       </button>
+                      <Tooltip content="Ignore the suggested profile match and keep this booking as standalone details.">
+                        <button type="button" className="btn btn-secondary" onClick={onDismissMatchedCustomer}>
+                          Keep Booking-Only Details
+                        </button>
+                      </Tooltip>
                     </div>
                   </AdminCard>
                 )}
@@ -204,7 +255,7 @@ export function BookingDetailDialog({
                   </AdminField>
                 </AdminForm>
 
-                <h3 className="manual-section-title" style={{ marginTop: '20px' }}>Lesson Config</h3>
+                <h3 className="manual-section-title booking-section-title">Lesson Config</h3>
                 <AdminForm className="dialog-form-grid">
                   <AdminField label="Start Time">
                     <input type="datetime-local" value={dialogForm.startAtLocal} onChange={e => updateForm({ startAtLocal: e.target.value })} />
@@ -239,17 +290,25 @@ export function BookingDetailDialog({
               <div className="dialog-col is-notes">
                 <h3 className="manual-section-title">Notes & Actions</h3>
                 <AdminField label="Lesson notes">
-                  <textarea className="dialog-notes" value={dialogForm.notes} onChange={(e) => updateForm({ notes: e.target.value })} style={{ minHeight: '120px' }} />
+                  <textarea className="dialog-notes booking-notes-area" value={dialogForm.notes} onChange={(e) => updateForm({ notes: e.target.value })} />
                 </AdminField>
-                <div className="button-row" style={{ flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
-                  <button className="btn btn-secondary" onClick={onMove}>Move Lesson Time</button>
-                  <button className="btn btn-secondary" onClick={onOpenMaterials}>Learning Materials</button>
+                <div className="button-row booking-notes-actions">
+                  <Tooltip content="Reschedule the lesson to a new start time.">
+                    <button className="btn btn-secondary" onClick={onMove}>Move Lesson Time</button>
+                  </Tooltip>
+                  <Tooltip content="Open the learning materials manager for this booking.">
+                    <button className="btn btn-secondary" onClick={onOpenMaterials}>Learning Materials</button>
+                  </Tooltip>
                   {event.entityType === "booking" && (
-                    <button className="btn btn-secondary" disabled={busyAction === "invoice"} onClick={onOpenInvoice}>
-                      {busyAction === "invoice" ? "Creating Invoice..." : "Invoice / Billing"}
-                    </button>
+                    <Tooltip content="Create or open a draft invoice linked to this booking.">
+                      <button className="btn btn-secondary" disabled={busyAction === "invoice"} onClick={onOpenInvoice}>
+                        {busyAction === "invoice" ? "Creating Invoice..." : "Invoice / Billing"}
+                      </button>
+                    </Tooltip>
                   )}
-                  <button className="btn btn-danger" disabled={!!busyAction} onClick={onDelete}>Cancel Booking</button>
+                  <Tooltip content="Cancel this booking. This action will notify the student.">
+                    <button className="btn btn-danger" disabled={!!busyAction} onClick={onDelete}>Cancel Booking</button>
+                  </Tooltip>
                 </div>
               </div>
             </>
@@ -257,7 +316,7 @@ export function BookingDetailDialog({
             <>
               <div className="dialog-col">
                 <h3 className="manual-section-title">Email History</h3>
-                <AdminCard ghost style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid var(--line)', padding: '12px' }}>
+                <AdminCard ghost className="booking-email-history-card">
                   {loadingEmailHistory ? (
                     <p className="helper-text">Loading history...</p>
                   ) : (
@@ -266,14 +325,14 @@ export function BookingDetailDialog({
                         <p className="helper-text">No emails recorded.</p>
                       ) : (
                         emailHistory.map(email => (
-                          <div key={email.id} className="email-history-item" style={{ borderBottom: '1px solid var(--line)', paddingBottom: '12px', marginBottom: '12px' }}>
-                            <div className="email-history-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                              <strong style={{ color: 'var(--ink-0)' }}>{email.subject}</strong>
+                          <div key={email.id} className="email-history-item booking-email-history-item">
+                            <div className="email-history-header booking-email-history-header">
+                              <strong>{email.subject}</strong>
                               <span className={`status-badge status-${email.status.toLowerCase()}`}>{email.status}</span>
                             </div>
-                            <div className="email-history-meta" style={{ fontSize: '0.75rem', color: 'var(--ink-2)' }}>
+                            <div className="email-history-meta booking-email-history-meta">
                               {formatDateTime(email.createdAt)}
-                              {email.error && <span style={{ color: 'var(--brand-danger)', marginLeft: '8px' }}>· {email.error}</span>}
+                              {email.error && <span className="booking-email-history-error">· {email.error}</span>}
                             </div>
                           </div>
                         ))
@@ -285,23 +344,19 @@ export function BookingDetailDialog({
 
               <div className="dialog-col is-notes">
                 <h3 className="manual-section-title">Send Custom Email</h3>
-                <AdminCard ghost>
+                <AdminCard ghost className="booking-email-composer-card">
                   <AdminForm>
                     <AdminField label="Subject" required fullWidth>
                       <input placeholder="Email subject..." value={emailSubject} onChange={e => setEmailSubject(e.target.value)} />
                     </AdminField>
                     <AdminField label="Message" required fullWidth>
-                      <textarea className="dialog-notes" placeholder="Type message here..." value={emailMessage} onChange={e => setEmailMessage(e.target.value)} style={{ minHeight: '180px' }} />
+                      <textarea className="dialog-notes booking-email-message-area" placeholder="Type message here..." value={emailMessage} onChange={e => setEmailMessage(e.target.value)} />
                     </AdminField>
-                    <button className="btn btn-primary" disabled={sendingEmail || !emailSubject.trim() || !emailMessage.trim()} onClick={onSendEmail} style={{ width: '100%', marginTop: '8px' }}>
-                      {sendingEmail ? 'Sending...' : 'Send Email'}
-                    </button>
                   </AdminForm>
                 </AdminCard>
               </div>
             </>
           )}
-        </div>
       </div>
     </AdminDialog>
   );

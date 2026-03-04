@@ -261,6 +261,25 @@ npm run test:watch -- --grep booking
 
 # Run end-to-end tests
 npm run test:e2e
+
+# Run only admin mobile responsiveness checks
+npm run test:e2e -- tests/e2e/admin-mobile.spec.ts
+```
+
+### Admin Mobile QA Checklist
+
+Use this when making shared admin UI/layout changes:
+
+```bash
+# 1) Start dev server
+npm run dev
+
+# 2) Export admin credentials used by Playwright login helper
+export DOCS_SCREENSHOTS_ADMIN_EMAIL="admin@example.com"
+export DOCS_SCREENSHOTS_ADMIN_PASSWORD="admin123"
+
+# 3) Run mobile admin route + dialog regression
+npm run test:e2e -- tests/e2e/admin-mobile.spec.ts
 ```
 
 ### Seeding Fake Data

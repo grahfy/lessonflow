@@ -1,55 +1,16 @@
 "use client";
 import { APP_TIMEZONE } from "@/lib/time";
+import { Tooltip } from "@/components/admin/ui/tooltip";
+import {
+  parseStudentPortalPayload,
+  type StudentPortalBooking,
+  type StudentPortalMaterial,
+  type StudentPortalPayload
+} from "@/lib/student-portal/contracts";
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-
-type PortalMaterial = {
-  id: string;
-  title: string;
-  materialType: "audio" | "pdf";
-  mimeType: string;
-  sizeBytes: number;
-  createdAt: string;
-  downloadUrl: string;
-  previewUrl: string;
-};
-
-type PortalBooking = {
-  id: string;
-  status: "approved" | "cancelled";
-  lessonMode: "in_person" | "video";
-  skillLevel: "beginner" | "intermediate" | "advanced";
-  lessonDuration: "min30" | "min60";
-  customDurationMinutes: number | null;
-  startAt: string;
-  endAt: string;
-  notes: string | null;
-  materials: PortalMaterial[];
-};
-
-type PortalPendingRequest = {
-  id: string;
-  requestedStartAt: string;
-  lessonMode: "in_person" | "video";
-  lessonDuration: "min30" | "min60";
-  customDurationMinutes: number | null;
-  status: "pending";
-};
-
-type PortalPayload = {
-  student: {
-    id: string;
-    fullName: string;
-    postcode: string;
-  };
-  now: string;
-  upcoming: PortalBooking[];
-  previous: PortalBooking[];
-  standaloneMaterials?: PortalMaterial[];
-  pendingRequests: PortalPendingRequest[];
-};
 
 type LessonDurationChoice = "min30" | "min60";
 
@@ -68,7 +29,7 @@ type SystemAnnouncement = {
  */
 export function StudentPortalClient() {
   const router = useRouter();
-  const [data, setData] = useState<PortalPayload | null>(null);
+  const [data, setData] = useState<StudentPortalPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -99,7 +60,15 @@ export function StudentPortalClient() {
       setError("Unable to load portal details right now.");
       return;
     }
-    const payload = (await response.json()) as PortalPayload;
+    const payloadBody = await response.json().catch(() => null);
+    let payload: StudentPortalPayload;
+    try {
+      payload = parseStudentPortalPayload(payloadBody);
+    } catch {
+      setLoading(false);
+      setError("Unable to load portal details right now.");
+      return;
+    }
     setData(payload);
     setLoading(false);
 
@@ -262,11 +231,11 @@ export function StudentPortalClient() {
       <div className="admin-card booking-row student-portal-header">
         <div className="student-portal-header-copy">
           <div className="student-portal-header-visual">
-            {/* Lightweight local SVG keeps the portal header visual fast to load. */}
+            {/* Optimized WebP keeps the portal header visual fast without oversized payloads. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               className="student-portal-header-illustration"
-              src="/images/student-portal-music-books.svg"
+              src="/images/student-portal-hero.webp"
               alt="Illustration of music study books and notes"
               width={360}
               height={220}
@@ -279,12 +248,16 @@ export function StudentPortalClient() {
           <p className="helper-text">Appointments and assigned learning materials.</p>
         </div>
         <div className="student-portal-header-actions">
-          <Link className="btn btn-secondary" href="/student/materials">
-            Show all learning materials
-          </Link>
-          <button className="btn btn-secondary" type="button" onClick={() => void logout()} disabled={loggingOut}>
-            {loggingOut ? "Signing out..." : "Sign out"}
-          </button>
+          <Tooltip content="Open the full materials library with every file assigned to your account.">
+            <Link className="btn btn-secondary" href="/student/materials">
+              Show all learning materials
+            </Link>
+          </Tooltip>
+          <Tooltip content="Sign out of the student portal on this device.">
+            <button className="btn btn-secondary" type="button" onClick={() => void logout()} disabled={loggingOut}>
+              {loggingOut ? "Signing out..." : "Sign out"}
+            </button>
+          </Tooltip>
         </div>
       </div>
 
@@ -346,9 +319,11 @@ export function StudentPortalClient() {
                   />
                 </div>
                 <div className="student-actions-cta">
-                  <button className="btn btn-primary" type="submit" disabled={requestingBooking}>
-                    {requestingBooking ? "Submitting..." : "Request lesson (pending)"}
-                  </button>
+                  <Tooltip content="Submit this lesson request for owner review and approval.">
+                    <button className="btn btn-primary" type="submit" disabled={requestingBooking}>
+                      {requestingBooking ? "Submitting..." : "Request lesson (pending)"}
+                    </button>
+                  </Tooltip>
                 </div>
               </form>
 
@@ -414,8 +389,8 @@ export function StudentPortalClient() {
  * Renders one portal booking list section with nested learning materials.
  */
 type BookingListProps = {
-  bookings: PortalBooking[];
-  standaloneMaterials?: PortalMaterial[];
+  bookings: StudentPortalBooking[];
+  standaloneMaterials?: StudentPortalMaterial[];
   emptyMessage: string;
   variant: "upcoming" | "previous";
   cancellingBookingId?: string | null;
@@ -451,18 +426,20 @@ function BookingList(input: BookingListProps) {
 
           {input.variant === "upcoming" && booking.status !== "cancelled" ? (
             <div className="student-booking-actions">
-              <button
-                className={`btn btn-danger ${isWithin24Hours(booking.startAt) ? "student-cancel-btn-warning" : ""}`}
-                type="button"
-                disabled={!!input.cancellingBookingId}
-                onClick={() => {
-                  if (input.onCancelBooking) {
-                    input.onCancelBooking(booking.id);
-                  }
-                }}
-              >
-                {input.cancellingBookingId === booking.id ? "Cancelling..." : "Cancel lesson"}
-              </button>
+              <Tooltip content="Cancel this upcoming lesson. A confirmation prompt will be shown first.">
+                <button
+                  className={`btn btn-danger ${isWithin24Hours(booking.startAt) ? "student-cancel-btn-warning" : ""}`}
+                  type="button"
+                  disabled={!!input.cancellingBookingId}
+                  onClick={() => {
+                    if (input.onCancelBooking) {
+                      input.onCancelBooking(booking.id);
+                    }
+                  }}
+                >
+                  {input.cancellingBookingId === booking.id ? "Cancelling..." : "Cancel lesson"}
+                </button>
+              </Tooltip>
             </div>
           ) : null}
 
@@ -486,13 +463,17 @@ function BookingList(input: BookingListProps) {
                       {material.materialType === "audio" ? (
                         <audio className="material-audio-player material-audio-player-student" controls preload="metadata" src={material.previewUrl} />
                       ) : (
-                        <a className="btn btn-secondary" href={material.previewUrl} target="_blank" rel="noreferrer">
-                          Preview
-                        </a>
+                        <Tooltip content="Preview this file in a new browser tab.">
+                          <a className="btn btn-secondary" href={material.previewUrl} target="_blank" rel="noreferrer">
+                            Preview
+                          </a>
+                        </Tooltip>
                       )}
-                      <a className="btn btn-secondary" href={material.downloadUrl}>
-                        Download
-                      </a>
+                      <Tooltip content="Download this file to your device.">
+                        <a className="btn btn-secondary" href={material.downloadUrl}>
+                          Download
+                        </a>
+                      </Tooltip>
                     </span>
                   </li>
                 ))}
@@ -520,13 +501,17 @@ function BookingList(input: BookingListProps) {
                       {material.materialType === "audio" ? (
                         <audio className="material-audio-player material-audio-player-student" controls preload="metadata" src={material.previewUrl} />
                       ) : (
-                        <a className="btn btn-secondary" href={material.previewUrl} target="_blank" rel="noreferrer">
-                          Preview
-                        </a>
+                        <Tooltip content="Preview this file in a new browser tab.">
+                          <a className="btn btn-secondary" href={material.previewUrl} target="_blank" rel="noreferrer">
+                            Preview
+                          </a>
+                        </Tooltip>
                       )}
-                      <a className="btn btn-secondary" href={material.downloadUrl}>
-                        Download
-                      </a>
+                      <Tooltip content="Download this file to your device.">
+                        <a className="btn btn-secondary" href={material.downloadUrl}>
+                          Download
+                        </a>
+                      </Tooltip>
                     </span>
                   </li>
                 ))}
@@ -556,7 +541,7 @@ function formatWhen(value: string): string {
 /**
  * Displays lesson duration, preferring custom minute values when available.
  */
-function describeDuration(booking: PortalBooking): string {
+function describeDuration(booking: StudentPortalBooking): string {
   if (booking.customDurationMinutes && booking.customDurationMinutes > 0) {
     return `${booking.customDurationMinutes} min`;
   }

@@ -19,9 +19,28 @@ type SiteShellProps = PropsWithChildren<{
  */
 export function SiteShell({ footerCopy, children }: SiteShellProps) {
   const pathname = usePathname();
+  const routeThemeClass: Record<string, string> = {
+    "/": "site-shell-home-admin-theme",
+    "/lessons": "site-shell-theme-lessons",
+    "/teacher": "site-shell-theme-teacher",
+    "/videos": "site-shell-theme-videos",
+    "/vouchers": "site-shell-theme-vouchers",
+    "/contact": "site-shell-theme-contact",
+    "/book": "site-shell-theme-book",
+    "/terms": "site-shell-theme-terms",
+    "/student/login": "site-shell-theme-student-login"
+  };
+  const themeClassName = routeThemeClass[pathname] || "";
+  const shellClassName = themeClassName
+    ? `site-shell site-shell-themed ${themeClassName}`
+    : "site-shell";
 
   return (
-    <div className="site-shell" data-motion-root="public" data-motion-primary="true">
+    <div
+      className={shellClassName}
+      data-motion-root="public"
+      data-motion-primary="true"
+    >
       <header className="site-header">
         <TweenLink className="brand" href="/">
           <span className="brand-mark" aria-hidden="true"></span>

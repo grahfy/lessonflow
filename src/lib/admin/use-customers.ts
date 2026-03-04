@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { useSafeFetch } from "./use-safe-fetch";
 import { type CustomerRow } from "@/components/admin/customers/customer-profile-dialog";
+import { type CustomersSortBy, type CustomersSortDirection } from "@/lib/customers/schema";
 
 export interface UseCustomersOptions {
     /** Number of customers per page */
@@ -20,7 +21,7 @@ export interface UseCustomersResult {
     loading: boolean;
     total: number;
     totalPages: number;
-    load: (query?: string, page?: number) => Promise<void>;
+    load: (query?: string, page?: number, sortBy?: CustomersSortBy, sortDir?: CustomersSortDirection) => Promise<void>;
     save: (customer: Partial<CustomerRow>, id?: string) => Promise<CustomerRow | null>;
     remove: (id: string) => Promise<{ archived: boolean } | null>;
 }
@@ -37,11 +38,19 @@ export function useCustomers(options: UseCustomersOptions = {}): UseCustomersRes
 
     const { safeFetch, handleApiError } = useSafeFetch({ onAuthError, onError });
 
-    const load = useCallback(async (query?: string, page = 1) => {
+    const load = useCallback(
+        async (
+            query?: string,
+            page = 1,
+            sortBy: CustomersSortBy = "customer",
+            sortDir: CustomersSortDirection = "asc"
+        ) => {
         setLoading(true);
         const search = (query ?? "").trim();
         const params = new URLSearchParams();
         if (search) params.set("q", search);
+        params.set("sortBy", sortBy);
+        params.set("sortDir", sortDir);
         params.set("page", String(page));
         params.set("pageSize", String(pageSize));
 
@@ -62,7 +71,7 @@ export function useCustomers(options: UseCustomersOptions = {}): UseCustomersRes
         } finally {
             setLoading(false);
         }
-    }, [pageSize, safeFetch, handleApiError]);
+    }, [pageSize, safeFetch, handleApiError, onError]);
 
     const save = useCallback(async (customer: Partial<CustomerRow>, id?: string): Promise<CustomerRow | null> => {
         const method = id ? "PATCH" : "POST";
