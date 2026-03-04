@@ -3185,6 +3185,16 @@ fi
 
 log_info "Build successful: $(cat .next/BUILD_ID)"
 
+# The systemd service runs the standalone server entrypoint directly. If Next.js
+# does not emit .next/standalone/server.js, promoting this release would cause
+# immediate runtime failure (MODULE_NOT_FOUND) after symlink switch.
+if [[ ! -f ".next/standalone/server.js" ]]; then
+    log_error "Standalone build output missing: .next/standalone/server.js"
+    log_error "Refusing to promote this release because lessonflow.service requires standalone output."
+    log_error "Check next.config.js output='standalone' and build logs, then redeploy."
+    exit 1
+fi
+
 # Setup standalone build (copy public, static assets, and runtime docs)
 # This is required for next/image/static assets and for /admin/manual, which
 # reads Markdown files from the filesystem at runtime in standalone mode.
