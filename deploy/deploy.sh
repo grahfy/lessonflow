@@ -913,6 +913,46 @@ run_migrations() {
     npm exec --no -- prisma migrate deploy
 }
 
+# Resolves the Prisma CLI package spec to install when devDependencies are
+# omitted in production deploys. This enforces Prisma major version 7 while
+# honoring the repo's configured prisma version/range when present.
+resolve_prisma_cli_install_spec() {
+    local configured_version=""
+    local detected_major=""
+
+    configured_version="$(node -e '
+        const fs = require("node:fs");
+        try {
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            const v = (pkg.devDependencies && pkg.devDependencies.prisma)
+                || (pkg.dependencies && pkg.dependencies.prisma)
+                || "";
+            process.stdout.write(v);
+        } catch {
+            process.stdout.write("");
+        }
+    ' 2>/dev/null || true)"
+
+    if [[ -z "${configured_version}" ]]; then
+        echo "prisma@^7"
+        return 0
+    fi
+
+    detected_major="$(printf '%s' "${configured_version}" | sed -E 's/^[^0-9]*([0-9]+).*/\1/')"
+    if [[ ! "${detected_major}" =~ ^[0-9]+$ ]]; then
+        echo "prisma@^7"
+        return 0
+    fi
+
+    if [[ "${detected_major}" != "7" ]]; then
+        log_warn "Configured prisma version '${configured_version}' is not major 7; enforcing prisma@^7 in deploy."
+        echo "prisma@^7"
+        return 0
+    fi
+
+    echo "prisma@${configured_version}"
+}
+
 # Updates Prisma state: generates client and applies migrations or schema push.
 # Consolidates all Prisma ORM operations for deployment and manual maintenance.
 # Skips generation/migrations if no changes are detected since previous deploy.
@@ -966,7 +1006,9 @@ update_prisma() {
 
     # Ensure Prisma CLI is available before trying to use it
     if ! npm list prisma >/dev/null 2>&1 && [[ ! -d "node_modules/prisma" ]]; then
-        run_npm_step_with_cache_repair "Installing Prisma CLI" npm install prisma --save-dev --ignore-scripts
+        local prisma_cli_spec=""
+        prisma_cli_spec="$(resolve_prisma_cli_install_spec)"
+        run_npm_step_with_cache_repair "Installing Prisma CLI (${prisma_cli_spec})" npm install --no-save --package-lock=false --ignore-scripts "${prisma_cli_spec}"
     fi
 
     run_step "Generating Prisma client" npm exec --no -- prisma generate
