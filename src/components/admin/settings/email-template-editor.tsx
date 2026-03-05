@@ -25,9 +25,29 @@ export function AdminEmailTemplateEditor() {
       try {
         const response = await fetch("/api/admin/email-templates");
         if (response.ok) {
-          const data = await response.json();
-          setTemplates(data.templates);
+          const data = (await response.json()) as {
+            templates?: Array<{ templateKey?: string; subject?: string; htmlBody?: string }>;
+          };
+          const nextTemplates = Array.isArray(data.templates)
+            ? data.templates
+                .filter(
+                  (template): template is { templateKey: string; subject: string; htmlBody: string } =>
+                    typeof template?.templateKey === "string" &&
+                    typeof template?.subject === "string" &&
+                    typeof template?.htmlBody === "string"
+                )
+                .map((template) => ({
+                  key: template.templateKey,
+                  subject: template.subject,
+                  body: template.htmlBody
+                }))
+            : [];
+          setTemplates(nextTemplates);
+        } else {
+          setError("Failed to load templates.");
         }
+      } catch {
+        setError("Failed to load templates.");
       } finally {
         setLoading(false);
       }
@@ -40,16 +60,31 @@ export function AdminEmailTemplateEditor() {
     setError("");
     setNotice("");
     try {
-      const response = await fetch("/api/admin/email-templates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ templates })
-      });
-      if (response.ok) {
-        setNotice("Email templates saved successfully.");
-      } else {
-        setError("Failed to save templates.");
+      if (templates.length === 0) {
+        setNotice("No templates to save.");
+        return;
       }
+
+      const responses = await Promise.all(
+        templates.map((template) =>
+          fetch("/api/admin/email-templates", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              templateKey: template.key,
+              subject: template.subject,
+              htmlBody: template.body
+            })
+          })
+        )
+      );
+
+      if (responses.some((response) => !response.ok)) {
+        setError("Failed to save templates.");
+        return;
+      }
+
+      setNotice("Email templates saved successfully.");
     } catch {
       setError("An error occurred while saving.");
     } finally {

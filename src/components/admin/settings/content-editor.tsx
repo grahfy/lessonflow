@@ -6,8 +6,9 @@ import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 
 type ContentSection = {
   key: string;
-  title: string;
-  body: string;
+  pagePath: string;
+  sectionKey: string;
+  contentText: string;
 };
 
 /**
@@ -25,9 +26,28 @@ export function AdminContentEditor() {
       try {
         const response = await fetch("/api/admin/content");
         if (response.ok) {
-          const data = await response.json();
-          setSections(data.sections);
+          const data = (await response.json()) as {
+            content?: Array<{ pagePath?: string; sectionKey?: string; content?: unknown }>;
+          };
+          const nextSections = Array.isArray(data.content)
+            ? data.content
+                .filter(
+                  (section): section is { pagePath: string; sectionKey: string; content: unknown } =>
+                    typeof section?.pagePath === "string" && typeof section?.sectionKey === "string"
+                )
+                .map((section) => ({
+                  key: `${section.pagePath}::${section.sectionKey}`,
+                  pagePath: section.pagePath,
+                  sectionKey: section.sectionKey,
+                  contentText: JSON.stringify(section.content ?? {}, null, 2)
+                }))
+            : [];
+          setSections(nextSections);
+        } else {
+          setError("Failed to load content.");
         }
+      } catch {
+        setError("Failed to load content.");
       } finally {
         setLoading(false);
       }
@@ -40,16 +60,41 @@ export function AdminContentEditor() {
     setError("");
     setNotice("");
     try {
-      const response = await fetch("/api/admin/content", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sections })
-      });
-      if (response.ok) {
-        setNotice("Content saved successfully.");
-      } else {
-        setError("Failed to save content.");
+      if (sections.length === 0) {
+        setNotice("No content sections to save.");
+        return;
       }
+
+      const parsedSections: Array<{ pagePath: string; sectionKey: string; content: unknown }> = [];
+      for (const section of sections) {
+        try {
+          parsedSections.push({
+            pagePath: section.pagePath,
+            sectionKey: section.sectionKey,
+            content: JSON.parse(section.contentText)
+          });
+        } catch {
+          setError(`Invalid JSON in ${section.pagePath} / ${section.sectionKey}.`);
+          return;
+        }
+      }
+
+      const responses = await Promise.all(
+        parsedSections.map((section) =>
+          fetch("/api/admin/content", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(section)
+          })
+        )
+      );
+
+      if (responses.some((response) => !response.ok)) {
+        setError("Failed to save content.");
+        return;
+      }
+
+      setNotice("Content saved successfully.");
     } catch {
       setError("An error occurred while saving.");
     } finally {
@@ -58,7 +103,7 @@ export function AdminContentEditor() {
   }
 
   function updateSection(key: string, patch: Partial<ContentSection>) {
-    setSections(sections.map(s => s.key === key ? { ...s, ...patch } : s));
+    setSections((prev) => prev.map((section) => (section.key === key ? { ...section, ...patch } : section)));
   }
 
   if (loading) return <p className="helper-text">Loading content...</p>;
@@ -78,11 +123,18 @@ export function AdminContentEditor() {
           {sections.map((section) => (
             <AdminCard key={section.key} style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid var(--line)' }}>
               <AdminForm>
-                <AdminField label="Section Title" fullWidth>
-                  <input value={section.title} onChange={e => updateSection(section.key, { title: e.target.value })} />
+                <AdminField label="Page Path" fullWidth>
+                  <input value={section.pagePath} readOnly />
                 </AdminField>
-                <AdminField label="Body Content (Markdown/HTML)" fullWidth>
-                  <textarea value={section.body} style={{ minHeight: '200px' }} onChange={e => updateSection(section.key, { body: e.target.value })} />
+                <AdminField label="Section Key" fullWidth>
+                  <input value={section.sectionKey} readOnly />
+                </AdminField>
+                <AdminField label="Section Content (JSON)" fullWidth>
+                  <textarea
+                    value={section.contentText}
+                    style={{ minHeight: '220px', fontFamily: 'monospace' }}
+                    onChange={(event) => updateSection(section.key, { contentText: event.target.value })}
+                  />
                 </AdminField>
               </AdminForm>
             </AdminCard>
