@@ -69,6 +69,30 @@ function findHeuristicCustomerMatch(customers: BookingMatchedCustomer[], email: 
   );
 }
 
+function getFieldErrorMessage(result: unknown): string | null {
+  if (!result || typeof result !== "object") {
+    return null;
+  }
+
+  const details = (result as { details?: unknown }).details;
+  if (!details || typeof details !== "object") {
+    return null;
+  }
+
+  const fieldErrors = (details as { fieldErrors?: unknown }).fieldErrors;
+  if (!fieldErrors || typeof fieldErrors !== "object") {
+    return null;
+  }
+
+  for (const [field, messages] of Object.entries(fieldErrors)) {
+    if (Array.isArray(messages) && typeof messages[0] === "string") {
+      return `${field}: ${messages[0]}`;
+    }
+  }
+
+  return null;
+}
+
 /**
  * Main admin bookings console client.
  * Refactored to use modular components and hooks.
@@ -103,6 +127,7 @@ export function AdminBookingsClient() {
   const [customerQuery, setCustomerQuery] = useState("");
   const [manualCustomerId, setManualCustomerId] = useState("");
   const [manualUpdateCustomerFromBooking, setManualUpdateCustomerFromBooking] = useState(true);
+  const [manualIsRecurring, setManualIsRecurring] = useState(false);
   const [manualDurationChoice, setManualDurationChoice] = useState("min30");
   const [manualMatch, setManualMatch] = useState<BookingMatchedCustomer | null>(null);
   
@@ -242,6 +267,7 @@ export function AdminBookingsClient() {
     setManualStep("customer");
     setCustomerQuery("");
     setManualCustomerId("");
+    setManualIsRecurring(false);
     setManualDurationChoice("min30");
     setManualMatch(null);
     setError("");
@@ -455,7 +481,8 @@ export function AdminBookingsClient() {
 
       if (!response.ok) {
         const data = await response.json().catch(() => null);
-        setError(typeof data?.error === "string" ? data.error : "Unable to create booking.");
+        const fieldError = getFieldErrorMessage(data);
+        setError(fieldError ?? (typeof data?.error === "string" ? data.error : "Unable to create booking."));
         setBusyAction(null);
         return;
       }
@@ -687,6 +714,8 @@ export function AdminBookingsClient() {
           onClearCustomer={clearManualCustomer}
           updateCustomerFromBooking={manualUpdateCustomerFromBooking}
           setUpdateCustomerFromBooking={setManualUpdateCustomerFromBooking}
+          isRecurring={manualIsRecurring}
+          setIsRecurring={setManualIsRecurring}
           durationChoice={manualDurationChoice}
           setDurationChoice={setManualDurationChoice}
           manualMatch={manualMatch}

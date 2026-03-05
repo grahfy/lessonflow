@@ -23,6 +23,8 @@ interface ManualBookingDialogProps {
   onClearCustomer: () => void;
   updateCustomerFromBooking: boolean;
   setUpdateCustomerFromBooking: (val: boolean) => void;
+  isRecurring: boolean;
+  setIsRecurring: (val: boolean) => void;
   durationChoice: string;
   setDurationChoice: (val: string) => void;
   manualMatch: BookingMatchedCustomer | null;
@@ -51,6 +53,8 @@ export function ManualBookingDialog({
   onClearCustomer,
   updateCustomerFromBooking,
   setUpdateCustomerFromBooking,
+  isRecurring,
+  setIsRecurring,
   durationChoice,
   setDurationChoice,
   manualMatch,
@@ -251,11 +255,26 @@ export function ManualBookingDialog({
               </AdminField>
               <AdminField label="Weekly Recurring">
                 <div className="manual-recurring-toggle">
-                  <input type="checkbox" name="isRecurring" className="manual-inline-checkbox" />
+                  <input
+                    type="checkbox"
+                    name="isRecurring"
+                    className="manual-inline-checkbox"
+                    checked={isRecurring}
+                    onChange={(event) => {
+                      const next = event.currentTarget.checked;
+                      setIsRecurring(next);
+                      if (!next && formRef.current) {
+                        const recurrenceField = formRef.current.elements.namedItem("recurrenceEndAt");
+                        if (recurrenceField && "value" in recurrenceField) {
+                          recurrenceField.value = "";
+                        }
+                      }
+                    }}
+                  />
                 </div>
               </AdminField>
               <AdminField label="Recurrence End (Required if recurring)">
-                <input name="recurrenceEndAt" type="datetime-local" />
+                <input name="recurrenceEndAt" type="datetime-local" disabled={!isRecurring} required={isRecurring} />
               </AdminField>
             </AdminForm>
 

@@ -194,173 +194,188 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json().catch(() => null);
-  const parsed = manualBookingSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid booking payload.", details: parsed.error.flatten() }, { status: 400 });
-  }
-
-  // Manual booking creation can bind to a selected customer, resolve a probable existing match,
-  // or create a new customer depending on the submitted match-resolution fields.
-  let customerId: string | null = null;
-  if (parsed.data.customerId) {
-    const selected = await prisma.customer.findUnique({
-      where: {
-        id: parsed.data.customerId
-      }
-    });
-    if (!selected || selected.isArchived) {
-      return NextResponse.json({ error: "Selected customer does not exist." }, { status: 400 });
-    }
-    customerId = selected.id;
-    if (parsed.data.updateCustomerFromBooking) {
-      await updateCustomerFromBooking(selected.id, parsed.data);
-    }
-  } else {
-    const existing = await prisma.customer.findFirst({
-      where: {
-        isArchived: false,
-        OR: [
-          { normalizedEmail: normalizeEmail(parsed.data.email) },
-          { normalizedPhone: normalizePhone(parsed.data.phone) }
-        ]
-      },
-      orderBy: {
-        createdAt: "desc"
-      }
-    });
-
-    if (existing && !parsed.data.matchResolution) {
-      return NextResponse.json(
-        {
-          error: "Possible existing customer match found.",
-          code: "CUSTOMER_MATCH",
-          customer: existing
-        },
-        { status: 409 }
-      );
+  try {
+    const body = await request.json().catch(() => null);
+    const parsed = manualBookingSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid booking payload.", details: parsed.error.flatten() }, { status: 400 });
     }
 
-    if (existing) {
-      if (parsed.data.matchResolution === "create_new") {
-        const created = await createCustomerFromBooking(parsed.data);
-        customerId = created.id;
-      } else {
-        customerId = existing.id;
-        if (parsed.data.matchResolution === "update_existing" || parsed.data.updateCustomerFromBooking) {
-          await updateCustomerFromBooking(existing.id, parsed.data);
+    // Manual booking creation can bind to a selected customer, resolve a probable existing match,
+    // or create a new customer depending on the submitted match-resolution fields.
+    let customerId: string | null = null;
+    if (parsed.data.customerId) {
+      const selected = await prisma.customer.findUnique({
+        where: {
+          id: parsed.data.customerId
         }
+      });
+      if (!selected || selected.isArchived) {
+        return NextResponse.json({ error: "Selected customer does not exist." }, { status: 400 });
+      }
+      customerId = selected.id;
+      if (parsed.data.updateCustomerFromBooking) {
+        await updateCustomerFromBooking(selected.id, parsed.data);
       }
     } else {
-      const created = await createCustomerFromBooking(parsed.data);
-      customerId = created.id;
-    }
-  }
+      const existing = await prisma.customer.findFirst({
+        where: {
+          isArchived: false,
+          OR: [
+            { normalizedEmail: normalizeEmail(parsed.data.email) },
+            { normalizedPhone: normalizePhone(parsed.data.phone) }
+          ]
+        },
+        orderBy: {
+          createdAt: "desc"
+        }
+      });
 
-  if (!customerId) {
-    return NextResponse.json({ error: "Unable to resolve customer for manual booking." }, { status: 500 });
-  }
-
-  await ensurePortalCredentialForCustomer({
-    customerId,
-    actorId: admin.id,
-    details: "Portal credential ensured during manual booking create."
-  });
-
-  const startAt = new Date(parsed.data.requestedStartAt);
-  if (parsed.data.isRecurring && parsed.data.recurrenceEndAt) {
-    const endAt = new Date(parsed.data.recurrenceEndAt);
-    const starts = generateRecurringStartDates({ startAt, recurrenceEndAt: endAt });
-
-    // Persist a series record for recurrence metadata, then create the operational booking rows.
-    const series = await prisma.bookingSeries.create({
-      data: {
-        firstName: parsed.data.firstName,
-        lastName: parsed.data.lastName,
-        name: parsed.data.name,
-        email: parsed.data.email,
-        phone: parsed.data.phone,
-        address: formatBookingAddress(parsed.data),
-        unitNumber: parsed.data.unitNumber,
-        houseNumber: parsed.data.houseNumber,
-        streetName: parsed.data.streetName,
-        streetType: parsed.data.streetType,
-        suburb: parsed.data.suburb,
-        state: parsed.data.state,
-        postcode: parsed.data.postcode,
-        lessonMode: parsed.data.lessonMode,
-        skillLevel: parsed.data.skillLevel,
-        lessonDuration: parsed.data.lessonDuration,
-        customDurationMinutes: parsed.data.customDurationMinutes ?? null,
-        dayOfWeek: startAt.getDay(),
-        startTimeLocal: startAt.toISOString().slice(11, 16),
-        startDate: startAt,
-        recurrenceEndAt: endAt,
-        timezone: APP_TIMEZONE,
-        customerId
+      if (existing && !parsed.data.matchResolution) {
+        return NextResponse.json(
+          {
+            error: "Possible existing customer match found.",
+            code: "CUSTOMER_MATCH",
+            customer: existing
+          },
+          { status: 409 }
+        );
       }
-    });
 
-    await prisma.$transaction(
-      starts.map((start) =>
-        prisma.booking.create({
-          data: {
-            firstName: parsed.data.firstName,
-            lastName: parsed.data.lastName,
-            name: parsed.data.name,
-            email: parsed.data.email,
-            phone: parsed.data.phone,
-            address: formatBookingAddress(parsed.data),
-            unitNumber: parsed.data.unitNumber,
-            houseNumber: parsed.data.houseNumber,
-            streetName: parsed.data.streetName,
-            streetType: parsed.data.streetType,
-            suburb: parsed.data.suburb,
-            state: parsed.data.state,
-            postcode: parsed.data.postcode,
-            lessonMode: parsed.data.lessonMode,
-            skillLevel: parsed.data.skillLevel,
-            lessonDuration: parsed.data.lessonDuration,
-            customDurationMinutes: parsed.data.customDurationMinutes ?? null,
-            startAt: start,
-            endAt: getBookingEnd(start, parsed.data.lessonDuration, parsed.data.customDurationMinutes),
-            timezone: APP_TIMEZONE,
-            notes: parsed.data.notes,
-            seriesId: series.id,
-            customerId,
-            modifiedById: admin.id
+      if (existing) {
+        if (parsed.data.matchResolution === "create_new") {
+          const created = await createCustomerFromBooking(parsed.data);
+          customerId = created.id;
+        } else {
+          customerId = existing.id;
+          if (parsed.data.matchResolution === "update_existing" || parsed.data.updateCustomerFromBooking) {
+            await updateCustomerFromBooking(existing.id, parsed.data);
           }
-        })
-      )
-    );
-  } else {
-    await prisma.booking.create({
-      data: {
-        firstName: parsed.data.firstName,
-        lastName: parsed.data.lastName,
-        name: parsed.data.name,
-        email: parsed.data.email,
-        phone: parsed.data.phone,
-        address: formatBookingAddress(parsed.data),
-        unitNumber: parsed.data.unitNumber,
-        houseNumber: parsed.data.houseNumber,
-        streetName: parsed.data.streetName,
-        streetType: parsed.data.streetType,
-        suburb: parsed.data.suburb,
-        state: parsed.data.state,
-        postcode: parsed.data.postcode,
-        lessonMode: parsed.data.lessonMode,
-        skillLevel: parsed.data.skillLevel,
-        lessonDuration: parsed.data.lessonDuration,
-        customDurationMinutes: parsed.data.customDurationMinutes ?? null,
-        startAt,
-        endAt: getBookingEnd(startAt, parsed.data.lessonDuration, parsed.data.customDurationMinutes),
-        timezone: APP_TIMEZONE,
-        notes: parsed.data.notes,
-        customerId,
-        modifiedById: admin.id
+        }
+      } else {
+        const created = await createCustomerFromBooking(parsed.data);
+        customerId = created.id;
       }
+    }
+
+    if (!customerId) {
+      return NextResponse.json({ error: "Unable to resolve customer for manual booking." }, { status: 500 });
+    }
+
+    await ensurePortalCredentialForCustomer({
+      customerId,
+      actorId: admin.id,
+      details: "Portal credential ensured during manual booking create."
     });
+
+    const startAt = new Date(parsed.data.requestedStartAt);
+    if (parsed.data.isRecurring && parsed.data.recurrenceEndAt) {
+      const endAt = new Date(parsed.data.recurrenceEndAt);
+      let starts: Date[] = [];
+      try {
+        starts = generateRecurringStartDates({ startAt, recurrenceEndAt: endAt });
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : "Invalid recurrence range." },
+          { status: 400 }
+        );
+      }
+
+      // Persist a series record for recurrence metadata, then create the operational booking rows.
+      const series = await prisma.bookingSeries.create({
+        data: {
+          firstName: parsed.data.firstName,
+          lastName: parsed.data.lastName,
+          name: parsed.data.name,
+          email: parsed.data.email,
+          phone: parsed.data.phone,
+          address: formatBookingAddress(parsed.data),
+          unitNumber: parsed.data.unitNumber,
+          houseNumber: parsed.data.houseNumber,
+          streetName: parsed.data.streetName,
+          streetType: parsed.data.streetType,
+          suburb: parsed.data.suburb,
+          state: parsed.data.state,
+          postcode: parsed.data.postcode,
+          lessonMode: parsed.data.lessonMode,
+          skillLevel: parsed.data.skillLevel,
+          lessonDuration: parsed.data.lessonDuration,
+          customDurationMinutes: parsed.data.customDurationMinutes ?? null,
+          dayOfWeek: startAt.getDay(),
+          startTimeLocal: startAt.toISOString().slice(11, 16),
+          startDate: startAt,
+          recurrenceEndAt: endAt,
+          timezone: APP_TIMEZONE,
+          customerId
+        }
+      });
+
+      await prisma.$transaction(
+        starts.map((start) =>
+          prisma.booking.create({
+            data: {
+              firstName: parsed.data.firstName,
+              lastName: parsed.data.lastName,
+              name: parsed.data.name,
+              email: parsed.data.email,
+              phone: parsed.data.phone,
+              address: formatBookingAddress(parsed.data),
+              unitNumber: parsed.data.unitNumber,
+              houseNumber: parsed.data.houseNumber,
+              streetName: parsed.data.streetName,
+              streetType: parsed.data.streetType,
+              suburb: parsed.data.suburb,
+              state: parsed.data.state,
+              postcode: parsed.data.postcode,
+              lessonMode: parsed.data.lessonMode,
+              skillLevel: parsed.data.skillLevel,
+              lessonDuration: parsed.data.lessonDuration,
+              customDurationMinutes: parsed.data.customDurationMinutes ?? null,
+              startAt: start,
+              endAt: getBookingEnd(start, parsed.data.lessonDuration, parsed.data.customDurationMinutes),
+              timezone: APP_TIMEZONE,
+              notes: parsed.data.notes,
+              seriesId: series.id,
+              customerId,
+              modifiedById: admin.id
+            }
+          })
+        )
+      );
+    } else {
+      await prisma.booking.create({
+        data: {
+          firstName: parsed.data.firstName,
+          lastName: parsed.data.lastName,
+          name: parsed.data.name,
+          email: parsed.data.email,
+          phone: parsed.data.phone,
+          address: formatBookingAddress(parsed.data),
+          unitNumber: parsed.data.unitNumber,
+          houseNumber: parsed.data.houseNumber,
+          streetName: parsed.data.streetName,
+          streetType: parsed.data.streetType,
+          suburb: parsed.data.suburb,
+          state: parsed.data.state,
+          postcode: parsed.data.postcode,
+          lessonMode: parsed.data.lessonMode,
+          skillLevel: parsed.data.skillLevel,
+          lessonDuration: parsed.data.lessonDuration,
+          customDurationMinutes: parsed.data.customDurationMinutes ?? null,
+          startAt,
+          endAt: getBookingEnd(startAt, parsed.data.lessonDuration, parsed.data.customDurationMinutes),
+          timezone: APP_TIMEZONE,
+          notes: parsed.data.notes,
+          customerId,
+          modifiedById: admin.id
+        }
+      });
+    }
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unable to create booking." },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ ok: true });
