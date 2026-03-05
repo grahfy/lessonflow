@@ -1,25 +1,101 @@
 import fs from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { prisma } from "../src/lib/db";
-import { sendEmail } from "../src/lib/email/service";
-import { ownerSystemUpdateTemplate } from "../src/lib/email/templates";
-import { getOwnerEmail } from "../src/lib/env";
+import dotenv from "dotenv";
+
+type UpdateCommit = {
+  shortHash: string;
+  authorName: string;
+  subject: string;
+  authoredAt: string;
+};
+
+type UpdateData = {
+  appliedAt: string;
+  commit: string;
+  shortCommit: string;
+  branch: string;
+  commits: UpdateCommit[];
+};
+
+type PrismaClientLike = {
+  $disconnect(): Promise<void>;
+};
+
+let prismaClient: PrismaClientLike | null = null;
+
+function loadRuntimeEnv(): void {
+  const candidatePaths = [
+    process.env.SHARED_DIR ? path.join(process.env.SHARED_DIR, ".env") : null,
+    path.join(process.cwd(), ".env")
+  ];
+  const loadedPaths = new Set<string>();
+
+  for (const envPath of candidatePaths) {
+    if (!envPath || loadedPaths.has(envPath) || !fs.existsSync(envPath)) {
+      continue;
+    }
+
+    const result = dotenv.config({ path: envPath, override: false });
+    if (result.error) {
+      console.warn(`Failed to load env file at ${envPath}: ${result.error.message}`);
+      continue;
+    }
+
+    loadedPaths.add(envPath);
+    console.log(`Loaded environment from: ${envPath}`);
+  }
+}
+
+function parseUpdateData(raw: string): UpdateData {
+  const parsed: unknown = JSON.parse(raw);
+
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("Update metadata is not a JSON object.");
+  }
+
+  const candidate = parsed as Partial<UpdateData>;
+  const commits = Array.isArray(candidate.commits) ? candidate.commits : [];
+
+  return {
+    appliedAt: String(candidate.appliedAt || ""),
+    commit: String(candidate.commit || ""),
+    shortCommit: String(candidate.shortCommit || ""),
+    branch: String(candidate.branch || ""),
+    commits: commits.map((commit) => ({
+      shortHash: String(commit?.shortHash || ""),
+      authorName: String(commit?.authorName || ""),
+      subject: String(commit?.subject || ""),
+      authoredAt: String(commit?.authoredAt || "")
+    }))
+  };
+}
 
 async function main() {
+  loadRuntimeEnv();
+
+  const [{ prisma }, { sendEmail }, { ownerSystemUpdateTemplate }, { getOwnerEmail }] =
+    await Promise.all([
+      import("../src/lib/db"),
+      import("../src/lib/email/service"),
+      import("../src/lib/email/templates"),
+      import("../src/lib/env")
+    ]);
+  prismaClient = prisma;
+
   // SHARED_DIR is passed from the update.sh script to point to the shared production storage.
-  const sharedDataDir = process.env.SHARED_DIR 
+  const sharedDataDir = process.env.SHARED_DIR
     ? path.join(process.env.SHARED_DIR, "data", "deploy")
     : path.join(process.cwd(), ".data", "deploy");
-    
+
   const updateFilePath = path.join(sharedDataDir, "latest-deploy-update.json");
-  
+
   console.log(`Loading update metadata from: ${updateFilePath}`);
-  
-  let updateData;
+
+  let updateData: UpdateData;
   try {
     const raw = await readFile(updateFilePath, "utf8");
-    updateData = JSON.parse(raw);
+    updateData = parseUpdateData(raw);
   } catch (error) {
     console.error(`Failed to read update metadata: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
@@ -60,12 +136,12 @@ async function main() {
   const announcement = {
     appliedAt: updateData.appliedAt,
     shortCommit: updateData.shortCommit,
-    commits: updateData.commits.map((c: any) => ({
+    commits: updateData.commits.map((c) => ({
       subject: c.subject,
       authoredAt: c.authoredAt
     }))
   };
-  
+
   try {
     fs.writeFileSync(announcementPath, JSON.stringify(announcement, null, 2), "utf8");
     console.log(`Public announcement file updated: ${announcementPath}`);
@@ -80,5 +156,7 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    if (prismaClient) {
+      await prismaClient.$disconnect();
+    }
   });

@@ -528,7 +528,7 @@ read_env_file_value_from_update() {
 
   [[ -f "${env_file}" ]] || return 1
 
-  line="$(grep -m1 -E "^[[:space:]]*${key}=" "${env_file}" 2>/dev/null || true)"
+  line="$(grep -m1 -E "^[[:space:]]*(export[[:space:]]+)?${key}[[:space:]]*=" "${env_file}" 2>/dev/null || true)"
   [[ -n "${line}" ]] || return 1
 
   value="${line#*=}"
