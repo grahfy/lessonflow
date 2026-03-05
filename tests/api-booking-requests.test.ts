@@ -69,6 +69,44 @@ describe("api-booking-requests", () => {
     expect(row?.isRecurring).toBe(true);
   });
 
+  it("rejects booking requests from non-AU server-side geolocation", async () => {
+    const startAt = addDays(new Date(), 7).toISOString();
+    const request = new Request("http://localhost/api/booking-requests", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-vercel-ip-country": "US"
+      },
+      body: JSON.stringify({
+        firstName: "Taylor",
+        lastName: "Swift",
+        name: "Taylor Swift",
+        email: "taylor@example.com",
+        phone: "0401-111-111",
+        postcode: "3070",
+        lessonMode: "video",
+        skillLevel: "advanced",
+        lessonDuration: "min30",
+        requestedStartAt: startAt,
+        isRecurring: false,
+        captchaToken: "test-token",
+        captchaAnswer: "test-answer"
+      })
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(403);
+    const payload = (await response.json()) as { error?: string };
+    expect(payload.error).toContain("Australian residents");
+
+    const row = await prisma.bookingRequest.findFirst({
+      where: {
+        email: "taylor@example.com"
+      }
+    });
+    expect(row).toBeNull();
+  });
+
   it("enforces 30-minute duration for new customers", async () => {
     const startAt = addDays(new Date(), 7).toISOString();
 

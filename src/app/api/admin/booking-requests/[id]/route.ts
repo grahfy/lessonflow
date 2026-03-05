@@ -167,6 +167,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           // Recurring approvals create a series plus one booking row per generated start date.
           const series = await tx.bookingSeries.create({
             data: {
+              firstName: bookingRequest.firstName,
+              lastName: bookingRequest.lastName,
               name: bookingRequest.name,
               email: bookingRequest.email,
               phone: bookingRequest.phone,
@@ -198,6 +200,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
           await tx.booking.createMany({
             data: starts.map((startAt) => ({
+              firstName: bookingRequest.firstName,
+              lastName: bookingRequest.lastName,
               name: bookingRequest.name,
               email: bookingRequest.email,
               phone: bookingRequest.phone,
@@ -225,6 +229,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         } else {
           await tx.booking.create({
             data: {
+              firstName: bookingRequest.firstName,
+              lastName: bookingRequest.lastName,
               name: bookingRequest.name,
               email: bookingRequest.email,
               phone: bookingRequest.phone,

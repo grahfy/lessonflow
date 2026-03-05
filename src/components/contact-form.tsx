@@ -106,9 +106,16 @@ export function ContactForm() {
 
       formElement.reset();
       await captcha.regenerate();
+      const partialDelivery =
+        result &&
+        typeof result === "object" &&
+        typeof (result as { deliveryStatus?: unknown }).deliveryStatus === "string" &&
+        (result as { deliveryStatus?: string }).deliveryStatus !== "sent";
       setState({
         status: "success",
-        message: "Thanks. Your message has been sent and the studio owner has been notified."
+        message: partialDelivery
+          ? "Thanks. Your message was saved successfully. Email notification is delayed, but the studio will still follow up."
+          : "Thanks. Your message has been sent and the studio owner has been notified."
       });
     } catch {
       setState({

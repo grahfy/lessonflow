@@ -75,12 +75,13 @@ export async function POST(request: Request) {
     if (emailResult.status !== "sent") {
       return NextResponse.json(
         {
-          ok: false,
+          ok: true,
           id: created.id,
-          error: "Your message was saved, but we could not deliver the email notification right now.",
+          partial: true,
+          warning: "Your message was saved, but we could not deliver the email notification right now.",
           deliveryStatus: emailResult.status
         },
-        { status: 503 }
+        { status: 202 }
       );
     }
 
@@ -95,11 +96,13 @@ export async function POST(request: Request) {
     if (createdId) {
       return NextResponse.json(
         {
-          ok: false,
+          ok: true,
           id: createdId,
-          error: "Your message was saved, but we could not finish the email notification right now."
+          partial: true,
+          warning: "Your message was saved, but we could not finish the email notification right now.",
+          deliveryStatus: "failed"
         },
-        { status: 503 }
+        { status: 202 }
       );
     }
 

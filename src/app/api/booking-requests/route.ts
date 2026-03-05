@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { bookingRequestSchema, formatBookingAddress } from "@/lib/booking-rules";
 import { verifyCaptchaGuard } from "@/lib/captcha";
 import { prisma } from "@/lib/db";
+import { resolveRequestCountry } from "@/lib/geo-country";
 import { sendOwnerBookingEmail } from "@/lib/booking-events";
 import { logError, logEvent } from "@/lib/observability";
 
@@ -56,6 +57,17 @@ export async function POST(request: Request) {
         status: gate.status,
         headers: gate.retryAfterSeconds ? { "Retry-After": String(gate.retryAfterSeconds) } : undefined
       }
+      );
+  }
+
+  // Enforce service eligibility from server-side geolocation signals; do not rely on client-only checks.
+  const resolvedCountry = await resolveRequestCountry(request.headers);
+  if (resolvedCountry.country && resolvedCountry.country !== "AU") {
+    return NextResponse.json(
+      {
+        error: "Booking requests are currently available to Australian residents only."
+      },
+      { status: 403 }
     );
   }
 

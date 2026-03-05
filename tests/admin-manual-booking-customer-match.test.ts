@@ -161,4 +161,33 @@ describe("admin-manual-booking-customer-match", () => {
     expect(customer.fullName).toBe("Taylor Updated");
     expect(customer.skillLevel).toBe("intermediate");
   });
+
+  it("persists first/last names for recurring manual bookings", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+    const startAt = addDays(new Date(), 10).toISOString();
+    const recurrenceEndAt = addDays(new Date(), 24).toISOString();
+
+    const response = await POST(
+      adminPost(
+        {
+          ...basePayload(startAt),
+          isRecurring: true,
+          recurrenceEndAt
+        },
+        token
+      )
+    );
+    expect(response.status).toBe(200);
+
+    const bookings = await prisma.booking.findMany({
+      where: { email: "taylor@example.com" },
+      orderBy: { startAt: "asc" }
+    });
+    expect(bookings.length).toBeGreaterThan(1);
+    for (const booking of bookings) {
+      expect(booking.firstName).toBe("Taylor");
+      expect(booking.lastName).toBe("Student");
+    }
+  });
 });

@@ -305,6 +305,8 @@ export async function POST(request: NextRequest) {
       starts.map((start) =>
         prisma.booking.create({
           data: {
+            firstName: parsed.data.firstName,
+            lastName: parsed.data.lastName,
             name: parsed.data.name,
             email: parsed.data.email,
             phone: parsed.data.phone,

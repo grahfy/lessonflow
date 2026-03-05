@@ -18,6 +18,7 @@ import { useCustomers } from "@/lib/admin/use-customers";
 import { useEmailHistory } from "@/lib/admin/use-email-history";
 import { useLearningMaterials } from "@/lib/admin/use-learning-materials";
 import { usePresets } from "@/lib/admin/use-presets";
+import { buildManualBookingPayload } from "@/lib/admin/manual-booking-payload";
 
 import { BookingDetailDialog } from "./booking-detail-dialog";
 import { ManualBookingDialog } from "./manual-booking-dialog";
@@ -241,6 +242,7 @@ export function AdminBookingsClient() {
     setManualStep("customer");
     setCustomerQuery("");
     setManualCustomerId("");
+    setManualDurationChoice("min30");
     setManualMatch(null);
     setError("");
     setNotice("");
@@ -413,38 +415,35 @@ export function AdminBookingsClient() {
     }
   }
 
-  async function addManualBooking(resolution?: string) {
+  async function addManualBooking(resolution?: "use_existing" | "update_existing" | "create_new") {
     if (!manualFormRef.current) return;
     setBusyAction("create");
     setError("");
 
     const formData = new FormData(manualFormRef.current);
-    const payload = Object.fromEntries(formData.entries()) as Record<string, unknown>;
-
-    payload.name = `${String(payload.firstName || "").trim()} ${String(payload.lastName || "").trim()}`.trim();
-    payload.customerId = manualCustomerId || undefined;
-    payload.matchResolution = resolution;
-    payload.isRecurring = formData.get("isRecurring") === "on";
-    payload.updateCustomerFromBooking = manualUpdateCustomerFromBooking;
-
-    if (payload.requestedStartAt) {
-      payload.requestedStartAt = new Date(String(payload.requestedStartAt)).toISOString();
-    }
-    if (payload.recurrenceEndAt) {
-      payload.recurrenceEndAt = new Date(String(payload.recurrenceEndAt)).toISOString();
-    } else {
-      delete payload.recurrenceEndAt;
-    }
-    if (!payload.customDurationMinutes) {
-      delete payload.customDurationMinutes;
+    const payloadResult = buildManualBookingPayload(formData, {
+      manualCustomerId,
+      matchResolution: resolution,
+      updateCustomerFromBooking: manualUpdateCustomerFromBooking
+    });
+    if (!payloadResult.ok) {
+      setError(payloadResult.error);
+      setBusyAction(null);
+      return;
     }
 
     try {
       const response = await fetch("/api/admin/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payloadResult.payload)
       });
+
+      if (response.status === 401) {
+        window.location.assign("/admin/login");
+        setBusyAction(null);
+        return;
+      }
 
       if (response.status === 409) {
         const data = await response.json();
@@ -455,7 +454,8 @@ export function AdminBookingsClient() {
       }
 
       if (!response.ok) {
-        setError("Unable to create booking.");
+        const data = await response.json().catch(() => null);
+        setError(typeof data?.error === "string" ? data.error : "Unable to create booking.");
         setBusyAction(null);
         return;
       }

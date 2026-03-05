@@ -112,6 +112,22 @@ describe("setup-wizard", () => {
     expect(postConfigureBody.code).toBe("SETUP_COMPLETE");
   });
 
+  it("returns 400 for invalid setup configure JSON payloads", async () => {
+    const response = await configureSetupEnv(
+      new Request("http://localhost/api/setup/configure", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: "{invalid-json"
+      })
+    );
+
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error?: string };
+    expect(body.error).toBe("Invalid configuration payload.");
+  });
+
   it("blocks admin login before setup is initialized", async () => {
     const request = new NextRequest("http://localhost/api/admin/login", {
       method: "POST",

@@ -11,10 +11,9 @@ describe("api-contact", () => {
     await prisma.contactSubmission.deleteMany();
   });
 
-  it("persists a valid contact message even when email delivery is unavailable", async () => {
-    // The current contract intentionally stores the contact request first and
-    // reports email delivery state separately (503 + queued_no_smtp) when SMTP
-    // isn't configured. This protects lead capture even during mail outages.
+  it("returns partial success when message is saved but email delivery is unavailable", async () => {
+    // The contract stores the contact submission first and reports partial success when
+    // owner notification delivery is degraded.
     const request = new Request("http://localhost/api/contact", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -29,10 +28,17 @@ describe("api-contact", () => {
     });
 
     const response = await POST(request);
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(202);
 
-    const payload = await response.json();
-    expect(payload.ok).toBe(false);
+    const payload = (await response.json()) as {
+      ok?: boolean;
+      partial?: boolean;
+      warning?: string;
+      deliveryStatus?: string;
+    };
+    expect(payload.ok).toBe(true);
+    expect(payload.partial).toBe(true);
+    expect(typeof payload.warning).toBe("string");
     expect(payload.deliveryStatus).toBe("queued_no_smtp");
 
     const row = await prisma.contactSubmission.findFirst();

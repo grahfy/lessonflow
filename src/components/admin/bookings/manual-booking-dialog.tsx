@@ -254,7 +254,7 @@ export function ManualBookingDialog({
                   <input type="checkbox" name="isRecurring" className="manual-inline-checkbox" />
                 </div>
               </AdminField>
-              <AdminField label="Recurrence End (Optional)">
+              <AdminField label="Recurrence End (Required if recurring)">
                 <input name="recurrenceEndAt" type="datetime-local" />
               </AdminField>
             </AdminForm>

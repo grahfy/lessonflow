@@ -18,6 +18,8 @@ function adminPatch(id: string, token: string, body: Record<string, unknown>) {
 
 function baseRequestData(overrides?: Partial<Parameters<typeof prisma.bookingRequest.create>[0]["data"]>) {
   return {
+    firstName: "Alex",
+    lastName: "Student",
     name: "Alex Student",
     email: "alex.student@example.com",
     phone: "0400123456",
@@ -144,5 +146,45 @@ describe("admin-booking-approval-portal-credential", () => {
     });
     expect(emails).toHaveLength(2);
     expect(emails[1]?.htmlBody).not.toContain("Temporary password");
+  });
+
+  it("preserves first/last names when approving recurring requests", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const startAt = new Date("2026-06-03T09:00:00.000Z");
+    const recurrenceEndAt = new Date("2026-06-24T09:00:00.000Z");
+
+    const requestRow = await prisma.bookingRequest.create({
+      data: baseRequestData({
+        isRecurring: true,
+        recurrenceEndAt,
+        requestedStartAt: startAt
+      })
+    });
+
+    const response = await PATCH(
+      adminPatch(requestRow.id, token, {
+        action: "approve"
+      }),
+      { params: Promise.resolve({ id: requestRow.id }) }
+    );
+    expect(response.status).toBe(200);
+
+    const createdBookings = await prisma.booking.findMany({
+      where: { requestId: requestRow.id },
+      orderBy: { startAt: "asc" }
+    });
+    expect(createdBookings.length).toBeGreaterThan(1);
+    for (const booking of createdBookings) {
+      expect(booking.firstName).toBe("Alex");
+      expect(booking.lastName).toBe("Student");
+    }
+
+    const series = await prisma.bookingSeries.findFirst({
+      where: { customerId: createdBookings[0]?.customerId || "" }
+    });
+    expect(series?.firstName).toBe("Alex");
+    expect(series?.lastName).toBe("Student");
   });
 });
