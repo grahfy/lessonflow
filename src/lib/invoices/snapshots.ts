@@ -1,5 +1,5 @@
 import { Booking, Customer } from "@/generated/prisma/client";
-import { PUBLIC_BRAND_NAME } from "@/lib/branding";
+import { getBranding } from "@/lib/branding";
 import { InvoiceCustomerSnapshot, InvoiceSellerSnapshot } from "@/lib/invoices/types";
 
 /**
@@ -35,10 +35,14 @@ export function customerSnapshotFromCustomer(customer: Pick<Customer, "firstName
 
 /**
  * Returns seller and banking details snapshot used for new invoices.
+ * Reads directly from process.env to ensure that updates made in admin settings
+ * are reflected immediately in new invoices.
  */
 export function sellerSnapshotFromEnv(): InvoiceSellerSnapshot {
+  const branding = getBranding();
+  
   return {
-    sellerBusinessName: process.env.INVOICE_BUSINESS_NAME || PUBLIC_BRAND_NAME,
+    sellerBusinessName: process.env.INVOICE_BUSINESS_NAME || branding.PUBLIC_BRAND_NAME,
     sellerAbn: process.env.INVOICE_BUSINESS_ABN || "",
     sellerEmail: process.env.CONTACT_EMAIL || process.env.ADMIN_EMAIL || process.env.SMTP_FROM || null,
     bankName: process.env.INVOICE_BANK_NAME || "",

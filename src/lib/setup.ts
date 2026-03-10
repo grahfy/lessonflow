@@ -1128,6 +1128,8 @@ export async function saveAdminSettingsConfig(
     const value = input[envVar.key] || "";
     if (value && value !== "***SET***") {
       vars.set(envVar.key, value);
+      // Update in-memory process.env so the current process sees the change immediately
+      process.env[envVar.key] = value;
     } else {
       const existingValue = process.env[envVar.key];
       if (existingValue) {
@@ -1138,6 +1140,7 @@ export async function saveAdminSettingsConfig(
 
   if (shouldUpdateAdminPassword) {
     vars.set("ADMIN_PASSWORD", adminPassword);
+    process.env.ADMIN_PASSWORD = adminPassword;
   } else if (process.env.ADMIN_PASSWORD) {
     vars.set("ADMIN_PASSWORD", process.env.ADMIN_PASSWORD);
   }
