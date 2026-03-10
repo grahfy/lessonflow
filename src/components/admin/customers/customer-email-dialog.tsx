@@ -62,7 +62,7 @@ export function CustomerEmailDialog({
     };
 
     return (
-        <div className="dialog-tab-stack customer-tab-panel">
+        <div className="dialog-layout customer-dialog-panel">
             <div className="dialog-col dialog-tab-section">
                 <div className="section-header-with-action">
                     <h3 className="manual-section-title">Email History</h3>
