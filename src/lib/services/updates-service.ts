@@ -37,7 +37,17 @@ export async function getUpdateStatus(forceFetch = false): Promise<UpdateStatus>
     const repoPath = getUpdatesGitRepoPath();
 
     // 1. Fetch latest from remote
-    await execAsync("git fetch origin main", { cwd: repoPath });
+    try {
+      await execAsync("git fetch origin main", { cwd: repoPath });
+    } catch (fetchError: any) {
+      console.error(`Update check failed: git fetch failed in ${repoPath}. Ensure it is a git repository and has remote access.`, fetchError.message);
+      return {
+        updateAvailable: false,
+        localSha: "fetch-failed",
+        remoteSha: "fetch-failed",
+        lastChecked: now
+      };
+    }
 
     // 2. Get local HEAD SHA
     const { stdout: localShaRaw } = await execAsync("git rev-parse HEAD", { cwd: repoPath });
