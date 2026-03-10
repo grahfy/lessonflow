@@ -5,8 +5,12 @@ import { useSafeFetch } from "./use-safe-fetch";
 
 export interface EmailRecord {
     id: string;
+    toEmail: string;
     subject: string;
+    htmlBody: string;
     status: string;
+    provider?: string;
+    source?: string;
     error?: string;
     createdAt: string;
 }

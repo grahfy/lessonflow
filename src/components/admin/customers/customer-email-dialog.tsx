@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { formatDateTime } from "@/lib/admin/utils";
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
+import { EmailViewerDialog } from "@/components/admin/ui/email-viewer-dialog";
+import { type EmailRecord } from "@/lib/admin/use-email-history";
 
 type Props = {
     loadingEmailHistory: boolean;
-    emailHistory: ReadonlyArray<{ id: string; subject: string; status: string; error?: string; createdAt: string }>;
+    emailHistory: ReadonlyArray<EmailRecord>;
     emailComposerSubject: string;
     setEmailComposerSubject: (val: string) => void;
     emailComposerMessage: string;
@@ -23,6 +26,8 @@ export function CustomerEmailDialog({
     sendingEmail,
     onSendEmail
 }: Props) {
+    const [selectedEmail, setSelectedEmail] = useState<EmailRecord | null>(null);
+
     return (
         <div className="dialog-tab-stack customer-tab-panel">
             <div className="dialog-col dialog-tab-section">
@@ -33,7 +38,7 @@ export function CustomerEmailDialog({
                     ) : emailHistory.length > 0 ? (
                         <div className="customer-email-history-list">
                             {emailHistory.map((email) => (
-                                <div key={email.id} className="customer-email-history-item">
+                                <div key={email.id} className="customer-email-history-item" onClick={() => setSelectedEmail(email)} style={{ cursor: "pointer" }}>
                                     <div className="customer-email-history-head">
                                         <strong>{email.subject}</strong>
                                         <span>{formatDateTime(email.createdAt)}</span>
@@ -42,6 +47,16 @@ export function CustomerEmailDialog({
                                         <span className={`status-badge status-${email.status.toLowerCase()}`}>
                                             {email.status}
                                         </span>
+                                        {email.provider && (
+                                            <span className="email-provider-tag">
+                                                · {email.provider.toUpperCase()}
+                                            </span>
+                                        )}
+                                        {email.source && (
+                                            <span className="email-source-tag">
+                                                · {email.source === 'app' ? 'via App' : 'via Gmail'}
+                                            </span>
+                                        )}
                                         {email.error && <span className="customer-email-history-error">· {email.error}</span>}
                                     </div>
                                 </div>
@@ -96,6 +111,12 @@ export function CustomerEmailDialog({
                     </AdminForm>
                 </AdminCard>
             </div>
+
+            <EmailViewerDialog
+                isOpen={!!selectedEmail}
+                onClose={() => setSelectedEmail(null)}
+                email={selectedEmail}
+            />
         </div>
     );
 }
