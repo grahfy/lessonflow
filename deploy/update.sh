@@ -137,9 +137,9 @@ Options:
   --interactive        Prompt for update/deploy options in TTY mode
   --install-nginx      Install Nginx (if needed) using setup-packages.sh in non-interactive mode
   --install-php-fpm-if-needed  Install PHP-FPM only when deploy nginx config uses PHP upstreams
-  --install-cron       Install cron/crond scheduler (if needed) and enable/start service
+  --install-cron       [DEPRECATED] Install cron/crond scheduler (systemd timers now used instead)
   --install-app-service  Install/update the app systemd unit and enable service
-  --install-cron-jobs  Install/update managed cron jobs and restart cron (best effort)
+  --install-cron-jobs  Install/update systemd timer units for scheduled jobs (default: ON)
   --no-auto-bootstrap  Disable automatic bootstrap detection for missing host setup
   --no-spinner         Disable spinner UI
   --no-color           Disable colored output
@@ -1648,9 +1648,9 @@ print_update_tui_menu() {
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
   echo -e "${BOLD}${GREEN}  Bootstrap Workflow Helpers${NC}"
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
-  print_tui_option_pair "11" "Install cron/crond" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")" "ON: Start installs/enables cron/crond before flow." \
+  print_tui_option_pair "11" "Install cron/crond [DEPRECATED]" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")" "Deprecated: systemd timers now used instead." \
     "12" "Install app service" "$(bool_word "${INSTALL_APP_SERVICE_IF_NEEDED}")" "ON: Start installs/updates app systemd unit before flow."
-  print_tui_option_pair "13" "Install cron jobs" "$(bool_word "${INSTALL_CRON_JOBS_IF_NEEDED}")" "ON: Start installs/updates managed cron jobs first." \
+  print_tui_option_pair "13" "Install systemd timers" "$(bool_word "${INSTALL_CRON_JOBS_IF_NEEDED}")" "ON: Start installs/updates systemd timer units first." \
     "14" "Install Nginx" "$(bool_word "${INSTALL_NGINX_IF_NEEDED}")" "ON: Start installs Nginx (if missing) before flow."
   print_tui_option_pair "15" "Install PHP-FPM" "$(bool_word "${INSTALL_PHP_FPM_IF_NEEDED}")" "ON: Start installs PHP-FPM only if nginx config needs it."
   if [[ "${SKIP_DEPLOY}" == false ]]; then
@@ -1668,7 +1668,7 @@ print_update_tui_menu() {
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
   echo -e "${BOLD}${MAGENTA}  Immediate Bootstrap Actions${NC}"
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
-  print_tui_action_pair "J" "Install/update cron jobs" "N" "Install Nginx"
+  print_tui_action_pair "J" "Install/update systemd timers" "N" "Install Nginx"
   print_tui_action_pair "P" "Install PHP-FPM (if needed)" "U" "Install/update app service"
   print_tui_action_pair "D" "Update Prisma (gen/mig)"
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
@@ -2105,9 +2105,9 @@ print_summary() {
   print_summary_row "Allow dirty" "$(bool_word "${ALLOW_DIRTY}")"
   print_summary_row "Auto bootstrap" "$(bool_word "${AUTO_BOOTSTRAP}")"
   print_summary_row "Sudo mode" "$(update_sudo_mode_label)"
-  print_summary_row "Install cron" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")"
+  print_summary_row "Install cron [DEPRECATED]" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")"
   print_summary_row "Install service" "$(bool_word "${INSTALL_APP_SERVICE_IF_NEEDED}")"
-  print_summary_row "Install cron jobs" "$(bool_word "${INSTALL_CRON_JOBS_IF_NEEDED}")"
+  print_summary_row "Install systemd timers" "$(bool_word "${INSTALL_CRON_JOBS_IF_NEEDED}")"
   print_summary_row "Install nginx" "$(bool_word "${INSTALL_NGINX_IF_NEEDED}")"
   print_summary_row "Install PHP-FPM" "$(bool_word "${INSTALL_PHP_FPM_IF_NEEDED}")"
   print_summary_row "Spinner UI" "$(spinner_ui_word)"
@@ -2117,7 +2117,7 @@ print_summary() {
     print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
     print_summary_row "Effective sudo" "${sudo_mode}"
     print_summary_row "Install deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")"
-    print_summary_row "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")"
+    print_summary_row "Systemd timers" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")"
     print_summary_row "Database mode" "$(update_migration_mode_label)"
     print_summary_row "SSL setup" "$(bool_word "${SSL_SETUP}")"
     if [[ "${SSL_SETUP}" == true ]]; then
@@ -2390,8 +2390,12 @@ if [[ "${SKIP_DEPLOY}" == true ]]; then
     ensure_php_fpm_installed_if_needed_from_update
   fi
 
-  if [[ "${INSTALL_CRON_IF_NEEDED}" == true && "${INSTALL_CRON_JOBS_IF_NEEDED}" != true ]]; then
-    ensure_cron_installed_from_update
+  # --install-cron is deprecated: systemd timers no longer require cron/crond package.
+  # This flag is kept for backward compatibility but now shows a deprecation notice.
+  if [[ "${INSTALL_CRON_IF_NEEDED}" == true ]]; then
+    log_warn "--install-cron is deprecated: systemd timers are now used instead."
+    log_warn "The cron/crond package is no longer required for scheduled jobs."
+    log_warn "Use --install-cron-jobs to install systemd timers (default behavior)."
   fi
 
   if [[ "${INSTALL_APP_SERVICE_IF_NEEDED}" == true ]]; then

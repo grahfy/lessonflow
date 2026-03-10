@@ -128,9 +128,9 @@ Options:
   --setup-mysql-db-from-env  Install local MySQL/MariaDB (if needed) and create DB from shared .env DATABASE_URL
   --install-nginx   Install Nginx (if needed) using setup-packages.sh in non-interactive mode
   --install-php-fpm-if-needed  Install PHP-FPM only when deploy nginx config uses PHP upstreams
-  --install-cron    Install cron/crond scheduler (if needed) and enable/start service
+  --install-cron    [DEPRECATED] Install cron/crond scheduler (systemd timers now used instead)
   --install-app-service  Install/update the app systemd unit and enable service
-  --install-cron-jobs  Install/update managed cron jobs and restart cron (best effort)
+  --install-cron-jobs  Install/update systemd timer units for scheduled jobs (default: ON)
   --no-auto-bootstrap  Disable automatic bootstrap detection for missing host setup
   --ssl             Run SSL setup after deployment
   --domain DOMAIN   Domain for SSL certificate
@@ -1751,7 +1751,7 @@ print_deploy_tui_menu() {
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     echo -e "${BOLD}${GREEN}  Bootstrap Workflow Helpers${NC}"
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
-    print_tui_option_pair "12" "Install cron/crond" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")" "ON: Start installs/enables cron/crond before build." \
+    print_tui_option_pair "12" "Install cron/crond [DEPRECATED]" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")" "Deprecated: systemd timers now used instead." \
         "13" "Install Nginx" "$(bool_word "${INSTALL_NGINX_IF_NEEDED}")" "ON: Start installs Nginx (if missing) before build."
     echo ""
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
@@ -1759,7 +1759,7 @@ print_deploy_tui_menu() {
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     print_tui_action_pair "M" "Run MySQL + create DB" "N" "Install Nginx"
     print_tui_action_pair "P" "Install PHP-FPM (if needed)" "U" "Install/update app service"
-    print_tui_action_pair "D" "Update Prisma (gen/mig)" "J" "Install/update cron jobs"
+    print_tui_action_pair "D" "Update Prisma (gen/mig)" "J" "Install/update systemd timers"
     print_tui_action_pair "R" "Grab update + reload script"
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     print_tui_action_pair "S" "Start deploy" "Q" "Cancel"
@@ -1875,10 +1875,10 @@ print_deploy_summary() {
     print_summary_row "Database mode" "$(deploy_migration_mode_label)"
     print_summary_row "Auto bootstrap" "$(bool_word "${AUTO_BOOTSTRAP}")"
     print_summary_row "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")"
-    print_summary_row "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")"
+    print_summary_row "Systemd timers" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")"
     print_summary_row "Package setup" "$(bool_word "${SETUP_PACKAGES}")"
     print_summary_row "MySQL + create DB" "$(bool_word "${SETUP_MYSQL_DB_FROM_ENV}")"
-    print_summary_row "Install cron/crond" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")"
+    print_summary_row "Install cron/crond [DEPRECATED]" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")"
     print_summary_row "Install Nginx" "$(bool_word "${INSTALL_NGINX_IF_NEEDED}")"
     print_summary_row "SSL setup" "$(bool_word "${SSL_SETUP}")"
     print_summary_row "Spinner UI" "$(spinner_ui_word)"
@@ -3233,8 +3233,12 @@ if [[ "${INSTALL_PHP_FPM_IF_NEEDED}" == true ]]; then
     ensure_php_fpm_installed_if_needed_from_deploy
 fi
 
-if [[ "${INSTALL_CRON_IF_NEEDED}" == true && "${INSTALL_CRON_JOBS_IF_NEEDED}" != true ]]; then
-    ensure_cron_installed_from_deploy
+# --install-cron is deprecated: systemd timers no longer require cron/crond package.
+# This flag is kept for backward compatibility but now shows a deprecation notice.
+if [[ "${INSTALL_CRON_IF_NEEDED}" == true ]]; then
+    log_warn "--install-cron is deprecated: systemd timers are now used instead."
+    log_warn "The cron/crond package is no longer required for scheduled jobs."
+    log_warn "Use --install-cron-jobs to install systemd timers (default behavior)."
 fi
 
 if [[ "${INSTALL_APP_SERVICE_IF_NEEDED}" == true ]]; then
