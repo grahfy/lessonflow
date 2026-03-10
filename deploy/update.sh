@@ -5,7 +5,7 @@
 # Pulls the latest git changes for a branch and then runs the deployment script.
 # Designed for server-side updates from a persistent git clone (for example
 # ~/lessonflow) and intentionally mirrors the interactive deploy UI.
-# [TEST COMMIT: 2026-03-11]
+# [TEST COMMIT: 2026-03-11 v2 - testing sudo + fix log duplication]
 #
 # Usage: ./deploy/update.sh [options]
 #
