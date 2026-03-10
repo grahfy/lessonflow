@@ -45,3 +45,6 @@ Expose the new information in the admin dashboard.
 - [x] Task: Add "Sync Now" button to Email History view. [322fc33]
 - [x] Task: Add Gmail connection status to Admin Settings. [a7a00ae]
 - [x] Task: Conductor - User Manual Verification 'Phase 5: UI & Visibility' (Protocol in workflow.md)
+
+## Phase: Review Fixes
+- [x] Task: Apply review suggestions [1c0ac3b]
