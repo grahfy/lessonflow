@@ -44,7 +44,7 @@ export interface CommitMetadata {
 
 // Simple in-memory cache to prevent redundant Git CLI spawns.
 let cachedStatus: UpdateStatus | null = null;
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL_MS = 0; // Disabled cache as per user request to check every page refresh
 
 /**
  * Checks if there are new commits on the remote repository.
