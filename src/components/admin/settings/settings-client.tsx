@@ -10,6 +10,7 @@ import { AdminPresetsEditor } from "@/components/admin/settings/presets-editor";
 import { AdminContentEditor } from "@/components/admin/settings/content-editor";
 import { AdminEmailTemplateEditor } from "@/components/admin/settings/email-template-editor";
 import { AdminInvoiceTemplateEditor } from "@/components/admin/invoices/invoice-template-editor";
+import { GmailStatus } from "@/components/admin/settings/gmail-status";
 
 import { useSettings, type EnvVarField } from "@/lib/admin/use-settings";
 
@@ -190,6 +191,7 @@ export function AdminSettingsClient() {
           <div key={group.title} className="field full">
             <div className="admin-settings-section">
               <h2 className="admin-settings-section-title">{group.title}</h2>
+              {group.title === "Email Delivery" && <GmailStatus />}
               <AdminForm>
                 {group.items.map((envVar) => {
                   const fieldError = fieldErrors[envVar.key];
