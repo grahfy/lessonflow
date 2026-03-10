@@ -5570,6 +5570,54 @@ h1 {
     justify-content: flex-start;
     gap: 8px;
   }
+
+  /* Syslog Mobile Improvements */
+  .syslog-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .syslog-toolbar-search {
+    max-width: none;
+  }
+
+  .syslog-toolbar-field {
+    justify-content: space-between;
+  }
+
+  .syslog-toolbar-actions {
+    margin-left: 0;
+    justify-content: stretch;
+    width: 100%;
+  }
+
+  .syslog-toolbar-actions .btn {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 6px;
+    font-size: 0.68rem;
+  }
+
+  .syslog-table-wrap {
+    border-radius: 8px;
+  }
+
+  .syslog-table td, .syslog-table th {
+    padding: 8px 10px;
+  }
+
+  /* Pagination Mobile Improvements */
+  .pagination-container {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .pagination-controls {
+    justify-content: space-between;
+    width: 100%;
+  }
 }
 
 /* Extra small devices (phones in portrait, less than 480px) */
