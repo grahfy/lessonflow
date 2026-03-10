@@ -66,6 +66,7 @@ BRANCH="main"
 SKIP_MIGRATE=false
 SKIP_DEPS=false
 SKIP_CRON_SETUP=false
+SKIP_PULL=false
 ROLLBACK=false
 SETUP_PACKAGES=false
 SETUP_MYSQL_DB_FROM_ENV=false
@@ -120,6 +121,7 @@ Options:
   --skip-migrate    Skip database migrations
   --skip-deps       Skip npm install
   --skip-cron       Skip managed cron jobs sync
+  --skip-pull       Skip internal git poll/update (self-update)
   --branch BRANCH   Git branch to deploy (default: main)
   --rollback        Rollback to previous release
   --setup-packages  Run package installation first (requires root)
@@ -2256,6 +2258,7 @@ NODE
 # is used immediately after a self-update (matching update.sh behavior).
 maybe_self_update_and_restart() {
     [[ "${ROLLBACK}" == true ]] && return 0
+    [[ "${SKIP_PULL}" == true ]] && return 0
 
     local restart_count="${MGS_DEPLOY_SELF_RESTART_COUNT:-0}"
     if [[ ! "${restart_count}" =~ ^[0-9]+$ ]]; then
@@ -2300,7 +2303,7 @@ maybe_self_update_and_restart() {
         return 0
     fi
 
-    run_step "Pulling latest origin/${BRANCH}" git -C "${repo_root}" pull --ff-only origin "${BRANCH}"
+    run_step "Merging latest origin/${BRANCH}" git -C "${repo_root}" merge --ff-only "origin/${BRANCH}"
     after_commit="$(git -C "${repo_root}" rev-parse --short=12 HEAD 2>/dev/null || true)"
     log_info "Repository commit: $(git -C "${repo_root}" rev-parse --short HEAD)"
 
@@ -2713,6 +2716,7 @@ while [[ $# -gt 0 ]]; do
         --skip-deps) SKIP_DEPS=true; shift ;;
         --skip-cron) SKIP_CRON_SETUP=true; shift ;;
         --skip-migrate) SKIP_MIGRATE=true; shift ;;
+        --skip-pull) SKIP_PULL=true; shift ;;
         --db-push) DB_PUSH=true; shift ;;
         --rollback) ROLLBACK=true; shift ;;
         --setup-packages) SETUP_PACKAGES=true; shift ;;

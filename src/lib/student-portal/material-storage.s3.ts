@@ -1,3 +1,15 @@
+/**
+ * S3 Remote Object Storage Driver
+ * 
+ * ARCHITECTURAL DESIGN:
+ * This acts as a placeholder implementation for high-availability deployments.
+ * Currently, standard Melbourne Guitar School installations are single-node 
+ * VPS droplets that use `material-storage.local.ts`. 
+ * 
+ * If the application is ever moved to standard Vercel hosting, this file 
+ * will be populated with the AWS SDK to bridge blob storage.
+ */
+
 import type {
   DeleteMaterialInput,
   GetMaterialInput,

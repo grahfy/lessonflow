@@ -1,3 +1,22 @@
+/**
+ * Learning Material Classification & Security
+ * 
+ * Provides domain logic for handling student file uploads, MIME type 
+ * resolution, and secure storage key generation.
+ * 
+ * DESIGN RATIONALE:
+ * 1. Explicit Allow-Listing: We strictly map extensions to known Safe 
+ *    MIME types. This prevents users from uploading deceptive or 
+ *    executable files.
+ * 2. Cross-Site Scripting (XSS) Prevention: SVG files are explicitly 
+ *    excluded from the `IMAGE_MIME_TYPES` enum because they can contain 
+ *    embedded JavaScript and event handlers which would execute when 
+ *    served directly to the student portal.
+ * 3. Deterministic Storage Keys: Keys are generated using a namespaced 
+ *    prefix (`customerId/bookingScope/timestamp-uuid.ext`) ensuring strict 
+ *    multi-tenant isolation at the filesystem/bucket level.
+ */
+
 import crypto from "node:crypto";
 import path from "node:path";
 import { LearningMaterialType } from "@/generated/prisma/client";
@@ -17,8 +36,7 @@ const AUDIO_MIME_TYPES = new Set([
 
 const PDF_MIME_TYPES = new Set(["application/pdf"]);
 
-// NOTE: SVG is intentionally excluded because SVG files can contain embedded
-// scripts and event handlers that pose XSS risks when served inline.
+// RATIONALE: SVG is intentionally excluded to prevent XSS.
 const IMAGE_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",

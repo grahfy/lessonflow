@@ -1,3 +1,17 @@
+/**
+ * Local Filesystem Material Storage Driver
+ * 
+ * Implementation of the storage interface for single-instance VPS deployments.
+ * 
+ * SECURITY RATIONALE:
+ * 1. Path Traversal Guard: We strictly normalize and bounds-check all file 
+ *    paths using `path.normalize(clean)` to ensure malicious keys cannot 
+ *    read/write outside the designated `.data/learning-materials` directory.
+ * 2. Unreachable From Web Root: Local files are stored OUTSIDE the `public/` 
+ *    folder. They can only be accessed via the authenticated API Route handler 
+ *    which verifies session integrity before streaming the buffer.
+ */
+
 import fs from "node:fs/promises";
 import path from "node:path";
 

@@ -1,3 +1,16 @@
+/**
+ * Learning Material Storage Provider Interface
+ * 
+ * Defines the contract for polymorphic file storage (Local vs S3).
+ * 
+ * ARCHITECTURAL RATIONALE:
+ * 1. Portability: By abstracting the actual byte-writing logic into a standard 
+ *    `Driver` interface, we allow deployments on full VPS instances (local 
+ *    storage) OR stateless environments like Vercel (S3 object storage).
+ * 2. Immutable Payloads: Learning materials are inherently write-once, 
+ *    read-many, meaning this simple interface covers 100% of required operations.
+ */
+
 import { createLocalMaterialStorageDriver } from "@/lib/student-portal/material-storage.local";
 import { createS3MaterialStorageDriver } from "@/lib/student-portal/material-storage.s3";
 
@@ -32,6 +45,8 @@ export type MaterialStorageDriver = {
 
 /**
  * Resolves the configured storage driver name with local default for dev/test.
+ * 
+ * RATIONALE: Environmental toggle allows for distinct testing vs production topologies.
  */
 export function getMaterialStorageDriverName(): MaterialStorageDriverName {
   const raw = (process.env.LEARNING_MATERIALS_STORAGE_DRIVER || "local").trim().toLowerCase();

@@ -1555,7 +1555,7 @@ run_tui_script_update_and_reload() {
     run_step "Checking out ${BRANCH}" git checkout "${BRANCH}" || return 0
   fi
 
-  run_step "Pulling latest ${REMOTE_NAME}/${BRANCH}" git pull --ff-only "${REMOTE_NAME}" "${BRANCH}" || return 0
+  run_step "Merging latest ${REMOTE_NAME}/${BRANCH}" git merge --ff-only "${REMOTE_NAME}/${BRANCH}" || return 0
   after_commit="$(git rev-parse --short=12 HEAD 2>/dev/null || true)"
   log_info "Repository commit: $(git rev-parse --short HEAD)"
   maybe_restart_after_self_update "${before_commit}" "${after_commit}"
@@ -1999,6 +1999,7 @@ run_deploy() {
     [[ -n "${effective_ssl_email}" ]] || effective_ssl_email="melbourneguitarschool@gmail.com"
   fi
   deploy_args+=( "--branch" "${BRANCH}" )
+  deploy_args+=( "--skip-pull" )
   [[ "${AUTO_BOOTSTRAP}" == false ]] && deploy_args+=( "--no-auto-bootstrap" )
   [[ "${SKIP_DEPS}" == true ]] && deploy_args+=( "--skip-deps" )
   [[ "${SKIP_CRON_SETUP}" == true ]] && deploy_args+=( "--skip-cron" )
@@ -2275,7 +2276,7 @@ if [[ "${SKIP_PULL}" == false ]]; then
   fi
 
   # Use ff-only to avoid accidental merge commits on production clones.
-  run_step "Pulling latest ${REMOTE_NAME}/${BRANCH}" git pull --ff-only "${REMOTE_NAME}" "${BRANCH}"
+  run_step "Merging latest ${REMOTE_NAME}/${BRANCH}" git merge --ff-only "${REMOTE_NAME}/${BRANCH}"
   local_after_pull_commit="$(git rev-parse --short=12 HEAD 2>/dev/null || true)"
   log_info "Updated to commit $(git rev-parse --short HEAD)"
   maybe_restart_after_self_update "${local_before_pull_commit}" "${local_after_pull_commit}"
