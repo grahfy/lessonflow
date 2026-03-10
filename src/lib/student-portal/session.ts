@@ -23,6 +23,8 @@ export function getStudentSessionMaxAgeSeconds(): number {
   return Math.min(Math.max(raw, 60), 60 * 60 * 24 * 365);
 }
 
+import { AppError } from "../errors";
+
 /**
  * Resolves the secret used for signing student session tokens.
  * Throws in production if not configured.
@@ -30,7 +32,7 @@ export function getStudentSessionMaxAgeSeconds(): number {
 function getStudentSessionSecret(): string {
   const secret = process.env.STUDENT_SESSION_SECRET || process.env.ADMIN_SESSION_SECRET;
   if (!secret) {
-    throw new Error("STUDENT_SESSION_SECRET or ADMIN_SESSION_SECRET is required. Set it in your environment variables.");
+    throw new AppError("STUDENT_SESSION_SECRET or ADMIN_SESSION_SECRET is required. Set it in your environment variables.", "MISSING_CONFIG", 500);
   }
   return secret;
 }

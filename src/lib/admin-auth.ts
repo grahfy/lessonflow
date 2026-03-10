@@ -22,14 +22,16 @@ import { prisma } from "@/lib/db";
  */
 const COOKIE_NAME = "admin_session";
 
+import { AppError } from "./errors";
+
 /**
  * Retrieves the session signing secret from environment.
- * @throws Error if not configured
+ * @throws AppError if not configured
  */
 function getSessionSecret(): string {
   const secret = process.env.ADMIN_SESSION_SECRET;
   if (!secret) {
-    throw new Error("ADMIN_SESSION_SECRET is required. Set it in your environment variables.");
+    throw new AppError("ADMIN_SESSION_SECRET is required. Set it in your environment variables.", "MISSING_CONFIG", 500);
   }
   return secret;
 }

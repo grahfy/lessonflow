@@ -9,5 +9,6 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { label: "Invoices", href: "/admin/invoices" },
   { label: "Reports", href: "/admin/reports" },
   { label: "Manual", href: "/admin/manual" },
+  { label: "Logs", href: "/admin/system-logs" },
   { label: "Settings", href: "/admin/settings" },
 ];

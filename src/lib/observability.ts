@@ -9,7 +9,30 @@
  * @logic - All logs use ISO timestamps for chronological ordering in log aggregators
  */
 
+import { prisma } from "./db";
+import { Prisma } from "@/generated/prisma/client";
+
 type LogLevel = "info" | "warn" | "error";
+
+/**
+ * Persists a log entry to the database.
+ * @internal - Fire-and-forget to avoid blocking the main execution flow
+ */
+function persistLog(level: LogLevel, event: string, message: string, meta?: Record<string, unknown>) {
+  // Use fire-and-forget; do not await this in the main logging functions
+  // to avoid performance bottlenecks and complex async/await chains in callers.
+  prisma.systemLog.create({
+    data: {
+      level,
+      event,
+      message,
+      meta: meta ? (meta as Prisma.InputJsonValue) : Prisma.JsonNull,
+    }
+  }).catch(err => {
+    // Only log to console to avoid potential recursion if logging failed
+    console.error("[observability] Failed to persist log to database:", err.message);
+  });
+}
 
 /**
  * Serializes metadata object to JSON string for log output.
@@ -38,6 +61,7 @@ function stringifyMeta(meta?: Record<string, unknown>) {
 export function logEvent(event: string, meta?: Record<string, unknown>) {
   const line = `[${new Date().toISOString()}] [info] ${event} ${stringifyMeta(meta)}`;
   console.info(line);
+  persistLog("info", event, line, meta);
 }
 
 /**
@@ -51,11 +75,17 @@ export function logEvent(event: string, meta?: Record<string, unknown>) {
 export function logError(event: string, error: unknown, meta?: Record<string, unknown>) {
   const line = `[${new Date().toISOString()}] [error] ${event} ${stringifyMeta(meta)}`;
   console.error(line);
+  
+  let errorMessage = "";
   if (error instanceof Error) {
-    console.error(error.stack || error.message);
+    errorMessage = error.stack || error.message;
+    console.error(errorMessage);
   } else {
+    errorMessage = String(error);
     console.error(error);
   }
+
+  persistLog("error", event, `${line}\n${errorMessage}`, meta);
 }
 
 /**
@@ -73,7 +103,8 @@ export function log(level: LogLevel, event: string, meta?: Record<string, unknow
   const line = `[${new Date().toISOString()}] [${level}] ${event} ${stringifyMeta(meta)}`;
   if (level === "warn") {
     console.warn(line);
-    return;
+  } else {
+    console.info(line);
   }
-  console.info(line);
+  persistLog(level, event, line, meta);
 }

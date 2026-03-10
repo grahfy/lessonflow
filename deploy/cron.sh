@@ -118,9 +118,12 @@ case "${JOB_TYPE}" in
     gmail-sync)
         ENDPOINT="/api/jobs/gmail-sync"
         ;;
+    purge-logs)
+        ENDPOINT="/api/jobs/purge-logs"
+        ;;
     *)
         log "ERROR: Unknown job type: ${JOB_TYPE}"
-        echo "Usage: $0 {daily-bookings-digest|invoice-reminders|admin-reports-daily|admin-reports-weekly|admin-reports-monthly|admin-reports-yearly|generate-sitemap|gmail-sync}"
+        echo "Usage: $0 {daily-bookings-digest|invoice-reminders|admin-reports-daily|admin-reports-weekly|admin-reports-monthly|admin-reports-yearly|generate-sitemap|gmail-sync|purge-logs}"
         exit 1
         ;;
 esac

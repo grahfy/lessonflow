@@ -522,3 +522,16 @@ model InvoiceAuditLog {
   @@index([invoiceId, createdAt])
   @@index([actorId])
 }
+
+// Application system logs for diagnostic and troubleshooting purposes.
+model SystemLog {
+  id        String   @id @default(cuid())
+  level     String   // info, warn, error
+  event     String
+  message   String   @db.Text
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([level])
+  @@index([createdAt])
+}
