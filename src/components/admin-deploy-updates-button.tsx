@@ -1,9 +1,30 @@
+/**
+ * Admin Deployment Updates Button & Dialog
+ * 
+ * "use client"
+ * 
+ * Provides an interactive UI for administrators to review the technical details 
+ * of the current and past application deployments (Git commits, versions, etc.).
+ * 
+ * KEY FEATURES:
+ * 1. Auto-Prompt: Automatically opens the dialog when a NEW deployment is 
+ *    detected that the current admin hasn't seen yet (tracked via localStorage).
+ * 2. Tabbed View: Toggle between "Latest" (detailed) and "History" (summary).
+ * 3. Commit Breakdown: Displays individual commit subjects and bodies included 
+ *    in each deployment.
+ * 
+ * RATIONALE: Informing admins of updates directly in the app reduces "version 
+ * confusion" and provides a clear audit trail of what code was applied and when.
+ */
+
 "use client";
 import { APP_TIMEZONE } from "@/lib/time";
-
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+/** 
+ * Represents a single Git commit included in a deployment payload.
+ */
 type DeployCommitEntry = {
   hash: string;
   shortHash: string;
@@ -13,14 +34,17 @@ type DeployCommitEntry = {
   body: string;
 };
 
+/**
+ * Metadata for a specific deployment event.
+ */
 type LatestDeployUpdate = {
   branch: string;
-  release: string;
-  appliedAt: string;
-  commit: string;
-  shortCommit: string;
+  release: string; // VPS release tag or version number
+  appliedAt: string; // ISO date of deployment
+  commit: string; // Full SHA
+  shortCommit: string; // 7-char SHA
   previousCommit: string | null;
-  commits: DeployCommitEntry[];
+  commits: DeployCommitEntry[]; // List of commits since previous deploy
 };
 
 type HistoryResponse = {
@@ -29,8 +53,12 @@ type HistoryResponse = {
 
 type ApiResponse = LatestDeployUpdate & { error?: string };
 
+/** LocalStorage key used to suppress repetitive auto-opening of the same update. */
 const SEEN_COMMIT_STORAGE_KEY = "mgs_admin_seen_deploy_commit";
 
+/**
+ * Utility to parse JSON from a fetch Response safely, handling potential non-JSON errors.
+ */
 async function readJsonSafe<T>(response: Response): Promise<T | null> {
   const contentType = response.headers.get("content-type") || "";
   if (!contentType.toLowerCase().includes("application/json")) {
@@ -39,6 +67,9 @@ async function readJsonSafe<T>(response: Response): Promise<T | null> {
   return (await response.json().catch(() => null)) as T | null;
 }
 
+/**
+ * Formats ISO strings for Australian display.
+ */
 function formatDateTime(value: string): string {
   return new Intl.DateTimeFormat("en-AU", {
     dateStyle: "medium",
@@ -48,7 +79,7 @@ function formatDateTime(value: string): string {
 }
 
 /**
- * Shows latest deployed commit notes in admin and auto-opens once per newly seen deployed commit.
+ * Primary component for the Admin Header that alerts users to new code changes.
  */
 export function AdminDeployUpdatesButton() {
   const router = useRouter();
@@ -61,6 +92,12 @@ export function AdminDeployUpdatesButton() {
   const [history, setHistory] = useState<LatestDeployUpdate[]>([]);
   const [expandedHistoryCommit, setExpandedHistoryCommit] = useState<string | null>(null);
 
+  /**
+   * Fetches latest deployment status and handles auto-opening logic.
+   * 
+   * @param options.forceOpen - Always open the dialog regardless of "seen" status
+   * @param options.autoPrompt - Check localStorage and open if it's a new commit
+   */
   async function loadAndMaybeOpen(options?: { forceOpen?: boolean; autoPrompt?: boolean }) {
     setLoading(true);
     setError("");
@@ -68,6 +105,7 @@ export function AdminDeployUpdatesButton() {
       const response = await fetch("/api/admin/deploy-updates/latest", { cache: "no-store" });
       const body = await readJsonSafe<ApiResponse>(response);
 
+      // Handle session expiration
       if (response.status === 401) {
         router.push("/admin/login");
         router.refresh();
@@ -102,6 +140,7 @@ export function AdminDeployUpdatesButton() {
       };
       setUpdate(payload);
 
+      // LOGIC: Check if this specific commit has been seen before by this browser.
       const shouldAutoPrompt = options?.autoPrompt === true;
       if (shouldAutoPrompt && typeof window !== "undefined") {
         const seenCommit = window.localStorage.getItem(SEEN_COMMIT_STORAGE_KEY);
@@ -124,6 +163,9 @@ export function AdminDeployUpdatesButton() {
     }
   }
 
+  /**
+   * Loads full deployment history from the API.
+   */
   async function loadHistory() {
     setLoading(true);
     try {
@@ -133,17 +175,19 @@ export function AdminDeployUpdatesButton() {
         setHistory(body.updates);
       }
     } catch {
-      // Best effort
+      // History is non-critical, fail silently
     } finally {
       setLoading(false);
     }
   }
 
+  // Initial load on mount
   useEffect(() => {
     void loadAndMaybeOpen({ autoPrompt: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Contextual history loading when tab changes
   useEffect(() => {
     if (open && activeTab === "history") {
       void loadHistory();
@@ -155,6 +199,9 @@ export function AdminDeployUpdatesButton() {
     return `${count} commit${count === 1 ? "" : "s"}`;
   };
 
+  /**
+   * Closes the dialog and marks the current commit as 'seen'.
+   */
   function closeModal() {
     setOpen(false);
     if (update && typeof window !== "undefined") {

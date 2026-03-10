@@ -1,13 +1,29 @@
+/**
+ * GST Policy Service
+ * 
+ * This module defines the rules for GST applicability in the LessonFlow invoicing system.
+ * It determines whether the school is GST-registered and how that affects 
+ * default tax modes and line item calculations.
+ * 
+ * RATIONALE: Australian tax law requires clear differentiation between GST-registered
+ * and non-registered entities. This centralized policy ensures consistency across
+ * PDF generation, DB persistence, and UI display.
+ */
+
 import { InvoiceTaxMode } from "@/generated/prisma/client";
 
 /**
- * Parses a boolean-like environment variable using conservative defaults.
+ * Utility to parse environment variables into booleans with safe fallbacks.
+ * 
+ * @param value - The raw environment variable string
+ * @param fallback - The value to return if the string is undefined or invalid
  */
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   if (!value) {
     return fallback;
   }
   const normalized = value.trim().toLowerCase();
+  // We explicitly check for common truthy/falsy strings to prevent misconfiguration
   if (normalized === "true" || normalized === "1" || normalized === "yes") {
     return true;
   }
@@ -18,14 +34,23 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
 }
 
 /**
- * Returns whether the business is currently configured as GST-registered.
+ * Checks if the business is officially GST-registered via environment configuration.
+ * When true, taxable items will incur 10% GST.
+ * 
+ * @returns boolean indicating registration status
  */
 export function isInvoiceGstRegistered(): boolean {
   return parseBoolean(process.env.INVOICE_GST_REGISTERED, false);
 }
 
 /**
- * Returns the system default tax mode for newly created line items/invoices.
+ * Provides the system-wide default tax mode for new invoices and line items.
+ * 
+ * LOGIC:
+ * 1. Honors explicit INVOICE_DEFAULT_TAX_MODE if set to "taxable" or "gst_free".
+ * 2. If no explicit default, uses "taxable" for registered businesses and "gst_free" otherwise.
+ * 
+ * @returns InvoiceTaxMode (taxable | gst_free)
  */
 export function getDefaultInvoiceTaxMode(): InvoiceTaxMode {
   const configured = process.env.INVOICE_DEFAULT_TAX_MODE?.trim().toLowerCase();
@@ -36,7 +61,13 @@ export function getDefaultInvoiceTaxMode(): InvoiceTaxMode {
 }
 
 /**
- * Returns whether GST can be applied for a given line tax mode and registration state.
+ * Logic gate for whether GST should be calculated for a given line item.
+ * 
+ * NOTE: Both the business MUST be registered AND the item MUST be marked as taxable
+ * for GST to be computed.
+ * 
+ * @param taxMode - The specific tax mode of the line item being checked
+ * @returns boolean
  */
 export function shouldApplyGst(taxMode: InvoiceTaxMode): boolean {
   return isInvoiceGstRegistered() && taxMode === "taxable";

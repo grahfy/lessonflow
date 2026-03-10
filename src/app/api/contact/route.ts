@@ -1,3 +1,14 @@
+/**
+ * Contact Submission API
+ * 
+ * Handles public inquiries from the school's contact form.
+ * 
+ * DESIGN PHILOSOPHY: Resilience First.
+ * We prioritize persisting the submission to the database over email delivery.
+ * If the database write succeeds but email delivery fails, we still return 
+ * a success (202 Accepted) to the user so they know their message is safe.
+ */
+
 import { NextResponse } from "next/server";
 
 import { contactSubmissionSchema } from "@/lib/booking-rules";
@@ -9,13 +20,21 @@ import { getOwnerEmail } from "@/lib/env";
 import { logError, logEvent } from "@/lib/observability";
 
 /**
- * Public contact-form submission endpoint.
- *
- * The route prioritizes saving the submission record first, then attempts owner notification email.
- * This avoids losing customer messages when the email provider is temporarily unavailable.
+ * Validates and processes a contact form submission.
+ * 
+ * SECURITY:
+ * 1. Captcha Guard: Prevents bot spam via Turnstile/ReCAPTCHA and rate limiting.
+ * 2. Zod Validation: Ensures incoming body matches the expected contact schema.
+ * 
+ * @param request - Standard Next.js Request object
+ * @returns JSON response with submission status
  */
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
+  
+  // STEP 1: Anti-Spam Verification
+  // RATIONALE: Public endpoints are prime targets for spam. 
+  // We use a window-based rate limit (16 requests per 10 mins per IP).
   const gate = verifyCaptchaGuard({
     body,
     headers: request.headers,
@@ -23,6 +42,7 @@ export async function POST(request: Request) {
     limit: 16,
     windowMs: 10 * 60 * 1000
   });
+  
   if (!gate.ok) {
     return NextResponse.json(
       { error: gate.message, code: gate.code },
@@ -33,6 +53,7 @@ export async function POST(request: Request) {
     );
   }
 
+  // STEP 2: Schema Validation
   const parsed = contactSubmissionSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -45,8 +66,10 @@ export async function POST(request: Request) {
   let createdId: string | null = null;
 
   try {
-    // Persist the message first so the studio can recover submissions even if
-    // the outbound email provider (SMTP/Gmail API) is temporarily unavailable.
+    // STEP 3: DB Persistence
+    // RATIONALE: We save the record before attempting email delivery. 
+    // This handles cases where the SMTP provider is down but the school still 
+    // needs to see the message in the Admin Dashboard later.
     const created = await prisma.contactSubmission.create({
       data: {
         name: parsed.data.name,
@@ -58,6 +81,7 @@ export async function POST(request: Request) {
     createdId = created.id;
     logEvent("contact.created", { id: created.id, email: created.email });
 
+    // STEP 4: Owner Notification
     const template = ownerNewContactTemplate({
       name: created.name,
       email: created.email,
@@ -71,7 +95,8 @@ export async function POST(request: Request) {
       html: template.html
     });
 
-    // Report partial success so the UI can tell the user the message was saved even if delivery is delayed.
+    // STEP 5: Response Coordination
+    // If email failed but DB succeeded, return 202 (Accepted) with a warning.
     if (emailResult.status !== "sent") {
       return NextResponse.json(
         {
@@ -87,12 +112,13 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, id: created.id });
   } catch (error) {
-    // Always return JSON so the client can render a precise error instead of
-    // falling back to a generic browser/network failure message.
+    // Error Logging
     logError("contact.submit_failed", error, {
       savedSubmissionId: createdId ?? undefined
     });
 
+    // If we have an ID, it means the catch happened during email sending, 
+    // so the message is actually saved in the DB.
     if (createdId) {
       return NextResponse.json(
         {

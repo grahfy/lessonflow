@@ -1,3 +1,10 @@
+/**
+ * Admin Bookings API Route
+ * 
+ * Handles reading calendar events and creating manual bookings for administrators.
+ * This route is the backbone of the Admin Calendar UI.
+ */
+
 import { APP_TIMEZONE } from "@/lib/time";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -10,6 +17,11 @@ import { requireAdminFromRequest } from "@/lib/admin-route";
 import { prisma } from "@/lib/db";
 import { ensurePortalCredentialForCustomer } from "@/lib/student-portal/credentials";
 
+/**
+ * Enhanced schema for manual bookings created by an admin.
+ * Includes additional fields for binding to existing customers or choosing
+ * resolution strategies when a possible duplicate is detected.
+ */
 const manualBookingSchema = bookingRequestSchema.and(
   z.object({
     customerId: z.string().trim().min(1).optional(),
@@ -21,9 +33,7 @@ const manualBookingSchema = bookingRequestSchema.and(
 type ManualBookingInput = z.infer<typeof manualBookingSchema>;
 
 /**
- * Creates a customer from a validated manual-booking payload.
- *
- * Extracted helper keeps the route's match-resolution logic readable.
+ * Internal helper to create a new customer record from booking data.
  */
 async function createCustomerFromBooking(input: ManualBookingInput) {
   return prisma.customer.create({
@@ -47,7 +57,8 @@ async function createCustomerFromBooking(input: ManualBookingInput) {
 }
 
 /**
- * Updates an existing customer from booking input when the admin explicitly chooses to sync data.
+ * Internal helper to update an existing customer from booking data.
+ * Used when an admin explicitly chooses to sync new details to the master profile.
  */
 async function updateCustomerFromBooking(id: string, input: ManualBookingInput) {
   return prisma.customer.update({
@@ -71,6 +82,16 @@ async function updateCustomerFromBooking(id: string, input: ManualBookingInput) 
   });
 }
 
+/**
+ * GET: Fetches calendar events (Bookings and Booking Requests) for a given range.
+ * 
+ * LOGIC:
+ * 1. Determines the visible calendar window (week, month, etc.)
+ * 2. Fetches 'approved' bookings.
+ * 3. Fetches 'cancelled' bookings updated within the recency cutoff (so they don't vanish immediately).
+ * 4. Fetches 'pending' booking requests.
+ * 5. Maps both entities into a unified "event" structure for the Radix/FullCalendar UI.
+ */
 export async function GET(request: NextRequest) {
   const admin = await requireAdminFromRequest(request);
   if (!admin) {
@@ -82,70 +103,46 @@ export async function GET(request: NextRequest) {
     const date = request.nextUrl.searchParams.get("date") || undefined;
     const view = viewRaw === "day" || viewRaw === "month" || viewRaw === "year" ? viewRaw : "week";
     const range = getCalendarRange(view, date);
+    
     if (Number.isNaN(range.start.getTime()) || Number.isNaN(range.end.getTime())) {
       return NextResponse.json({ error: "Invalid calendar date." }, { status: 400 });
     }
+    
     const now = new Date();
     const recencyCutoff = getRecencyCutoff(now);
-    // Include recently cancelled/rejected items briefly so admins can confirm actions after reload
-    // without permanently cluttering the calendar.
 
+    // Fetch approved and recently cancelled bookings
     const rows = await prisma.booking.findMany({
       where: {
         OR: [
           {
             status: "approved",
-            startAt: {
-              gte: range.start,
-              lte: range.end
-            }
+            startAt: { gte: range.start, lte: range.end }
           },
           {
             status: "cancelled",
-            startAt: {
-              gte: range.start,
-              lte: range.end
-            },
-            updatedAt: {
-              gte: recencyCutoff
-            }
+            startAt: { gte: range.start, lte: range.end },
+            updatedAt: { gte: recencyCutoff } // RATIONALE: Keep recently deleted items visible for UX feedback
           }
         ]
       },
-      orderBy: {
-        startAt: "asc"
-      }
+      orderBy: { startAt: "asc" }
     });
 
+    // Fetch pending and recently rejected/cancelled requests
     const requestRows = await prisma.bookingRequest.findMany({
       where: {
-        requestedStartAt: {
-          gte: range.start,
-          lte: range.end
-        },
+        requestedStartAt: { gte: range.start, lte: range.end },
         OR: [
-          {
-            status: "pending"
-          },
-          {
-            status: "rejected",
-            updatedAt: {
-              gte: recencyCutoff
-            }
-          },
-          {
-            status: "cancelled",
-            updatedAt: {
-              gte: recencyCutoff
-            }
-          }
+          { status: "pending" },
+          { status: "rejected", updatedAt: { gte: recencyCutoff } },
+          { status: "cancelled", updatedAt: { gte: recencyCutoff } }
         ]
       },
-      orderBy: {
-        requestedStartAt: "asc"
-      }
+      orderBy: { requestedStartAt: "asc" }
     });
 
+    // Unified Event Mapping
     const events = [
       ...rows.map((booking) => ({
         entityType: "booking" as const,
@@ -188,6 +185,21 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * POST: Handles the creation of a manual booking by an administrator.
+ * 
+ * LOGIC:
+ * 1. Validates the submission against manualBookingSchema.
+ * 2. Resolves the Customer:
+ *    - If customerId provided: Check existence and optionally update profile.
+ *    - If NO customerId: Search for existing customer by email/phone.
+ *    - If match found WITHOUT explicit resolution: Return 409 Conflict.
+ *    - Proceed with resolution strategy (create_new | use_existing | update_existing).
+ * 3. Ensures Portals Credentials: Every booking ensures the customer has portal access.
+ * 4. Financial/Series Logic:
+ *    - If Recurring: Generate a series and multiple weekly booking rows in a transaction.
+ *    - Else: Create a single booking row.
+ */
 export async function POST(request: NextRequest) {
   const admin = await requireAdminFromRequest(request);
   if (!admin) {
@@ -201,14 +213,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid booking payload.", details: parsed.error.flatten() }, { status: 400 });
     }
 
-    // Manual booking creation can bind to a selected customer, resolve a probable existing match,
-    // or create a new customer depending on the submitted match-resolution fields.
+    // --- STEP 1: CUSTOMER RESOLUTION ---
     let customerId: string | null = null;
     if (parsed.data.customerId) {
+      // Direct binding to an existing customer record
       const selected = await prisma.customer.findUnique({
-        where: {
-          id: parsed.data.customerId
-        }
+        where: { id: parsed.data.customerId }
       });
       if (!selected || selected.isArchived) {
         return NextResponse.json({ error: "Selected customer does not exist." }, { status: 400 });
@@ -218,6 +228,7 @@ export async function POST(request: NextRequest) {
         await updateCustomerFromBooking(selected.id, parsed.data);
       }
     } else {
+      // Probabilistic match based on contact details
       const existing = await prisma.customer.findFirst({
         where: {
           isArchived: false,
@@ -226,11 +237,10 @@ export async function POST(request: NextRequest) {
             { normalizedPhone: normalizePhone(parsed.data.phone) }
           ]
         },
-        orderBy: {
-          createdAt: "desc"
-        }
+        orderBy: { createdAt: "desc" }
       });
 
+      // CONFLICT HANDLING: Notify admin of probable duplicate before proceeding
       if (existing && !parsed.data.matchResolution) {
         return NextResponse.json(
           {
@@ -242,6 +252,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Resolution Application
       if (existing) {
         if (parsed.data.matchResolution === "create_new") {
           const created = await createCustomerFromBooking(parsed.data);
@@ -262,6 +273,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unable to resolve customer for manual booking." }, { status: 500 });
     }
 
+    // --- STEP 2: ACCESS CONTROL ---
+    // RATIONALE: We ensure every customer booked into the system has portal
+    // access so they can receive automated materials and schedule updates.
     await ensurePortalCredentialForCustomer({
       customerId,
       actorId: admin.id,
@@ -269,6 +283,8 @@ export async function POST(request: NextRequest) {
     });
 
     const startAt = new Date(parsed.data.requestedStartAt);
+
+    // --- STEP 3: PERSISTENCE (Single or Recurring) ---
     if (parsed.data.isRecurring && parsed.data.recurrenceEndAt) {
       const endAt = new Date(parsed.data.recurrenceEndAt);
       let starts: Date[] = [];
@@ -281,7 +297,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Persist a series record for recurrence metadata, then create the operational booking rows.
+      // 3a. Create the high-level Series record
       const series = await prisma.bookingSeries.create({
         data: {
           firstName: parsed.data.firstName,
@@ -310,6 +326,7 @@ export async function POST(request: NextRequest) {
         }
       });
 
+      // 3b. Create individual booking instances in a transaction to ensure all or nothing
       await prisma.$transaction(
         starts.map((start) =>
           prisma.booking.create({
@@ -343,6 +360,7 @@ export async function POST(request: NextRequest) {
         )
       );
     } else {
+      // Single booking creation
       await prisma.booking.create({
         data: {
           firstName: parsed.data.firstName,

@@ -1,3 +1,17 @@
+/**
+ * Invoice Persistence Service
+ * 
+ * This module handles the atomic creation and storage of invoice records.
+ * It ensures that every invoice is created with consistent snapshots of 
+ * historical data (customer and seller details) to maintain financial 
+ * records even if master profiles change in the future.
+ * 
+ * RATIONALE: We denormalize customer and seller data into the invoice record
+ * at the moment of creation. This is a critical accounting practice to 
+ * ensure that old invoices still reflect the names, addresses, and bank 
+ * details that were valid at the time the document was issued.
+ */
+
 import { InvoiceDocumentType, InvoiceStatus, InvoiceTaxMode, Prisma } from "@/generated/prisma/client";
 
 import { calculateInvoiceTotals } from "@/lib/invoices/calculate";
@@ -7,7 +21,10 @@ import { sellerSnapshotFromEnv } from "@/lib/invoices/snapshots";
 import { InvoiceCustomerSnapshot, InvoiceLineItemDraft } from "@/lib/invoices/types";
 
 /**
- * Parses invoice payment terms from env and returns a conservative fallback.
+ * Retrieves the standard payment term (in days) from environment variables.
+ * Used to calculate the default due date for new invoices.
+ * 
+ * @returns number (default 14)
  */
 function getPaymentTermsDays(): number {
   const raw = Number.parseInt(process.env.INVOICE_PAYMENT_TERMS_DAYS || "14", 10);
@@ -18,7 +35,10 @@ function getPaymentTermsDays(): number {
 }
 
 /**
- * Calculates a default due date by adding configured payment terms to issue time.
+ * Convenience helper to calculate a due date based on an issue date.
+ * 
+ * @param issuedAt - The date the invoice is issued
+ * @returns Date object for the due date
  */
 export function getDefaultDueAt(issuedAt: Date): Date {
   const due = new Date(issuedAt);
@@ -26,9 +46,12 @@ export function getDefaultDueAt(issuedAt: Date): Date {
   return due;
 }
 
+/**
+ * Input structure for creating a new invoice record.
+ */
 type CreateInvoiceRecordInput = {
-  tx: Prisma.TransactionClient;
-  adminId: string;
+  tx: Prisma.TransactionClient; // RATIONALE: Mandatory transaction client to ensure atomicity
+  adminId: string;              // The ID of the admin creating the record
   status?: InvoiceStatus;
   documentType?: InvoiceDocumentType;
   taxMode?: InvoiceTaxMode;
@@ -43,18 +66,23 @@ type CreateInvoiceRecordInput = {
 };
 
 /**
- * Creates an invoice and all line items atomically with deterministic totals.
+ * Creates an invoice and its associated line items atomically.
  *
- * Key invariants:
- * - totals are recalculated server-side (client totals are not trusted)
- * - seller details are snapshotted from env so historical invoices remain stable
- * - invoice number generation occurs inside the transaction to avoid duplicates
- * - an audit log entry is written with the creating actor
+ * KEY INVARIANTS:
+ * 1. Totals are ALWAYS recalculated server-side using the calculation engine.
+ * 2. Seller and Customer details are "snapshotted" (denormalized) for historical stability.
+ * 3. Unique invoice number generation occurs WITHIN the provided transaction.
+ * 4. An audit log entry is automatically generated to track the creator.
+ * 
+ * @param input - Detailed configuration for the new invoice
+ * @returns The created invoice object including line items
  */
 export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
   const taxMode = input.taxMode ?? getDefaultInvoiceTaxMode();
-  // Normalize defaults before calculating totals so persisted ordering and tax mode assignment are
-  // deterministic even if the caller omits optional line metadata.
+  
+  // LOGIC: Normalize defaults before calculating totals.
+  // This ensures that persisted ordering and tax mode assignment are deterministic 
+  // even if the caller omits optional line metadata in the draft.
   const normalizedLineItems = input.lineItems.map((lineItem, index) => ({
     ...lineItem,
     taxMode: lineItem.taxMode ?? taxMode,
@@ -63,7 +91,8 @@ export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
 
   const calculation = calculateInvoiceTotals(normalizedLineItems);
   const sellerSnapshot = sellerSnapshotFromEnv();
-  // Number generation is transaction-scoped to keep invoice numbering consistent under concurrency.
+  
+  // NOTE: Number generation is transaction-scoped to maintain consistency under concurrency.
   const invoiceNumber = await generateNextInvoiceNumber(input.tx, input.issuedAt);
 
   const invoice = await input.tx.invoice.create({
@@ -75,12 +104,16 @@ export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
       customerId: input.customerId ?? null,
       bookingId: input.bookingId ?? null,
       originalInvoiceId: input.originalInvoiceId ?? null,
+      
+      // DENORMALIZED CUSTOMER DATA
       customerFirstName: input.customerSnapshot.customerFirstName,
       customerLastName: input.customerSnapshot.customerLastName,
       customerName: input.customerSnapshot.customerName,
       customerEmail: input.customerSnapshot.customerEmail,
       customerPhone: input.customerSnapshot.customerPhone,
       customerAddress: input.customerSnapshot.customerAddress,
+      
+      // DENORMALIZED SELLER DATA
       sellerBusinessName: sellerSnapshot.sellerBusinessName,
       sellerAbn: sellerSnapshot.sellerAbn,
       sellerEmail: sellerSnapshot.sellerEmail,
@@ -88,14 +121,19 @@ export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
       bankBsb: sellerSnapshot.bankBsb,
       bankAccountName: sellerSnapshot.bankAccountName,
       bankAccountNumber: sellerSnapshot.bankAccountNumber,
+      
+      // CALCULATED TOTALS
       subtotalCents: calculation.totals.subtotalCents,
       gstCents: calculation.totals.gstCents,
       totalCents: calculation.totals.totalCents,
+      
       notes: input.notes?.trim() || null,
       issuedAt: input.issuedAt,
       dueAt: input.dueAt,
       createdById: input.adminId,
       updatedById: input.adminId,
+      
+      // ATOMIC LINE ITEM CREATION
       lineItems: {
         create: calculation.lineItems.map((lineItem) => ({
           kind: lineItem.kind,
@@ -109,6 +147,8 @@ export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
           sortOrder: lineItem.sortOrder
         }))
       },
+      
+      // AUTOMATIC AUDIT LOGGING
       auditLogs: {
         create: {
           action: "created",
@@ -126,6 +166,5 @@ export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
     }
   });
 
-  // Callers often render or send the invoice immediately, so we return lines in stable sort order.
   return invoice;
 }

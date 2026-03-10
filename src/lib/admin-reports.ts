@@ -22,8 +22,14 @@ import {
 
 import { prisma } from "@/lib/db";
 
+/**
+ * Supported time periods for admin reports.
+ */
 export type AdminReportPeriodKey = "daily" | "weekly" | "monthly" | "yearly";
 
+/**
+ * Internal interface for calculating start/end dates of report windows.
+ */
 type PeriodBounds = {
   key: AdminReportPeriodKey;
   label: string;
@@ -55,6 +61,9 @@ export type ReportMetricSnapshot = {
     creditNotePaidCents: number;
     paidDocumentCount: number;
   };
+  /**
+   * Detailed rows for display in tables or email summaries.
+   */
   details: {
     pendingAppointments: Array<{ time: string; customerName: string }>;
     upcomingConfirmedAppointments: Array<{ time: string; customerName: string }>;
@@ -68,6 +77,9 @@ export type ReportMetricSnapshot = {
   };
 };
 
+/**
+ * Comparison data between current and previous periods.
+ */
 export type ReportComparison = {
   previousLabel: string;
   previousStart: string;
@@ -96,6 +108,9 @@ export type TrendPoint = {
   earningsNetCents: number;
 };
 
+/**
+ * The main dashboard structure containing multiple periods and trend data.
+ */
 export type AdminReportsDashboard = {
   generatedAt: string;
   periods: {
@@ -110,9 +125,13 @@ export type AdminReportsDashboard = {
     monthly: TrendPoint[];
     yearly: TrendPoint[];
   };
+  /**
+   * Optional custom range report if parameters were provided.
+   */
   customRange?: CustomRangeReport;
 };
 
+// RATIONALE: These statuses represent money that is technically "owed" but not yet "in the bank".
 const OUTSTANDING_INVOICE_STATUSES: InvoiceStatus[] = ["draft", "sent"];
 
 function parseReportEmailRowLimit(value: string | undefined, fallback: number, min = 1, max = 50): number {
@@ -124,6 +143,13 @@ function parseReportEmailRowLimit(value: string | undefined, fallback: number, m
 const REPORT_EMAIL_APPOINTMENT_ROWS = parseReportEmailRowLimit(process.env.ADMIN_REPORT_EMAIL_APPOINTMENT_ROWS, 10);
 const REPORT_EMAIL_OUTSTANDING_INVOICE_ROWS = parseReportEmailRowLimit(process.env.ADMIN_REPORT_EMAIL_OUTSTANDING_INVOICE_ROWS, 12);
 
+/**
+ * Calculates the start and end dates for a given period relative to a reference date.
+ * Also calculates the corresponding "previous" period for comparison.
+ * 
+ * @param period - The period type (daily, weekly, etc.)
+ * @param now - Reference date
+ */
 function periodBounds(period: AdminReportPeriodKey, now: Date): PeriodBounds {
   if (period === "daily") {
     const start = startOfDay(now);
@@ -188,6 +214,12 @@ function periodBounds(period: AdminReportPeriodKey, now: Date): PeriodBounds {
   };
 }
 
+/**
+ * Aggregates booking counts for a specific time window.
+ * 
+ * @param start - Window start
+ * @param end - Window end
+ */
 async function getAppointmentCountsForWindow(start: Date, end: Date) {
   const [confirmedCount, cancelledCount] = await Promise.all([
     prisma.booking.count({
@@ -213,6 +245,10 @@ async function getAppointmentCountsForWindow(start: Date, end: Date) {
   return { confirmedCount, cancelledCount };
 }
 
+/**
+ * Fetches current system state that is NOT tied to a specific time window,
+ * such as current pending requests and upcoming confirmed lessons.
+ */
 async function getAppointmentPipelineSnapshot(now: Date) {
   const [pendingRequestCount, upcomingConfirmedCount] = await Promise.all([
     prisma.bookingRequest.count({
@@ -326,6 +362,11 @@ async function getEarningsForWindow(start: Date, end: Date) {
   };
 }
 
+/**
+ * Aggregates total outstanding financial liabilities.
+ * 
+ * @param now - Reference date for overdue calculation
+ */
 async function getOutstandingSnapshot(now: Date) {
   const [allOutstanding, overdueOutstanding] = await Promise.all([
     prisma.invoice.aggregate({
@@ -383,6 +424,12 @@ async function getOutstandingInvoiceDetailRows(now: Date) {
   }));
 }
 
+/**
+ * Orcherstrates multiple DB calls to build a complete metric set for a period.
+ * 
+ * RATIONALE: We use Promise.all to parallelize queries as they are independent,
+ * significantly reducing latency for the dashboard load.
+ */
 async function buildPeriodMetrics(bounds: PeriodBounds, now: Date): Promise<PeriodReport> {
   const [appointments, appointmentPipeline, appointmentDetails, earnings, outstandingInvoices, outstandingInvoiceDetails, previousAppointments, previousEarnings] = await Promise.all([
     getAppointmentCountsForWindow(bounds.start, bounds.end),
@@ -477,6 +524,10 @@ async function buildCustomPeriodMetrics(start: Date, end: Date, now: Date): Prom
   };
 }
 
+/**
+ * Converts a date into a consistent string key based on the desired granularity.
+ * Used for bucket mapping and trend visualization.
+ */
 function bucketDateKey(date: Date, grain: "day" | "week" | "month" | "year") {
   if (grain === "day") {
     return format(startOfDay(date), "yyyy-MM-dd");
@@ -646,6 +697,13 @@ async function buildTrend(
   }));
 }
 
+/**
+ * Primary entry point for the Admin Dashboard metrics.
+ * Fetches all standard periods and trend points in a single pass.
+ * 
+ * @param now - Reference "current" date
+ * @param options - Optional custom date range parameters
+ */
 export async function getAdminReportsDashboard(
   now: Date = new Date(),
   options?: { customRangeStart?: Date; customRangeEnd?: Date }
