@@ -30,7 +30,7 @@ type EditableLineItem = {
   isPreset?: boolean;
 };
 
-type CreateInvoiceBasis = "lesson_based" | "standalone";
+type CreateInvoiceBasis = "lesson_based" | "standalone" | (string & {});
 type InvoiceDisplayStatus = InvoiceRow["status"] | "overdue";
 
 function getDisplayStatus(invoice: InvoiceRow, overdueOnly: boolean): InvoiceDisplayStatus {
@@ -97,6 +97,7 @@ export function AdminInvoicesClient() {
   const [createInvoiceBasis, setCreateInvoiceBasis] = useState<CreateInvoiceBasis>("lesson_based");
   const [createLessonPrice, setCreateLessonPrice] = useState("60.00");
   const [createStandalonePrice, setCreateStandalonePrice] = useState("0.00");
+  const [createSelectedPresetIds, setCreateSelectedPresetIds] = useState<string[]>([]);
   const [createDueAt, setCreateDueAt] = useState("");
   const [createTaxMode, setCreateTaxMode] = useState<InvoiceTaxMode>("taxable");
 
@@ -293,13 +294,13 @@ export function AdminInvoicesClient() {
     }
   }
 
-  async function createInvoice() {
+  async function createInvoice(shouldSend: boolean = false) {
     const customer = customerOptions.find(c => c.id === createSelectedCustomerId);
     if (!customer) {
       setError("Please select a customer.");
       return;
     }
-    setBusyAction("create");
+    setBusyAction(shouldSend ? "create_send" : "create");
     setError("");
 
     const payload = {
@@ -323,22 +324,54 @@ export function AdminInvoicesClient() {
       standalonePriceCents: parseAudInputToCents(createStandalonePrice).cents || 0,
       dueAt: createDueAt ? new Date(createDueAt).toISOString() : new Date().toISOString(),
       taxMode: createTaxMode,
-      lineItems: createInvoiceBasis === "standalone" ? [{
-        description: "Standard Lesson Fee",
-        quantity: 1,
-        unitPriceCents: parseAudInputToCents(createStandalonePrice).cents || 0,
-        kind: "lesson_fee",
-        taxMode: createTaxMode
-      }] : undefined
+      lineItems: (() => {
+        if (createInvoiceBasis === "standalone") {
+          return [{
+            description: "Standard Lesson Fee",
+            quantity: 1,
+            unitPriceCents: parseAudInputToCents(createStandalonePrice).cents || 0,
+            kind: "lesson_fee",
+            taxMode: createTaxMode
+          }];
+        }
+        if (createInvoiceBasis === "presets") {
+          const selectedPresets = presets.filter(p => createSelectedPresetIds.includes(p.id));
+          return selectedPresets.map(preset => ({
+            description: preset.description,
+            quantity: 1,
+            unitPriceCents: preset.unitPriceCents,
+            kind: "custom",
+            taxMode: createTaxMode
+          }));
+        }
+        return undefined;
+      })()
     };
 
     const result = await createInvoiceApi(payload);
-    setBusyAction(null);
 
-    if (result) {
-      setCreateOpen(false);
-      setNotice("Invoice created.");
-      void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
+    if (result && shouldSend) {
+      const sentResult = await performActionApi(result.id, "send");
+      setBusyAction(null);
+      if (sentResult) {
+        setCreateOpen(false);
+        setNotice("Invoice created and sent to customer.");
+        openDetail(sentResult);
+        void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
+      } else {
+        setCreateOpen(false);
+        setNotice("Invoice created but failed to send. Now open in draft.");
+        openDetail(result);
+        void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
+      }
+    } else {
+      setBusyAction(null);
+      if (result) {
+        setCreateOpen(false);
+        setNotice("Invoice created.");
+        openDetail(result);
+        void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
+      }
     }
   }
 
@@ -594,6 +627,11 @@ export function AdminInvoicesClient() {
               </Tooltip>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
+              <Tooltip content="Save edits to recipient details, due date, notes, and line items.">
+                <button className="btn btn-secondary" disabled={!!busyAction} onClick={saveInvoiceEdits}>
+                  {busyAction === 'save' ? 'SAVING...' : 'SAVE EDITS'}
+                </button>
+              </Tooltip>
               {selectedInvoice?.status === 'draft' && (
                 <Tooltip content="Email this invoice to the customer and mark it as sent.">
                   <button className="btn btn-primary" disabled={!!busyAction} onClick={() => void performAction('send')}>
@@ -733,11 +771,16 @@ export function AdminInvoicesClient() {
         footer={
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
             <Tooltip content="Close the create invoice dialog without saving.">
-              <button className="btn btn-secondary" onClick={() => setCreateOpen(false)}>CANCEL</button>
+              <button className="btn btn-secondary" disabled={!!busyAction} onClick={() => setCreateOpen(false)}>CANCEL</button>
             </Tooltip>
-            <Tooltip content="Create a new invoice from the selected customer and pricing options.">
-              <button className="btn btn-primary" disabled={!!busyAction || !createSelectedCustomerId} onClick={createInvoice}>
-                {busyAction === 'create' ? 'CREATING...' : 'CREATE INVOICE'}
+            <Tooltip content="Create a new draft invoice only.">
+              <button className="btn btn-secondary" disabled={!!busyAction || !createSelectedCustomerId} onClick={() => void createInvoice(false)}>
+                {busyAction === 'create' ? 'SAVING...' : 'SAVE DRAFT'}
+              </button>
+            </Tooltip>
+            <Tooltip content="Create and immediately email the invoice to the customer.">
+              <button className="btn btn-primary" disabled={!!busyAction || !createSelectedCustomerId} onClick={() => void createInvoice(true)}>
+                {busyAction === 'create_send' ? 'SENDING...' : 'CREATE & SEND'}
               </button>
             </Tooltip>
           </div>
@@ -758,6 +801,9 @@ export function AdminInvoicesClient() {
                   <select value={createInvoiceBasis} onChange={(e) => setCreateInvoiceBasis(e.target.value as CreateInvoiceBasis)}>
                     <option value="lesson_based">Lessons (Calculated from bookings)</option>
                     <option value="standalone">Standalone (Manual line items)</option>
+                    {presets.length > 0 && (
+                      <option value="presets">Multiple Presets (Select below)...</option>
+                    )}
                   </select>
                 </AdminField>
                 <AdminField label="Tax Mode">
@@ -766,13 +812,33 @@ export function AdminInvoicesClient() {
                     <option value="gst_free">GST Free</option>
                   </select>
                 </AdminField>
-                {createInvoiceBasis === 'lesson_based' ? (
+                {createInvoiceBasis === 'lesson_based' && (
                   <AdminField label="Lesson Rate (AUD)">
                     <input value={createLessonPrice} onChange={(e) => setCreateLessonPrice(e.target.value)} />
                   </AdminField>
-                ) : (
+                )}
+                {createInvoiceBasis === 'standalone' && (
                   <AdminField label="Initial Item Price (AUD)">
                     <input value={createStandalonePrice} onChange={(e) => setCreateStandalonePrice(e.target.value)} />
+                  </AdminField>
+                )}
+                {createInvoiceBasis === 'presets' && (
+                  <AdminField label="Select Presets" fullWidth>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--line)' }}>
+                      {presets.map(p => (
+                        <label key={`create-preset-${p.id}`} className="admin-inline-checkbox" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                          <input 
+                            type="checkbox" 
+                            checked={createSelectedPresetIds.includes(p.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) setCreateSelectedPresetIds(prev => [...prev, p.id]);
+                              else setCreateSelectedPresetIds(prev => prev.filter(id => id !== p.id));
+                            }}
+                          />
+                          {p.label} ({toCurrency(p.unitPriceCents, DEFAULT_CURRENCY)})
+                        </label>
+                      ))}
+                    </div>
                   </AdminField>
                 )}
                 <AdminField label="Due Date (Optional)">
@@ -787,7 +853,9 @@ export function AdminInvoicesClient() {
               <p className="helper-text">
                 {createInvoiceBasis === 'lesson_based' 
                   ? "This will automatically pull all approved bookings for the selected customer that haven't been invoiced yet."
-                  : "This will create a blank invoice with one line item at the specified price. You can add more items after creation."}
+                  : createInvoiceBasis === 'standalone'
+                  ? "This will create a blank invoice with one line item at the specified price. You can add more items after creation."
+                  : "This will create a blank invoice pre-filled with the selected preset items."}
               </p>
             </AdminCard>
           </div>

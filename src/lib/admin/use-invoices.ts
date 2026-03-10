@@ -190,7 +190,10 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
             }
 
             const data = await response.json();
-            return data.invoice as InvoiceRow;
+            const newInvoice = data.invoice as InvoiceRow;
+            setInvoices(prev => [newInvoice, ...prev]);
+            setTotalCount(prev => prev + 1);
+            return newInvoice;
         } catch {
             return null;
         }
