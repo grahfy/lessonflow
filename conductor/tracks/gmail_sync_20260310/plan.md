@@ -23,13 +23,13 @@ Implement the low-level service for interacting with Gmail API.
 - [x] Task: Implement `listSentMessages` and `getMessageDetails` in `src/lib/gmail/service.ts`. [b4719bc]
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Gmail API Client' (Protocol in workflow.md)
 
-## Phase 3: Core Email Service Integration
+## Phase 3: Core Email Service Integration [checkpoint: e9642c1]
 Modify the existing email service to support multiple providers.
 
 - [x] Task: Update `src/lib/email/service.ts` to select provider based on environment variable. [64b12b8]
 - [x] Task: Implement provider-specific logic in `sendEmail`. [64b12b8]
 - [x] Task: Ensure all sent emails record their `provider` and `externalId` (if applicable) in the database. [64b12b8]
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Core Email Service Integration' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Core Email Service Integration' (Protocol in workflow.md)
 
 ## Phase 4: Background Synchronization
 Implement the logic to pull sent items from Gmail.
