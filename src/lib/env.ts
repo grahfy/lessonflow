@@ -74,6 +74,17 @@ export function getPublicSiteUrl(): string {
 }
 
 /**
+ * Returns the path to the persistent git repository used for system updates.
+ * In production, this is usually separate from the running application directory
+ * (e.g., ~/lessonflow). In development, it defaults to the current working directory.
+ * 
+ * @returns Absolute path to the git repository
+ */
+export function getUpdatesGitRepoPath(): string {
+  return (process.env.UPDATES_GIT_REPO_PATH || process.cwd()).trim();
+}
+
+/**
  * Returns full student login URL for portal onboarding emails.
  * 
  * This constructs the complete URL by combining the public site URL with

@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminFromRequest } from "@/lib/admin-route";
+import { getUpdatesGitRepoPath } from "@/lib/env";
 import path from "node:path";
 import fs from "node:fs";
 
@@ -11,8 +12,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const repoRoot = process.cwd();
-    const lockFile = path.join(repoRoot, ".data", "update.lock");
+    const repoRoot = getUpdatesGitRepoPath();
+    const appRoot = process.cwd();
+    const lockFile = path.join(appRoot, ".data", "update.lock");
 
     // Check for existing lock file
     if (fs.existsSync(lockFile)) {
@@ -28,14 +30,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Trigger the update script in the background
-    const scriptPath = path.join(repoRoot, "scripts", "trigger-update.sh");
+    const scriptPath = path.join(appRoot, "scripts", "trigger-update.sh");
     
     // We use spawn and detach so the script keeps running even if the 
     // Next.js request handler finishes.
-    const child = spawn("bash", [scriptPath], {
+    const child = spawn("bash", [scriptPath, repoRoot], {
       detached: true,
       stdio: "ignore",
-      cwd: repoRoot
+      cwd: appRoot
     });
 
     child.unref();

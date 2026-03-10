@@ -8,13 +8,16 @@
 
 set -euo pipefail
 
+# Accept the repository path as the first argument, default to parent of script dir
+REPO_ROOT="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-LOCK_FILE="${REPO_ROOT}/.data/update.lock"
-LOG_FILE="${REPO_ROOT}/.data/update.log"
+# Lock and log files stay in the app's data directory
+APP_DATA_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)/.data"
+LOCK_FILE="${APP_DATA_DIR}/update.lock"
+LOG_FILE="${APP_DATA_DIR}/update.log"
 
-# Ensure .data exists
-mkdir -p "${REPO_ROOT}/.data"
+# Ensure APP_DATA_DIR exists
+mkdir -p "${APP_DATA_DIR}"
 
 # Check for lock file
 if [ -f "$LOCK_FILE" ]; then

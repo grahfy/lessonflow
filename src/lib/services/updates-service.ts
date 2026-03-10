@@ -1,5 +1,6 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
+import { getUpdatesGitRepoPath } from "@/lib/env";
 
 const execAsync = promisify(exec);
 
@@ -33,15 +34,17 @@ export async function getUpdateStatus(forceFetch = false): Promise<UpdateStatus>
   }
 
   try {
+    const repoPath = getUpdatesGitRepoPath();
+
     // 1. Fetch latest from remote
-    await execAsync("git fetch origin main");
+    await execAsync("git fetch origin main", { cwd: repoPath });
 
     // 2. Get local HEAD SHA
-    const { stdout: localShaRaw } = await execAsync("git rev-parse HEAD");
+    const { stdout: localShaRaw } = await execAsync("git rev-parse HEAD", { cwd: repoPath });
     const localSha = localShaRaw.trim();
 
     // 3. Get remote origin/main SHA
-    const { stdout: remoteShaRaw } = await execAsync("git rev-parse origin/main");
+    const { stdout: remoteShaRaw } = await execAsync("git rev-parse origin/main", { cwd: repoPath });
     const remoteSha = remoteShaRaw.trim();
 
     const status: UpdateStatus = {
@@ -73,10 +76,11 @@ export async function getPendingCommits(localSha: string, remoteSha: string): Pr
   if (localSha === remoteSha) return [];
 
   try {
+    const repoPath = getUpdatesGitRepoPath();
     // List commits from localSha to remoteSha
     // %H: hash, %an: author name, %ad: author date (short), %s: subject
     const format = "%H|%an|%ad|%s";
-    const { stdout } = await execAsync(`git log ${localSha}..${remoteSha} --pretty=format:"${format}" --date=short`);
+    const { stdout } = await execAsync(`git log ${localSha}..${remoteSha} --pretty=format:"${format}" --date=short`, { cwd: repoPath });
     
     if (!stdout.trim()) return [];
 
