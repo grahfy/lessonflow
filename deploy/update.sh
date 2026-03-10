@@ -1549,13 +1549,13 @@ run_tui_script_update_and_reload() {
   local after_commit=""
   before_commit="$(git rev-parse --short=12 HEAD 2>/dev/null || true)"
 
-  run_step "Fetching ${REMOTE_NAME}/${BRANCH}" git fetch "${REMOTE_NAME}" "${BRANCH}" || return 0
+  run_step "Fetching ${REMOTE_NAME}/${BRANCH}" run_deploy_path_cmd git fetch "${REMOTE_NAME}" "${BRANCH}" || return 0
 
   if [[ "$(current_branch_name)" != "${BRANCH}" ]]; then
-    run_step "Checking out ${BRANCH}" git checkout "${BRANCH}" || return 0
+    run_step "Checking out ${BRANCH}" run_deploy_path_cmd git checkout "${BRANCH}" || return 0
   fi
 
-  run_step "Merging latest ${REMOTE_NAME}/${BRANCH}" git merge --ff-only "${REMOTE_NAME}/${BRANCH}" || return 0
+  run_step "Merging latest ${REMOTE_NAME}/${BRANCH}" run_deploy_path_cmd git merge --ff-only "${REMOTE_NAME}/${BRANCH}" || return 0
   after_commit="$(git rev-parse --short=12 HEAD 2>/dev/null || true)"
   log_info "Repository commit: $(git rev-parse --short HEAD)"
   maybe_restart_after_self_update "${before_commit}" "${after_commit}"
@@ -2269,14 +2269,14 @@ if [[ "${SKIP_PULL}" == false ]]; then
   local_before_pull_commit="$(git rev-parse --short=12 HEAD 2>/dev/null || true)"
   # Fetch/pull stays in the persistent repo clone; deploy.sh then rsyncs a clean
   # release directory so runtime symlink switches remain atomic.
-  run_step "Fetching ${REMOTE_NAME}/${BRANCH}" git fetch "${REMOTE_NAME}" "${BRANCH}"
+  run_step "Fetching ${REMOTE_NAME}/${BRANCH}" run_deploy_path_cmd git fetch "${REMOTE_NAME}" "${BRANCH}"
 
   if [[ "$(current_branch_name)" != "${BRANCH}" ]]; then
-    run_step "Checking out ${BRANCH}" git checkout "${BRANCH}"
+    run_step "Checking out ${BRANCH}" run_deploy_path_cmd git checkout "${BRANCH}"
   fi
 
   # Use ff-only to avoid accidental merge commits on production clones.
-  run_step "Merging latest ${REMOTE_NAME}/${BRANCH}" git merge --ff-only "${REMOTE_NAME}/${BRANCH}"
+  run_step "Merging latest ${REMOTE_NAME}/${BRANCH}" run_deploy_path_cmd git merge --ff-only "${REMOTE_NAME}/${BRANCH}"
   local_after_pull_commit="$(git rev-parse --short=12 HEAD 2>/dev/null || true)"
   log_info "Updated to commit $(git rev-parse --short HEAD)"
   maybe_restart_after_self_update "${local_before_pull_commit}" "${local_after_pull_commit}"
