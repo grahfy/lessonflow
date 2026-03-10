@@ -164,7 +164,15 @@ export function AdminBookingsClient() {
   const events = useMemo(() => rawEvents as EventWithRow[], [rawEvents]);
 
   const { customers: customerOptions, load: loadCustomers } = useCustomers({ pageSize: 250, onAuthError, onError: setError });
-  const { history: emailHistory, loading: loadingEmailHistory, sending: sendingEmail, load: loadEmailHistory, send: sendEmailApi } = useEmailHistory({ onAuthError, onError: setError });
+  const { 
+    history: emailHistory, 
+    loading: loadingEmailHistory, 
+    sending: sendingEmail, 
+    syncing: syncingEmail,
+    load: loadEmailHistory, 
+    send: sendEmailApi,
+    sync: syncEmailApi
+  } = useEmailHistory({ onAuthError, onError: setError });
   const { materials: materialsList, loading: materialsLoading, uploading: materialsUploading, load: loadMaterials, upload: uploadMaterialApi, remove: removeMaterialApi } = useLearningMaterials({ onAuthError, onError: setError });
   const { presets } = usePresets({ onAuthError, onError: setError });
 
@@ -595,12 +603,14 @@ export function AdminBookingsClient() {
           emailHistory={emailHistory}
           loadingEmailHistory={loadingEmailHistory}
           sendingEmail={sendingEmail}
+          syncingEmail={syncingEmail}
           emailSubject={emailComposerSubject}
           setEmailSubject={setEmailComposerSubject}
           emailMessage={emailComposerMessage}
           setEmailMessage={setEmailComposerMessage}
           onSendEmail={sendCustomEmail}
-          onPerformAction={async (action) => {
+          onSyncEmail={() => selectedKey && syncEmailApi(selectedKey)}
+          onPerformAction={performAction}
             const event = events.find(e => e.id === selectedKey);
             if (!event) return;
             

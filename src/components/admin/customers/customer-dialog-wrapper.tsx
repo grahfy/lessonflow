@@ -3,6 +3,7 @@ import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { CustomerProfileDialog, type CustomerForm, type CustomerRow } from "./customer-profile-dialog";
 import { CustomerEmailDialog } from "./customer-email-dialog";
 import { CustomerMaterialsDialog } from "./customer-materials-dialog";
+import { type EmailRecord } from "@/lib/admin/use-email-history";
 import { type LearningMaterialBooking, type LearningMaterialRow } from "@/lib/admin/types";
 
 type Tab = "profile" | "emails" | "materials";
@@ -34,13 +35,15 @@ type Props = {
 
     // Email Props
     loadingEmailHistory: boolean;
-    emailHistory: ReadonlyArray<{ id: string; subject: string; status: string; error?: string; createdAt: string }>;
+    emailHistory: ReadonlyArray<EmailRecord>;
     emailComposerSubject: string;
     setEmailComposerSubject: React.Dispatch<React.SetStateAction<string>>;
     emailComposerMessage: string;
     setEmailComposerMessage: React.Dispatch<React.SetStateAction<string>>;
     sendingEmail: boolean;
+    syncingEmail: boolean;
     onSendEmail: (subject: string, message: string) => void;
+    onSyncEmail: () => void;
 
     // Materials Props
     materialsLoading: boolean;
@@ -148,7 +151,9 @@ export function CustomerDialogWrapper({
                     emailComposerMessage={rest.emailComposerMessage}
                     setEmailComposerMessage={rest.setEmailComposerMessage}
                     sendingEmail={rest.sendingEmail}
+                    syncingEmail={rest.syncingEmail}
                     onSendEmail={rest.onSendEmail}
+                    onSyncEmail={rest.onSyncEmail}
                 />
             )}
 

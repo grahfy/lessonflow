@@ -13,7 +13,9 @@ type Props = {
     emailComposerMessage: string;
     setEmailComposerMessage: (val: string) => void;
     sendingEmail: boolean;
+    syncingEmail?: boolean;
     onSendEmail: (subject: string, message: string) => void;
+    onSyncEmail?: () => void;
 };
 
 export function CustomerEmailDialog({
@@ -24,14 +26,28 @@ export function CustomerEmailDialog({
     emailComposerMessage,
     setEmailComposerMessage,
     sendingEmail,
-    onSendEmail
+    syncingEmail,
+    onSendEmail,
+    onSyncEmail
 }: Props) {
     const [selectedEmail, setSelectedEmail] = useState<EmailRecord | null>(null);
 
     return (
         <div className="dialog-tab-stack customer-tab-panel">
             <div className="dialog-col dialog-tab-section">
-                <h3 className="manual-section-title">Email History</h3>
+                <div className="section-header-with-action">
+                    <h3 className="manual-section-title">Email History</h3>
+                    {onSyncEmail && (
+                        <button 
+                            type="button" 
+                            className="btn btn-secondary btn-small"
+                            onClick={onSyncEmail}
+                            disabled={syncingEmail || loadingEmailHistory}
+                        >
+                            {syncingEmail ? "Syncing..." : "Sync Now"}
+                        </button>
+                    )}
+                </div>
                 <AdminCard ghost className="customer-email-history-card">
                     {loadingEmailHistory ? (
                         <p className="helper-text">Loading history...</p>

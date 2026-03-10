@@ -1,9 +1,10 @@
 "use client";
 
-import { RefObject } from "react";
+import { RefObject, useState } from "react";
 import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { AdminCard } from "@/components/admin/ui/admin-card";
+import { EmailViewerDialog } from "@/components/admin/ui/email-viewer-dialog";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { formatDateTime } from "@/lib/admin/formatters";
 import { type BookingEvent } from "@/lib/admin/use-bookings";
@@ -40,11 +41,13 @@ interface BookingDetailDialogProps {
   emailHistory: ReadonlyArray<EmailRecord>;
   loadingEmailHistory: boolean;
   sendingEmail: boolean;
+  syncingEmail: boolean;
   emailSubject: string;
   setEmailSubject: (val: string) => void;
   emailMessage: string;
   setEmailMessage: (val: string) => void;
   onSendEmail: () => void;
+  onSyncEmail: () => void;
 
   // Additional Actions
   onPerformAction: (action: string) => void;
@@ -73,20 +76,25 @@ export function BookingDetailDialog({
   emailHistory,
   loadingEmailHistory,
   sendingEmail,
+  syncingEmail,
   emailSubject,
   setEmailSubject,
   emailMessage,
   setEmailMessage,
   onSendEmail,
+  onSyncEmail,
   onPerformAction,
   onOpenMaterials,
   onOpenInvoice
 }: BookingDetailDialogProps) {
+  const [selectedEmail, setSelectedEmail] = useState<EmailRecord | null>(null);
+
   if (!event || !dialogForm) return null;
 
   const updateForm = (patch: Partial<BookingDialogForm>) => setDialogForm({ ...dialogForm, ...patch });
 
   return (
+    <>
     <AdminDialog
       isOpen={isOpen}
       onClose={onClose}
@@ -323,7 +331,17 @@ export function BookingDetailDialog({
           ) : (
             <>
               <div className="dialog-col">
-                <h3 className="manual-section-title">Email History</h3>
+                <div className="section-header-with-action">
+                  <h3 className="manual-section-title">Email History</h3>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-small"
+                    onClick={onSyncEmail}
+                    disabled={syncingEmail || loadingEmailHistory}
+                  >
+                    {syncingEmail ? "Syncing..." : "Sync Now"}
+                  </button>
+                </div>
                 <AdminCard ghost className="booking-email-history-card">
                   {loadingEmailHistory ? (
                     <p className="helper-text">Loading history...</p>
@@ -333,13 +351,20 @@ export function BookingDetailDialog({
                         <p className="helper-text">No emails recorded.</p>
                       ) : (
                         emailHistory.map(email => (
-                          <div key={email.id} className="email-history-item booking-email-history-item">
+                          <div key={email.id} className="email-history-item booking-email-history-item" onClick={() => setSelectedEmail(email)} style={{ cursor: "pointer" }}>
                             <div className="email-history-header booking-email-history-header">
                               <strong>{email.subject}</strong>
                               <span className={`status-badge status-${email.status.toLowerCase()}`}>{email.status}</span>
                             </div>
                             <div className="email-history-meta booking-email-history-meta">
                               {formatDateTime(email.createdAt)}
+                              {email.provider && <span className="email-provider-tag"> · {email.provider.toUpperCase()}</span>}
+                              {email.source && (
+                                <span className="email-source-tag">
+                                  {" "}
+                                  · {email.source === "app" ? "via App" : "via Gmail"}
+                                </span>
+                              )}
                               {email.error && <span className="booking-email-history-error">· {email.error}</span>}
                             </div>
                           </div>
@@ -367,5 +392,11 @@ export function BookingDetailDialog({
           )}
       </div>
     </AdminDialog>
+    <EmailViewerDialog
+      isOpen={!!selectedEmail}
+      onClose={() => setSelectedEmail(null)}
+      email={selectedEmail}
+    />
+    </>
   );
 }

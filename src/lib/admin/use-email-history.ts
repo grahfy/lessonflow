@@ -26,8 +26,10 @@ export interface UseEmailHistoryResult {
     history: ReadonlyArray<EmailRecord>;
     loading: boolean;
     sending: boolean;
+    syncing: boolean;
     load: (customerId: string) => Promise<void>;
     send: (customerId: string, subject: string, message: string) => Promise<boolean>;
+    sync: (customerId: string) => Promise<boolean>;
 }
 
 /**
@@ -38,6 +40,7 @@ export function useEmailHistory(options: UseEmailHistoryOptions = {}): UseEmailH
     const [history, setHistory] = useState<ReadonlyArray<EmailRecord>>([]);
     const [loading, setLoading] = useState(false);
     const [sending, setSending] = useState(false);
+    const [syncing, setSyncing] = useState(false);
 
     const { safeFetch, handleApiError } = useSafeFetch({ onAuthError, onError });
 
@@ -80,11 +83,36 @@ export function useEmailHistory(options: UseEmailHistoryOptions = {}): UseEmailH
         }
     }, [safeFetch, handleApiError, load]);
 
+    const sync = useCallback(async (customerId: string): Promise<boolean> => {
+        setSyncing(true);
+        try {
+            const response = await safeFetch(`/api/admin/gmail/sync`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+            });
+
+            if (!response.ok) {
+                await handleApiError(response, "Unable to sync Gmail.");
+                return false;
+            }
+
+            // Reload history after successful sync
+            void load(customerId);
+            return true;
+        } catch {
+            return false;
+        } finally {
+            setSyncing(false);
+        }
+    }, [safeFetch, handleApiError, load]);
+
     return {
         history,
         loading,
         sending,
+        syncing,
         load,
-        send
+        send,
+        sync
     };
 }
