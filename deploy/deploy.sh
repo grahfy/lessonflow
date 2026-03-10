@@ -759,8 +759,13 @@ backup_database_before_schema_change() {
         echo "  gunzip -c \"${backup_file}\" | ${mysql_bin} -h \"${DB_URL_HOST}\" -P \"${DB_URL_PORT}\" -u \"${DB_URL_USER}\" \"${DB_URL_NAME}\""
     } > "${restore_note}"
 
-    chmod 640 "${backup_file}" "${restore_note}" 2>/dev/null || true
-    chown :www-data "${backup_file}" "${restore_note}" 2>/dev/null || true
+    if [[ -O "${backup_file}" ]]; then
+        chmod 640 "${backup_file}" "${restore_note}" 2>/dev/null || true
+        chown :www-data "${backup_file}" "${restore_note}" 2>/dev/null || true
+    else
+        run_sudo_cmd chmod 640 "${backup_file}" "${restore_note}" 2>/dev/null || true
+        run_sudo_cmd chown :www-data "${backup_file}" "${restore_note}" 2>/dev/null || true
+    fi
     log_info "Database backup complete."
     log_info "Restore note: ${restore_note}"
     return 0
