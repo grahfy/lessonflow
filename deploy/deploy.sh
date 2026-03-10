@@ -158,6 +158,18 @@ detect_tty_capabilities() {
 # Sizes the TUI panel to the active terminal width while keeping a readable max
 # width on very wide terminals. This lets the deploy menu adapt to SSH windows
 # and split panes without manually editing script constants.
+
+# Run a command with sudo if we are not root and sudo is available.
+run_sudo_cmd() {
+    if [[ ${EUID} -eq 0 ]]; then
+        "$@"
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo "$@"
+    else
+        "$@"
+    fi
+}
+
 auto_size_tui_panel_width() {
     local cols=""
     local target_width=""
@@ -185,47 +197,6 @@ auto_size_tui_panel_width() {
     DEPLOY_TUI_PANEL_WIDTH="${target_width}"
 }
 
-# Re-runs the deploy script with sudo when root privileges are required but the
-# operator started it without sudo on the command line.
-reexec_with_sudo_if_needed() {
-    if [[ ${EUID} -eq 0 ]]; then
-        return 0
-    fi
-
-    if ! command -v sudo >/dev/null 2>&1; then
-        log_error "This deployment script requires root privileges and sudo is not available."
-        exit 1
-    fi
-
-    local sudo_env_args=()
-    local env_name=""
-    for env_name in \
-        NODE_OPTIONS \
-        NEXT_LOW_MEMORY_BUILD \
-        MGS_SKIP_DEPLOY_SHARED_ENV_REVIEW_PROMPT \
-        DEFAULT_BUILD_NODE_HEAP_MB \
-        LOW_RAM_1GB_AUTO_HEAP_MB \
-        LOW_RAM_2GB_AUTO_HEAP_MB \
-        LOW_RAM_1GB_NEXT_BUILD_HEAP_MB \
-        LOW_RAM_2GB_NEXT_BUILD_HEAP_MB \
-        TEMP_BUILD_SWAP_AUTO_ENABLED \
-        LOW_RAM_1GB_TARGET_TOTAL_SWAP_MB \
-        LOW_RAM_2GB_TARGET_TOTAL_SWAP_MB \
-        TEMP_BUILD_SWAP_MIN_CREATE_MB \
-        TEMP_BUILD_SWAP_PATH
-    do
-        if [[ -v "${env_name}" ]]; then
-            sudo_env_args+=( "${env_name}=${!env_name}" )
-        fi
-    done
-
-    log_info "Root privileges required. Re-running deployment with sudo..."
-    if (( ${#sudo_env_args[@]} > 0 )); then
-        exec sudo env "${sudo_env_args[@]}" "${SCRIPT_DIR}/deploy.sh" "${ORIGINAL_ARGS[@]}"
-    fi
-
-    exec sudo "${SCRIPT_DIR}/deploy.sh" "${ORIGINAL_ARGS[@]}"
-}
 
 # Returns the application version from package.json (or "unknown" if unreadable).
 get_app_version() {
@@ -369,7 +340,7 @@ ensure_shared_env_file() {
 
     if [[ ! -f "${shared_env_path}" ]]; then
         cp "${env_template_path}" "${shared_env_path}"
-        chown www-data:www-data "${shared_env_path}" 2>/dev/null || true
+        chown :www-data "${shared_env_path}" 2>/dev/null || true
         chmod 640 "${shared_env_path}" 2>/dev/null || true
         log_info "Created shared .env from template: ${shared_env_path}"
     else
@@ -399,7 +370,7 @@ ensure_shared_env_file() {
     fi
 
     # Re-apply runtime ownership in case the file was previously edited as root.
-    chown www-data:www-data "${shared_env_path}" 2>/dev/null || true
+    chown :www-data "${shared_env_path}" 2>/dev/null || true
     chmod 640 "${shared_env_path}" 2>/dev/null || true
     return 0
 }
@@ -428,7 +399,7 @@ edit_shared_env_now() {
         return 0
     fi
 
-    chown www-data:www-data "${shared_env_path}" 2>/dev/null || true
+    chown :www-data "${shared_env_path}" 2>/dev/null || true
     chmod 640 "${shared_env_path}" 2>/dev/null || true
     log_info "Shared .env review complete"
     return 0
@@ -683,7 +654,7 @@ backup_database_before_schema_change() {
     restore_note="${backup_dir}/pre-schema-${timestamp}.restore.txt"
 
     mkdir -p "${backup_dir}"
-    chown -R www-data:www-data "${SHARED_DIR}/data" >/dev/null 2>&1 || true
+    chown -R :www-data "${SHARED_DIR}/data" 2>/dev/null || true
 
     rm -f "${backup_file}" 2>/dev/null || true
 
@@ -790,7 +761,7 @@ backup_database_before_schema_change() {
     } > "${restore_note}"
 
     chmod 640 "${backup_file}" "${restore_note}" 2>/dev/null || true
-    chown www-data:www-data "${backup_file}" "${restore_note}" 2>/dev/null || true
+    chown :www-data "${backup_file}" "${restore_note}" 2>/dev/null || true
     log_info "Database backup complete."
     log_info "Restore note: ${restore_note}"
     return 0
@@ -810,12 +781,8 @@ ensure_mysql_installed_for_env_db_setup() {
         return 1
     fi
 
-    if [[ ${EUID} -ne 0 ]]; then
-        log_error "MySQL installation helper requires root (deploy.sh should have re-execed with sudo already)."
-        return 1
-    fi
 
-    run_step "Installing MySQL/MariaDB packages" "${SCRIPT_DIR}/setup-packages.sh" --skip-node --skip-nginx --skip-certbot --non-interactive
+    run_step "Installing MySQL/MariaDB packages" run_sudo_cmd "${SCRIPT_DIR}/setup-packages.sh" --skip-node --skip-nginx --skip-certbot --non-interactive
 }
 
 # Best-effort start/enable of common local MySQL/MariaDB services so DB create
@@ -830,8 +797,8 @@ ensure_mysql_service_running_for_env_db_setup() {
     fi
 
     for service_name in mysql mariadb mysqld; do
-        if systemctl start "${service_name}" >/dev/null 2>&1; then
-            systemctl enable "${service_name}" >/dev/null 2>&1 || true
+        if run_sudo_cmd systemctl start "${service_name}" >/dev/null 2>&1; then
+            run_sudo_cmd systemctl enable "${service_name}" >/dev/null 2>&1 || true
             log_info "Database service ready: ${service_name}"
             started=true
             break
@@ -856,12 +823,8 @@ mysql_admin_exec_local() {
         return 1
     fi
 
-    if [[ ${EUID} -ne 0 ]]; then
-        log_error "Local database bootstrap requires root (deploy.sh should have re-execed with sudo already)."
-        return 1
-    fi
 
-    "${mysql_bin}" --batch --skip-column-names -e "${sql}"
+    run_sudo_cmd "${mysql_bin}" --batch --skip-column-names -e "${sql}"
 }
 
 # Reads DATABASE_URL from shared/.env, installs local MySQL if needed, and
@@ -1144,12 +1107,8 @@ ensure_nginx_installed_from_deploy() {
         return 1
     fi
 
-    if [[ ${EUID} -ne 0 ]]; then
-        log_error "Nginx installation helper requires root (deploy.sh should have re-execed with sudo already)."
-        return 1
-    fi
 
-    run_step "Installing Nginx packages" "${SCRIPT_DIR}/setup-packages.sh" --skip-node --skip-db --skip-certbot --non-interactive
+    run_step "Installing Nginx packages" run_sudo_cmd "${SCRIPT_DIR}/setup-packages.sh" --skip-node --skip-db --skip-certbot --non-interactive
 }
 
 # Detects whether the deploy nginx configs appear to require PHP/FastCGI.
@@ -1194,10 +1153,6 @@ ensure_php_fpm_installed_if_needed_from_deploy() {
         return 0
     fi
 
-    if [[ ${EUID} -ne 0 ]]; then
-        log_error "PHP-FPM installation helper requires root (deploy.sh should have re-execed with sudo already)."
-        return 1
-    fi
 
     if [[ -r /etc/os-release ]]; then
         # shellcheck disable=SC1091
@@ -1231,26 +1186,26 @@ ensure_php_fpm_installed_if_needed_from_deploy() {
 
     case "${pkg_manager}" in
         apt)
-            run_step "Installing PHP-FPM packages" apt install -y php-fpm || return 1
+            run_step "Installing PHP-FPM packages" run_sudo_cmd apt install -y php-fpm || return 1
             ;;
         dnf)
-            run_step "Installing PHP-FPM packages" dnf install -y php-fpm || return 1
+            run_step "Installing PHP-FPM packages" run_sudo_cmd dnf install -y php-fpm || return 1
             ;;
         yum)
-            run_step "Installing PHP-FPM packages" yum install -y php-fpm || return 1
+            run_step "Installing PHP-FPM packages" run_sudo_cmd yum install -y php-fpm || return 1
             ;;
         zypper)
-            run_step "Installing PHP-FPM packages" zypper install -y php-fpm || return 1
+            run_step "Installing PHP-FPM packages" run_sudo_cmd zypper install -y php-fpm || return 1
             ;;
         pacman)
-            run_step "Installing PHP-FPM packages" pacman -S --noconfirm php-fpm || return 1
+            run_step "Installing PHP-FPM packages" run_sudo_cmd pacman -S --noconfirm php-fpm || return 1
             ;;
     esac
 
     if command -v systemctl >/dev/null 2>&1; then
         for service_name in php-fpm php8.3-fpm php8.2-fpm php8.1-fpm php8.0-fpm php7.4-fpm; do
-            if systemctl start "${service_name}" >/dev/null 2>&1; then
-                systemctl enable "${service_name}" >/dev/null 2>&1 || true
+            if run_sudo_cmd systemctl start "${service_name}" >/dev/null 2>&1; then
+                run_sudo_cmd systemctl enable "${service_name}" >/dev/null 2>&1 || true
                 log_info "PHP-FPM service ready: ${service_name}"
                 break
             fi
@@ -1303,8 +1258,8 @@ ensure_cron_scheduler_running_enabled() {
         return 0
     fi
 
-    systemctl enable "${service_name}" >/dev/null 2>&1 || true
-    if systemctl start "${service_name}" >/dev/null 2>&1; then
+    run_sudo_cmd systemctl enable "${service_name}" >/dev/null 2>&1 || true
+    if run_sudo_cmd systemctl start "${service_name}" >/dev/null 2>&1; then
         log_info "Cron scheduler ready: ${service_name}"
     else
         log_warn "Could not start cron scheduler service: ${service_name}"
@@ -1332,10 +1287,6 @@ ensure_cron_installed_from_deploy() {
         log_warn "crontab is installed, but cron/crond service is missing. Attempting package repair/install..."
     fi
 
-    if [[ ${EUID} -ne 0 ]]; then
-        log_error "Cron installation helper requires root (deploy.sh should have re-execed with sudo already)."
-        return 1
-    fi
 
     if [[ -r /etc/os-release ]]; then
         # shellcheck disable=SC1091
@@ -1373,19 +1324,19 @@ ensure_cron_installed_from_deploy() {
 
     case "${pkg_manager}" in
         apt)
-            run_step "Installing cron scheduler package" apt install -y "${cron_pkg}" || return 1
+            run_step "Installing cron scheduler package" run_sudo_cmd apt install -y "${cron_pkg}" || return 1
             ;;
         dnf)
-            run_step "Installing cron scheduler package" dnf install -y "${cron_pkg}" || return 1
+            run_step "Installing cron scheduler package" run_sudo_cmd dnf install -y "${cron_pkg}" || return 1
             ;;
         yum)
-            run_step "Installing cron scheduler package" yum install -y "${cron_pkg}" || return 1
+            run_step "Installing cron scheduler package" run_sudo_cmd yum install -y "${cron_pkg}" || return 1
             ;;
         zypper)
-            run_step "Installing cron scheduler package" zypper install -y "${cron_pkg}" || return 1
+            run_step "Installing cron scheduler package" run_sudo_cmd zypper install -y "${cron_pkg}" || return 1
             ;;
         pacman)
-            run_step "Installing cron scheduler package" pacman -S --noconfirm "${cron_pkg}" || return 1
+            run_step "Installing cron scheduler package" run_sudo_cmd pacman -S --noconfirm "${cron_pkg}" || return 1
             ;;
     esac
 
@@ -1403,10 +1354,6 @@ install_app_systemd_service_from_deploy() {
 
     section "App Systemd Service Install"
 
-    if [[ ${EUID} -ne 0 ]]; then
-        log_error "Systemd service helper requires root (deploy.sh should have re-execed with sudo already)."
-        return 1
-    fi
 
     if ! command -v systemctl >/dev/null 2>&1; then
         log_error "systemctl not available on this host."
@@ -1431,17 +1378,17 @@ install_app_systemd_service_from_deploy() {
 
     if [[ ! -f "${service_file}" ]] || ! cmp -s "${tmp_service}" "${service_file}"; then
         log_info "Updating systemd service: ${service_file}"
-        cp "${tmp_service}" "${service_file}"
-        systemctl daemon-reload
+        run_sudo_cmd cp "${tmp_service}" "${service_file}"
+        run_sudo_cmd systemctl daemon-reload
     else
         log_info "Systemd service already up to date"
     fi
     rm -f "${tmp_service}"
 
-    systemctl enable "${APP_NAME}" >/dev/null 2>&1 || true
+    run_sudo_cmd systemctl enable "${APP_NAME}" >/dev/null 2>&1 || true
 
     if [[ -L "${CURRENT_LINK}" || -d "${CURRENT_LINK}" ]]; then
-        if systemctl start "${APP_NAME}" >/dev/null 2>&1; then
+        if run_sudo_cmd systemctl start "${APP_NAME}" >/dev/null 2>&1; then
             log_info "Systemd service ready: ${APP_NAME}"
         else
             log_warn "Systemd service installed but not started (check current release/env): ${APP_NAME}"
@@ -2112,7 +2059,7 @@ restart_cron_scheduler_if_present() {
     fi
 
     log_info "Restarting cron scheduler (${cron_service})..."
-    if ! run_step "Restarting cron scheduler (${cron_service})" systemctl restart "${cron_service}"; then
+    if ! run_step "Restarting cron scheduler (${cron_service})" run_sudo_cmd systemctl restart "${cron_service}"; then
         log_warn "Cron scheduler restart failed; continuing deployment"
     fi
 }
@@ -2164,7 +2111,7 @@ install_or_update_managed_crontab_jobs() {
         echo
     } > "${tmp_file}"
 
-    run_step "Installing/updating managed cron jobs" crontab "${tmp_file}"
+    run_step "Installing/updating managed cron jobs" run_sudo_cmd crontab "${tmp_file}"
     rm -f "${tmp_file}"
 }
 
@@ -2501,12 +2448,8 @@ ensure_temporary_build_swap() {
         return 0
     fi
 
-    if [[ ${EUID} -ne 0 ]]; then
-        log_warn "Cannot create temporary build swap without root privileges"
-        return 0
-    fi
 
-    if ! command -v mkswap >/dev/null 2>&1 || ! command -v swapon >/dev/null 2>&1 || ! command -v swapoff >/dev/null 2>&1; then
+    if ! command -v run_sudo_cmd mkswap >/dev/null 2>&1 || ! command -v run_sudo_cmd swapon >/dev/null 2>&1 || ! command -v run_sudo_cmd swapoff >/dev/null 2>&1; then
         log_warn "Swap tools not available (mkswap/swapon/swapoff); skipping temporary build swap"
         return 0
     fi
@@ -2553,22 +2496,22 @@ ensure_temporary_build_swap() {
 
     if [[ -e "${TEMP_BUILD_SWAP_PATH}" ]]; then
         log_warn "Removing stale temporary swap file: ${TEMP_BUILD_SWAP_PATH}"
-        rm -f "${TEMP_BUILD_SWAP_PATH}" || {
+        run_sudo_cmd rm -f "${TEMP_BUILD_SWAP_PATH}" || {
             log_warn "Failed to remove stale temporary swap file; skipping temporary build swap"
             return 0
         }
     fi
 
     log_warn "Creating temporary build swap (${swap_mb}MB) at ${TEMP_BUILD_SWAP_PATH} to reach ~${target_total_swap_mb}MB total swap"
-    if command -v fallocate >/dev/null 2>&1; then
-        fallocate -l "${swap_mb}M" "${TEMP_BUILD_SWAP_PATH}" 2>/dev/null || dd if=/dev/zero of="${TEMP_BUILD_SWAP_PATH}" bs=1M count="${swap_mb}" status=none
+    if command -v run_sudo_cmd fallocate >/dev/null 2>&1; then
+        run_sudo_cmd fallocate -l "${swap_mb}M" "${TEMP_BUILD_SWAP_PATH}" 2>/dev/null || dd if=/dev/zero of="${TEMP_BUILD_SWAP_PATH}" bs=1M count="${swap_mb}" status=none
     else
         dd if=/dev/zero of="${TEMP_BUILD_SWAP_PATH}" bs=1M count="${swap_mb}" status=none
     fi
 
-    chmod 600 "${TEMP_BUILD_SWAP_PATH}"
-    mkswap "${TEMP_BUILD_SWAP_PATH}" >/dev/null
-    swapon "${TEMP_BUILD_SWAP_PATH}"
+    run_sudo_cmd chmod 600 "${TEMP_BUILD_SWAP_PATH}"
+    run_sudo_cmd mkswap "${TEMP_BUILD_SWAP_PATH}" >/dev/null
+    run_sudo_cmd swapon "${TEMP_BUILD_SWAP_PATH}"
 
     TEMP_BUILD_SWAP_ACTIVE=true
     TEMP_BUILD_SWAP_CREATED_FILE=true
@@ -2583,7 +2526,7 @@ cleanup_temporary_build_swap() {
     fi
 
     if [[ "${OSTYPE:-}" == linux* ]] && grep -qE "[[:space:]]${TEMP_BUILD_SWAP_PATH//\//\\/}([[:space:]]|$)" /proc/swaps 2>/dev/null; then
-        if swapoff "${TEMP_BUILD_SWAP_PATH}" >/dev/null 2>&1; then
+        if run_sudo_cmd swapoff "${TEMP_BUILD_SWAP_PATH}" >/dev/null 2>&1; then
             log_info "Disabled temporary build swap"
         else
             log_warn "Failed to disable temporary build swap: ${TEMP_BUILD_SWAP_PATH}"
@@ -2591,7 +2534,7 @@ cleanup_temporary_build_swap() {
     fi
 
     if [[ "${TEMP_BUILD_SWAP_CREATED_FILE}" == true && -e "${TEMP_BUILD_SWAP_PATH}" ]]; then
-        if rm -f "${TEMP_BUILD_SWAP_PATH}"; then
+        if run_sudo_cmd rm -f "${TEMP_BUILD_SWAP_PATH}"; then
             log_info "Removed temporary build swap file"
         else
             log_warn "Failed to remove temporary build swap file: ${TEMP_BUILD_SWAP_PATH}"
@@ -2819,15 +2762,11 @@ check_legacy_migration() {
 
     section "Legacy Migration Detection"
 
-    if [[ ${EUID} -ne 0 ]]; then
-        log_error "Migration requires root privileges. Please re-run with sudo or --sudo-deploy."
-        exit 1
-    fi
 
     if [[ -d "${legacy_dir}" ]]; then
         log_warn "Detected legacy deployment directory: ${legacy_dir}"
         log_info "Migrating ${legacy_dir} to ${DEPLOY_DIR}..."
-        mv "${legacy_dir}" "${DEPLOY_DIR}"
+        run_sudo_cmd mv "${legacy_dir}" "${DEPLOY_DIR}"
         log_info "Directory migrated successfully."
     fi
 
@@ -2835,10 +2774,10 @@ check_legacy_migration() {
         if systemctl list-units --full --all | grep -q "${legacy_service}"; then
             if systemctl is-active --quiet "${legacy_service}"; then
                 log_info "Stopping legacy service: ${legacy_service}"
-                systemctl stop "${legacy_service}"
+                run_sudo_cmd systemctl stop "${legacy_service}"
             fi
             log_info "Disabling legacy service: ${legacy_service}"
-            systemctl disable "${legacy_service}"
+            run_sudo_cmd systemctl disable "${legacy_service}"
         fi
     fi
 
@@ -2853,7 +2792,7 @@ check_legacy_migration() {
                 "${legacy_service_file}" > "${target_service_file}"
         fi
         if command -v systemctl >/dev/null 2>&1; then
-            systemctl daemon-reload >/dev/null 2>&1 || true
+            run_sudo_cmd systemctl daemon-reload >/dev/null 2>&1 || true
         fi
     fi
 
@@ -2891,7 +2830,7 @@ check_legacy_migration() {
 
         tmp_file="$(mktemp)"
         printf '%s\n' "${migrated}" > "${tmp_file}"
-        crontab "${tmp_file}" || true
+        run_sudo_cmd crontab "${tmp_file}" || true
         rm -f "${tmp_file}"
     fi
 
@@ -2976,7 +2915,6 @@ repair_current_symlink_drift() {
 }
 
 detect_tty_capabilities
-reexec_with_sudo_if_needed
 maybe_self_update_and_restart
 
 check_legacy_migration
@@ -3065,7 +3003,7 @@ rollback() {
     ln -sfn "${RELEASES_DIR}/${previous_release}" "${CURRENT_LINK}"
     
     # Restart service
-    systemctl restart ${APP_NAME}
+    run_sudo_cmd systemctl restart ${APP_NAME}
     
     log_info "Rollback complete! Now running release: ${previous_release}"
     exit 0
@@ -3079,7 +3017,7 @@ fi
 # Run package setup if requested
 if [[ "${SETUP_PACKAGES}" == true ]]; then
     section "Package Setup"
-    run_step "Installing system packages" "${SCRIPT_DIR}/setup-packages.sh" --non-interactive
+    run_step "Installing system packages" run_sudo_cmd "${SCRIPT_DIR}/setup-packages.sh" --non-interactive
 fi
 
 # =============================================================================
@@ -3116,7 +3054,7 @@ fi
 # Create directories if they don't exist
 mkdir -p "${RELEASES_DIR}"
 mkdir -p "${SHARED_DIR}/data"
-chown -R www-data:www-data "${DEPLOY_DIR}"
+chown -R :www-data "${DEPLOY_DIR}" 2>/dev/null || true
 chmod -R 775 "${SHARED_DIR}/data"
 
 section "Environment File (.env)"
@@ -3268,7 +3206,7 @@ ln -sfn "${NEW_RELEASE_DIR}" "${CURRENT_LINK}"
 # Fix permissions for the entire deploy directory
 # Do this AFTER everything is set up to ensure all new files are owned by www-data
 log_info "Fixing permissions..."
-chown -R www-data:www-data "${DEPLOY_DIR}"
+chown -R :www-data "${DEPLOY_DIR}" 2>/dev/null || true
 chmod -R 755 "${NEW_RELEASE_DIR}"
 
 # Ensure systemd service is installed
@@ -3290,13 +3228,13 @@ fi
 
 if [[ ! -f "${SERVICE_FILE}" ]]; then
     log_info "Installing systemd service..."
-    cp "${SERVICE_SOURCE}" "${SERVICE_FILE}"
-    systemctl daemon-reload
-    systemctl enable ${APP_NAME}
+    run_sudo_cmd cp "${SERVICE_SOURCE}" "${SERVICE_FILE}"
+    run_sudo_cmd systemctl daemon-reload
+    run_sudo_cmd systemctl enable ${APP_NAME}
 elif ! cmp -s "${SERVICE_SOURCE}" "${SERVICE_FILE}"; then
     log_info "Updating systemd service..."
-    cp "${SERVICE_SOURCE}" "${SERVICE_FILE}"
-    systemctl daemon-reload
+    run_sudo_cmd cp "${SERVICE_SOURCE}" "${SERVICE_FILE}"
+    run_sudo_cmd systemctl daemon-reload
 else
     log_info "Systemd service already up to date"
 fi
@@ -3345,7 +3283,7 @@ fi
 # healthy so proxy errors during startup are less likely.
 # Restart the service
 log_info "Restarting service..."
-run_step "Restarting systemd service (${APP_NAME})" systemctl restart "${APP_NAME}"
+run_step "Restarting systemd service (${APP_NAME})" run_sudo_cmd systemctl restart "${APP_NAME}"
 
 # Wait for service to start
 run_step "Waiting for service warm-up" sleep 5
@@ -3362,7 +3300,7 @@ fi
 # Restart nginx after app deploy so the synced template is active and any proxy
 # worker state picks up the current upstream + headers/rate-limit config.
 log_info "Restarting nginx..."
-run_step "Restarting nginx" systemctl restart nginx
+run_step "Restarting nginx" run_sudo_cmd systemctl restart nginx
 
 # Install/update the managed cron entries after the `current` symlink moves so
 # cron uses the latest runner path and includes any newly introduced jobs.

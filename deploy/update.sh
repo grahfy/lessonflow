@@ -1783,7 +1783,8 @@ should_use_sudo_for_deploy() {
   if [[ ${EUID} -eq 0 ]]; then
     return 1
   fi
-  command -v sudo >/dev/null 2>&1
+  # Default to no global sudo execution
+  return 1
 }
 
 # Prompts for sudo once (or verifies cached auth in non-interactive runs) so the
