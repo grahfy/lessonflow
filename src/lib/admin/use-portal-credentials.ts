@@ -10,11 +10,18 @@ export interface UsePortalCredentialsOptions {
     onError?: (message: string) => void;
 }
 
+export interface PortalCredential {
+    id: string;
+    generatedAt: string;
+    rotatedAt: string | null;
+    isActive: boolean;
+}
+
 export interface UsePortalCredentialsResult {
     revealedPasswords: Record<string, string>;
     busyCustomerId: string | null;
-    reveal: (customerId: string) => Promise<{ password: string; credential: any } | null>;
-    regenerate: (customerId: string) => Promise<{ password: string; credential: any } | null>;
+    reveal: (customerId: string) => Promise<{ password: string; credential: PortalCredential } | null>;
+    regenerate: (customerId: string) => Promise<{ password: string; credential: PortalCredential } | null>;
 }
 
 /**
@@ -27,7 +34,7 @@ export function usePortalCredentials(options: UsePortalCredentialsOptions = {}):
 
     const { safeFetch, handleApiError } = useSafeFetch({ onAuthError, onError });
 
-    const reveal = useCallback(async (customerId: string): Promise<{ password: string; credential: any } | null> => {
+    const reveal = useCallback(async (customerId: string): Promise<{ password: string; credential: PortalCredential } | null> => {
         setBusyCustomerId(customerId);
         try {
             const response = await safeFetch(`/api/admin/customers/${customerId}/portal-credential`, {
@@ -52,7 +59,7 @@ export function usePortalCredentials(options: UsePortalCredentialsOptions = {}):
         }
     }, [safeFetch, handleApiError]);
 
-    const regenerate = useCallback(async (customerId: string): Promise<{ password: string; credential: any } | null> => {
+    const regenerate = useCallback(async (customerId: string): Promise<{ password: string; credential: PortalCredential } | null> => {
         setBusyCustomerId(customerId);
         try {
             const response = await safeFetch(`/api/admin/customers/${customerId}/portal-credential`, {
