@@ -1,4 +1,3 @@
-import { google } from "googleapis";
 import { getGmailClient } from "./client";
 
 /**

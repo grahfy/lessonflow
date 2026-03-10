@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/db";
 import { interpolatePlaceholders, PlaceholderContext } from "@/lib/email/placeholders";
-import { PUBLIC_BRAND_NAME, CONTACT_PHONE, CONTACT_ADDRESS, LOGO_URL } from "@/lib/branding";
-import { getPublicSiteUrl } from "@/lib/env";
+import { renderEmailLayout, getEmailBranding } from "./layout";
 
 /**
  * Renders an email template by key, merging DB content with hardcoded fallbacks.
@@ -22,20 +21,26 @@ export async function renderTemplate(
   });
 
   // 2. Prepare global branding context
-  const siteUrl = getPublicSiteUrl().replace(/\/+$/, "");
+  const branding = getEmailBranding();
   const globalContext: PlaceholderContext = {
-    brandName: PUBLIC_BRAND_NAME,
-    contactPhone: CONTACT_PHONE,
-    contactAddress: CONTACT_ADDRESS,
-    siteUrl,
-    logoUrl: LOGO_URL,
+    brandName: branding.brandName,
+    contactPhone: branding.phone,
+    contactAddress: branding.address,
+    siteUrl: branding.siteUrl,
+    logoUrl: branding.logoUrl,
     ...context
   };
 
   if (dbTemplate) {
+    const subject = interpolatePlaceholders(dbTemplate.subject, globalContext);
+    const bodyHtml = interpolatePlaceholders(dbTemplate.htmlBody, globalContext);
+
     return {
-      subject: interpolatePlaceholders(dbTemplate.subject, globalContext),
-      html: interpolatePlaceholders(dbTemplate.htmlBody, globalContext)
+      subject,
+      html: renderEmailLayout({
+        title: subject,
+        contentHtml: bodyHtml
+      })
     };
   }
 

@@ -18,7 +18,6 @@
  * - GMAIL_USER_EMAIL: The Gmail address to send from (e.g., lessonflow@gmail.com)
  */
 
-import { google } from "googleapis";
 import { prisma } from "@/lib/db";
 import { logError, logEvent } from "@/lib/observability";
 import { getGmailClient } from "@/lib/gmail/client";
