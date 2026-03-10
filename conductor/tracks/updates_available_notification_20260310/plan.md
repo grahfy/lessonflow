@@ -62,3 +62,6 @@ Create the real-time feedback UI for the update process and handle the applicati
 - [x] Task: Final Integration & Cleanup
     - [x] Ensure `deploy/update.sh` correctly writes metadata used by the existing "Latest Updates" popup
 - [x] Task: Conductor - User Manual Verification 'Phase 4: Progress UI & Restart Handling' (Protocol in workflow.md)
+
+## Phase: Review Fixes
+- [x] Task: Apply review suggestions 6a178c5
