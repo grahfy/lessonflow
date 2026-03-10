@@ -653,7 +653,7 @@ backup_database_before_schema_change() {
     restore_note="${backup_dir}/pre-schema-${timestamp}.restore.txt"
 
     mkdir -p "${backup_dir}"
-    chown -R :www-data "${SHARED_DIR}/data" 2>/dev/null || true
+    run_sudo_cmd chown -R :www-data "${SHARED_DIR}/data" 2>/dev/null || true
 
     rm -f "${backup_file}" 2>/dev/null || true
 
@@ -760,8 +760,8 @@ backup_database_before_schema_change() {
     } > "${restore_note}"
 
     if [[ -O "${backup_file}" ]]; then
-        chmod 640 "${backup_file}" "${restore_note}" 2>/dev/null || true
-        chown :www-data "${backup_file}" "${restore_note}" 2>/dev/null || true
+        run_sudo_cmd chmod 640 "${backup_file}" "${restore_note}" 2>/dev/null || true
+        run_sudo_cmd chown :www-data "${backup_file}" "${restore_note}" 2>/dev/null || true
     else
         run_sudo_cmd chmod 640 "${backup_file}" "${restore_note}" 2>/dev/null || true
         run_sudo_cmd chown :www-data "${backup_file}" "${restore_note}" 2>/dev/null || true
@@ -2297,10 +2297,10 @@ maybe_self_update_and_restart() {
 
     section "Git Update"
     log_info "Deploy self-update check in ${repo_root}"
-    run_step "Fetching origin/${BRANCH}" git -C "${repo_root}" fetch origin "${BRANCH}"
+    run_step "Fetching origin/${BRANCH}" run_sudo_cmd git -C "${repo_root}" fetch origin "${BRANCH}"
 
     if [[ -n "${current_branch}" && "${current_branch}" != "${BRANCH}" ]]; then
-        run_step "Checking out ${BRANCH}" git -C "${repo_root}" checkout "${BRANCH}"
+        run_step "Checking out ${BRANCH}" run_sudo_cmd git -C "${repo_root}" checkout "${BRANCH}"
     fi
 
     if [[ -z "$(git -C "${repo_root}" symbolic-ref --short HEAD 2>/dev/null || true)" ]]; then
@@ -2308,7 +2308,7 @@ maybe_self_update_and_restart() {
         return 0
     fi
 
-    run_step "Merging latest origin/${BRANCH}" git -C "${repo_root}" merge --ff-only "origin/${BRANCH}"
+    run_step "Merging latest origin/${BRANCH}" run_sudo_cmd git -C "${repo_root}" merge --ff-only "origin/${BRANCH}"
     after_commit="$(git -C "${repo_root}" rev-parse --short=12 HEAD 2>/dev/null || true)"
     log_info "Repository commit: $(git -C "${repo_root}" rev-parse --short HEAD)"
 
@@ -3067,8 +3067,8 @@ fi
 # Create directories if they don't exist
 mkdir -p "${RELEASES_DIR}"
 mkdir -p "${SHARED_DIR}/data"
-chown -R :www-data "${DEPLOY_DIR}" 2>/dev/null || true
-chmod -R 775 "${SHARED_DIR}/data"
+run_sudo_cmd chown -R :www-data "${DEPLOY_DIR}" 2>/dev/null || true
+run_sudo_cmd chmod -R 775 "${SHARED_DIR}/data" 2>/dev/null || true
 
 section "Environment File (.env)"
 ensure_shared_env_file "${SOURCE_DIR}/.env.example" || true
@@ -3219,8 +3219,8 @@ ln -sfn "${NEW_RELEASE_DIR}" "${CURRENT_LINK}"
 # Fix permissions for the entire deploy directory
 # Do this AFTER everything is set up to ensure all new files are owned by www-data
 log_info "Fixing permissions..."
-chown -R :www-data "${DEPLOY_DIR}" 2>/dev/null || true
-chmod -R 755 "${NEW_RELEASE_DIR}"
+run_sudo_cmd chown -R :www-data "${DEPLOY_DIR}" 2>/dev/null || true
+run_sudo_cmd chmod -R 755 "${NEW_RELEASE_DIR}" 2>/dev/null || true
 
 # Ensure systemd service is installed
 SERVICE_FILE="/etc/systemd/system/${APP_NAME}.service"
