@@ -6,8 +6,14 @@ mkdir -p "${TEST_DEPLOY_DIR}"
 export DEPLOY_DIR="${TEST_DEPLOY_DIR}"
 export MGS_SKIP_DEPLOY_SHARED_ENV_REVIEW_PROMPT=1
 
+# Create an empty template .env.example
+touch .env.example
+
 echo "Running deploy.sh in test directory..."
 bash ./deploy/deploy.sh --skip-deps --skip-migrate --no-spinner --no-auto-bootstrap --skip-cron
+
+echo "Checking generated CRON_SECRET..."
+cat "${TEST_DEPLOY_DIR}/shared/.env"
 
 echo "Full dry-run passed."
 rm -rf "${TEST_DEPLOY_DIR}"

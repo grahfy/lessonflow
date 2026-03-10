@@ -1,3 +1,25 @@
+/**
+ * Admin Customers Console
+ * 
+ * The primary CRM interface for managing students, their communication history, 
+ * learning materials, and portal credentials.
+ * 
+ * CORE RESPONSIBILITIES:
+ * 1. Customer Discovery: Paginated list with debounced search (Name, Email, Phone).
+ * 2. Profile Management: Creating and editing detailed student records.
+ * 3. Communication Audit: Viewing outbound email history and syncing from Gmail.
+ * 4. Resource Allocation: Attaching audio/PDF materials to customers or specific lessons.
+ * 5. Access Control: Managing and rotating student portal credentials.
+ * 
+ * DESIGN RATIONALE:
+ * - Tabbed Detail View: Collates all student-related data in a single modal 
+ *   to minimize context switching.
+ * - Soft Deletion: If a customer has linked bookings, "deletion" automatically 
+ *   switches to "archiving" to preserve financial and historical integrity.
+ * - Debounced Search: Reduces database load by waiting 300ms before triggering 
+ *   a search query.
+ */
+
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
@@ -16,6 +38,10 @@ import { useLearningMaterials } from "@/lib/admin/use-learning-materials";
 import { usePortalCredentials } from "@/lib/admin/use-portal-credentials";
 import { type CustomersSortBy, type CustomersSortDirection } from "@/lib/customers/schema";
 
+/**
+ * Main Client Component for the /admin/customers route.
+ * Orchestrates data fetching across multiple sub-services (Email, Materials, Credentials).
+ */
 export function AdminCustomersClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -24,6 +50,7 @@ export function AdminCustomersClient() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
+  // Transient feedback timer (Auto-clear notices)
   useEffect(() => {
     if (notice) {
       const timer = setTimeout(() => setNotice(""), 10000);
@@ -31,6 +58,7 @@ export function AdminCustomersClient() {
     }
   }, [notice]);
 
+  // Search & Sorting State
   const [customerQuery, setCustomerQuery] = useState("");
   const [debouncedCustomerQuery, setDebouncedCustomerQuery] = useState("");
   const [sortBy, setSortBy] = useState<CustomersSortBy>("customer");
@@ -40,7 +68,7 @@ export function AdminCustomersClient() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
 
-  // UI State
+  // Selected Customer UI State
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerRow | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [customerForm, setCustomerForm] = useState<CustomerForm>(emptyCustomerForm());
@@ -51,7 +79,7 @@ export function AdminCustomersClient() {
   const [emailComposerSubject, setEmailComposerSubject] = useState("");
   const [emailComposerMessage, setEmailComposerMessage] = useState("");
 
-  // Materials State
+  // Materials State (Filtering uploads to specific bookings)
   const [materialsBookingId, setMaterialsBookingId] = useState("");
 
   const dialogPresence = usePresenceExit();
@@ -60,7 +88,8 @@ export function AdminCustomersClient() {
 
   const onAuthError = useCallback(() => window.location.assign("/admin/login"), []);
 
-  // Data Hooks
+  // -- DATA HOOKS (Separated by domain logic) --
+  
   const { 
     customers, 
     loading: loadingCustomers, 
@@ -84,6 +113,7 @@ export function AdminCustomersClient() {
     send: sendEmailApi,
     sync: syncEmailApi
     } = useEmailHistory({ onAuthError, onError: setError });
+
   const {
     materials: materialsList,
     bookings: materialsBookings,
@@ -102,7 +132,9 @@ export function AdminCustomersClient() {
     regenerate: regeneratePortalPasswordApi
   } = usePortalCredentials({ onAuthError, onError: setError });
 
-  // Dialog Handlers
+  // -- DIALOG HANDLERS --
+
+  /** Opens the complex tabbed detail dialog for a customer and triggers sub-data loads. */
   const openCustomerDialog = useCallback(async (customer: CustomerRow | null, editMode = false) => {
     setError("");
     setNotice("");
@@ -111,6 +143,7 @@ export function AdminCustomersClient() {
     setCustomerForm(customer ? customerFormFromRow(customer) : emptyCustomerForm());
     setActiveTab("profile");
 
+    // Eagerly load history if a customer is selected
     if (customer) {
       void loadEmailHistory(customer.id);
       void loadMaterials(customer.id);
@@ -130,14 +163,18 @@ export function AdminCustomersClient() {
     setSelectedCustomer(null);
     setIsEditing(false);
     setCustomerForm(emptyCustomerForm());
+    // Clear URL segments to maintain clean routing
     router.replace("/admin/customers", { scroll: false });
   }, [dialogPresence, router]);
 
-  // Effects
+  // -- EFFECTS --
+
+  // React to search/sort changes
   useEffect(() => {
     void loadCustomers(debouncedCustomerQuery, page, sortBy, sortDir);
   }, [debouncedCustomerQuery, page, sortBy, sortDir, loadCustomers]);
 
+  // Deep linking to customer details via URL (e.g. from invoices page)
   useEffect(() => {
     const customerId = searchParams.get("customerId");
     const shouldOpen = searchParams.get("open") === "true";
@@ -151,12 +188,15 @@ export function AdminCustomersClient() {
     }
   }, [searchParams, customers, selectedCustomer, openCustomerDialog, router]);
 
+  // Handle Input Debouncing
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedCustomerQuery(customerQuery), 300);
     return () => clearTimeout(timer);
   }, [customerQuery]);
 
-  // Action Handlers
+  // -- ACTION HANDLERS --
+
+  /** Creates or updates a customer profile. */
   async function saveCustomer() {
     setError("");
     setNotice("");
@@ -184,6 +224,11 @@ export function AdminCustomersClient() {
     }
   }
 
+  /**
+   * Deletes a customer or archives them if they have active bookings.
+   * RATIONALE: We cannot hard-delete customers with financial or scheduling 
+   * history as it would orphan child records.
+   */
   async function deleteCustomer(customer: CustomerRow) {
     if (!window.confirm(`Are you sure you want to delete ${customer.fullName}? This will archive the customer if they have linked bookings.`)) {
       return;
@@ -202,6 +247,7 @@ export function AdminCustomersClient() {
     }
   }
 
+  /** Dispatches an ad-hoc custom email to the student. */
   async function sendCustomerEmail(subject: string, message: string, captcha?: { captchaToken: string; captchaAnswer: string }) {
     if (!selectedCustomer) return { success: false };
     setError("");
@@ -214,6 +260,7 @@ export function AdminCustomersClient() {
     return result;
   }
 
+  /** Uploads a resource file (WAV/PDF/IMG) for the student. */
   async function uploadMaterial(captcha?: { captchaToken: string; captchaAnswer: string }) {
     if (!selectedCustomer || !materialsUploadFormRef.current) return;
     setError("");
@@ -245,6 +292,7 @@ export function AdminCustomersClient() {
           <button className="btn btn-primary" onClick={() => openCustomerDialog(null, true)}>
             CREATE NEW CUSTOMER
           </button>
+          
           <div className="search-box">
             <label htmlFor={searchInputId}>Search</label>
             <input
@@ -254,6 +302,7 @@ export function AdminCustomersClient() {
               placeholder="Search by name, email, or phone..."
               onChange={(event) => setCustomerQuery(event.target.value)}
             />
+            {/* Inline Sorting Controls */}
             <div className="admin-sort-inline-row">
               <span className="admin-inline-field">SORT BY</span>
               <select
@@ -299,6 +348,11 @@ export function AdminCustomersClient() {
         />
       </div>
 
+      {/* 
+        MULTI-TAB DETAIL DIALOG
+        RATIONALE: We use a deferred mounting strategy to ensure animations are 
+        smooth and data cleanup occurs on exit.
+      */}
       {dialogPresence.isMounted && (
         <CustomerDialogWrapper
           dialogRootRef={dialogRootRef}
@@ -314,7 +368,7 @@ export function AdminCustomersClient() {
           error={error}
           notice={notice}
           
-          // Email History
+          // Email History & Sync Logic
           loadingEmailHistory={loadingEmailHistory}
           emailHistory={emailHistory}
           emailComposerSubject={emailComposerSubject}
@@ -326,7 +380,7 @@ export function AdminCustomersClient() {
           onSendEmail={sendCustomerEmail}
           onSyncEmail={() => selectedCustomer && syncEmailApi(selectedCustomer.id)}
 
-          // Learning Materials
+          // Learning Materials Asset Management
           materialsList={materialsList}
           materialsBookings={materialsBookings}
           materialsLoading={materialsLoading}
@@ -339,13 +393,13 @@ export function AdminCustomersClient() {
           onDeleteMaterial={(mId) => deleteMaterial(mId)}
           onMaterialBookingSelect={loadMaterials}
 
-          // Portal Credentials
+          // Student Portal Identity Access
           revealedPortalPasswords={revealedPortalPasswords}
           portalCredentialBusyCustomerId={portalCredentialBusyCustomerId}
           onRevealPortalPassword={() => selectedCustomer && revealPortalPasswordApi(selectedCustomer.id)}
           onRegeneratePortalPassword={() => selectedCustomer && regeneratePortalPasswordApi(selectedCustomer.id)}
           
-          // Action handlers for profile tab
+          // Profile Tab Internal Actions
           onCancelEdit={() => setIsEditing(false)}
           onStartEdit={() => setIsEditing(true)}
           onDeleteCustomer={() => selectedCustomer && deleteCustomer(selectedCustomer)}
