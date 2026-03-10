@@ -5,12 +5,12 @@
 - [x] Task: Update `src/app/api/admin/customers/[id]/email/route.ts` to validate CAPTCHA answer using the internal validation service. [ff3dbf8]
 - [x] Task: Conductor - User Manual Verification 'Phase 1: API & Client Hook Updates' (Protocol in workflow.md) [ff3dbf8]
 
-#### Phase 2: UI Integration
-- [ ] Task: Update `CustomerEmailDialog` props to accept a `CaptchaController`.
-- [ ] Task: Implement `useCaptcha` in `AdminCustomersClient` and pass the controller down through `CustomerDialogWrapper`.
-- [ ] Task: Integrate `CaptchaField` into the `CustomerEmailDialog` "Send Email" section and enforce validation before sending.
-- [ ] Task: Ensure the CAPTCHA refreshes on success or failure.
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: UI Integration' (Protocol in workflow.md)
+#### Phase 2: UI Integration [checkpoint: 62437ff]
+- [x] Task: Update `CustomerEmailDialog` props to accept a `CaptchaController`. [62437ff]
+- [x] Task: Implement `useCaptcha` in `AdminCustomersClient` and pass the controller down through `CustomerDialogWrapper`. [62437ff]
+- [x] Task: Integrate `CaptchaField` into the `CustomerEmailDialog` "Send Email" section and enforce validation before sending. [62437ff]
+- [x] Task: Ensure the CAPTCHA refreshes on success or failure. [62437ff]
+- [x] Task: Conductor - User Manual Verification 'Phase 2: UI Integration' (Protocol in workflow.md) [62437ff]
 
 #### Phase 3: Testing & Verification
 - [ ] Task: Write/Update integration tests to verify the API rejects requests without valid CAPTCHA.
