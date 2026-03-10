@@ -1192,6 +1192,18 @@ ensure_managed_cron_jobs_installed_from_update() {
   return 0
 }
 
+# Checks for existence of the core systemd timer that triggers lessonflow jobs.
+managed_systemd_timers_present_from_update() {
+  if ! command -v systemctl >/dev/null 2>&1; then
+    return 1
+  fi
+  # We check for the daily bookings timer as a proxy for the suite
+  if systemctl list-unit-files --type=timer 2>/dev/null | grep -q '^lessonflow-daily-bookings\.timer'; then
+    return 0
+  fi
+  return 1
+}
+
 # Checks for the lessonflow managed cron block in root crontab without forcing
 # an interactive sudo prompt during auto-bootstrap detection.
 managed_cron_block_present_from_update() {
@@ -1244,12 +1256,9 @@ auto_enable_bootstrap_defaults_from_update() {
       changed=true
       enabled_flags+=( "install-app-service" )
     fi
-
-    if ! cron_scheduler_service_name_from_update >/dev/null 2>&1; then
-      INSTALL_CRON_IF_NEEDED=true
-      changed=true
-      enabled_flags+=( "install-cron" )
-    fi
+    
+    # RATIONALE: We no longer auto-enable INSTALL_CRON_IF_NEEDED because cron is 
+    # deprecated in favor of systemd timers. We only check for the app service.
   fi
 
   if [[ ! -d "${DEPLOY_DIR}" || ! -L "${CURRENT_LINK}" ]]; then
@@ -1259,7 +1268,8 @@ auto_enable_bootstrap_defaults_from_update() {
     enabled_flags+=( "install-app-service" "install-cron-jobs" )
   fi
 
-  if ! managed_cron_block_present_from_update; then
+  # Auto-enable cron jobs (timers) installation if neither timers nor legacy cron block is present.
+  if ! managed_systemd_timers_present_from_update && ! managed_cron_block_present_from_update; then
     INSTALL_CRON_JOBS_IF_NEEDED=true
     changed=true
     enabled_flags+=( "install-cron-jobs" )
