@@ -424,7 +424,7 @@ export const CONFIGURABLE_ENV_VARS = [
     key: "NEXT_PUBLIC_INVOICE_LOGO_URL",
     title: "Invoice Logo URL",
     description: "URL to the logo shown on invoices.",
-    placeholder: "/images/company-logo-invoice.webp",
+    placeholder: "/images/company-logo-invoice.png",
     isRequired: false,
     isSecret: false,
     validation: () => null
@@ -840,7 +840,22 @@ export const setupInitializeSchema = z
 export type SetupInitializeInput = z.infer<typeof setupInitializeSchema>;
 
 /**
+ * Default invoice product presets seeded during initial setup so the
+ * "Add from Preset" dropdown is populated on fresh deployments.
+ * Admins can edit/delete/add presets later via Settings → Product Presets.
+ */
+const DEFAULT_INVOICE_PRESETS = [
+  { id: "trial_30min", label: "30min Trial Lesson ($20)", description: "30min Trial Lesson", unitPriceCents: 2000, sortOrder: 10 },
+  { id: "pack_5x30", label: "5 × 30 Minute Lessons ($200)", description: "5 × 30 Minute Lessons", unitPriceCents: 20000, sortOrder: 20 },
+  { id: "pack_10x30", label: "10 × 30 Minute Lessons ($388)", description: "10 × 30 Minute Lessons", unitPriceCents: 38800, sortOrder: 30 },
+  { id: "pack_5x60", label: "5 × 1 Hour Lessons ($375)", description: "5 × 1 Hour Lessons", unitPriceCents: 37500, sortOrder: 40 },
+  { id: "pack_10x60", label: "10 × 1 Hour Lessons ($725)", description: "10 × 1 Hour Lessons", unitPriceCents: 72500, sortOrder: 50 },
+];
+
+/**
  * Creates the first admin account used to mark setup as complete.
+ * Also seeds default invoice product presets so the invoice UI is
+ * functional immediately after deployment.
  */
 export async function createInitialAdmin(input: SetupInitializeInput) {
   const normalizedEmail = input.email.trim().toLowerCase();
@@ -853,7 +868,7 @@ export async function createInitialAdmin(input: SetupInitializeInput) {
       return null;
     }
 
-    return tx.adminUser.create({
+    const admin = await tx.adminUser.create({
       data: {
         email: normalizedEmail,
         displayName,
@@ -861,6 +876,23 @@ export async function createInitialAdmin(input: SetupInitializeInput) {
         isActive: true
       }
     });
+
+    // Seed default invoice product presets so the "Add from Preset"
+    // dropdown works on fresh deployments. skipDuplicates makes this
+    // idempotent if presets were already created by a seed script.
+    await tx.invoiceProductPreset.createMany({
+      data: DEFAULT_INVOICE_PRESETS.map((p) => ({
+        id: p.id,
+        label: p.label,
+        description: p.description,
+        unitPriceCents: p.unitPriceCents,
+        sortOrder: p.sortOrder,
+        isActive: true
+      })),
+      skipDuplicates: true
+    });
+
+    return admin;
   });
 
   return created;
