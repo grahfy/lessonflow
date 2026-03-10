@@ -9,5 +9,15 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: Admin Booking Popup UI Re-adjustment**
+- [x] **Track: add captcha when sending emails in admin section**
+*Link: [./tracks/add_captcha_admin_email_20260310/](./tracks/add_captcha_admin_email_20260310/)*
+
+---
+
+- [ ] **Track: System Logs and Improved Error Handling**
+*Link: [./tracks/system-logs_20260310/](./tracks/system-logs_20260310/)*
+
+---
+
+- [x] **Track: Admin Booking Popup UI Re-adjustment**
 *Link: [./tracks/booking_ui_compact_20260310/](./tracks/booking_ui_compact_20260310/)*
