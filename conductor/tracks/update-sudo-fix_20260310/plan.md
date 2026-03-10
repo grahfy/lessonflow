@@ -5,12 +5,12 @@
 - [x] Task: Map out required directory permissions for the deployment user.
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Research and Analysis' (Protocol in workflow.md)
 
-## Phase 2: Permission and Ownership Updates
-- [~] Task: Implement updates to directory ownership for deployment targets.
-    - [ ] Create a shell script/commands to set ownership to the deployment user.
-- [ ] Task: Configure targeted passwordless `sudo` for service restarts if necessary.
-    - [ ] Draft the `sudoers` entry for the specific service restart command.
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Permission and Ownership Updates' (Protocol in workflow.md)
+## Phase 2: Permission and Ownership Updates [checkpoint: 52c5021]
+- [x] Task: Implement updates to directory ownership for deployment targets.
+    - [x] Create a shell script/commands to set ownership to the deployment user.
+- [x] Task: Configure targeted passwordless `sudo` for service restarts if necessary.
+    - [x] Draft the `sudoers` entry for the specific service restart command.
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Permission and Ownership Updates' (Protocol in workflow.md)
 
 ## Phase 3: Script Refactoring and Verification
 - [ ] Task: Write Tests: Verify script execution without `sudo` (e.g., via a mock environment or dry-run).
