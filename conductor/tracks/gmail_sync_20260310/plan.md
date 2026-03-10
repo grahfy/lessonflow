@@ -1,0 +1,47 @@
+# Implementation Plan: Gmail Integration & Two-Way Sync
+
+This plan follows the project's standard TDD workflow.
+
+## Phase 1: Database & Environment Preparation
+Update the data model to track provider information and external IDs for deduplication.
+
+- [ ] Task: Update `OutboundEmail` model in `schema.prisma`.
+    - [ ] Add `provider` (String, default "smtp").
+    - [ ] Add `externalId` (String, unique, nullable).
+    - [ ] Add `source` (String, default "app").
+- [ ] Task: Execute database migration.
+    - [ ] `npx prisma migrate dev --name add_email_sync_fields`
+- [ ] Task: Update `.env.example` with `EMAIL_PROVIDER` setting.
+- [ ] Task: Conductor - User Manual Verification 'Phase 1: Database & Environment Preparation' (Protocol in workflow.md)
+
+## Phase 2: Gmail API Client
+Implement the low-level service for interacting with Gmail API.
+
+- [ ] Task: Install `googleapis` dependency.
+- [ ] Task: Create `src/lib/gmail/client.ts` for OAuth2 authentication logic.
+- [ ] Task: Implement `sendGmail` function in `src/lib/gmail/service.ts`.
+- [ ] Task: Implement `listSentMessages` and `getMessageDetails` in `src/lib/gmail/service.ts`.
+- [ ] Task: Conductor - User Manual Verification 'Phase 2: Gmail API Client' (Protocol in workflow.md)
+
+## Phase 3: Core Email Service Integration
+Modify the existing email service to support multiple providers.
+
+- [ ] Task: Update `src/lib/email/service.ts` to select provider based on environment variable.
+- [ ] Task: Implement provider-specific logic in `sendEmail`.
+- [ ] Task: Ensure all sent emails record their `provider` and `externalId` (if applicable) in the database.
+- [ ] Task: Conductor - User Manual Verification 'Phase 3: Core Email Service Integration' (Protocol in workflow.md)
+
+## Phase 4: Background Synchronization
+Implement the logic to pull sent items from Gmail.
+
+- [ ] Task: Create `src/lib/gmail/sync.ts` logic for fetching and deduplicating emails.
+- [ ] Task: Create background job route `src/app/api/jobs/gmail-sync/route.ts`.
+- [ ] Task: Conductor - User Manual Verification 'Phase 4: Background Synchronization' (Protocol in workflow.md)
+
+## Phase 5: UI & Visibility
+Expose the new information in the admin dashboard.
+
+- [ ] Task: Update Email History UI to show provider/source labels.
+- [ ] Task: Add "Sync Now" button to Email History view.
+- [ ] Task: Add Gmail connection status to Admin Settings.
+- [ ] Task: Conductor - User Manual Verification 'Phase 5: UI & Visibility' (Protocol in workflow.md)
