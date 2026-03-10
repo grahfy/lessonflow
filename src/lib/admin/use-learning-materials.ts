@@ -59,6 +59,16 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
             formData.append("bookingId", bookingId);
         }
 
+        // If no explicit title field exists in the form, derive one from the
+        // original filename so materials aren't saved as "Untitled lesson material".
+        if (!formData.get("title")) {
+            const file = formData.get("file");
+            if (file instanceof File && file.name) {
+                const nameWithoutExt = file.name.replace(/\.[^.]+$/, "");
+                formData.set("title", nameWithoutExt);
+            }
+        }
+
         setUploading(true);
         try {
             const response = await fetch(`/api/admin/customers/${customerId}/learning-materials`, {
