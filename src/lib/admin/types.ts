@@ -25,6 +25,7 @@ export type LearningMaterialBooking = {
 export type LearningMaterialRow = {
     id: string;
     title: string;
+    description: string | null;
     bookingId: string | null;
     materialType: "audio" | "pdf";
     mimeType: string;

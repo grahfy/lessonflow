@@ -50,6 +50,7 @@ export function CustomerMaterialsDialog({
                                         <div className="customer-materials-item-copy">
                                             <strong>{m.title}</strong>
                                             <span>{m.mimeType} · {(m.sizeBytes / 1024 / 1024).toFixed(2)} MB · {formatDateTime(m.createdAt)}</span>
+                                            {m.description ? <span className="helper-text">{m.description}</span> : null}
                                         </div>
                                         <div className="customer-materials-item-actions">
                                             <button className="btn btn-secondary" onClick={() => window.open(`/api/admin/learning-materials/${m.id}`, '_blank')}>View</button>
@@ -144,6 +145,14 @@ export function CustomerMaterialsDialog({
                                         {selectedFileName}
                                     </span>
                                 </div>
+                            </AdminField>
+                            <AdminField label="Description (optional)" fullWidth>
+                                <textarea
+                                    name="description"
+                                    rows={2}
+                                    maxLength={500}
+                                    placeholder="E.g. Practice this fingerpicking pattern at 80 BPM"
+                                />
                             </AdminField>
                             <button
                                 type="button"

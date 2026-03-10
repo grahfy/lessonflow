@@ -349,6 +349,7 @@ model LearningMaterial {
   uploadedById String?
   uploadedBy   AdminUser?           @relation("LearningMaterialUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
   title        String
+  description  String?
   materialType LearningMaterialType
   storageKey   String               @unique
   mimeType     String

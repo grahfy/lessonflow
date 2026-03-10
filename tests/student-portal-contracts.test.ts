@@ -13,6 +13,7 @@ describe("student-portal-contracts", () => {
     const material = mapStudentPortalMaterial({
       id: "mat_1",
       title: "Arpeggio Sheet",
+      description: null,
       materialType: "pdf",
       mimeType: "application/pdf",
       sizeBytes: 2048,
@@ -34,6 +35,7 @@ describe("student-portal-contracts", () => {
         {
           id: "mat_1",
           title: "Arpeggio Sheet",
+          description: null,
           materialType: "pdf",
           mimeType: "application/pdf",
           sizeBytes: 2048,

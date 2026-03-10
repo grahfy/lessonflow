@@ -9,6 +9,7 @@ const studentPortalMaterialTypeSchema = z.enum(["audio", "pdf"]);
 export const studentPortalMaterialSchema = z.object({
   id: z.string(),
   title: z.string(),
+  description: z.string().nullable(),
   materialType: studentPortalMaterialTypeSchema,
   mimeType: z.string(),
   sizeBytes: z.number().int().nonnegative(),
@@ -86,7 +87,7 @@ export type StudentPortalCancelBookingResponse = z.infer<typeof studentPortalCan
 
 type MaterialMapInput = Pick<
   LearningMaterial,
-  "id" | "title" | "materialType" | "mimeType" | "sizeBytes" | "createdAt"
+  "id" | "title" | "description" | "materialType" | "mimeType" | "sizeBytes" | "createdAt"
 >;
 
 type BookingMapInput = Pick<
@@ -116,6 +117,7 @@ export function mapStudentPortalMaterial(material: MaterialMapInput): StudentPor
   return studentPortalMaterialSchema.parse({
     id: material.id,
     title: material.title,
+    description: material.description,
     materialType: material.materialType,
     mimeType: material.mimeType,
     sizeBytes: material.sizeBytes,

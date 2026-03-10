@@ -88,6 +88,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       materials: materials.map((material) => ({
         id: material.id,
         title: material.title,
+        description: material.description,
         bookingId: material.bookingId,
         materialType: material.materialType,
         mimeType: material.mimeType,
@@ -129,6 +130,10 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const bookingId = String(form.get("bookingId") || "").trim();
     const title = sanitizeLearningMaterialTitle(String(form.get("title") || ""));
+    // Optional free-text description; trim and cap at 500 characters to prevent
+    // excessively long values, store null when the admin leaves it blank.
+    const rawDescription = String(form.get("description") || "").trim().slice(0, 500);
+    const description = rawDescription || null;
     const file = form.get("file");
 
     if (!(file instanceof File)) {
@@ -182,6 +187,7 @@ export async function POST(request: NextRequest, { params }: Params) {
           bookingId: linkedBookingId,
           uploadedById: admin.id,
           title,
+          description,
           materialType: classification.materialType,
           storageKey,
           mimeType: classification.mimeType,
@@ -194,6 +200,7 @@ export async function POST(request: NextRequest, { params }: Params) {
           material: {
             id: material.id,
             title: material.title,
+            description: material.description,
             bookingId: material.bookingId,
             materialType: material.materialType,
             mimeType: material.mimeType,

@@ -77,6 +77,7 @@ describe("admin-learning-materials", () => {
     const uploadForm = new FormData();
     uploadForm.set("bookingId", booking.id);
     uploadForm.set("title", "Chord chart");
+    uploadForm.set("description", "Practice this chord transition slowly");
     uploadForm.set(
       "file",
       new File([Buffer.from("pdf-content")], "chord-chart.pdf", {
@@ -110,10 +111,11 @@ describe("admin-learning-materials", () => {
     });
     expect(listResponse.status).toBe(200);
     const listPayload = (await listResponse.json()) as {
-      materials: Array<{ id: string; bookingId: string }>;
+      materials: Array<{ id: string; bookingId: string; description: string | null }>;
     };
     expect(listPayload.materials.map((material) => material.id)).toContain(uploadPayload.material.id);
     expect(listPayload.materials[0]?.bookingId).toBe(booking.id);
+    expect(listPayload.materials[0]?.description).toBe("Practice this chord transition slowly");
 
     const deleteRequest = new NextRequest(`http://localhost/api/admin/learning-materials/${uploadPayload.material.id}`, {
       method: "DELETE",
