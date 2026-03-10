@@ -1,8 +1,0 @@
-{
-  "track_id": "gmail_sync_20260310",
-  "type": "feature",
-  "status": "new",
-  "created_at": "2026-03-10T10:00:00Z",
-  "updated_at": "2026-03-10T10:00:00Z",
-  "description": "make email history be able to use gmail as well as outbound email"
-}
