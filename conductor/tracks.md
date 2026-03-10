@@ -6,3 +6,8 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 - [x] **Track: consolidate, unify all of the code in the admin section.**
 *Link: [./tracks/admin_consolidation_20260303/](./tracks/admin_consolidation_20260303/)*
+
+---
+
+- [ ] **Track: add an updates available notification with button in the admin section, that shows the latest commit changes and then updates and restarts lessonflow.**
+*Link: [./tracks/updates_available_notification_20260310/](./tracks/updates_available_notification_20260310/)*

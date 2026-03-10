@@ -1,0 +1,64 @@
+# Implementation Plan: Updates Available Notification
+
+This plan outlines the steps to implement a proactive update management system in LessonFlow, allowing admins to detect, review, and apply repository updates directly from the web console.
+
+## Phase 1: Update Detection and Metadata Service
+Implement the backend logic to detect pending repository updates and retrieve commit details.
+
+- [ ] Task: Create `src/lib/services/updates-service.ts` to manage update detection
+    - [ ] Implement `getUpdateStatus()` to compare local HEAD with `origin/main`
+    - [ ] Implement `getPendingCommits()` to retrieve messages between local and remote
+    - [ ] Add caching (e.g., 5-minute TTL) to prevent excessive `git fetch` calls
+- [ ] Task: Create API route `GET /api/admin/updates/status`
+    - [ ] Return update availability and pending commit list
+    - [ ] Enforce strict admin session verification
+- [ ] Task: Write Tests for Update Service
+    - [ ] Mock `child_process.exec` to simulate various git states
+    - [ ] Verify correct SHA comparison and commit list parsing
+- [ ] Task: Conductor - User Manual Verification 'Phase 1: Update Detection and Metadata Service' (Protocol in workflow.md)
+
+## Phase 2: Admin UI Integration (Banner and Changes Modal)
+Surface the update availability to administrators through a persistent dashboard banner.
+
+- [ ] Task: Create `UpdateNotificationBanner` component
+    - [ ] Fetch status from `/api/admin/updates/status` on mount
+    - [ ] Display high-visibility banner if update is available
+- [ ] Task: Integrate banner into `src/components/admin/layout/admin-shell.tsx`
+    - [ ] Ensure it appears above the main content but below the header
+- [ ] Task: Create `PendingChangesModal` component
+    - [ ] Display the list of pending commits (author, date, message)
+    - [ ] Add "Update Now" button with secondary confirmation dialog
+- [ ] Task: Write Tests for Update UI
+    - [ ] Verify banner appears only when updates are available
+    - [ ] Verify modal correctly renders commit data
+- [ ] Task: Conductor - User Manual Verification 'Phase 2: Admin UI Integration (Banner and Changes Modal)' (Protocol in workflow.md)
+
+## Phase 3: Secure Update Trigger & Script Wrapper
+Implement the mechanism to safely trigger the server-side deployment script.
+
+- [ ] Task: Create non-interactive update wrapper `scripts/trigger-update.sh`
+    - [ ] Call `deploy/update.sh --non-interactive` (or equivalent)
+    - [ ] Ensure it runs with appropriate permissions
+- [ ] Task: Implement Update Execution API `POST /api/admin/updates/execute`
+    - [ ] Implement process locking (prevent multiple concurrent updates)
+    - [ ] Trigger the wrapper script and capture output to a temporary log file
+- [ ] Task: Implement Log Streaming Route `GET /api/admin/updates/stream`
+    - [ ] Use Server-Sent Events (SSE) to stream the update log file content to the client
+- [ ] Task: Write Tests for Update Execution
+    - [ ] Verify admin authorization
+    - [ ] Verify process locking behavior
+- [ ] Task: Conductor - User Manual Verification 'Phase 3: Secure Update Trigger & Script Wrapper' (Protocol in workflow.md)
+
+## Phase 4: Progress UI & Restart Handling
+Create the real-time feedback UI for the update process and handle the application restart.
+
+- [ ] Task: Create `/admin/updates/progress` page
+    - [ ] Connect to `/api/admin/updates/stream` SSE endpoint
+    - [ ] Render a scrolling log view of the deployment process
+    - [ ] Show a "Restarting..." state when the build is complete
+- [ ] Task: Implement Graceful Reconnection Logic
+    - [ ] If the connection drops (during restart), poll the health check endpoint
+    - [ ] Redirect back to the dashboard once LessonFlow is back online
+- [ ] Task: Final Integration & Cleanup
+    - [ ] Ensure `deploy/update.sh` correctly writes metadata used by the existing "Latest Updates" popup
+- [ ] Task: Conductor - User Manual Verification 'Phase 4: Progress UI & Restart Handling' (Protocol in workflow.md)
