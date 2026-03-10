@@ -17,8 +17,8 @@ Update the data model to track provider information and external IDs for dedupli
 ## Phase 2: Gmail API Client
 Implement the low-level service for interacting with Gmail API.
 
-- [ ] Task: Install `googleapis` dependency.
-- [ ] Task: Create `src/lib/gmail/client.ts` for OAuth2 authentication logic.
+- [x] Task: Install `googleapis` dependency.
+- [x] Task: Create `src/lib/gmail/client.ts` for OAuth2 authentication logic. [873f580]
 - [ ] Task: Implement `sendGmail` function in `src/lib/gmail/service.ts`.
 - [ ] Task: Implement `listSentMessages` and `getMessageDetails` in `src/lib/gmail/service.ts`.
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Gmail API Client' (Protocol in workflow.md)
