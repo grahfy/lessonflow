@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { listSentMessages, getMessageDetails } from "./service";
+import type { gmail_v1 } from "googleapis";
 import { logError, logEvent } from "@/lib/observability";
 
 /**
@@ -28,13 +29,12 @@ export async function syncGmailSentMessages(maxResults: number = 50) {
       }
 
       // 2. Fetch details. Try for full content, fallback to metadata if permissions are restricted.
-      let details;
+      let details: gmail_v1.Schema$Message | undefined;
       try {
         details = await getMessageDetails(msg.id, "full");
-      } catch (error: any) {
-        // If we only have gmail.metadata scope, "full" will fail with 403 or a specific error message.
-        // The reported error "Metadata scope does not support 'q' parameter" suggests metadata scope is active.
-        if (error.code === 403 || error.status === 403 || error.message?.includes("Metadata scope")) {
+      } catch (error: unknown) {
+        const err = error as { code?: number; status?: number; message?: string };
+        if (err.code === 403 || err.status === 403 || err.message?.includes("Metadata scope")) {
           details = await getMessageDetails(msg.id, "metadata");
         } else {
           throw error;

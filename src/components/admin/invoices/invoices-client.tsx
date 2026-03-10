@@ -786,7 +786,8 @@ export function AdminInvoicesClient() {
           </div>
         }
       >
-        <div className="dialog-layout">
+        <div className="booking-dialog-scroll">
+          <div className="dialog-layout">
           <div className="dialog-col">
             <h3 className="manual-section-title">Recipient & Basis</h3>
             <AdminCard ghost style={{ marginBottom: '16px' }}>
@@ -859,6 +860,7 @@ export function AdminInvoicesClient() {
               </p>
             </AdminCard>
           </div>
+        </div>
         </div>
       </AdminDialog>
     </AdminShell>

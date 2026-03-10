@@ -335,7 +335,7 @@ export function AdminBookingsClient() {
     const setFieldValue = (name: string, value: string) => {
       const field = formElements.namedItem(name);
       if (field && "value" in field) {
-        (field as any).value = value;
+        (field as unknown as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value = value;
       }
     };
     setFieldValue("firstName", customer.firstName || customer.fullName.split(" ")[0] || "");
@@ -359,7 +359,7 @@ export function AdminBookingsClient() {
     const setFieldValue = (name: string, value: string) => {
       const field = formElements.namedItem(name);
       if (field && "value" in field) {
-        (field as any).value = value;
+        (field as unknown as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value = value;
       }
     };
     setFieldValue("firstName", "");
@@ -693,6 +693,7 @@ export function AdminBookingsClient() {
           isOpen={true}
           onClose={() => setIsMoveOpen(false)}
           title="Move Lesson Time"
+          wide
           footer={
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", width: "100%" }}>
               <button className="btn btn-secondary" onClick={() => setIsMoveOpen(false)}>CANCEL</button>

@@ -57,7 +57,7 @@ export function CustomerTable({
                 pageSize: pageSize,
                 onPageChange: onSetPage,
                 onPageSizeChange: onSetPageSize,
-                pageSizeOptions: [25, 50, 100, 250]
+                pageSizeOptions: [15, 25, 50, 100, 250]
             }}
         >
             {customers.map((customer) => (

@@ -55,7 +55,7 @@ export function AdminTable({
           pageSize={pagination.pageSize}
           onPageSizeChange={pagination.onPageSizeChange}
           totalCount={pagination.totalCount}
-          pageSizeOptions={pagination.pageSizeOptions || [25, 50, 100, 250]}
+          pageSizeOptions={pagination.pageSizeOptions || [15, 25, 50, 100, 250]}
         />
       )}
     </div>

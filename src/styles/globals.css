@@ -2162,12 +2162,14 @@ h1 {
 
 .dialog-tab-section {
   width: 100%;
-  min-height: 640px;
+  min-height: min(70vh, 760px);
 }
 
 .customer-tab-panel {
   margin-top: 12px;
-  min-height: 650px;
+  height: min(70vh, 760px);
+  max-height: none;
+  min-height: min(70vh, 760px);
 }
 
 .customer-dialog-description {
@@ -2198,10 +2200,12 @@ h1 {
 
 .customer-dialog-panel {
   margin-top: 12px;
+  height: min(70vh, 760px);
+  max-height: none;
 }
 
 .customer-profile-panel {
-  min-height: 650px;
+  min-height: min(70vh, 760px);
 }
 
 .customer-profile-subhead {
@@ -2219,7 +2223,7 @@ h1 {
 }
 
 .customer-email-history-card {
-  max-height: 500px;
+  height: 100%;
   overflow-y: auto;
 }
 
@@ -2286,7 +2290,7 @@ h1 {
 }
 
 .customer-materials-list-card {
-  max-height: 500px;
+  height: 100%;
   overflow-y: auto;
 }
 
@@ -2794,7 +2798,8 @@ h1 {
 }
 
 .dialog-panel-wide {
-  width: min(1320px, calc(100vw - 32px));
+  width: min(1380px, calc(100vw - 24px));
+  max-height: min(96vh, 1020px);
 }
 
 .dialog-head {
@@ -2820,7 +2825,7 @@ h1 {
 
 .booking-dialog-scroll {
   min-height: 0;
-  max-height: min(68vh, 760px);
+  max-height: min(70vh, 760px);
   overflow: auto;
   padding-right: 4px;
 }
@@ -3415,7 +3420,10 @@ h1 {
 
 .admin-list-cell.admin-list-col-status,
 .admin-list-cell.admin-list-col-total,
-.admin-list-cell.admin-list-col-due,
+.admin-list-cell.admin-list-col-due {
+  font-size: 0.95rem;
+}
+
 .admin-list-cell.admin-list-col-phone,
 .admin-list-cell.admin-list-col-skill,
 .admin-list-cell.admin-list-col-portal {
