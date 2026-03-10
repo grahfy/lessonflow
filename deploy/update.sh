@@ -2211,9 +2211,17 @@ run_deploy() {
     fi
 
     if (( ${#sudo_env_args[@]} > 0 )); then
-      sudo env "${sudo_env_args[@]}" "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
+      if [[ -n "${MGS_SUDO_PASSWORD:-}" ]]; then
+        echo "$MGS_SUDO_PASSWORD" | sudo -S env "${sudo_env_args[@]}" "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
+      else
+        sudo env "${sudo_env_args[@]}" "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
+      fi
     else
-      sudo "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
+      if [[ -n "${MGS_SUDO_PASSWORD:-}" ]]; then
+        echo "$MGS_SUDO_PASSWORD" | sudo -S "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
+      else
+        sudo "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
+      fi
     fi
   else
     MGS_SKIP_DEPLOY_SHARED_ENV_REVIEW_PROMPT=1 "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
