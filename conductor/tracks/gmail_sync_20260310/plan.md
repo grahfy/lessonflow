@@ -43,5 +43,5 @@ Expose the new information in the admin dashboard.
 
 - [x] Task: Update Email History UI to show provider/source labels. [d400e95]
 - [x] Task: Add "Sync Now" button to Email History view. [322fc33]
-- [ ] Task: Add Gmail connection status to Admin Settings.
+- [x] Task: Add Gmail connection status to Admin Settings. [a7a00ae]
 - [ ] Task: Conductor - User Manual Verification 'Phase 5: UI & Visibility' (Protocol in workflow.md)
