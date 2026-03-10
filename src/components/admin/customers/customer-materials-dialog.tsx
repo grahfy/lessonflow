@@ -40,12 +40,12 @@ export function CustomerMaterialsDialog({
     const handleUpload = () => {
         if (!captcha.validateAnswer()) return;
         onUpload(captcha.getPayload());
-        // The form reset in the parent will trigger the captcha refresh if we handle it right,
-        // but let's manually regenerate on upload start/attempt to be safe or on success.
+        // Refresh captcha after upload attempt
+        void captcha.regenerate();
     };
 
     return (
-        <div className="dialog-tab-stack customer-tab-panel">
+        <div className="dialog-layout customer-tab-panel">
             <div className="dialog-col dialog-tab-section">
                 <h3 className="manual-section-title">Materials List</h3>
                 <AdminCard ghost className="customer-materials-list-card">
