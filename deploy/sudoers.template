@@ -1,0 +1,19 @@
+# Sudoers configuration for LessonFlow deployment
+# This allows the deployment user to restart specific services without a password.
+# To install, copy this file to /etc/sudoers.d/lessonflow and replace <DEPLOY_USER> with the actual username.
+#
+# cp deploy/sudoers.template /etc/sudoers.d/lessonflow
+# sed -i 's/<DEPLOY_USER>/grahf/g' /etc/sudoers.d/lessonflow
+# chmod 0440 /etc/sudoers.d/lessonflow
+
+<DEPLOY_USER> ALL=(root) NOPASSWD: /usr/bin/systemctl restart lessonflow, \
+                                    /usr/bin/systemctl daemon-reload, \
+                                    /usr/bin/systemctl enable lessonflow, \
+                                    /usr/bin/systemctl restart nginx, \
+                                    /usr/bin/systemctl restart cron, \
+                                    /usr/bin/systemctl restart crond, \
+                                    /usr/bin/systemctl start cron, \
+                                    /usr/bin/systemctl start crond, \
+                                    /usr/bin/systemctl enable cron, \
+                                    /usr/bin/systemctl enable crond, \
+                                    /usr/bin/crontab *
