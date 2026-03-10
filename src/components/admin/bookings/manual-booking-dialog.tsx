@@ -5,7 +5,9 @@ import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { type ManualStep, MANUAL_STEP_LABEL, MANUAL_STEP_ORDER, AU_STATES } from "@/lib/admin/types";
+import { toAuState } from "@/lib/admin/utils";
 import { type BookingMatchedCustomer } from "./types";
+import { AddressAutocomplete, type ParsedAddress } from "@/components/admin/ui/address-autocomplete";
 
 interface ManualBookingDialogProps {
   isOpen: boolean;
@@ -63,6 +65,26 @@ export function ManualBookingDialog({
   busyAction
 }: ManualBookingDialogProps) {
   const stepIndex = MANUAL_STEP_ORDER.indexOf(step);
+
+  const handleAddressSelect = (addr: ParsedAddress) => {
+    if (!formRef.current) return;
+    const form = formRef.current;
+    
+    const updateInput = (name: string, value: string) => {
+      const el = form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement | null;
+      if (el) {
+        el.value = value;
+      }
+    };
+
+    updateInput("unitNumber", addr.unitNumber);
+    updateInput("houseNumber", addr.houseNumber);
+    updateInput("streetName", addr.streetName);
+    updateInput("streetType", addr.streetType);
+    updateInput("suburb", addr.suburb);
+    updateInput("state", toAuState(addr.state));
+    updateInput("postcode", addr.postcode);
+  };
 
   return (
     <AdminDialog
@@ -172,6 +194,9 @@ export function ManualBookingDialog({
             </AdminForm>
 
             <h3 className="manual-section-title manual-subsection-heading">Address</h3>
+            <div style={{ marginBottom: "16px" }}>
+              <AddressAutocomplete onAddressSelect={handleAddressSelect} disabled={!!busyAction} />
+            </div>
             <AdminForm className="manual-grid manual-grid-3">
               <AdminField label="Unit">
                 <input name="unitNumber" maxLength={5} onInput={e => e.currentTarget.value = toDigits(e.currentTarget.value, 5)} />

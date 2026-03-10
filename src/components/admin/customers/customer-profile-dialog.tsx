@@ -3,6 +3,7 @@ import { AU_STATES } from "@/lib/admin/types";
 import { formatDateTime, toAuState, toDigits } from "@/lib/admin/utils";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { AdminCard } from "@/components/admin/ui/admin-card";
+import { AddressAutocomplete } from "@/components/admin/ui/address-autocomplete";
 
 // Types derived from admin-customers-client.tsx
 export type CustomerRow = {
@@ -196,6 +197,14 @@ export function CustomerProfileDialog({
                 </AdminForm>
 
                 <h4 className="customer-profile-subhead">Address</h4>
+                {isEditing && (
+                    <div style={{ paddingBottom: '16px' }}>
+                        <AddressAutocomplete 
+                            onAddressSelect={(addr) => updateForm({ ...addr, state: toAuState(addr.state) })} 
+                            disabled={savingCustomer} 
+                        />
+                    </div>
+                )}
                 <AdminForm className="dialog-form-grid">
                     <AdminField label="Unit / Apartment">
                         <input

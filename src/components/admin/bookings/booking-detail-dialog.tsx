@@ -9,7 +9,9 @@ import { formatDateTime } from "@/lib/admin/formatters";
 import { type BookingEvent } from "@/lib/admin/use-bookings";
 import { type EmailRecord } from "@/lib/admin/use-email-history";
 import { AU_STATES } from "@/lib/admin/types";
+import { toAuState } from "@/lib/admin/utils";
 import { type BookingDialogForm, type BookingMatchedCustomer } from "./types";
+import { AddressAutocomplete } from "@/components/admin/ui/address-autocomplete";
 
 interface BookingDetailDialogProps {
   isOpen: boolean;
@@ -217,6 +219,12 @@ export function BookingDetailDialog({
                   <AdminField label="Phone">
                     <input value={dialogForm.phone} maxLength={10} onChange={e => updateForm({ phone: e.target.value.replace(/\D/g, '').slice(0, 10) })} />
                   </AdminField>
+                  <div style={{ gridColumn: "1 / -1", padding: "8px 0" }}>
+                     <AddressAutocomplete 
+                        onAddressSelect={(addr) => updateForm({ ...addr, state: toAuState(addr.state) })} 
+                        disabled={!!busyAction} 
+                     />
+                  </div>
                   <AdminField label="Unit">
                     <input value={dialogForm.unitNumber} onChange={e => updateForm({ unitNumber: e.target.value })} />
                   </AdminField>
