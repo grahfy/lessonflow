@@ -2893,23 +2893,44 @@ h1 {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  gap: 6px;
 }
 
-#booking-detail-dialog .dialog-col.is-notes .field,
-#booking-detail-dialog .booking-email-composer-card .field:last-child {
+#booking-detail-dialog .booking-email-composer-card .field:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+#booking-detail-dialog .booking-email-composer-card .field:first-child label {
+  margin-bottom: 0;
+}
+
+#booking-detail-dialog .dialog-col.is-notes > .field {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
 
+#booking-detail-dialog .booking-email-composer-card .field {
+  height: auto !important;
+}
+
+#booking-detail-dialog .booking-email-composer-card .field:last-child {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
 #booking-detail-dialog .dialog-notes {
   flex: 1;
-  min-height: 120px;
+  min-height: 100px;
 }
 
 #booking-detail-dialog .booking-email-message-area {
-  min-height: 240px;
+  min-height: 140px;
+  height: 160px;
 }
 
 #booking-detail-dialog .booking-notes-actions {
