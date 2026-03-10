@@ -365,13 +365,16 @@ model LearningMaterial {
 // Email delivery/outbox tracking used by the mail service and reminder jobs to
 // record attempts, status, and provider errors.
 model OutboundEmail {
-  id        String   @id @default(cuid())
-  toEmail   String
-  subject   String
-  htmlBody  String   @db.Text
-  status    String
-  error     String?  @db.Text
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  toEmail    String
+  subject    String
+  htmlBody   String   @db.Text
+  status     String
+  provider   String   @default("smtp")
+  externalId String?  @unique
+  source     String   @default("app")
+  error      String?  @db.Text
+  createdAt  DateTime @default(now())
 }
 
 // Invoice and credit note domain model. Customer-facing invoice data is
