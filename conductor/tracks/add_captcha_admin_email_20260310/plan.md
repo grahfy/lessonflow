@@ -1,9 +1,9 @@
 ### Implementation Plan: Add CAPTCHA to Admin Customer Email Flow
 
-#### Phase 1: API & Client Hook Updates
-- [ ] Task: Update `src/lib/admin/use-email-history.ts` to include CAPTCHA payload in the `send` method.
-- [ ] Task: Update `src/app/api/admin/customers/[id]/email/route.ts` to validate CAPTCHA answer using the internal validation service.
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: API & Client Hook Updates' (Protocol in workflow.md)
+#### Phase 1: API & Client Hook Updates [checkpoint: ff3dbf8]
+- [x] Task: Update `src/lib/admin/use-email-history.ts` to include CAPTCHA payload in the `send` method. [ff3dbf8]
+- [x] Task: Update `src/app/api/admin/customers/[id]/email/route.ts` to validate CAPTCHA answer using the internal validation service. [ff3dbf8]
+- [x] Task: Conductor - User Manual Verification 'Phase 1: API & Client Hook Updates' (Protocol in workflow.md) [ff3dbf8]
 
 #### Phase 2: UI Integration
 - [ ] Task: Update `CustomerEmailDialog` props to accept a `CaptchaController`.
