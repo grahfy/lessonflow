@@ -19,7 +19,7 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: Deployment Update History**
+- [~] **Track: Deployment Update History**
 *Link: [./tracks/deploy-history_20260310/](./tracks/deploy-history_20260310/)*
 
 ---

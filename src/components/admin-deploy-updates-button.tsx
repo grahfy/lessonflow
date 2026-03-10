@@ -23,6 +23,10 @@ type LatestDeployUpdate = {
   commits: DeployCommitEntry[];
 };
 
+type HistoryResponse = {
+  updates: LatestDeployUpdate[];
+};
+
 type ApiResponse = LatestDeployUpdate & { error?: string };
 
 const SEEN_COMMIT_STORAGE_KEY = "mgs_admin_seen_deploy_commit";
@@ -53,6 +57,9 @@ export function AdminDeployUpdatesButton() {
   const [error, setError] = useState("");
   const [update, setUpdate] = useState<LatestDeployUpdate | null>(null);
   const [autoPromptedCommit, setAutoPromptedCommit] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"latest" | "history">("latest");
+  const [history, setHistory] = useState<LatestDeployUpdate[]>([]);
+  const [expandedHistoryCommit, setExpandedHistoryCommit] = useState<string | null>(null);
 
   async function loadAndMaybeOpen(options?: { forceOpen?: boolean; autoPrompt?: boolean }) {
     setLoading(true);
@@ -117,15 +124,36 @@ export function AdminDeployUpdatesButton() {
     }
   }
 
+  async function loadHistory() {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/admin/deploy-updates/history", { cache: "no-store" });
+      const body = await readJsonSafe<HistoryResponse>(response);
+      if (response.ok && body?.updates) {
+        setHistory(body.updates);
+      }
+    } catch {
+      // Best effort
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
     void loadAndMaybeOpen({ autoPrompt: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const commitCountLabel = useMemo(() => {
-    const count = update?.commits?.length || 0;
+  useEffect(() => {
+    if (open && activeTab === "history") {
+      void loadHistory();
+    }
+  }, [open, activeTab]);
+
+  const commitCountLabel = (commits?: DeployCommitEntry[]) => {
+    const count = commits?.length || 0;
     return `${count} commit${count === 1 ? "" : "s"}`;
-  }, [update]);
+  };
 
   function closeModal() {
     setOpen(false);
@@ -144,13 +172,26 @@ export function AdminDeployUpdatesButton() {
         <div className="dialog-backdrop" onClick={closeModal}>
           <div className="dialog-panel dialog-panel-wide deploy-updates-dialog" onClick={(event) => event.stopPropagation()}>
             <div className="dialog-head">
-              <h3>Latest deployment updates</h3>
+              <div className="deploy-updates-tabs">
+                <button 
+                  className={`tab-link ${activeTab === "latest" ? "active" : ""}`}
+                  onClick={() => setActiveTab("latest")}
+                >
+                  Latest
+                </button>
+                <button 
+                  className={`tab-link ${activeTab === "history" ? "active" : ""}`}
+                  onClick={() => setActiveTab("history")}
+                >
+                  History
+                </button>
+              </div>
               <button className="btn btn-secondary" type="button" onClick={closeModal}>Close</button>
             </div>
 
             {error ? <p className="notice error">{error}</p> : null}
 
-            {update ? (
+            {activeTab === "latest" && update ? (
               <div className="deploy-updates-content">
                 <p className="helper-text dialog-status">
                   Applied {formatDateTime(update.appliedAt)} · branch <strong>{update.branch}</strong> · release <strong>{update.release || "-"}</strong>
@@ -166,7 +207,7 @@ export function AdminDeployUpdatesButton() {
                   </div>
                   <div className="deploy-updates-meta-card">
                     <p className="deploy-updates-meta-label">Included changes</p>
-                    <p className="deploy-updates-meta-value">{commitCountLabel}</p>
+                    <p className="deploy-updates-meta-value">{commitCountLabel(update.commits)}</p>
                   </div>
                 </div>
 
@@ -189,6 +230,51 @@ export function AdminDeployUpdatesButton() {
                 </div>
               </div>
             ) : null}
+
+            {activeTab === "history" && (
+              <div className="deploy-updates-content">
+                {history.length === 0 && !loading ? (
+                  <p className="helper-text">No deployment history found.</p>
+                ) : (
+                  <div className="deploy-history-list">
+                    {history.map((item) => (
+                      <div key={item.commit} className={`deploy-history-item ${expandedHistoryCommit === item.commit ? "expanded" : ""}`}>
+                        <div 
+                          className="deploy-history-item-summary"
+                          onClick={() => setExpandedHistoryCommit(expandedHistoryCommit === item.commit ? null : item.commit)}
+                        >
+                          <div className="deploy-history-item-main">
+                            <strong>{formatDateTime(item.appliedAt)}</strong>
+                            <span className="helper-text">
+                              branch <strong>{item.branch}</strong> · release <strong>{item.release || "-"}</strong>
+                            </span>
+                          </div>
+                          <div className="deploy-history-item-meta">
+                            <code>{item.shortCommit}</code> · {commitCountLabel(item.commits)}
+                            <span className="expand-icon">{expandedHistoryCommit === item.commit ? "−" : "+"}</span>
+                          </div>
+                        </div>
+                        
+                        {expandedHistoryCommit === item.commit && (
+                          <div className="deploy-history-item-details">
+                            {(item.commits || []).map((commit) => (
+                              <article key={commit.hash} className="deploy-updates-item small">
+                                <div className="deploy-updates-item-head">
+                                  <strong>{commit.subject}</strong>
+                                  <span>
+                                    <code>{commit.shortHash}</code> · {commit.authorName}
+                                  </span>
+                                </div>
+                              </article>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       ) : null}

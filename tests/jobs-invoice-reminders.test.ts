@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 
 import { POST as runInvoiceReminderJob } from "@/app/api/jobs/invoice-reminders/route";
 import { prisma } from "@/lib/db";
+import { ensureOwnerAdmin } from "@/lib/admin-auth";
 
 function jobRequest(secret?: string, body?: Record<string, unknown>) {
   const headers = new Headers({
@@ -70,6 +71,8 @@ describe("jobs-invoice-reminders", () => {
     await prisma.invoiceLineItem.deleteMany();
     await prisma.invoice.deleteMany();
     await prisma.outboundEmail.deleteMany();
+    await prisma.adminUser.deleteMany();
+    await ensureOwnerAdmin();
   });
 
   it("rejects requests with missing or invalid cron secret", async () => {

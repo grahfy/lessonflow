@@ -1995,7 +1995,6 @@ h1 {
     linear-gradient(150deg, rgba(8, 30, 37, 0.92), rgba(13, 29, 49, 0.82));
   --admin-shell-shadow: 0 24px 44px rgba(5, 15, 18, 0.34);
 }
-
 .admin-shell-manual-page {
   --admin-shell-border: rgba(148, 163, 184, 0.24);
   --admin-shell-bg:
@@ -2003,6 +2002,130 @@ h1 {
     radial-gradient(circle at 84% 26%, rgba(59, 130, 246, 0.12), transparent 44%),
     linear-gradient(150deg, rgba(15, 23, 42, 0.92), rgba(17, 24, 39, 0.84));
   --admin-shell-shadow: 0 24px 44px rgba(5, 10, 18, 0.34);
+}
+
+/* Deployment Updates Dialog & History */
+.deploy-updates-dialog {
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+}
+
+.deploy-updates-tabs {
+  display: flex;
+  gap: 12px;
+}
+
+.tab-link {
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--ink-1);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 8px 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.tab-link:hover {
+  color: var(--ink-0);
+}
+
+.tab-link.active {
+  color: var(--brand-0);
+  border-bottom-color: var(--brand-0);
+}
+
+.deploy-updates-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.deploy-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.deploy-history-item {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+  transition: background 0.2s;
+}
+
+.deploy-history-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.deploy-history-item.expanded {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.deploy-history-item-summary {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: pointer;
+}
+
+.deploy-history-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.deploy-history-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--ink-1);
+  font-size: 0.85rem;
+}
+
+.expand-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+}
+
+.deploy-history-item-details {
+  padding: 0 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.1);
+  padding-top: 12px;
+}
+
+.deploy-updates-item.small {
+  padding: 8px 10px;
+  background: transparent;
+  border-left: 2px solid var(--line);
+  border-radius: 0;
+}
+
+.deploy-updates-item.small .deploy-updates-item-head {
+  font-size: 0.85rem;
 }
 
 .customer-item .customer-col-identity {

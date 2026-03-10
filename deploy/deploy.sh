@@ -2186,6 +2186,8 @@ write_latest_deploy_update_metadata() {
     DEPLOY_UPDATE_PREVIOUS_COMMIT="${previous_commit}" \
     DEPLOY_UPDATE_RELEASE="${release_id}" \
     DEPLOY_UPDATE_BRANCH="${branch_name}" \
+    DEPLOY_UPDATE_CRON_SECRET="${CRON_SECRET}" \
+    DEPLOY_UPDATE_SITE_URL="${NEXT_PUBLIC_SITE_URL}" \
     node <<'NODE'
 const fs = require("node:fs");
 const path = require("node:path");
@@ -2197,14 +2199,20 @@ const commit = process.env.DEPLOY_UPDATE_COMMIT || "";
 const previousCommit = process.env.DEPLOY_UPDATE_PREVIOUS_COMMIT || "";
 const release = process.env.DEPLOY_UPDATE_RELEASE || "";
 const branch = process.env.DEPLOY_UPDATE_BRANCH || "main";
+const cronSecret = process.env.DEPLOY_UPDATE_CRON_SECRET || "";
+const siteUrl = process.env.DEPLOY_UPDATE_SITE_URL || "http://127.0.0.1:3000";
 
 if (!repoRoot || !outputFile || !commit) process.exit(0);
 
 function safeGit(args) {
-  return execFileSync("git", ["-C", repoRoot, ...args], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"]
-  }).trimEnd();
+  try {
+    return execFileSync("git", ["-C", repoRoot, ...args], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"]
+    }).trimEnd();
+  } catch {
+    return "";
+  }
 }
 
 function getCommits() {
@@ -2225,6 +2233,8 @@ function getCommits() {
   }
 
   const raw = safeGit(args);
+  if (!raw) return [];
+
   const entries = raw
     .split("\x1e")
     .map((part) => part.trim())
@@ -2253,13 +2263,40 @@ const payload = {
   release,
   appliedAt: new Date().toISOString(),
   commit,
-  shortCommit: safeGit(["rev-parse", "--short", commit]),
+  shortCommit: safeGit(["rev-parse", "--short", commit]) || commit.slice(0, 7),
   previousCommit: previousCommit || null,
   commits: getCommits()
 };
 
-fs.mkdirSync(path.dirname(outputFile), { recursive: true });
-fs.writeFileSync(outputFile, JSON.stringify(payload, null, 2) + "\n", "utf8");
+// 1. Write to local JSON file (fallback/backup)
+try {
+  fs.mkdirSync(path.dirname(outputFile), { recursive: true });
+  fs.writeFileSync(outputFile, JSON.stringify(payload, null, 2) + "\n", "utf8");
+} catch (err) {
+  process.stderr.write(`Warning: Failed to write deployment JSON: ${err.message}\n`);
+}
+
+// 2. Record in database via API
+if (cronSecret && siteUrl) {
+  const url = `${siteUrl.replace(/\/+$/, "")}/api/admin/deploy-updates/record`;
+  
+  // Use a simple fetch-like approach with built-in modules or just assume it's best-effort.
+  // Since we don't want to add dependencies to the deploy script, we'll use a sub-process curl or node's https.
+  try {
+    const data = JSON.stringify(payload);
+    execFileSync("curl", [
+      "-X", "POST",
+      "-H", "Content-Type: application/json",
+      "-H", `Authorization: Bearer ${cronSecret}`,
+      "-d", data,
+      "--silent",
+      "--max-time", "10",
+      url
+    ]);
+  } catch (err) {
+    process.stderr.write(`Warning: Failed to record deployment in database: ${err.message}\n`);
+  }
+}
 NODE
 }
 
