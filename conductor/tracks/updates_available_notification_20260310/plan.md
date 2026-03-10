@@ -17,7 +17,7 @@ Implement the backend logic to detect pending repository updates and retrieve co
     - [x] Verify correct SHA comparison and commit list parsing
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Update Detection and Metadata Service' (Protocol in workflow.md)
 
-## Phase 2: Admin UI Integration (Banner and Changes Modal)
+## Phase 2: Admin UI Integration (Banner and Changes Modal) [checkpoint: 0ed695a]
 Surface the update availability to administrators through a persistent dashboard banner.
 
 - [x] Task: Create `UpdateNotificationBanner` component
@@ -31,7 +31,7 @@ Surface the update availability to administrators through a persistent dashboard
 - [x] Task: Write Tests for Update UI
     - [x] Verify banner appears only when updates are available
     - [x] Verify modal correctly renders commit data
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Admin UI Integration (Banner and Changes Modal)' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Admin UI Integration (Banner and Changes Modal)' (Protocol in workflow.md)
 
 ## Phase 3: Secure Update Trigger & Script Wrapper
 Implement the mechanism to safely trigger the server-side deployment script.
