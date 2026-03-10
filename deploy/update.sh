@@ -1204,7 +1204,11 @@ managed_cron_block_present_from_update() {
   if [[ ${EUID} -eq 0 ]]; then
     cron_dump="$(crontab -l 2>/dev/null || true)"
   elif should_use_sudo_for_deploy; then
-    cron_dump="$(sudo -n crontab -l 2>/dev/null || true)"
+    if [[ -n "${MGS_SUDO_PASSWORD:-}" ]]; then
+      cron_dump="$(echo "$MGS_SUDO_PASSWORD" | sudo -S crontab -l 2>/dev/null || true)"
+    else
+      cron_dump="$(sudo -n crontab -l 2>/dev/null || true)"
+    fi
   else
     cron_dump="$(crontab -l 2>/dev/null || true)"
   fi
@@ -1884,7 +1888,16 @@ cleanup_local_install_and_build_caches() {
       # root-owned. If sudo deploy is enabled and auth is already primed, retry
       # repo-path cleanup via sudo without prompting again.
       if [[ -n "${REPO_ROOT:-}" && "${path}" == "${REPO_ROOT}"/* ]] && should_use_sudo_for_deploy; then
-        if sudo -n rm -rf "${path}" 2>/dev/null; then
+        local retry_success=false
+        if [[ -n "${MGS_SUDO_PASSWORD:-}" ]]; then
+          if echo "$MGS_SUDO_PASSWORD" | sudo -S rm -rf "${path}" 2>/dev/null; then
+            retry_success=true
+          fi
+        elif sudo -n rm -rf "${path}" 2>/dev/null; then
+          retry_success=true
+        fi
+
+        if [[ "${retry_success}" == true ]]; then
           removed=$((removed + 1))
           log_info "Removed cache path via sudo: ${path}"
           continue
