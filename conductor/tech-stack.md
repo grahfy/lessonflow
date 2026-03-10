@@ -26,5 +26,5 @@
 - **Authentication:** [bcryptjs](https://github.com/dcodeIO/bcrypt.js) - Secure password hashing.
 - **Date Handling:** [date-fns](https://date-fns.org/) - Modern JavaScript date utility library.
 - **Deployment:** Custom bash scripts for VPS/DigitalOcean self-hosting.
-- **Updates:** Integrated web-triggered deployment wrapper with real-time log streaming (SSE).
+- **Updates:** Integrated web-triggered deployment wrapper with real-time log streaming (SSE) and database-backed deployment history.
 - **Observability:** Database-backed system logs with integrated technical issue reporting.
