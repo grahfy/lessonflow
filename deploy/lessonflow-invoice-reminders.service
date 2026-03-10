@@ -1,0 +1,37 @@
+# LessonFlow - Invoice Reminders Service
+# Install: sudo cp deploy/lessonflow-invoice-reminders.service /etc/systemd/system/
+# Enable:  sudo systemctl enable lessonflow-invoice-reminders
+# Start:   sudo systemctl start lessonflow-invoice-reminders
+
+[Unit]
+Description=LessonFlow Invoice Reminders
+Documentation=https://github.com/your-org/lessonflow-website
+After=network.target lessonflow.service
+Wants=lessonflow.service
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/lessonflow/current
+
+# Load environment from shared .env
+EnvironmentFile=/var/www/lessonflow/shared/.env
+
+# Execute the cron runner script for invoice-reminders
+ExecStart=/var/www/lessonflow/current/deploy/cron.sh invoice-reminders
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lessonflow-invoice-reminders
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/lessonflow /var/log/lessonflow
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

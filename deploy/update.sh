@@ -945,7 +945,16 @@ install_or_update_managed_crontab_jobs_from_update() {
 
   if ! command -v crontab >/dev/null 2>&1; then
     log_info "crontab command not available; skipping cron job install"
-    return 1
+    return 0
+  fi
+
+  # Check if /var/spool/cron/ is writable before attempting crontab installation
+  # This handles containerized or restricted environments with read-only filesystems
+  local spool_cron_dir="/var/spool/cron"
+  if [[ -d "${spool_cron_dir}" && ! -w "${spool_cron_dir}" ]]; then
+    log_warn "Cron spool directory is read-only (${spool_cron_dir}); skipping cron job installation"
+    log_warn "Cron jobs will not run automatically. Configure cron manually if needed."
+    return 0
   fi
 
   existing="$(run_server_setup_cmd crontab -l 2>/dev/null || true)"
@@ -974,11 +983,107 @@ install_or_update_managed_crontab_jobs_from_update() {
     echo
   } > "${tmp_file}"
 
-  run_step "Installing/updating managed cron jobs" run_server_setup_cmd crontab "${tmp_file}" || {
+  # Attempt to install crontab, but handle read-only filesystem gracefully
+  if run_step "Installing/updating managed cron jobs" run_server_setup_cmd crontab "${tmp_file}"; then
     rm -f "${tmp_file}"
-    return 1
-  }
-  rm -f "${tmp_file}"
+    return 0
+  else
+    local exit_code=$?
+    rm -f "${tmp_file}"
+    
+    # Check if the failure was due to read-only filesystem
+    if [[ ${exit_code} -ne 0 ]]; then
+      log_warn "Crontab installation failed (exit code ${exit_code}); this may be due to a read-only filesystem"
+      log_warn "Cron jobs will not run automatically. Configure cron manually if needed."
+      return 0
+    fi
+  fi
+}
+
+# Installs and enables systemd timer units for all scheduled jobs.
+# This is the preferred method for production deployments as timers work
+# with read-only filesystems and integrate with systemd logging/monitoring.
+install_systemd_timers_from_update() {
+  if ! command -v systemctl >/dev/null 2>&1; then
+    log_info "systemctl not available; skipping systemd timer installation"
+    return 0
+  fi
+
+  section "Systemd Timers Install"
+
+  local timer_dir="${SCRIPT_DIR}"
+  local systemd_dir="/etc/systemd/system"
+  local timer_names=(
+    "lessonflow-daily-bookings"
+    "lessonflow-invoice-reminders"
+    "lessonflow-admin-reports-daily"
+    "lessonflow-admin-reports-weekly"
+    "lessonflow-admin-reports-monthly"
+    "lessonflow-admin-reports-yearly"
+    "lessonflow-gmail-sync"
+  )
+
+  # Copy service and timer unit files to systemd directory
+  for timer_name in "${timer_names[@]}"; do
+    local service_file="${timer_dir}/${timer_name}.service"
+    local timer_file="${timer_dir}/${timer_name}.timer"
+    local target_service="${systemd_dir}/${timer_name}.service"
+    local target_timer="${systemd_dir}/${timer_name}.timer"
+
+    if [[ ! -f "${service_file}" ]]; then
+      log_warn "Service unit not found: ${service_file}; skipping ${timer_name}"
+      continue
+    fi
+    if [[ ! -f "${timer_file}" ]]; then
+      log_warn "Timer unit not found: ${timer_file}; skipping ${timer_name}"
+      continue
+    fi
+
+    # Copy service unit
+    if run_server_setup_cmd cp "${service_file}" "${target_service}"; then
+      log_info "Installed service: ${target_service}"
+    else
+      log_warn "Failed to install service: ${target_service}"
+      continue
+    fi
+
+    # Copy timer unit
+    if run_server_setup_cmd cp "${timer_file}" "${target_timer}"; then
+      log_info "Installed timer: ${target_timer}"
+    else
+      log_warn "Failed to install timer: ${target_timer}"
+      continue
+    fi
+  done
+
+  # Reload systemd daemon to pick up new units
+  if ! run_server_setup_cmd systemctl daemon-reload; then
+    log_warn "Failed to reload systemd daemon; timer units may not be recognized"
+    return 0
+  fi
+
+  # Enable all timers
+  for timer_name in "${timer_names[@]}"; do
+    if run_server_setup_cmd systemctl enable "${timer_name}.timer" 2>/dev/null; then
+      log_info "Enabled timer: ${timer_name}.timer"
+    else
+      log_warn "Failed to enable timer: ${timer_name}.timer"
+    fi
+  done
+
+  # Restart all timers to apply any changes
+  for timer_name in "${timer_names[@]}"; do
+    if run_server_setup_cmd systemctl restart "${timer_name}.timer" 2>/dev/null; then
+      log_info "Restarted timer: ${timer_name}.timer"
+    else
+      log_warn "Failed to restart timer: ${timer_name}.timer"
+    fi
+  done
+
+  # Show timer status
+  log_info "Timer status summary:"
+  run_server_setup_cmd systemctl list-timers "${timer_names[@]/%/.timer}" 2>/dev/null || true
+
   return 0
 }
 
@@ -1003,34 +1108,30 @@ restart_cron_scheduler_if_present_from_update() {
   return 0
 }
 
-# Installs/updates the managed crontab block and ensures the scheduler is
-# installed/running. This is useful for first-time bootstrap and cron repairs.
+# Installs and enables systemd timer units for all scheduled jobs.
+# This is the preferred method for production deployments as timers work
+# with read-only filesystems and integrate with systemd logging/monitoring.
 ensure_managed_cron_jobs_installed_from_update() {
   local cron_runner="${CURRENT_LINK}/deploy/cron.sh"
-  local cron_service_name=""
 
-  section "Managed Cron Jobs Install"
+  section "Systemd Timers Install"
 
-  # Some hosts may have `crontab` available but no active/installed scheduler
-  # service unit yet. Ensure the scheduler package/service exists before we
-  # install the managed crontab block so jobs can actually run.
-  if command -v systemctl >/dev/null 2>&1; then
-    if ! cron_service_name="$(cron_scheduler_service_name_from_update)"; then
-      ensure_cron_installed_from_update || return 1
-    fi
+  # Check if systemctl is available
+  if ! command -v systemctl >/dev/null 2>&1; then
+    log_warn "systemctl not available; falling back to traditional cron"
+    install_or_update_managed_crontab_jobs_from_update || return 1
+    restart_cron_scheduler_if_present_from_update
+    return 0
   fi
 
-  if ! command -v crontab >/dev/null 2>&1; then
-    ensure_cron_installed_from_update || return 1
-  fi
-
+  # Check if cron runner is available
   if [[ ! -x "${cron_runner}" ]]; then
-    log_warn "Cron runner not found yet: ${cron_runner}"
-    log_warn "Installing cron entries anyway; they will work after the first successful deploy creates current/."
+    log_info "Cron runner not available yet (${cron_runner}); deferring timer install until post-release sync."
+    return 0
   fi
 
-  install_or_update_managed_crontab_jobs_from_update || return 1
-  restart_cron_scheduler_if_present_from_update
+  # Install systemd timers (preferred method)
+  install_systemd_timers_from_update
   return 0
 }
 

@@ -1,0 +1,19 @@
+# LessonFlow - Admin Reports Monthly Timer
+# Install: sudo cp deploy/lessonflow-admin-reports-monthly.timer /etc/systemd/system/
+# Enable:  sudo systemctl enable lessonflow-admin-reports-monthly.timer
+# Status:  systemctl list-timers lessonflow-admin-reports-monthly.timer
+
+[Unit]
+Description=Run Admin Reports Monthly on the 1st at 8:15 AM
+Documentation=https://github.com/your-org/lessonflow-website
+
+[Timer]
+# Run monthly on the 1st at 8:15 AM
+OnCalendar=*-*-01 08:15:00
+# If the timer was missed (e.g., server was down), run it when the system comes back up
+Persistent=true
+# Add a small random delay to avoid thundering herd
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

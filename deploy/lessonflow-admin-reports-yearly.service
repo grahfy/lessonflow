@@ -1,0 +1,37 @@
+# LessonFlow - Admin Reports Yearly Service
+# Install: sudo cp deploy/lessonflow-admin-reports-yearly.service /etc/systemd/system/
+# Enable:  sudo systemctl enable lessonflow-admin-reports-yearly
+# Start:   sudo systemctl start lessonflow-admin-reports-yearly
+
+[Unit]
+Description=LessonFlow Admin Reports Yearly
+Documentation=https://github.com/your-org/lessonflow-website
+After=network.target lessonflow.service
+Wants=lessonflow.service
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/lessonflow/current
+
+# Load environment from shared .env
+EnvironmentFile=/var/www/lessonflow/shared/.env
+
+# Execute the cron runner script for admin-reports-yearly
+ExecStart=/var/www/lessonflow/current/deploy/cron.sh admin-reports-yearly
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lessonflow-admin-reports-yearly
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/lessonflow /var/log/lessonflow
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

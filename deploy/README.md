@@ -449,38 +449,104 @@ sudo certbot renew --dry-run
 Deploys now install/update a managed root crontab block automatically (via `deploy/deploy.sh`),
 including digest, reminder, and admin report jobs. You can still inspect/edit the crontab manually:
 
+## Scheduled Jobs (Systemd Timers)
+
+LessonFlow uses **systemd timers** for scheduled jobs (preferred over cron for production deployments). Timers integrate with systemd logging, support missed execution recovery, and work with read-only filesystems.
+
+### Timer Schedule
+
+| Timer | Service | Schedule | Description |
+|-------|---------|----------|-------------|
+| `lessonflow-daily-bookings.timer` | `lessonflow-daily-bookings.service` | Daily at 8:00 PM | Daily bookings digest |
+| `lessonflow-invoice-reminders.timer` | `lessonflow-invoice-reminders.service` | Daily at 8:30 PM | Invoice reminders |
+| `lessonflow-admin-reports-daily.timer` | `lessonflow-admin-reports-daily.service` | Daily at 8:45 PM | Daily admin reports |
+| `lessonflow-admin-reports-weekly.timer` | `lessonflow-admin-reports-weekly.service` | Monday at 8:00 AM | Weekly admin reports |
+| `lessonflow-admin-reports-monthly.timer` | `lessonflow-admin-reports-monthly.service` | 1st of month at 8:15 AM | Monthly admin reports |
+| `lessonflow-admin-reports-yearly.timer` | `lessonflow-admin-reports-yearly.service` | January 1st at 8:30 AM | Yearly admin reports |
+| `lessonflow-gmail-sync.timer` | `lessonflow-gmail-sync.service` | Every 2 minutes | Gmail synchronization |
+
+All times are in server timezone (UTC 20:00 = 6:00 PM AEDT).
+
+### Managing Timers
+
+```bash
+# View all LessonFlow timers
+systemctl list-timers 'lessonflow-*.timer'
+
+# View timer status and next trigger
+systemctl list-timers lessonflow-daily-bookings.timer
+
+# View timer details
+systemctl cat lessonflow-daily-bookings.timer
+
+# View service logs
+sudo journalctl -u lessonflow-daily-bookings -f
+
+# Manually trigger a job
+sudo systemctl start lessonflow-daily-bookings.service
+
+# Enable/disable a timer
+sudo systemctl enable lessonflow-daily-bookings.timer
+sudo systemctl disable lessonflow-daily-bookings.timer
+
+# Reload timers after changes
+sudo systemctl daemon-reload
+sudo systemctl restart lessonflow-daily-bookings.timer
+```
+
+### Installing Timers Manually
+
+If you need to install timers manually (outside of deploy):
+
+```bash
+# Copy unit files
+sudo cp deploy/lessonflow-*.service /etc/systemd/system/
+sudo cp deploy/lessonflow-*.timer /etc/systemd/system/
+
+# Reload systemd
+sudo systemctl daemon-reload
+
+# Enable all timers
+sudo systemctl enable lessonflow-*.timer
+
+# Start all timers
+sudo systemctl restart lessonflow-*.timer
+```
+
+### Fallback to Traditional Cron
+
+If your system doesn't support systemd timers, you can use traditional cron. Add these entries to root's crontab:
+
 ```bash
 sudo crontab -e
 ```
 
-Managed entries installed by deploy:
+Managed cron entries (legacy fallback):
 
 ```cron
-# Daily bookings digest at 8:00 PM UTC
+# Daily bookings digest at 8:00 PM
 0 20 * * * /var/www/lessonflow/current/deploy/cron.sh daily-bookings-digest
 
-# Invoice reminders at 8:30 PM UTC
+# Invoice reminders at 8:30 PM
 30 20 * * * /var/www/lessonflow/current/deploy/cron.sh invoice-reminders
 
-# Daily owner report at 8:45 PM UTC
+# Daily owner report at 8:45 PM
 45 20 * * * /var/www/lessonflow/current/deploy/cron.sh admin-reports-daily
 
-# Weekly owner report every Monday at 8:00 AM UTC
+# Weekly owner report every Monday at 8:00 AM
 0 8 * * 1 /var/www/lessonflow/current/deploy/cron.sh admin-reports-weekly
 
-# Monthly owner report on the 1st at 8:15 AM UTC
+# Monthly owner report on the 1st at 8:15 AM
 15 8 1 * * /var/www/lessonflow/current/deploy/cron.sh admin-reports-monthly
 
-# Yearly owner report on Jan 1 at 8:30 AM UTC
+# Yearly owner report on Jan 1 at 8:30 AM
 30 8 1 1 * /var/www/lessonflow/current/deploy/cron.sh admin-reports-yearly
+
+# Gmail sync every 2 minutes
+*/2 * * * * /var/www/lessonflow/current/deploy/cron.sh gmail-sync
 ```
 
-Adjust times as needed for your timezone (UTC 20:00 = 6:00 AM AEDT).
-
-Cron management notes:
-- The deploy TUI `Cron jobs sync` option is **ON** by default.
-- Use `--skip-cron` (or set `Cron jobs sync` to OFF in the TUI) if you need to preserve a manually managed crontab temporarily.
-- Deploys still restart the cron service (`cron`/`crond`) best-effort after a successful release.
+**Note:** The deploy script automatically installs systemd timers by default. Traditional cron is only used as a fallback when systemd is not available.
 
 ---
 
@@ -503,7 +569,25 @@ tail -f /var/log/nginx/lessonflow.access.log
 tail -f /var/log/nginx/lessonflow.error.log
 ```
 
-### Cron Logs
+### Scheduled Job Logs (Systemd Timers)
+
+```bash
+# View all timer logs
+sudo journalctl -u lessonflow-daily-bookings -f
+sudo journalctl -u lessonflow-invoice-reminders -f
+sudo journalctl -u lessonflow-admin-reports-daily -f
+sudo journalctl -u lessonflow-gmail-sync -f
+
+# View logs from a specific time
+sudo journalctl -u lessonflow-daily-bookings --since "1 hour ago"
+
+# View recent failures
+sudo journalctl -u lessonflow-daily-bookings -p err
+```
+
+### Cron Logs (Legacy Fallback)
+
+If using traditional cron instead of systemd timers:
 
 ```bash
 tail -f /var/log/lessonflow/cron-$(date +%Y%m%d).log

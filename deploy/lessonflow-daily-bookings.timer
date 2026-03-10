@@ -1,0 +1,19 @@
+# LessonFlow - Daily Bookings Digest Timer
+# Install: sudo cp deploy/lessonflow-daily-bookings.timer /etc/systemd/system/
+# Enable:  sudo systemctl enable lessonflow-daily-bookings.timer
+# Status:  systemctl list-timers lessonflow-daily-bookings.timer
+
+[Unit]
+Description=Run Daily Bookings Digest at 8:00 PM daily
+Documentation=https://github.com/your-org/lessonflow-website
+
+[Timer]
+# Run daily at 8:00 PM (20:00)
+OnCalendar=*-*-* 20:00:00
+# If the timer was missed (e.g., server was down), run it when the system comes back up
+Persistent=true
+# Add a small random delay to avoid thundering herd
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

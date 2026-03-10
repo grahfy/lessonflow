@@ -1,0 +1,37 @@
+# LessonFlow - Gmail Sync Service
+# Install: sudo cp deploy/lessonflow-gmail-sync.service /etc/systemd/system/
+# Enable:  sudo systemctl enable lessonflow-gmail-sync
+# Start:   sudo systemctl start lessonflow-gmail-sync
+
+[Unit]
+Description=LessonFlow Gmail Sync
+Documentation=https://github.com/your-org/lessonflow-website
+After=network.target lessonflow.service
+Wants=lessonflow.service
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/lessonflow/current
+
+# Load environment from shared .env
+EnvironmentFile=/var/www/lessonflow/shared/.env
+
+# Execute the cron runner script for gmail-sync
+ExecStart=/var/www/lessonflow/current/deploy/cron.sh gmail-sync
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lessonflow-gmail-sync
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/lessonflow /var/log/lessonflow
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

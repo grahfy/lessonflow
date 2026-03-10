@@ -1404,33 +1404,30 @@ install_app_systemd_service_from_deploy() {
     return 0
 }
 
-# Installs/updates the managed root crontab block and restarts cron so the
-# latest current/deploy/cron.sh path is picked up immediately.
+# Installs and enables systemd timer units for all scheduled jobs.
+# This is the preferred method for production deployments as timers work
+# with read-only filesystems and integrate with systemd logging/monitoring.
 ensure_managed_cron_jobs_installed_from_deploy() {
     local cron_runner="${CURRENT_LINK}/deploy/cron.sh"
-    local cron_service_name=""
 
-    section "Managed Cron Jobs Install"
+    section "Systemd Timers Install"
 
-    # Match update.sh behavior: if a scheduler unit is missing but crontab is
-    # present, install/enable cron/crond before writing managed jobs.
-    if command -v systemctl >/dev/null 2>&1; then
-        if ! cron_service_name="$(cron_scheduler_service_name)"; then
-            ensure_cron_installed_from_deploy || return 1
-        fi
-    fi
-
-    if ! command -v crontab >/dev/null 2>&1; then
-        ensure_cron_installed_from_deploy || return 1
-    fi
-
-    if [[ ! -x "${cron_runner}" ]]; then
-        log_info "Cron runner not available yet (${cron_runner}); deferring managed cron install until post-release sync."
+    # Check if systemctl is available
+    if ! command -v systemctl >/dev/null 2>&1; then
+        log_warn "systemctl not available; falling back to traditional cron"
+        install_or_update_managed_crontab_jobs
+        restart_cron_scheduler_if_present
         return 0
     fi
 
-    install_or_update_managed_crontab_jobs
-    restart_cron_scheduler_if_present
+    # Check if cron runner is available
+    if [[ ! -x "${cron_runner}" ]]; then
+        log_info "Cron runner not available yet (${cron_runner}); deferring timer install until post-release sync."
+        return 0
+    fi
+
+    # Install systemd timers (preferred method)
+    install_systemd_timers_from_deploy
     return 0
 }
 
@@ -2082,13 +2079,22 @@ install_or_update_managed_crontab_jobs() {
     local end_marker="# END LESSONFLOW_MANAGED_CRON"
     local legacy_begin="# BEGIN MELBOURNE_GUITAR_SCHOOL_MANAGED_CRON"
     local legacy_end="# END MELBOURNE_GUITAR_SCHOOL_MANAGED_CRON"
-    
+
     local existing=""
     local stripped=""
     local tmp_file=""
 
+    # Check if /var/spool/cron/ is writable before attempting crontab installation
+    # This handles containerized or restricted environments with read-only filesystems
+    local spool_cron_dir="/var/spool/cron"
+    if [[ -d "${spool_cron_dir}" && ! -w "${spool_cron_dir}" ]]; then
+        log_warn "Cron spool directory is read-only (${spool_cron_dir}); skipping cron job installation"
+        log_warn "Cron jobs will not run automatically. Configure cron manually if needed."
+        return 0
+    fi
+
     existing="$(crontab -l 2>/dev/null || true)"
-    
+
     # Strip both new and legacy blocks
     stripped="$(printf '%s\n' "${existing}" | awk -v b1="${begin_marker}" -v e1="${end_marker}" -v b2="${legacy_begin}" -v e2="${legacy_end}" '
         $0 == b1 || $0 == b2 { skip=1; next }
@@ -2115,8 +2121,108 @@ install_or_update_managed_crontab_jobs() {
         echo
     } > "${tmp_file}"
 
-    run_step "Installing/updating managed cron jobs" run_sudo_cmd crontab "${tmp_file}"
-    rm -f "${tmp_file}"
+    # Attempt to install crontab, but handle read-only filesystem gracefully
+    if run_step "Installing/updating managed cron jobs" run_sudo_cmd crontab "${tmp_file}"; then
+        rm -f "${tmp_file}"
+        return 0
+    else
+        local exit_code=$?
+        rm -f "${tmp_file}"
+
+        # Check if the failure was due to read-only filesystem
+        if [[ ${exit_code} -ne 0 ]]; then
+            log_warn "Crontab installation failed (exit code ${exit_code}); this may be due to a read-only filesystem"
+            log_warn "Cron jobs will not run automatically. Configure cron manually if needed."
+            return 0
+        fi
+    fi
+}
+
+# Installs and enables systemd timer units for all scheduled jobs.
+# This is the preferred method for production deployments as timers work
+# with read-only filesystems and integrate with systemd logging/monitoring.
+install_systemd_timers_from_deploy() {
+    if ! command -v systemctl >/dev/null 2>&1; then
+        log_info "systemctl not available; skipping systemd timer installation"
+        return 0
+    fi
+
+    section "Systemd Timers Install"
+
+    local timer_dir="${SCRIPT_DIR}"
+    local systemd_dir="/etc/systemd/system"
+    local timer_names=(
+        "lessonflow-daily-bookings"
+        "lessonflow-invoice-reminders"
+        "lessonflow-admin-reports-daily"
+        "lessonflow-admin-reports-weekly"
+        "lessonflow-admin-reports-monthly"
+        "lessonflow-admin-reports-yearly"
+        "lessonflow-gmail-sync"
+    )
+
+    # Copy service and timer unit files to systemd directory
+    for timer_name in "${timer_names[@]}"; do
+        local service_file="${timer_dir}/${timer_name}.service"
+        local timer_file="${timer_dir}/${timer_name}.timer"
+        local target_service="${systemd_dir}/${timer_name}.service"
+        local target_timer="${systemd_dir}/${timer_name}.timer"
+
+        if [[ ! -f "${service_file}" ]]; then
+            log_warn "Service unit not found: ${service_file}; skipping ${timer_name}"
+            continue
+        fi
+        if [[ ! -f "${timer_file}" ]]; then
+            log_warn "Timer unit not found: ${timer_file}; skipping ${timer_name}"
+            continue
+        fi
+
+        # Copy service unit
+        if run_sudo_cmd cp "${service_file}" "${target_service}"; then
+            log_info "Installed service: ${target_service}"
+        else
+            log_warn "Failed to install service: ${target_service}"
+            continue
+        fi
+
+        # Copy timer unit
+        if run_sudo_cmd cp "${timer_file}" "${target_timer}"; then
+            log_info "Installed timer: ${target_timer}"
+        else
+            log_warn "Failed to install timer: ${target_timer}"
+            continue
+        fi
+    done
+
+    # Reload systemd daemon to pick up new units
+    if ! run_sudo_cmd systemctl daemon-reload; then
+        log_warn "Failed to reload systemd daemon; timer units may not be recognized"
+        return 0
+    fi
+
+    # Enable all timers
+    for timer_name in "${timer_names[@]}"; do
+        if run_sudo_cmd systemctl enable "${timer_name}.timer" 2>/dev/null; then
+            log_info "Enabled timer: ${timer_name}.timer"
+        else
+            log_warn "Failed to enable timer: ${timer_name}.timer"
+        fi
+    done
+
+    # Restart all timers to apply any changes
+    for timer_name in "${timer_names[@]}"; do
+        if run_sudo_cmd systemctl restart "${timer_name}.timer" 2>/dev/null; then
+            log_info "Restarted timer: ${timer_name}.timer"
+        else
+            log_warn "Failed to restart timer: ${timer_name}.timer"
+        fi
+    done
+
+    # Show timer status
+    log_info "Timer status summary:"
+    run_sudo_cmd systemctl list-timers "${timer_names[@]/%/.timer}" 2>/dev/null || true
+
+    return 0
 }
 
 write_latest_deploy_update_metadata() {

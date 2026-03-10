@@ -1,0 +1,37 @@
+# LessonFlow - Admin Reports Daily Service
+# Install: sudo cp deploy/lessonflow-admin-reports-daily.service /etc/systemd/system/
+# Enable:  sudo systemctl enable lessonflow-admin-reports-daily
+# Start:   sudo systemctl start lessonflow-admin-reports-daily
+
+[Unit]
+Description=LessonFlow Admin Reports Daily
+Documentation=https://github.com/your-org/lessonflow-website
+After=network.target lessonflow.service
+Wants=lessonflow.service
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/lessonflow/current
+
+# Load environment from shared .env
+EnvironmentFile=/var/www/lessonflow/shared/.env
+
+# Execute the cron runner script for admin-reports-daily
+ExecStart=/var/www/lessonflow/current/deploy/cron.sh admin-reports-daily
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lessonflow-admin-reports-daily
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/lessonflow /var/log/lessonflow
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

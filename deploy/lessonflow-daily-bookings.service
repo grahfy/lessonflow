@@ -1,0 +1,37 @@
+# LessonFlow - Daily Bookings Digest Service
+# Install: sudo cp deploy/lessonflow-daily-bookings.service /etc/systemd/system/
+# Enable:  sudo systemctl enable lessonflow-daily-bookings
+# Start:   sudo systemctl start lessonflow-daily-bookings
+
+[Unit]
+Description=LessonFlow Daily Bookings Digest
+Documentation=https://github.com/your-org/lessonflow-website
+After=network.target lessonflow.service
+Wants=lessonflow.service
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/lessonflow/current
+
+# Load environment from shared .env
+EnvironmentFile=/var/www/lessonflow/shared/.env
+
+# Execute the cron runner script for daily-bookings-digest
+ExecStart=/var/www/lessonflow/current/deploy/cron.sh daily-bookings-digest
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lessonflow-daily-bookings
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/lessonflow /var/log/lessonflow
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

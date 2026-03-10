@@ -1,0 +1,20 @@
+# LessonFlow - Gmail Sync Timer
+# Install: sudo cp deploy/lessonflow-gmail-sync.timer /etc/systemd/system/
+# Enable:  sudo systemctl enable lessonflow-gmail-sync.timer
+# Status:  systemctl list-timers lessonflow-gmail-sync.timer
+
+[Unit]
+Description=Run Gmail Sync every 2 minutes
+Documentation=https://github.com/your-org/lessonflow-website
+
+[Timer]
+# Run every 2 minutes
+OnBootSec=2min
+OnUnitActiveSec=2min
+# If the timer was missed (e.g., server was down), run it when the system comes back up
+Persistent=true
+# Add a small random delay to avoid thundering herd
+RandomizedDelaySec=10
+
+[Install]
+WantedBy=timers.target

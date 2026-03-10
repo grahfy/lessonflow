@@ -1,0 +1,19 @@
+# LessonFlow - Admin Reports Daily Timer
+# Install: sudo cp deploy/lessonflow-admin-reports-daily.timer /etc/systemd/system/
+# Enable:  sudo systemctl enable lessonflow-admin-reports-daily.timer
+# Status:  systemctl list-timers lessonflow-admin-reports-daily.timer
+
+[Unit]
+Description=Run Admin Reports Daily at 8:45 PM
+Documentation=https://github.com/your-org/lessonflow-website
+
+[Timer]
+# Run daily at 8:45 PM (20:45)
+OnCalendar=*-*-* 20:45:00
+# If the timer was missed (e.g., server was down), run it when the system comes back up
+Persistent=true
+# Add a small random delay to avoid thundering herd
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

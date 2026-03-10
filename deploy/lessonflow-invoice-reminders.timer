@@ -1,0 +1,19 @@
+# LessonFlow - Invoice Reminders Timer
+# Install: sudo cp deploy/lessonflow-invoice-reminders.timer /etc/systemd/system/
+# Enable:  sudo systemctl enable lessonflow-invoice-reminders.timer
+# Status:  systemctl list-timers lessonflow-invoice-reminders.timer
+
+[Unit]
+Description=Run Invoice Reminders at 8:30 PM daily
+Documentation=https://github.com/your-org/lessonflow-website
+
+[Timer]
+# Run daily at 8:30 PM (20:30)
+OnCalendar=*-*-* 20:30:00
+# If the timer was missed (e.g., server was down), run it when the system comes back up
+Persistent=true
+# Add a small random delay to avoid thundering herd
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target
