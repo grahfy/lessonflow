@@ -5,16 +5,16 @@ This plan outlines the steps to implement a proactive update management system i
 ## Phase 1: Update Detection and Metadata Service
 Implement the backend logic to detect pending repository updates and retrieve commit details.
 
-- [ ] Task: Create `src/lib/services/updates-service.ts` to manage update detection
-    - [ ] Implement `getUpdateStatus()` to compare local HEAD with `origin/main`
-    - [ ] Implement `getPendingCommits()` to retrieve messages between local and remote
-    - [ ] Add caching (e.g., 5-minute TTL) to prevent excessive `git fetch` calls
-- [ ] Task: Create API route `GET /api/admin/updates/status`
-    - [ ] Return update availability and pending commit list
-    - [ ] Enforce strict admin session verification
-- [ ] Task: Write Tests for Update Service
-    - [ ] Mock `child_process.exec` to simulate various git states
-    - [ ] Verify correct SHA comparison and commit list parsing
+- [x] Task: Create `src/lib/services/updates-service.ts` to manage update detection
+    - [x] Implement `getUpdateStatus()` to compare local HEAD with `origin/main`
+    - [x] Implement `getPendingCommits()` to retrieve messages between local and remote
+    - [x] Add caching (e.g., 5-minute TTL) to prevent excessive `git fetch` calls
+- [x] Task: Create API route `GET /api/admin/updates/status`
+    - [x] Return update availability and pending commit list
+    - [x] Enforce strict admin session verification
+- [x] Task: Write Tests for Update Service
+    - [x] Mock `child_process.exec` to simulate various git states
+    - [x] Verify correct SHA comparison and commit list parsing
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Update Detection and Metadata Service' (Protocol in workflow.md)
 
 ## Phase 2: Admin UI Integration (Banner and Changes Modal)
