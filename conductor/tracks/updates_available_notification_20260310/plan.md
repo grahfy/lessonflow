@@ -36,17 +36,17 @@ Surface the update availability to administrators through a persistent dashboard
 ## Phase 3: Secure Update Trigger & Script Wrapper
 Implement the mechanism to safely trigger the server-side deployment script.
 
-- [ ] Task: Create non-interactive update wrapper `scripts/trigger-update.sh`
-    - [ ] Call `deploy/update.sh --non-interactive` (or equivalent)
-    - [ ] Ensure it runs with appropriate permissions
-- [ ] Task: Implement Update Execution API `POST /api/admin/updates/execute`
-    - [ ] Implement process locking (prevent multiple concurrent updates)
-    - [ ] Trigger the wrapper script and capture output to a temporary log file
-- [ ] Task: Implement Log Streaming Route `GET /api/admin/updates/stream`
-    - [ ] Use Server-Sent Events (SSE) to stream the update log file content to the client
-- [ ] Task: Write Tests for Update Execution
-    - [ ] Verify admin authorization
-    - [ ] Verify process locking behavior
+- [x] Task: Create non-interactive update wrapper `scripts/trigger-update.sh`
+    - [x] Call `deploy/update.sh --non-interactive` (or equivalent)
+    - [x] Ensure it runs with appropriate permissions
+- [x] Task: Implement Update Execution API `POST /api/admin/updates/execute`
+    - [x] Implement process locking (prevent multiple concurrent updates)
+    - [x] Trigger the wrapper script and capture output to a temporary log file
+- [x] Task: Implement Log Streaming Route `GET /api/admin/updates/stream`
+    - [x] Use Server-Sent Events (SSE) to stream the update log file content to the client
+- [x] Task: Write Tests for Update Execution
+    - [x] Verify admin authorization
+    - [x] Verify process locking behavior
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Secure Update Trigger & Script Wrapper' (Protocol in workflow.md)
 
 ## Phase 4: Progress UI & Restart Handling
