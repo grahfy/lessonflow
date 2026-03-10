@@ -15,3 +15,27 @@ Scheduled job reliability must be monitored continuously. Reminder jobs and othe
 Rollback readiness is part of every deployment plan. Maintain access to a known-good release state and confirm schema compatibility assumptions before applying rollback in production.
 
 Operational safety rules are strict: never run destructive data operations without backup confidence, never point seed/test tooling at production data, and always rotate sensitive secrets after exposure or incident suspicion.
+
+## Deployment Permissions and sudo
+
+Deployments previously required the deployment user to run the update script entirely via `sudo`. This has been updated to use granular privileges and ensure least privilege access.
+
+### Setting up a Deployment User
+If you are deploying for the first time, you must configure permissions so the deployment user can access the web root and restart services without `sudo` prompting.
+
+1. **Set up web root permissions:**
+   ```bash
+   sudo ./deploy/setup-permissions.sh <your_deployment_user>
+   ```
+   This script adds your user to the `www-data` group and sets `/var/www/lessonflow` to be group-writable so the build process can create releases.
+
+2. **Configure passwordless service restarts:**
+   ```bash
+   sudo cp deploy/sudoers.template /etc/sudoers.d/lessonflow
+   sudo sed -i 's/<DEPLOY_USER>/<your_deployment_user>/g' /etc/sudoers.d/lessonflow
+   sudo chmod 0440 /etc/sudoers.d/lessonflow
+   ```
+   This allows the deployment user to restart `lessonflow`, `nginx`, and `cron` via `systemctl` during the deploy process without requiring an interactive password prompt.
+
+Once configured, simply run `./deploy/update.sh` as the deployment user. The script will automatically escalate privileges via `sudo` only for specific system commands, keeping the main build process isolated to your user permissions.
+
