@@ -22,6 +22,7 @@
 ## Infrastructure & Utilities
 - **PDF Generation:** [pdf-lib](https://pdf-lib.js.org/) - Creating and modifying PDF documents programmatically.
 - **Email:** [Nodemailer](https://nodemailer.com/) - Flexible email sending library.
+- **Google APIs:** [googleapis](https://github.com/googleapis/google-api-nodejs-client) - Official Node.js client for Google APIs, including Gmail.
 - **Authentication:** [bcryptjs](https://github.com/dcodeIO/bcrypt.js) - Secure password hashing.
 - **Date Handling:** [date-fns](https://date-fns.org/) - Modern JavaScript date utility library.
 - **Deployment:** Custom bash scripts for VPS/DigitalOcean self-hosting.

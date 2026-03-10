@@ -21,6 +21,7 @@ LessonFlow is a comprehensive management platform tailored for music schools and
 - **Appointment Management:** Approve, reject, cancel, or move appointments with ease.
 - **Recurring Series:** Manage long-term lesson commitments automatically.
 - **Financial Integrity:** Invoices denormalize customer data at creation for historical accuracy.
+- **Unified Communication History:** Integrated Gmail support with two-way synchronization for a complete view of student interactions.
 - **Whitelabeling:** Easily rebrand the platform via environment variables and an admin settings panel.
 - **Resource Management:** Assign audio and PDF materials to specific students or appointments.
 
