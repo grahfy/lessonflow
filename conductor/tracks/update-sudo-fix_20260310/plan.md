@@ -12,11 +12,11 @@
     - [x] Draft the `sudoers` entry for the specific service restart command.
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Permission and Ownership Updates' (Protocol in workflow.md)
 
-## Phase 3: Script Refactoring and Verification
+## Phase 3: Script Refactoring and Verification [checkpoint: 3065b56]
 - [x] Task: Write Tests: Verify script execution without `sudo` (e.g., via a mock environment or dry-run).
 - [x] Task: Implement: Refactor `deploy/update.sh` to remove global `sudo` requirement.
 - [x] Task: Verify Green Phase: Ensure tests pass and the script executes as expected.
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Script Refactoring and Verification' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Script Refactoring and Verification' (Protocol in workflow.md)
 
 ## Phase 4: Final Documentation and Cleanup
 - [ ] Task: Update deployment documentation (`Documentation/digitalocean-admin-operations.md`).
