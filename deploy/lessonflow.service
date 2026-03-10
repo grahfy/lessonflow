@@ -44,7 +44,7 @@ SyslogIdentifier=lessonflow
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/www/lessonflow
+ReadWritePaths=/var/www/lessonflow /opt/melbourne-guitar-school
 PrivateTmp=true
 
 # Resource limits

@@ -35,6 +35,7 @@ SyslogIdentifier={{APP_NAME}}
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
+# Note: Add additional paths here if the app needs write access to a git repo for updates
 ReadWritePaths=/var/www/{{APP_NAME}}
 PrivateTmp=true
 
