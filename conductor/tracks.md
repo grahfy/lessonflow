@@ -14,10 +14,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [x] **Track: System Logs and Improved Error Handling**
-*Link: [./tracks/system-logs_20260310/](./tracks/system-logs_20260310/)*
-
----
-
 - [ ] **Track: when running update on the website, it runs the script but requires sudo**
 *Link: [./tracks/update-sudo-fix_20260310/](./tracks/update-sudo-fix_20260310/)*
