@@ -7,13 +7,18 @@ import { z } from "zod";
 import { SystemLog } from "@/generated/prisma/client";
 
 const reportBugSchema = z.object({
+  subject: z.string().min(3).max(200),
+  replyEmail: z.string().email().optional(),
   description: z.string().min(10),
+  screenshot: z.string().optional(),
   logIds: z.array(z.string()).optional(),
   includeRecentLogs: z.boolean().default(true),
 });
 
 /**
  * Endpoint to report a bug by emailing selected or recent logs to the developer.
+ * Accepts an optional subject line, description, screenshot (base64 data URL),
+ * and either specific log IDs or a flag to include the most recent 50 logs.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -32,7 +37,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const { description, logIds, includeRecentLogs } = parsed.data;
+    const { subject, replyEmail, description, screenshot, logIds, includeRecentLogs } = parsed.data;
 
     // Fetch relevant logs
     let logsToInclude: SystemLog[] = [];
@@ -52,14 +57,23 @@ export async function POST(request: NextRequest) {
       `[${log.createdAt.toISOString()}] [${log.level}] ${log.event}\n${log.message}\nMeta: ${JSON.stringify(log.meta)}`
     ).join("\n\n---\n\n");
 
+    // Build screenshot HTML block if provided
+    const screenshotHtml = screenshot
+      ? `<h2>Screenshot</h2><p><img src="${screenshot}" alt="Bug report screenshot" style="max-width: 100%; border: 1px solid #ccc; border-radius: 4px;" /></p>`
+      : "";
+
     const htmlBody = `
-      <h1>Bug Report from LessonFlow Admin</h1>
+      <h1>Bug Report: ${subject}</h1>
       <p><strong>Reporter:</strong> ${admin.displayName} (${admin.email})</p>
+      ${replyEmail ? `<p><strong>Reply To:</strong> ${replyEmail}</p>` : ""}
+      <p><strong>Subject:</strong> ${subject}</p>
       <p><strong>Description:</strong></p>
       <div style="background: #f4f4f4; padding: 15px; border-radius: 4px; white-space: pre-wrap;">
         ${description}
       </div>
       
+      ${screenshotHtml}
+
       <h2>Log Context</h2>
       <pre style="background: #eee; padding: 10px; font-size: 12px; border: 1px solid #ccc; overflow: auto;">
 ${logContext || "No logs included."}
@@ -68,7 +82,7 @@ ${logContext || "No logs included."}
 
     const result = await sendEmail({
       to: "contact@grahfmusic.com",
-      subject: `[LessonFlow Bug Report] from ${admin.displayName}`,
+      subject: `[LessonFlow Bug] ${subject} — from ${admin.displayName}`,
       html: htmlBody,
     });
 
@@ -84,3 +98,4 @@ ${logContext || "No logs included."}
     return jsonUnexpectedError(error, "Unable to submit bug report.");
   }
 }
+

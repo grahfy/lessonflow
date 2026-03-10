@@ -13,9 +13,9 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Permission and Ownership Updates' (Protocol in workflow.md)
 
 ## Phase 3: Script Refactoring and Verification
-- [ ] Task: Write Tests: Verify script execution without `sudo` (e.g., via a mock environment or dry-run).
-- [ ] Task: Implement: Refactor `deploy/update.sh` to remove global `sudo` requirement.
-- [ ] Task: Verify Green Phase: Ensure tests pass and the script executes as expected.
+- [x] Task: Write Tests: Verify script execution without `sudo` (e.g., via a mock environment or dry-run).
+- [x] Task: Implement: Refactor `deploy/update.sh` to remove global `sudo` requirement.
+- [x] Task: Verify Green Phase: Ensure tests pass and the script executes as expected.
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Script Refactoring and Verification' (Protocol in workflow.md)
 
 ## Phase 4: Final Documentation and Cleanup

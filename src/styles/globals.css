@@ -3706,7 +3706,8 @@ h1 {
 .syslog-col-event {
   color: #7dd3fc;
   font-size: 0.78rem;
-  max-width: 200px;
+  min-width: 140px;
+  max-width: 260px;
   overflow: hidden;
   text-overflow: ellipsis;
 }

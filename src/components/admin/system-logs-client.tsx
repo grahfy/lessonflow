@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { AdminShell } from "@/components/admin/layout/admin-shell";
-import { AlertCircle, CheckCircle, RefreshCw, Bug, X, Search, Terminal, ChevronRight, ChevronDown, Filter } from "lucide-react";
-import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AlertCircle, CheckCircle, RefreshCw, Bug, Search, Terminal, ChevronRight, ChevronDown, Filter, ImagePlus, X } from "lucide-react";
 import { Pagination } from "@/components/pagination";
 
 type SystemLog = {
@@ -37,6 +37,23 @@ function deriveEventId(event: string): string {
     .slice(0, 24);
 }
 
+/**
+ * Strips the redundant `[timestamp] [level] event {meta}` prefix from
+ * stored log messages since those fields are already shown in dedicated
+ * table columns. Returns only the meaningful payload.
+ */
+function cleanMessage(message: string, event: string): string {
+  // Messages are stored as: "[ISO] [level] event {meta}"
+  // Strip leading "[...] [level] event" prefix if present.
+  const prefixPattern = /^\[[^\]]*\]\s*\[[^\]]*\]\s*/;
+  let cleaned = message.replace(prefixPattern, "");
+  // Also strip the event name from the start if it's duplicated
+  if (cleaned.startsWith(event)) {
+    cleaned = cleaned.slice(event.length).trim();
+  }
+  return cleaned || message;
+}
+
 export function SystemLogsClient() {
   const [logs, setLogs] = useState<SystemLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,11 +67,33 @@ export function SystemLogsClient() {
   
   // Bug reporting state
   const [isReportingBug, setIsReportingBug] = useState(false);
+  const [bugSubject, setBugSubject] = useState("");
+  const [bugEmail, setBugEmail] = useState("");
   const [bugDescription, setBugDescription] = useState("");
+  const [bugScreenshot, setBugScreenshot] = useState<string | null>(null);
   const [submittingBug, setSubmittingBug] = useState(false);
   const [reportResult, setReportResult] = useState<{ success?: boolean; error?: string } | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+
+  /**
+   * Reads a selected image file and converts it to a base64 data URL.
+   * Constrains the image to max 1200px width to keep the payload reasonable.
+   */
+  const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // NOTE: Only accept image files up to 5 MB to avoid oversized payloads.
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Screenshot must be under 5 MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setBugScreenshot(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -103,14 +142,20 @@ export function SystemLogsClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          subject: bugSubject,
+          replyEmail: bugEmail,
           description: bugDescription,
+          screenshot: bugScreenshot || undefined,
           includeRecentLogs: true,
         }),
       });
       const data = await response.json();
       if (data.ok) {
         setReportResult({ success: true });
+        setBugSubject("");
+        setBugEmail("");
         setBugDescription("");
+        setBugScreenshot(null);
         setNotice("Technical issue reported successfully.");
         setTimeout(() => {
           setIsReportingBug(false);
@@ -283,7 +328,7 @@ export function SystemLogsClient() {
                             {deriveEventId(log.event)}
                           </td>
                           <td className="syslog-col-message" title={log.message}>
-                            {log.message}
+                            {cleanMessage(log.message, log.event)}
                           </td>
                         </tr>
                         {isExpanded && hasMeta && (
@@ -329,86 +374,141 @@ export function SystemLogsClient() {
         </div>
       </div>
 
-      {/* Bug Report Dialog */}
-      <DialogPrimitive.Root open={isReportingBug} onOpenChange={setIsReportingBug}>
-        <DialogPrimitive.Portal>
-          <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" />
-          <DialogPrimitive.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-lg translate-x-[-50%] translate-y-[-50%] rounded-xl bg-white p-0 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="flex items-center justify-between px-6 py-4 border-b bg-slate-50">
-              <DialogPrimitive.Title className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Bug size={20} className="text-slate-500" />
-                Report Technical Issue
-              </DialogPrimitive.Title>
-              <DialogPrimitive.Close asChild>
-                <button className="rounded-full p-1.5 hover:bg-slate-200 transition-colors">
-                  <X className="h-5 w-5 text-slate-500" />
-                  <span className="sr-only">Close</span>
-                </button>
-              </DialogPrimitive.Close>
-            </div>
-            
-            <form onSubmit={handleReportBug}>
-              <div className="p-6 space-y-4">
-                <p className="text-sm text-slate-600 leading-relaxed">
-                  Describe the issue you&apos;re experiencing. Recent system logs will be attached automatically to help the developer with troubleshooting.
-                </p>
-                
-                <div className="space-y-1.5">
-                  <label htmlFor="bug-desc" className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    Issue Description
-                  </label>
-                  <textarea
-                    id="bug-desc"
-                    required
-                    minLength={10}
-                    autoFocus
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all h-32 resize-none text-sm bg-slate-50 border-slate-200"
-                    placeholder="What happened? What were you trying to do?"
-                    value={bugDescription}
-                    onChange={(e) => setBugDescription(e.target.value)}
-                  />
-                </div>
+      {/* Bug Report Dialog — uses the standard AdminDialog component */}
+      <AdminDialog
+        isOpen={isReportingBug}
+        onClose={() => setIsReportingBug(false)}
+        title="Report Technical Issue"
+        description="Describe the issue you're experiencing. Recent system logs will be attached automatically to help the developer with troubleshooting."
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setIsReportingBug(false)}
+              className="btn btn-secondary"
+            >
+              CANCEL
+            </button>
+            <button
+              type="submit"
+              form="bug-report-form"
+              disabled={submittingBug || bugSubject.length < 3 || !bugEmail.includes("@") || bugDescription.length < 10}
+              className="btn btn-primary"
+            >
+              {submittingBug ? (
+                <>
+                  <RefreshCw size={16} className="animate-spin" />
+                  SENDING...
+                </>
+              ) : (
+                <>
+                  <Bug size={16} />
+                  SUBMIT REPORT
+                </>
+              )}
+            </button>
+          </>
+        }
+      >
+        <form id="bug-report-form" onSubmit={handleReportBug}>
+          <div className="field">
+            <label htmlFor="bug-subject" className="admin-inline-field">Subject</label>
+            <input
+              id="bug-subject"
+              type="text"
+              required
+              minLength={3}
+              maxLength={200}
+              autoFocus
+              placeholder="Brief summary of the issue"
+              value={bugSubject}
+              onChange={(e) => setBugSubject(e.target.value)}
+            />
+          </div>
 
-                {reportResult && (
-                  <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${reportResult.success ? "bg-green-50 text-green-700 border border-green-100" : "bg-red-50 text-red-700 border border-red-100"}`}>
-                    {reportResult.success ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-                    <span className="font-medium">
-                      {reportResult.success ? "Report sent successfully! Thank you." : reportResult.error}
-                    </span>
-                  </div>
-                )}
-              </div>
-              
-              <div className="px-6 py-4 bg-slate-50 border-t flex justify-end gap-3">
+          <div className="field" style={{ marginTop: 10 }}>
+            <label htmlFor="bug-email" className="admin-inline-field">Your Email</label>
+            <input
+              id="bug-email"
+              type="email"
+              required
+              placeholder="your.email@example.com"
+              value={bugEmail}
+              onChange={(e) => setBugEmail(e.target.value)}
+            />
+          </div>
+
+          <div className="field" style={{ marginTop: 10 }}>
+            <label htmlFor="bug-desc" className="admin-inline-field">Description</label>
+            <textarea
+              id="bug-desc"
+              required
+              minLength={10}
+              rows={4}
+              placeholder="What happened? What were you trying to do?"
+              value={bugDescription}
+              onChange={(e) => setBugDescription(e.target.value)}
+            />
+          </div>
+
+          <div className="field" style={{ marginTop: 10 }}>
+            <label className="admin-inline-field">Screenshot (optional)</label>
+            {bugScreenshot ? (
+              <div style={{ position: "relative", marginTop: 6 }}>
+                <img
+                  src={bugScreenshot}
+                  alt="Screenshot preview"
+                  style={{
+                    maxWidth: "100%",
+                    maxHeight: 200,
+                    borderRadius: 8,
+                    border: "1px solid rgba(100, 116, 139, 0.3)",
+                  }}
+                />
                 <button
                   type="button"
-                  onClick={() => setIsReportingBug(false)}
                   className="btn btn-secondary"
+                  onClick={() => setBugScreenshot(null)}
+                  style={{
+                    position: "absolute",
+                    top: 6,
+                    right: 6,
+                    padding: "4px 6px",
+                    minWidth: 0,
+                    fontSize: "0.7rem",
+                  }}
                 >
-                  CANCEL
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingBug || bugDescription.length < 10}
-                  className="btn btn-primary min-w-[140px]"
-                >
-                  {submittingBug ? (
-                    <>
-                      <RefreshCw size={16} className="animate-spin mr-2" />
-                      SENDING...
-                    </>
-                  ) : (
-                    <>
-                      <Bug size={16} className="mr-2" />
-                      SUBMIT REPORT
-                    </>
-                  )}
+                  <X size={14} />
+                  REMOVE
                 </button>
               </div>
-            </form>
-          </DialogPrimitive.Content>
-        </DialogPrimitive.Portal>
-      </DialogPrimitive.Root>
+            ) : (
+              <label
+                htmlFor="bug-screenshot"
+                className="btn btn-secondary"
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 4, cursor: "pointer" }}
+              >
+                <ImagePlus size={16} />
+                ATTACH SCREENSHOT
+                <input
+                  id="bug-screenshot"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleScreenshotChange}
+                  style={{ display: "none" }}
+                />
+              </label>
+            )}
+          </div>
+
+          {reportResult && (
+            <div className={`notice ${reportResult.success ? "success" : "error"}`} style={{ marginTop: 12 }}>
+              {reportResult.success ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+              {reportResult.success ? " Report sent successfully! Thank you." : ` ${reportResult.error}`}
+            </div>
+          )}
+        </form>
+      </AdminDialog>
     </AdminShell>
   );
 }
