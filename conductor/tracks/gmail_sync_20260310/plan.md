@@ -2,7 +2,7 @@
 
 This plan follows the project's standard TDD workflow.
 
-## Phase 1: Database & Environment Preparation
+## Phase 1: Database & Environment Preparation [checkpoint: 011da99]
 Update the data model to track provider information and external IDs for deduplication.
 
 - [x] Task: Update `OutboundEmail` model in `schema.prisma`. [7dc184f]
@@ -12,7 +12,7 @@ Update the data model to track provider information and external IDs for dedupli
 - [x] Task: Execute database migration. [83d803e]
     - [x] `npx prisma migrate dev --name add_email_sync_fields`
 - [x] Task: Update `.env.example` with `EMAIL_PROVIDER` setting. [985c9e8]
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Database & Environment Preparation' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Database & Environment Preparation' (Protocol in workflow.md)
 
 ## Phase 2: Gmail API Client
 Implement the low-level service for interacting with Gmail API.
