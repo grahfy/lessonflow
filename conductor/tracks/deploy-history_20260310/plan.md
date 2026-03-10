@@ -40,11 +40,11 @@ Add the history view and tabbed navigation to the admin console.
     - [x] Fetch data from `/api/admin/deploy-updates/history` when the tab is active (aae1040)
 - [x] Task: Conductor - User Manual Verification 'Phase 3: UI Implementation' (Protocol in workflow.md) (aae1040)
 
-## Phase 4: Final Cleanup and Verification
+## Phase 4: Final Cleanup and Verification [checkpoint: ecf2b22]
 Ensure everything is working correctly and clean up legacy logic.
 
-- [ ] Task: Verify full end-to-end flow
-    - [ ] Simulate a deployment and check both "Latest" and "History" tabs
-- [ ] Task: (Optional) Migrate existing JSON metadata to the database
-    - [ ] Create a one-time script to seed the DB from the current `latest-deploy-update.json`
-- [ ] Task: Conductor - User Manual Verification 'Phase 4: Final Cleanup and Verification' (Protocol in workflow.md)
+- [x] Task: Verify full end-to-end flow (ecf2b22)
+    - [x] Simulate a deployment and check both "Latest" and "History" tabs (ecf2b22)
+- [x] Task: (Optional) Migrate existing JSON metadata to the database (ecf2b22)
+    - [x] Create a one-time script to seed the DB from the current `latest-deploy-update.json` (ecf2b22)
+- [x] Task: Conductor - User Manual Verification 'Phase 4: Final Cleanup and Verification' (Protocol in workflow.md) (ecf2b22)
