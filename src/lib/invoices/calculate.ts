@@ -1,11 +1,15 @@
 /**
  * Financial Calculation Engine
  * 
- * This module is the single source of truth for all invoice-related financial math.
- * It handles line item subtotals, GST calculation, and aggregate document totals.
+ * The single source of truth for all invoice-related financial math.
  * 
- * DESIGN PRINCIPLE: We operate entirely in integer cents to avoid floating-point
- * rounding errors (e.g. 0.1 + 0.2 !== 0.3).
+ * CORE ARCHITECTURE:
+ * 1. Integer Arithmetic: All calculations use integer CENTS. This prevents 
+ *    the precision errors common in floating-point math (e.g., 0.1 + 0.2 === 0.30000000000000004).
+ * 2. Deterministic Results: Every calculation (tax, subtotal, totals) is 
+ *    clamped and truncated to ensure consistency across the DB, UI, and PDF.
+ * 3. Australian Tax Compliance: Implements the 10% GST logic specifically 
+ *    tailored for Australian small businesses.
  */
 
 import { InvoiceTaxMode } from "@/generated/prisma/client";
@@ -13,30 +17,32 @@ import { InvoiceTaxMode } from "@/generated/prisma/client";
 import { shouldApplyGst } from "@/lib/invoices/gst-policy";
 import { CalculatedInvoiceLineItem, CalculatedInvoiceTotals, InvoiceLineItemDraft } from "@/lib/invoices/types";
 
-/**
- * Standard Australian GST rate (10%).
- */
+/** Standard Australian GST rate (10%). */
 const GST_RATE = 0.1;
 
 /**
- * Calculates financial values for a single line item.
+ * Derived financial values for a single line item.
  * 
- * LOGIC:
- * 1. Normalizes quantity to at least 1 (truncated to integer).
- * 2. Normalizes unit price to at least 0 (truncated to integer cents).
- * 3. Calculates subtotal (qty * price).
- * 4. Applies 10% GST if the business is registered and the item is taxable.
- *
- * RATIONALE: We clamp and truncate values here to ensure that persisted totals
- * are deterministic. Server-side persistence must never trust UI-provided math.
+ * RATIONALE:
+ * - We enforce a minimum quantity of 1 for invoices.
+ * - We enforce a minimum unit price of 0 (no negative line items).
+ * - GST is calculated per-line using standard rounding (Banker's rounding 
+ *   or simple halfway-up depending on standard implementation, here simple round).
  * 
- * @param lineItem - The raw or drafted line item data
- * @returns CalculatedInvoiceLineItem with derived financial fields
+ * @param lineItem - Input partial containing quantity, price, and tax mode
+ * @returns Fully populated line item with calculated cents
  */
 export function calculateLineItem(lineItem: InvoiceLineItemDraft): CalculatedInvoiceLineItem {
+  // Ensure we don't have fractional quantities (e.g. 1.5 lessons) for business simplicity.
   const normalizedQuantity = Math.max(1, Math.trunc(lineItem.quantity));
   const normalizedUnitPrice = Math.max(0, Math.trunc(lineItem.unitPriceCents));
+  
   const lineSubtotalCents = normalizedQuantity * normalizedUnitPrice;
+  
+  /**
+   * NOTE: GST is only applied if the business is registered AND 
+   * the specific item is marked as taxable.
+   */
   const lineGstCents = shouldApplyGst(lineItem.taxMode) ? Math.round(lineSubtotalCents * GST_RATE) : 0;
 
   return {
@@ -50,14 +56,16 @@ export function calculateLineItem(lineItem: InvoiceLineItemDraft): CalculatedInv
 }
 
 /**
- * Recomputes all line items and aggregates them into document-wide totals.
+ * Aggregates all line items into a document-wide financial snapshot.
  * 
- * NOTE: This is the final step before persistence to the database or 
- * rendering a PDF. It ensures that the document total exactly equals
- * the sum of its lines.
+ * DESIGN RATIONALE:
+ * - Summation Order: We sum the calculated fields (Subtotal, GST, Total) 
+ *   independently. This ensures the grand total always matches the sum 
+ *   of its line totals exactly, preventing "off-by-one-cent" errors 
+ *   on the PDF footers.
  * 
- * @param lineItems - Array of line item drafts
- * @returns Object containing both calculated lines and aggregate totals
+ * @param lineItems - List of line items (e.g. from a form draft)
+ * @returns Object with recomputed lines and the aggregate totals
  */
 export function calculateInvoiceTotals(lineItems: InvoiceLineItemDraft[]): {
   lineItems: CalculatedInvoiceLineItem[];
@@ -86,14 +94,9 @@ export function calculateInvoiceTotals(lineItems: InvoiceLineItemDraft[]): {
 }
 
 /**
- * Batch-updates the tax mode for all line items to match a document-wide selection.
- * 
- * RATIONALE: In the Admin UI, users often want to toggle an entire invoice 
- * between GST-free and Taxable. This helper ensures all lines are updated
- * before a recalculation occurs.
- * 
- * @param lineItems - Array of line items to update
- * @param taxMode - The target tax mode (taxable | gst_free)
+ * Bulk updates the tax mode of a list of items.
+ * RATIONALE: Used in the UI when the user toggles the "GST Mode" for the 
+ * entire invoice; ensures all items are synchronized before recalculation.
  */
 export function applyInvoiceTaxMode(lineItems: InvoiceLineItemDraft[], taxMode: InvoiceTaxMode): InvoiceLineItemDraft[] {
   return lineItems.map((lineItem) => ({

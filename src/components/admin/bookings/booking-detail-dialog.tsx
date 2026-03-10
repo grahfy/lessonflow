@@ -1,3 +1,26 @@
+/**
+ * Booking Lifecycle & Detal Management Console
+ * 
+ * Centralized dialog for managing a single booking event (Request or Confirmed).
+ * Orchestrates customer details, scheduling, communication history, 
+ * learning materials, and billing.
+ * 
+ * DESIGN RATIONALE:
+ * 1. Unified Request/Booking Flow: Uses the same UI for both "Booking Requests" 
+ *    and "Confirmed Bookings" to maintain design consistency and reduce 
+ *    code duplication.
+ * 2. Heuristic Matching logic: If a booking comes in from a guest email that 
+ *    partially matches an existing customer, the UI provides a "Match Found" 
+ *    guard to prevent duplicate profile creation.
+ * 3. Bidirectional Communication: Integrates an Email History viewer (fetched 
+ *    from `OutboundEmail` logs and optionally Gmail API) alongside a 
+ *    custom composer.
+ * 4. Modular Actions: Provides entry points to adjacent domains:
+ *    - Invoicing (Financial)
+ *    - Learning Materials (Educational)
+ *    - Address Autocomplete (UX)
+ */
+
 "use client";
 
 import { RefObject, useState } from "react";
@@ -19,25 +42,27 @@ interface BookingDetailDialogProps {
   onClose: () => void;
   rootRef: RefObject<HTMLDivElement | null>;
   event: BookingEvent | null;
+  /** Current state of the editing form, extracted from the event entity. */
   dialogForm: BookingDialogForm | null;
   setDialogForm: (form: BookingDialogForm) => void;
+  /** Tracks which button (Save/Approve/Invoice) is currently requesting. */
   busyAction: string | null;
   onSave: () => void;
   onDelete: () => void;
   onMove: () => void;
   
-  // Tabs
+  // Tabs Navigation
   activeTab: "appointment" | "emails";
   setActiveTab: (tab: "appointment" | "emails") => void;
 
-  // Customer
+  // CRM Integration
   matchedCustomer: BookingMatchedCustomer | null;
   hasHeuristicMatch: boolean;
   onApplyMatchedCustomer: () => void;
   onOpenMatchedCustomer: () => void | Promise<void>;
   onDismissMatchedCustomer: () => void;
 
-  // Email
+  // Communication Engine
   emailHistory: ReadonlyArray<EmailRecord>;
   loadingEmailHistory: boolean;
   sendingEmail: boolean;
@@ -49,12 +74,15 @@ interface BookingDetailDialogProps {
   onSendEmail: () => void;
   onSyncEmail: () => void;
 
-  // Additional Actions
+  // Domain Actions
   onPerformAction: (action: string) => void;
   onOpenMaterials: () => void;
   onOpenInvoice: () => void | Promise<void>;
 }
 
+/**
+ * Renders the full-screen admin dialog for a specific booking.
+ */
 export function BookingDetailDialog({
   isOpen,
   onClose,
@@ -91,6 +119,7 @@ export function BookingDetailDialog({
 
   if (!event || !dialogForm) return null;
 
+  /** Local helper for atomic form updates. */
   const updateForm = (patch: Partial<BookingDialogForm>) => setDialogForm({ ...dialogForm, ...patch });
 
   return (
@@ -120,6 +149,7 @@ export function BookingDetailDialog({
                     {busyAction === 'save' ? 'Saving...' : 'Save Changes'}
                   </button>
                 </Tooltip>
+                {/* RATIONALE: Requests can be 'Approved' to create a Booking linked to a Teacher/Room. */}
                 {event.status === 'pending' && (
                   <Tooltip content="Approve this pending request and convert it into a confirmed booking.">
                     <button className="btn btn-primary" disabled={!!busyAction} onClick={() => onPerformAction('approve')}>
@@ -162,6 +192,11 @@ export function BookingDetailDialog({
         </div>
       }
     >
+      {/* 
+          Main Nav Tabs
+          RATIONALE: We separate 'Appointment' from 'Communication' to keep 
+          the form clean while still providing deep history access. 
+      */}
       <div className="dialog-tabs dialog-tabs-booking">
         <div className="dialog-tabs-left">
           <Tooltip content="View and edit appointment details for this booking.">
@@ -187,6 +222,7 @@ export function BookingDetailDialog({
       <div className="dialog-layout booking-dialog-layout">
           {activeTab === 'appointment' ? (
             <>
+              {/* SECTION: CUSTOMER INFORMATION */}
               <div className="dialog-col">
                 <div className="dialog-section-heading">
                   <h3 className="manual-section-title">Customer Details</h3>
@@ -196,6 +232,9 @@ export function BookingDetailDialog({
                     </span>
                   ) : null}
                 </div>
+                
+                {/* RATIONALE: Prompting the admin to link a request to a profile 
+                    early ensures data deduplication. */}
                 {hasHeuristicMatch && matchedCustomer && (
                   <AdminCard
                     ghost
@@ -227,12 +266,15 @@ export function BookingDetailDialog({
                   <AdminField label="Phone">
                     <input value={dialogForm.phone} maxLength={10} onChange={e => updateForm({ phone: e.target.value.replace(/\D/g, '').slice(0, 10) })} />
                   </AdminField>
+                  
+                  {/* UX: Address predictive search for lesson travel or billing accuracy. */}
                   <div style={{ gridColumn: "1 / -1", padding: "8px 0" }}>
                      <AddressAutocomplete 
                         onAddressSelect={(addr) => updateForm({ ...addr, state: toAuState(addr.state) })} 
                         disabled={!!busyAction} 
                      />
                   </div>
+                  
                   <AdminField label="Unit">
                     <input value={dialogForm.unitNumber} onChange={e => updateForm({ unitNumber: e.target.value })} />
                   </AdminField>
@@ -271,6 +313,7 @@ export function BookingDetailDialog({
                   </AdminField>
                 </AdminForm>
 
+                {/* SECTION: LESSON LOGISTICS */}
                 <h3 className="manual-section-title booking-section-title">Lesson Config</h3>
                 <AdminForm className="dialog-form-grid">
                   <AdminField label="Start Time">
@@ -303,6 +346,8 @@ export function BookingDetailDialog({
                   )}
                 </AdminForm>
               </div>
+
+              {/* SECTION: NOTES & DOMAIN ACTIONS */}
               <div className="dialog-col is-notes">
                 <h3 className="manual-section-title">Notes & Actions</h3>
                 <AdminField label="Lesson notes">
@@ -315,6 +360,8 @@ export function BookingDetailDialog({
                   <Tooltip content="Open the learning materials manager for this booking.">
                     <button className="btn btn-secondary" onClick={onOpenMaterials}>Learning Materials</button>
                   </Tooltip>
+                  
+                  {/* RATIONALE: Invoicing is only available once a Request is converted to a Booking. */}
                   {event.entityType === "booking" && (
                     <Tooltip content="Create or open a draft invoice linked to this booking.">
                       <button className="btn btn-secondary" disabled={busyAction === "invoice"} onClick={onOpenInvoice}>
@@ -322,6 +369,7 @@ export function BookingDetailDialog({
                       </button>
                     </Tooltip>
                   )}
+                  
                   <Tooltip content="Cancel this booking. This action will notify the student.">
                     <button className="btn btn-danger" disabled={!!busyAction} onClick={onDelete}>Cancel Booking</button>
                   </Tooltip>
@@ -330,6 +378,7 @@ export function BookingDetailDialog({
             </>
           ) : (
             <>
+              {/* SECTION: COMMUNICATION HISTORY */}
               <div className="dialog-col">
                 <div className="section-header-with-action">
                   <h3 className="manual-section-title">Email History</h3>
@@ -375,6 +424,7 @@ export function BookingDetailDialog({
                 </AdminCard>
               </div>
 
+              {/* SECTION: EMAIL COMPOSER */}
               <div className="dialog-col is-notes">
                 <h3 className="manual-section-title">Send Custom Email</h3>
                 <AdminCard ghost className="booking-email-composer-card">
@@ -392,6 +442,8 @@ export function BookingDetailDialog({
           )}
       </div>
     </AdminDialog>
+    
+    {/* Specialized sub-dialog for viewing full HTML content of sent emails. */}
     <EmailViewerDialog
       isOpen={!!selectedEmail}
       onClose={() => setSelectedEmail(null)}

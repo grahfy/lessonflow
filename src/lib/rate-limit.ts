@@ -1,86 +1,73 @@
 /**
- * Rate Limiting Module
+ * Security Throttling & Rate Limiting Engine
  * 
- * Provides in-memory sliding window rate limiting for API endpoints to prevent
- * abuse and brute-force attacks.
+ * Provides an in-memory sliding window rate limiter to protect public facing 
+ * endpoints (Login, Booking, Contact Form) from brute-force and SPAM.
  * 
- * SECURITY:
- * - Protects against brute-force login attempts
- * - Prevents API endpoint abuse
- * - Uses client IP as the rate limit key
- * 
- * UI/USAGE:
- * - Used by login endpoints to limit failed attempts
- * - Used by booking API to prevent spam submissions
- * - Returns headers: X-RateLimit-Remaining, Retry-After
+ * DESIGN RATIONALE:
+ * 1. Low-Latency Protection: By using a simple in-memory Map (scoped to 
+ *    `globalThis` to survive HMR), we avoid the network overhead of an 
+ *    external cache (like Redis) for the current single-droplet architecture.
+ * 2. IP-Based Identification: Uses the most trustworthy client IP extracted 
+ *    from headers (`X-Real-IP` or `X-Forwarded-For`).
+ * 3. Transparent Feedback: Returns standard rate-limit headers to clients, 
+ *    allowing the UI to show accurate "Retry-After" countdowns.
  */
 
 import { NextRequest } from "next/server";
 
-/**
- * Input parameters for rate limit consumption.
- */
+/** Configuration for a specific rate-limiting bucket. */
 type RateLimitInput = {
-  key: string;        // Unique identifier for rate limiting scope
-  limit: number;      // Maximum requests allowed in the time window
-  windowMs: number;   // Time window in milliseconds
+  /** Unique key (e.g. `login:${ip}`). */
+  key: string;
+  /** Max allowed requests in this window. */
+  limit: number;
+  /** Duration of the window in milliseconds. */
+  windowMs: number;
 };
 
-/**
- * Internal state tracking for rate limit counters.
- */
+/** Tracking state for a specific key. */
 type RateLimitState = {
-  count: number;      // Current request count in window
-  resetAt: number;    // Unix timestamp when window resets
+  count: number;
+  resetAt: number;
 };
 
-/**
- * Result object returned after checking rate limit.
- */
+/** High-level result of a consumption attempt. */
 export type RateLimitResult = {
-  allowed: boolean;           // Whether request is permitted
-  remaining: number;           // Remaining requests in window
-  retryAfterSeconds: number;  // Seconds to wait if rate limited
+  /** True if the request should proceed. */
+  allowed: boolean;
+  /** Remaining slots in the current window. */
+  remaining: number;
+  /** Seconds until the window resets (if at limit). */
+  retryAfterSeconds: number;
 };
 
 /**
  * Global in-memory store for rate limiting state.
- * Uses globalThis to persist across hot reloads in development.
- * 
- * STRUCTURE: Map<key, {count, resetAt}>
- * SECURITY: In production with multiple instances, this should use
- *           Redis or similar distributed store
+ * RATIONALE: Using `globalThis` ensures the store is not wiped during 
+ * Next.js development hot-reloads.
  */
 const globalStore = globalThis as unknown as {
   __rateLimitStore?: Map<string, RateLimitState>;
 };
 
-/**
- * Initialize or retrieve the global rate limit store.
- */
 const store = globalStore.__rateLimitStore ?? new Map<string, RateLimitState>();
 if (!globalStore.__rateLimitStore) {
   globalStore.__rateLimitStore = store;
 }
 
 /**
- * Extracts client IP address from request headers.
+ * Extracts the most granular client IP from request headers.
  * 
- * Handles common proxy/load balancer header formats.
- *
- * DigitalOcean Droplet recommendation (Nginx/Caddy reverse proxy):
- * - Set `X-Real-IP` from the proxy's remote address and prefer it here.
- * - If only `X-Forwarded-For` is available and the proxy appends values,
- *   the last entry is the most trustworthy hop added by the reverse proxy.
+ * LOGIC:
+ * 1. Check `X-Real-IP` (Set by Nginx/Caddy proxies).
+ * 2. Check `X-Forwarded-For` (Taking the last hop as the most reliable).
  * 
- * @param request - Next.js request object
- * @returns Client IP string or "unknown" as fallback
+ * @param headers - Request headers
  */
 export function getRequestIpFromHeaders(headers: Headers): string {
   const realIp = headers.get("x-real-ip")?.trim();
-  if (realIp) {
-    return realIp;
-  }
+  if (realIp) return realIp;
 
   const forwarded = headers.get("x-forwarded-for");
   if (forwarded) {
@@ -89,38 +76,24 @@ export function getRequestIpFromHeaders(headers: Headers): string {
       .map((value) => value.trim())
       .filter(Boolean);
     const last = parts.at(-1);
-    if (last) {
-      return last;
-    }
+    if (last) return last;
   }
 
   return "unknown";
 }
 
-/**
- * Backward-compatible wrapper for existing callers that pass NextRequest.
- */
+/** Legacy wrapper for NextRequest objects. */
 export function getRequestIp(request: NextRequest): string {
   return getRequestIpFromHeaders(request.headers);
 }
 
 /**
- * Consumes a rate limit slot for the given key.
+ * Tickers the rate limiter for a specific key.
  * 
- * Implements sliding window style limiting:
- * - If no existing state or window expired: create new counter at 1
- * - If under limit: increment counter
- * - If at/over limit: reject with retry time
- * 
- * SECURITY:
- * - Disabled in test environment to allow unlimited testing
- * - Returns consistent response format for client handling
- * 
- * @param input - Rate limit parameters
- * @returns RateLimitResult indicating allowed/remaining/retry time
+ * @param input - Key and Window constraints
  */
 export function consumeRateLimit(input: RateLimitInput): RateLimitResult {
-  // Disable rate limiting in test environment
+  // SECURITY: Disable rate limiting in tests to avoid flakiness in E2E suites.
   if (process.env.NODE_ENV === "test") {
     return {
       allowed: true,
@@ -132,7 +105,7 @@ export function consumeRateLimit(input: RateLimitInput): RateLimitResult {
   const now = Date.now();
   const existing = store.get(input.key);
 
-  // New window or expired window - start fresh
+  // Scenario A: New window or expired window - start fresh
   if (!existing || existing.resetAt <= now) {
     store.set(input.key, {
       count: 1,
@@ -145,7 +118,7 @@ export function consumeRateLimit(input: RateLimitInput): RateLimitResult {
     };
   }
 
-  // Window active but at limit - reject request
+  // Scenario B: Window active but at limit - reject request
   if (existing.count >= input.limit) {
     return {
       allowed: false,
@@ -154,7 +127,7 @@ export function consumeRateLimit(input: RateLimitInput): RateLimitResult {
     };
   }
 
-  // Window active and under limit - increment
+  // Scenario C: Window active and under limit - increment
   existing.count += 1;
   store.set(input.key, existing);
 

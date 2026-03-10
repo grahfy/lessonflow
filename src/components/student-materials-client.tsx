@@ -1,4 +1,26 @@
+/**
+ * Student Materials Library
+ * 
+ * Provides a unified, filterable/sortable interface for students to access 
+ * all assigned resources (PDFs, Audio, Images) across their entire 
+ * lesson history.
+ * 
+ * DESIGN RATIONALE:
+ * 1. Aggregated View: Instead of making students hunt through individual 
+ *    lesson records, this component flattens all materials into a single 
+ *    "Library" view, ordered by "Recently Added".
+ * 2. Mixed Media Handling: Automatically renders specialized players 
+ *    (e.g. `<audio>`) for media files while providing direct download 
+ *    for documents.
+ * 3. Mobile Optimized: Uses a flexible table layout with "Namestack" formatting 
+ *    to ensure readability on small guitar-tutor devices.
+ * 4. Context Preservation: Even in a flattened list, we preserve the link 
+ *    to the original Booking so students can identify which lesson a 
+ *    resource belongs to.
+ */
+
 "use client";
+
 import { APP_TIMEZONE } from "@/lib/time";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import {
@@ -11,6 +33,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
+/** Local wrapper for material items enriched with booking context. */
 type StudentMaterialEntry = {
   bookingId: string | null;
   bookingStartAt: string | null;
@@ -18,10 +41,6 @@ type StudentMaterialEntry = {
   material: StudentPortalMaterial;
 };
 
-/**
- * Dedicated materials page for students, showing every assigned resource
- * in one place with direct download links.
- */
 export function StudentMaterialsClient() {
   const router = useRouter();
   const [data, setData] = useState<StudentPortalPayload | null>(null);
@@ -30,26 +49,31 @@ export function StudentMaterialsClient() {
   const [loggingOut, setLoggingOut] = useState(false);
 
   /**
-   * Loads authenticated portal data and redirects to login if the session expired.
+   * Loads authenticated portal data.
+   * RATIONALE: We reuse the main portal endpoint to ensure permissions 
+   * and data snapshots are identical to the dashboard.
    */
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
-    // Reuse the portal endpoint so the materials page and portal home stay consistent and no
-    // duplicate server aggregation logic is needed.
+    
     const response = await fetch("/api/student/portal", { cache: "no-store" });
+    
     if (response.status === 401) {
       router.push("/student/login");
       router.refresh();
       return;
     }
+    
     if (!response.ok) {
       setLoading(false);
       setError("Unable to load learning materials right now.");
       return;
     }
+    
     const payloadBody = await response.json().catch(() => null);
     let payload: StudentPortalPayload;
+    
     try {
       payload = parseStudentPortalPayload(payloadBody);
     } catch {
@@ -57,6 +81,7 @@ export function StudentMaterialsClient() {
       setError("Unable to load learning materials right now.");
       return;
     }
+    
     setData(payload);
     setLoading(false);
   }, [router]);
@@ -65,21 +90,16 @@ export function StudentMaterialsClient() {
     void load();
   }, [load]);
 
-  /**
-   * Ends the student session and returns to the login screen.
-   */
   async function logout() {
     setLoggingOut(true);
-    // Logout is best-effort; navigation back to login is still the primary UX outcome.
     await fetch("/api/student/logout", { method: "POST" });
     router.push("/student/login");
     router.refresh();
   }
 
+  /** Flattens nested booking materials into a single sortable array. */
   const materials = useMemo(() => {
-    if (!data) {
-      return [] as StudentMaterialEntry[];
-    }
+    if (!data) return [] as StudentMaterialEntry[];
     return collectAllStudentMaterials(data);
   }, [data]);
 
@@ -114,6 +134,7 @@ export function StudentMaterialsClient() {
             <h2>All learning materials</h2>
             <p className="helper-text">Your assigned files, arranged like a library list.</p>
           </div>
+          
           {materials.length ? (
             <div className="student-drive-table-wrap">
               <table className="student-drive-table">
@@ -132,6 +153,12 @@ export function StudentMaterialsClient() {
                       <td className="student-drive-name-cell">
                         <span className={`student-drive-type-dot is-${entry.material.materialType}`} aria-hidden="true" />
                         <div className="student-drive-name-stack">
+                          {/* 
+                             Naming RATIONALE: 
+                             Display the descriptive title first, fallback to filename. 
+                             This ensures internal filenames (e.g. "lesson_v1.pdf") 
+                             don't ruin the professional UI.
+                          */}
                           <strong>{entry.material.description || entry.material.title}</strong>
                           {entry.material.description ? <span className="helper-text">{entry.material.title}</span> : null}
                           <span className="helper-text">{formatBytes(entry.material.sizeBytes)}</span>
@@ -175,11 +202,12 @@ export function StudentMaterialsClient() {
 }
 
 /**
- * Merges all booking-linked materials into one chronological list.
+ * Aggregates all materials into one chronological stream.
  */
 function collectAllStudentMaterials(payload: StudentPortalPayload): StudentMaterialEntry[] {
   const rows: StudentMaterialEntry[] = [];
   const allBookings = [...payload.upcoming, ...payload.previous];
+  
   for (const booking of allBookings) {
     for (const material of booking.materials) {
       rows.push({
@@ -190,6 +218,7 @@ function collectAllStudentMaterials(payload: StudentPortalPayload): StudentMater
       });
     }
   }
+  
   for (const material of payload.standaloneMaterials || []) {
     rows.push({
       bookingId: null,
@@ -198,14 +227,13 @@ function collectAllStudentMaterials(payload: StudentPortalPayload): StudentMater
       material
     });
   }
-  // Sort by material creation time so the page behaves like a "recently added" library list.
+  
+  // Newest materials at the top.
   rows.sort((left, right) => new Date(right.material.createdAt).getTime() - new Date(left.material.createdAt).getTime());
   return rows;
 }
 
-/**
- * Formats timestamps in Melbourne-local style for consistency with portal cards.
- */
+/** Formats dates consistently across the portal. */
 function formatWhen(value: string): string {
   const date = new Date(value);
   return new Intl.DateTimeFormat("en-AU", {
@@ -215,17 +243,11 @@ function formatWhen(value: string): string {
   }).format(date);
 }
 
-/**
- * Formats raw byte sizes into readable file-size labels.
- */
+/** Formats byte sizes for display. */
 function formatBytes(sizeBytes: number): string {
-  if (sizeBytes < 1024) {
-    return `${sizeBytes} B`;
-  }
+  if (sizeBytes < 1024) return `${sizeBytes} B`;
   const sizeKb = sizeBytes / 1024;
-  if (sizeKb < 1024) {
-    return `${sizeKb.toFixed(1)} KB`;
-  }
+  if (sizeKb < 1024) return `${sizeKb.toFixed(1)} KB`;
   const sizeMb = sizeKb / 1024;
   return `${sizeMb.toFixed(1)} MB`;
 }

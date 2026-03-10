@@ -1,26 +1,37 @@
 /**
- * @fileoverview Structured logging utilities for application observability
- * @description Provides centralized logging functions with consistent formatting,
- * timestamps, and metadata serialization. Used throughout the application for
- * debugging, monitoring, and audit trails.
+ * Application Observability & Structured Logging
  * 
- * @security - Error logging includes stack traces for debugging but care should
- * be taken not to log sensitive customer data (PII is logged at customer-match stage)
- * @logic - All logs use ISO timestamps for chronological ordering in log aggregators
+ * Provides centralized logging with both Console output (for real-time 
+ * monitoring) and Database persistence (for historical audit and 
+ * admin dashboarding).
+ * 
+ * DESIGN RATIONALE:
+ * 1. Hybrid Storage: Logs are emitted to `stdout/stderr` (captured by VPS 
+ *    process managers like PM2 or Systemd) AND written to the `SystemLog` 
+ *    table. This ensures logs are available even if the DB is down, 
+ *    while still providing a searchable UI for admins.
+ * 2. Non-Blocking Persistence: Database logging is "fire-and-forget" 
+ *    (not awaited). This prevents slow DB writes from increasing 
+ *    latency for end-users or critical API flows.
+ * 3. Structured Metadata: Supports JSON metadata for deep inspection 
+ *    of events (e.g. logging the specific Booking ID involved in an error).
  */
 
 import { prisma } from "./db";
 import { Prisma } from "@/generated/prisma/client";
 
+/** Supported severity levels for the observability stack. */
 type LogLevel = "info" | "warn" | "error";
 
 /**
- * Persists a log entry to the database.
- * @internal - Fire-and-forget to avoid blocking the main execution flow
+ * Persists a log entry to the database SystemLog table.
+ * 
+ * @internal - This is called internally by logger functions. 
+ * RATIONALE: We use a separate .catch block to prevent logging failures 
+ * from causing infinite recursion or crashing the parent process.
  */
 function persistLog(level: LogLevel, event: string, message: string, meta?: Record<string, unknown>) {
-  // Use fire-and-forget; do not await this in the main logging functions
-  // to avoid performance bottlenecks and complex async/await chains in callers.
+  // Fire-and-forget: we do NOT await this to keep the application fast.
   prisma.systemLog.create({
     data: {
       level,
@@ -29,22 +40,17 @@ function persistLog(level: LogLevel, event: string, message: string, meta?: Reco
       meta: meta ? (meta as Prisma.InputJsonValue) : Prisma.JsonNull,
     }
   }).catch(err => {
-    // Only log to console to avoid potential recursion if logging failed
-    console.error("[observability] Failed to persist log to database:", err.message);
+    // Fallback to console only if DB persistence fails.
+    console.error("[observability] Persistence failure:", err.message);
   });
 }
 
 /**
- * Serializes metadata object to JSON string for log output.
- * @param meta - Optional metadata object to serialize
- * @returns JSON string or empty string if meta is undefined/null
- * @security - Uses try/catch to prevent logging failures from crashing the app
- * @logic - Returns placeholder if serialization fails (e.g., circular references)
+ * Safely stringifies metadata for console output.
+ * RATIONALE: Prevents "Circular Reference" errors from crashing the logger.
  */
 function stringifyMeta(meta?: Record<string, unknown>) {
-  if (!meta) {
-    return "";
-  }
+  if (!meta) return "";
   try {
     return JSON.stringify(meta);
   } catch {
@@ -53,10 +59,11 @@ function stringifyMeta(meta?: Record<string, unknown>) {
 }
 
 /**
- * Logs an informational event with optional metadata.
- * @param event - Human-readable event description
- * @param meta - Optional context data (e.g., { bookingId: "123", action: "created" })
- * @ui - Used for tracking user flows and business operations in monitoring dashboards
+ * Logs a successful business event.
+ * Use this for high-level tracking like "Booking Approved" or "Invoice Sent".
+ * 
+ * @param event - Short, searchable string (e.g. "auth.login.success")
+ * @param meta - Additional context (e.g. { userId: "..." })
  */
 export function logEvent(event: string, meta?: Record<string, unknown>) {
   const line = `[${new Date().toISOString()}] [info] ${event} ${stringifyMeta(meta)}`;
@@ -65,12 +72,11 @@ export function logEvent(event: string, meta?: Record<string, unknown>) {
 }
 
 /**
- * Logs an error event with error object and optional metadata.
- * @param event - Human-readable error description
- * @param error - The error object (Error instance or other value)
- * @param meta - Optional context data for debugging
- * @security - Includes full stack trace for debugging but avoid logging PII
- * @logic - Handles both Error instances and non-Error values gracefully
+ * Detailed error logger with stack trace capturing.
+ * 
+ * @param event - Context of where the error occurred (e.g. "api.booking.create.failed")
+ * @param error - The actual error object caught in the try/catch
+ * @param meta - Local variables at the time of failure
  */
 export function logError(event: string, error: unknown, meta?: Record<string, unknown>) {
   const line = `[${new Date().toISOString()}] [error] ${event} ${stringifyMeta(meta)}`;
@@ -85,26 +91,26 @@ export function logError(event: string, error: unknown, meta?: Record<string, un
     console.error(error);
   }
 
+  // Persists the full stack trace to the DB for admin debugging.
   persistLog("error", event, `${line}\n${errorMessage}`, meta);
 }
 
 /**
- * Generic logging function with level selection.
- * @param level - Log severity level (info, warn, error)
- * @param event - Human-readable event description
- * @param meta - Optional context data
- * @logic - Error level delegates to logError; warn uses console.warn
+ * Generic logging bridge for arbitrary levels.
  */
 export function log(level: LogLevel, event: string, meta?: Record<string, unknown>) {
   if (level === "error") {
     logError(event, null, meta);
     return;
   }
+  
   const line = `[${new Date().toISOString()}] [${level}] ${event} ${stringifyMeta(meta)}`;
+  
   if (level === "warn") {
     console.warn(line);
   } else {
     console.info(line);
   }
+  
   persistLog(level, event, line, meta);
 }

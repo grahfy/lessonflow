@@ -1,14 +1,41 @@
+/**
+ * Invoice Reminder Batch Processor
+ * 
+ * Orchestrates the automated dispatch of overdue notices for outstanding 
+ * invoices. This service is designed to be invoked by both Scheduled CRON 
+ * jobs and manual Admin triggers.
+ * 
+ * DESIGN RATIONALE:
+ * 1. Eligibility Segregation: Candidate selection is broad (all sent/overdue), 
+ *    but actual dispatch is gated by `getInvoiceReminderEligibility`. This 
+ *    ensures idempotency—reminders won't be sent multiple times for 
+ *    the same 'stage' (7, 14, 30 days).
+ * 2. Error Isolation: Each invoice is processed in its own try/catch block. 
+ *    A failure in one (e.g., bad customer email) does not halt the entire 
+ *    batch, ensuring maximum system throughput.
+ * 3. Dry-Run Support: Allows admins to preview who will receive a notice 
+ *    without actually firing emails or updating the DB.
+ * 4. Audit Trail: Every sent reminder is logged to the `InvoiceAuditLog` 
+ *    for accountability and timeline tracking.
+ */
+
 import { prisma } from "@/lib/db";
 import { getInvoiceReminderEligibility, sendInvoiceReminder } from "@/lib/invoices/reminders";
 
 type RunInvoiceReminderBatchInput = {
+  /** The Admin (or SYSTEM_USER) ID triggering the batch. */
   actorId: string;
+  /** If true, returns candidate list without sending emails. */
   dryRun?: boolean;
+  /** Limits batch size to prevent SMTP rate-limiting or timeouts. */
   maxInvoices?: number;
+  /** Filter to a single customer (useful for targeted manual recovery). */
   customerId?: string;
+  /** Force-limit to a specific escalation stage. */
   stage?: 7 | 14 | 30;
 };
 
+/** High-level summary of the batch operation results. */
 export type InvoiceReminderRunResult = {
   dryRun: boolean;
   candidateCount: number;
@@ -21,58 +48,44 @@ export type InvoiceReminderRunResult = {
 };
 
 /**
- * Runs a reminder batch for overdue sent invoices.
- *
- * This centralizes reminder execution for both manual admin triggering and
- * scheduled cron jobs so reminder-stage behavior remains consistent.
+ * Main execution loop for invoice reminders.
+ * 
+ * RATIONALE: We process oldest-due first to prioritize recovery of 
+ * stale debt.
  */
 export async function runInvoiceReminderBatch(input: RunInvoiceReminderBatchInput): Promise<InvoiceReminderRunResult> {
   const now = new Date();
-  // Candidate selection is intentionally broad and bounded; stage/idempotency filtering happens
-  // below through shared eligibility logic so manual and cron runs behave identically.
+  
+  // 1. Fetch search candidates (overdue & currently sent)
   const candidates = await prisma.invoice.findMany({
     where: {
       isDeleted: false,
       documentType: "invoice",
       status: "sent",
-      dueAt: {
-        lt: now
-      },
+      dueAt: { lt: now },
       customerId: input.customerId ?? undefined
     },
     include: {
-      lineItems: {
-        orderBy: {
-          sortOrder: "asc"
-        }
-      }
+      lineItems: { orderBy: { sortOrder: "asc" } }
     },
     orderBy: [{ dueAt: "asc" }, { createdAt: "asc" }],
     take: input.maxInvoices ?? 100
   });
 
+  // 2. Filter by business logic eligibility (Escalated stages: 7, 14, 30 days)
   const eligible = candidates
     .map((invoice) => {
       const eligibility = getInvoiceReminderEligibility(invoice, now);
-      return {
-        invoice,
-        eligibility
-      };
+      return { invoice, eligibility };
     })
     .filter(({ eligibility }) => {
-      // Optional stage filter supports admin-triggered dry runs or one-off recovery sends.
-      if (!eligibility.isEligible || !eligibility.stage) {
-        return false;
-      }
-      if (input.stage && eligibility.stage !== input.stage) {
-        return false;
-      }
+      if (!eligibility.isEligible || !eligibility.stage) return false;
+      if (input.stage && eligibility.stage !== input.stage) return false;
       return true;
     });
 
+  // 3. Early exit if Dry Run requested
   if (input.dryRun) {
-    // Dry-run output shows the exact invoices/stages that would be processed without mutating DB
-    // state or dispatching customer email.
     return {
       dryRun: true,
       candidateCount: candidates.length,
@@ -93,16 +106,16 @@ export async function runInvoiceReminderBatch(input: RunInvoiceReminderBatchInpu
   const sent: Array<{ id: string; invoiceNumber: string; overdueDays: number; stage: 7 | 14 | 30 }> = [];
   const failed: Array<{ id: string; invoiceNumber: string; error: string }> = [];
 
+  // 4. Dispatch Loop
   for (const entry of eligible) {
     const { invoice, eligibility } = entry;
-    if (!eligibility.stage) {
-      continue;
-    }
+    if (!eligibility.stage) continue;
 
     try {
+      // Dispatch email via SMTP/Gmail
       const reminder = await sendInvoiceReminder(invoice, eligibility.overdueDays, eligibility.stage);
-      // Persist reminder metadata and audit logs per invoice so a single failure does not poison
-      // the entire batch.
+      
+      // Update metadata to prevent duplicate sends until the next escalation stage
       await prisma.invoice.update({
         where: { id: invoice.id },
         data: {
@@ -118,6 +131,7 @@ export async function runInvoiceReminderBatch(input: RunInvoiceReminderBatchInpu
           }
         }
       });
+      
       sent.push({
         id: invoice.id,
         invoiceNumber: invoice.invoiceNumber,
@@ -125,8 +139,7 @@ export async function runInvoiceReminderBatch(input: RunInvoiceReminderBatchInpu
         stage: eligibility.stage
       });
     } catch (error) {
-      // Continue collecting failures to maximize progress during cron runs and return actionable
-      // diagnostics to the admin UI/manual runner.
+      // RATIONALE: Keep going to process other invoices even if one fails.
       failed.push({
         id: invoice.id,
         invoiceNumber: invoice.invoiceNumber,

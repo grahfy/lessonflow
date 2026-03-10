@@ -1,73 +1,65 @@
 /**
  * GST Policy Service
  * 
- * This module defines the rules for GST applicability in the LessonFlow invoicing system.
- * It determines whether the school is GST-registered and how that affects 
- * default tax modes and line item calculations.
+ * Defines the core rules for Australian GST applicability in LessonFlow.
  * 
- * RATIONALE: Australian tax law requires clear differentiation between GST-registered
- * and non-registered entities. This centralized policy ensures consistency across
- * PDF generation, DB persistence, and UI display.
+ * ARCHITECTURAL RATIONALE:
+ * - Compliance: Single point of truth for whether the business is GST-registered.
+ * - Flexibility: Supports schools that are transitionary (e.g. crossing registration 
+ *   thresholds) via environment variable toggles.
+ * - Consistency: Synchronizes tax behavior across DB calculations, Invoice PDFs, 
+ *   and UI components to avoid "rounding" or "mis-match" errors.
  */
 
 import { InvoiceTaxMode } from "@/generated/prisma/client";
 
 /**
- * Utility to parse environment variables into booleans with safe fallbacks.
- * 
- * @param value - The raw environment variable string
- * @param fallback - The value to return if the string is undefined or invalid
+ * Parses environment variables into booleans with strict truthy/falsy sets.
+ * Used for critical business toggles like GST registration.
  */
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
-  if (!value) {
-    return fallback;
-  }
+  if (!value) return fallback;
   const normalized = value.trim().toLowerCase();
-  // We explicitly check for common truthy/falsy strings to prevent misconfiguration
-  if (normalized === "true" || normalized === "1" || normalized === "yes") {
-    return true;
-  }
-  if (normalized === "false" || normalized === "0" || normalized === "no") {
-    return false;
-  }
+  
+  if (["true", "1", "yes", "on"].includes(normalized)) return true;
+  if (["false", "0", "no", "off"].includes(normalized)) return false;
+  
   return fallback;
 }
 
 /**
- * Checks if the business is officially GST-registered via environment configuration.
- * When true, taxable items will incur 10% GST.
+ * Returns whether the school is registered for GST.
  * 
- * @returns boolean indicating registration status
+ * NOTE: If false, GST will be 0 on ALL invoices regardless of individual 
+ * line item settings. This prevents non-registered sole traders from 
+ * accidentally charging tax they aren't authorized to collect.
  */
 export function isInvoiceGstRegistered(): boolean {
   return parseBoolean(process.env.INVOICE_GST_REGISTERED, false);
 }
 
 /**
- * Provides the system-wide default tax mode for new invoices and line items.
+ * Determines the default Tax Mode for new line items.
  * 
  * LOGIC:
- * 1. Honors explicit INVOICE_DEFAULT_TAX_MODE if set to "taxable" or "gst_free".
- * 2. If no explicit default, uses "taxable" for registered businesses and "gst_free" otherwise.
- * 
- * @returns InvoiceTaxMode (taxable | gst_free)
+ * 1. Honors explicit `INVOICE_DEFAULT_TAX_MODE` override.
+ * 2. Defaults to 'taxable' for registered businesses, 'gst_free' otherwise.
  */
 export function getDefaultInvoiceTaxMode(): InvoiceTaxMode {
   const configured = process.env.INVOICE_DEFAULT_TAX_MODE?.trim().toLowerCase();
+  
   if (configured === "taxable" || configured === "gst_free") {
-    return configured;
+    return configured as InvoiceTaxMode;
   }
+  
   return isInvoiceGstRegistered() ? "taxable" : "gst_free";
 }
 
 /**
- * Logic gate for whether GST should be calculated for a given line item.
+ * Predicate to decide if GST math should run for a specific context.
  * 
- * NOTE: Both the business MUST be registered AND the item MUST be marked as taxable
- * for GST to be computed.
- * 
- * @param taxMode - The specific tax mode of the line item being checked
- * @returns boolean
+ * RATIONALE: To apply GST, the entity must be registered AND the 
+ * specific item (e.g. textbook vs tuition) must be marked taxable.
  */
 export function shouldApplyGst(taxMode: InvoiceTaxMode): boolean {
   return isInvoiceGstRegistered() && taxMode === "taxable";

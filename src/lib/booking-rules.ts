@@ -1,3 +1,22 @@
+/**
+ * Booking Validation & Domain Rules Engine
+ * 
+ * This module acts as the "Source of Truth" for all business logic surrounding 
+ * scheduling, address integrity, and lesson parameters.
+ * 
+ * CORE RESPONSIBILITIES:
+ * 1. Schema Definition: Centralized Zod schemas for public and admin data entry.
+ * 2. Cross-Field Validation: Logic that ensures bookings are in the future, 
+ *    within the correct year, and geographically valid (e.g., VIC-only for in-person).
+ * 3. Duration Math: Converting UI duration tokens (min30/min60) into 
+ *    discrete temporal intervals for DB storage.
+ * 4. Recurring Logic: Algorithmic generation of weekly booking series.
+ * 
+ * RATIONALE: By centralizing these rules in a single library, we ensure that 
+ * the Public Booking Form, Admin Manual Booking, and Background Workers 
+ * all adhere to identical constraints, preventing system drift.
+ */
+
 import { addMinutes, addWeeks, isAfter, isBefore } from "date-fns";
 import { z } from "zod";
 
@@ -47,6 +66,7 @@ export const contactSubmissionSchema = z.object({
 
 /**
  * Complete booking request schema with simplified address validation.
+ * 
  * LOGIC: Validates core identification fields (Name, Email, Phone, Postcode).
  * RATIONALE: Address fields (street, house number, etc.) have been moved out of the 
  * public UI to reduce friction. They are kept in the schema as optional/empty strings 
@@ -86,7 +106,7 @@ export const bookingRequestSchema = z
     const now = new Date();
     const currentYear = getCurrentCalendarYear();
 
-    // SECURITY: Prevent booking dates in the past
+    // SECURITY: Prevent booking dates in the past or far future outside the business cycle.
     if (!isDateInCalendarYear(startAt, currentYear)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -162,6 +182,7 @@ export type BookingRequestInput = z.infer<typeof bookingRequestSchema>;
 
 /** 
  * Formats Australian address for display in UI.
+ * 
  * LOGIC: Handles missing components by filtering out empty strings and joining with 
  * sensible delimiters. If only postcode exists, returns that.
  */
@@ -198,7 +219,11 @@ export function formatBookingAddress(input: {
 // DURATION CALCULATIONS - Business logic for lesson timing
 // =============================================================================
 
-/** Converts duration enum to actual minutes for database/storage */
+/**
+ * Normalizes UI duration tokens into raw minute counts.
+ * RATIONALE: We allow 'Custom' durations in the Admin panel which override 
+ * the standard enum choices.
+ */
 export function getDurationMinutes(
   duration: z.infer<typeof lessonDurationSchema>,
   customDurationMinutes?: number | null
@@ -209,7 +234,11 @@ export function getDurationMinutes(
   return duration === "min30" ? 30 : 60;
 }
 
-/** Calculates lesson end time from start time and duration */
+/** 
+ * Calculates lesson end time. 
+ * RATIONALE: Explicitly calculated on the server to ensure No-overlap constraints 
+ * aren't bypassed by client-side clock drift.
+ */
 export function getBookingEnd(
   startAt: Date,
   duration: z.infer<typeof lessonDurationSchema>,
@@ -224,7 +253,11 @@ export function getBookingEnd(
 
 /**
  * Generates all booking dates for a recurring weekly lesson.
+ * 
  * LOGIC: Creates weekly occurrences from start date until end date (inclusive).
+ * RATIONALE: We generate discrete dates here so that the DB can store them 
+ * as individual 'Booking' records, allowing per-lesson notes and manual 
+ * rescheduling of specific weeks.
  */
 export function generateRecurringStartDates(input: {
   startAt: Date;

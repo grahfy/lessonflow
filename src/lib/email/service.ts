@@ -1,5 +1,5 @@
 /**
- * Unified Email Service
+ * Unified Email Dispatch & Audit Engine
  * 
  * Provides a resilient API for sending transactional emails (Invoices, Reminders, Portal Access).
  * 
@@ -31,7 +31,9 @@ type SendEmailInput = {
   to: string;
   subject: string;
   html: string;
+  /** Optional blind carbon copy recipients. */
   bcc?: string | string[];
+  /** Optional file attachments (e.g. Invoices). */
   attachments?: Array<{
     filename: string;
     content: Buffer;
@@ -41,21 +43,33 @@ type SendEmailInput = {
 
 /** Standardized response for all email delivery attempts. */
 export type SendEmailResult = {
+  /** 
+   * 'sent': Delivered to provider successfully.
+   * 'queued_no_smtp': Recorded in DB but no provider was available.
+   * 'failed': Provider rejected the message.
+   */
   status: "sent" | "queued_no_smtp" | "failed";
   error?: string;
 };
 
-/** Reused transporter instance. */
+/** Reused transporter instance to minimize connection overhead. */
 let transporter: nodemailer.Transporter | null = null;
 
-/** Normalizes email addresses by removing name labels and lowercasing. */
+/** 
+ * Cleanly extracts the raw email portion from "Name <email@address.com>" 
+ * or similar descriptive formats.
+ */
 function normalizeAddressValue(value: string): string {
   const trimmed = value.trim().toLowerCase();
   const bracketMatch = trimmed.match(/<([^>]+)>/);
   return (bracketMatch?.[1] || trimmed).trim();
 }
 
-/** Merges a single BCC recipient into an existing array of BCCs. */
+/** 
+ * Aggregates BCC recipients while ensuring uniqueness.
+ * RATIONALE: Prevents duplicate deliveries if the owner is already 
+ * explicitly in the BCC list.
+ */
 function mergeBccValues(existing: string | string[] | undefined, extra: string): string[] {
   const seen = new Set<string>();
   const merged: string[] = [];
@@ -79,6 +93,7 @@ function mergeBccValues(existing: string | string[] | undefined, extra: string):
 
 /**
  * Returns the owner's email if the target 'to' address is a customer.
+ * 
  * RATIONALE: We BCC the owner on customer emails so they have a local copy 
  * in their inbox for historical context and verification.
  */
@@ -93,8 +108,8 @@ function getCustomerAuditBccRecipient(to: string): string | null {
 }
 
 /**
- * Initializes the SMTP transporter using environment variables.
- * Returns null if credentials are missing.
+ * Lazy-initializes the SMTP transporter.
+ * Returns null if credentials (SMTP_HOST, etc.) are missing.
  */
 function getTransporter() {
   const host = process.env.SMTP_HOST;
@@ -132,6 +147,8 @@ type SendTemplateEmailInput = {
 /**
  * High-level helper for sending templated emails.
  * Merges DB-stored templates with runtime placeholders (e.g. {{student_name}}).
+ * 
+ * @param input - Recipient, Template Key, and dynamic Context
  */
 export async function sendTemplateEmail(input: SendTemplateEmailInput): Promise<SendEmailResult> {
   const rendered = await renderTemplate(input.templateKey, input.context, input.fallbackRenderer);
@@ -147,6 +164,14 @@ export async function sendTemplateEmail(input: SendTemplateEmailInput): Promise<
 
 /**
  * Core delivery logic with Audit logging and multi-provider failover.
+ * 
+ * LOGIC:
+ * 1. Checks `EMAIL_PROVIDER` preference.
+ * 2. Attempts SMTP primary delivery if configured.
+ * 3. Fallbacks to Gmail API if SMTP fails and Gmail is configured.
+ * 4. Logs the final outcome in `OutboundEmail` table.
+ * 
+ * @param input - Message body and attachments
  */
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
   const from = process.env.SMTP_FROM || "LessonFlow <no-reply@example.com>";
@@ -155,7 +180,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   const ownerBcc = getCustomerAuditBccRecipient(input.to);
   const bcc = ownerBcc ? mergeBccValues(input.bcc, ownerBcc) : input.bcc;
 
-  // STEP 1: GMAIL PROVIDER PATH
+  // STEP 1: GMAIL PROVIDER PATH (Explicitly requested)
   if (provider === "gmail" || (!tx && isGmailConfigured())) {
     if (!isGmailConfigured()) {
       return { status: "failed", error: "EMAIL_PROVIDER is set to gmail but GMAIL credentials are missing." };

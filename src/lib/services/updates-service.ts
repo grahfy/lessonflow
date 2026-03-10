@@ -1,16 +1,40 @@
+/**
+ * Application Version & Update Service
+ * 
+ * Provides an interface to the underlying Git repository to detect pending 
+ * production updates. This is primarily used by the Admin Dashboard to 
+ * notify operators when new code is available on the remote repository.
+ * 
+ * DESIGN RATIONALE:
+ * 1. CLI-First approach: We wrap raw `git` commands rather than using a 
+ *    JS Git library to minimize dependency bloat and ensure 100% compatibility 
+ *    with the server's Git installation.
+ * 2. Caching: Remote fetch operations are expensive and potentially 
+ *    rate-limited by providers. We implement a non-persistent in-memory 
+ *    cache (5m TTL) to keep the UI snappy.
+ * 3. Atomic SHA comparison: Comparisons are done between local `HEAD` and 
+ *    `origin/main` to determine update availability.
+ * 
+ * SECURITY NOTE: This service requires the Node.js process to have read access 
+ * to the `.git` directory and execution privileges for `git`.
+ */
+
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import { getUpdatesGitRepoPath } from "@/lib/env";
 
 const execAsync = promisify(exec);
 
+/** Represents the differential state between local and remote codebases. */
 export interface UpdateStatus {
+  /** True if origin/main is ahead of local HEAD. */
   updateAvailable: boolean;
   localSha: string;
   remoteSha: string;
   lastChecked: Date;
 }
 
+/** Sanitized commit information for display in the Admin UI. */
 export interface CommitMetadata {
   sha: string;
   author: string;
@@ -18,13 +42,15 @@ export interface CommitMetadata {
   message: string;
 }
 
-// Simple in-memory cache
+// Simple in-memory cache to prevent redundant Git CLI spawns.
 let cachedStatus: UpdateStatus | null = null;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Checks if there are new commits on the remote repository.
  * Performs a `git fetch` and compares local HEAD with `origin/main`.
+ * 
+ * @param forceFetch - If true, bypasses the 5-minute cache.
  */
 export async function getUpdateStatus(forceFetch = false): Promise<UpdateStatus> {
   const now = new Date();
@@ -36,11 +62,11 @@ export async function getUpdateStatus(forceFetch = false): Promise<UpdateStatus>
   try {
     const repoPath = getUpdatesGitRepoPath();
 
-    // 1. Fetch latest from remote
+    // 1. Fetch latest metadata from remote (non-destructive)
     try {
       await execAsync("git fetch origin main", { cwd: repoPath });
     } catch (fetchError) {
-      console.error(`Update check failed: git fetch failed in ${repoPath}. Ensure it is a git repository and has remote access.`, (fetchError as Error).message);
+      console.error(`Update check failed: git fetch failed in ${repoPath}.`, (fetchError as Error).message);
       return {
         updateAvailable: false,
         localSha: "fetch-failed",
@@ -68,7 +94,6 @@ export async function getUpdateStatus(forceFetch = false): Promise<UpdateStatus>
     return status;
   } catch (error) {
     console.error("Failed to check for updates:", error);
-    // Return a safe default if git commands fail
     return {
       updateAvailable: false,
       localSha: "unknown",
@@ -79,16 +104,20 @@ export async function getUpdateStatus(forceFetch = false): Promise<UpdateStatus>
 }
 
 /**
- * Retrieves the list of commits between two SHAs.
- * Format: sha|author|date|message
+ * Retrieves a list of commits present on Remote but not on Local.
+ * 
+ * RATIONALE: This allows the Admin to see a "Changelog" of what will be 
+ * applied before they trigger a deployment.
+ * 
+ * @param localSha - The current version hash
+ * @param remoteSha - The target version hash
  */
 export async function getPendingCommits(localSha: string, remoteSha: string): Promise<CommitMetadata[]> {
   if (localSha === remoteSha) return [];
 
   try {
     const repoPath = getUpdatesGitRepoPath();
-    // List commits from localSha to remoteSha
-    // %H: hash, %an: author name, %ad: author date (short), %s: subject
+    // List commits from localSha to remoteSha using a custom pipe-delimited format for easy parsing.
     const format = "%H|%an|%ad|%s";
     const { stdout } = await execAsync(`git log ${localSha}..${remoteSha} --pretty=format:"${format}" --date=short`, { cwd: repoPath });
     

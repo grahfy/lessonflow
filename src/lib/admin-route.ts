@@ -1,18 +1,26 @@
-import { NextRequest } from "next/server";
+/**
+ * Admin Route Protection Utility
+ * 
+ * Provides a standardized way for API Route Handlers to verify administrative 
+ * privileges before processing a request.
+ * 
+ * DESIGN RATIONALE:
+ * 1. Request Isolation: Instead of relying on global state, this function 
+ *    explicitly takes the `NextRequest` object to resolve the session cookie.
+ * 2. Standardized Gatekeeping: By using this single helper across all `/api/admin/*` 
+ *    routes, we ensure a unified security posture that is easy to audit.
+ */
 
+import { NextRequest } from "next/server";
 import { getAdminFromToken, getSessionCookieName } from "@/lib/admin-auth";
 
 /**
- * Middleware function to authenticate admin users from incoming requests.
+ * Validates the administrative session of an incoming Request.
  * 
- * SECURITY: This function extracts the session token from cookies and validates
- * it against the admin authentication system. Used to protect admin-only routes.
- * 
- * @returns The authenticated admin user object if valid token exists, null otherwise
+ * @param request - Next.js Request object with cookies
+ * @returns The matching DB Admin record or null if the session is invalid/missing.
  */
 export async function requireAdminFromRequest(request: NextRequest) {
-  // Extract session token from the admin session cookie
   const token = request.cookies.get(getSessionCookieName())?.value;
-  // Validate token and return admin user or null
   return getAdminFromToken(token);
 }

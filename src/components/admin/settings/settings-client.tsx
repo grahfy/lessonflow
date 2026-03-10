@@ -1,3 +1,23 @@
+/**
+ * Admin Configuration & Whitelabel Console
+ * 
+ * Provides a unified interface for managing application-wide settings, 
+ * ranging from branding (Logos/Names) to financial policies (GST/Bank Details) 
+ * and technical secrets (API Keys/Secrets).
+ * 
+ * DESIGN RATIONALE:
+ * 1. Environment-Backed: Many settings map directly to `.env` variables 
+ *    on the server. This allows for persistent configuration that survives 
+ *    code deployments.
+ * 2. Tabbed Logic: High-complexity settings are partitioned into "Branding", 
+ *    "System", "Invoices", and "Content" to reduce cognative load.
+ * 3. Security: Secret fields (like `SMTP_PASS`) are masked (displayed as ***SET***) 
+ *    when hydrated from the server to prevent accidental exposure 
+ *    in the UI.
+ * 4. Atomic Updates: Validation ensures critical fields (like Admin Email) 
+ *    trigger a re-authentication flow if changed to maintain session integrity.
+ */
+
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
@@ -17,37 +37,58 @@ import { useSettings, type EnvVarField } from "@/lib/admin/use-settings";
 type TabKey = "branding" | "pages" | "emails" | "invoices" | "products" | "system";
 
 /**
- * Refactored Admin Settings with multi-tab layout for full whitelabel control.
- * Uses centralized hooks and UI components.
+ * Main Client Component for the Admin Settings route.
  */
 export function AdminSettingsClient() {
   const router = useRouter();
+  
+  // Local UI State
   const [activeTab, setActiveTab] = useState<TabKey>("branding");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  
+  // Form State
   const [values, setValues] = useState<Record<string, string>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  
+  // Password Rotation State
   const [adminPassword, setAdminPassword] = useState("");
   const [confirmAdminPassword, setConfirmAdminPassword] = useState("");
 
   const onAuthError = useCallback(() => window.location.assign("/admin/login"), []);
 
-  const { settings, loading, saving, load: loadSettings, save: saveSettingsApi } = useSettings({ onAuthError, onError: setError });
+  // -- DATA HOOK --
+  const { 
+    settings, 
+    loading, 
+    saving, 
+    load: loadSettings, 
+    save: saveSettingsApi 
+  } = useSettings({ onAuthError, onError: setError });
 
   useEffect(() => {
     void loadSettings();
   }, [loadSettings]);
 
+  /** Hydrate form values from server settings once loaded. */
   useEffect(() => {
     if (settings?.envVars) {
       setValues(
         Object.fromEntries(
-          settings.envVars.map((item) => [item.key, item.currentValue === "***SET***" ? "" : item.currentValue])
+          settings.envVars.map((item) => [
+            item.key, 
+            item.currentValue === "***SET***" ? "" : item.currentValue
+          ])
         )
       );
     }
   }, [settings]);
 
+  /**
+   * Grouping Logic
+   * RATIONALE: We manually group environment variables into logical UI sections
+   * to ensure a structured, user-friendly configuration experience.
+   */
   const groupedVars = useMemo(() => {
     if (!settings?.envVars) return [];
     
@@ -87,12 +128,17 @@ export function AdminSettingsClient() {
         ]
       },
       {
-        title: "Security",
+        title: "Security & Encryption",
         tab: "system",
-        keys: ["ADMIN_SESSION_SECRET", "STUDENT_SESSION_SECRET", "STUDENT_PORTAL_PASSWORD_ENCRYPTION_KEY", "CRON_SECRET"]
+        keys: [
+          "ADMIN_SESSION_SECRET", 
+          "STUDENT_SESSION_SECRET", 
+          "STUDENT_PORTAL_PASSWORD_ENCRYPTION_KEY", 
+          "CRON_SECRET"
+        ]
       },
       {
-        title: "Invoices & Payments",
+        title: "Invoices & Payments (Taxation)",
         tab: "invoices",
         keys: [
           "INVOICE_BUSINESS_NAME",
@@ -109,7 +155,7 @@ export function AdminSettingsClient() {
         ]
       },
       {
-        title: "Student Portal Settings",
+        title: "Student Portal (Access Control)",
         tab: "system",
         keys: ["STUDENT_SESSION_MAX_AGE_SECONDS", "STUDENT_PORTAL_PASSWORD_LENGTH"]
       }
@@ -118,7 +164,7 @@ export function AdminSettingsClient() {
     const byKey = new Map(settings.envVars.map((item) => [item.key, item]));
     const seen = new Set<string>();
 
-    const ordered: Array<{ title: string; tab: TabKey; items: EnvVarField[] }> = groups
+    const ordered = groups
       .map((group) => ({
         title: group.title,
         tab: group.tab,
@@ -127,24 +173,25 @@ export function AdminSettingsClient() {
       .filter((group) => group.items.length > 0);
 
     for (const group of ordered) {
-      for (const item of group.items) {
-        seen.add(item.key);
-      }
+      for (const item of group.items) seen.add(item.key);
     }
 
+    // Capture any dynamically added variables that weren't manually categorized.
     const uncategorized = settings.envVars.filter((item) => !seen.has(item.key));
     if (uncategorized.length > 0) {
-      ordered.push({ title: "Other Config", tab: "system", items: uncategorized });
+      ordered.push({ title: "Additional Config", tab: "system", items: uncategorized });
     }
 
     return ordered;
   }, [settings]);
 
+  /** Finalizes form submission and handles re-auth consequences. */
   async function handleSave() {
     setFieldErrors({});
     setError("");
     setNotice("");
 
+    // Validate password identity before sending to server
     if (adminPassword || confirmAdminPassword) {
       if (adminPassword !== confirmAdminPassword) {
         setFieldErrors({ ADMIN_PASSWORD_CONFIRM: "Passwords do not match." });
@@ -170,8 +217,9 @@ export function AdminSettingsClient() {
     setAdminPassword("");
     setConfirmAdminPassword("");
 
+    // Handle logout if the email/password was changed
     if (body.requiresReauth) {
-      setNotice(`${body.message || "Settings saved."} Admin email changed, please sign in again.`);
+      setNotice(`${body.message || "Settings saved."} Identity changed, please sign in again.`);
       window.setTimeout(() => {
         router.push(body.nextPath || "/admin/login");
         router.refresh();
@@ -181,6 +229,7 @@ export function AdminSettingsClient() {
     }
   }
 
+  /** Renders the environment variable form fields for a specific tab. */
   const renderEnvFields = (tab: TabKey) => {
     const groupsInTab = groupedVars.filter(g => g.tab === tab);
     if (groupsInTab.length === 0) return null;
@@ -191,7 +240,9 @@ export function AdminSettingsClient() {
           <div key={group.title} className="field full">
             <div className="admin-settings-section">
               <h2 className="admin-settings-section-title">{group.title}</h2>
+              {/* Specialized status row for Gmail oauth flow */}
               {group.title === "Email Delivery" && <GmailStatus />}
+              
               <AdminForm>
                 {group.items.map((envVar) => {
                   const fieldError = fieldErrors[envVar.key];
@@ -245,7 +296,13 @@ export function AdminSettingsClient() {
   };
 
   return (
-    <AdminShell title="Admin Configuration" error={error} notice={notice} loading={loading} className="admin-shell-settings">
+    <AdminShell 
+      title="Admin Configuration" 
+      error={error} 
+      notice={notice} 
+      loading={loading} 
+      className="admin-shell-settings"
+    >
       <div className="admin-layout-content is-scrollable">
         <AdminCard className="booking-row">
           <div className="site-nav">
@@ -260,30 +317,41 @@ export function AdminSettingsClient() {
 
         {!loading && (
           <>
+            {/* 1. Branding Tab (Logo, Name, etc) */}
             {activeTab === "branding" && renderEnvFields("branding")}
+            
+            {/* 2. Content Pages Editor (Terms, Lessons) */}
             {activeTab === "pages" && <AdminContentEditor />}
+            
+            {/* 3. Email Templates (Audit Logs, Receipts) */}
             {activeTab === "emails" && <AdminEmailTemplateEditor />}
+            
+            {/* 4. Invoice Branding & Numbering */}
             {activeTab === "invoices" && (
               <>
                 {renderEnvFields("invoices")}
                 <AdminInvoiceTemplateEditor />
               </>
             )}
+            
+            {/* 5. Product Presets (Textbooks, Tuition) */}
             {activeTab === "products" && <AdminPresetsEditor />}
+            
+            {/* 6. System & Security Console */}
             {activeTab === "system" && (
               <>
                 {renderEnvFields("system")}
                 <AdminCard>
-                  <h2 className="admin-settings-section-title">Admin Password</h2>
+                  <h2 className="admin-settings-section-title">Admin Password Management</h2>
                   <AdminForm>
-                    <AdminField label="New Password">
+                    <AdminField label="New Secure Password">
                       <input type="password" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} />
                     </AdminField>
-                    <AdminField label="Confirm Password">
+                    <AdminField label="Confirm New Password">
                       <input type="password" value={confirmAdminPassword} onChange={e => setConfirmAdminPassword(e.target.value)} />
                     </AdminField>
                     <div className="field full">
-                      <button className="btn btn-primary" onClick={handleSave}>Update Credentials</button>
+                      <button className="btn btn-primary" onClick={handleSave}>Rotate Credentials</button>
                     </div>
                   </AdminForm>
                 </AdminCard>

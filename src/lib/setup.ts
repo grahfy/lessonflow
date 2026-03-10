@@ -1,8 +1,22 @@
 /**
- * Setup Wizard Configuration
+ * First-Run Setup & Environment Readiness Service
  * 
- * First-run setup wizard for configuring environment variables and creating
- * the initial admin account. Used during initial deployment.
+ * LessonsFlow requires a specific set of environment variables and database 
+ * connectivity to operate. This module provides the logic for the "Setup Wizard" 
+ * which guides new operators through the initial configuration process.
+ * 
+ * DESIGN RATIONALE:
+ * 1. Pre-Flight Checks: Defines a robust suite of `evaluateSetupChecks` that 
+ *    probe database connectivity, site URL validity, and secret strength 
+ *    before allowing the application to initialize.
+ * 2. Mixed Readiness States: Uses `pass`/`warn`/`fail` toggles so that 
+ *    the UI can distinguish between "Critical Blockers" (Fail) and 
+ *    "Sub-optimal Production Settings" (Warn).
+ * 3. Dynamic Schema: Exports the `CONFIGURABLE_ENV_VARS` registry which 
+ *    drives both the server-side validation and the client-side form generation.
+ * 4. Security Lockdown: Once at least one admin account is created, 
+ *    `isSetupComplete` toggles true, shielding the setup API from 
+ *    future public access.
  */
 
 import fs from "node:fs/promises";

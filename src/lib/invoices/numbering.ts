@@ -1,52 +1,53 @@
 /**
- * Invoice Numbering Service
+ * Sequential Document Numbering Service
  * 
- * This module manages the generation of unique, sequential identifiers for 
- * invoices and credit notes. 
+ * Responsible for generating unique, chronological identifiers for Invoices 
+ * and Credit Notes.
  * 
- * FORMAT: [PREFIX]-[YEAR]-[SEQUENCE] (e.g., MGS-2024-0001)
+ * NUMBERING STRATEGY:
+ * - Format: `{PREFIX}-{YEAR}-{SEQUENCE}` (e.g. MGS-2024-0042)
+ * - Scope: Sequences reset according to the Issue Year. This prevents 
+ *   numbers from becoming unwieldy over decades and improves auditability.
+ * - Collisions: While we pre-calculate the "Next" number based on the `createdAt` 
+ *   of the latest document, the Database maintains a `UNIQUE` constraint on 
+ *   `invoiceNumber` as a final guard against race conditions.
  * 
- * RATIONALE: We use a YEAR-based sequence to ensure that numbering stays 
- * organized and provides immediate context about when a document was issued.
+ * RATIONALE: Many accounting systems require sequential numbering for tax 
+ * compliance (GST/Australia). This module ensures those sequences are 
+ * contiguous and non-overlapping.
  */
 
 import { Prisma, PrismaClient } from "@/generated/prisma/client";
 
 /**
- * Parses an existing invoice number to extract its trailing numeric sequence.
- * 
- * @param invoiceNumber - The full string (e.g. "MGS-2024-0042")
- * @returns The integer sequence (e.g. 42) or 0 if no match
+ * Parses a document string to find the numeric end-piece.
+ * Logic: Finds the portion after the final hyphen.
  */
 function extractSequence(invoiceNumber: string): number {
+  if (!invoiceNumber) return 0;
+  
   const match = invoiceNumber.match(/-(\d+)$/);
-  if (!match) {
-    return 0;
-  }
+  if (!match) return 0;
+  
   return Number.parseInt(match[1], 10) || 0;
 }
 
 /**
- * Retrieves the base prefix for invoices from environment variables.
- * 
- * NOTE: We strip non-alphanumeric characters to ensure the prefix is safe 
- * for use in filenames and email subjects.
- * 
- * @returns Cleaned prefix string
+ * Resolves the Invoice prefix from environment.
+ * RATIONALE: Sanitized to Alphanumeric only to ensure compatibility 
+ * with various PDF readers and email clients that may struggle with 
+ * special characters in IDs.
  */
 function getInvoicePrefix(): string {
   const configured = process.env.INVOICE_NUMBER_PREFIX?.trim();
-  if (!configured) {
-    return "MGS";
-  }
+  if (!configured) return "MGS";
+  
   return configured.replace(/[^A-Za-z0-9]/g, "").slice(0, 12) || "MGS";
 }
 
 /**
- * Retrieves the base prefix for credit notes.
- * Defaults to [InvoicePrefix]CN if not explicitly set.
- * 
- * @returns Cleaned prefix string
+ * Resolves the Credit Note prefix.
+ * Defaults to `${InvoicePrefix}CN` if not specified.
  */
 function getCreditNotePrefix(): string {
   const configured = process.env.INVOICE_CREDIT_NOTE_PREFIX?.trim();
@@ -57,19 +58,16 @@ function getCreditNotePrefix(): string {
 }
 
 /**
- * Calculates and returns the next available invoice number for a given issue year.
+ * Generates the next available Invoice number for the specified year.
  * 
  * LOGIC:
- * 1. Find the most recently created invoice for the same year and prefix.
- * 2. Extract its sequence number.
- * 3. Increment by 1 and pad with leading zeros.
+ * 1. Calculate standard prefix based on the `issuedAt` date.
+ * 2. Find the most recently created document (by `createdAt`) with that prefix.
+ * 3. Increment its trailing sequence by 1.
+ * 4. Pad with zeros (to a length of 4) for consistent sorting and visual alignment.
  * 
- * SECURITY: While this logic is deterministic, the database maintains a 
- * UNIQUE constraint on invoiceNumber to prevent race-condition collisions.
- * 
- * @param prisma - Prisma client or transaction for DB access
- * @param issuedAt - The intended date of issue (determines the year segment)
- * @returns Next unique invoice number
+ * @param prisma - Active DB client or transaction
+ * @param issuedAt - Date the document is officially "dated"
  */
 export async function generateNextInvoiceNumber(prisma: PrismaClient | Prisma.TransactionClient, issuedAt: Date): Promise<string> {
   const prefix = getInvoicePrefix();
@@ -82,11 +80,11 @@ export async function generateNextInvoiceNumber(prisma: PrismaClient | Prisma.Tr
       documentType: "invoice"
     },
     orderBy: {
-      createdAt: "desc" // NOTE: We use createdAt to find the "latest" to ensure sequence consistency
+      // NOTE: We order by createdAt to ensure we find the truly most recent 
+      // entry, regardless of manual 'issuedAt' back-dating.
+      createdAt: "desc" 
     },
-    select: {
-      invoiceNumber: true
-    }
+    select: { invoiceNumber: true }
   });
 
   const nextSequence = extractSequence(latest?.invoiceNumber || "") + 1;
@@ -94,12 +92,8 @@ export async function generateNextInvoiceNumber(prisma: PrismaClient | Prisma.Tr
 }
 
 /**
- * Generates the next unique credit note number for a given year.
- * Mirrors the logic of generateNextInvoiceNumber but targets 'credit_note' types.
- * 
- * @param prisma - Prisma client or transaction for DB access
- * @param issuedAt - The intended date of issue
- * @returns Next unique credit note number
+ * Generates the next unique Credit Note number.
+ * Mirrors the invoice logic but uses the Credit Note prefix and document type.
  */
 export async function generateNextCreditNoteNumber(prisma: PrismaClient | Prisma.TransactionClient, issuedAt: Date): Promise<string> {
   const prefix = getCreditNotePrefix();
@@ -111,12 +105,8 @@ export async function generateNextCreditNoteNumber(prisma: PrismaClient | Prisma
       invoiceNumber: { startsWith: start },
       documentType: "credit_note"
     },
-    orderBy: {
-      createdAt: "desc"
-    },
-    select: {
-      invoiceNumber: true
-    }
+    orderBy: { createdAt: "desc" },
+    select: { invoiceNumber: true }
   });
 
   const nextSequence = extractSequence(latest?.invoiceNumber || "") + 1;
