@@ -3,7 +3,8 @@ import { formatDateTime } from "@/lib/admin/utils";
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { EmailViewerDialog } from "@/components/admin/ui/email-viewer-dialog";
-import { type EmailRecord } from "@/lib/admin/use-email-history";
+import { type EmailRecord, type SendEmailResult } from "@/lib/admin/use-email-history";
+import { useCaptcha, CaptchaField } from "@/components/captcha";
 
 type Props = {
     loadingEmailHistory: boolean;
@@ -14,7 +15,7 @@ type Props = {
     setEmailComposerMessage: (val: string) => void;
     sendingEmail: boolean;
     syncingEmail?: boolean;
-    onSendEmail: (subject: string, message: string) => void;
+    onSendEmail: (subject: string, message: string, captcha?: { captchaToken: string; captchaAnswer: string }) => Promise<SendEmailResult>;
     onSyncEmail?: () => void;
 };
 
@@ -31,6 +32,34 @@ export function CustomerEmailDialog({
     onSyncEmail
 }: Props) {
     const [selectedEmail, setSelectedEmail] = useState<EmailRecord | null>(null);
+    const captcha = useCaptcha();
+
+    const handleSend = async () => {
+        if (!captcha.validateAnswer()) return;
+        
+        const result = await onSendEmail(emailComposerSubject, emailComposerMessage, captcha.getPayload());
+        
+        if (!result.success) {
+            // Handle CAPTCHA-related errors by refreshing the challenge.
+            // We check for common CAPTCHA error codes returned by the server.
+            const isCaptchaError = result.errorCode && [
+                "CAPTCHA_REQUIRED",
+                "CAPTCHA_INVALID",
+                "CAPTCHA_EXPIRED",
+                "CAPTCHA_RATE_LIMITED"
+            ].includes(result.errorCode);
+
+            if (isCaptchaError) {
+                captcha.handleServerError();
+            } else {
+                // For other errors, still regenerate to be safe if a CAPTCHA was used
+                void captcha.regenerate();
+            }
+        } else {
+            // Success: clear answer and regenerate for next time
+            void captcha.regenerate();
+        }
+    };
 
     return (
         <div className="dialog-tab-stack customer-tab-panel">
@@ -119,11 +148,12 @@ export function CustomerEmailDialog({
                                 className="btn btn-primary"
                                 type="button"
                                 disabled={sendingEmail || !emailComposerSubject.trim() || !emailComposerMessage.trim()}
-                                onClick={() => onSendEmail(emailComposerSubject, emailComposerMessage)}
+                                onClick={handleSend}
                             >
                                 {sendingEmail ? "Sending..." : "Send Email"}
                             </button>
                         </div>
+                        <CaptchaField idPrefix="customer-email" captcha={captcha} />
                     </AdminForm>
                 </AdminCard>
             </div>

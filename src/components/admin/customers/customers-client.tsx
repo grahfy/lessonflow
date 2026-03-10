@@ -202,15 +202,16 @@ export function AdminCustomersClient() {
     }
   }
 
-  async function sendCustomerEmail(subject: string, message: string) {
-    if (!selectedCustomer) return;
+  async function sendCustomerEmail(subject: string, message: string, captcha?: { captchaToken: string; captchaAnswer: string }) {
+    if (!selectedCustomer) return { success: false };
     setError("");
-    const success = await sendEmailApi(selectedCustomer.id, subject, message);
-    if (success) {
+    const result = await sendEmailApi(selectedCustomer.id, subject, message, captcha);
+    if (result.success) {
       setNotice("Email sent successfully.");
       setEmailComposerSubject("");
       setEmailComposerMessage("");
     }
+    return result;
   }
 
   async function uploadMaterial(captcha?: { captchaToken: string; captchaAnswer: string }) {

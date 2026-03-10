@@ -3,7 +3,7 @@ import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { CustomerProfileDialog, type CustomerForm, type CustomerRow } from "./customer-profile-dialog";
 import { CustomerEmailDialog } from "./customer-email-dialog";
 import { CustomerMaterialsDialog } from "./customer-materials-dialog";
-import { type EmailRecord } from "@/lib/admin/use-email-history";
+import { type EmailRecord, type SendEmailResult } from "@/lib/admin/use-email-history";
 import { type LearningMaterialBooking, type LearningMaterialRow } from "@/lib/admin/types";
 
 type Tab = "profile" | "emails" | "materials";
@@ -42,7 +42,7 @@ type Props = {
     setEmailComposerMessage: React.Dispatch<React.SetStateAction<string>>;
     sendingEmail: boolean;
     syncingEmail: boolean;
-    onSendEmail: (subject: string, message: string) => void;
+    onSendEmail: (subject: string, message: string, captcha?: { captchaToken: string; captchaAnswer: string }) => Promise<SendEmailResult>;
     onSyncEmail: () => void;
 
     // Materials Props
