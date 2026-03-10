@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
+import { verifyCaptchaSubmission } from "@/lib/captcha";
 import { prisma } from "@/lib/db";
 import { createMaterialStorageDriver } from "@/lib/student-portal/material-storage";
 import {
@@ -136,6 +137,17 @@ export async function POST(request: NextRequest, { params }: Params) {
     const description = rawDescription || null;
     const file = form.get("file");
 
+    // CAPTCHA verification — enforced in production to add defence-in-depth on top of
+    // session authentication. Dev/test environments bypass this to keep workflows fast.
+    if (process.env.NODE_ENV !== "test" && process.env.NODE_ENV !== "development") {
+      const captchaToken = String(form.get("captchaToken") || "").trim();
+      const captchaAnswer = String(form.get("captchaAnswer") || "").trim();
+      const captchaResult = verifyCaptchaSubmission({ captchaToken, captchaAnswer });
+      if (!captchaResult.ok) {
+        return NextResponse.json({ error: captchaResult.message, code: captchaResult.code }, { status: 400 });
+      }
+    }
+
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "Learning material file is required." }, { status: 400 });
     }
@@ -163,7 +175,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       mimeType: file.type
     });
     if (!classification) {
-      return NextResponse.json({ error: "Only PDF and common audio files are supported." }, { status: 400 });
+      return NextResponse.json({ error: "Only PDF, common audio, and image files (JPEG, PNG, GIF, WebP) are supported." }, { status: 400 });
     }
 
     const storageKey = buildLearningMaterialStorageKey({

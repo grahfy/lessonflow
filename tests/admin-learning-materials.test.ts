@@ -162,4 +162,39 @@ describe("admin-learning-materials", () => {
     });
     expect(uploadResponse.status).toBe(400);
   });
+
+  it("uploads and handles image files", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+    const cookie = `${getSessionCookieName()}=${token}`;
+
+    const customer = await createCustomer("Image Student", "image@example.com", "0400555666", "3070");
+
+    const uploadForm = new FormData();
+    uploadForm.set("title", "Lesson Photo");
+    uploadForm.set(
+      "file",
+      new File([Buffer.from("fake-image-binary-data")], "lesson.jpg", {
+        type: "image/jpeg"
+      })
+    );
+
+    const uploadRequest = new NextRequest(`http://localhost/api/admin/customers/${customer.id}/learning-materials`, {
+      method: "POST",
+      body: uploadForm,
+      headers: { cookie }
+    });
+    const uploadResponse = await POST(uploadRequest, {
+      params: Promise.resolve({ id: customer.id })
+    });
+    expect(uploadResponse.status).toBe(201);
+
+    const { material } = (await uploadResponse.json()) as { material: any };
+    expect(material.materialType).toBe("image");
+    expect(material.mimeType).toBe("image/jpeg");
+
+    // Verify retrieval
+    const dbMaterial = await prisma.learningMaterial.findUnique({ where: { id: material.id } });
+    expect(dbMaterial?.materialType).toBe("image");
+  });
 });

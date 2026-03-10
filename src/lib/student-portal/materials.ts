@@ -17,6 +17,15 @@ const AUDIO_MIME_TYPES = new Set([
 
 const PDF_MIME_TYPES = new Set(["application/pdf"]);
 
+// NOTE: SVG is intentionally excluded because SVG files can contain embedded
+// scripts and event handlers that pose XSS risks when served inline.
+const IMAGE_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp"
+]);
+
 const EXTENSION_TO_MIME: Record<string, string> = {
   ".pdf": "application/pdf",
   ".mp3": "audio/mpeg",
@@ -25,7 +34,12 @@ const EXTENSION_TO_MIME: Record<string, string> = {
   ".ogg": "audio/ogg",
   ".webm": "audio/webm",
   ".aac": "audio/aac",
-  ".flac": "audio/flac"
+  ".flac": "audio/flac",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".gif": "image/gif",
+  ".webp": "image/webp"
 };
 
 /**
@@ -41,8 +55,17 @@ export function getLearningMaterialAcceptValue(): string {
     ".webm",
     ".aac",
     ".flac",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".webp",
     "application/pdf",
-    "audio/*"
+    "audio/*",
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp"
   ].join(",");
 }
 
@@ -59,6 +82,7 @@ export function sanitizeLearningMaterialTitle(value: string): string {
 
 /**
  * Determines whether the uploaded file is supported and maps it to DB enum values.
+ * Supports PDF documents, common audio formats, and raster image types.
  */
 export function classifyLearningMaterialFile(input: {
   fileName: string;
@@ -97,6 +121,23 @@ export function classifyLearningMaterialFile(input: {
     };
   }
 
+  // Image classification — check resolved MIME first, then fall back to extension lookup.
+  if (IMAGE_MIME_TYPES.has(resolvedMime)) {
+    return {
+      materialType: "image",
+      mimeType: resolvedMime,
+      extension: ext || ".jpg"
+    };
+  }
+
+  if (ext && EXTENSION_TO_MIME[ext] && IMAGE_MIME_TYPES.has(EXTENSION_TO_MIME[ext])) {
+    return {
+      materialType: "image",
+      mimeType: EXTENSION_TO_MIME[ext],
+      extension: ext
+    };
+  }
+
   return null;
 }
 
@@ -128,7 +169,8 @@ export function buildLearningMaterialDownloadFilename(input: {
     .trim()
     .slice(0, 120) || "lesson-material";
 
-  const ext = inferExtensionFromMime(input.mimeType) || (input.materialType === "pdf" ? ".pdf" : ".mp3");
+  const FALLBACK_EXT: Record<string, string> = { pdf: ".pdf", image: ".jpg", audio: ".mp3" };
+  const ext = inferExtensionFromMime(input.mimeType) || FALLBACK_EXT[input.materialType] || ".bin";
   return `${base}${ext}`;
 }
 

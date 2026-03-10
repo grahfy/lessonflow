@@ -18,7 +18,7 @@ export interface UseLearningMaterialsResult {
     uploading: boolean;
     deletingId: string | null;
     load: (customerId: string) => Promise<void>;
-    upload: (customerId: string, bookingId: string, form: HTMLFormElement) => Promise<boolean>;
+    upload: (customerId: string, bookingId: string, form: HTMLFormElement, captcha?: { captchaToken: string; captchaAnswer: string }) => Promise<boolean>;
     remove: (materialId: string) => Promise<boolean>;
 }
 
@@ -53,10 +53,21 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
         }
     }, [safeFetch, handleApiError, onError]);
 
-    const upload = useCallback(async (customerId: string, bookingId: string, form: HTMLFormElement): Promise<boolean> => {
+    const upload = useCallback(async (
+        customerId: string,
+        bookingId: string,
+        form: HTMLFormElement,
+        captcha?: { captchaToken: string; captchaAnswer: string }
+    ): Promise<boolean> => {
         const formData = new FormData(form);
         if (bookingId) {
             formData.append("bookingId", bookingId);
+        }
+
+        // Append CAPTCHA fields when provided (production uploads require them).
+        if (captcha?.captchaToken) {
+            formData.set("captchaToken", captcha.captchaToken);
+            formData.set("captchaAnswer", captcha.captchaAnswer);
         }
 
         // If no explicit title field exists in the form, derive one from the

@@ -27,7 +27,7 @@ export type LearningMaterialRow = {
     title: string;
     description: string | null;
     bookingId: string | null;
-    materialType: "audio" | "pdf";
+    materialType: "audio" | "pdf" | "image";
     mimeType: string;
     sizeBytes: number;
     createdAt: string;
@@ -37,4 +37,4 @@ export type LearningMaterialRow = {
 
 export const PHONE_PATTERN = /^\d{10}$/;
 export const POSTCODE_PATTERN = /^\d{4}$/;
-export const LEARNING_MATERIAL_ACCEPT = ".pdf,.mp3,.m4a,.wav,.ogg,.webm,.aac,.flac,application/pdf,audio/*";
+export const LEARNING_MATERIAL_ACCEPT = ".pdf,.mp3,.m4a,.wav,.ogg,.webm,.aac,.flac,.jpg,.jpeg,.png,.gif,.webp,application/pdf,audio/*,image/jpeg,image/png,image/gif,image/webp";

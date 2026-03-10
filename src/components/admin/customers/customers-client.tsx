@@ -212,10 +212,10 @@ export function AdminCustomersClient() {
     }
   }
 
-  async function uploadMaterial() {
+  async function uploadMaterial(captcha?: { captchaToken: string; captchaAnswer: string }) {
     if (!selectedCustomer || !materialsUploadFormRef.current) return;
     setError("");
-    const success = await uploadMaterialApi(selectedCustomer.id, materialsBookingId, materialsUploadFormRef.current);
+    const success = await uploadMaterialApi(selectedCustomer.id, materialsBookingId, materialsUploadFormRef.current, captcha);
     if (success) {
       setNotice("Material uploaded.");
       materialsUploadFormRef.current.reset();

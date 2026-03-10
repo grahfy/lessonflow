@@ -4,7 +4,7 @@ import type { Booking, BookingRequest, LearningMaterial } from "@/generated/pris
 const studentPortalLessonModeSchema = z.enum(["in_person", "video"]);
 const studentPortalLessonDurationSchema = z.enum(["min30", "min60"]);
 const studentPortalBookingStatusSchema = z.enum(["approved", "cancelled"]);
-const studentPortalMaterialTypeSchema = z.enum(["audio", "pdf"]);
+const studentPortalMaterialTypeSchema = z.enum(["audio", "pdf", "image"]);
 
 export const studentPortalMaterialSchema = z.object({
   id: z.string(),

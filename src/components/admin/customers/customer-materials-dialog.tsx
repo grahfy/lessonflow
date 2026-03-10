@@ -4,6 +4,7 @@ import { formatDateTime } from "@/lib/admin/utils";
 import { type LearningMaterialBooking, type LearningMaterialRow, LEARNING_MATERIAL_ACCEPT } from "@/lib/admin/types";
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
+import { useCaptcha, CaptchaField } from "@/components/captcha";
 
 type Props = {
     materialsLoading: boolean;
@@ -14,7 +15,7 @@ type Props = {
     materialsUploading: boolean;
     materialsDeletingId: string | null;
     materialsUploadFormRef: RefObject<HTMLFormElement | null>;
-    onUpload: () => void;
+    onUpload: (captcha?: { captchaToken: string; captchaAnswer: string }) => void;
     onDelete: (id: string) => void;
     onBookingSelect: (bookingId: string) => void;
 };
@@ -33,7 +34,15 @@ export function CustomerMaterialsDialog({
     onBookingSelect
 }: Props) {
     const fileInputId = useId();
+    const captcha = useCaptcha();
     const [selectedFileName, setSelectedFileName] = useState("No file selected");
+
+    const handleUpload = () => {
+        if (!captcha.validateAnswer()) return;
+        onUpload(captcha.getPayload());
+        // The form reset in the parent will trigger the captcha refresh if we handle it right,
+        // but let's manually regenerate on upload start/attempt to be safe or on success.
+    };
 
     return (
         <div className="dialog-tab-stack customer-tab-panel">
@@ -48,9 +57,9 @@ export function CustomerMaterialsDialog({
                                 <div key={m.id} className="customer-materials-item">
                                     <div className="customer-materials-item-head">
                                         <div className="customer-materials-item-copy">
-                                            <strong>{m.title}</strong>
+                                            <strong>{m.description || m.title}</strong>
                                             <span>{m.mimeType} · {(m.sizeBytes / 1024 / 1024).toFixed(2)} MB · {formatDateTime(m.createdAt)}</span>
-                                            {m.description ? <span className="helper-text">{m.description}</span> : null}
+                                            {m.description ? <span className="helper-text">{m.title}</span> : null}
                                         </div>
                                         <div className="customer-materials-item-actions">
                                             <button className="btn btn-secondary" onClick={() => window.open(`/api/admin/learning-materials/${m.id}`, '_blank')}>View</button>
@@ -154,10 +163,11 @@ export function CustomerMaterialsDialog({
                                     placeholder="E.g. Practice this fingerpicking pattern at 80 BPM"
                                 />
                             </AdminField>
+                            <CaptchaField idPrefix="material-upload" captcha={captcha} />
                             <button
                                 type="button"
                                 disabled={materialsUploading}
-                                onClick={() => void onUpload()}
+                                onClick={handleUpload}
                                 className="btn btn-primary customer-materials-upload-btn"
                             >
                                 {materialsUploading ? 'Uploading...' : 'Upload Material'}

@@ -92,6 +92,7 @@ enum PortalCredentialAuditAction {
 enum LearningMaterialType {
   audio
   pdf
+  image
 }
 
 // Public website contact form submissions. These are stored even when email

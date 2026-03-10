@@ -456,8 +456,9 @@ function BookingList(input: BookingListProps) {
               <ul className="student-material-list">
                 {booking.materials.map((material) => (
                   <li key={material.id}>
-                    <span>
-                      {material.title} ({material.materialType.toUpperCase()})
+                    <span className="student-material-title" style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span>{material.description || material.title} ({material.materialType.toUpperCase()})</span>
+                      {material.description ? <span className="helper-text" style={{ fontSize: '0.85em', marginTop: '2px' }}>{material.title}</span> : null}
                     </span>
                     <span className="dialog-actions-inline">
                       {material.materialType === "audio" ? (
@@ -494,8 +495,9 @@ function BookingList(input: BookingListProps) {
               <ul className="student-material-list">
                 {standaloneMaterials.map((material) => (
                   <li key={`general-${material.id}`}>
-                    <span>
-                      {material.title} ({material.materialType.toUpperCase()})
+                    <span className="student-material-title" style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span>{material.description || material.title} ({material.materialType.toUpperCase()})</span>
+                      {material.description ? <span className="helper-text" style={{ fontSize: '0.85em', marginTop: '2px' }}>{material.title}</span> : null}
                     </span>
                     <span className="dialog-actions-inline">
                       {material.materialType === "audio" ? (

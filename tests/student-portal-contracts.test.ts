@@ -21,6 +21,18 @@ describe("student-portal-contracts", () => {
     });
     expect(material.downloadUrl).toBe("/api/student/learning-materials/mat_1/download");
 
+    const imageMaterial = mapStudentPortalMaterial({
+      id: "mat_2",
+      title: "Scale Diagram",
+      description: "Major scale positions",
+      materialType: "image",
+      mimeType: "image/png",
+      sizeBytes: 1024,
+      createdAt: new Date("2026-03-05T10:00:00.000Z")
+    });
+    expect(imageMaterial.materialType).toBe("image");
+    expect(imageMaterial.previewUrl).toBe("/api/student/learning-materials/mat_2/download?disposition=inline");
+
     const booking = mapStudentPortalBooking({
       id: "book_1",
       status: "approved",

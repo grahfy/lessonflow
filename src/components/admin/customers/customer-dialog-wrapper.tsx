@@ -51,7 +51,7 @@ type Props = {
     materialsUploading: boolean;
     materialsDeletingId: string | null;
     materialsUploadFormRef: RefObject<HTMLFormElement | null>;
-    onUploadMaterial: () => void;
+    onUploadMaterial: (captcha?: { captchaToken: string; captchaAnswer: string }) => void;
     onDeleteMaterial: (id: string) => void;
     onMaterialBookingSelect: (bookingId: string) => void;
 };

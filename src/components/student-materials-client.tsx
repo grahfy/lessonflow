@@ -132,8 +132,8 @@ export function StudentMaterialsClient() {
                       <td className="student-drive-name-cell">
                         <span className={`student-drive-type-dot is-${entry.material.materialType}`} aria-hidden="true" />
                         <div className="student-drive-name-stack">
-                          <strong>{entry.material.title}</strong>
-                          {entry.material.description ? <span className="helper-text">{entry.material.description}</span> : null}
+                          <strong>{entry.material.description || entry.material.title}</strong>
+                          {entry.material.description ? <span className="helper-text">{entry.material.title}</span> : null}
                           <span className="helper-text">{formatBytes(entry.material.sizeBytes)}</span>
                         </div>
                       </td>
