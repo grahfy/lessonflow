@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { Loader2 } from "lucide-react";
 import { Pagination } from "@/components/pagination";
 
 interface AdminTableProps {
@@ -41,6 +42,12 @@ export function AdminTable({
           )}
           <div className="admin-table-body">
             {children}
+            {loading && (!children || (Array.isArray(children) && children.length === 0)) && (
+              <div className="admin-table-loading">
+                <Loader2 className="admin-spin" />
+                <span>retrieving data...</span>
+              </div>
+            )}
             {!loading && (!children || (Array.isArray(children) && children.length === 0)) && (
               <p className="helper-text admin-table-empty">{emptyLabel}</p>
             )}
