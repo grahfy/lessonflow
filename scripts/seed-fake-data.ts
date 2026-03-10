@@ -301,6 +301,205 @@ async function seedFakeData() {
     if ((i + 1) % 10 === 0) {
       console.log(`... ${i + 1} customers seeded`);
     }
+
+    // Generate some fake email history
+    const pastEmailCount = Math.floor(Math.random() * 4) + 1;
+    for (let k = 0; k < pastEmailCount; k++) {
+      const daysAgo = Math.floor(Math.random() * 60) + 1;
+      const type = getRandomItem(['Booking Confirmation', 'Lesson Reminder', 'Invoice Attached', 'Welcome to the Platform', 'Monthly Newsletter']);
+      
+      let content = '';
+
+      if (type === 'Invoice Attached') {
+        const invoiceNum = `INV-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+        content = `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f5; }
+    .container { max-width: 650px; margin: 20px auto; background: #ffffff; border-top: 5px solid #2563eb; padding: 30px; border-radius: 4px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f3f4f6; padding-bottom: 20px; margin-bottom: 20px; }
+    h1 { color: #1e40af; margin: 0; font-size: 24px; }
+    .invoice-meta {text-align: right;}
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th { background: #f9fafb; padding: 12px; text-align: left; border-bottom: 2px solid #e5e7eb; color: #4b5563; }
+    td { padding: 12px; border-bottom: 1px solid #e5e7eb; }
+    .total-row { font-weight: bold; background: #f9fafb; font-size: 1.1em;}
+    .footer { margin-top: 40px; text-align: center; color: #6b7280; font-size: 13px; }
+    .button { display: inline-block; background: #2563eb; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 20px;}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1>Invoice ${invoiceNum}</h1>
+        <p>Melbourne Guitar School</p>
+      </div>
+      <div class="invoice-meta">
+        <strong>Due Date:</strong> ${format(addDays(new Date(), 7), "dd MMM yyyy")}<br/>
+        <strong>Amount Due:</strong> <span style="font-size:1.2em; color:#b91c1c;">$60.00</span>
+      </div>
+    </div>
+    
+    <p>Hi ${customer.firstName},</p>
+    <p>Thank you for your recent lessons. Please find the details of your latest invoice below. A PDF copy is attached to this email.</p>
+    
+    <table>
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th>Qty</th>
+          <th>Rate</th>
+          <th>Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Standard 60-Minute Lesson</td>
+          <td>1</td>
+          <td>$60.00</td>
+          <td>$60.00</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr class="total-row">
+          <td colspan="3" style="text-align: right;">Total</td>
+          <td>$60.00</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div style="text-align: center;">
+      <a href="#" class="button">Pay Invoice Online</a>
+    </div>
+
+    <div class="footer">
+      If you have any questions regarding this invoice, simply reply to this email.
+    </div>
+  </div>
+</body>
+</html>`;
+      } else if (type === 'Monthly Newsletter') {
+         content = `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: 'Georgia', serif; background-color: #fffbeb; margin: 0; padding: 20px; color: #3f3f46; }
+    .wrapper { max-width: 600px; margin: 0 auto; background: #ffffff; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+    .hero { background: #fbbf24; color: #78350f; padding: 40px 20px; text-align: center; border-radius: 6px; margin-bottom: 30px; }
+    h1 { margin: 0; font-size: 28px; letter-spacing: 1px; }
+    h2 { color: #b45309; border-bottom: 2px dashed #fcd34d; padding-bottom: 10px; margin-top: 30px;}
+    .article { margin-bottom: 30px; line-height: 1.8; }
+    .highlight { background: #fef3c7; padding: 15px; border-left: 4px solid #f59e0b; font-style: italic; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="hero">
+      <h1>The Fretboard Gazette</h1>
+      <p>November Edition - Notes, Techniques & Community News</p>
+    </div>
+    
+    <p>Hello ${customer.firstName},</p>
+    
+    <div class="article">
+      <h2>Mastering the Pentatonic Scales</h2>
+      <p>This month we focus on breaking out of the infamous "box shape" 1 of the minor pentatonic scale. By linking position 1 with positions 2 and 5, you can traverse the neck fluidly.</p>
+      <div class="highlight">
+        "The guitar is a small orchestra. It is polyphonic. Every string is a different color, a different voice." - Andrés Segovia
+      </div>
+      <p>Check out our online portal where we've uploaded 3 new backing tracks in A minor specifically designed to practice diagonal scale runs. Log in to the Student Portal to download the PDFs and audio files.</p>
+    </div>
+
+    <div class="article">
+      <h2>Upcoming Masterclass: Fingerstyle Basics</h2>
+      <p>Join us on the 15th for a group workshop covering Travis picking, open tunings (DAGDAD), and percussive body slaps. Spots are limited to 10 students.</p>
+      <p style="text-align: center;">
+        <a href="#" style="display:inline-block; padding: 12px 25px; background: #d97706; color: white; text-decoration: none; border-radius: 4px; font-weight: bold;">Reserve Your Spot ($25)</a>
+      </p>
+    </div>
+
+    <div style="margin-top: 50px; text-align: center; font-size: 12px; color: #9ca3af; border-top: 1px solid #f3f4f6; padding-top: 20px;">
+      You are receiving this because you are an active student at Melbourne Guitar School.<br/>
+      <a href="#" style="color: #6b7280;">Unsubscribe from monthly newsletters</a>
+    </div>
+  </div>
+</body>
+</html>`;
+      } else {
+        // Default / Standard generic type
+        content = `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb; }
+    .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #e5e7eb; }
+    .header { text-align: center; margin-bottom: 30px; }
+    .header h1 { color: #111827; font-size: 24px; margin: 0; }
+    .content h2 { color: #1f2937; font-size: 18px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-top: 24px; }
+    .content p { margin: 16px 0; }
+    .button-container { text-align: center; margin: 30px 0; }
+    .button { display: inline-block; padding: 12px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; }
+    .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #6b7280; }
+    .info-list { margin: 20px 0; padding: 0; list-style: none; }
+    .info-list li { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #f3f4f6; }
+    .spacer { height: 250px; background: linear-gradient(to bottom, #f3f4f6, transparent); margin: 30px 0; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #9ca3af; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <h1>${type}</h1>
+      </div>
+      <div class="content">
+        <p>Hi ${customer.firstName},</p>
+        <p>This is a simulated <strong>${type.toLowerCase()}</strong> email for testing the email history viewer.</p>
+        
+        <h2>Account Snapshot</h2>
+        <ul class="info-list">
+          <li><strong>Name:</strong> ${customer.fullName}</li>
+          <li><strong>Email:</strong> ${customer.email}</li>
+          <li><strong>Location:</strong> ${customer.suburb}, ${customer.state}</li>
+        </ul>
+
+        <h2>Important Information</h2>
+        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+        <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+        
+        <div class="spacer">
+          Long content spacer to demonstrate iframe vertical scrolling capabilities inside the popup...
+        </div>
+
+        <p>Section below the fold to ensure scrolling functions perfectly for lengthy documents like invoices or policy attachments.</p>
+
+        <div class="button-container">
+          <a href="#" class="button">View Online</a>
+        </div>
+      </div>
+      <div class="footer">
+        <p>&copy; ${new Date().getFullYear()} Melbourne Guitar School. All rights reserved.</p>
+        <p>Generated on ${new Date().toISOString()}</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+      }
+
+      await prisma.outboundEmail.create({
+        data: {
+          toEmail: customer.email,
+          subject: `${type} for ${customer.fullName}`,
+          htmlBody: content,
+          status: Math.random() > 0.1 ? 'sent' : 'failed',
+          error: Math.random() > 0.9 ? 'SMTP connection timeout' : null,
+          createdAt: subDays(now, daysAgo),
+        }
+      });
+    }
   }
 
   console.log('✅ Seeding complete.');

@@ -76,13 +76,14 @@ export function AdminCustomersClient() {
   });
 
   const {
-    history: emailHistory,
-    loading: loadingEmailHistory,
-    sending: sendingEmail,
-    load: loadEmailHistory,
-    send: sendEmailApi
-  } = useEmailHistory({ onAuthError, onError: setError });
-
+    history: emailHistory, 
+    loading: loadingEmailHistory, 
+    sending: sendingEmail, 
+    syncing: syncingEmail,
+    load: loadEmailHistory, 
+    send: sendEmailApi,
+    sync: syncEmailApi
+    } = useEmailHistory({ onAuthError, onError: setError });
   const {
     materials: materialsList,
     bookings: materialsBookings,
@@ -320,7 +321,9 @@ export function AdminCustomersClient() {
           emailComposerMessage={emailComposerMessage}
           setEmailComposerMessage={setEmailComposerMessage}
           sendingEmail={sendingEmail}
+          syncingEmail={syncingEmail}
           onSendEmail={sendCustomerEmail}
+          onSyncEmail={() => selectedCustomer && syncEmailApi(selectedCustomer.id)}
 
           // Learning Materials
           materialsList={materialsList}

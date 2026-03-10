@@ -505,6 +505,23 @@ export function AdminBookingsClient() {
     }
   }
 
+  async function performAction(action: string) {
+    const event = events.find(e => e.id === selectedKey);
+    if (!event) return;
+    
+    setBusyAction(action);
+    const success = await updateBookingApi(selectedKey!, event.entityType, action, {});
+    setBusyAction(null);
+    
+    if (success) {
+      setNotice(`Booking ${action}ed.`);
+      if (action === 'approve' || action === 'reject') {
+        void closeDialog();
+      }
+      void loadBookings(view, dateStr);
+    }
+  }
+
   const rangeLabel = useMemo(() => {
     const d = parseISO(dateStr);
     if (view === 'day') return format(d, 'EEEE, d MMMM yyyy');
@@ -611,21 +628,6 @@ export function AdminBookingsClient() {
           onSendEmail={sendCustomEmail}
           onSyncEmail={() => selectedKey && syncEmailApi(selectedKey)}
           onPerformAction={performAction}
-            const event = events.find(e => e.id === selectedKey);
-            if (!event) return;
-            
-            setBusyAction(action);
-            const success = await updateBookingApi(selectedKey!, event.entityType, action, {});
-            setBusyAction(null);
-            
-            if (success) {
-              setNotice(`Booking ${action}ed.`);
-              if (action === 'approve' || action === 'reject') {
-                void closeDialog();
-              }
-              void loadBookings(view, dateStr);
-            }
-          }}
           onOpenMaterials={openMaterialsDialog}
           onOpenInvoice={async () => {
             const event = selectedEvent;
