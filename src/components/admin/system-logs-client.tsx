@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { AdminShell } from "@/components/admin/layout/admin-shell";
-import { AdminTable, AdminTableSeparator as Separator } from "@/components/admin/ui/admin-table";
-import { AlertCircle, CheckCircle, Info, RefreshCw, Bug, X, Search } from "lucide-react";
+import { AlertCircle, CheckCircle, RefreshCw, Bug, X, Search, Terminal, ChevronRight, ChevronDown, Filter } from "lucide-react";
 import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { Pagination } from "@/components/pagination";
 
 type SystemLog = {
   id: string;
@@ -15,6 +15,28 @@ type SystemLog = {
   createdAt: string;
 };
 
+/**
+ * Extracts a short "source" category from the event string.
+ * For example "Booking approved" → "Booking", "Invoice sent" → "Invoice".
+ * Falls back to the full event if it's a single word.
+ */
+function deriveSource(event: string): string {
+  const firstWord = event.split(/[\s_-]/)[0];
+  return firstWord || event;
+}
+
+/**
+ * Formats event string into a short identifier.
+ * "Booking approved" → "BOOKING_APPROVED"
+ */
+function deriveEventId(event: string): string {
+  return event
+    .toUpperCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^A-Z0-9_]/g, "")
+    .slice(0, 24);
+}
+
 export function SystemLogsClient() {
   const [logs, setLogs] = useState<SystemLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,6 +46,7 @@ export function SystemLogsClient() {
   const [totalPages, setTotalPages] = useState(1);
   const [levelFilter, setLevelFilter] = useState("");
   const [eventSearch, setEventSearch] = useState("");
+  const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
   
   // Bug reporting state
   const [isReportingBug, setIsReportingBug] = useState(false);
@@ -61,6 +84,16 @@ export function SystemLogsClient() {
     fetchLogs();
   }, [fetchLogs]);
 
+  const toggleExpand = (id: string) => {
+    const newSet = new Set(expandedLogs);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setExpandedLogs(newSet);
+  };
+
   const handleReportBug = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmittingBug(true);
@@ -88,176 +121,212 @@ export function SystemLogsClient() {
         setReportResult({ error: data.error || "Failed to submit report" });
       }
     } catch (err) {
+      console.error("Failed to submit bug report:", err);
       setReportResult({ error: "An unexpected error occurred" });
     } finally {
       setSubmittingBug(false);
     }
   };
 
-  const getLevelStyles = (level: string) => {
+  /**
+   * Returns the CSS class suffix for a log level badge.
+   */
+  const getLevelClass = (level: string): string => {
     switch (level.toLowerCase()) {
-      case "error":
-        return "text-red-600 bg-red-50 border-red-100";
-      case "warn":
-        return "text-amber-600 bg-yellow-50 border-yellow-100";
-      case "info":
-        return "text-blue-600 bg-blue-50 border-blue-100";
-      default:
-        return "text-slate-600 bg-slate-50 border-slate-100";
+      case "error": return "syslog-level-error";
+      case "warn": return "syslog-level-warn";
+      case "info": return "syslog-level-info";
+      default: return "syslog-level-info";
     }
   };
 
-  const getLevelIcon = (level: string) => {
-    switch (level.toLowerCase()) {
-      case "error":
-        return <AlertCircle size={14} />;
-      case "warn":
-        return <Info size={14} />;
-      case "info":
-        return <CheckCircle size={14} />;
-      default:
-        return <Info size={14} />;
-    }
+  /**
+   * Format timestamp for display in the monitoring-style table.
+   * Output: "2026-03-10 23:48:34"
+   */
+  const formatTimestamp = (iso: string): string => {
+    const d = new Date(iso);
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   };
 
-  const header = (
-    <>
-      <div className="admin-list-col" style={{ width: '180px' }}>Timestamp</div>
-      <Separator />
-      <div className="admin-list-col" style={{ width: '100px' }}>Level</div>
-      <Separator />
-      <div className="admin-list-col" style={{ width: '200px' }}>Event</div>
-      <Separator />
-      <div className="admin-list-col" style={{ flex: 1 }}>Message</div>
-    </>
-  );
+  // Pagination info for the footer
+  const startRange = totalCount > 0 ? (page - 1) * pageSize + 1 : 0;
+  const endRange = Math.min(page * pageSize, totalCount);
 
   return (
     <AdminShell title="System Logs" notice={notice} error={error} className="admin-shell-logs">
       <div className="admin-layout-content">
-        <div className="admin-actions-bar">
-          <div className="flex gap-2">
-            <button 
-              className="btn btn-secondary" 
+        {/* ── Toolbar ── */}
+        <div className="syslog-toolbar">
+          <div className="syslog-toolbar-search">
+            <Search size={14} />
+            <input
+              id="syslog-search"
+              type="text"
+              placeholder="Search logs..."
+              value={eventSearch}
+              onChange={(e) => {
+                setEventSearch(e.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
+
+          <div className="syslog-toolbar-field">
+            <label htmlFor="syslog-level">Level</label>
+            <select
+              id="syslog-level"
+              value={levelFilter}
+              onChange={(e) => {
+                setLevelFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">All Levels</option>
+              <option value="info">Info</option>
+              <option value="warn">Warning</option>
+              <option value="error">Error</option>
+            </select>
+          </div>
+
+          <div className="syslog-toolbar-actions">
+            <button
+              className="btn btn-primary"
               onClick={fetchLogs}
               disabled={loading}
             >
-              <RefreshCw size={16} className={loading ? "animate-spin mr-2" : "mr-2"} />
+              <Filter size={14} />
+              FILTER
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={fetchLogs}
+              disabled={loading}
+            >
+              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
               REFRESH
             </button>
-            <button 
-              className="btn btn-primary" 
+            <button
+              className="btn btn-secondary"
               onClick={() => setIsReportingBug(true)}
             >
-              <Bug size={16} className="mr-2" />
-              REPORT TECHNICAL ISSUE
+              <Bug size={14} />
+              REPORT ISSUE
             </button>
-          </div>
-
-          <div className="search-box">
-            <div className="flex items-center gap-2">
-              <label htmlFor="event-search">Search Event</label>
-              <div className="relative">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  id="event-search"
-                  type="text"
-                  placeholder="Filter by event..."
-                  className="pl-9"
-                  value={eventSearch}
-                  onChange={(e) => {
-                    setEventSearch(e.target.value);
-                    setPage(1);
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="admin-sort-inline-row">
-              <span className="admin-inline-field">LEVEL</span>
-              <select
-                value={levelFilter}
-                onChange={(e) => {
-                  setLevelFilter(e.target.value);
-                  setPage(1);
-                }}
-              >
-                <option value="">All Levels</option>
-                <option value="info">Info</option>
-                <option value="warn">Warning</option>
-                <option value="error">Error</option>
-              </select>
-            </div>
           </div>
         </div>
 
-        <AdminTable
-          header={header}
-          loading={loading}
-          emptyLabel="No system logs found matching your criteria."
-          pagination={{
-            currentPage: page,
-            totalPages: totalPages,
-            totalCount: totalCount,
-            pageSize: pageSize,
-            onPageChange: setPage,
-            onPageSizeChange: (size) => {
+        {/* ── Table container ── */}
+        <div className="syslog-table-wrap">
+          {/* Table bar */}
+          <div className="syslog-table-bar">
+            <div className="syslog-table-bar-left">
+              <Terminal size={14} />
+              <span>System Output</span>
+            </div>
+            {loading && (
+              <div className="syslog-table-bar-status">
+                <RefreshCw size={12} className="animate-spin" />
+                <span>Loading…</span>
+              </div>
+            )}
+          </div>
+
+          {/* Scrollable table area */}
+          <div className="syslog-scroll">
+            <table className="syslog-table">
+              <thead>
+                <tr>
+                  <th className="syslog-col-expand"></th>
+                  <th>Timestamp ↑</th>
+                  <th>Level</th>
+                  <th>Source</th>
+                  <th>Event ID</th>
+                  <th>Message</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.length === 0 && !loading ? (
+                  <tr>
+                    <td colSpan={6} className="syslog-empty">
+                      No system logs found matching your criteria.
+                    </td>
+                  </tr>
+                ) : (
+                  logs.map((log) => {
+                    const hasMeta = log.meta && Object.keys(log.meta).length > 0;
+                    const isExpanded = expandedLogs.has(log.id);
+                    return (
+                      <React.Fragment key={log.id}>
+                        <tr
+                          className={hasMeta ? "syslog-row-expandable" : ""}
+                          onClick={() => hasMeta && toggleExpand(log.id)}
+                        >
+                          <td className="syslog-col-expand">
+                            {hasMeta ? (
+                              isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />
+                            ) : null}
+                          </td>
+                          <td className="syslog-col-timestamp">
+                            {formatTimestamp(log.createdAt)}
+                          </td>
+                          <td>
+                            <span className={`syslog-level ${getLevelClass(log.level)}`}>
+                              {log.level.toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="syslog-col-source">
+                            {deriveSource(log.event)}
+                          </td>
+                          <td className="syslog-col-event" title={log.event}>
+                            {deriveEventId(log.event)}
+                          </td>
+                          <td className="syslog-col-message" title={log.message}>
+                            {log.message}
+                          </td>
+                        </tr>
+                        {isExpanded && hasMeta && (
+                          <tr>
+                            <td colSpan={6} className="syslog-meta-cell">
+                              <div className="syslog-meta-block">
+                                {JSON.stringify(log.meta, null, 2)}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footer with count summary */}
+          {totalCount > 0 && (
+            <div className="syslog-footer">
+              <span>Page {page} of {totalPages}</span>
+              <span>{startRange}-{endRange} of {totalCount.toLocaleString()} logs</span>
+            </div>
+          )}
+        </div>
+
+        {/* Pagination */}
+        <div style={{ flexShrink: 0 }}>
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            pageSize={pageSize}
+            onPageSizeChange={(size) => {
               setPageSize(size);
               setPage(1);
-            },
-            pageSizeOptions: [25, 50, 100, 250]
-          }}
-        >
-          {logs.map((log) => (
-            <div key={log.id} className="invoice-row-item invoice-table-row cursor-default hover:bg-slate-50/50">
-              <div className="admin-list-cell text-slate-500 text-xs" style={{ width: '180px', flexShrink: 0 }}>
-                <span className="admin-mobile-label">Timestamp</span>
-                {new Date(log.createdAt).toLocaleString("en-AU", { 
-                  day: '2-digit', 
-                  month: '2-digit', 
-                  year: 'numeric', 
-                  hour: '2-digit', 
-                  minute: '2-digit', 
-                  second: '2-digit' 
-                })}
-              </div>
-
-              <Separator />
-              <div className="admin-list-cell" style={{ width: '100px', flexShrink: 0 }}>
-                <span className="admin-mobile-label">Level</span>
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${getLevelStyles(log.level)}`}>
-                  {getLevelIcon(log.level)}
-                  {log.level}
-                </span>
-              </div>
-
-              <Separator />
-              <div className="admin-list-cell font-medium text-slate-200" style={{ width: '200px', flexShrink: 0 }}>
-                <span className="admin-mobile-label">Event</span>
-                {log.event}
-              </div>
-
-              <Separator />
-              <div className="admin-list-cell" style={{ flex: 1, minWidth: 0 }}>
-                <span className="admin-mobile-label">Message</span>
-                <div className="w-full overflow-hidden">
-                  <p 
-                    className="text-slate-400 text-xs whitespace-nowrap overflow-hidden text-ellipsis" 
-                    style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace' }}
-                    title={log.message}
-                  >
-                    {log.message}
-                  </p>
-                  {log.meta && Object.keys(log.meta).length > 0 && (
-                    <div className="mt-1 text-[9px] text-slate-500 font-mono overflow-hidden text-ellipsis whitespace-nowrap opacity-60">
-                      {JSON.stringify(log.meta)}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </AdminTable>
+            }}
+            totalCount={totalCount}
+            pageSizeOptions={[25, 50, 100]}
+          />
+        </div>
       </div>
 
       {/* Bug Report Dialog */}
@@ -281,7 +350,7 @@ export function SystemLogsClient() {
             <form onSubmit={handleReportBug}>
               <div className="p-6 space-y-4">
                 <p className="text-sm text-slate-600 leading-relaxed">
-                  Describe the issue you're experiencing. Recent system logs will be attached automatically to help the developer with troubleshooting.
+                  Describe the issue you&apos;re experiencing. Recent system logs will be attached automatically to help the developer with troubleshooting.
                 </p>
                 
                 <div className="space-y-1.5">

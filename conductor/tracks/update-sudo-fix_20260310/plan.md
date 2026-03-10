@@ -6,7 +6,7 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Research and Analysis' (Protocol in workflow.md)
 
 ## Phase 2: Permission and Ownership Updates
-- [ ] Task: Implement updates to directory ownership for deployment targets.
+- [~] Task: Implement updates to directory ownership for deployment targets.
     - [ ] Create a shell script/commands to set ownership to the deployment user.
 - [ ] Task: Configure targeted passwordless `sudo` for service restarts if necessary.
     - [ ] Draft the `sudoers` entry for the specific service restart command.
