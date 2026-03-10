@@ -22,19 +22,25 @@ export interface UseEmailHistoryOptions {
     onError?: (message: string) => void;
 }
 
+export type SendEmailResult = {
+    success: boolean;
+    errorCode?: string;
+};
+
 export interface UseEmailHistoryResult {
     history: ReadonlyArray<EmailRecord>;
     loading: boolean;
     sending: boolean;
     syncing: boolean;
     load: (customerId: string) => Promise<void>;
-    send: (customerId: string, subject: string, message: string, captcha?: { captchaToken: string; captchaAnswer: string }) => Promise<boolean>;
+    send: (customerId: string, subject: string, message: string, captcha?: { captchaToken: string; captchaAnswer: string }) => Promise<SendEmailResult>;
+    sync: (customerId: string) => Promise<boolean>;
 }
 
-    /**
-    * Hook to manage email communication history and sending for customers.
-    */
-    export function useEmailHistory(options: UseEmailHistoryOptions = {}): UseEmailHistoryResult {
+/**
+ * Hook to manage email communication history and sending for customers.
+ */
+export function useEmailHistory(options: UseEmailHistoryOptions = {}): UseEmailHistoryResult {
     const { onAuthError, onError } = options;
     const [history, setHistory] = useState<ReadonlyArray<EmailRecord>>([]);
     const [loading, setLoading] = useState(false);
@@ -58,7 +64,7 @@ export interface UseEmailHistoryResult {
         }
     }, [safeFetch]);
 
-    const send = useCallback(async (customerId: string, subject: string, message: string, captcha?: { captchaToken: string; captchaAnswer: string }): Promise<boolean> => {
+    const send = useCallback(async (customerId: string, subject: string, message: string, captcha?: { captchaToken: string; captchaAnswer: string }): Promise<SendEmailResult> => {
         setSending(true);
         try {
             const response = await safeFetch(`/api/admin/customers/${customerId}/email`, {
@@ -68,15 +74,16 @@ export interface UseEmailHistoryResult {
             });
 
             if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
                 await handleApiError(response, "Unable to send email.");
-                return false;
+                return { success: false, errorCode: errorData.code };
             }
 
             // Reload history after successful send
             void load(customerId);
-            return true;
+            return { success: true };
         } catch {
-            return false;
+            return { success: false };
         } finally {
             setSending(false);
         }

@@ -12,3 +12,6 @@
 ## Management
 - [Tracks Registry](./tracks.md)
 - [Tracks Directory](./tracks/)
+
+## Active Tracks
+- [System Logs and Improved Error Handling](./tracks/system-logs_20260310/)

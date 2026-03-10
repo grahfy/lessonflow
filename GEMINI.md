@@ -71,6 +71,10 @@ LessonFlow is a comprehensive management platform tailored for music schools and
 *   **Deployment:** The project uses a "releases" based symlink deployment strategy on Linux servers, managed by scripts in `deploy/`.
 *   **Documentation in Code:** Always comment code extensively when modifying or adding. Provide clear explanations for complex logic, domain-specific decisions, and technical trade-offs to ensure maintainability.
 
+## Gemini CLI Preferences
+
+*   **Commit Strategy:** When using the Conductor extension, avoid making individual commits for every task or phase. Instead, perform all implementation work and then make **one single, long, and detailed multiline commit** at the end of the track (when it is complete) that explains the "why" and "what" of all changes.
+
 ## Operational Notes
 
 *   **Scheduled Jobs:** The system relies on cron jobs (calling `/api/jobs/*`) for reminders and digests, protected by `CRON_SECRET`.
