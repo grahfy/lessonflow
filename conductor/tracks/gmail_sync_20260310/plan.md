@@ -9,8 +9,8 @@ Update the data model to track provider information and external IDs for dedupli
     - [x] Add `provider` (String, default "smtp").
     - [x] Add `externalId` (String, unique, nullable).
     - [x] Add `source` (String, default "app").
-- [ ] Task: Execute database migration.
-    - [ ] `npx prisma migrate dev --name add_email_sync_fields`
+- [x] Task: Execute database migration. [83d803e]
+    - [x] `npx prisma migrate dev --name add_email_sync_fields`
 - [ ] Task: Update `.env.example` with `EMAIL_PROVIDER` setting.
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Database & Environment Preparation' (Protocol in workflow.md)
 
