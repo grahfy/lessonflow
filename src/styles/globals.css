@@ -3340,11 +3340,20 @@ h1 {
 .admin-table-scroll {
   flex: 1;
   overflow-y: auto;
+  overflow-x: auto;
   max-height: none;
   display: flex;
   flex-direction: column;
   gap: 0;
   padding: 0;
+}
+
+.admin-table-inner {
+  display: flex;
+  flex-direction: column;
+  min-width: 100%;
+  width: max-content;
+  flex: 1;
 }
 
 .admin-table-body {
@@ -3377,42 +3386,50 @@ h1 {
 .admin-list-col-customer {
   flex: 1;
   min-width: 180px;
+  flex-shrink: 0;
 }
 
 .admin-list-col-number {
   width: 140px;
+  flex-shrink: 0;
 }
 
 .admin-list-col-phone {
   width: 110px;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .admin-list-col-skill {
   width: 120px;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .admin-list-col-status {
   width: 100px;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .admin-list-col-total,
 .admin-list-col-due {
   width: 120px;
   text-align: right;
+  flex-shrink: 0;
 }
 
 .admin-list-col-portal {
-  flex: 0.8;
-  min-width: 150px;
+  flex: 0 0 170px;
+  min-width: 170px;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .admin-list-col-actions {
-  width: 240px;
+  width: 260px;
   text-align: right;
+  flex-shrink: 0;
 }
 
 .customer-table-row,
@@ -3426,6 +3443,15 @@ h1 {
   border-radius: 0;
   border: 0;
   border-bottom: 1px solid var(--line);
+}
+
+.admin-table-header-row.is-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg-1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  width: 100%;
 }
 
 .admin-list-cell {
@@ -5135,6 +5161,7 @@ h1 {
 @media (min-width: 761px) and (max-width: 900px) {
   .admin-table-header-row {
     display: flex;
+    width: 100%;
   }
 
   .admin-table-separator {
@@ -5160,6 +5187,7 @@ h1 {
     border-radius: 0;
     margin: 0;
     background: transparent;
+    width: 100%;
   }
 
   .customer-table-row .admin-list-col-identity,

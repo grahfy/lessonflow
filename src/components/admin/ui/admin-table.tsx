@@ -32,18 +32,19 @@ export function AdminTable({
 }: AdminTableProps) {
   return (
     <div className="admin-card invoice-list-card admin-table-card">
-      {header && (
-        <div className="invoice-list-header admin-table-header-row">
-          {header}
-        </div>
-      )}
-      
       <div className="admin-list-scroll admin-table-scroll">
-        <div className="admin-table-body">
-          {children}
-          {!loading && (!children || (Array.isArray(children) && children.length === 0)) && (
-            <p className="helper-text admin-table-empty">{emptyLabel}</p>
+        <div className="admin-table-inner">
+          {header && (
+            <div className="invoice-list-header admin-table-header-row is-sticky">
+              {header}
+            </div>
           )}
+          <div className="admin-table-body">
+            {children}
+            {!loading && (!children || (Array.isArray(children) && children.length === 0)) && (
+              <p className="helper-text admin-table-empty">{emptyLabel}</p>
+            )}
+          </div>
         </div>
       </div>
 
