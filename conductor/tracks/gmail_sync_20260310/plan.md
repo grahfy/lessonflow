@@ -26,9 +26,9 @@ Implement the low-level service for interacting with Gmail API.
 ## Phase 3: Core Email Service Integration
 Modify the existing email service to support multiple providers.
 
-- [ ] Task: Update `src/lib/email/service.ts` to select provider based on environment variable.
-- [ ] Task: Implement provider-specific logic in `sendEmail`.
-- [ ] Task: Ensure all sent emails record their `provider` and `externalId` (if applicable) in the database.
+- [x] Task: Update `src/lib/email/service.ts` to select provider based on environment variable. [64b12b8]
+- [x] Task: Implement provider-specific logic in `sendEmail`. [64b12b8]
+- [x] Task: Ensure all sent emails record their `provider` and `externalId` (if applicable) in the database. [64b12b8]
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Core Email Service Integration' (Protocol in workflow.md)
 
 ## Phase 4: Background Synchronization
