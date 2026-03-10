@@ -16,3 +16,8 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 - [ ] **Track: System Logs and Improved Error Handling**
 *Link: [./tracks/system-logs_20260310/](./tracks/system-logs_20260310/)*
+
+---
+
+- [ ] **Track: Deployment Update History**
+*Link: [./tracks/deploy-history_20260310/](./tracks/deploy-history_20260310/)*
