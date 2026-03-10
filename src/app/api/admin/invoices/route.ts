@@ -1,3 +1,10 @@
+/**
+ * Admin Invoices API Route
+ * 
+ * Provides financial document management (Invoices and Credit Notes).
+ * Handles sophisticated filtering (search, status, aging) and atomic creation.
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@/generated/prisma/client";
 
@@ -10,7 +17,19 @@ import { createInvoiceRecord } from "@/lib/invoices/persistence";
 import { InvoiceLineItemDraft } from "@/lib/invoices/types";
 
 /**
- * Lists invoices using query filters designed for admin search and outstanding views.
+ * GET: Lists invoices using complex query filters for admin dashboard views.
+ * 
+ * FILTER CAPABILITIES:
+ * 1. Text Search: Fuzzy match on invoice number, customer name, and email.
+ * 2. Status: Filter by 'draft', 'issued', 'paid', 'void'.
+ * 3. Outstanding: One-click filter for unpaid items past their due date.
+ * 4. Aging: Group by 'current' (not due), 'overdue 1-30 days', 'overdue 30+ days'.
+ * 
+ * DESIGN RATIONALE: We build the 'where' clause incrementally to allow 
+ * multi-axis filtering (e.g., Search for "John" AND Status "Paid").
+ * 
+ * @param request - Filter/Sort/Page params
+ * @returns Sorted and paged array of enriched invoice objects
  */
 export async function GET(request: NextRequest) {
   try {
@@ -30,12 +49,12 @@ export async function GET(request: NextRequest) {
       page: request.nextUrl.searchParams.get("page") ?? undefined,
       pageSize: request.nextUrl.searchParams.get("pageSize") ?? undefined
     });
+
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid query payload.", details: parsed.error.flatten() }, { status: 400 });
     }
 
-    // Build the filter incrementally so the admin UI can combine search + status + aging filters
-    // without exploding route branches for every permutation.
+    // Incremental Filter Builder
     const where: Prisma.InvoiceWhereInput = {
       isDeleted: false
     };
@@ -46,19 +65,19 @@ export async function GET(request: NextRequest) {
     if (parsed.data.customerId) {
       where.customerId = parsed.data.customerId;
     }
+
+    // LOGIC: "Outstanding" is a composite filter (Not Paid/Void AND Passed Due Date)
     if (parsed.data.outstanding === "true") {
       const now = new Date();
+      // Snap to UTC start of day for stable filtering
       const nowUtcDayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
       const overdueCutoff = new Date(nowUtcDayStart.getTime() - 24 * 60 * 60 * 1000);
-      where.status = {
-        notIn: ["paid", "void"]
-      };
+      
+      where.status = { notIn: ["paid", "void"] };
       where.documentType = "invoice";
-      // "Overdue only" means invoices with overdueDays > 1 (strictly more than one day overdue).
-      where.dueAt = {
-        lt: overdueCutoff
-      };
+      where.dueAt = { lt: overdueCutoff };
     }
+
     if (parsed.data.q) {
       where.OR = [
         { invoiceNumber: { contains: parsed.data.q } },
@@ -67,35 +86,26 @@ export async function GET(request: NextRequest) {
       ];
     }
 
+    // LOGIC: Aging Buckets help admins prioritize collection efforts.
     if (parsed.data.agingBucket) {
       const now = new Date();
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      where.status = {
-        notIn: ["paid", "void"]
-      };
+      where.status = { notIn: ["paid", "void"] };
+
       if (parsed.data.agingBucket === "current") {
         where.dueAt = { gte: now };
       } else if (parsed.data.agingBucket === "overdue_1_30") {
-        where.dueAt = {
-          lt: now,
-          gte: thirtyDaysAgo
-        };
+        where.dueAt = { lt: now, gte: thirtyDaysAgo };
       } else {
-        where.dueAt = {
-          lt: thirtyDaysAgo
-        };
+        where.dueAt = { lt: thirtyDaysAgo };
       }
     }
 
+    // Dynamic Sort Order Builder
     const orderBy: Prisma.InvoiceOrderByWithRelationInput[] = (() => {
       const { sortBy, sortDir } = parsed.data;
       if (sortBy === "customer_last_name") {
-        return [
-          { customerLastName: sortDir },
-          { customerFirstName: sortDir },
-          { customerName: sortDir },
-          { invoiceNumber: "desc" }
-        ];
+        return [{ customerLastName: sortDir }, { customerFirstName: sortDir }, { customerName: sortDir }, { invoiceNumber: "desc" }];
       }
       if (sortBy === "status") {
         return [{ status: sortDir }, { dueAt: "asc" }, { invoiceNumber: "desc" }];
@@ -106,22 +116,18 @@ export async function GET(request: NextRequest) {
       if (sortBy === "due_date") {
         return [{ dueAt: sortDir }, { invoiceNumber: "desc" }];
       }
-
       return [{ invoiceNumber: sortDir }];
     })();
 
     const skip = (parsed.data.page - 1) * parsed.data.pageSize;
-    // Fetch rows and total count in one transaction so pagination metadata matches the same filter snapshot.
+
+    // Execute in transaction for consistency
     const [invoices, total] = await prisma.$transaction([
       prisma.invoice.findMany({
         where,
         orderBy,
         include: {
-          lineItems: {
-            orderBy: {
-              sortOrder: "asc"
-            }
-          }
+          lineItems: { orderBy: { sortOrder: "asc" } }
         },
         skip,
         take: parsed.data.pageSize
@@ -129,6 +135,7 @@ export async function GET(request: NextRequest) {
       prisma.invoice.count({ where })
     ]);
 
+    // Enriched Response (Add dynamic fields like overdueDays)
     return NextResponse.json({
       invoices: invoices.map((invoice) => ({
         ...invoice,
@@ -150,7 +157,19 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * Creates an invoice from direct payload values, preserving snapshots and line-item totals.
+ * POST: Atomic creation of an invoice.
+ * 
+ * ARCHITECTURE:
+ * 1. Validates input schema (Zod).
+ * 2. Checks entity integrity (customer and booking existence).
+ * 3. Normalizes line items.
+ * 4. HANDS OFF to `createInvoiceRecord` inside a PRISMA TRANSACTION.
+ * 
+ * RATIONALE: Numbering, total recalculation, and audit logging MUST 
+ * succeed or fail as a single unit to maintain financial integrity.
+ * 
+ * @param request - Validated invoice payload
+ * @returns Completed invoice record with generated number and totals
  */
 export async function POST(request: NextRequest) {
   try {
@@ -165,6 +184,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid invoice payload.", details: parsed.error.flatten() }, { status: 400 });
     }
 
+    // Entity verification
     if (parsed.data.customerId) {
       const customer = await prisma.customer.findUnique({ where: { id: parsed.data.customerId } });
       if (!customer || customer.isArchived) {
@@ -175,10 +195,7 @@ export async function POST(request: NextRequest) {
     if (parsed.data.bookingId) {
       const booking = await prisma.booking.findUnique({
         where: { id: parsed.data.bookingId },
-        select: {
-          id: true,
-          customerId: true
-        }
+        select: { id: true, customerId: true }
       });
       if (!booking) {
         return NextResponse.json({ error: "Selected booking does not exist." }, { status: 400 });
@@ -188,7 +205,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Normalize request payload into the persistence-layer draft shape before transactional create.
+    // Mapping Draft Line Items
     const lineItems: InvoiceLineItemDraft[] = parsed.data.lineItems.map((lineItem) => ({
       description: lineItem.description,
       quantity: lineItem.quantity,
@@ -200,7 +217,8 @@ export async function POST(request: NextRequest) {
 
     const issuedAt = parsed.data.issuedAt ? new Date(parsed.data.issuedAt) : new Date();
     const dueAt = new Date(parsed.data.dueAt);
-    // Numbering, totals, line items, and audit logs must be committed atomically.
+
+    // CRITICAL: Everything happens inside this transaction
     const invoice = await prisma.$transaction((tx) =>
       createInvoiceRecord({
         tx,

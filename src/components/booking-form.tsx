@@ -1,49 +1,63 @@
+/**
+ * Public Booking Form Component
+ * 
+ * Provides a user-friendly interface for new students to request music lessons.
+ * 
+ * DESIGN FEATURES:
+ * 1. Multi-Step Validation: Captcha -> Geo-Fence -> Zod Schema.
+ * 2. Geo-Blocking: Restricts submissions to Australian residents based on API signals.
+ * 3. Atomic Feedback: Shows success/error state in a dedicated dialog overlay.
+ * 4. UX Rationale: Fields are simplified to reduce friction. New customers are 
+ *    automatically capped at 30 minutes for their first lesson intro.
+ */
+
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { CaptchaField, useCaptcha } from "@/components/captcha";
 
+/**
+ * State of the form submission process.
+ */
 type BookingState =
   | { status: "idle" }
   | { status: "success"; message: string }
   | { status: "error"; message: string };
 
 /**
- * Public booking-request form.
- *
- * Submissions create pending booking requests that are manually approved by the owner/admin before
- * becoming confirmed bookings. The UI therefore focuses on validation and expectation-setting.
+ * Primary component for the public-facing booking request page.
  */
 export function BookingForm() {
   const [state, setState] = useState<BookingState>({ status: "idle" });
   const [loading, setLoading] = useState(false);
-  // RATIONALE: durationType and lessonMode are kept as state to drive conditional UI rendering
-  // (e.g., custom duration input) and validation messaging.
+  
+  // DRIVING UI: keep durationType and lessonMode in state for conditional inputs
   const [durationType, setDurationType] = useState<"min30" | "min60" | "custom">("min60");
   const [lessonMode, setLessonMode] = useState<"in_person" | "video">("in_person");
+  
   const captcha = useCaptcha();
 
+  /** Close status dialog on Escape key. */
   useEffect(() => {
-    if (state.status === "idle") {
-      return;
-    }
+    if (state.status === "idle") return;
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setState({ status: "idle" });
-      }
+      if (event.key === "Escape") setState({ status: "idle" });
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [state.status]);
 
+  /**
+   * Main submission handler.
+   */
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formElement = event.currentTarget;
 
-    // Require a loaded CAPTCHA challenge and a non-empty answer before any API call.
+    // STEP 1: CAPTCHA CHECK
     if (!captcha.validateAnswer()) {
       setState({
         status: "error",
@@ -58,14 +72,13 @@ export function BookingForm() {
 
     try {
       /**
-       * GEOLOCATION CHECK
-       * RATIONALE: To prevent unqualified leads and international spam, we verify the 
-       * user's country via their IP address before allowing form submission.
+       * STEP 2: GEOLOCATION CHECK
+       * RATIONALE: We only serve students in Australia. Checking client IP via 
+       * /api/geo allows us to fail fast before processing heavy form data.
        */
       const geoResponse = await fetch("/api/geo");
       if (geoResponse.ok) {
         const geoData = await geoResponse.json();
-        // Strict restriction to Australia (AU)
         if (geoData.country && geoData.country !== "AU") {
           setState({
             status: "error",
@@ -77,10 +90,10 @@ export function BookingForm() {
         }
       }
 
+      // STEP 3: DATA AGGREGATION
       const form = new FormData(formElement);
       const firstName = String(form.get("firstName") || "").trim();
       const lastName = String(form.get("lastName") || "").trim();
-      // Combine name for backward compatibility with database schema
       const fullName = [firstName, lastName].filter(Boolean).join(" ");
       const startRaw = String(form.get("requestedStartAt") || "");
       const phoneDigits = String(form.get("phone") || "").replace(/\D/g, "").slice(0, 10);
@@ -90,19 +103,16 @@ export function BookingForm() {
 
       const requestedStartAtDate = new Date(startRaw);
       if (Number.isNaN(requestedStartAtDate.getTime())) {
-        setState({
-          status: "error",
-          message: "Please choose a valid booking start date and time."
-        });
+        setState({ status: "error", message: "Please choose a valid booking start date and time." });
         setLoading(false);
         return;
       }
 
       /**
-       * SIMPLIFIED PAYLOAD
-       * RATIONALE: UI has been simplified to reduce friction. Removed address fields 
-       * are defaulted to empty strings to maintain compatibility with existing 
-       * database constraints and downstream logic.
+       * PAYLOAD MAPPING
+       * RATIONALE: Address fields are abstracted away from the public UI to 
+       * speed up the request process. Empty strings are sent to maintain 
+       * schema compatibility on the backend.
        */
       const requestPayload = {
         firstName,
@@ -117,7 +127,6 @@ export function BookingForm() {
         customDurationMinutes,
         requestedStartAt: requestedStartAtDate.toISOString(),
         notes: String(form.get("notes") || ""),
-        // Address fields are now sent as empty strings from public UI
         country: "Australia",
         unitNumber: "",
         houseNumber: "",
@@ -125,14 +134,13 @@ export function BookingForm() {
         streetType: "",
         suburb: "",
         state: "VIC",
-        // Recurring bookings are disabled for the public form
-        isRecurring: false,
+        isRecurring: false, // Disallow recurring series from the public form
         recurrenceEndAt: undefined
       };
 
+      // STEP 4: API SUBMISSION
       let response: Response;
       try {
-        // The booking request endpoint persists the request and then notifies the owner by email.
         response = await fetch("/api/booking-requests", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -144,7 +152,7 @@ export function BookingForm() {
       } catch {
         setState({
           status: "error",
-          message: "Booking could not be submitted right now. Please try again, or contact us by phone or email."
+          message: "Booking could not be submitted right now. Please try again later."
         });
         await captcha.regenerate();
         return;
@@ -152,35 +160,34 @@ export function BookingForm() {
 
       let responsePayload: { id?: string; error?: string; deliveryStatus?: string } | null = null;
       try {
-        responsePayload = (await response.json()) as { id?: string; error?: string; deliveryStatus?: string };
+        responsePayload = (await response.json());
       } catch {
-        responsePayload = null;
+        // payload may be empty
       }
 
-      // Saved-request responses can still be returned as 503 when owner notification delivery is
-      // degraded. Treat those as a user-visible success so the requester gets confirmation.
+      // LOGIC: Status 503 is treated as a semi-success if the record was saved but email failed.
       if (!response.ok && !(response.status === 503 && typeof responsePayload?.id === "string")) {
         setState({
           status: "error",
-          message: responsePayload?.error || "Booking could not be submitted. Check required fields and selected date."
+          message: responsePayload?.error || "Booking could not be submitted. Check required fields."
         });
         await captcha.regenerate();
         return;
       }
 
+      // STEP 5: SUCCESS RESET
       formElement.reset();
       setDurationType("min60");
       setLessonMode("in_person");
       await captcha.regenerate();
       setState({
         status: "success",
-        message:
-          "Booking submission is pending. We will get back to you via email or phone within 24 hours regarding booking confirmation."
+        message: "Booking submission is pending. We will get back to you via email or phone within 24 hours."
       });
     } catch {
       setState({
         status: "error",
-        message: "Booking could not be submitted right now. Please try again, or contact us by phone or email."
+        message: "Booking could not be submitted right now. Please try again."
       });
       await captcha.regenerate();
     } finally {
@@ -243,10 +250,7 @@ export function BookingForm() {
           name="lessonMode"
           required
           value={lessonMode}
-          onChange={(event) => {
-            const nextMode = event.target.value as "in_person" | "video";
-            setLessonMode(nextMode);
-          }}
+          onChange={(event) => setLessonMode(event.target.value as "in_person" | "video")}
         >
           <option value="in_person">In-person</option>
           <option value="video">Video</option>
@@ -328,7 +332,7 @@ export function BookingForm() {
           >
             <div className="dialog-head">
               <h3 id="book-submit-status-title">
-                {state.status === "success" ? "Booking Request Submitted" : "Booking Request Error"}
+                {state.status === "success" ? "Booking Requested" : "Request Error"}
               </h3>
             </div>
             <p

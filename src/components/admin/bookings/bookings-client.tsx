@@ -1,3 +1,24 @@
+/**
+ * Admin Bookings Console Client
+ * 
+ * "use client"
+ * 
+ * The central management hub for the school's lesson schedule. 
+ * Provides a calendar interface (Day/Week/Month/Year) for review, approval, 
+ * and manual booking creation.
+ * 
+ * CORE RESPONSIBILITIES:
+ * 1. Schedule Visibility: Visual layout of all bookings and requests.
+ * 2. Lifecyle Management: Approve, Reject, Reschedule (Move), or Cancel lessons.
+ * 3. CRM Integration: Heuristic matching to link bookings to existing customers.
+ * 4. Communication: Integrated email composer for sending direct updates to students.
+ * 5. Materials: Attach PDFs/Audio to specific bookings for student portal access.
+ * 
+ * RATIONALE: High-fidelity scheduling is the "ground truth" for the business. 
+ * The UI is designed to minimize administrative friction through automated 
+ * matching and integrated communication tools.
+ */
+
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -29,16 +50,20 @@ import {
   type ManualStep, 
 } from "@/lib/admin/types";
 
+/** Available calendar layouts. */
 type CalendarView = "day" | "week" | "month" | "year";
 
+/** Extends the base booking event with raw row data for detailed editing. */
 interface EventWithRow extends BookingEvent {
   row: BookingRowData;
 }
 
+/** Normalization for email matching. */
 function normalizeEmailForMatch(value: string | null | undefined): string {
   return (value || "").trim().toLowerCase();
 }
 
+/** Normalization for phone matching (strips non-digits, handles AU prefix). */
 function normalizePhoneForMatch(value: string | null | undefined): string {
   const digits = (value || "").replace(/\D/g, "");
   if (digits.length === 11 && digits.startsWith("61")) {
@@ -50,6 +75,13 @@ function normalizePhoneForMatch(value: string | null | undefined): string {
   return digits;
 }
 
+/**
+ * Heuristic Matching Logic
+ * 
+ * RATIONALE: We often get booking requests with slightly different names or 
+ * contact details. Matching by normalized phone OR email allows the system to 
+ * suggest linking records, preventing data silos and duplicate profiles.
+ */
 function findHeuristicCustomerMatch(customers: BookingMatchedCustomer[], email: string | null | undefined, phone: string | null | undefined) {
   const normalizedEmail = normalizeEmailForMatch(email);
   const normalizedPhone = normalizePhoneForMatch(phone);
@@ -69,38 +101,30 @@ function findHeuristicCustomerMatch(customers: BookingMatchedCustomer[], email: 
   );
 }
 
+/** Extracts first validation error message from API response details. */
 function getFieldErrorMessage(result: unknown): string | null {
-  if (!result || typeof result !== "object") {
-    return null;
-  }
-
+  if (!result || typeof result !== "object") return null;
   const details = (result as { details?: unknown }).details;
-  if (!details || typeof details !== "object") {
-    return null;
-  }
-
+  if (!details || typeof details !== "object") return null;
   const fieldErrors = (details as { fieldErrors?: unknown }).fieldErrors;
-  if (!fieldErrors || typeof fieldErrors !== "object") {
-    return null;
-  }
+  if (!fieldErrors || typeof fieldErrors !== "object") return null;
 
   for (const [field, messages] of Object.entries(fieldErrors)) {
     if (Array.isArray(messages) && typeof messages[0] === "string") {
       return `${field}: ${messages[0]}`;
     }
   }
-
   return null;
 }
 
 /**
- * Main admin bookings console client.
- * Refactored to use modular components and hooks.
+ * Primary stateful component for the Admin Bookings Console.
  */
 export function AdminBookingsClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
+  // PARAMS: Sync calendar view state with URL for shareable/bookmarkable states.
   const view = (searchParams.get("view") as CalendarView) || "week";
   const dateStr = searchParams.get("date") || new Date().toISOString().split("T")[0];
 
@@ -150,16 +174,13 @@ export function AdminBookingsClient() {
 
   const onAuthError = useCallback(() => window.location.assign("/admin/login"), []);
 
-  // Data Hooks
+  // Data Fetching Hooks (Abstracted for reuse and clean component logic)
   const { 
     events: rawEvents, 
     load: loadBookings, 
     update: updateBookingApi,
     remove: removeBookingApi
-  } = useBookings({
-    onError: setError,
-    onAuthError
-  });
+  } = useBookings({ onError: setError, onAuthError });
 
   const events = useMemo(() => rawEvents as EventWithRow[], [rawEvents]);
 
@@ -177,28 +198,28 @@ export function AdminBookingsClient() {
   const { presets } = usePresets({ onAuthError, onError: setError });
 
   const selectedEvent = useMemo(() => events.find((event) => event.id === selectedKey) || null, [events, selectedKey]);
+  
+  // LOGIC: Resolve customer relationships
   const linkedCustomer = useMemo(() => {
     const customerId = selectedEvent?.row?.customerId;
-    if (!customerId) {
-      return null;
-    }
+    if (!customerId) return null;
     return customerOptions.find((customer) => customer.id === customerId) || null;
   }, [selectedEvent, customerOptions]);
+
   const heuristicCustomer = useMemo(() => {
-    if (!dialogForm || linkedCustomer) {
-      return linkedCustomer;
-    }
+    if (!dialogForm || linkedCustomer) return linkedCustomer;
     return findHeuristicCustomerMatch(customerOptions, dialogForm.email, dialogForm.phone);
   }, [dialogForm, linkedCustomer, customerOptions]);
+
   const hasHeuristicMatch = Boolean(!linkedCustomer && heuristicCustomer);
   const matchedDialogCustomer = linkedCustomer || (!dialogMatchDismissed ? heuristicCustomer : null);
 
-  // Effects
+  // Sync data with view/date parameters
   useEffect(() => {
     void loadBookings(view, dateStr);
   }, [view, dateStr, loadBookings]);
 
-  // Navigation
+  /** Navigation utility for changing calendar views. */
   const navigate = useCallback((newView: CalendarView, newDate: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("view", newView);
@@ -209,24 +230,28 @@ export function AdminBookingsClient() {
   const goPrev = () => {
     const d = parseISO(dateStr);
     let next;
-    if (view === 'day') next = subDays(d, 1);
-    else if (view === 'week') next = subWeeks(d, 1);
-    else if (view === 'month') next = subMonths(d, 1);
+    if (view === "day") next = subDays(d, 1);
+    else if (view === "week") next = subWeeks(d, 1);
+    else if (view === "month") next = subMonths(d, 1);
     else next = subYears(d, 1);
-    navigate(view, format(next, 'yyyy-MM-dd'));
+    navigate(view, format(next, "yyyy-MM-dd"));
   };
 
   const goNext = () => {
     const d = parseISO(dateStr);
     let next;
-    if (view === 'day') next = addDays(d, 1);
-    else if (view === 'week') next = addWeeks(d, 1);
-    else if (view === 'month') next = addMonths(d, 1);
+    if (view === "day") next = addDays(d, 1);
+    else if (view === "week") next = addWeeks(d, 1);
+    else if (view === "month") next = addMonths(d, 1);
     else next = addYears(d, 1);
-    navigate(view, format(next, 'yyyy-MM-dd'));
+    navigate(view, format(next, "yyyy-MM-dd"));
   };
 
-  // Handlers
+  /**
+   * Opens the detailed booking event dialog.
+   * RATIONALE: We pre-fill the form with deep row data and immediately trigger 
+   * a check for existing customers and email history to give the admin full context.
+   */
   const openDialog = useCallback((event: AdminCalendarEvent) => {
     setSelectedKey(event.id);
     const row = event.row as BookingRowData;
@@ -310,7 +335,7 @@ export function AdminBookingsClient() {
     const setFieldValue = (name: string, value: string) => {
       const field = formElements.namedItem(name);
       if (field && "value" in field) {
-        field.value = value;
+        (field as any).value = value;
       }
     };
     setFieldValue("firstName", customer.firstName || customer.fullName.split(" ")[0] || "");
@@ -334,7 +359,7 @@ export function AdminBookingsClient() {
     const setFieldValue = (name: string, value: string) => {
       const field = formElements.namedItem(name);
       if (field && "value" in field) {
-        field.value = value;
+        (field as any).value = value;
       }
     };
     setFieldValue("firstName", "");
@@ -354,9 +379,7 @@ export function AdminBookingsClient() {
   }, []);
 
   const applyMatchedCustomerToDialog = useCallback((customer: BookingMatchedCustomer) => {
-    if (!customer || !dialogForm) {
-      return;
-    }
+    if (!customer || !dialogForm) return;
     const fullNameParts = String(customer.fullName || "").trim().split(/\s+/).filter(Boolean);
     const firstNameFallback = fullNameParts[0] || "";
     const lastNameFallback = fullNameParts.slice(1).join(" ");
@@ -384,14 +407,13 @@ export function AdminBookingsClient() {
   }, [dialogForm]);
 
   const openMatchedCustomer = useCallback(async () => {
-    if (!matchedDialogCustomer?.id) {
-      return;
-    }
+    if (!matchedDialogCustomer?.id) return;
     await closeDialog();
     router.push(`/admin/customers?customerId=${matchedDialogCustomer.id}&open=true`);
   }, [closeDialog, matchedDialogCustomer, router]);
 
-  // Action Logic
+  // ACTION LOGIC: Wrappers around API hooks with state management and user feedback
+  
   async function saveBooking() {
     const event = events.find(e => e.id === selectedKey);
     if (!selectedKey || !dialogForm || !event) return;
@@ -449,6 +471,7 @@ export function AdminBookingsClient() {
     }
   }
 
+  /** logic for resolving manual booking with potential duplicates. */
   async function addManualBooking(resolution?: "use_existing" | "update_existing" | "create_new") {
     if (!manualFormRef.current) return;
     setBusyAction("create");
@@ -515,7 +538,7 @@ export function AdminBookingsClient() {
     
     if (success) {
       setNotice(`Booking ${action}ed.`);
-      if (action === 'approve' || action === 'reject') {
+      if (action === "approve" || action === "reject") {
         void closeDialog();
       }
       void loadBookings(view, dateStr);
@@ -524,10 +547,10 @@ export function AdminBookingsClient() {
 
   const rangeLabel = useMemo(() => {
     const d = parseISO(dateStr);
-    if (view === 'day') return format(d, 'EEEE, d MMMM yyyy');
-    if (view === 'week') return `Week of ${format(startOfWeek(d, { weekStartsOn: 1 }), 'd MMMM yyyy')}`;
-    if (view === 'month') return format(d, 'MMMM yyyy');
-    return format(d, 'yyyy');
+    if (view === "day") return format(d, "EEEE, d MMMM yyyy");
+    if (view === "week") return `Week of ${format(startOfWeek(d, { weekStartsOn: 1 }), "d MMMM yyyy")}`;
+    if (view === "month") return format(d, "MMMM yyyy");
+    return format(d, "yyyy");
   }, [view, dateStr]);
 
   function startOfWeek(date: Date, options: { weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 }) {
@@ -562,16 +585,16 @@ export function AdminBookingsClient() {
           <div className="admin-range-actions">
             <div className="site-nav admin-range-view-nav">
               <Tooltip content="Switch to a single-day booking timeline.">
-                <button className={`btn ${view === 'day' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => navigate('day', dateStr)}>DAY</button>
+                <button className={`btn ${view === "day" ? "btn-primary" : "btn-secondary"}`} onClick={() => navigate("day", dateStr)}>DAY</button>
               </Tooltip>
               <Tooltip content="Switch to week view for lesson planning.">
-                <button className={`btn ${view === 'week' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => navigate('week', dateStr)}>WEEK</button>
+                <button className={`btn ${view === "week" ? "btn-primary" : "btn-secondary"}`} onClick={() => navigate("week", dateStr)}>WEEK</button>
               </Tooltip>
               <Tooltip content="Switch to month view for broader scheduling.">
-                <button className={`btn ${view === 'month' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => navigate('month', dateStr)}>MONTH</button>
+                <button className={`btn ${view === "month" ? "btn-primary" : "btn-secondary"}`} onClick={() => navigate("month", dateStr)}>MONTH</button>
               </Tooltip>
               <Tooltip content="Switch to year view for long-range planning.">
-                <button className={`btn ${view === 'year' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => navigate('year', dateStr)}>YEAR</button>
+                <button className={`btn ${view === "year" ? "btn-primary" : "btn-secondary"}`} onClick={() => navigate("year", dateStr)}>YEAR</button>
               </Tooltip>
             </div>
             <div className="admin-range-divider" />
@@ -616,6 +639,39 @@ export function AdminBookingsClient() {
           hasHeuristicMatch={hasHeuristicMatch && !dialogMatchDismissed}
           onApplyMatchedCustomer={() => matchedDialogCustomer && applyMatchedCustomerToDialog(matchedDialogCustomer)}
           onOpenMatchedCustomer={() => void openMatchedCustomer()}
+          onOpenInvoice={async () => {
+            const event = selectedEvent;
+            if (!event || event.entityType !== "booking") return;
+            const lessonPreset = presets.find((p) => `${p.label} ${p.description}`.toLowerCase().includes("lesson")) || presets[0] || null;
+            setBusyAction("invoice");
+            try {
+              const res = await fetch(`/api/admin/bookings/${event.id}/invoice`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  lineItems: [{
+                    description: lessonPreset?.description || lessonPreset?.label || "Standard Lesson Fee",
+                    quantity: 1,
+                    unitPriceCents: lessonPreset?.unitPriceCents ?? 6000,
+                    kind: "lesson_fee"
+                  }]
+                })
+              });
+              if (!res.ok) {
+                const p = await res.json().catch(() => null);
+                setError(p?.error || "Unable to create invoice draft.");
+                return;
+              }
+              const p = await res.json();
+              setNotice("Draft invoice created.");
+              await closeDialog();
+              router.push(`/admin/invoices?openInvoiceId=${encodeURIComponent(p?.invoice?.id)}`);
+            } catch {
+              setError("Network error creating invoice draft.");
+            } finally {
+              setBusyAction(null);
+            }
+          }}
           onDismissMatchedCustomer={() => setDialogMatchDismissed(true)}
           emailHistory={emailHistory}
           loadingEmailHistory={loadingEmailHistory}
@@ -629,57 +685,6 @@ export function AdminBookingsClient() {
           onSyncEmail={() => selectedKey && syncEmailApi(selectedKey)}
           onPerformAction={performAction}
           onOpenMaterials={openMaterialsDialog}
-          onOpenInvoice={async () => {
-            const event = selectedEvent;
-            if (!event || event.entityType !== "booking") {
-              return;
-            }
-
-            const lessonPreset = presets.find((preset) => {
-              const blob = `${preset.label} ${preset.description}`.toLowerCase();
-              return blob.includes("lesson");
-            }) || presets[0] || null;
-
-            setBusyAction("invoice");
-            setError("");
-            try {
-              const response = await fetch(`/api/admin/bookings/${event.id}/invoice`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  lineItems: [
-                    {
-                      description: lessonPreset?.description || lessonPreset?.label || "Standard Lesson Fee",
-                      quantity: 1,
-                      unitPriceCents: lessonPreset?.unitPriceCents ?? 6000,
-                      kind: "lesson_fee"
-                    }
-                  ]
-                })
-              });
-
-              if (!response.ok) {
-                const payload = await response.json().catch(() => null);
-                setError(payload?.error || "Unable to create invoice draft for this booking.");
-                return;
-              }
-
-              const payload = await response.json();
-              const createdInvoiceId = payload?.invoice?.id as string | undefined;
-              if (!createdInvoiceId) {
-                setError("Invoice draft was created but could not be opened.");
-                return;
-              }
-
-              setNotice("Draft invoice created from booking.");
-              await closeDialog();
-              router.push(`/admin/invoices?openInvoiceId=${encodeURIComponent(createdInvoiceId)}`);
-            } catch {
-              setError("Network error while creating invoice draft.");
-            } finally {
-              setBusyAction(null);
-            }
-          }}
         />
       )}
 
@@ -689,15 +694,11 @@ export function AdminBookingsClient() {
           onClose={() => setIsMoveOpen(false)}
           title="Move Lesson Time"
           footer={
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
-              <Tooltip content="Close this dialog without changing the booking time.">
-                <button className="btn btn-secondary" onClick={() => setIsMoveOpen(false)}>CANCEL</button>
-              </Tooltip>
-              <Tooltip content="Apply the new lesson start time for this booking.">
-                <button className="btn btn-primary" disabled={!!busyAction} onClick={moveBooking}>
-                  {busyAction === 'move' ? 'MOVING...' : 'CONFIRM MOVE'}
-                </button>
-              </Tooltip>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", width: "100%" }}>
+              <button className="btn btn-secondary" onClick={() => setIsMoveOpen(false)}>CANCEL</button>
+              <button className="btn btn-primary" disabled={!!busyAction} onClick={moveBooking}>
+                {busyAction === "move" ? "MOVING..." : "CONFIRM MOVE"}
+              </button>
             </div>
           }
         >

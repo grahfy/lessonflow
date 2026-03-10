@@ -1,9 +1,20 @@
-// Prisma schema for the LessonFlow app.
-// Production and test workflows now target MySQL (`provider = "mysql"`), so
-// helper scripts should provide a mysql:// DATABASE_URL for Prisma commands.
-// Historical migration note: a baseline migration was added for fresh MySQL
-// databases; existing databases may need `prisma migrate resolve --applied`
-// rather than executing baseline SQL directly.
+/**
+ * LessonFlow Database Schema
+ * 
+ * Powered by Prisma with a MySQL/MariaDB provider.
+ * 
+ * ARCHITECTURAL PRINCIPLES:
+ * 1. Request/Booking Separation: Incoming leads (Requests) are kept distinct 
+ *    from confirmed schedule slots (Bookings) to maintain a clean calendar.
+ * 2. Financial Immutability: Invoices denormalize customer data (name, email, 
+ *    ABN) at the time of creation so historical documents remain legally 
+ *    accurate even if a student's profile is updated later.
+ * 3. Audit Trails: All critical entities (Bookings, Invoices, Credentials) 
+ *    feature append-only audit log tables for accountability.
+ * 4. Soft Deletion: Financial records use `isDeleted` or `isArchived` flags 
+ *    rather than hard deletes to preserve reporting integrity.
+ */
+
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -11,6 +22,7 @@ generator client {
 
 datasource db {
   provider = "mysql"
+  url      = env("DATABASE_URL")
 }
 
 enum LessonMode {
