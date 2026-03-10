@@ -2124,14 +2124,21 @@ write_latest_deploy_update_metadata() {
 
     mkdir -p "$(dirname "${output_file}")"
 
+    local env_cron_secret="${CRON_SECRET:-}"
+    local env_site_url="${NEXT_PUBLIC_SITE_URL:-}"
+    if [[ -f "${SHARED_DIR}/.env" ]]; then
+        [[ -z "${env_cron_secret}" ]] && env_cron_secret="$(read_env_file_value "${SHARED_DIR}/.env" "CRON_SECRET" || true)"
+        [[ -z "${env_site_url}" ]] && env_site_url="$(read_env_file_value "${SHARED_DIR}/.env" "NEXT_PUBLIC_SITE_URL" || true)"
+    fi
+
     DEPLOY_UPDATE_REPO_ROOT="${repo_root}" \
     DEPLOY_UPDATE_OUTPUT_FILE="${output_file}" \
     DEPLOY_UPDATE_COMMIT="${commit_hash}" \
     DEPLOY_UPDATE_PREVIOUS_COMMIT="${previous_commit}" \
     DEPLOY_UPDATE_RELEASE="${release_id}" \
     DEPLOY_UPDATE_BRANCH="${branch_name}" \
-    DEPLOY_UPDATE_CRON_SECRET="${CRON_SECRET:-}" \
-    DEPLOY_UPDATE_SITE_URL="${NEXT_PUBLIC_SITE_URL:-}" \
+    DEPLOY_UPDATE_CRON_SECRET="${env_cron_secret}" \
+    DEPLOY_UPDATE_SITE_URL="${env_site_url}" \
     node <<'NODE'
 const fs = require("node:fs");
 const path = require("node:path");
