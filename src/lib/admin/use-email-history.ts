@@ -28,14 +28,13 @@ export interface UseEmailHistoryResult {
     sending: boolean;
     syncing: boolean;
     load: (customerId: string) => Promise<void>;
-    send: (customerId: string, subject: string, message: string) => Promise<boolean>;
-    sync: (customerId: string) => Promise<boolean>;
+    send: (customerId: string, subject: string, message: string, captcha?: { captchaToken: string; captchaAnswer: string }) => Promise<boolean>;
 }
 
-/**
- * Hook to manage email communication history and sending for customers.
- */
-export function useEmailHistory(options: UseEmailHistoryOptions = {}): UseEmailHistoryResult {
+    /**
+    * Hook to manage email communication history and sending for customers.
+    */
+    export function useEmailHistory(options: UseEmailHistoryOptions = {}): UseEmailHistoryResult {
     const { onAuthError, onError } = options;
     const [history, setHistory] = useState<ReadonlyArray<EmailRecord>>([]);
     const [loading, setLoading] = useState(false);
@@ -59,13 +58,13 @@ export function useEmailHistory(options: UseEmailHistoryOptions = {}): UseEmailH
         }
     }, [safeFetch]);
 
-    const send = useCallback(async (customerId: string, subject: string, message: string): Promise<boolean> => {
+    const send = useCallback(async (customerId: string, subject: string, message: string, captcha?: { captchaToken: string; captchaAnswer: string }): Promise<boolean> => {
         setSending(true);
         try {
             const response = await safeFetch(`/api/admin/customers/${customerId}/email`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ subject, message })
+                body: JSON.stringify({ subject, message, ...captcha })
             });
 
             if (!response.ok) {

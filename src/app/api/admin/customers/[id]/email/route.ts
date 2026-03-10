@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
+import { verifyCaptchaSubmission } from "@/lib/captcha";
 import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/email/service";
 import { customerCustomMessageTemplate } from "@/lib/email/templates";
@@ -15,7 +16,9 @@ type Params = {
 
 const sendEmailSchema = z.object({
   subject: z.string().trim().min(1).max(200),
-  message: z.string().trim().min(1).max(4000)
+  message: z.string().trim().min(1).max(4000),
+  captchaToken: z.string().optional(),
+  captchaAnswer: z.string().optional()
 });
 
 /**
@@ -77,6 +80,18 @@ export async function POST(request: NextRequest, { params }: Params) {
     const parsed = sendEmailSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid email payload.", details: parsed.error.flatten() }, { status: 400 });
+    }
+
+    // CAPTCHA verification — enforced in production to add defence-in-depth on top of
+    // session authentication. Dev/test environments bypass this to keep workflows fast.
+    if (process.env.NODE_ENV !== "test" && process.env.NODE_ENV !== "development") {
+      const captchaResult = verifyCaptchaSubmission({
+        captchaToken: parsed.data.captchaToken || "",
+        captchaAnswer: parsed.data.captchaAnswer || ""
+      });
+      if (!captchaResult.ok) {
+        return NextResponse.json({ error: captchaResult.message, code: captchaResult.code }, { status: 400 });
+      }
     }
 
     const template = customerCustomMessageTemplate({
