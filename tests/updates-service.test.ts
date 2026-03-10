@@ -7,19 +7,24 @@ vi.mock("node:child_process", () => ({
   exec: vi.fn()
 }));
 
+// Mock util.promisify to return the exec mock directly
+vi.mock("node:util", () => ({
+  promisify: vi.fn((fn) => fn)
+}));
+
 describe("updates-service", () => {
   describe("getUpdateStatus", () => {
     it("returns updateAvailable: true when remote has new commits", async () => {
       // Mock git rev-parse HEAD (local) and git rev-parse origin/main (remote)
-      // We'll mock exec to return different SHAs
-      (exec as any).mockImplementation((cmd: string, callback: any) => {
+      (exec as any).mockImplementation((cmd: string) => {
         if (cmd.includes("rev-parse HEAD")) {
-          callback(null, { stdout: "local-sha\n" });
+          return Promise.resolve({ stdout: "local-sha\n" });
         } else if (cmd.includes("rev-parse origin/main")) {
-          callback(null, { stdout: "remote-sha\n" });
+          return Promise.resolve({ stdout: "remote-sha\n" });
         } else if (cmd.includes("fetch")) {
-          callback(null, { stdout: "" });
+          return Promise.resolve({ stdout: "" });
         }
+        return Promise.resolve({ stdout: "" });
       });
 
       const status = await getUpdateStatus(true);
@@ -29,14 +34,15 @@ describe("updates-service", () => {
     });
 
     it("returns updateAvailable: false when local and remote SHAs match", async () => {
-      (exec as any).mockImplementation((cmd: string, callback: any) => {
+      (exec as any).mockImplementation((cmd: string) => {
         if (cmd.includes("rev-parse HEAD")) {
-          callback(null, { stdout: "same-sha\n" });
+          return Promise.resolve({ stdout: "same-sha\n" });
         } else if (cmd.includes("rev-parse origin/main")) {
-          callback(null, { stdout: "same-sha\n" });
+          return Promise.resolve({ stdout: "same-sha\n" });
         } else if (cmd.includes("fetch")) {
-          callback(null, { stdout: "" });
+          return Promise.resolve({ stdout: "" });
         }
+        return Promise.resolve({ stdout: "" });
       });
 
       const status = await getUpdateStatus(true);
@@ -51,10 +57,11 @@ describe("updates-service", () => {
         "hash2|Author Two|2026-03-09|Message two"
       ].join("\n");
 
-      (exec as any).mockImplementation((cmd: string, callback: any) => {
+      (exec as any).mockImplementation((cmd: string) => {
         if (cmd.includes("log")) {
-          callback(null, { stdout: mockLogOutput + "\n" });
+          return Promise.resolve({ stdout: mockLogOutput + "\n" });
         }
+        return Promise.resolve({ stdout: "" });
       });
 
       const commits = await getPendingCommits("local-sha", "remote-sha");

@@ -34,27 +34,13 @@ export function UpdateNotificationBanner() {
 
   return (
     <>
-      <div 
-        className="notice" 
-        style={{ 
-          background: 'linear-gradient(90deg, var(--brand-0), var(--brand-1))',
-          color: 'white',
-          padding: '12px 20px',
-          borderRadius: 'var(--radius-md)',
-          margin: '0 0 20px 0',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-        }}
-      >
-        <span style={{ fontWeight: 600 }}>
+      <div className="update-available-banner">
+        <span>
           🚀 A new version of LessonFlow is available ({status.pendingCommits.length} new commit{status.pendingCommits.length === 1 ? "" : "s"}).
         </span>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button 
-            className="btn btn-secondary" 
-            style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)', color: 'white' }}
+            className="btn update-banner-button" 
             onClick={() => setShowModal(true)}
           >
             View Changes
