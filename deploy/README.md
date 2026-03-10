@@ -10,7 +10,7 @@ Complete guide for deploying to a Virtual Private Server.
 4. [Database Setup](#database-setup)
 5. [Application Deployment](#application-deployment)
 6. [SSL Certificate](#ssl-certificate)
-7. [Cron Jobs](#cron-jobs)
+7. [Scheduled Jobs](#scheduled-jobs-systemd-timers)
 8. [Monitoring & Logs](#monitoring--logs)
 9. [Troubleshooting](#troubleshooting)
 
@@ -443,11 +443,6 @@ sudo certbot renew --dry-run
 ```
 
 ---
-
-## Cron Jobs
-
-Deploys now install/update a managed root crontab block automatically (via `deploy/deploy.sh`),
-including digest, reminder, and admin report jobs. You can still inspect/edit the crontab manually:
 
 ## Scheduled Jobs (Systemd Timers)
 

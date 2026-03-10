@@ -21,6 +21,13 @@ It is designed for self-hosted operations where a small team needs one system fo
 - **White-label CMS:** Dynamic control over public page content, branding, and SEO metadata via admin settings.
 - **Automatic Geo-detection:** Intelligent request country resolution for localized student and admin context.
 - **In-app Manual:** Comprehensive searchable operator manual (`/admin/manual`) synchronized with repository documentation.
+- **Gift Vouchers:** Public-facing voucher sales page with digital delivery and GiftUp integration.
+- **Video Showcase:** Public media page displaying teacher performance videos and original music.
+- **Terms & Conditions:** Dedicated public page for voucher and service terms.
+- **System Logs:** Admin-accessible diagnostic logs for troubleshooting (`/admin/system-logs`).
+- **CAPTCHA Protection:** SVG-based verification for admin email actions on booking requests.
+- **Modernized Scheduling:** Replaced legacy cron with systemd timers for reliable scheduled jobs.
+- **Enhanced Admin UX:** Mobile-friendly layouts, table pagination, inline tooltips, and improved dialog designs.
 
 ## Documentation Map
 
@@ -104,20 +111,20 @@ npm run prisma:studio    # Open database explorer
 ## Important Routes
 
 Public:
-- `/` (Home), `/lessons`, `/contact`, `/book` (Booking request)
+- `/` (Home), `/lessons`, `/teacher`, `/vouchers`, `/videos`, `/contact`, `/book` (Booking request), `/terms`
 
 Admin:
-- `/admin/login`, `/admin/bookings`, `/admin/customers`, `/admin/invoices`, `/admin/settings`, `/admin/manual`
+- `/admin/login`, `/admin/bookings`, `/admin/customers`, `/admin/invoices`, `/admin/reports`, `/admin/settings`, `/admin/manual`, `/admin/system-logs`, `/admin/updates`
 
 Student:
-- `/student/login`, `/student/portal`
+- `/student/login`, `/student/portal`, `/student/materials`
 
 ## Deploy & Maintenance Scripts
 
 Located in [`deploy/`](deploy/), these scripts handle the server lifecycle:
 
 - **`setup-packages.sh`**: One-time server bootstrap. Detects OS and installs all dependencies.
-- **`deploy.sh`**: The core release engine. Handles builds, migrations, Nginx sync, and crontab updates.
+- **`deploy.sh`**: The core release engine. Handles builds, migrations, Nginx sync, and systemd timer setup.
   - `sudo ./deploy/deploy.sh --interactive` (Recommended for first-time or manual deploys)
   - `sudo ./deploy/deploy.sh --rollback` (Instant zero-downtime rollback to previous release)
 - **`update.sh`**: Wrapper for `git pull` + `deploy.sh`. Used for routine updates.
@@ -125,7 +132,7 @@ Located in [`deploy/`](deploy/), these scripts handle the server lifecycle:
 - **`setup-ssl.sh`**: Automates Let's Encrypt certificate acquisition and Nginx SSL config.
 - **`maintenance.sh`**: Operational upkeep, cache cleaning, and service restarts.
 - **`backup.sh`**: Database and application data backup helper.
-- **`cron.sh`**: The entrypoint for all scheduled jobs (reminders, digests, reports).
+- **`cron.sh`**: The entrypoint for scheduled jobs using systemd timers (reminders, digests, reports).
 
 ## Whitelabel and Branding
 
