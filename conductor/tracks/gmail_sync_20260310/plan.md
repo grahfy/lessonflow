@@ -38,10 +38,10 @@ Implement the logic to pull sent items from Gmail.
 - [x] Task: Create background job route `src/app/api/jobs/gmail-sync/route.ts`. [88a704a]
 - [x] Task: Conductor - User Manual Verification 'Phase 4: Background Synchronization' (Protocol in workflow.md)
 
-## Phase 5: UI & Visibility
+## Phase 5: UI & Visibility [checkpoint: 3becb57]
 Expose the new information in the admin dashboard.
 
 - [x] Task: Update Email History UI to show provider/source labels. [d400e95]
 - [x] Task: Add "Sync Now" button to Email History view. [322fc33]
 - [x] Task: Add Gmail connection status to Admin Settings. [a7a00ae]
-- [ ] Task: Conductor - User Manual Verification 'Phase 5: UI & Visibility' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 5: UI & Visibility' (Protocol in workflow.md)
