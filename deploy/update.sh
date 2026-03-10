@@ -1080,11 +1080,56 @@ install_systemd_timers_from_update() {
     fi
   done
 
+  # Remove legacy cron entries to avoid duplicate job execution
+  remove_legacy_cron_entries_from_update
+
   # Show timer status
   log_info "Timer status summary:"
   run_server_setup_cmd systemctl list-timers "${timer_names[@]/%/.timer}" 2>/dev/null || true
 
   return 0
+}
+
+# Removes legacy managed cron entries from root crontab to prevent duplicate
+# job execution after migrating to systemd timers.
+remove_legacy_cron_entries_from_update() {
+  if ! command -v crontab >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local begin_marker="# BEGIN LESSONFLOW_MANAGED_CRON"
+  local end_marker="# END LESSONFLOW_MANAGED_CRON"
+  local legacy_begin="# BEGIN MELBOURNE_GUITAR_SCHOOL_MANAGED_CRON"
+  local legacy_end="# END MELBOURNE_GUITAR_SCHOOL_MANAGED_CRON"
+  local existing=""
+  local stripped=""
+
+  existing="$(run_server_setup_cmd crontab -l 2>/dev/null || true)"
+
+  # Check if there are any managed entries to remove
+  if ! printf '%s\n' "${existing}" | grep -qE "^(# BEGIN (LESSONFLOW|MELBOURNE_GUITAR_SCHOOL)_MANAGED_CRON|# END (LESSONFLOW|MELBOURNE_GUITAR_SCHOOL)_MANAGED_CRON|.*lessonflow.*/deploy/cron\.sh|.*melbourne-guitar-school.*/deploy/cron\.sh)"; then
+    log_info "No legacy cron entries found; skipping cleanup"
+    return 0
+  fi
+
+  # Strip both new and legacy blocks
+  stripped="$(printf '%s\n' "${existing}" | awk -v b1="${begin_marker}" -v e1="${end_marker}" -v b2="${legacy_begin}" -v e2="${legacy_end}" '
+    $0 == b1 || $0 == b2 { skip=1; next }
+    $0 == e1 || $0 == e2 { skip=0; next }
+    !skip { print }
+  ' | sed '/\/var\/www\/melbourne-guitar-school\/current\/deploy\/cron\.sh/d' | sed '/\/var\/www\/lessonflow\/current\/deploy\/cron\.sh/d')"
+
+  # Write back the cleaned crontab
+  local tmp_file
+  tmp_file="$(mktemp)"
+  printf '%s\n' "${stripped}" > "${tmp_file}"
+
+  if run_server_setup_cmd crontab "${tmp_file}" 2>/dev/null; then
+    log_info "Removed legacy cron entries (migrated to systemd timers)"
+  else
+    log_warn "Failed to update crontab; legacy entries may remain"
+  fi
+  rm -f "${tmp_file}"
 }
 
 # Restarts cron/crond after crontab changes so hosts that rely on service
