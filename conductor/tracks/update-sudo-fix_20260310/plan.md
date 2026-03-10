@@ -1,9 +1,9 @@
 # Implementation Plan: update_permissions_sudo_fix
 
-## Phase 1: Research and Analysis
-- [ ] Task: Analyze current `deploy/update.sh` and identifying `sudo` usage.
-- [ ] Task: Map out required directory permissions for the deployment user.
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Research and Analysis' (Protocol in workflow.md)
+## Phase 1: Research and Analysis [checkpoint: 0186dd4]
+- [x] Task: Analyze current `deploy/update.sh` and identifying `sudo` usage.
+- [x] Task: Map out required directory permissions for the deployment user.
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Research and Analysis' (Protocol in workflow.md)
 
 ## Phase 2: Permission and Ownership Updates
 - [ ] Task: Implement updates to directory ownership for deployment targets.
