@@ -18,9 +18,10 @@
  * - GMAIL_USER_EMAIL: The Gmail address to send from (e.g., lessonflow@gmail.com)
  */
 
-import { google, Auth } from "googleapis";
+import { google } from "googleapis";
 import { prisma } from "@/lib/db";
 import { logError, logEvent } from "@/lib/observability";
+import { getGmailClient } from "@/lib/gmail/client";
 
 type SendEmailInput = {
   to: string;
@@ -39,8 +40,6 @@ type SendEmailResult = {
   error?: string;
 };
 
-let authClient: Auth.OAuth2Client | null = null;
-
 /**
  * Checks if Gmail API is configured with all required credentials.
  */
@@ -51,33 +50,6 @@ export function isGmailConfigured(): boolean {
     process.env.GMAIL_REFRESH_TOKEN &&
     process.env.GMAIL_USER_EMAIL
   );
-}
-
-/**
- * Gets or creates an authenticated OAuth2 client for Gmail API.
- * Uses the refresh token to automatically refresh expired access tokens.
- */
-function getAuthClient() {
-  if (!isGmailConfigured()) {
-    return null;
-  }
-
-  if (!authClient) {
-    const { GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN } = process.env;
-
-    authClient = new google.auth.OAuth2(
-      GMAIL_CLIENT_ID!,
-      GMAIL_CLIENT_SECRET!,
-      // No redirect URI is needed at runtime because we only use the stored refresh token.
-    );
-
-    // The Google client will automatically refresh short-lived access tokens from this refresh token.
-    authClient.setCredentials({
-      refresh_token: GMAIL_REFRESH_TOKEN!,
-    });
-  }
-
-  return authClient;
 }
 
 /**
@@ -150,9 +122,7 @@ function encodeEmailMessage(
 }
 
 export async function sendGmailEmail(input: SendEmailInput): Promise<SendEmailResult> {
-  const auth = getAuthClient();
-  
-  if (!auth) {
+  if (!isGmailConfigured()) {
     return {
       status: "queued_no_smtp",
       error: "Gmail API is not configured. Missing required environment variables."
@@ -162,7 +132,7 @@ export async function sendGmailEmail(input: SendEmailInput): Promise<SendEmailRe
   const from = process.env.GMAIL_USER_EMAIL!;
   const rawMessage = encodeEmailMessage(from, input.to, input.bcc, input.subject, input.html, input.attachments);
 
-  const gmail = google.gmail({ version: "v1", auth });
+  const gmail = getGmailClient();
 
   try {
     const response = await gmail.users.messages.send({
@@ -178,7 +148,10 @@ export async function sendGmailEmail(input: SendEmailInput): Promise<SendEmailRe
         toEmail: input.to,
         subject: input.subject,
         htmlBody: input.html,
-        status: "sent"
+        status: "sent",
+        provider: "gmail",
+        externalId: response.data.id,
+        source: "app"
       },
     });
 
@@ -197,6 +170,8 @@ export async function sendGmailEmail(input: SendEmailInput): Promise<SendEmailRe
         subject: input.subject,
         htmlBody: input.html,
         status: "failed",
+        provider: "gmail",
+        source: "app",
         error: message,
       },
     });
@@ -211,14 +186,12 @@ export async function sendGmailEmail(input: SendEmailInput): Promise<SendEmailRe
  * Useful for verifying the OAuth2 setup is working.
  */
 export async function getGmailUserProfile(): Promise<string | null> {
-  const auth = getAuthClient();
-  
-  if (!auth) {
+  if (!isGmailConfigured()) {
     return null;
   }
 
   try {
-    const gmail = google.gmail({ version: "v1", auth });
+    const gmail = getGmailClient();
     // Lightweight support probe used to verify OAuth configuration without sending an email.
     const profile = await gmail.users.getProfile({ userId: "me" });
     return profile.data.emailAddress || null;
