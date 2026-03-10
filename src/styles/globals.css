@@ -2458,6 +2458,13 @@ h1 {
 
 .admin-header-nav {
   display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.admin-header-nav-primary {
+  display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
@@ -2466,6 +2473,7 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  margin-left: auto;
 }
 
 .admin-header-menu-toggle {
@@ -4961,7 +4969,15 @@ h1 {
     background: rgba(255, 255, 255, 0.04);
   }
 
-  .admin-header-nav.is-open .btn {
+  .admin-header-nav.is-open .btn,
+  .admin-header-nav.is-open .admin-header-nav-primary .btn {
+    width: 100%;
+  }
+
+  .admin-header-nav-primary {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
     width: 100%;
   }
 

@@ -159,5 +159,19 @@ test.describe("admin mobile responsiveness", () => {
     ).toBeGreaterThanOrEqual(canScrollSettings.viewportHeight);
     expect(canScrollSettings.end, "Settings page should support downward scrolling on mobile.").toBeGreaterThanOrEqual(canScrollSettings.start);
     await assertNoHorizontalOverflow(page, "/admin/settings scroll state");
+
+    // Verify Latest Updates and Sign Out are in the mobile menu
+    await page.goto("/admin/bookings", { waitUntil: "domcontentloaded" });
+    const toggle = page.getByRole("button", { name: /^menu$/i }).first();
+    await toggle.click();
+    
+    const navPanel = page.locator("#admin-header-menu-panel");
+    await expect(navPanel).toBeVisible();
+    
+    const latestUpdatesBtn = navPanel.getByRole("button", { name: /latest updates/i });
+    const signOutBtn = navPanel.getByRole("button", { name: /sign out/i });
+    
+    await expect(latestUpdatesBtn).toBeVisible();
+    await expect(signOutBtn).toBeVisible();
   });
 });

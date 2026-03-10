@@ -50,34 +50,36 @@ export function AdminHeader({ title }: AdminHeaderProps) {
           className={`admin-header-nav ${menuOpen ? "is-open" : ""}`}
           aria-hidden={!menuOpen}
         >
-          {ADMIN_NAV_ITEMS.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <Tooltip key={item.href} content={item.tooltip}>
-                <button
-                  className={`btn ${isActive ? "btn-primary" : "btn-secondary"}`}
-                  type="button"
-                  onClick={() => router.push(item.href)}
-                >
-                  {item.label}
-                </button>
-              </Tooltip>
-            );
-          })}
-        </div>
+          <div className="admin-header-nav-primary">
+            {ADMIN_NAV_ITEMS.map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <Tooltip key={item.href} content={item.tooltip}>
+                  <button
+                    className={`btn ${isActive ? "btn-primary" : "btn-secondary"}`}
+                    type="button"
+                    onClick={() => router.push(item.href)}
+                  >
+                    {item.label}
+                  </button>
+                </Tooltip>
+              );
+            })}
+          </div>
 
-        <div className="admin-header-quick-actions">
-          <AdminDeployUpdatesButton />
-          <Tooltip content="Sign out of the admin console.">
-            <button
-              className="btn btn-secondary"
-              type="button"
-              data-motion-item="admin-logout"
-              onClick={() => void logout()}
-            >
-              Sign out
-            </button>
-          </Tooltip>
+          <div className="admin-header-quick-actions">
+            <AdminDeployUpdatesButton />
+            <Tooltip content="Sign out of the admin console.">
+              <button
+                className="btn btn-secondary"
+                type="button"
+                data-motion-item="admin-logout"
+                onClick={() => void logout()}
+              >
+                Sign out
+              </button>
+            </Tooltip>
+          </div>
         </div>
       </div>
     </div>
