@@ -625,22 +625,8 @@ edit_shared_env_now() {
 }
 
 maybe_edit_shared_env_before_deploy() {
-  local source_path="$1"
-  local shared_env_path="${SHARED_DIR}/.env"
-
-  [[ "${IS_TTY}" == true ]] || return 0
-  [[ -f "${shared_env_path}" ]] || return 0
-
-  if path_is_within_deploy_dir "${source_path}"; then
-    return 0
-  fi
-
-  log_warn "Repository is outside ${DEPLOY_DIR}; review shared .env before deploying."
-  if ! prompt_yes_no "Open ${shared_env_path} in an editor now?" "y"; then
-    return 0
-  fi
-
-  edit_shared_env_now || true
+  # Bypassed: Users can still edit the .env via the TUI menu if desired
+  return 0
 }
 
 # Installs Nginx using the shared package installer in a minimal mode suitable
