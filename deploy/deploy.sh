@@ -369,6 +369,18 @@ ensure_shared_env_file() {
         log_info "Shared .env keys synchronized with template."
     fi
 
+    # Auto-generate CRON_SECRET if missing or empty
+    if ! grep -q "^[[:space:]]*CRON_SECRET=[^[:space:]]" "${shared_env_path}"; then
+        local new_secret
+        new_secret="$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)"
+        if grep -q "^[[:space:]]*CRON_SECRET=" "${shared_env_path}"; then
+            sed -i "s/^[[:space:]]*CRON_SECRET=.*/CRON_SECRET=\"${new_secret}\"/" "${shared_env_path}"
+        else
+            echo "CRON_SECRET=\"${new_secret}\"" >> "${shared_env_path}"
+        fi
+        log_info "Auto-generated CRON_SECRET in shared .env"
+    fi
+
     # Re-apply runtime ownership in case the file was previously edited as root.
     chown :www-data "${shared_env_path}" 2>/dev/null || true
     chmod 640 "${shared_env_path}" 2>/dev/null || true
