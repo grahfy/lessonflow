@@ -49,7 +49,7 @@ Implement the mechanism to safely trigger the server-side deployment script.
     - [x] Verify process locking behavior
 - [x] Task: Conductor - User Manual Verification 'Phase 3: Secure Update Trigger & Script Wrapper' (Protocol in workflow.md)
 
-## Phase 4: Progress UI & Restart Handling
+## Phase 4: Progress UI & Restart Handling [checkpoint: 4ea0496]
 Create the real-time feedback UI for the update process and handle the application restart.
 
 - [x] Task: Create `/admin/updates/progress` page
@@ -61,4 +61,4 @@ Create the real-time feedback UI for the update process and handle the applicati
     - [x] Redirect back to the dashboard once LessonFlow is back online
 - [x] Task: Final Integration & Cleanup
     - [x] Ensure `deploy/update.sh` correctly writes metadata used by the existing "Latest Updates" popup
-- [ ] Task: Conductor - User Manual Verification 'Phase 4: Progress UI & Restart Handling' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 4: Progress UI & Restart Handling' (Protocol in workflow.md)
