@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
 
     if (Array.isArray(commits) && commits.length > 0) {
       await prisma.deployCommit.createMany({
-        data: commits.map((c: any) => ({
+        data: commits.map((c: { hash: string; shortHash: string; authorName: string; authoredAt: string | Date; subject: string; body?: string | null }) => ({
           deployUpdateId: deployUpdate.id,
           hash: c.hash,
           shortHash: c.shortHash,

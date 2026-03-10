@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
         // Check if process is still alive
         process.kill(parseInt(pid, 10), 0);
         return NextResponse.json({ error: "Update already in progress." }, { status: 409 });
-      } catch (e) {
+      } catch {
         // Process is dead, stale lock
         fs.unlinkSync(lockFile);
       }

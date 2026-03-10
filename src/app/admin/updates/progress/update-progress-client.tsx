@@ -27,7 +27,7 @@ export function UpdateProgressClient() {
       try {
         const data = JSON.parse(event.data);
         setLogs((prev) => [...prev, data]);
-      } catch (err) {
+      } catch {
         setLogs((prev) => [...prev, event.data]);
       }
     };
@@ -38,8 +38,8 @@ export function UpdateProgressClient() {
       startPolling();
     });
 
-    eventSource.onerror = (err) => {
-      console.error("SSE connection error:", err);
+    eventSource.onerror = (error) => {
+      console.error("SSE connection error:", error);
       // Don't set error immediately, could be transient or restart-induced
       if (status === "restarting") {
         eventSource.close();
@@ -52,6 +52,7 @@ export function UpdateProgressClient() {
     return () => {
       eventSource.close();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMounted]);
 
   // Auto-scroll to bottom of logs
@@ -74,7 +75,7 @@ export function UpdateProgressClient() {
           }, 2000);
           return;
         }
-      } catch (e) {
+      } catch {
         // Expected failure during restart
       }
       // Retry in 3 seconds

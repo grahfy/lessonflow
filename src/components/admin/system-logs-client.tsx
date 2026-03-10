@@ -455,6 +455,7 @@ export function SystemLogsClient() {
             <label className="admin-inline-field">Screenshot (optional)</label>
             {bugScreenshot ? (
               <div style={{ position: "relative", marginTop: 6 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={bugScreenshot}
                   alt="Screenshot preview"

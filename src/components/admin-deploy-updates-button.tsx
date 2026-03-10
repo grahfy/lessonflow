@@ -1,7 +1,7 @@
 "use client";
 import { APP_TIMEZONE } from "@/lib/time";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type DeployCommitEntry = {

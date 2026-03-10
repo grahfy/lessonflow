@@ -39,8 +39,8 @@ export async function getUpdateStatus(forceFetch = false): Promise<UpdateStatus>
     // 1. Fetch latest from remote
     try {
       await execAsync("git fetch origin main", { cwd: repoPath });
-    } catch (fetchError: any) {
-      console.error(`Update check failed: git fetch failed in ${repoPath}. Ensure it is a git repository and has remote access.`, fetchError.message);
+    } catch (fetchError) {
+      console.error(`Update check failed: git fetch failed in ${repoPath}. Ensure it is a git repository and has remote access.`, (fetchError as Error).message);
       return {
         updateAvailable: false,
         localSha: "fetch-failed",

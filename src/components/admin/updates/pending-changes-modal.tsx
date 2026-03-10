@@ -29,7 +29,7 @@ export function PendingChangesModal({ commits, onClose }: PendingChangesModalPro
         setError(data.error || "Failed to trigger update.");
         setLoading(false);
       }
-    } catch (err) {
+    } catch {
       setError("A network error occurred.");
       setLoading(false);
     }
