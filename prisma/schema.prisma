@@ -523,6 +523,38 @@ model InvoiceAuditLog {
   @@index([actorId])
 }
 
+// Records of application deployments triggered via the web console or CLI.
+model DeployUpdate {
+  id             String         @id @default(cuid())
+  branch         String
+  release        String
+  appliedAt      DateTime       @default(now())
+  commit         String         @unique
+  shortCommit    String
+  previousCommit String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  commits        DeployCommit[]
+
+  @@index([appliedAt])
+}
+
+// Individual git commit metadata included in a specific deployment.
+model DeployCommit {
+  id             String       @id @default(cuid())
+  deployUpdateId String
+  deployUpdate   DeployUpdate @relation(fields: [deployUpdateId], references: [id], onDelete: Cascade)
+  hash           String
+  shortHash      String
+  authorName     String
+  authoredAt     DateTime
+  subject        String       @db.Text
+  body           String?      @db.Text
+  createdAt      DateTime     @default(now())
+
+  @@index([deployUpdateId])
+}
+
 // Application system logs for diagnostic and troubleshooting purposes.
 model SystemLog {
   id        String   @id @default(cuid())

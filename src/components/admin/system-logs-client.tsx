@@ -133,7 +133,7 @@ export function SystemLogsClient() {
   );
 
   return (
-    <AdminShell title="System Logs" notice={notice} error={error}>
+    <AdminShell title="System Logs" notice={notice} error={error} className="admin-shell-logs">
       <div className="admin-layout-content">
         <div className="admin-actions-bar">
           <div className="flex gap-2">
@@ -209,8 +209,8 @@ export function SystemLogsClient() {
           }}
         >
           {logs.map((log) => (
-            <div key={log.id} className="invoice-row-item cursor-default hover:bg-slate-50/50">
-              <div className="admin-list-cell text-slate-500 text-xs" style={{ width: '180px' }}>
+            <div key={log.id} className="invoice-row-item invoice-table-row cursor-default hover:bg-slate-50/50">
+              <div className="admin-list-cell text-slate-500 text-xs" style={{ width: '180px', flexShrink: 0 }}>
                 <span className="admin-mobile-label">Timestamp</span>
                 {new Date(log.createdAt).toLocaleString("en-AU", { 
                   day: '2-digit', 
@@ -223,7 +223,7 @@ export function SystemLogsClient() {
               </div>
 
               <Separator />
-              <div className="admin-list-cell" style={{ width: '100px' }}>
+              <div className="admin-list-cell" style={{ width: '100px', flexShrink: 0 }}>
                 <span className="admin-mobile-label">Level</span>
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${getLevelStyles(log.level)}`}>
                   {getLevelIcon(log.level)}
@@ -232,24 +232,24 @@ export function SystemLogsClient() {
               </div>
 
               <Separator />
-              <div className="admin-list-cell font-medium text-slate-900" style={{ width: '200px' }}>
+              <div className="admin-list-cell font-medium text-slate-200" style={{ width: '200px', flexShrink: 0 }}>
                 <span className="admin-mobile-label">Event</span>
                 {log.event}
               </div>
 
               <Separator />
-              <div className="admin-list-cell" style={{ flex: 1 }}>
+              <div className="admin-list-cell" style={{ flex: 1, minWidth: 0 }}>
                 <span className="admin-mobile-label">Message</span>
-                <div className="w-full">
+                <div className="w-full overflow-hidden">
                   <p 
-                    className="text-slate-600 text-xs break-all line-clamp-2" 
-                    style={{ fontFamily: 'monospace' }}
+                    className="text-slate-400 text-xs whitespace-nowrap overflow-hidden text-ellipsis" 
+                    style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace' }}
                     title={log.message}
                   >
                     {log.message}
                   </p>
                   {log.meta && Object.keys(log.meta).length > 0 && (
-                    <div className="mt-1 text-[9px] text-slate-400 font-mono overflow-hidden text-ellipsis whitespace-nowrap opacity-60">
+                    <div className="mt-1 text-[9px] text-slate-500 font-mono overflow-hidden text-ellipsis whitespace-nowrap opacity-60">
                       {JSON.stringify(log.meta)}
                     </div>
                   )}
