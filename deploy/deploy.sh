@@ -165,6 +165,8 @@ detect_tty_capabilities() {
 run_sudo_cmd() {
     if [[ ${EUID} -eq 0 ]]; then
         "$@"
+    elif [[ -n "${MGS_SUDO_PASSWORD:-}" ]]; then
+        echo "$MGS_SUDO_PASSWORD" | sudo -S "$@"
     elif command -v sudo >/dev/null 2>&1; then
         sudo "$@"
     else

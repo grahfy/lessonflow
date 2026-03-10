@@ -69,10 +69,6 @@ export function UpdateProgressClient() {
         const res = await fetch("/api/admin/updates/status", { cache: 'no-store' });
         if (res.ok) {
           setStatus("complete");
-          setTimeout(() => {
-            router.push("/admin");
-            router.refresh();
-          }, 2000);
           return;
         }
       } catch {
@@ -92,10 +88,24 @@ export function UpdateProgressClient() {
       <div className="update-status-header">
         {status === "connecting" && <p className="notice">Establishing connection to update stream...</p>}
         {status === "updating" && <p className="notice">Applying updates. This may take a few minutes. <strong>Do not close this page.</strong></p>}
-        {status === "restarting" && <p className="notice success">Build complete. LessonFlow is restarting. You will be redirected automatically.</p>}
-        {status === "complete" && <p className="notice success">Update successful! Redirecting to dashboard...</p>}
-        {status === "error" && <p className="notice error">Connection to update stream lost. Please check server logs or refresh the page.</p>}
+        {status === "restarting" && <p className="notice success">Build complete. LessonFlow is restarting. Please wait a moment.</p>}
+        {status === "complete" && <p className="notice success">Update successful! Your system is now up to date.</p>}
+        {status === "error" && <p className="notice error">An error occurred during the update or the connection was lost. Please check server logs.</p>}
       </div>
+
+      {(status === "complete" || status === "error") && (
+        <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'center' }}>
+          <button 
+            className="btn btn-primary"
+            onClick={() => {
+              router.push("/admin");
+              router.refresh();
+            }}
+          >
+            Back to Admin Dashboard
+          </button>
+        </div>
+      )}
 
       <div 
         className="update-log-view"

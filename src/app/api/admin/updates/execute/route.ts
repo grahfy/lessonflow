@@ -29,6 +29,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Parse sudo credentials from request body
+    const body = await request.json().catch(() => ({}));
+    const { sudoUser, sudoPassword } = body;
+
     // Trigger the update script in the background
     const scriptPath = path.join(appRoot, "scripts", "trigger-update.sh");
     
@@ -37,7 +41,12 @@ export async function POST(request: NextRequest) {
     const child = spawn("bash", [scriptPath, repoRoot], {
       detached: true,
       stdio: "ignore",
-      cwd: appRoot
+      cwd: appRoot,
+      env: {
+        ...process.env,
+        MGS_SUDO_USER: sudoUser || "",
+        MGS_SUDO_PASSWORD: sudoPassword || ""
+      }
     });
 
     child.unref();

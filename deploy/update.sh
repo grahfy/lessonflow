@@ -482,7 +482,11 @@ run_shared_env_cmd() {
   fi
 
   ensure_sudo_for_deploy_ready
-  sudo "$@"
+  if [[ -n "${MGS_SUDO_PASSWORD:-}" ]]; then
+    echo "$MGS_SUDO_PASSWORD" | sudo -S "$@"
+  else
+    sudo "$@"
+  fi
 }
 
 # Runs a privileged server-setup command (package install/systemctl) and fails
@@ -499,7 +503,11 @@ run_server_setup_cmd() {
   fi
 
   ensure_sudo_for_deploy_ready
-  sudo "$@"
+  if [[ -n "${MGS_SUDO_PASSWORD:-}" ]]; then
+    echo "$MGS_SUDO_PASSWORD" | sudo -S "$@"
+  else
+    sudo "$@"
+  fi
 }
 
 # Runs a command that touches deployed release files/paths, using sudo when the
@@ -513,7 +521,11 @@ run_deploy_path_cmd() {
 
   if should_use_sudo_for_deploy; then
     ensure_sudo_for_deploy_ready
-    sudo "$@"
+    if [[ -n "${MGS_SUDO_PASSWORD:-}" ]]; then
+      echo "$MGS_SUDO_PASSWORD" | sudo -S "$@"
+    else
+      sudo "$@"
+    fi
     return $?
   fi
 
@@ -1283,7 +1295,11 @@ update_prisma_from_update() {
   
   if should_use_sudo_for_deploy; then
     ensure_sudo_for_deploy_ready
-    sudo "${DEPLOY_SCRIPT}" "${deploy_args[@]}" --update-prisma
+    if [[ -n "${MGS_SUDO_PASSWORD:-}" ]]; then
+      echo "$MGS_SUDO_PASSWORD" | sudo -S "${DEPLOY_SCRIPT}" "${deploy_args[@]}" --update-prisma
+    else
+      sudo "${DEPLOY_SCRIPT}" "${deploy_args[@]}" --update-prisma
+    fi
   else
     "${DEPLOY_SCRIPT}" "${deploy_args[@]}" --update-prisma
   fi
@@ -1916,6 +1932,10 @@ should_use_sudo_for_deploy() {
   if [[ ${EUID} -eq 0 ]]; then
     return 1
   fi
+  # If a sudo password is provided via environment, we should use it.
+  if [[ -n "${MGS_SUDO_PASSWORD:-}" ]]; then
+    return 0
+  fi
   # Default to no global sudo execution
   return 1
 }
@@ -1938,7 +1958,12 @@ ensure_sudo_for_deploy_ready() {
       exit 1
     fi
   else
-    if ! sudo -n true 2>/dev/null; then
+    if [[ -n "${MGS_SUDO_PASSWORD:-}" ]]; then
+      if ! echo "$MGS_SUDO_PASSWORD" | sudo -S -v 2>/dev/null; then
+        log_error "Piped sudo authentication failed. Please check the provided password."
+        exit 1
+      fi
+    elif ! sudo -n true 2>/dev/null; then
       log_error "Sudo access is required for deployment. Re-run interactively or configure passwordless sudo for deploy commands."
       exit 1
     fi
