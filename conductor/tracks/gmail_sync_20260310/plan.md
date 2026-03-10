@@ -14,14 +14,14 @@ Update the data model to track provider information and external IDs for dedupli
 - [x] Task: Update `.env.example` with `EMAIL_PROVIDER` setting. [985c9e8]
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Database & Environment Preparation' (Protocol in workflow.md)
 
-## Phase 2: Gmail API Client
+## Phase 2: Gmail API Client [checkpoint: 1c4b363]
 Implement the low-level service for interacting with Gmail API.
 
 - [x] Task: Install `googleapis` dependency.
 - [x] Task: Create `src/lib/gmail/client.ts` for OAuth2 authentication logic. [873f580]
 - [x] Task: Implement `sendGmail` function in `src/lib/gmail/service.ts`. [b4719bc]
 - [x] Task: Implement `listSentMessages` and `getMessageDetails` in `src/lib/gmail/service.ts`. [b4719bc]
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Gmail API Client' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Gmail API Client' (Protocol in workflow.md)
 
 ## Phase 3: Core Email Service Integration
 Modify the existing email service to support multiple providers.
