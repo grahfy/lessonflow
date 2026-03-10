@@ -52,13 +52,13 @@ Implement the mechanism to safely trigger the server-side deployment script.
 ## Phase 4: Progress UI & Restart Handling
 Create the real-time feedback UI for the update process and handle the application restart.
 
-- [ ] Task: Create `/admin/updates/progress` page
-    - [ ] Connect to `/api/admin/updates/stream` SSE endpoint
-    - [ ] Render a scrolling log view of the deployment process
-    - [ ] Show a "Restarting..." state when the build is complete
-- [ ] Task: Implement Graceful Reconnection Logic
-    - [ ] If the connection drops (during restart), poll the health check endpoint
-    - [ ] Redirect back to the dashboard once LessonFlow is back online
-- [ ] Task: Final Integration & Cleanup
-    - [ ] Ensure `deploy/update.sh` correctly writes metadata used by the existing "Latest Updates" popup
+- [x] Task: Create `/admin/updates/progress` page
+    - [x] Connect to `/api/admin/updates/stream` SSE endpoint
+    - [x] Render a scrolling log view of the deployment process
+    - [x] Show a "Restarting..." state when the build is complete
+- [x] Task: Implement Graceful Reconnection Logic
+    - [x] If the connection drops (during restart), poll the health check endpoint
+    - [x] Redirect back to the dashboard once LessonFlow is back online
+- [x] Task: Final Integration & Cleanup
+    - [x] Ensure `deploy/update.sh` correctly writes metadata used by the existing "Latest Updates" popup
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: Progress UI & Restart Handling' (Protocol in workflow.md)
