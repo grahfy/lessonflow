@@ -137,19 +137,34 @@ export async function sendTemplateEmail(input: SendTemplateEmailInput): Promise<
 
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
   const from = process.env.SMTP_FROM || "LessonFlow <no-reply@example.com>";
+  const provider = (process.env.EMAIL_PROVIDER || "smtp").toLowerCase();
   const tx = getTransporter();
   const ownerBcc = getCustomerAuditBccRecipient(input.to);
   const bcc = ownerBcc ? mergeBccValues(input.bcc, ownerBcc) : input.bcc;
 
-  if (!tx) {
-    // Prefer Gmail API over queueing when available because some hosts block outbound SMTP ports.
-    if (isGmailConfigured()) {
-      return sendGmailEmail({
-        ...input,
-        bcc
-      });
+  // 1. GMAIL PROVIDER PATH
+  if (provider === "gmail" || (!tx && isGmailConfigured())) {
+    if (!isGmailConfigured()) {
+      return {
+        status: "failed",
+        error: "EMAIL_PROVIDER is set to gmail but GMAIL credentials are missing."
+      };
     }
 
+    const gmailResult = await sendGmailEmail({
+      ...input,
+      bcc
+    });
+
+    if (gmailResult.status === "sent") {
+      logEvent("email.sent_via_gmail", { to: input.to, subject: input.subject });
+    }
+    
+    return gmailResult;
+  }
+
+  // 2. SMTP PROVIDER PATH (FALLBACK TO QUEUED IF NO TRANSPORT)
+  if (!tx) {
     // Preserve business workflows by recording the outbound email even when no live transport is
     // configured (for example local development or a partially configured production host).
     await prisma.outboundEmail.create({
@@ -157,7 +172,9 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         toEmail: input.to,
         subject: input.subject,
         htmlBody: input.html,
-        status: "queued_no_smtp"
+        status: "queued_no_smtp",
+        provider: "smtp",
+        source: "app"
       }
     });
     logEvent("email.queued_no_smtp", { to: input.to, subject: input.subject });
@@ -165,7 +182,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   }
 
   try {
-    await tx.sendMail({
+    const info = await tx.sendMail({
       from,
       to: input.to,
       bcc,
@@ -183,10 +200,13 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         toEmail: input.to,
         subject: input.subject,
         htmlBody: input.html,
-        status: "sent"
+        status: "sent",
+        provider: "smtp",
+        externalId: info.messageId,
+        source: "app"
       }
     });
-    logEvent("email.sent", { to: input.to, subject: input.subject });
+    logEvent("email.sent_smtp", { to: input.to, subject: input.subject });
     return { status: "sent" };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -194,7 +214,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     if (isGmailConfigured()) {
       // SMTP can fail transiently (provider blocks, auth drift, TLS issues). We attempt Gmail API
       // before reporting failure so a configured secondary path can keep operations flowing.
-      logError("email.smtp_failed", error, { to: input.to, subject: input.subject });
+      logError("email.smtp_failed_attempting_gmail", error, { to: input.to, subject: input.subject });
 
       const gmailResult = await sendGmailEmail(input);
       if (gmailResult.status === "sent") {
@@ -218,6 +238,8 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         subject: input.subject,
         htmlBody: input.html,
         status: "failed",
+        provider: "smtp",
+        source: "app",
         error: message
       }
     });
