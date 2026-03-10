@@ -20,17 +20,17 @@ Implement the backend logic to detect pending repository updates and retrieve co
 ## Phase 2: Admin UI Integration (Banner and Changes Modal)
 Surface the update availability to administrators through a persistent dashboard banner.
 
-- [ ] Task: Create `UpdateNotificationBanner` component
-    - [ ] Fetch status from `/api/admin/updates/status` on mount
-    - [ ] Display high-visibility banner if update is available
-- [ ] Task: Integrate banner into `src/components/admin/layout/admin-shell.tsx`
-    - [ ] Ensure it appears above the main content but below the header
-- [ ] Task: Create `PendingChangesModal` component
-    - [ ] Display the list of pending commits (author, date, message)
-    - [ ] Add "Update Now" button with secondary confirmation dialog
-- [ ] Task: Write Tests for Update UI
-    - [ ] Verify banner appears only when updates are available
-    - [ ] Verify modal correctly renders commit data
+- [x] Task: Create `UpdateNotificationBanner` component
+    - [x] Fetch status from `/api/admin/updates/status` on mount
+    - [x] Display high-visibility banner if update is available
+- [x] Task: Integrate banner into `src/components/admin/layout/admin-shell.tsx`
+    - [x] Ensure it appears above the main content but below the header
+- [x] Task: Create `PendingChangesModal` component
+    - [x] Display the list of pending commits (author, date, message)
+    - [x] Add "Update Now" button with secondary confirmation dialog
+- [x] Task: Write Tests for Update UI
+    - [x] Verify banner appears only when updates are available
+    - [x] Verify modal correctly renders commit data
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Admin UI Integration (Banner and Changes Modal)' (Protocol in workflow.md)
 
 ## Phase 3: Secure Update Trigger & Script Wrapper
