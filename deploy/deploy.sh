@@ -2159,6 +2159,7 @@ install_or_update_managed_crontab_jobs() {
         echo "0 8 * * 1 ${cron_runner} admin-reports-weekly"
         echo "15 8 1 * * ${cron_runner} admin-reports-monthly"
         echo "30 8 1 1 * ${cron_runner} admin-reports-yearly"
+        echo "*/15 * * * * ${cron_runner} gmail-sync"
         printf '%s\n' "${end_marker}"
         echo
     } > "${tmp_file}"

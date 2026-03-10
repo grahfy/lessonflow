@@ -115,9 +115,12 @@ case "${JOB_TYPE}" in
     generate-sitemap)
         ENDPOINT="/api/jobs/generate-sitemap"
         ;;
+    gmail-sync)
+        ENDPOINT="/api/jobs/gmail-sync"
+        ;;
     *)
         log "ERROR: Unknown job type: ${JOB_TYPE}"
-        echo "Usage: $0 {daily-bookings-digest|invoice-reminders|admin-reports-daily|admin-reports-weekly|admin-reports-monthly|admin-reports-yearly|generate-sitemap}"
+        echo "Usage: $0 {daily-bookings-digest|invoice-reminders|admin-reports-daily|admin-reports-weekly|admin-reports-monthly|admin-reports-yearly|generate-sitemap|gmail-sync}"
         exit 1
         ;;
 esac
