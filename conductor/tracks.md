@@ -19,10 +19,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [x] **Track: Deployment Update History**
-*Link: [./tracks/deploy-history_20260310/](./tracks/deploy-history_20260310/)*
-
----
-
 - [ ] **Track: when running update on the website, it runs the script but requires sudo**
 *Link: [./tracks/update-sudo-fix_20260310/](./tracks/update-sudo-fix_20260310/)*
