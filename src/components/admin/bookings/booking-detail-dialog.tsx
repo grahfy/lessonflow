@@ -26,12 +26,13 @@
 import { RefObject, useState } from "react";
 import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
+import { useCaptcha, CaptchaField } from "@/components/captcha";
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { EmailViewerDialog } from "@/components/admin/ui/email-viewer-dialog";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { formatDateTime } from "@/lib/admin/formatters";
 import { type BookingEvent } from "@/lib/admin/use-bookings";
-import { type EmailRecord } from "@/lib/admin/use-email-history";
+import { type EmailRecord, type SendEmailResult } from "@/lib/admin/use-email-history";
 import { AU_STATES } from "@/lib/admin/types";
 import { toAuState } from "@/lib/admin/utils";
 import { type BookingDialogForm, type BookingMatchedCustomer } from "./types";
@@ -73,7 +74,7 @@ interface BookingDetailDialogProps {
   setEmailSubject: (val: string) => void;
   emailMessage: string;
   setEmailMessage: (val: string) => void;
-  onSendEmail: () => void;
+  onSendEmail: (subject: string, message: string, captcha?: { captchaToken: string; captchaAnswer: string }) => Promise<SendEmailResult>;
   onSyncEmail: () => void;
 
   // Domain Actions
@@ -128,6 +129,31 @@ export function BookingDetailDialog({
   materialsDialogProps
 }: BookingDetailDialogProps) {
   const [selectedEmail, setSelectedEmail] = useState<EmailRecord | null>(null);
+  const captcha = useCaptcha();
+
+  const handleSend = async () => {
+    if (!captcha.validateAnswer()) return;
+    
+    const result = await onSendEmail(emailSubject, emailMessage, captcha.getPayload());
+    
+    if (!result.success) {
+      // Handle CAPTCHA-related errors by refreshing the challenge.
+      const isCaptchaError = result.errorCode && [
+        "CAPTCHA_REQUIRED",
+        "CAPTCHA_INVALID",
+        "CAPTCHA_EXPIRED",
+        "CAPTCHA_RATE_LIMITED"
+      ].includes(result.errorCode);
+
+      if (isCaptchaError) {
+        captcha.onServerError("CAPTCHA verification failed. Please try again.");
+      } else {
+        void captcha.regenerate();
+      }
+    } else {
+      void captcha.regenerate();
+    }
+  };
 
   if (!event || !dialogForm) return null;
 
@@ -171,34 +197,11 @@ export function BookingDetailDialog({
                 )}
               </>
             ) : (
-              <>
-                <Tooltip content="Send this custom email to the booking contact.">
-                  <button
-                    className="btn btn-primary"
-                    disabled={sendingEmail || !emailSubject.trim() || !emailMessage.trim()}
-                    onClick={onSendEmail}
-                  >
-                    {sendingEmail ? "Sending..." : "Send Email"}
-                  </button>
-                </Tooltip>
-                <Tooltip content="Clear the current subject/message draft fields.">
-                  <button
-                    className="btn btn-danger"
-                    disabled={sendingEmail || (!emailSubject.trim() && !emailMessage.trim())}
-                    onClick={() => {
-                      setEmailSubject("");
-                      setEmailMessage("");
-                    }}
-                  >
-                    Clear Draft
-                  </button>
-                </Tooltip>
-                <Tooltip content="Return to appointment details and actions.">
-                  <button className="btn btn-secondary" onClick={() => setActiveTab("appointment")}>
-                    Back to Appointment
-                  </button>
-                </Tooltip>
-              </>
+              <Tooltip content="Return to appointment details and actions.">
+                <button className="btn btn-secondary" onClick={() => setActiveTab("appointment")}>
+                  Back to Appointment
+                </button>
+              </Tooltip>
             )}
           </div>
         </div>
@@ -236,7 +239,7 @@ export function BookingDetailDialog({
         ) : null}
       </div>
 
-      <div className="dialog-layout booking-dialog-layout">
+      <div className={`dialog-layout booking-dialog-layout ${activeTab === 'emails' ? 'customer-dialog-panel' : ''}`}>
           {activeTab === 'appointment' ? (
             <>
               {/* SECTION: CUSTOMER INFORMATION */}
@@ -392,10 +395,10 @@ export function BookingDetailDialog({
             </>
           ) : activeTab === 'emails' ? (
             <>
-              {/* SECTION: COMMUNICATION HISTORY */}
-              <div className="dialog-col">
-                <div className="section-header-with-action">
-                  <h3 className="manual-section-title">Email History</h3>
+            {/* SECTION: COMMUNICATION HISTORY */}
+            <div className="dialog-col dialog-tab-section">
+              <div className="section-header-with-action">
+                <h3 className="manual-section-title">Email History</h3>
                   <button
                     type="button"
                     className="btn btn-secondary btn-small"
@@ -439,21 +442,47 @@ export function BookingDetailDialog({
               </div>
 
               {/* SECTION: EMAIL COMPOSER */}
-              <div className="dialog-col is-notes">
-                <h3 className="manual-section-title">Send Custom Email</h3>
-                <AdminCard ghost className="booking-email-composer-card">
-                  <AdminForm>
-                    <AdminField label="Subject" tooltip="The subject line for the email sent to the student." required fullWidth>
-                      <input placeholder="Email subject..." value={emailSubject} onChange={e => setEmailSubject(e.target.value)} />
-                    </AdminField>
-                    <AdminField label="Message" tooltip="The main body text of the email." required fullWidth>
-                      <textarea className="dialog-notes booking-email-message-area" placeholder="Type message here..." value={emailMessage} onChange={e => setEmailMessage(e.target.value)} />
-                    </AdminField>
-                  </AdminForm>
-                </AdminCard>
-              </div>
-            </>
-          ) : activeTab === 'materials' ? (
+            <div className="dialog-col dialog-tab-section">
+              <h3 className="manual-section-title">Send Email</h3>
+              <AdminCard ghost className="customer-email-composer-card">
+                <AdminForm className="customer-email-composer-form">
+                  <AdminField label="Subject" tooltip="The subject line of the email." required fullWidth>
+                    <input placeholder="Email subject..." value={emailSubject} onChange={e => setEmailSubject(e.target.value)} />
+                  </AdminField>
+                  <AdminField label="Message" tooltip="The main body text of the email." required fullWidth>
+                    <textarea className="dialog-notes booking-email-message-area" placeholder="Type message here..." value={emailMessage} onChange={e => setEmailMessage(e.target.value)} />
+                  </AdminField>
+                  <div className="button-row button-row-justify customer-email-actions">
+                    <Tooltip content="Clear message fields.">
+                      <button
+                        className="btn btn-secondary"
+                        type="button"
+                        disabled={sendingEmail || (!emailSubject.trim() && !emailMessage.trim())}
+                        onClick={() => {
+                          setEmailSubject("");
+                          setEmailMessage("");
+                        }}
+                      >
+                        Clear Draft
+                      </button>
+                    </Tooltip>
+                    <Tooltip content="Send this custom email to the booking contact.">
+                      <button
+                        className="btn btn-primary"
+                        type="button"
+                        disabled={sendingEmail || !emailSubject.trim() || !emailMessage.trim()}
+                        onClick={handleSend}
+                      >
+                        {sendingEmail ? "Sending..." : "Send Email"}
+                      </button>
+                    </Tooltip>
+                  </div>
+                  <CaptchaField idPrefix="booking-email" captcha={captcha} />
+                </AdminForm>
+              </AdminCard>
+            </div>
+          </>
+        ) : activeTab === 'materials' ? (
             <>
               {/* SECTION: LEARNING MATERIALS */}
               <BookingMaterialsDialog

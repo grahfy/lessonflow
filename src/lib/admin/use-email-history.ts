@@ -75,7 +75,11 @@ export function useEmailHistory(options: UseEmailHistoryOptions = {}): UseEmailH
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                await handleApiError(response, "Unable to send email.");
+                if (onError) {
+                    onError(errorData.error || "Unable to send email.");
+                } else {
+                    await handleApiError(response, "Unable to send email.");
+                }
                 return { success: false, errorCode: errorData.code };
             }
 
@@ -87,7 +91,7 @@ export function useEmailHistory(options: UseEmailHistoryOptions = {}): UseEmailH
         } finally {
             setSending(false);
         }
-    }, [safeFetch, handleApiError, load]);
+    }, [safeFetch, handleApiError, load, onError]);
 
     const sync = useCallback(async (customerId: string): Promise<boolean> => {
         setSyncing(true);

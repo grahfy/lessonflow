@@ -441,14 +441,19 @@ export function AdminBookingsClient() {
     }
   }
 
-  async function sendCustomEmail() {
-    if (!selectedKey || !emailComposerSubject || !emailComposerMessage) return;
-    const success = await sendEmailApi(selectedKey, emailComposerSubject, emailComposerMessage);
-    if (success) {
+  async function sendCustomEmail(subject: string, message: string, captcha?: { captchaToken: string; captchaAnswer: string }) {
+    const event = events.find(e => e.id === selectedKey);
+    const customerId = event?.row.customerId;
+    if (!customerId || !subject || !message) return { success: false };
+    
+    setError("");
+    const result = await sendEmailApi(customerId, subject, message, captcha);
+    if (result.success) {
       setNotice("Email sent.");
       setEmailComposerSubject("");
       setEmailComposerMessage("");
     }
+    return result;
   }
 
   async function uploadMaterial(captcha?: { captchaToken: string; captchaAnswer: string }) {
@@ -671,7 +676,12 @@ export function AdminBookingsClient() {
           emailMessage={emailComposerMessage}
           setEmailMessage={setEmailComposerMessage}
           onSendEmail={sendCustomEmail}
-          onSyncEmail={() => selectedKey && syncEmailApi(selectedKey)}
+          onSyncEmail={() => {
+            const event = events.find(e => e.id === selectedKey);
+            if (event?.row.customerId) {
+              void syncEmailApi(event.row.customerId);
+            }
+          }}
           onPerformAction={performAction}
           materialsDialogProps={{
             materialsList,
