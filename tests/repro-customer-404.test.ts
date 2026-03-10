@@ -17,10 +17,13 @@ function adminRequest(url: string, method: "GET", token: string) {
 
 describe("repro-customer-404", () => {
   beforeEach(async () => {
+    // Must clean admin users too — a prior test (e.g. admin-auth-guards) may have
+    // left the owner admin as isActive:false, which ensureOwnerAdmin() wouldn't fix.
     await prisma.customer.deleteMany();
+    await prisma.adminUser.deleteMany();
   });
 
-  it("returns 404 for archived customer", async () => {
+  it("returns 200 with full record for archived customer", async () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);
 
