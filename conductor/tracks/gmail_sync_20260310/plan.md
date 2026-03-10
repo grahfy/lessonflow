@@ -35,7 +35,7 @@ Modify the existing email service to support multiple providers.
 Implement the logic to pull sent items from Gmail.
 
 - [x] Task: Create `src/lib/gmail/sync.ts` logic for fetching and deduplicating emails. [b1be064]
-- [ ] Task: Create background job route `src/app/api/jobs/gmail-sync/route.ts`.
+- [x] Task: Create background job route `src/app/api/jobs/gmail-sync/route.ts`. [88a704a]
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: Background Synchronization' (Protocol in workflow.md)
 
 ## Phase 5: UI & Visibility
