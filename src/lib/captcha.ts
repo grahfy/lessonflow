@@ -1,41 +1,50 @@
-import { randomUUID } from "node:crypto";
+/**
+ * Bot Defense & SVG CAPTCHA Engine
+ * 
+ * Provides a dependency-free, lightweight CAPTCHA system to protect public 
+ * forms (Bookings, Contacts) from automated submissions.
+ * 
+ * DESIGN RATIONALE:
+ * 1. SVG-Based Rendering: We generate CAPTCHA images as SVG DataURIs server-side. 
+ *    This avoids external image-processing dependencies (like Canvas/Sharp) 
+ *    and ensures crisp rendering on all screen densities.
+ * 2. Visual Obfuscation: Uses random rotation, skewing, noise curves, 
+ *    fractal turbulence (SVG filters), and occlusion bars to thwart OCR 
+ *    while remaining readable to humans.
+ * 3. Atomic Challenges: Challenges are stored in a short-lived (5m TTL) 
+ *    in-memory Map and are consumed immediately upon a single verification 
+ *    attempt (fail or pass), preventing replay attacks.
+ * 4. UX Optimization: Uses a filtered alphabet (omitting 0/O, 1/I) to 
+ *    reduce user frustration from visually ambiguous characters.
+ */
 
+import { randomUUID } from "node:crypto";
 import { consumeRateLimit, getRequestIpFromHeaders, type RateLimitResult } from "@/lib/rate-limit";
 
-/**
- * In-memory CAPTCHA challenge store.
- *
- * This keeps implementation simple and fast for the current app deployment model.
- * Challenges are short-lived and single-use to reduce replay attempts.
- */
+/** Internal challenge state. */
 type CaptchaRecord = {
+  /** The plain-text answer to match against. */
   answer: string;
+  /** Unix expiration timestamp. */
   expiresAt: number;
 };
 
-/**
- * Public challenge payload returned to the client.
- *
- * The answer is never returned. The image is delivered as a data URL so forms can
- * render it directly without a second request.
- */
+/** Public payload returned to the client-side component. */
 export type CaptchaChallenge = {
+  /** Unique challenge identifier. */
   token: string;
+  /** Base64 encoded SVG string. */
   imageDataUrl: string;
+  /** Seconds until the token becomes invalid. */
   expiresInSeconds: number;
+  /** Localization-ready descriptive prompt. */
   prompt: string;
 };
 
-/**
- * Server-side validation result for a submitted CAPTCHA answer.
- */
 export type CaptchaValidationResult =
   | { ok: true }
   | { ok: false; code: "MISSING" | "NOT_FOUND" | "EXPIRED" | "INVALID"; message: string };
 
-/**
- * Shared anti-bot gate result used by CAPTCHA-protected routes.
- */
 export type CaptchaGuardResult =
   | { ok: true }
   | {
@@ -48,11 +57,12 @@ export type CaptchaGuardResult =
 
 const CAPTCHA_TTL_MS = 5 * 60 * 1000;
 const CAPTCHA_LENGTH = 6;
+// Filtered alphabet: No O, 0, I, 1
 const CAPTCHA_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%&*+-=?";
 const captchaStore = new Map<string, CaptchaRecord>();
 
 /**
- * Normalizes user-entered values so matching is case-insensitive and whitespace-safe.
+ * Normalizes input for comparison.
  */
 function normalizeCaptchaAnswer(value: unknown): string {
   return String(value ?? "")
@@ -62,9 +72,7 @@ function normalizeCaptchaAnswer(value: unknown): string {
 }
 
 /**
- * Removes expired challenges opportunistically during create/verify calls.
- *
- * This avoids introducing background timers while keeping the in-memory map bounded.
+ * Opportunistic cleanup to prevent memory leaks without background timers.
  */
 function cleanupExpiredChallenges(now = Date.now()): void {
   for (const [token, record] of captchaStore.entries()) {
@@ -74,10 +82,7 @@ function cleanupExpiredChallenges(now = Date.now()): void {
   }
 }
 
-/**
- * Generates a short human-readable CAPTCHA code using an alphabet that avoids
- * visually ambiguous characters like 0/O and 1/I.
- */
+/** Generates a random alphanumeric code. */
 function generateCaptchaCode(length = CAPTCHA_LENGTH): string {
   let code = "";
   for (let i = 0; i < length; i += 1) {
@@ -87,9 +92,7 @@ function generateCaptchaCode(length = CAPTCHA_LENGTH): string {
   return code;
 }
 
-/**
- * Escapes text for safe inclusion in SVG/XML attributes and text nodes.
- */
+/** Escapes special XML characters for the SVG template. */
 function escapeSvgText(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -100,9 +103,9 @@ function escapeSvgText(value: string): string {
 }
 
 /**
- * Renders the CAPTCHA image as an SVG with light noise lines and jittered character placement.
- *
- * SVG keeps the implementation dependency-free and produces crisp output across devices.
+ * Renders the CAPTCHA code into an SVG with multiple layers of noise.
+ * RATIONALE: We use a combination of linear noise, bezier curves, 
+ * and fractal displacement to disrupt automated segmentation.
  */
 function renderCaptchaSvgDataUrl(code: string): string {
   const width = 220;
@@ -154,7 +157,7 @@ function renderCaptchaSvgDataUrl(code: string): string {
     return `<path d="M 0 ${startY} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${width} ${endY}" fill="none" stroke="#5a6c7d" stroke-width="${strokeWidth}" opacity="${opacity}" />`;
   }).join("");
 
-  const occlusionBars = Array.from({ length: 3 }, () => {
+  const opacityBars = Array.from({ length: 3 }, () => {
     const x = Math.floor(Math.random() * (width - 30));
     const y = Math.floor(Math.random() * (height - 10));
     const w = 20 + Math.floor(Math.random() * 45);
@@ -184,7 +187,7 @@ function renderCaptchaSvgDataUrl(code: string): string {
       <g filter="url(#${filterId})">
         ${characterLayers}
       </g>
-      ${occlusionBars}
+      ${opacityBars}
     </svg>
   `.trim();
 
@@ -206,10 +209,6 @@ export function createCaptchaChallenge(): CaptchaChallenge {
     expiresAt
   });
 
-  if (process.env.NODE_ENV === "development") {
-    console.log("[CAPTCHA] Created new challenge:", token.substring(0, 8) + "...", "(answer:", answer + ")", "(expires in", Math.floor(CAPTCHA_TTL_MS / 1000), "s)");
-  }
-
   return {
     token,
     imageDataUrl: renderCaptchaSvgDataUrl(answer),
@@ -220,9 +219,10 @@ export function createCaptchaChallenge(): CaptchaChallenge {
 
 /**
  * Validates and consumes a CAPTCHA challenge.
- *
- * The challenge is single-use on any verification attempt (valid or invalid) so repeated guessing
- * against the same image is not possible.
+ * 
+ * DESIGN RATIONALE: Challenges are single-use. We delete the record 
+ * from the store immediately upon retrieval, even if validation fails. 
+ * This prevents brute-force attempts on a single challenge image.
  */
 export function verifyCaptchaSubmission(input: {
   captchaToken?: unknown;
@@ -234,19 +234,11 @@ export function verifyCaptchaSubmission(input: {
   const answer = normalizeCaptchaAnswer(input.captchaAnswer);
 
   if (!token || !answer) {
-    return {
-      ok: false,
-      code: "MISSING",
-      message: "CAPTCHA token and answer are required."
-    };
+    return { ok: false, code: "MISSING", message: "CAPTCHA token and answer are required." };
   }
 
   const record = captchaStore.get(token);
   if (!record) {
-    // In development, log to help debug CAPTCHA issues
-    if (process.env.NODE_ENV === "development") {
-      console.log("[CAPTCHA] Token not found (may have been already used or expired):", token.substring(0, 8) + "...");
-    }
     return {
       ok: false,
       code: "NOT_FOUND",
@@ -254,42 +246,26 @@ export function verifyCaptchaSubmission(input: {
     };
   }
 
-  // Always consume once retrieved to prevent repeated attempts against one challenge image.
   captchaStore.delete(token);
 
   if (record.expiresAt <= Date.now()) {
-    if (process.env.NODE_ENV === "development") {
-      console.log("[CAPTCHA] Token expired:", token.substring(0, 8) + "...");
-    }
-    return {
-      ok: false,
-      code: "EXPIRED",
-      message: "CAPTCHA challenge expired. Please try a new challenge."
-    };
+    return { ok: false, code: "EXPIRED", message: "CAPTCHA challenge expired. Please try a new challenge." };
   }
 
   if (record.answer !== answer) {
-    if (process.env.NODE_ENV === "development") {
-      console.log("[CAPTCHA] Invalid answer. Expected:", record.answer, "Got:", answer);
-    }
-    return {
-      ok: false,
-      code: "INVALID",
-      message: "CAPTCHA answer was incorrect. Please try a new challenge."
-    };
+    return { ok: false, code: "INVALID", message: "CAPTCHA answer was incorrect. Please try a new challenge." };
   }
 
-  if (process.env.NODE_ENV === "development") {
-    console.log("[CAPTCHA] Validated successfully");
-  }
   return { ok: true };
 }
 
 /**
- * Performs the full anti-bot gate used by protected routes:
- * 1) reject honeypot-filled submissions
- * 2) rate-limit CAPTCHA attempts by IP and scope
- * 3) verify and consume CAPTCHA token/answer
+ * High-level Atomic Anti-Bot Guard.
+ * 
+ * Logic:
+ * 1. Honeypot Check: Reject immediately if the invisible 'website' field is filled.
+ * 2. Rate Limit: Throttles attempts by IP to prevent CAPTCHA-solving-farm attacks.
+ * 3. Validation: Consumes the token and verifies the answer.
  */
 export function verifyCaptchaGuard(input: {
   body: unknown;
@@ -304,6 +280,7 @@ export function verifyCaptchaGuard(input: {
     captchaAnswer?: unknown;
   } | null;
 
+  // 1. Honeypot check
   const honeypot = String(body?.website ?? "").trim();
   if (honeypot) {
     return {
@@ -314,11 +291,13 @@ export function verifyCaptchaGuard(input: {
     };
   }
 
+  // 2. IP Throttling
   const rateLimit: RateLimitResult = consumeRateLimit({
     key: `captcha:${input.scope}:${getRequestIpFromHeaders(input.headers)}`,
     limit: input.limit ?? 20,
     windowMs: input.windowMs ?? 10 * 60 * 1000
   });
+
   if (!rateLimit.allowed) {
     return {
       ok: false,
@@ -329,15 +308,17 @@ export function verifyCaptchaGuard(input: {
     };
   }
 
-  // Bypass CAPTCHA verification in test or development environment
+  // 3. Environment Bypass (Tests/Dev)
   if (process.env.NODE_ENV === "test" || process.env.NODE_ENV === "development") {
     return { ok: true };
   }
 
+  // 4. Verification
   const captcha = verifyCaptchaSubmission({
     captchaToken: body?.captchaToken,
     captchaAnswer: body?.captchaAnswer
   });
+
   if (!captcha.ok) {
     return {
       ok: false,

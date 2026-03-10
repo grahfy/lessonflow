@@ -1,44 +1,40 @@
 /**
- * Database Client - Prisma Singleton
+ * Primary Database Client - Prisma Singleton
  * 
- * This module provides a singleton instance of the Prisma ORM client for database
- * operations throughout the LessonFlow application.
+ * Provides a unified connection instance for the MariaDB database. 
+ * Managed as a singleton to prevent connection exhaustion.
  * 
- * STRUCTURE:
- * - Uses globalThis to maintain a single Prisma instance across hot reloads
- * - Prevents connection exhaustion in development mode
- * 
- * SECURITY:
- * - Database URL should be stored in environment variables, not committed
- * - Use connection pooling for production to handle concurrent requests
- * 
- * @see https://www.prisma.io/docs/guides/performance-and-optimization/connection-management
+ * DESIGN RATIONALE:
+ * 1. Connection Singleton: In development, Next.js performs hot module 
+ *    replacement (HMR), which can clear local variables and trigger 
+ *    the creation of dozens of Prisma clients. We use the `globalThis` 
+ *    pattern to persist the client across reloads.
+ * 2. Prisma 7 Adapters: We explicitly utilize the `PrismaMariaDb` adapter 
+ *    for direct connections, ensuring high-performance native communication 
+ *    with the database server.
+ * 3. Centralized Lifecycle: All application logic imports from this file, 
+ *    ensuring consistent timeout and middleware settings (if added).
  */
 
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import { PrismaClient } from "../generated/prisma/client";
 
 /**
- * Global type augmentation to store Prisma instance across module reloads.
- * This prevents creating multiple database connections during development
- * hot reloads, which could exhaust connection limits.
+ * Persists the client across hot-reloads in development.
  */
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-// Database connection URL from environment
 const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
-  throw new Error("DATABASE_URL environment variable is not set");
+  throw new Error("DATABASE_URL environment variable is not set. Check your .env file.");
 }
 
 /**
- * Main Prisma client instance.
- * 
- * In Prisma 7, we must provide an adapter for direct database connections.
- * In development: stored in global to survive hot reloads.
+ * The system-wide Prisma instance.
+ * RATIONALE: Lazy-instantiated on first import.
  */
 export const prisma = globalForPrisma.prisma ?? (() => {
   const adapter = new PrismaMariaDb(connectionString);
@@ -46,9 +42,7 @@ export const prisma = globalForPrisma.prisma ?? (() => {
 })();
 
 /**
- * Development-mode optimization:
- * Store Prisma instance in global to prevent connection exhaustion
- * when Next.js hot-reloads modules during development.
+ * Development-mode persistence logic.
  */
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;

@@ -1,16 +1,24 @@
 /**
- * Centralized branding and identity constants.
- * These values are sourced from environment variables where possible,
- * with fallback defaults for the LessonFlow platform.
+ * Centralized Branding & Identity Registry
+ * 
+ * Provides a unified source of truth for the school's brand identity (Names, 
+ * Logos, Contact Info). Sourced primarily from environment variables.
+ * 
+ * DESIGN RATIONALE:
+ * 1. Dynamic Updates: We prefer `getBranding()` over static constants so that 
+ *    changes made via the Admin UI (which updates .env or process memory) are 
+ *    reflected immediately without requiring a full application restart in 
+ *    environments that support dynamic process.env.
+ * 2. Fallback Defaults: Provides sensible defaults for the LessonFlow 
+ *    platform to ensure the UI never renders empty branding slots.
  */
 
-// Basic platform name is usually immutable
 export const PLATFORM_NAME = "LessonFlow";
 
 /**
- * Returns the current branding configuration, sourcing from environment variables
- * to ensure that changes made in the admin settings are reflected without a restart
- * where the runtime supports dynamic process.env updates.
+ * Resolves the full branding object from the environment.
+ * RATIONALE: Used by layout components to ensure they have the latest 
+ * school identity without being tightly coupled to specific ENV keys.
  */
 export function getBranding() {
   return {
@@ -26,9 +34,7 @@ export function getBranding() {
   };
 }
 
-// Legacy constant exports for backward compatibility. 
-// Note: These may become stale if process.env is updated after module load.
-// New code should prefer using getBranding() or reading process.env directly.
+// Legacy constants for backward compatibility with existing components.
 export const PUBLIC_BRAND_NAME = process.env.NEXT_PUBLIC_BRAND_NAME || "Melbourne Guitar School";
 export const PRIMARY_SUBJECT = process.env.NEXT_PUBLIC_PRIMARY_SUBJECT || "Guitar";
 export const PRIMARY_LOCATION = process.env.NEXT_PUBLIC_PRIMARY_LOCATION || "Northcote";
@@ -42,17 +48,13 @@ export const DEFAULT_CURRENCY = process.env.NEXT_PUBLIC_DEFAULT_CURRENCY || "AUD
 export const POWERED_BY_PLATFORM_COPY = `Powered by ${PLATFORM_NAME}`;
 export const STUDENT_PORTAL_PLATFORM_NAME = `${PLATFORM_NAME} Student Portal`;
 
-/**
- * Returns a capitalized version of the primary subject (e.g. "Guitar").
- */
+/** Capitalized version of the primary instrument. */
 export function getSubjectLabel(): string {
   const subject = process.env.NEXT_PUBLIC_PRIMARY_SUBJECT || PRIMARY_SUBJECT;
   return subject.charAt(0).toUpperCase() + subject.slice(1);
 }
 
-/**
- * Returns the full brand title, often used in SEO and headers.
- */
+/** Primary school name. */
 export function getBrandTitle(): string {
   return process.env.NEXT_PUBLIC_BRAND_NAME || PUBLIC_BRAND_NAME;
 }
