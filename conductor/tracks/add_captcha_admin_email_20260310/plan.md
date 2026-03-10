@@ -12,7 +12,7 @@
 - [x] Task: Ensure the CAPTCHA refreshes on success or failure. [62437ff]
 - [x] Task: Conductor - User Manual Verification 'Phase 2: UI Integration' (Protocol in workflow.md) [62437ff]
 
-#### Phase 3: Testing & Verification
-- [ ] Task: Write/Update integration tests to verify the API rejects requests without valid CAPTCHA.
-- [ ] Task: Perform manual E2E verification of the full flow in the admin console.
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Testing & Verification' (Protocol in workflow.md)
+#### Phase 3: Testing & Verification [checkpoint: 1879f94]
+- [x] Task: Write/Update integration tests to verify the API rejects requests without valid CAPTCHA. [1879f94]
+- [x] Task: Perform manual E2E verification of the full flow in the admin console. [1879f94]
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Testing & Verification' (Protocol in workflow.md) [1879f94]
