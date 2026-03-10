@@ -25,6 +25,7 @@ LessonFlow is a comprehensive management platform tailored for music schools and
 - **Whitelabeling:** Easily rebrand the platform via environment variables and an admin settings panel.
 - **Resource Management:** Assign audio and PDF materials to specific students or appointments.
 - **Proactive Update Management:** Admins are notified of available repository updates and can apply them with one click from the web console.
+- **System Observability:** Integrated log viewer for administrators to monitor application health and report technical issues directly to developers.
 
 ## Strategic Goals
 - **Efficiency:** Minimize the time teachers spend on non-teaching tasks.
