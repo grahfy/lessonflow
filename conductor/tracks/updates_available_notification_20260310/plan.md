@@ -2,7 +2,7 @@
 
 This plan outlines the steps to implement a proactive update management system in LessonFlow, allowing admins to detect, review, and apply repository updates directly from the web console.
 
-## Phase 1: Update Detection and Metadata Service
+## Phase 1: Update Detection and Metadata Service [checkpoint: ec95206]
 Implement the backend logic to detect pending repository updates and retrieve commit details.
 
 - [x] Task: Create `src/lib/services/updates-service.ts` to manage update detection
@@ -15,7 +15,7 @@ Implement the backend logic to detect pending repository updates and retrieve co
 - [x] Task: Write Tests for Update Service
     - [x] Mock `child_process.exec` to simulate various git states
     - [x] Verify correct SHA comparison and commit list parsing
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Update Detection and Metadata Service' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Update Detection and Metadata Service' (Protocol in workflow.md)
 
 ## Phase 2: Admin UI Integration (Banner and Changes Modal)
 Surface the update availability to administrators through a persistent dashboard banner.
