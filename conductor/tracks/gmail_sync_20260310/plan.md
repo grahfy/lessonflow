@@ -41,7 +41,7 @@ Implement the logic to pull sent items from Gmail.
 ## Phase 5: UI & Visibility
 Expose the new information in the admin dashboard.
 
-- [ ] Task: Update Email History UI to show provider/source labels.
+- [x] Task: Update Email History UI to show provider/source labels. [d400e95]
 - [ ] Task: Add "Sync Now" button to Email History view.
 - [ ] Task: Add Gmail connection status to Admin Settings.
 - [ ] Task: Conductor - User Manual Verification 'Phase 5: UI & Visibility' (Protocol in workflow.md)
