@@ -21,6 +21,7 @@
 import { APP_TIMEZONE } from "@/lib/time";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Tooltip } from "@/components/admin/ui/tooltip";
 
 /** 
  * Represents a single Git commit included in a deployment payload.
@@ -211,9 +212,11 @@ export function AdminDeployUpdatesButton() {
 
   return (
     <>
-      <button className="btn btn-secondary" type="button" disabled={loading} onClick={() => void loadAndMaybeOpen({ forceOpen: true })}>
-        {loading ? "Loading updates..." : "Latest Updates"}
-      </button>
+      <Tooltip content="Review recent code deployments and updates to the platform.">
+        <button className="btn btn-secondary" type="button" disabled={loading} onClick={() => void loadAndMaybeOpen({ forceOpen: true })}>
+          {loading ? "Loading updates..." : "Latest Updates"}
+        </button>
+      </Tooltip>
 
       {open ? (
         <div className="dialog-backdrop" onClick={closeModal}>

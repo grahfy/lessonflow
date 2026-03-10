@@ -28,7 +28,7 @@ import { format, parseISO, addDays, subDays, addWeeks, subWeeks, addMonths, subM
 import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AdminBookingCalendar, type AdminCalendarEvent } from "@/components/admin-booking-calendar";
-import { animateIn, animateOut } from "@/components/motion/tween-orchestrator";
+import { animateIn, animateOut, useTweenOrchestrator } from "@/components/motion/tween-orchestrator";
 import { usePresenceExit } from "@/components/motion/use-presence-exit";
 import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
@@ -123,6 +123,7 @@ function getFieldErrorMessage(result: unknown): string | null {
 export function AdminBookingsClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { beginExitTransition } = useTweenOrchestrator();
   
   // PARAMS: Sync calendar view state with URL for shareable/bookmarkable states.
   const view = (searchParams.get("view") as CalendarView) || "week";
@@ -397,8 +398,8 @@ export function AdminBookingsClient() {
   const openMatchedCustomer = useCallback(async () => {
     if (!matchedDialogCustomer?.id) return;
     await closeDialog();
-    router.push(`/admin/customers?customerId=${matchedDialogCustomer.id}&open=true`);
-  }, [closeDialog, matchedDialogCustomer, router]);
+    void beginExitTransition(null, 0, () => router.push(`/admin/customers?customerId=${matchedDialogCustomer.id}&open=true`));
+  }, [closeDialog, matchedDialogCustomer, router, beginExitTransition]);
 
   // ACTION LOGIC: Wrappers around API hooks with state management and user feedback
   
@@ -653,7 +654,7 @@ export function AdminBookingsClient() {
               const p = await res.json();
               setNotice("Draft invoice created.");
               await closeDialog();
-              router.push(`/admin/invoices?openInvoiceId=${encodeURIComponent(p?.invoice?.id)}`);
+              void beginExitTransition(null, 0, () => router.push(`/admin/invoices?openInvoiceId=${encodeURIComponent(p?.invoice?.id)}`));
             } catch {
               setError("Network error creating invoice draft.");
             } finally {
@@ -700,7 +701,7 @@ export function AdminBookingsClient() {
           }
         >
           <AdminForm>
-            <AdminField label="New Start Time" required>
+            <AdminField label="New Start Time" tooltip="Select the new date and time for this booking." required>
               <input type="datetime-local" value={moveNewStart} onChange={e => setMoveNewStart(e.target.value)} />
             </AdminField>
           </AdminForm>

@@ -92,12 +92,13 @@ export function AdminDialog({
 
   return (
     <div 
+      ref={rootRef}
       className="dialog-backdrop" 
       onClick={onClose}
       data-motion-root="admin"
+      data-motion-item="true"
     >
       <div 
-        ref={rootRef}
         id={id}
         className={`dialog-panel ${wide ? 'dialog-panel-wide' : ''}`}
         onClick={(e) => e.stopPropagation()}

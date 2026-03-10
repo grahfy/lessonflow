@@ -114,10 +114,10 @@ export function AdminEmailTemplateEditor() {
             <AdminCard key={t.key} style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid var(--line)' }}>
               <h3 style={{ fontSize: '0.9rem', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t.key.replace(/_/g, ' ')}</h3>
               <AdminForm>
-                <AdminField label="Subject" required fullWidth>
+                <AdminField label="Subject" tooltip="The subject line of this automated email." required fullWidth>
                   <input value={t.subject} onChange={e => updateTemplate(t.key, { subject: e.target.value })} />
                 </AdminField>
-                <AdminField label="Body" required fullWidth>
+                <AdminField label="Body" tooltip="The HTML content of the email." required fullWidth>
                   <textarea value={t.body} style={{ minHeight: '200px', fontFamily: 'monospace' }} onChange={e => updateTemplate(t.key, { body: e.target.value })} />
                 </AdminField>
               </AdminForm>

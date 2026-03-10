@@ -9,6 +9,7 @@ import { AdminTable, AdminTableSeparator as Separator } from "@/components/admin
 import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { Tooltip } from "@/components/admin/ui/tooltip";
+import { useTweenOrchestrator } from "@/components/motion/tween-orchestrator";
 import { parseAudInputToCents } from "@/lib/invoices/currency";
 import { DEFAULT_CURRENCY } from "@/lib/branding";
 import { toDateTimeLocalValue, toMoneyInput } from "@/lib/admin/formatters";
@@ -62,6 +63,7 @@ export function AdminInvoicesClient() {
   const searchParams = useSearchParams();
   const searchInputId = useId();
   const sortSelectId = useId();
+  const { beginExitTransition } = useTweenOrchestrator();
   
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -402,7 +404,7 @@ export function AdminInvoicesClient() {
   const openLinkedCustomer = () => {
     if (!selectedInvoice?.customerId) return;
     closeDetail();
-    router.push(`/admin/customers?customerId=${selectedInvoice.customerId}&open=true`);
+    void beginExitTransition(null, 0, () => router.push(`/admin/customers?customerId=${selectedInvoice.customerId}&open=true`));
   };
 
   const header = (
@@ -436,56 +438,64 @@ export function AdminInvoicesClient() {
                 {busyAction === 'bulk-reminders' ? "SENDING..." : "SEND OVERDUE REMINDERS"}
               </button>
             </Tooltip>
-            <label className="admin-inline-checkbox">
-              <input
-                type="checkbox"
-                checked={overdueOnly}
-                onChange={(e) => {
-                  setOverdueOnly(e.target.checked);
-                  setPage(1);
-                }}
-              />
-              Overdue only
-            </label>
+            <Tooltip content="Show only invoices that are past their due date.">
+              <label className="admin-inline-checkbox">
+                <input
+                  type="checkbox"
+                  checked={overdueOnly}
+                  onChange={(e) => {
+                    setOverdueOnly(e.target.checked);
+                    setPage(1);
+                  }}
+                />
+                Overdue only
+              </label>
+            </Tooltip>
           </div>
 
           <div className="search-box">
             <div className="admin-search-inline-row">
               <label htmlFor={searchInputId}>Search</label>
-              <input
-                id={searchInputId}
-                type="text"
-                value={query}
-                placeholder="Search by number or customer..."
-                onChange={(e) => { setQuery(e.target.value); setPage(1); }}
-              />
+              <Tooltip content="Search for invoices by number or customer name.">
+                <input
+                  id={searchInputId}
+                  type="text"
+                  value={query}
+                  placeholder="Search by number or customer..."
+                  onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+                />
+              </Tooltip>
               <label htmlFor={sortSelectId} className="admin-inline-field">
                 Sort by
               </label>
-              <select
-                id={sortSelectId}
-                value={sortBy}
-                onChange={(e) => {
-                  setSortBy(e.target.value as InvoiceSortBy);
-                  setPage(1);
-                }}
-              >
-                <option value="invoice_number">Invoice Number</option>
-                <option value="customer_last_name">Customer (Last Name)</option>
-                <option value="status">Status</option>
-                <option value="total">Total</option>
-                <option value="due_date">Due Date</option>
-              </select>
-              <button
-                type="button"
-                className="btn btn-secondary admin-sort-direction-btn"
-                onClick={() => {
-                  setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
-                  setPage(1);
-                }}
-              >
-                {sortDir === "asc" ? "ASC" : "DESC"}
-              </button>
+              <Tooltip content="Change the primary sorting field for the invoice list.">
+                <select
+                  id={sortSelectId}
+                  value={sortBy}
+                  onChange={(e) => {
+                    setSortBy(e.target.value as InvoiceSortBy);
+                    setPage(1);
+                  }}
+                >
+                  <option value="invoice_number">Invoice Number</option>
+                  <option value="customer_last_name">Customer (Last Name)</option>
+                  <option value="status">Status</option>
+                  <option value="total">Total</option>
+                  <option value="due_date">Due Date</option>
+                </select>
+              </Tooltip>
+              <Tooltip content={sortDir === "asc" ? "Sort in ascending order." : "Sort in descending order."}>
+                <button
+                  type="button"
+                  className="btn btn-secondary admin-sort-direction-btn"
+                  onClick={() => {
+                    setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+                    setPage(1);
+                  }}
+                >
+                  {sortDir === "asc" ? "ASC" : "DESC"}
+                </button>
+              </Tooltip>
             </div>
           </div>
         </div>
@@ -657,19 +667,19 @@ export function AdminInvoicesClient() {
                 <h3 className="manual-section-title">Invoice Details</h3>
                 <AdminCard ghost style={{ marginBottom: '16px' }}>
                   <AdminForm className="dialog-form-grid">
-                    <AdminField label="First Name">
+                    <AdminField label="First Name" tooltip="Customer's first name.">
                       <input value={editingCustomerFirstName} onChange={e => setEditingCustomerFirstName(e.target.value)} />
                     </AdminField>
-                    <AdminField label="Last Name">
+                    <AdminField label="Last Name" tooltip="Customer's last name.">
                       <input value={editingCustomerLastName} onChange={e => setEditingCustomerLastName(e.target.value)} />
                     </AdminField>
-                    <AdminField label="Email" fullWidth>
+                    <AdminField label="Email" tooltip="Primary email for sending the invoice." fullWidth>
                       <input value={selectedInvoice.customerEmail} readOnly />
                     </AdminField>
-                    <AdminField label="Due Date">
+                    <AdminField label="Due Date" tooltip="When the invoice payment is required.">
                       <input type="datetime-local" value={editingDueAt} onChange={(e) => setEditingDueAt(e.target.value)} />
                     </AdminField>
-                    <AdminField label="Notes" fullWidth>
+                    <AdminField label="Notes" tooltip="Visible to the customer on the public invoice." fullWidth>
                       <textarea value={editingNotes} onChange={(e) => setEditingNotes(e.target.value)} placeholder="Customer-facing notes..." style={{ minHeight: '80px' }} />
                     </AdminField>
                   </AdminForm>
@@ -691,17 +701,17 @@ export function AdminInvoicesClient() {
                     {editingLineItems.map((li) => (
                       <div key={li.key} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', borderBottom: '1px solid var(--line)', paddingBottom: '12px' }}>
                         <div style={{ flex: 1 }}>
-                          <AdminField label="Description">
+                          <AdminField label="Description" tooltip="Line item name or service provided.">
                             <input value={li.description} onChange={(e) => updateLineItem(li.key, { description: e.target.value })} />
                           </AdminField>
                         </div>
                         <div style={{ width: '60px' }}>
-                          <AdminField label="Qty">
+                          <AdminField label="Qty" tooltip="Quantity.">
                             <input type="number" value={li.quantity} onChange={(e) => updateLineItem(li.key, { quantity: e.target.value })} />
                           </AdminField>
                         </div>
                         <div style={{ width: '100px' }}>
-                          <AdminField label="Price">
+                          <AdminField label="Price" tooltip="Unit price in AUD.">
                             <input value={li.unitPriceAud} onChange={(e) => updateLineItem(li.key, { unitPriceAud: e.target.value })} />
                           </AdminField>
                         </div>
@@ -792,13 +802,13 @@ export function AdminInvoicesClient() {
             <h3 className="manual-section-title">Recipient & Basis</h3>
             <AdminCard ghost style={{ marginBottom: '16px' }}>
               <AdminForm className="dialog-form-grid">
-                <AdminField label="Select Customer" fullWidth required>
+                <AdminField label="Select Customer" tooltip="Choose which student to bill." fullWidth required>
                   <select value={createSelectedCustomerId} onChange={(e) => setCreateSelectedCustomerId(e.target.value)} style={{ width: '100%' }}>
                     <option value="">-- Choose student --</option>
                     {customerOptions.map(c => <option key={c.id} value={c.id}>{c.lastName ? `${c.lastName}, ${c.firstName}` : c.fullName}</option>)}
                   </select>
                 </AdminField>
-                <AdminField label="Invoice Basis">
+                <AdminField label="Invoice Basis" tooltip="How to generate line items for this invoice.">
                   <select value={createInvoiceBasis} onChange={(e) => setCreateInvoiceBasis(e.target.value as CreateInvoiceBasis)}>
                     <option value="lesson_based">Lessons (Calculated from bookings)</option>
                     <option value="standalone">Standalone (Manual line items)</option>
@@ -807,24 +817,24 @@ export function AdminInvoicesClient() {
                     )}
                   </select>
                 </AdminField>
-                <AdminField label="Tax Mode">
+                <AdminField label="Tax Mode" tooltip="Whether GST applies.">
                   <select value={createTaxMode} onChange={(e) => setCreateTaxMode(e.target.value as InvoiceTaxMode)}>
                     <option value="taxable">Taxable (standard)</option>
                     <option value="gst_free">GST Free</option>
                   </select>
                 </AdminField>
                 {createInvoiceBasis === 'lesson_based' && (
-                  <AdminField label="Lesson Rate (AUD)">
+                  <AdminField label="Lesson Rate (AUD)" tooltip="Price per standard lesson block for this billing period.">
                     <input value={createLessonPrice} onChange={(e) => setCreateLessonPrice(e.target.value)} />
                   </AdminField>
                 )}
                 {createInvoiceBasis === 'standalone' && (
-                  <AdminField label="Initial Item Price (AUD)">
+                  <AdminField label="Initial Item Price (AUD)" tooltip="Starting price for the manual line item.">
                     <input value={createStandalonePrice} onChange={(e) => setCreateStandalonePrice(e.target.value)} />
                   </AdminField>
                 )}
                 {createInvoiceBasis === 'presets' && (
-                  <AdminField label="Select Presets" fullWidth>
+                  <AdminField label="Select Presets" tooltip="Choose one or more configured products." fullWidth>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--line)' }}>
                       {presets.map(p => (
                         <label key={`create-preset-${p.id}`} className="admin-inline-checkbox" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
@@ -842,7 +852,7 @@ export function AdminInvoicesClient() {
                     </div>
                   </AdminField>
                 )}
-                <AdminField label="Due Date (Optional)">
+                <AdminField label="Due Date (Optional)" tooltip="When the invoice must be paid.">
                   <input type="datetime-local" value={createDueAt} onChange={(e) => setCreateDueAt(e.target.value)} />
                 </AdminField>
               </AdminForm>

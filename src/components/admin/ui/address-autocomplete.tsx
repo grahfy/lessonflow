@@ -176,7 +176,7 @@ export function AddressAutocomplete({ onAddressSelect, disabled }: AddressAutoco
   };
 
   return (
-    <AdminField label="Search Address" className="manual-span-full address-autocomplete">
+    <AdminField label="Search Address" tooltip="Type an address to automatically fill the form fields below." className="manual-span-full address-autocomplete">
       <div ref={wrapperRef} style={{ position: "relative", width: "100%" }}>
         <input
           type="text"

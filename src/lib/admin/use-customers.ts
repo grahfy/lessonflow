@@ -18,6 +18,7 @@ export interface UseCustomersOptions {
 
 export interface UseCustomersResult {
     customers: CustomerRow[];
+    setCustomers: React.Dispatch<React.SetStateAction<CustomerRow[]>>;
     loading: boolean;
     total: number;
     totalPages: number;
@@ -115,6 +116,7 @@ export function useCustomers(options: UseCustomersOptions = {}): UseCustomersRes
 
     return {
         customers,
+        setCustomers,
         loading,
         total,
         totalPages,

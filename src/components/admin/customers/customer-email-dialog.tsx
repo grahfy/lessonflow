@@ -5,6 +5,7 @@ import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { EmailViewerDialog } from "@/components/admin/ui/email-viewer-dialog";
 import { type EmailRecord, type SendEmailResult } from "@/lib/admin/use-email-history";
 import { useCaptcha, CaptchaField } from "@/components/captcha";
+import { Tooltip } from "@/components/admin/ui/tooltip";
 
 type Props = {
     loadingEmailHistory: boolean;
@@ -67,14 +68,16 @@ export function CustomerEmailDialog({
                 <div className="section-header-with-action">
                     <h3 className="manual-section-title">Email History</h3>
                     {onSyncEmail && (
-                        <button 
-                            type="button" 
-                            className="btn btn-secondary btn-small"
-                            onClick={onSyncEmail}
-                            disabled={syncingEmail || loadingEmailHistory}
-                        >
-                            {syncingEmail ? "Syncing..." : "Sync Now"}
-                        </button>
+                        <Tooltip content="Sync recent emails from connected providers.">
+                            <button 
+                                type="button" 
+                                className="btn btn-secondary btn-small"
+                                onClick={onSyncEmail}
+                                disabled={syncingEmail || loadingEmailHistory}
+                            >
+                                {syncingEmail ? "Syncing..." : "Sync Now"}
+                            </button>
+                        </Tooltip>
                     )}
                 </div>
                 <AdminCard ghost className="customer-email-history-card">
@@ -117,14 +120,14 @@ export function CustomerEmailDialog({
                 <h3 className="manual-section-title">Send Email</h3>
                 <AdminCard ghost className="customer-email-composer-card">
                     <AdminForm className="customer-email-composer-form">
-                        <AdminField label="Subject" required fullWidth>
+                        <AdminField label="Subject" tooltip="The subject line of the email." required fullWidth>
                             <input
                                 placeholder="Email subject..."
                                 value={emailComposerSubject}
                                 onChange={e => setEmailComposerSubject(e.target.value)}
                             />
                         </AdminField>
-                        <AdminField label="Message" required fullWidth>
+                        <AdminField label="Message" tooltip="The body content of the email." required fullWidth>
                             <textarea
                                 placeholder="Type your message here..."
                                 className="customer-email-message-input"
@@ -133,25 +136,29 @@ export function CustomerEmailDialog({
                             />
                         </AdminField>
                         <div className="button-row button-row-justify customer-email-actions">
-                            <button
-                                className="btn btn-secondary"
-                                type="button"
-                                disabled={sendingEmail || (!emailComposerSubject.trim() && !emailComposerMessage.trim())}
-                                onClick={() => {
-                                    setEmailComposerSubject("");
-                                    setEmailComposerMessage("");
-                                }}
-                            >
-                                Clear Draft
-                            </button>
-                            <button
-                                className="btn btn-primary"
-                                type="button"
-                                disabled={sendingEmail || !emailComposerSubject.trim() || !emailComposerMessage.trim()}
-                                onClick={handleSend}
-                            >
-                                {sendingEmail ? "Sending..." : "Send Email"}
-                            </button>
+                            <Tooltip content="Clear message fields.">
+                                <button
+                                    className="btn btn-secondary"
+                                    type="button"
+                                    disabled={sendingEmail || (!emailComposerSubject.trim() && !emailComposerMessage.trim())}
+                                    onClick={() => {
+                                        setEmailComposerSubject("");
+                                        setEmailComposerMessage("");
+                                    }}
+                                >
+                                    Clear Draft
+                                </button>
+                            </Tooltip>
+                            <Tooltip content="Send this email to the customer.">
+                                <button
+                                    className="btn btn-primary"
+                                    type="button"
+                                    disabled={sendingEmail || !emailComposerSubject.trim() || !emailComposerMessage.trim()}
+                                    onClick={handleSend}
+                                >
+                                    {sendingEmail ? "Sending..." : "Send Email"}
+                                </button>
+                            </Tooltip>
                         </div>
                         <CaptchaField idPrefix="customer-email" captcha={captcha} />
                     </AdminForm>

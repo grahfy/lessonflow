@@ -5,6 +5,7 @@ import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { AlertCircle, CheckCircle, RefreshCw, Bug, Search, Terminal, ChevronRight, ChevronDown, Filter, ImagePlus, X } from "lucide-react";
 import { Pagination } from "@/components/pagination";
+import { Tooltip } from "@/components/admin/ui/tooltip";
 
 type SystemLog = {
   id: string;
@@ -206,20 +207,24 @@ export function SystemLogsClient() {
         <div className="syslog-toolbar">
           <div className="syslog-toolbar-search">
             <Search size={14} />
-            <input
-              id="syslog-search"
-              type="text"
-              placeholder="Search logs..."
-              value={eventSearch}
-              onChange={(e) => {
-                setEventSearch(e.target.value);
-                setPage(1);
-              }}
-            />
+            <Tooltip content="Search logs by event name or identifier.">
+              <input
+                id="syslog-search"
+                type="text"
+                placeholder="Search logs..."
+                value={eventSearch}
+                onChange={(e) => {
+                  setEventSearch(e.target.value);
+                  setPage(1);
+                }}
+              />
+            </Tooltip>
           </div>
 
           <div className="syslog-toolbar-field">
-            <label htmlFor="syslog-level">Level</label>
+            <Tooltip content="Filter logs by severity level.">
+              <label htmlFor="syslog-level">Level</label>
+            </Tooltip>
             <select
               id="syslog-level"
               value={levelFilter}
@@ -236,29 +241,35 @@ export function SystemLogsClient() {
           </div>
 
           <div className="syslog-toolbar-actions">
-            <button
-              className="btn btn-primary"
-              onClick={fetchLogs}
-              disabled={loading}
-            >
-              <Filter size={14} />
-              FILTER
-            </button>
-            <button
-              className="btn btn-secondary"
-              onClick={fetchLogs}
-              disabled={loading}
-            >
-              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-              REFRESH
-            </button>
-            <button
-              className="btn btn-secondary"
-              onClick={() => setIsReportingBug(true)}
-            >
-              <Bug size={14} />
-              REPORT ISSUE
-            </button>
+            <Tooltip content="Apply the current search and level filters to the logs.">
+              <button
+                className="btn btn-primary"
+                onClick={fetchLogs}
+                disabled={loading}
+              >
+                <Filter size={14} />
+                FILTER
+              </button>
+            </Tooltip>
+            <Tooltip content="Reload the system logs from the server.">
+              <button
+                className="btn btn-secondary"
+                onClick={fetchLogs}
+                disabled={loading}
+              >
+                <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+                REFRESH
+              </button>
+            </Tooltip>
+            <Tooltip content="Open a form to submit a technical issue report to the developer.">
+              <button
+                className="btn btn-secondary"
+                onClick={() => setIsReportingBug(true)}
+              >
+                <Bug size={14} />
+                REPORT ISSUE
+              </button>
+            </Tooltip>
           </div>
         </div>
 
@@ -412,7 +423,9 @@ export function SystemLogsClient() {
       >
         <form id="bug-report-form" onSubmit={handleReportBug}>
           <div className="field">
-            <label htmlFor="bug-subject" className="admin-inline-field">Subject</label>
+            <Tooltip content="A short title describing the issue you encountered.">
+              <label htmlFor="bug-subject" className="admin-inline-field">Subject</label>
+            </Tooltip>
             <input
               id="bug-subject"
               type="text"
@@ -427,7 +440,9 @@ export function SystemLogsClient() {
           </div>
 
           <div className="field" style={{ marginTop: 10 }}>
-            <label htmlFor="bug-email" className="admin-inline-field">Your Email</label>
+            <Tooltip content="Where should the developer reply to this report?">
+              <label htmlFor="bug-email" className="admin-inline-field">Your Email</label>
+            </Tooltip>
             <input
               id="bug-email"
               type="email"
@@ -439,7 +454,9 @@ export function SystemLogsClient() {
           </div>
 
           <div className="field" style={{ marginTop: 10 }}>
-            <label htmlFor="bug-desc" className="admin-inline-field">Description</label>
+            <Tooltip content="Please provide steps to reproduce the issue.">
+              <label htmlFor="bug-desc" className="admin-inline-field">Description</label>
+            </Tooltip>
             <textarea
               id="bug-desc"
               required

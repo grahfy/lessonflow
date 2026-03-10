@@ -85,16 +85,16 @@ export function AdminPresetsEditor() {
           {presets.map((p) => (
             <AdminCard key={p.id} style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid var(--line)' }}>
               <AdminForm>
-                <AdminField label="Label" required>
+                <AdminField label="Label" tooltip="Short name for this preset (e.g. '1 Hour Lesson')." required>
                   <input value={p.label} onChange={e => updatePreset(p.id, { label: e.target.value })} />
                 </AdminField>
-                <AdminField label="Price (AUD)" required>
+                <AdminField label="Price (AUD)" tooltip="Default price in Australian Dollars." required>
                   <input 
                     value={toMoneyInput(p.unitPriceCents)} 
                     onChange={e => updatePreset(p.id, { unitPriceCents: parseAudInputToCents(e.target.value).cents || 0 })} 
                   />
                 </AdminField>
-                <AdminField label="Default Description" fullWidth>
+                <AdminField label="Default Description" tooltip="Pre-filled text for the invoice line item." fullWidth>
                   <textarea 
                     value={p.description} 
                     style={{ minHeight: '60px' }} 
@@ -113,21 +113,21 @@ export function AdminPresetsEditor() {
           <AdminCard style={{ border: '1px dashed var(--line)', background: 'transparent' }}>
             <h3 style={{ fontSize: '0.9rem', marginBottom: '12px' }}>Add New Preset</h3>
             <AdminForm>
-              <AdminField label="Label">
+              <AdminField label="Label" tooltip="Short name for the new preset.">
                 <input 
                   placeholder="e.g. 10 Week Term" 
                   value={newPreset.label} 
                   onChange={e => setNewPreset(prev => ({ ...prev, label: e.target.value }))} 
                 />
               </AdminField>
-              <AdminField label="Price (AUD)">
+              <AdminField label="Price (AUD)" tooltip="Default price in Australian Dollars.">
                 <input 
                   placeholder="0.00" 
                   value={toMoneyInput(newPreset.unitPriceCents || 0)} 
                   onChange={e => setNewPreset(prev => ({ ...prev, unitPriceCents: parseAudInputToCents(e.target.value).cents || 0 }))} 
                 />
               </AdminField>
-              <AdminField label="Default Description" fullWidth>
+              <AdminField label="Default Description" tooltip="Pre-filled text for the invoice line item." fullWidth>
                 <textarea 
                   placeholder="Line item text..." 
                   value={newPreset.description} 

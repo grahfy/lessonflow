@@ -5,6 +5,7 @@ import { type LearningMaterialBooking, type LearningMaterialRow, LEARNING_MATERI
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { useCaptcha, CaptchaField } from "@/components/captcha";
+import { Tooltip } from "@/components/admin/ui/tooltip";
 
 type Props = {
     materialsLoading: boolean;
@@ -62,14 +63,18 @@ export function CustomerMaterialsDialog({
                                             {m.description ? <span className="helper-text">{m.title}</span> : null}
                                         </div>
                                         <div className="customer-materials-item-actions">
-                                            <button className="btn btn-secondary" onClick={() => window.open(`/api/admin/learning-materials/${m.id}`, '_blank')}>View</button>
-                                            <button
-                                                className="btn btn-danger"
-                                                disabled={materialsDeletingId === m.id}
-                                                onClick={() => void onDelete(m.id)}
-                                            >
-                                                {materialsDeletingId === m.id ? "Deleting..." : "Delete"}
-                                            </button>
+                                            <Tooltip content="Open material in a new tab.">
+                                                <button className="btn btn-secondary" onClick={() => window.open(`/api/admin/learning-materials/${m.id}`, '_blank')}>View</button>
+                                            </Tooltip>
+                                            <Tooltip content="Permanently remove this material.">
+                                                <button
+                                                    className="btn btn-danger"
+                                                    disabled={materialsDeletingId === m.id}
+                                                    onClick={() => void onDelete(m.id)}
+                                                >
+                                                    {materialsDeletingId === m.id ? "Deleting..." : "Delete"}
+                                                </button>
+                                            </Tooltip>
                                         </div>
                                     </div>
                                     
@@ -109,7 +114,7 @@ export function CustomerMaterialsDialog({
                         onReset={() => setSelectedFileName("No file selected")}
                     >
                         <AdminForm className="customer-materials-upload-grid">
-                            <AdminField label="Associate with booking" fullWidth>
+                            <AdminField label="Associate with booking" tooltip="Link this material to a specific scheduled lesson." fullWidth>
                                 <select
                                     value={materialsBookingId}
                                     onChange={e => {
@@ -125,7 +130,7 @@ export function CustomerMaterialsDialog({
                                     ))}
                                 </select>
                             </AdminField>
-                            <AdminField label="Select file" fullWidth>
+                            <AdminField label="Select file" tooltip="Choose the file to upload from your computer." fullWidth>
                                 <input
                                     id={fileInputId}
                                     type="file"
@@ -147,15 +152,17 @@ export function CustomerMaterialsDialog({
                                     }}
                                 />
                                 <div className="customer-materials-file-picker">
-                                    <label htmlFor={fileInputId} className="btn btn-secondary">
-                                        Browse
-                                    </label>
+                                    <Tooltip content="Select a file from your device.">
+                                        <label htmlFor={fileInputId} className="btn btn-secondary">
+                                            Browse
+                                        </label>
+                                    </Tooltip>
                                     <span className="customer-materials-file-name" title={selectedFileName}>
                                         {selectedFileName}
                                     </span>
                                 </div>
                             </AdminField>
-                            <AdminField label="Description (optional)" fullWidth>
+                            <AdminField label="Description (optional)" tooltip="Provide context or instructions for this material." fullWidth>
                                 <textarea
                                     name="description"
                                     rows={2}
@@ -164,14 +171,16 @@ export function CustomerMaterialsDialog({
                                 />
                             </AdminField>
                             <CaptchaField idPrefix="material-upload" captcha={captcha} />
-                            <button
-                                type="button"
-                                disabled={materialsUploading}
-                                onClick={handleUpload}
-                                className="btn btn-primary customer-materials-upload-btn"
-                            >
-                                {materialsUploading ? 'Uploading...' : 'Upload Material'}
-                            </button>
+                            <Tooltip content="Upload the selected material.">
+                                <button
+                                    type="button"
+                                    disabled={materialsUploading}
+                                    onClick={handleUpload}
+                                    className="btn btn-primary customer-materials-upload-btn"
+                                >
+                                    {materialsUploading ? 'Uploading...' : 'Upload Material'}
+                                </button>
+                            </Tooltip>
                         </AdminForm>
                     </form>
                 </AdminCard>

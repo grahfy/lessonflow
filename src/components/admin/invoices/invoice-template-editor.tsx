@@ -78,7 +78,7 @@ export function AdminInvoiceTemplateEditor() {
             <AdminCard key={t.key} style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid var(--line)' }}>
               <h3 style={{ fontSize: '0.9rem', marginBottom: '12px', textTransform: 'uppercase' }}>{t.key.replace(/_/g, ' ')}</h3>
               <AdminForm>
-                <AdminField label="Content" fullWidth>
+                <AdminField label="Content" tooltip="The actual text content for this template (supports plain text)." fullWidth>
                   <textarea value={t.content} style={{ minHeight: '120px' }} onChange={e => updateTemplate(t.key, e.target.value)} />
                 </AdminField>
               </AdminForm>

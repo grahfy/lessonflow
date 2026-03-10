@@ -271,16 +271,16 @@ export function BookingDetailDialog({
                 )}
 
                 <AdminForm className="dialog-form-grid">
-                  <AdminField label="First Name">
+                  <AdminField label="First Name" tooltip="Student's legal or preferred first name.">
                     <input value={dialogForm.firstName} onChange={e => updateForm({ firstName: e.target.value })} />
                   </AdminField>
-                  <AdminField label="Last Name">
+                  <AdminField label="Last Name" tooltip="Student's family name.">
                     <input value={dialogForm.lastName} onChange={e => updateForm({ lastName: e.target.value })} />
                   </AdminField>
-                  <AdminField label="Email" fullWidth>
+                  <AdminField label="Email" tooltip="Primary email address for communication and portal login." fullWidth>
                     <input value={dialogForm.email} onChange={e => updateForm({ email: e.target.value })} />
                   </AdminField>
-                  <AdminField label="Phone">
+                  <AdminField label="Phone" tooltip="Contact phone number (10 digits).">
                     <input value={dialogForm.phone} maxLength={10} onChange={e => updateForm({ phone: e.target.value.replace(/\D/g, '').slice(0, 10) })} />
                   </AdminField>
                   
@@ -292,16 +292,16 @@ export function BookingDetailDialog({
                      />
                   </div>
                   
-                  <AdminField label="Unit">
+                  <AdminField label="Unit" tooltip="Unit or apartment number (optional).">
                     <input value={dialogForm.unitNumber} onChange={e => updateForm({ unitNumber: e.target.value })} />
                   </AdminField>
-                  <AdminField label="House #">
+                  <AdminField label="House #" tooltip="Street or house number.">
                     <input value={dialogForm.houseNumber} onChange={e => updateForm({ houseNumber: e.target.value })} />
                   </AdminField>
-                  <AdminField label="Street Name">
+                  <AdminField label="Street Name" tooltip="Name of the street.">
                     <input value={dialogForm.streetName} onChange={e => updateForm({ streetName: e.target.value })} />
                   </AdminField>
-                  <AdminField label="Street Type">
+                  <AdminField label="Street Type" tooltip="Type of street (e.g., Road, Avenue).">
                     <select value={dialogForm.streetType} onChange={e => updateForm({ streetType: e.target.value })}>
                       <option value="Street">Street</option>
                       <option value="Road">Road</option>
@@ -317,15 +317,15 @@ export function BookingDetailDialog({
                       <option value="Close">Close</option>
                     </select>
                   </AdminField>
-                  <AdminField label="Suburb">
+                  <AdminField label="Suburb" tooltip="City or suburb name.">
                     <input value={dialogForm.suburb} onChange={e => updateForm({ suburb: e.target.value })} />
                   </AdminField>
-                  <AdminField label="State">
+                  <AdminField label="State" tooltip="Australian state or territory.">
                     <select value={dialogForm.state} onChange={e => updateForm({ state: e.target.value })}>
                       {AU_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </AdminField>
-                  <AdminField label="Postcode">
+                  <AdminField label="Postcode" tooltip="4-digit postal code.">
                     <input value={dialogForm.postcode} maxLength={4} onChange={e => updateForm({ postcode: e.target.value.replace(/\D/g, '').slice(0, 4) })} />
                   </AdminField>
                 </AdminForm>
@@ -333,23 +333,23 @@ export function BookingDetailDialog({
                 {/* SECTION: LESSON LOGISTICS */}
                 <h3 className="manual-section-title booking-section-title">Lesson Config</h3>
                 <AdminForm className="dialog-form-grid">
-                  <AdminField label="Start Time">
+                  <AdminField label="Start Time" tooltip="The date and time this lesson is scheduled to begin.">
                     <input type="datetime-local" value={dialogForm.startAtLocal} onChange={e => updateForm({ startAtLocal: e.target.value })} />
                   </AdminField>
-                  <AdminField label="Mode">
+                  <AdminField label="Mode" tooltip="Physical location or virtual format of the lesson.">
                     <select value={dialogForm.lessonMode} onChange={e => updateForm({ lessonMode: e.target.value })}>
                       <option value="in_person">In-person</option>
                       <option value="video">Video</option>
                     </select>
                   </AdminField>
-                  <AdminField label="Skill Level">
+                  <AdminField label="Skill Level" tooltip="The student's current proficiency level.">
                     <select value={dialogForm.skillLevel} onChange={e => updateForm({ skillLevel: e.target.value })}>
                       <option value="beginner">Beginner</option>
                       <option value="intermediate">Intermediate</option>
                       <option value="advanced">Advanced</option>
                     </select>
                   </AdminField>
-                  <AdminField label="Duration">
+                  <AdminField label="Duration" tooltip="Length of the lesson in minutes.">
                     <select value={dialogForm.durationChoice} onChange={e => updateForm({ durationChoice: e.target.value })}>
                       <option value="min30">30 minutes</option>
                       <option value="min60">60 minutes</option>
@@ -357,7 +357,7 @@ export function BookingDetailDialog({
                     </select>
                   </AdminField>
                   {dialogForm.durationChoice === 'custom' && (
-                    <AdminField label="Minutes">
+                    <AdminField label="Minutes" tooltip="Custom duration in minutes.">
                       <input value={dialogForm.customDurationMinutes} onChange={e => updateForm({ customDurationMinutes: e.target.value.replace(/\D/g, '') })} />
                     </AdminField>
                   )}
@@ -367,7 +367,7 @@ export function BookingDetailDialog({
               {/* SECTION: NOTES & DOMAIN ACTIONS */}
               <div className="dialog-col is-notes">
                 <h3 className="manual-section-title">Notes & Actions</h3>
-                <AdminField label="Lesson notes">
+                <AdminField label="Lesson notes" tooltip="Internal notes about the student's progress or goals.">
                   <textarea className="dialog-notes booking-notes-area" value={dialogForm.notes} onChange={(e) => updateForm({ notes: e.target.value })} />
                 </AdminField>
                 <div className="button-row booking-notes-actions">
@@ -443,10 +443,10 @@ export function BookingDetailDialog({
                 <h3 className="manual-section-title">Send Custom Email</h3>
                 <AdminCard ghost className="booking-email-composer-card">
                   <AdminForm>
-                    <AdminField label="Subject" required fullWidth>
+                    <AdminField label="Subject" tooltip="The subject line for the email sent to the student." required fullWidth>
                       <input placeholder="Email subject..." value={emailSubject} onChange={e => setEmailSubject(e.target.value)} />
                     </AdminField>
-                    <AdminField label="Message" required fullWidth>
+                    <AdminField label="Message" tooltip="The main body text of the email." required fullWidth>
                       <textarea className="dialog-notes booking-email-message-area" placeholder="Type message here..." value={emailMessage} onChange={e => setEmailMessage(e.target.value)} />
                     </AdminField>
                   </AdminForm>

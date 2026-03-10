@@ -31,6 +31,7 @@ import { AdminContentEditor } from "@/components/admin/settings/content-editor";
 import { AdminEmailTemplateEditor } from "@/components/admin/settings/email-template-editor";
 import { AdminInvoiceTemplateEditor } from "@/components/admin/invoices/invoice-template-editor";
 import { GmailStatus } from "@/components/admin/settings/gmail-status";
+import { Tooltip } from "@/components/admin/ui/tooltip";
 
 import { useSettings, type EnvVarField } from "@/lib/admin/use-settings";
 
@@ -257,7 +258,7 @@ export function AdminSettingsClient() {
                       key={envVar.key}
                       label={envVar.title}
                       required={envVar.isRequired}
-                      description={envVar.description}
+                      tooltip={envVar.description}
                       error={fieldError}
                       htmlFor={`admin-setting-${envVar.key}`}
                     >
@@ -286,9 +287,11 @@ export function AdminSettingsClient() {
 
         <div className="field full">
           <div className="button-row">
-            <button className="btn btn-primary" type="button" disabled={saving} onClick={handleSave}>
-              {saving ? "Saving..." : "Save Configuration"}
-            </button>
+            <Tooltip content="Apply and save changes to these settings.">
+              <button className="btn btn-primary" type="button" disabled={saving} onClick={handleSave}>
+                {saving ? "Saving..." : "Save Configuration"}
+              </button>
+            </Tooltip>
           </div>
         </div>
       </AdminCard>
@@ -306,12 +309,24 @@ export function AdminSettingsClient() {
       <div className="admin-layout-content is-scrollable">
         <AdminCard className="booking-row">
           <div className="site-nav">
-            <button className={`btn ${activeTab === "branding" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("branding")}>Branding</button>
-            <button className={`btn ${activeTab === "pages" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("pages")}>Pages</button>
-            <button className={`btn ${activeTab === "emails" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("emails")}>Emails</button>
-            <button className={`btn ${activeTab === "invoices" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("invoices")}>Invoices</button>
-            <button className={`btn ${activeTab === "products" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("products")}>Products</button>
-            <button className={`btn ${activeTab === "system" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("system")}>System</button>
+            <Tooltip content="Configure brand names, logos, and contact information.">
+              <button className={`btn ${activeTab === "branding" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("branding")}>Branding</button>
+            </Tooltip>
+            <Tooltip content="Edit content for the student portal and legal pages.">
+              <button className={`btn ${activeTab === "pages" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("pages")}>Pages</button>
+            </Tooltip>
+            <Tooltip content="Customize email templates sent to students and staff.">
+              <button className={`btn ${activeTab === "emails" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("emails")}>Emails</button>
+            </Tooltip>
+            <Tooltip content="Manage invoice numbering, payment terms, and visual templates.">
+              <button className={`btn ${activeTab === "invoices" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("invoices")}>Invoices</button>
+            </Tooltip>
+            <Tooltip content="Configure catalog items like tuition types and textbooks.">
+              <button className={`btn ${activeTab === "products" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("products")}>Products</button>
+            </Tooltip>
+            <Tooltip content="Advanced configuration for databases, security, and email delivery routes.">
+              <button className={`btn ${activeTab === "system" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("system")}>System</button>
+            </Tooltip>
           </div>
         </AdminCard>
 
@@ -344,14 +359,16 @@ export function AdminSettingsClient() {
                 <AdminCard>
                   <h2 className="admin-settings-section-title">Admin Password Management</h2>
                   <AdminForm>
-                    <AdminField label="New Secure Password">
-                      <input type="password" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} />
+                    <AdminField label="New Password" tooltip="Required only if changing the admin password.">
+                      <input type="password" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} autoComplete="new-password" />
                     </AdminField>
-                    <AdminField label="Confirm New Password">
-                      <input type="password" value={confirmAdminPassword} onChange={e => setConfirmAdminPassword(e.target.value)} />
+                    <AdminField label="Confirm New Password" tooltip="Must match the new password above." error={fieldErrors.ADMIN_PASSWORD_CONFIRM}>
+                      <input type="password" value={confirmAdminPassword} onChange={e => setConfirmAdminPassword(e.target.value)} autoComplete="new-password" />
                     </AdminField>
                     <div className="field full">
-                      <button className="btn btn-primary" onClick={handleSave}>Rotate Credentials</button>
+                      <Tooltip content="Update the administrator password. This will require you to log in again.">
+                        <button className="btn btn-primary" onClick={handleSave}>Rotate Credentials</button>
+                      </Tooltip>
                     </div>
                   </AdminForm>
                 </AdminCard>

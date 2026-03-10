@@ -4,6 +4,7 @@ import { formatDateTime, toAuState, toDigits } from "@/lib/admin/utils";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AddressAutocomplete } from "@/components/admin/ui/address-autocomplete";
+import { Tooltip } from "@/components/admin/ui/tooltip";
 
 // Types derived from admin-customers-client.tsx
 export type CustomerRow = {
@@ -137,21 +138,21 @@ export function CustomerProfileDialog({
             <div className="dialog-col customer-tab-section customer-profile-panel">
                 <h4>Contact & Profile</h4>
                 <AdminForm className="dialog-form-grid">
-                    <AdminField label="First Name" required>
+                    <AdminField label="First Name" tooltip="Student's legal or preferred first name." required>
                         <input
                             value={form.firstName}
                             readOnly={!isEditing}
                             onChange={e => updateForm({ firstName: e.target.value })}
                         />
                     </AdminField>
-                    <AdminField label="Last Name" required>
+                    <AdminField label="Last Name" tooltip="Student's family name." required>
                         <input
                             value={form.lastName}
                             readOnly={!isEditing}
                             onChange={e => updateForm({ lastName: e.target.value })}
                         />
                     </AdminField>
-                    <AdminField label="Email" required fullWidth>
+                    <AdminField label="Email" tooltip="Primary email address for communication and portal login." required fullWidth>
                         <input
                             type="email"
                             value={form.email}
@@ -159,7 +160,7 @@ export function CustomerProfileDialog({
                             onChange={e => updateForm({ email: e.target.value })}
                         />
                     </AdminField>
-                    <AdminField label="Phone" required>
+                    <AdminField label="Phone" tooltip="Contact phone number (10 digits)." required>
                         <input
                             value={form.phone}
                             readOnly={!isEditing}
@@ -167,7 +168,7 @@ export function CustomerProfileDialog({
                             onChange={e => updateForm({ phone: toDigits(e.target.value, 10) })}
                         />
                     </AdminField>
-                    <AdminField label="Skill Level">
+                    <AdminField label="Skill Level" tooltip="The student's current proficiency level.">
                         {isEditing ? (
                             <select
                                 value={form.skillLevel}
@@ -181,7 +182,7 @@ export function CustomerProfileDialog({
                             <input value={form.skillLevel} style={{ textTransform: 'capitalize' }} readOnly />
                         )}
                     </AdminField>
-                    <AdminField label="Lesson Mode">
+                    <AdminField label="Lesson Mode" tooltip="Physical location or virtual format preferred by the student.">
                         {isEditing ? (
                             <select
                                 value={form.lessonMode}
@@ -206,28 +207,28 @@ export function CustomerProfileDialog({
                     </div>
                 )}
                 <AdminForm className="dialog-form-grid">
-                    <AdminField label="Unit / Apartment">
+                    <AdminField label="Unit / Apartment" tooltip="Unit or apartment number (optional).">
                         <input
                             value={form.unitNumber}
                             readOnly={!isEditing}
                             onChange={e => updateForm({ unitNumber: e.target.value })}
                         />
                     </AdminField>
-                    <AdminField label="House Number" required>
+                    <AdminField label="House Number" tooltip="Street or house number." required>
                         <input
                             value={form.houseNumber}
                             readOnly={!isEditing}
                             onChange={e => updateForm({ houseNumber: e.target.value })}
                         />
                     </AdminField>
-                    <AdminField label="Street Name" required>
+                    <AdminField label="Street Name" tooltip="Name of the street." required>
                         <input
                             value={form.streetName}
                             readOnly={!isEditing}
                             onChange={e => updateForm({ streetName: e.target.value })}
                         />
                     </AdminField>
-                    <AdminField label="Street Type" required>
+                    <AdminField label="Street Type" tooltip="Type of street (e.g., Road, Avenue)." required>
                         {isEditing ? (
                             <select
                                 value={form.streetType}
@@ -250,14 +251,14 @@ export function CustomerProfileDialog({
                             <input value={form.streetType} readOnly />
                         )}
                     </AdminField>
-                    <AdminField label="Suburb" required>
+                    <AdminField label="Suburb" tooltip="City or suburb name." required>
                         <input
                             value={form.suburb}
                             readOnly={!isEditing}
                             onChange={e => updateForm({ suburb: e.target.value })}
                         />
                     </AdminField>
-                    <AdminField label="State" required>
+                    <AdminField label="State" tooltip="Australian state or territory." required>
                         {isEditing ? (
                             <select
                                 value={form.state}
@@ -269,7 +270,7 @@ export function CustomerProfileDialog({
                             <input value={form.state} readOnly />
                         )}
                     </AdminField>
-                    <AdminField label="Postcode" required>
+                    <AdminField label="Postcode" tooltip="4-digit postal code." required>
                         <input
                             value={form.postcode}
                             readOnly={!isEditing}
@@ -319,24 +320,28 @@ export function CustomerProfileDialog({
                         )}
 
                         <div className="button-row" style={{ marginTop: '8px' }}>
-                            <button
-                                className="btn btn-secondary"
-                                type="button"
-                                disabled={!customer || !customer.portalCredential || portalCredentialBusyCustomerId === customer.id || isEditing}
-                                onClick={() => customer && onRevealPortalPassword()}
-                            >
-                                {customer && portalCredentialBusyCustomerId === customer.id ? "..." : "Reveal Password"}
-                            </button>
-                            <button
-                                className="btn btn-secondary"
-                                type="button"
-                                disabled={!customer || portalCredentialBusyCustomerId === customer.id || isEditing}
-                                onClick={() => customer && onRegeneratePortalPassword()}
-                            >
-                                {customer && portalCredentialBusyCustomerId === customer.id 
-                                    ? "..." 
-                                    : (customer?.portalCredential ? "Regenerate" : "Generate Password")}
-                            </button>
+                            <Tooltip content="Show current portal password.">
+                                <button
+                                    className="btn btn-secondary"
+                                    type="button"
+                                    disabled={!customer || !customer.portalCredential || portalCredentialBusyCustomerId === customer.id || isEditing}
+                                    onClick={() => customer && onRevealPortalPassword()}
+                                >
+                                    {customer && portalCredentialBusyCustomerId === customer.id ? "..." : "Reveal Password"}
+                                </button>
+                            </Tooltip>
+                            <Tooltip content="Generate and issue a new password.">
+                                <button
+                                    className="btn btn-secondary"
+                                    type="button"
+                                    disabled={!customer || portalCredentialBusyCustomerId === customer.id || isEditing}
+                                    onClick={() => customer && onRegeneratePortalPassword()}
+                                >
+                                    {customer && portalCredentialBusyCustomerId === customer.id 
+                                        ? "..." 
+                                        : (customer?.portalCredential ? "Regenerate" : "Generate Password")}
+                                </button>
+                            </Tooltip>
                         </div>
                     </div>
                 </AdminCard>
@@ -345,47 +350,57 @@ export function CustomerProfileDialog({
                 <div className="dialog-actions" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '10px' }}>
                     {isEditing ? (
                         <>
-                            <button
-                                className="btn btn-primary"
-                                type="button"
-                                disabled={savingCustomer}
-                                onClick={onSave}
-                            >
-                                {savingCustomer ? "Saving..." : "Save Changes"}
-                            </button>
-                            <button
-                                className="btn btn-secondary"
-                                type="button"
-                                disabled={savingCustomer}
-                                onClick={onCancelEdit}
-                            >
-                                Cancel Edit
-                            </button>
+                            <Tooltip content="Save changes to customer profile.">
+                                <button
+                                    className="btn btn-primary"
+                                    type="button"
+                                    disabled={savingCustomer}
+                                    onClick={onSave}
+                                >
+                                    {savingCustomer ? "Saving..." : "Save Changes"}
+                                </button>
+                            </Tooltip>
+                            <Tooltip content="Discard unsaved edits.">
+                                <button
+                                    className="btn btn-secondary"
+                                    type="button"
+                                    disabled={savingCustomer}
+                                    onClick={onCancelEdit}
+                                >
+                                    Cancel Edit
+                                </button>
+                            </Tooltip>
                         </>
                     ) : (
                         <>
-                            <button
-                                className="btn btn-primary"
-                                type="button"
-                                onClick={onViewBillingHistory}
-                            >
-                                View Billing History
-                            </button>
-                            <button className="btn btn-secondary" type="button" onClick={onStartEdit}>
-                                Edit Profile
-                            </button>
+                            <Tooltip content="View all past invoices and transactions.">
+                                <button
+                                    className="btn btn-primary"
+                                    type="button"
+                                    onClick={onViewBillingHistory}
+                                >
+                                    View Billing History
+                                </button>
+                            </Tooltip>
+                            <Tooltip content="Modify this customer's details.">
+                                <button className="btn btn-secondary" type="button" onClick={onStartEdit}>
+                                    Edit Profile
+                                </button>
+                            </Tooltip>
                         </>
                     )}
 
                     {customer && (
-                        <button
-                            className="btn btn-danger"
-                            type="button"
-                            disabled={deletingCustomerId === customer.id || savingCustomer || isEditing}
-                            onClick={onDelete}
-                        >
-                            {deletingCustomerId === customer.id ? "Deleting..." : "Delete Customer"}
-                        </button>
+                        <Tooltip content="Permanently delete this customer record.">
+                            <button
+                                className="btn btn-danger"
+                                type="button"
+                                disabled={deletingCustomerId === customer.id || savingCustomer || isEditing}
+                                onClick={onDelete}
+                            >
+                                {deletingCustomerId === customer.id ? "Deleting..." : "Delete Customer"}
+                            </button>
+                        </Tooltip>
                     )}
                 </div>
             </div>

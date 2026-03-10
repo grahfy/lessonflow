@@ -26,10 +26,11 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
-import { animateIn, animateOut } from "@/components/motion/tween-orchestrator";
+import { animateIn, animateOut, useTweenOrchestrator } from "@/components/motion/tween-orchestrator";
 import { usePresenceExit } from "@/components/motion/use-presence-exit";
 import { CustomerTable } from "@/components/admin/customers/customer-table";
 import { CustomerDialogWrapper } from "@/components/admin/customers/customer-dialog-wrapper";
+import { Tooltip } from "@/components/admin/ui/tooltip";
 import { emptyCustomerForm, customerFormFromRow, type CustomerRow, type CustomerForm } from "@/components/admin/customers/customer-profile-dialog";
 
 import { useCustomers } from "@/lib/admin/use-customers";
@@ -46,6 +47,7 @@ export function AdminCustomersClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const searchInputId = useId();
+  const { beginExitTransition } = useTweenOrchestrator();
   
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -92,6 +94,7 @@ export function AdminCustomersClient() {
   
   const { 
     customers, 
+    setCustomers,
     loading: loadingCustomers, 
     total: totalCount, 
     totalPages, 
@@ -295,36 +298,42 @@ export function AdminCustomersClient() {
           
           <div className="search-box">
             <label htmlFor={searchInputId}>Search</label>
-            <input
-              id={searchInputId}
-              type="text"
-              value={customerQuery}
-              placeholder="Search by name, email, or phone..."
-              onChange={(event) => setCustomerQuery(event.target.value)}
-            />
+            <Tooltip content="Search for students by name, email, or phone number.">
+              <input
+                id={searchInputId}
+                type="text"
+                value={customerQuery}
+                placeholder="Search by name, email, or phone..."
+                onChange={(event) => setCustomerQuery(event.target.value)}
+              />
+            </Tooltip>
             {/* Inline Sorting Controls */}
             <div className="admin-sort-inline-row">
               <span className="admin-inline-field">SORT BY</span>
-              <select
-                value={sortBy}
-                onChange={(event) => {
-                  setSortBy(event.target.value as CustomersSortBy);
-                  setPage(1);
-                }}
-              >
-                <option value="customer">Customer</option>
-                <option value="skill_mode">Skill / Mode</option>
-              </select>
-              <button
-                type="button"
-                className="btn btn-secondary admin-sort-direction-btn"
-                onClick={() => {
-                  setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
-                  setPage(1);
-                }}
-              >
-                {sortDir === "asc" ? "ASC" : "DESC"}
-              </button>
+              <Tooltip content="Change the primary sorting field for the customer list.">
+                <select
+                  value={sortBy}
+                  onChange={(event) => {
+                    setSortBy(event.target.value as CustomersSortBy);
+                    setPage(1);
+                  }}
+                >
+                  <option value="customer">Customer</option>
+                  <option value="skill_mode">Skill / Mode</option>
+                </select>
+              </Tooltip>
+              <Tooltip content={sortDir === "asc" ? "Sort in ascending order." : "Sort in descending order."}>
+                <button
+                  type="button"
+                  className="btn btn-secondary admin-sort-direction-btn"
+                  onClick={() => {
+                    setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+                    setPage(1);
+                  }}
+                >
+                  {sortDir === "asc" ? "ASC" : "DESC"}
+                </button>
+              </Tooltip>
             </div>
           </div>
         </div>
@@ -344,7 +353,7 @@ export function AdminCustomersClient() {
           }}
           onOpenCustomerDialog={openCustomerDialog}
           onDeleteCustomer={deleteCustomer}
-          onViewInvoices={(name) => router.push(`/admin/invoices?q=${encodeURIComponent(name)}`)}
+          onViewInvoices={(name) => void beginExitTransition(null, 0, () => router.push(`/admin/invoices?q=${encodeURIComponent(name)}`))}
         />
       </div>
 
@@ -396,14 +405,32 @@ export function AdminCustomersClient() {
           // Student Portal Identity Access
           revealedPortalPasswords={revealedPortalPasswords}
           portalCredentialBusyCustomerId={portalCredentialBusyCustomerId}
-          onRevealPortalPassword={() => selectedCustomer && revealPortalPasswordApi(selectedCustomer.id)}
-          onRegeneratePortalPassword={() => selectedCustomer && regeneratePortalPasswordApi(selectedCustomer.id)}
+          onRevealPortalPassword={async () => {
+            if (!selectedCustomer) return;
+            const result = await revealPortalPasswordApi(selectedCustomer.id);
+            if (result?.credential) {
+              const updated = { ...selectedCustomer, portalCredential: result.credential };
+              setSelectedCustomer(updated);
+              // Also update in the list to maintain consistency
+              setCustomers((prev: CustomerRow[]) => prev.map((c: CustomerRow) => c.id === updated.id ? updated : c));
+            }
+          }}
+          onRegeneratePortalPassword={async () => {
+            if (!selectedCustomer) return;
+            const result = await regeneratePortalPasswordApi(selectedCustomer.id);
+            if (result?.credential) {
+              const updated = { ...selectedCustomer, portalCredential: result.credential };
+              setSelectedCustomer(updated);
+              // Also update in the list to maintain consistency
+              setCustomers((prev: CustomerRow[]) => prev.map((c: CustomerRow) => c.id === updated.id ? updated : c));
+            }
+          }}
           
           // Profile Tab Internal Actions
           onCancelEdit={() => setIsEditing(false)}
           onStartEdit={() => setIsEditing(true)}
           onDeleteCustomer={() => selectedCustomer && deleteCustomer(selectedCustomer)}
-          onViewBillingHistory={() => selectedCustomer && router.push(`/admin/invoices?q=${encodeURIComponent(selectedCustomer.fullName)}`)}
+          onViewBillingHistory={() => selectedCustomer && void beginExitTransition(null, 0, () => router.push(`/admin/invoices?q=${encodeURIComponent(selectedCustomer.fullName)}`))}
           deletingCustomerId={null}
         />
       )}

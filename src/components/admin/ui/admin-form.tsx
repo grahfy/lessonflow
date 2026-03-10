@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, type HTMLAttributes, type PropsWithChildren } from "react";
+import { Tooltip } from "@/components/admin/ui/tooltip";
 
 type AdminFormProps = PropsWithChildren<HTMLAttributes<HTMLDivElement>>;
 
@@ -32,13 +33,14 @@ interface AdminFieldProps extends PropsWithChildren {
   fullWidth?: boolean;
   htmlFor?: string;
   className?: string;
+  tooltip?: string;
 }
 
 /**
  * Standard form field for admin sections.
  */
 export const AdminField = forwardRef<HTMLDivElement, AdminFieldProps>(
-  ({ label, description, error, required, fullWidth, htmlFor, className, children }, ref) => {
+  ({ label, description, error, required, fullWidth, htmlFor, className, tooltip, children }, ref) => {
     const classes = [
       "field",
       fullWidth ? "full" : "",
@@ -47,8 +49,14 @@ export const AdminField = forwardRef<HTMLDivElement, AdminFieldProps>(
 
     return (
       <div ref={ref} className={classes}>
-        <label htmlFor={htmlFor}>
-          {label}
+        <label htmlFor={htmlFor} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {tooltip ? (
+            <Tooltip content={tooltip}>
+              <span style={{ textDecoration: 'underline dotted', cursor: 'help' }}>{label}</span>
+            </Tooltip>
+          ) : (
+            label
+          )}
           {required && <span className="required-mark">*</span>}
         </label>
         {description && <p className="field-description">{description}</p>}

@@ -17,7 +17,7 @@ export interface UseLearningMaterialsResult {
     loading: boolean;
     uploading: boolean;
     deletingId: string | null;
-    load: (customerId: string) => Promise<void>;
+    load: (customerId: string, bookingId?: string | null) => Promise<void>;
     upload: (customerId: string, bookingId: string, form: HTMLFormElement, captcha?: { captchaToken: string; captchaAnswer: string }) => Promise<boolean>;
     remove: (materialId: string) => Promise<boolean>;
 }
@@ -35,10 +35,11 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
 
     const { safeFetch, handleApiError } = useSafeFetch({ onAuthError, onError });
 
-    const load = useCallback(async (customerId: string) => {
+    const load = useCallback(async (customerId: string, bookingId?: string | null) => {
         setLoading(true);
         try {
-            const response = await safeFetch(`/api/admin/customers/${customerId}/learning-materials`, { cache: "no-store" });
+            const url = `/api/admin/customers/${customerId}/learning-materials${bookingId ? `?bookingId=${encodeURIComponent(bookingId)}` : ''}`;
+            const response = await safeFetch(url, { cache: "no-store" });
             if (!response.ok) {
                 await handleApiError(response, "Unable to load learning materials.");
                 return;
@@ -92,7 +93,7 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
                 return false;
             }
 
-            void load(customerId);
+            void load(customerId, bookingId);
             return true;
         } catch {
             return false;

@@ -306,7 +306,7 @@ export async function animateIn(root: HTMLElement | null, options: AnimationOpti
   } else {
     gsap.set(items, {
       opacity: 0,
-      y: options.y ?? 10
+      y: options.y ?? 0
     });
   }
 
@@ -421,9 +421,9 @@ export async function animateOut(root: HTMLElement | null, options: AnimationOpt
   } else {
     timeline.to(items, {
       opacity: 0,
-      y: options.y ?? -8,
+      y: options.y ?? 0,
       duration: options.duration ?? 0.16,
-      stagger: options.stagger ?? 0.018,
+      stagger: options.stagger ?? 0,
       ease: "power2.in",
       overwrite: "auto"
     });

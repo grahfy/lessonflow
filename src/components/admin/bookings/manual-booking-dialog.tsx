@@ -8,6 +8,7 @@ import { type ManualStep, MANUAL_STEP_LABEL, MANUAL_STEP_ORDER, AU_STATES } from
 import { toAuState } from "@/lib/admin/utils";
 import { type BookingMatchedCustomer } from "./types";
 import { AddressAutocomplete, type ParsedAddress } from "@/components/admin/ui/address-autocomplete";
+import { Tooltip } from "@/components/admin/ui/tooltip";
 
 interface ManualBookingDialogProps {
   isOpen: boolean;
@@ -97,19 +98,27 @@ export function ManualBookingDialog({
         <div className="manual-dialog-footer">
           <div>
             {step !== 'customer' && (
-              <button className="btn btn-secondary" onClick={() => setStep(MANUAL_STEP_ORDER[stepIndex - 1])}>Back</button>
+              <Tooltip content="Return to the previous step.">
+                <button className="btn btn-secondary" onClick={() => setStep(MANUAL_STEP_ORDER[stepIndex - 1])}>Back</button>
+              </Tooltip>
             )}
           </div>
           <div className="manual-dialog-footer-right">
-            <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <Tooltip content="Close this dialog without saving.">
+              <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            </Tooltip>
             {step === 'schedule' ? (
-              <button className="btn btn-primary" disabled={!!busyAction} onClick={onSave}>
-                {busyAction === 'create' ? 'Adding...' : 'Add booking'}
-              </button>
+              <Tooltip content="Confirm and create this manual booking.">
+                <button className="btn btn-primary" disabled={!!busyAction} onClick={onSave}>
+                  {busyAction === 'create' ? 'Adding...' : 'Add booking'}
+                </button>
+              </Tooltip>
             ) : (
-              <button className="btn btn-primary" onClick={() => setStep(MANUAL_STEP_ORDER[stepIndex + 1])}>
-                Next: {MANUAL_STEP_LABEL[MANUAL_STEP_ORDER[stepIndex + 1]]}
-              </button>
+              <Tooltip content="Proceed to the next step.">
+                <button className="btn btn-primary" onClick={() => setStep(MANUAL_STEP_ORDER[stepIndex + 1])}>
+                  Next: {MANUAL_STEP_LABEL[MANUAL_STEP_ORDER[stepIndex + 1]]}
+                </button>
+              </Tooltip>
             )}
           </div>
         </div>
@@ -131,14 +140,14 @@ export function ManualBookingDialog({
         <div className="manual-booking-scroll" style={{ display: step === "customer" ? "block" : "none" }} aria-hidden={step !== "customer"}>
             <h3 className="manual-section-title">Customer Selection</h3>
             <AdminForm className="manual-grid manual-grid-3">
-              <AdminField label="Search existing students">
+              <AdminField label="Search existing students" tooltip="Search for an existing customer to pre-fill details.">
                 <input 
                   value={customerQuery} 
                   onChange={e => setCustomerQuery(e.target.value)} 
                   placeholder="Filter by name, email, or phone..."
                 />
               </AdminField>
-              <AdminField label="Select from list" className="manual-span-2">
+              <AdminField label="Select from list" tooltip="Choose a customer from the search results." className="manual-span-2">
                 <select 
                   value={manualCustomerId} 
                   onChange={e => {
@@ -169,9 +178,11 @@ export function ManualBookingDialog({
                 </label>
                 {manualCustomerId && (
                   <div className="manual-clear-row">
-                    <button type="button" className="btn btn-secondary" onClick={onClearCustomer}>
-                      Clear selected customer
-                    </button>
+                    <Tooltip content="Deselect this customer and clear the form.">
+                      <button type="button" className="btn btn-secondary" onClick={onClearCustomer}>
+                        Clear selected customer
+                      </button>
+                    </Tooltip>
                   </div>
                 )}
               </div>
@@ -179,16 +190,16 @@ export function ManualBookingDialog({
 
             <h3 className="manual-section-title manual-subsection-heading">Student Details</h3>
             <AdminForm className="manual-grid manual-grid-2">
-              <AdminField label="First Name" required>
+              <AdminField label="First Name" tooltip="Student's legal or preferred first name." required>
                 <input name="firstName" required />
               </AdminField>
-              <AdminField label="Last Name" required>
+              <AdminField label="Last Name" tooltip="Student's family name." required>
                 <input name="lastName" required />
               </AdminField>
-              <AdminField label="Email" required>
+              <AdminField label="Email" tooltip="Primary email address for communication and portal login." required>
                 <input name="email" type="email" required />
               </AdminField>
-              <AdminField label="Phone" required>
+              <AdminField label="Phone" tooltip="Contact phone number (10 digits)." required>
                 <input name="phone" required maxLength={10} onInput={e => e.currentTarget.value = toDigits(e.currentTarget.value, 10)} />
               </AdminField>
             </AdminForm>
@@ -198,13 +209,13 @@ export function ManualBookingDialog({
               <AddressAutocomplete onAddressSelect={handleAddressSelect} disabled={!!busyAction} />
             </div>
             <AdminForm className="manual-grid manual-grid-3">
-              <AdminField label="Unit">
+              <AdminField label="Unit" tooltip="Unit or apartment number (optional).">
                 <input name="unitNumber" maxLength={5} onInput={e => e.currentTarget.value = toDigits(e.currentTarget.value, 5)} />
               </AdminField>
-              <AdminField label="House Number" required>
+              <AdminField label="House Number" tooltip="Street or house number." required>
                 <input name="houseNumber" required maxLength={5} onInput={e => e.currentTarget.value = toDigits(e.currentTarget.value, 5)} />
               </AdminField>
-              <AdminField label="Street Type" required>
+              <AdminField label="Street Type" tooltip="Type of street (e.g., Road, Avenue)." required>
                 <select name="streetType" required defaultValue="Street">
                   <option value="Street">Street</option>
                   <option value="Road">Road</option>
@@ -220,18 +231,18 @@ export function ManualBookingDialog({
                   <option value="Close">Close</option>
                 </select>
               </AdminField>
-              <AdminField label="Street Name" required className="manual-span-2">
+              <AdminField label="Street Name" tooltip="Name of the street." required className="manual-span-2">
                 <input name="streetName" required />
               </AdminField>
-              <AdminField label="Suburb" required>
+              <AdminField label="Suburb" tooltip="City or suburb name." required>
                 <input name="suburb" required />
               </AdminField>
-              <AdminField label="State" required className="manual-span-2">
+              <AdminField label="State" tooltip="Australian state or territory." required className="manual-span-2">
                 <select name="state" required defaultValue="VIC">
                   {AU_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </AdminField>
-              <AdminField label="Postcode" required>
+              <AdminField label="Postcode" tooltip="4-digit postal code." required>
                 <input name="postcode" required maxLength={4} onInput={e => e.currentTarget.value = toDigits(e.currentTarget.value, 4)} />
               </AdminField>
             </AdminForm>
@@ -240,20 +251,20 @@ export function ManualBookingDialog({
         <div className="manual-booking-scroll" style={{ display: step === "lesson" ? "block" : "none" }} aria-hidden={step !== "lesson"}>
             <h3 className="manual-section-title">Lesson Details</h3>
             <AdminForm className="manual-grid manual-grid-3">
-              <AdminField label="Mode" required>
+              <AdminField label="Mode" tooltip="Physical location or virtual format of the lesson." required>
                 <select name="lessonMode" defaultValue="in_person">
                   <option value="in_person">In-person</option>
                   <option value="video">Video</option>
                 </select>
               </AdminField>
-              <AdminField label="Skill Level" required>
+              <AdminField label="Skill Level" tooltip="The student's current proficiency level." required>
                 <select name="skillLevel" defaultValue="beginner">
                   <option value="beginner">Beginner</option>
                   <option value="intermediate">Intermediate</option>
                   <option value="advanced">Advanced</option>
                 </select>
               </AdminField>
-              <AdminField label="Duration" required>
+              <AdminField label="Duration" tooltip="Length of the lesson in minutes." required>
                 <select
                   name="lessonDuration"
                   value={durationChoice}
@@ -265,7 +276,7 @@ export function ManualBookingDialog({
                 </select>
               </AdminField>
               {durationChoice === "custom" && (
-                <AdminField label="Custom Minutes" required>
+                <AdminField label="Custom Minutes" tooltip="Custom duration in minutes." required>
                   <input name="customDurationMinutes" required maxLength={3} onInput={e => e.currentTarget.value = toDigits(e.currentTarget.value, 3)} />
                 </AdminField>
               )}
@@ -275,10 +286,10 @@ export function ManualBookingDialog({
         <div className="manual-booking-scroll" style={{ display: step === "schedule" ? "block" : "none" }} aria-hidden={step !== "schedule"}>
             <h3 className="manual-section-title">Schedule & Confirm</h3>
             <AdminForm className="manual-grid manual-grid-2">
-              <AdminField label="Start Time" required>
+              <AdminField label="Start Time" tooltip="The date and time this lesson is scheduled to begin." required>
                 <input name="requestedStartAt" type="datetime-local" required />
               </AdminField>
-              <AdminField label="Weekly Recurring">
+              <AdminField label="Weekly Recurring" tooltip="Check if this lesson repeats weekly.">
                 <div className="manual-recurring-toggle">
                   <input
                     type="checkbox"
@@ -298,7 +309,7 @@ export function ManualBookingDialog({
                   />
                 </div>
               </AdminField>
-              <AdminField label="Recurrence End (Required if recurring)">
+              <AdminField label="Recurrence End (Required if recurring)" tooltip="When the weekly recurrence should stop.">
                 <input name="recurrenceEndAt" type="datetime-local" disabled={!isRecurring} required={isRecurring} />
               </AdminField>
             </AdminForm>
@@ -308,15 +319,19 @@ export function ManualBookingDialog({
                 <h4 className="manual-match-title">Duplicate Student Detected</h4>
                 <p className="helper-text">{manualMatch.fullName} · {manualMatch.email} · {manualMatch.phone}</p>
                 <div className="button-row manual-match-actions">
-                  <button 
-                    className="btn btn-primary" 
-                    onClick={() => onResolveMatch(updateCustomerFromBooking ? "update_existing" : "use_existing")}
-                  >
-                    Use Existing
-                  </button>
-                  <button className="btn btn-secondary" onClick={() => onResolveMatch("create_new")}>
-                    Create New
-                  </button>
+                  <Tooltip content="Apply the booking to this existing customer profile.">
+                    <button 
+                      className="btn btn-primary" 
+                      onClick={() => onResolveMatch(updateCustomerFromBooking ? "update_existing" : "use_existing")}
+                    >
+                      Use Existing
+                    </button>
+                  </Tooltip>
+                  <Tooltip content="Force creation of a new, separate customer profile.">
+                    <button className="btn btn-secondary" onClick={() => onResolveMatch("create_new")}>
+                      Create New
+                    </button>
+                  </Tooltip>
                 </div>
               </AdminCard>
             )}

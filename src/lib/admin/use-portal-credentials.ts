@@ -13,8 +13,8 @@ export interface UsePortalCredentialsOptions {
 export interface UsePortalCredentialsResult {
     revealedPasswords: Record<string, string>;
     busyCustomerId: string | null;
-    reveal: (customerId: string) => Promise<string | null>;
-    regenerate: (customerId: string) => Promise<string | null>;
+    reveal: (customerId: string) => Promise<{ password: string; credential: any } | null>;
+    regenerate: (customerId: string) => Promise<{ password: string; credential: any } | null>;
 }
 
 /**
@@ -27,7 +27,7 @@ export function usePortalCredentials(options: UsePortalCredentialsOptions = {}):
 
     const { safeFetch, handleApiError } = useSafeFetch({ onAuthError, onError });
 
-    const reveal = useCallback(async (customerId: string): Promise<string | null> => {
+    const reveal = useCallback(async (customerId: string): Promise<{ password: string; credential: any } | null> => {
         setBusyCustomerId(customerId);
         try {
             const response = await safeFetch(`/api/admin/customers/${customerId}/portal-credential`, {
@@ -44,7 +44,7 @@ export function usePortalCredentials(options: UsePortalCredentialsOptions = {}):
             const data = await response.json();
             const password = data.password as string;
             setRevealedPasswords(prev => ({ ...prev, [customerId]: password }));
-            return password;
+            return { password, credential: data.credential };
         } catch {
             return null;
         } finally {
@@ -52,7 +52,7 @@ export function usePortalCredentials(options: UsePortalCredentialsOptions = {}):
         }
     }, [safeFetch, handleApiError]);
 
-    const regenerate = useCallback(async (customerId: string): Promise<string | null> => {
+    const regenerate = useCallback(async (customerId: string): Promise<{ password: string; credential: any } | null> => {
         setBusyCustomerId(customerId);
         try {
             const response = await safeFetch(`/api/admin/customers/${customerId}/portal-credential`, {
@@ -69,7 +69,7 @@ export function usePortalCredentials(options: UsePortalCredentialsOptions = {}):
             const data = await response.json();
             const password = data.password as string;
             setRevealedPasswords(prev => ({ ...prev, [customerId]: password }));
-            return password;
+            return { password, credential: data.credential };
         } catch {
             return null;
         } finally {

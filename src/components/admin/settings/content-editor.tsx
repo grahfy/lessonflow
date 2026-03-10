@@ -123,13 +123,13 @@ export function AdminContentEditor() {
           {sections.map((section) => (
             <AdminCard key={section.key} style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid var(--line)' }}>
               <AdminForm>
-                <AdminField label="Page Path" fullWidth>
+                <AdminField label="Page Path" tooltip="The URL path where this content is used." fullWidth>
                   <input value={section.pagePath} readOnly />
                 </AdminField>
-                <AdminField label="Section Key" fullWidth>
+                <AdminField label="Section Key" tooltip="Unique identifier for this specific content block." fullWidth>
                   <input value={section.sectionKey} readOnly />
                 </AdminField>
-                <AdminField label="Section Content (JSON)" fullWidth>
+                <AdminField label="Section Content (JSON)" tooltip="The structured text or data for this section (Edit carefully!)." fullWidth>
                   <textarea
                     value={section.contentText}
                     style={{ minHeight: '220px', fontFamily: 'monospace' }}
