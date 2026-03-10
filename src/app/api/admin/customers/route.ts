@@ -1,3 +1,10 @@
+/**
+ * Admin Customers API Route
+ * 
+ * Provides directory management for student profiles (Customers).
+ * Supports paged searching, sorting, and manual creation by administrators.
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
@@ -10,6 +17,9 @@ import { prisma } from "@/lib/db";
 import { ensurePortalCredentialForCustomer } from "@/lib/student-portal/credentials";
 import { listCustomersQuerySchema } from "@/lib/customers/schema";
 
+/**
+ * Validation schema for manual customer creation.
+ */
 const createCustomerSchema = z.object({
   firstName: z.string().trim().min(1).max(60),
   lastName: z.string().trim().min(1).max(60),
@@ -28,7 +38,16 @@ const createCustomerSchema = z.object({
 });
 
 /**
- * Lists active customers for admin search/select controls and customer directory dialogs.
+ * GET: Lists active customers for admin search/select controls and directory tables.
+ * 
+ * LOGIC:
+ * 1. Parses query parameters (search string 'q', sort options, pagination 'page/pageSize').
+ * 2. Builds a Prisma 'where' clause for fuzzy matching names, emails, and phones.
+ * 3. Executes count and findMany in a transaction for a consistent paged result.
+ * 4. Includes portal credential metadata so the UI can quickly show enrollment status.
+ * 
+ * @param request - Incoming request with search/paging params
+ * @returns Paged customer list with total count
  */
 export async function GET(request: NextRequest) {
   try {
@@ -71,8 +90,7 @@ export async function GET(request: NextRequest) {
         ? [{ skillLevel: sortDir }, { lessonMode: sortDir }, { fullName: "asc" }, { createdAt: "desc" }]
         : [{ fullName: sortDir }, { createdAt: "desc" }];
 
-    // Include portal credential metadata so the admin UI can show/reveal/regenerate state without
-    // making a second request per customer row.
+    // Execute paged queries in parallel
     const [customers, total] = await prisma.$transaction([
       prisma.customer.findMany({
         where,
@@ -105,6 +123,19 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * POST: Manually creates a new customer profile.
+ * 
+ * CONFLICT RESOLUTION:
+ * Explicitly checks for existing active customers with matching email/phone 
+ * before creation. Returns 409 (Conflict) to prevent accidental duplicates.
+ * 
+ * RATIONALE: Every customer created via admin also receives a Student Portal 
+ * credential automatically, ensuring they are "portal-ready" immediately.
+ * 
+ * @param request - Customer data payload
+ * @returns The newly created customer record
+ */
 export async function POST(request: NextRequest) {
   try {
     const admin = await requireAdminFromRequest(request);
@@ -121,17 +152,15 @@ export async function POST(request: NextRequest) {
     const normalizedEmail = normalizeEmail(parsed.data.email);
     const normalizedPhone = normalizePhone(parsed.data.phone);
 
-    // Email/phone uniqueness is enforced at the workflow level to support a friendlier conflict
-    // response than a raw DB constraint error.
+    // STEP 1: Duplicate Check
     const existing = await prisma.customer.findFirst({
       where: {
         isArchived: false,
         OR: [{ normalizedEmail }, { normalizedPhone }]
       },
-      orderBy: {
-        createdAt: "desc"
-      }
+      orderBy: { createdAt: "desc" }
     });
+    
     if (existing) {
       return NextResponse.json(
         {
@@ -142,6 +171,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // STEP 2: Record Creation
     const created = await prisma.customer.create({
       data: customerSnapshotFromInput({
         firstName: parsed.data.firstName,
@@ -160,8 +190,8 @@ export async function POST(request: NextRequest) {
         postcode: parsed.data.postcode ?? ""
       })
     });
-    // Pre-generate portal credentials so new admin-created customers can access the student portal
-    // immediately when support shares details later.
+
+    // STEP 3: Automated Enrollment
     await ensurePortalCredentialForCustomer({
       customerId: created.id,
       actorId: admin.id,

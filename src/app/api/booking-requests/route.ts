@@ -1,3 +1,15 @@
+/**
+ * Public Booking Requests API
+ * 
+ * Handles incoming lesson requests from the school's public booking form.
+ * 
+ * DESIGN PHILOSOPHY:
+ * 1. Accessibility: GET is disabled to prevent data leakage of private requests.
+ * 2. Geo-Fencing: Server-side validation ensures only AU residents can submit.
+ * 3. Atomic Grace: The request is persisted to DB before owner notification 
+ *    (fallback to 503 if email fails but record is saved).
+ */
+
 import { NextResponse } from "next/server";
 
 import { bookingRequestSchema, formatBookingAddress } from "@/lib/booking-rules";
@@ -7,8 +19,16 @@ import { resolveRequestCountry } from "@/lib/geo-country";
 import { sendOwnerBookingEmail } from "@/lib/booking-events";
 import { logError, logEvent } from "@/lib/observability";
 
+/** Timeout for the outbound notification email to the school owner. */
 const OWNER_BOOKING_EMAIL_TIMEOUT_MS = 12000;
 
+/**
+ * Wraps the email service in a timeout to prevent the HTTP request from 
+ * hanging if the SMTP provider is unresponsive.
+ * 
+ * @param input - The booking request payload for the email template
+ * @returns Result status of the notification attempt
+ */
 async function sendOwnerBookingEmailWithTimeout(input: Parameters<typeof sendOwnerBookingEmail>[0]) {
   return Promise.race([
     sendOwnerBookingEmail(input),
@@ -24,10 +44,8 @@ async function sendOwnerBookingEmailWithTimeout(input: Parameters<typeof sendOwn
 }
 
 /**
- * Public booking-request submission endpoint.
- *
- * `GET` is intentionally disabled so pending booking requests cannot be listed publicly. `POST`
- * accepts and persists requests, then notifies the owner using the shared email template/service.
+ * GET: Method Not Allowed.
+ * RATIONALE: Public listing of booking requests is a security risk.
  */
 export async function GET() {
   return NextResponse.json(
@@ -41,8 +59,27 @@ export async function GET() {
   );
 }
 
+/**
+ * POST: Handles the submission of a new booking request.
+ * 
+ * SECURITY & VALIDATION:
+ * 1. Captcha: Throttles bots and automated spam.
+ * 2. Geo-Blocking: Uses header-based geolocation to enforce domestic-only service.
+ * 3. Zod Parsing: Strict type enforcement of the request body.
+ * 
+ * LOGIC:
+ * - Attempts to match the requester to an existing Customer profile.
+ * - Enforces business rules (e.g., new customers restricted to 30-min intro lessons).
+ * - Persists the 'pending' request.
+ * - Triggers an asynchronous email to the owner.
+ * 
+ * @param request - Incoming Next.js Request
+ * @returns Progress status, including DB record ID
+ */
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
+  
+  // STEP 1: Anti-Spam Gate
   const gate = verifyCaptchaGuard({
     body,
     headers: request.headers,
@@ -50,6 +87,7 @@ export async function POST(request: Request) {
     limit: 16,
     windowMs: 10 * 60 * 1000
   });
+
   if (!gate.ok) {
     return NextResponse.json(
       { error: gate.message, code: gate.code },
@@ -57,10 +95,11 @@ export async function POST(request: Request) {
         status: gate.status,
         headers: gate.retryAfterSeconds ? { "Retry-After": String(gate.retryAfterSeconds) } : undefined
       }
-      );
+    );
   }
 
-  // Enforce service eligibility from server-side geolocation signals; do not rely on client-only checks.
+  // STEP 2: Geo-Fencing
+  // RATIONALE: We only provide lessons in Australia. Server-side check prevents vpn/bot bypass.
   const resolvedCountry = await resolveRequestCountry(request.headers);
   if (resolvedCountry.country && resolvedCountry.country !== "AU") {
     return NextResponse.json(
@@ -71,6 +110,7 @@ export async function POST(request: Request) {
     );
   }
 
+  // STEP 3: Schema Validation
   const parsed = bookingRequestSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -123,7 +163,7 @@ export async function POST(request: Request) {
       finalCustomDuration = null;
     }
 
-    // Persist first so the admin can review the request even if outbound email delivery is degraded.
+    // STEP 4: DB Persistence
     const created = await prisma.bookingRequest.create({
       data: {
         firstName: parsed.data.firstName,
@@ -154,6 +194,7 @@ export async function POST(request: Request) {
     createdId = created.id;
     logEvent("booking_request.created", { id: created.id, email: created.email, recurring: created.isRecurring });
 
+    // STEP 5: Owner Notification
     const emailResult = await sendOwnerBookingEmailWithTimeout({
       bookingRequest: created
     });
