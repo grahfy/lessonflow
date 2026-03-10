@@ -9,5 +9,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: make email history be able to use gmail as well as outbound email**
+- [x] **Track: make email history be able to use gmail as well as outbound email**
 *Link: [./tracks/gmail_sync_20260310/](./tracks/gmail_sync_20260310/)*
