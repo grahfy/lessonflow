@@ -33,7 +33,7 @@ Surface the update availability to administrators through a persistent dashboard
     - [x] Verify modal correctly renders commit data
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Admin UI Integration (Banner and Changes Modal)' (Protocol in workflow.md)
 
-## Phase 3: Secure Update Trigger & Script Wrapper
+## Phase 3: Secure Update Trigger & Script Wrapper [checkpoint: da38772]
 Implement the mechanism to safely trigger the server-side deployment script.
 
 - [x] Task: Create non-interactive update wrapper `scripts/trigger-update.sh`
@@ -47,7 +47,7 @@ Implement the mechanism to safely trigger the server-side deployment script.
 - [x] Task: Write Tests for Update Execution
     - [x] Verify admin authorization
     - [x] Verify process locking behavior
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Secure Update Trigger & Script Wrapper' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Secure Update Trigger & Script Wrapper' (Protocol in workflow.md)
 
 ## Phase 4: Progress UI & Restart Handling
 Create the real-time feedback UI for the update process and handle the application restart.
