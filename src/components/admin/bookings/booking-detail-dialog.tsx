@@ -36,6 +36,8 @@ import { AU_STATES } from "@/lib/admin/types";
 import { toAuState } from "@/lib/admin/utils";
 import { type BookingDialogForm, type BookingMatchedCustomer } from "./types";
 import { AddressAutocomplete } from "@/components/admin/ui/address-autocomplete";
+import { BookingMaterialsDialog } from "./booking-materials-dialog";
+import { type LearningMaterialRow } from "@/lib/admin/types";
 
 interface BookingDetailDialogProps {
   isOpen: boolean;
@@ -50,10 +52,10 @@ interface BookingDetailDialogProps {
   onSave: () => void;
   onDelete: () => void;
   onMove: () => void;
-  
+
   // Tabs Navigation
-  activeTab: "appointment" | "emails";
-  setActiveTab: (tab: "appointment" | "emails") => void;
+  activeTab: "appointment" | "emails" | "materials";
+  setActiveTab: (tab: "appointment" | "emails" | "materials") => void;
 
   // CRM Integration
   matchedCustomer: BookingMatchedCustomer | null;
@@ -76,8 +78,18 @@ interface BookingDetailDialogProps {
 
   // Domain Actions
   onPerformAction: (action: string) => void;
-  onOpenMaterials: () => void;
   onOpenInvoice: () => void | Promise<void>;
+
+  // Learning Materials
+  materialsDialogProps: {
+    materialsList: LearningMaterialRow[];
+    materialsLoading: boolean;
+    materialsUploading: boolean;
+    materialsDeletingId: string | null;
+    onUpload: (captcha?: { captchaToken: string; captchaAnswer: string }) => void;
+    onDelete: (id: string) => void;
+    uploadFormRef: RefObject<HTMLFormElement | null>;
+  };
 }
 
 /**
@@ -112,8 +124,8 @@ export function BookingDetailDialog({
   onSendEmail,
   onSyncEmail,
   onPerformAction,
-  onOpenMaterials,
-  onOpenInvoice
+  onOpenInvoice,
+  materialsDialogProps
 }: BookingDetailDialogProps) {
   const [selectedEmail, setSelectedEmail] = useState<EmailRecord | null>(null);
 
@@ -207,6 +219,11 @@ export function BookingDetailDialog({
           <Tooltip content="View email history and send a custom message to the student.">
             <button className={`btn ${activeTab === "emails" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("emails")}>
               Communication
+            </button>
+          </Tooltip>
+          <Tooltip content="View and manage learning materials for this booking.">
+            <button className={`btn ${activeTab === "materials" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("materials")}>
+              Learning Materials
             </button>
           </Tooltip>
         </div>
@@ -357,10 +374,7 @@ export function BookingDetailDialog({
                   <Tooltip content="Reschedule the lesson to a new start time.">
                     <button className="btn btn-secondary" onClick={onMove}>Move Lesson Time</button>
                   </Tooltip>
-                  <Tooltip content="Open the learning materials manager for this booking.">
-                    <button className="btn btn-secondary" onClick={onOpenMaterials}>Learning Materials</button>
-                  </Tooltip>
-                  
+
                   {/* RATIONALE: Invoicing is only available once a Request is converted to a Booking. */}
                   {event.entityType === "booking" && (
                     <Tooltip content="Create or open a draft invoice linked to this booking.">
@@ -369,14 +383,14 @@ export function BookingDetailDialog({
                       </button>
                     </Tooltip>
                   )}
-                  
+
                   <Tooltip content="Cancel this booking. This action will notify the student.">
                     <button className="btn btn-danger" disabled={!!busyAction} onClick={onDelete}>Cancel Booking</button>
                   </Tooltip>
                 </div>
               </div>
             </>
-          ) : (
+          ) : activeTab === 'emails' ? (
             <>
               {/* SECTION: COMMUNICATION HISTORY */}
               <div className="dialog-col">
@@ -439,10 +453,23 @@ export function BookingDetailDialog({
                 </AdminCard>
               </div>
             </>
-          )}
+          ) : activeTab === 'materials' ? (
+            <>
+              {/* SECTION: LEARNING MATERIALS */}
+              <BookingMaterialsDialog
+                materialsLoading={materialsDialogProps.materialsLoading}
+                materialsList={materialsDialogProps.materialsList}
+                materialsUploading={materialsDialogProps.materialsUploading}
+                materialsDeletingId={materialsDialogProps.materialsDeletingId}
+                uploadFormRef={materialsDialogProps.uploadFormRef}
+                onUpload={materialsDialogProps.onUpload}
+                onDelete={materialsDialogProps.onDelete}
+              />
+            </>
+          ) : null}
       </div>
     </AdminDialog>
-    
+
     {/* Specialized sub-dialog for viewing full HTML content of sent emails. */}
     <EmailViewerDialog
       isOpen={!!selectedEmail}

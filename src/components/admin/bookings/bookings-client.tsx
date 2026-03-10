@@ -43,7 +43,7 @@ import { buildManualBookingPayload } from "@/lib/admin/manual-booking-payload";
 
 import { BookingDetailDialog } from "./booking-detail-dialog";
 import { ManualBookingDialog } from "./manual-booking-dialog";
-import { BookingMaterialsDialog } from "./booking-materials-dialog";
+
 import { type BookingDialogForm, type BookingMatchedCustomer, type BookingRowData } from "./types";
 
 import { 
@@ -142,7 +142,7 @@ export function AdminBookingsClient() {
 
   // Dialog & Selection State
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"appointment" | "emails">("appointment");
+  const [activeTab, setActiveTab] = useState<"appointment" | "emails" | "materials">("appointment");
   const [dialogForm, setDialogForm] = useState<BookingDialogForm | null>(null);
   const [dialogMatchDismissed, setDialogMatchDismissed] = useState(false);
 
@@ -165,10 +165,10 @@ export function AdminBookingsClient() {
 
   const dialogPresence = usePresenceExit();
   const manualDialogPresence = usePresenceExit();
-  const materialsDialogPresence = usePresenceExit();
+
   const dialogRootRef = useRef<HTMLDivElement | null>(null);
   const manualDialogRootRef = useRef<HTMLDivElement | null>(null);
-  const materialsDialogRootRef = useRef<HTMLDivElement | null>(null);
+
   const materialsUploadFormRef = useRef<HTMLFormElement | null>(null);
   const manualFormRef = useRef<HTMLFormElement | null>(null);
 
@@ -194,7 +194,7 @@ export function AdminBookingsClient() {
     send: sendEmailApi,
     sync: syncEmailApi
   } = useEmailHistory({ onAuthError, onError: setError });
-  const { materials: materialsList, loading: materialsLoading, uploading: materialsUploading, load: loadMaterials, upload: uploadMaterialApi, remove: removeMaterialApi } = useLearningMaterials({ onAuthError, onError: setError });
+  const { materials: materialsList, loading: materialsLoading, uploading: materialsUploading, deletingId: materialsDeletingId, load: loadMaterials, upload: uploadMaterialApi, remove: removeMaterialApi } = useLearningMaterials({ onAuthError, onError: setError });
   const { presets } = usePresets({ onAuthError, onError: setError });
 
   const selectedEvent = useMemo(() => events.find((event) => event.id === selectedKey) || null, [events, selectedKey]);
@@ -283,11 +283,12 @@ export function AdminBookingsClient() {
 
     if (typeof row.customerId === "string" && row.customerId) {
       void loadEmailHistory(row.customerId);
+      void loadMaterials(row.customerId, event.id);
     }
 
     dialogPresence.show();
     if (dialogRootRef.current) animateIn(dialogRootRef.current);
-  }, [dialogPresence, loadCustomers, loadEmailHistory]);
+  }, [dialogPresence, loadCustomers, loadEmailHistory, loadMaterials]);
 
   const closeDialog = useCallback(async () => {
     if (dialogRootRef.current) await animateOut(dialogRootRef.current);
@@ -315,19 +316,6 @@ export function AdminBookingsClient() {
     manualDialogPresence.hide();
   }, [manualDialogPresence]);
 
-  const openMaterialsDialog = useCallback(async () => {
-    const event = events.find(e => e.id === selectedKey);
-    if (!event?.row.customerId) return;
-    
-    void loadMaterials(event.row.customerId);
-    materialsDialogPresence.show();
-    if (materialsDialogRootRef.current) animateIn(materialsDialogRootRef.current);
-  }, [events, selectedKey, loadMaterials, materialsDialogPresence]);
-
-  const closeMaterialsDialog = useCallback(async () => {
-    if (materialsDialogRootRef.current) await animateOut(materialsDialogRootRef.current);
-    materialsDialogPresence.hide();
-  }, [materialsDialogPresence]);
 
   const applyCustomerToManual = useCallback((customer: BookingMatchedCustomer) => {
     if (!manualFormRef.current) return;
@@ -462,10 +450,10 @@ export function AdminBookingsClient() {
     }
   }
 
-  async function uploadMaterial() {
+  async function uploadMaterial(captcha?: { captchaToken: string; captchaAnswer: string }) {
     const event = events.find(e => e.id === selectedKey);
-    if (!event?.row.customerId || !materialsUploadFormRef.current) return;
-    const success = await uploadMaterialApi(event.row.customerId, event.id, materialsUploadFormRef.current);
+    if (!event?.row.customerId || !event.id || !materialsUploadFormRef.current) return;
+    const success = await uploadMaterialApi(event.row.customerId, event.id, materialsUploadFormRef.current, captcha);
     if (success) {
       setNotice("Material uploaded.");
     }
@@ -684,7 +672,15 @@ export function AdminBookingsClient() {
           onSendEmail={sendCustomEmail}
           onSyncEmail={() => selectedKey && syncEmailApi(selectedKey)}
           onPerformAction={performAction}
-          onOpenMaterials={openMaterialsDialog}
+          materialsDialogProps={{
+            materialsList,
+            materialsLoading,
+            materialsUploading,
+            materialsDeletingId,
+            onUpload: uploadMaterial,
+            onDelete: removeMaterialApi,
+            uploadFormRef: materialsUploadFormRef
+          }}
         />
       )}
 
@@ -736,20 +732,6 @@ export function AdminBookingsClient() {
           onResolveMatch={(resolution) => void addManualBooking(resolution)}
           onSave={() => void addManualBooking()}
           busyAction={busyAction}
-        />
-      )}
-
-      {materialsDialogPresence.isMounted && (
-        <BookingMaterialsDialog
-          isOpen={true}
-          onClose={closeMaterialsDialog}
-          rootRef={materialsDialogRootRef}
-          materialsList={materialsList}
-          materialsLoading={materialsLoading}
-          materialsUploading={materialsUploading}
-          onUpload={uploadMaterial}
-          onDelete={removeMaterialApi}
-          uploadFormRef={materialsUploadFormRef}
         />
       )}
     </AdminShell>
