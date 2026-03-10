@@ -42,7 +42,7 @@ ORIGINAL_ARGS=( "$@" )
 
 # Configuration
 APP_NAME="lessonflow"
-DEPLOY_DIR="/var/www/${APP_NAME}"
+DEPLOY_DIR="${DEPLOY_DIR:-/var/www/${APP_NAME}}"
 RELEASES_DIR="${DEPLOY_DIR}/releases"
 SHARED_DIR="${DEPLOY_DIR}/shared"
 CURRENT_LINK="${DEPLOY_DIR}/current"

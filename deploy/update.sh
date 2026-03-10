@@ -47,7 +47,7 @@ ORIGINAL_ARGS=( "$@" )
 # Runtime configuration defaults. Branch defaults to the current checked-out
 # branch later so server operators can simply run ./deploy/update.sh.
 APP_NAME="lessonflow"
-DEPLOY_DIR="/var/www/${APP_NAME}"
+DEPLOY_DIR="${DEPLOY_DIR:-/var/www/${APP_NAME}}"
 SHARED_DIR="${DEPLOY_DIR}/shared"
 CURRENT_LINK="${DEPLOY_DIR}/current"
 REMOTE_NAME="origin"
