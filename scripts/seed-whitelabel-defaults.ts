@@ -25,7 +25,7 @@ async function main() {
     await prisma.invoiceTemplate.create({
       data: {
         isDefault: true,
-        logoUrl: "/images/company-logo-invoice.webp",
+        logoUrl: "/images/company-logo-invoice.png",
         accentColor: "#2247d8",
         footerText: "Thank you for choosing Melbourne Guitar School. Payment is due within 14 days.",
         headerInfo: `Rear 66/68 High St

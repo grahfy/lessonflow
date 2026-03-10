@@ -74,15 +74,29 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord, templateC
 
   try {
     if (logoUrl) {
-      const logoPath = logoUrl.startsWith("/") ? path.join(process.cwd(), "public", logoUrl) : logoUrl;
+      // RATIONALE: pdf-lib only supports PNG and JPEG — not WebP. If a WebP URL
+      // was configured (e.g. via env), automatically fall back to a .png variant
+      // so the logo still renders instead of silently failing.
+      let resolvedLogoUrl = logoUrl;
+      if (resolvedLogoUrl.toLowerCase().endsWith(".webp")) {
+        console.warn(
+          `Invoice logo URL "${resolvedLogoUrl}" is WebP, which pdf-lib cannot embed. ` +
+          `Falling back to .png variant.`
+        );
+        resolvedLogoUrl = resolvedLogoUrl.replace(/\.webp$/i, ".png");
+      }
+
+      const logoPath = resolvedLogoUrl.startsWith("/")
+        ? path.join(process.cwd(), "public", resolvedLogoUrl)
+        : resolvedLogoUrl;
       const logoBytes = await fs.readFile(logoPath);
-      // pdf-lib only supports PNG and JPEG.
-      const logoImage = logoUrl.toLowerCase().endsWith(".png") 
-        ? await document.embedPng(logoBytes) 
+
+      const logoImage = resolvedLogoUrl.toLowerCase().endsWith(".png")
+        ? await document.embedPng(logoBytes)
         : await document.embedJpg(logoBytes);
       
-      // Increased scale from 80 to 125 for a larger logo
-      const scale = 125 / logoImage.height;
+      // Increased scale from 125 to 150 for a larger logo
+      const scale = 150 / logoImage.height;
       const logoDims = logoImage.scale(scale);
       page.drawImage(logoImage, {
         x: leftMargin,
@@ -92,7 +106,7 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord, templateC
       });
     }
   } catch (e) {
-    console.warn("Could not load invoice logo image", e);
+    console.warn("Could not load invoice logo image from", logoUrl, e);
   }
 
   const drawRightText = (text: string, size: number, isBold: boolean, currentY: number, color = rgb(0, 0, 0)) => {
