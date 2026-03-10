@@ -8,7 +8,7 @@ export async function listSentMessages(maxResults: number = 50, pageToken?: stri
   const gmail = getGmailClient();
   const response = await gmail.users.messages.list({
     userId: "me",
-    q: "label:SENT",
+    labelIds: ["SENT"],
     maxResults,
     pageToken,
   });
@@ -22,12 +22,12 @@ export async function listSentMessages(maxResults: number = 50, pageToken?: stri
 /**
  * Fetches full details for a specific Gmail message.
  */
-export async function getMessageDetails(messageId: string) {
+export async function getMessageDetails(messageId: string, format: "full" | "metadata" | "minimal" = "full") {
   const gmail = getGmailClient();
   const response = await gmail.users.messages.get({
     userId: "me",
     id: messageId,
-    format: "full",
+    format,
   });
 
   return response.data;

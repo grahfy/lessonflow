@@ -1,21 +1,24 @@
 /**
- * GST Policy Service
+ * Australian GST Compliance Policy
  * 
- * Defines the core rules for Australian GST applicability in LessonFlow.
+ * Defines the core rules for GST applicability within LessonFlow.
  * 
  * ARCHITECTURAL RATIONALE:
- * - Compliance: Single point of truth for whether the business is GST-registered.
- * - Flexibility: Supports schools that are transitionary (e.g. crossing registration 
- *   thresholds) via environment variable toggles.
- * - Consistency: Synchronizes tax behavior across DB calculations, Invoice PDFs, 
- *   and UI components to avoid "rounding" or "mis-match" errors.
+ * 1. Legal Compliance: Single source of truth for whether the business entity 
+ *    is registered for GST. This is critical for generating valid Tax Invoices.
+ * 2. Risk Mitigation: If `INVOICE_GST_REGISTERED` is false, the system 
+ *    hard-overrides all tax calculations to zero. This prevents unregistered 
+ *    sole traders from accidentally charging tax they aren't authorized to collect.
+ * 3. Environment Driven: Uses environment variables to allow seamless 
+ *    transitions once a business crosses the ATO registration threshold.
  */
 
 import { InvoiceTaxMode } from "@/generated/prisma/client";
 
 /**
- * Parses environment variables into booleans with strict truthy/falsy sets.
- * Used for critical business toggles like GST registration.
+ * Strict boolean parser for environment variables.
+ * RATIONALE: We avoid 'truthy' traps (like empty strings) to ensure 
+ * financial flags are unambiguous.
  */
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   if (!value) return fallback;
@@ -28,22 +31,23 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
 }
 
 /**
- * Returns whether the school is registered for GST.
+ * Global entity registration check.
  * 
- * NOTE: If false, GST will be 0 on ALL invoices regardless of individual 
- * line item settings. This prevents non-registered sole traders from 
- * accidentally charging tax they aren't authorized to collect.
+ * NOTE: This is the 'Master Switch'. If this returns false, the entire 
+ * invoicing engine treats every transaction as non-taxable regardless 
+ * of line-item settings.
  */
 export function isInvoiceGstRegistered(): boolean {
   return parseBoolean(process.env.INVOICE_GST_REGISTERED, false);
 }
 
 /**
- * Determines the default Tax Mode for new line items.
+ * Fallback Tax Mode for new line items.
  * 
  * LOGIC:
- * 1. Honors explicit `INVOICE_DEFAULT_TAX_MODE` override.
- * 2. Defaults to 'taxable' for registered businesses, 'gst_free' otherwise.
+ * 1. If an override is set via `INVOICE_DEFAULT_TAX_MODE`, we use it.
+ * 2. Otherwise, we default to 'taxable' if registered, or 'gst_free' 
+ *    to align with registration status.
  */
 export function getDefaultInvoiceTaxMode(): InvoiceTaxMode {
   const configured = process.env.INVOICE_DEFAULT_TAX_MODE?.trim().toLowerCase();
@@ -56,10 +60,10 @@ export function getDefaultInvoiceTaxMode(): InvoiceTaxMode {
 }
 
 /**
- * Predicate to decide if GST math should run for a specific context.
+ * Final determination for tax calculation.
  * 
- * RATIONALE: To apply GST, the entity must be registered AND the 
- * specific item (e.g. textbook vs tuition) must be marked taxable.
+ * @param taxMode - The specific mode assigned to a line item (e.g. gst_free, taxable)
+ * @returns True if and only if both the BUSINESS is registered AND the LINE is taxable.
  */
 export function shouldApplyGst(taxMode: InvoiceTaxMode): boolean {
   return isInvoiceGstRegistered() && taxMode === "taxable";

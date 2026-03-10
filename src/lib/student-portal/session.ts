@@ -1,20 +1,18 @@
 /**
- * Student Session Management
+ * Student Session & Security Registry
  * 
  * Provides stateless, signed session tokens for student portal authentication.
  * 
- * DESIGN RATIONALE:
- * - Statelessness: Using signed tokens (HMAC) instead of database-backed sessions 
- *   reduces DB load and allows for highly efficient authentication in Middlewares 
- *   and Server Components.
- * - Integrity: Every token is signed with a secret (`STUDENT_SESSION_SECRET`) using 
- *   SHA-256 HMAC. Any modification to the payload will invalidate the signature.
- * - Expiration: Sessions include an `exp` timestamp in the payload, ensuring 
- *   tokens eventually expire even if they aren't explicitly revoked.
- * - Archival Guard: Authentication checks the `isArchived` flag in the DB, allowing 
- *   admins to instantly revoke a student's access by archiving their profile.
- * 
- * SECURITY NOTE: Ensure `STUDENT_SESSION_SECRET` is a long, random string in production.
+ * CORE ARCHITECTURE:
+ * 1. Statelessness: We use Signed Tokens (HMAC) instead of database-backed 
+ *    sessions. This significantly reduces DB load and allows for immediate 
+ *    authentication checks in Middlewares and Edge Functions.
+ * 2. Cryptographic Integrity: Every token is signed with `STUDENT_SESSION_SECRET` 
+ *    using SHA-256 HMAC. Any modification to the Customer ID or Expiration 
+ *    timestamp will invalidate the signature.
+ * 3. Atomic Revocation: Although the token is stateless, we re-verify the 
+ *    `isArchived` status on every Server Component load to ensure that 
+ *    administratively locked students cannot use their remaining session time.
  */
 
 import crypto from "node:crypto";
@@ -24,73 +22,71 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { AppError } from "../errors";
 
-/** Name of the HTTP-only cookie used to store the session. */
+/** Primary cookie identifier. */
 const STUDENT_SESSION_COOKIE_NAME = "student_session";
-/** Default to 30 days if not configured via environment. */
+
+/** Standard 30-day session durability. */
 const DEFAULT_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
 /** Inner structure of the signed session token. */
 type StudentSessionPayload = {
+  /** The UUID of the authenticated customer. */
   customerId: string;
+  /** UNIX EPOCH timestamp in milliseconds. */
   exp: number;
 };
 
 /**
- * Returns configured student-session max age in seconds with safe bounds.
- * Prevents extremely short or excessively long sessions.
+ * Bounds the session duration from environment configuration.
  */
 export function getStudentSessionMaxAgeSeconds(): number {
   const raw = Number.parseInt(process.env.STUDENT_SESSION_MAX_AGE_SECONDS || `${DEFAULT_MAX_AGE_SECONDS}`, 10);
-  if (!Number.isFinite(raw)) {
-    return DEFAULT_MAX_AGE_SECONDS;
-  }
+  if (!Number.isFinite(raw)) return DEFAULT_MAX_AGE_SECONDS;
   return Math.min(Math.max(raw, 60), 60 * 60 * 24 * 365);
 }
 
 /**
- * Resolves the secret used for signing student session tokens.
- * Throws in production if not configured to prevent weak default security.
+ * Resolves the signing secret, enforcing high-security in production.
  */
 function getStudentSessionSecret(): string {
   const secret = process.env.STUDENT_SESSION_SECRET || process.env.ADMIN_SESSION_SECRET;
   if (!secret) {
-    throw new AppError("STUDENT_SESSION_SECRET or ADMIN_SESSION_SECRET is required. Set it in your environment variables.", "MISSING_CONFIG", 500);
+    throw new AppError("Critical Security Error: STUDENT_SESSION_SECRET is not configured.", "MISSING_CONFIG", 500);
   }
   return secret;
 }
 
 /**
- * Signs the encoded payload with an HMAC-SHA256 signature.
- * RATIONALE: This prevents "fiddling" with the payload (e.g. changing customerId).
+ * Computes an HMAC-SHA256 signature for the payload string.
+ * RATIONALE: Protects against session hijacking where a user tries to 
+ * impersonate another customer ID.
  */
 function signPayload(payload: string): string {
   return crypto.createHmac("sha256", getStudentSessionSecret()).update(payload).digest("hex");
 }
 
-/**
- * Encodes session payload objects as compact base64url strings for cookie compatibility.
- */
+/** Base64URL encoding for cookie safety. */
 function encode(data: StudentSessionPayload): string {
   return Buffer.from(JSON.stringify(data), "utf8").toString("base64url");
 }
 
 /**
- * Decodes and verifies a signed student session token.
- * 
- * VALIDATION STEPS:
- * 1. Checks structure (payload.signature).
- * 2. Re-computes signature to verify integrity.
- * 3. Checks expiration timestamp.
- * 4. Verifies presence of customerId.
+ * Verifies and parses a signed session token.
+ * logic:
+ * 1. Split payload from signature.
+ * 2. Verify signature matches payload + secret.
+ * 3. Parse JSON and check expiration.
  */
 function decode(token: string): StudentSessionPayload | null {
-  const [payload, signature] = token.split(".");
+  const parts = token.split(".");
+  const [payload, signature] = parts;
   if (!payload || !signature) return null;
   
   if (signPayload(payload) !== signature) return null;
 
   try {
     const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as StudentSessionPayload;
+    // RATIONALE: We verify expiration BEFORE checking customer existence for speed.
     if (!decoded.customerId || !decoded.exp || Date.now() > decoded.exp) return null;
     return decoded;
   } catch {
@@ -99,7 +95,7 @@ function decode(token: string): StudentSessionPayload | null {
 }
 
 /**
- * Generates a signed session token for the given customer ID.
+ * Generates a fresh signed session token.
  */
 export function createStudentSessionToken(customerId: string): string {
   const exp = Date.now() + getStudentSessionMaxAgeSeconds() * 1000;
@@ -107,15 +103,17 @@ export function createStudentSessionToken(customerId: string): string {
   return `${payload}.${signPayload(payload)}`;
 }
 
-/** Exposes the constant for usage in Set-Cookie headers. */
 export function getStudentSessionCookieName(): string {
   return STUDENT_SESSION_COOKIE_NAME;
 }
 
 /**
- * Resolves a full Customer profile from a session token.
- * RATIONALE: While the token is stateless, we re-query the DB here to 
- * verify that the customer hasn't been archived or deleted since login.
+ * Hydrates a full Customer entity from a session token.
+ * 
+ * DESIGN RATIONALE: While the session is technically 'valid' if the 
+ * signature is correct, we re-query the database to verify the 
+ * `isArchived` flag. This allows admins to "kill" active sessions 
+ * by archiving a customer record.
  */
 export async function getStudentFromToken(token?: string | null) {
   if (!token) return null;
@@ -127,24 +125,19 @@ export async function getStudentFromToken(token?: string | null) {
     where: { id: payload.customerId }
   });
 
-  // Revoke access immediately if archived.
   if (!customer || customer.isArchived) return null;
   
   return customer;
 }
 
-/**
- * Helper to fetch the current student identity in Server Components.
- */
+/** Utility for Server Components. */
 export async function getCurrentStudent() {
   const store = await cookies();
-  const token = (await store).get(STUDENT_SESSION_COOKIE_NAME)?.value;
+  const token = store.get(STUDENT_SESSION_COOKIE_NAME)?.value;
   return getStudentFromToken(token);
 }
 
-/**
- * Helper to fetch student identity in API Route Handlers.
- */
+/** Utility for API Routes. */
 export async function requireStudentFromRequest(request: NextRequest) {
   const token = request.cookies.get(STUDENT_SESSION_COOKIE_NAME)?.value;
   return getStudentFromToken(token);

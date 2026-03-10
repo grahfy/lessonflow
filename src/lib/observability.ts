@@ -1,20 +1,21 @@
 /**
  * Application Observability & Structured Logging
  * 
- * Provides centralized logging with both Console output (for real-time 
- * monitoring) and Database persistence (for historical audit and 
- * admin dashboarding).
+ * Central telemetry service for the LessonFlow platform. Provides unified 
+ * logging with both real-time stdout visibility and historical DB persistence.
  * 
  * DESIGN RATIONALE:
  * 1. Hybrid Storage: Logs are emitted to `stdout/stderr` (captured by VPS 
  *    process managers like PM2 or Systemd) AND written to the `SystemLog` 
- *    table. This ensures logs are available even if the DB is down, 
- *    while still providing a searchable UI for admins.
+ *    database table. This ensures logs are available even if the DB is down 
+ *    (via CLI) while still providing a searchable UI for administrators.
  * 2. Non-Blocking Persistence: Database logging is "fire-and-forget" 
- *    (not awaited). This prevents slow DB writes from increasing 
- *    latency for end-users or critical API flows.
- * 3. Structured Metadata: Supports JSON metadata for deep inspection 
- *    of events (e.g. logging the specific Booking ID involved in an error).
+ *    (asynchronous and not awaited). This prevents slow database writes from 
+ *    increasing the request latency for critical API paths.
+ * 3. Structured Metadata: Supports standard JSON objects for deep event 
+ *    inspection (e.g. logging the specific Booking ID and User Agent).
+ * 4. Error Stack Preservation: Automatically captures and flattens stack 
+ *    traces into the message field for easy debugging in the Admin UI.
  */
 
 import { prisma } from "./db";
@@ -26,12 +27,12 @@ type LogLevel = "info" | "warn" | "error";
 /**
  * Persists a log entry to the database SystemLog table.
  * 
- * @internal - This is called internally by logger functions. 
- * RATIONALE: We use a separate .catch block to prevent logging failures 
- * from causing infinite recursion or crashing the parent process.
+ * @internal - Called by public log methods.
+ * RATIONALE: We use a catch-all to prevent observability failures from 
+ * crashing the main application flow.
  */
 function persistLog(level: LogLevel, event: string, message: string, meta?: Record<string, unknown>) {
-  // Fire-and-forget: we do NOT await this to keep the application fast.
+  // RATIONALE: We do NOT await this promise to avoid blocking the Event Loop.
   prisma.systemLog.create({
     data: {
       level,
@@ -40,14 +41,13 @@ function persistLog(level: LogLevel, event: string, message: string, meta?: Reco
       meta: meta ? (meta as Prisma.InputJsonValue) : Prisma.JsonNull,
     }
   }).catch(err => {
-    // Fallback to console only if DB persistence fails.
-    console.error("[observability] Persistence failure:", err.message);
+    // Fallback to console if DB write fails.
+    console.error(`[observability] DB Persistence Failure for event "${event}":`, err.message);
   });
 }
 
 /**
- * Safely stringifies metadata for console output.
- * RATIONALE: Prevents "Circular Reference" errors from crashing the logger.
+ * Ensures metadata can be cleanly stringified for console output.
  */
 function stringifyMeta(meta?: Record<string, unknown>) {
   if (!meta) return "";
@@ -59,11 +59,10 @@ function stringifyMeta(meta?: Record<string, unknown>) {
 }
 
 /**
- * Logs a successful business event.
- * Use this for high-level tracking like "Booking Approved" or "Invoice Sent".
+ * Logs a standard business event.
  * 
- * @param event - Short, searchable string (e.g. "auth.login.success")
- * @param meta - Additional context (e.g. { userId: "..." })
+ * @param event - Logical descriptor (e.g. "invoice.issued")
+ * @param meta - Contextual data (e.g. { invoiceId: "..." })
  */
 export function logEvent(event: string, meta?: Record<string, unknown>) {
   const line = `[${new Date().toISOString()}] [info] ${event} ${stringifyMeta(meta)}`;
@@ -72,11 +71,14 @@ export function logEvent(event: string, meta?: Record<string, unknown>) {
 }
 
 /**
- * Detailed error logger with stack trace capturing.
+ * Detailed error logger.
  * 
- * @param event - Context of where the error occurred (e.g. "api.booking.create.failed")
- * @param error - The actual error object caught in the try/catch
- * @param meta - Local variables at the time of failure
+ * RATIONALE: Captures full stack traces into the DB record to allow 
+ * developers to trace bugs without needing server SSH access.
+ * 
+ * @param event - High-level context (e.g. "email.dispatch.failed")
+ * @param error - The error instance caught in the handle
+ * @param meta - Local variables at the point of failure
  */
 export function logError(event: string, error: unknown, meta?: Record<string, unknown>) {
   const line = `[${new Date().toISOString()}] [error] ${event} ${stringifyMeta(meta)}`;
@@ -91,12 +93,11 @@ export function logError(event: string, error: unknown, meta?: Record<string, un
     console.error(error);
   }
 
-  // Persists the full stack trace to the DB for admin debugging.
   persistLog("error", event, `${line}\n${errorMessage}`, meta);
 }
 
 /**
- * Generic logging bridge for arbitrary levels.
+ * Generic logging bridge.
  */
 export function log(level: LogLevel, event: string, meta?: Record<string, unknown>) {
   if (level === "error") {

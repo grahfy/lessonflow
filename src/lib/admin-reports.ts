@@ -1,5 +1,5 @@
 /**
- * Admin Reports & Metrics Aggregator
+ * Admin Reports & Business Intelligence Engine
  * 
  * Central service for calculating business performance, financial health, 
  * and scheduling trends across multiple time horizons.
@@ -8,15 +8,19 @@
  * 1. Multi-Dimensional: Aggregates data by Day, Week, Month, and Year for 
  *    comprehensive business visibility.
  * 2. High Concurrency: Uses `Promise.all` extensively to parallelize 
- *    independent DB queries, minimizing report generation latency.
+ *    independent DB queries, minimizing report generation latency for 
+ *    the Admin Dashboard.
  * 3. Trend Bucketing: Implements "Bucket Mapping" to normalize disparate 
- *    events into time-series data for visualization (Line Charts).
+ *    events into time-series data for visualization (Line Charts), ensuring 
+ *    zero-activity periods are still represented.
  * 4. Comparative Analysis: Automatically computes deltas (performance 
  *    relative to the previous period) to highlight growth or decline.
  * 
- * RATIONALE: Managing a music school requires tracking "Pipeline" (incoming 
- * requests) vs "Execution" (confirmed lessons) vs "Cashflow" (paid invoices). 
- * This module bridges those data models into a unified dashboard.
+ * DESIGN RATIONALE:
+ * Managing a music school requires tracking "Pipeline" (incoming requests) 
+ * vs "Execution" (confirmed lessons) vs "Cashflow" (actual collected 
+ * payments). This module bridges those disparate data models into a unified 
+ * telemetry set.
  */
 
 import { BookingStatus, InvoiceStatus } from "@/generated/prisma/client";
@@ -145,7 +149,7 @@ export type AdminReportsDashboard = {
 /** RATIONALE: Invoices that aren't PAID or VOID are considered 'In Flight' (Outstanding). */
 const OUTSTANDING_INVOICE_STATUSES: InvoiceStatus[] = ["draft", "sent"];
 
-/** Safely parses row limits for report lists (e.g. only show top 10 overdue). */
+/** Safely parses row limits for report lists. */
 function parseReportEmailRowLimit(value: string | undefined, fallback: number, min = 1, max = 50): number {
   const parsed = Number.parseInt(String(value || ""), 10);
   if (!Number.isFinite(parsed)) return fallback;
@@ -653,8 +657,8 @@ async function buildTrend(
 /**
  * Primary orchestrator for the Admin Report Dashboard.
  * 
- * DESIGN RATIONALE: By grouping ALL dashboard data into one call, 
- * we minimize frontend-loading states and ensure a consistent 
+ * DESIGN RATIONALE: By grouping ALL dashboard data into one call, we 
+ * minimize frontend-loading states and ensure a consistent 
  * "Time-of-Generation" across all metrics.
  * 
  * @param now - Reference date for 'today'

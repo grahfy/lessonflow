@@ -27,8 +27,19 @@ export async function syncGmailSentMessages(maxResults: number = 50) {
         continue;
       }
 
-      // 2. Fetch full details
-      const details = await getMessageDetails(msg.id);
+      // 2. Fetch details. Try for full content, fallback to metadata if permissions are restricted.
+      let details;
+      try {
+        details = await getMessageDetails(msg.id, "full");
+      } catch (error: any) {
+        // If we only have gmail.metadata scope, "full" will fail with 403 or a specific error message.
+        // The reported error "Metadata scope does not support 'q' parameter" suggests metadata scope is active.
+        if (error.code === 403 || error.status === 403 || error.message?.includes("Metadata scope")) {
+          details = await getMessageDetails(msg.id, "metadata");
+        } else {
+          throw error;
+        }
+      }
       
       // 3. Extract metadata from headers
       const headers = details.payload?.headers || [];
