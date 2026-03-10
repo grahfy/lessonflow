@@ -5,10 +5,10 @@ This plan follows the project's standard TDD workflow.
 ## Phase 1: Database & Environment Preparation
 Update the data model to track provider information and external IDs for deduplication.
 
-- [ ] Task: Update `OutboundEmail` model in `schema.prisma`.
-    - [ ] Add `provider` (String, default "smtp").
-    - [ ] Add `externalId` (String, unique, nullable).
-    - [ ] Add `source` (String, default "app").
+- [x] Task: Update `OutboundEmail` model in `schema.prisma`. [7dc184f]
+    - [x] Add `provider` (String, default "smtp").
+    - [x] Add `externalId` (String, unique, nullable).
+    - [x] Add `source` (String, default "app").
 - [ ] Task: Execute database migration.
     - [ ] `npx prisma migrate dev --name add_email_sync_fields`
 - [ ] Task: Update `.env.example` with `EMAIL_PROVIDER` setting.
