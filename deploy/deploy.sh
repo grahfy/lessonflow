@@ -166,7 +166,9 @@ run_sudo_cmd() {
     if [[ ${EUID} -eq 0 ]]; then
         "$@"
     elif [[ -n "${MGS_SUDO_PASSWORD:-}" ]]; then
-        echo "$MGS_SUDO_PASSWORD" | sudo -S "$@"
+        local user_arg=""
+        [[ -n "${MGS_SUDO_USER:-}" ]] && user_arg="-u ${MGS_SUDO_USER}"
+        printf '%s\n' "$MGS_SUDO_PASSWORD" | sudo -S -p '' ${user_arg} "$@"
     elif command -v sudo >/dev/null 2>&1; then
         sudo "$@"
     else

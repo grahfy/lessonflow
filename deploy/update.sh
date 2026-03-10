@@ -1982,10 +1982,12 @@ ensure_sudo_for_deploy_ready() {
     fi
   else
     if [[ -n "${MGS_SUDO_PASSWORD:-}" ]]; then
-      if ! echo "$MGS_SUDO_PASSWORD" | sudo -S -v 2>/dev/null; then
+      log_info "Sudo password provided in environment (length: ${#MGS_SUDO_PASSWORD}). Attempting piped authentication..."
+      if ! printf '%s\n' "$MGS_SUDO_PASSWORD" | sudo -S -v 2>/dev/null; then
         log_error "Piped sudo authentication failed. Please check the provided password."
         exit 1
       fi
+      log_info "Piped sudo authentication successful."
     elif ! sudo -n true 2>/dev/null; then
       log_error "Sudo access is required for deployment. Re-run interactively or configure passwordless sudo for deploy commands."
       exit 1
@@ -2233,15 +2235,22 @@ run_deploy() {
       sudo_env_args+=( "NEXT_LOW_MEMORY_BUILD=${NEXT_LOW_MEMORY_BUILD}" )
     fi
 
+    if [[ -n "${MGS_SUDO_PASSWORD:-}" ]]; then
+      sudo_env_args+=( "MGS_SUDO_PASSWORD=${MGS_SUDO_PASSWORD}" )
+    fi
+    if [[ -n "${MGS_SUDO_USER:-}" ]]; then
+      sudo_env_args+=( "MGS_SUDO_USER=${MGS_SUDO_USER}" )
+    fi
+
     if (( ${#sudo_env_args[@]} > 0 )); then
       if [[ -n "${MGS_SUDO_PASSWORD:-}" ]]; then
-        echo "$MGS_SUDO_PASSWORD" | sudo -S env "${sudo_env_args[@]}" "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
+        printf '%s\n' "$MGS_SUDO_PASSWORD" | sudo -S -p '' env "${sudo_env_args[@]}" "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
       else
         sudo env "${sudo_env_args[@]}" "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
       fi
     else
       if [[ -n "${MGS_SUDO_PASSWORD:-}" ]]; then
-        echo "$MGS_SUDO_PASSWORD" | sudo -S "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
+        printf '%s\n' "$MGS_SUDO_PASSWORD" | sudo -S -p '' "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
       else
         sudo "${DEPLOY_SCRIPT}" "${deploy_args[@]}"
       fi

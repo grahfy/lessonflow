@@ -47,6 +47,8 @@ echo "Starting update process at $(date)" > "$LOG_FILE"
 # sudo -n (non-interactive) is used for the actual deployment.
 export MGS_SKIP_DEPLOY_SHARED_ENV_REVIEW_PROMPT=1
 export MGS_SKIP_SELF_UPDATE_KEYPRESS=1
+export MGS_SUDO_USER="${MGS_SUDO_USER:-}"
+export MGS_SUDO_PASSWORD="${MGS_SUDO_PASSWORD:-}"
 
 cd "$REPO_ROOT"
 

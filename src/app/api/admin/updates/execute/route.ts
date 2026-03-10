@@ -33,6 +33,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const { sudoUser, sudoPassword } = body;
 
+    console.log(`[Updates API] Triggering update. Sudo creds present: user=${!!sudoUser}, pass=${!!sudoPassword} (len=${sudoPassword?.length || 0})`);
+
     // Trigger the update script in the background
     const scriptPath = path.join(appRoot, "scripts", "trigger-update.sh");
     
