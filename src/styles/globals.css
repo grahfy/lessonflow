@@ -1361,6 +1361,7 @@ h1 {
   justify-content: space-between;
   width: 100%;
   gap: 8px;
+  margin-top: 8px;
 }
 
 .manual-dialog-footer-right {
@@ -1447,12 +1448,18 @@ h1 {
 }
 
 .manual-subsection-heading {
-  margin-top: 24px;
+  margin-top: 12px;
 }
 
 .manual-grid {
   display: grid;
-  gap: 10px;
+  gap: 8px;
+}
+
+.manual-booking-scroll {
+  max-height: min(64vh, 680px);
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .manual-grid .field {
