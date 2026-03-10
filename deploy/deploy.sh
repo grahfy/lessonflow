@@ -2118,8 +2118,8 @@ write_latest_deploy_update_metadata() {
     DEPLOY_UPDATE_PREVIOUS_COMMIT="${previous_commit}" \
     DEPLOY_UPDATE_RELEASE="${release_id}" \
     DEPLOY_UPDATE_BRANCH="${branch_name}" \
-    DEPLOY_UPDATE_CRON_SECRET="${CRON_SECRET}" \
-    DEPLOY_UPDATE_SITE_URL="${NEXT_PUBLIC_SITE_URL}" \
+    DEPLOY_UPDATE_CRON_SECRET="${CRON_SECRET:-}" \
+    DEPLOY_UPDATE_SITE_URL="${NEXT_PUBLIC_SITE_URL:-}" \
     node <<'NODE'
 const fs = require("node:fs");
 const path = require("node:path");
