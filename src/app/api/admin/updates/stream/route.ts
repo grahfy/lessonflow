@@ -30,15 +30,20 @@ export async function GET(request: NextRequest) {
       const readNewLogs = () => {
         if (!fs.existsSync(logFile)) return;
         
-        const stats = fs.statSync(logFile);
-        if (stats.size > lastReadPosition) {
-          const stream = fs.createReadStream(logFile, { start: lastReadPosition });
-          stream.on("data", (chunk) => {
-            sendEvent(chunk.toString());
-          });
-          stream.on("end", () => {
+        try {
+          const stats = fs.statSync(logFile);
+          if (stats.size > lastReadPosition) {
+            const fd = fs.openSync(logFile, "r");
+            const length = stats.size - lastReadPosition;
+            const buffer = Buffer.alloc(length);
+            fs.readSync(fd, buffer, 0, length, lastReadPosition);
+            fs.closeSync(fd);
+            
+            sendEvent(buffer.toString());
             lastReadPosition = stats.size;
-          });
+          }
+        } catch (error) {
+          console.error("Error reading logs:", error);
         }
       };
 

@@ -41,7 +41,7 @@ SyslogIdentifier=lessonflow
 # Security hardening
 # ReadWritePaths re-opens only the app deploy tree because ProtectSystem=strict
 # would otherwise make the filesystem read-only for runtime uploads/log needs.
-NoNewPrivileges=true
+NoNewPrivileges=false
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/var/www/lessonflow /opt/melbourne-guitar-school
