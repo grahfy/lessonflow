@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminFromRequest } from "@/lib/admin-route";
-import { getUpdateStatus, getPendingCommits } from "@/lib/services/updates-service";
+import { getUpdateStatus, getPendingCommits, type CommitMetadata } from "@/lib/services/updates-service";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 
 export async function GET(request: NextRequest) {
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     const status = await getUpdateStatus(forceFetch);
     
-    let pendingCommits = [];
+    let pendingCommits: CommitMetadata[] = [];
     if (status.updateAvailable) {
       pendingCommits = await getPendingCommits(status.localSha, status.remoteSha);
     }

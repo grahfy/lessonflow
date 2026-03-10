@@ -50,7 +50,7 @@ export function CustomerEmailDialog({
             ].includes(result.errorCode);
 
             if (isCaptchaError) {
-                captcha.handleServerError();
+                captcha.onServerError("CAPTCHA verification failed. Please try again.");
             } else {
                 // For other errors, still regenerate to be safe if a CAPTCHA was used
                 void captcha.regenerate();

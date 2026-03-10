@@ -2638,7 +2638,7 @@ h1 {
 
 #booking-detail-dialog {
   width: min(1380px, calc(100vw - 24px));
-  max-height: min(94vh, 980px);
+  max-height: min(96vh, 1020px);
 }
 
 #booking-detail-dialog .booking-dialog-body-lock {
@@ -2710,7 +2710,8 @@ h1 {
 
 #booking-detail-dialog .booking-dialog-layout {
   flex: 1;
-  min-height: min(62vh, 640px);
+  min-height: min(70vh, 760px);
+  height: min(70vh, 760px);
   max-height: none;
   overflow: auto;
   padding-right: 4px;
@@ -2843,11 +2844,84 @@ h1 {
 }
 
 .booking-section-title {
-  margin-top: 20px;
+  margin-top: 12px;
 }
 
 .booking-notes-area {
+  min-height: 100px;
+}
+
+#booking-detail-dialog .dialog-col {
+  padding: 8px;
+  gap: 6px;
+}
+
+#booking-detail-dialog .field {
+  gap: 3px;
+}
+
+#booking-detail-dialog .field label {
+  font-size: 0.75rem;
+  margin-bottom: 1px;
+}
+
+#booking-detail-dialog .field input,
+#booking-detail-dialog .field select,
+#booking-detail-dialog .field textarea {
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+}
+
+#booking-detail-dialog .dialog-col.is-notes {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  height: 100%;
+}
+
+#booking-detail-dialog .booking-email-composer-card,
+#booking-detail-dialog .booking-email-composer-card .form-grid {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+#booking-detail-dialog .dialog-col.is-notes .field,
+#booking-detail-dialog .booking-email-composer-card .field:last-child {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+#booking-detail-dialog .dialog-notes {
+  flex: 1;
   min-height: 120px;
+}
+
+#booking-detail-dialog .booking-email-message-area {
+  min-height: 240px;
+}
+
+#booking-detail-dialog .booking-notes-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+  flex-shrink: 0;
+}
+
+#booking-detail-dialog .booking-notes-actions .btn {
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 0.82rem;
+}
+
+#booking-detail-dialog .dialog-footer {
+  margin-top: 8px;
+  padding-top: 8px;
 }
 
 .booking-notes-actions {
