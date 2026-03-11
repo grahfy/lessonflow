@@ -2,9 +2,9 @@
 
 Release date: March 12, 2026
 
-This `1.0` release marks the first public release of LessonFlow from the initial project import through current `main`.
+This `1.0` release marks the first public release of LessonFlow from the initial project import through the public-ready `main` branch.
 
-Release range: `5d00dae794560461b8951d01d46821937c72c711..f6dc8f4`
+Release range: `5d00dae794560461b8951d01d46821937c72c711..8d65c5b`
 
 ## Highlights
 
@@ -43,6 +43,7 @@ Release range: `5d00dae794560461b8951d01d46821937c72c711..f6dc8f4`
 - Added self-hosted deployment, update, SSL, backup, restore, and maintenance tooling for VPS environments.
 - Added deployment history visibility and browser-triggered update progress tracking inside the admin console.
 - Added scheduled background jobs for reminders, reports, daily summaries, and Gmail synchronization.
+- Added deploy-mode reporting so operators can quickly confirm whether a host is using the supported release-directory runtime layout.
 
 ## Fixes and Stability Improvements
 
@@ -59,6 +60,7 @@ Release range: `5d00dae794560461b8951d01d46821937c72c711..f6dc8f4`
 - Browser-triggered updates run through a dedicated host-side systemd runner instead of prompting for sudo in the browser.
 - Admin settings can trigger a controlled service restart so runtime configuration changes take effect.
 - Production deployment guidance is Docker-independent and targets self-hosted VPS environments using `systemd + nginx + MySQL/MariaDB`.
+- GitLab source archives now reflect a cleaned public branch that excludes internal AI workflow material and private planning notes.
 
 ## Upgrade Notes
 
@@ -68,6 +70,7 @@ Release range: `5d00dae794560461b8951d01d46821937c72c711..f6dc8f4`
 - Existing deployments with pre-migration databases should follow the baseline migration guidance in `deploy/README.md` to avoid Prisma baseline conflicts.
 - Existing hosts using older update flows should install the dedicated web-update systemd unit and related sudoers entry before relying on browser-triggered updates.
 - Existing hosts moving from older cron-based scheduling should ensure the LessonFlow timers and services are installed and enabled.
+- Operators can run `sudo ./deploy/deploy.sh --print-deploy-mode` to confirm a host is already on the supported release-directory layout.
 
 ## Risk / Notes
 
@@ -75,3 +78,4 @@ Release range: `5d00dae794560461b8951d01d46821937c72c711..f6dc8f4`
 - Rollback planning matters because deploy/update flows now interact with shared environment files, release symlinks, systemd units, and scheduled jobs.
 - Gmail history sync depends on valid OAuth credentials and a working `lessonflow-gmail-sync` timer/service installation.
 - Existing installs may require one-time migration handoff or environment cleanup before they behave like a fresh `1.0` install.
+- The `v1.0` tag was refreshed to the cleaned public-ready branch so GitLab release archives match the published release state.

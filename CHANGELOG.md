@@ -4,9 +4,9 @@ All notable product releases for LessonFlow are documented in this file.
 
 ## [1.0] - 2026-03-12
 
-First public release of LessonFlow, covering the repo history from the initial project import through current `main`.
+First public release of LessonFlow, covering the repo history from the initial project import through the public-ready `main` branch.
 
-Release range: `5d00dae794560461b8951d01d46821937c72c711..f6dc8f4`
+Release range: `5d00dae794560461b8951d01d46821937c72c711..8d65c5b`
 
 Detailed release notes: [`Documentation/release-notes-v1.0.md`](Documentation/release-notes-v1.0.md)
 
@@ -34,6 +34,8 @@ Detailed release notes: [`Documentation/release-notes-v1.0.md`](Documentation/re
 - Moved scheduled production jobs to `systemd` timers as the preferred runtime path.
 - Switched browser-triggered updates to a dedicated host-side systemd runner rather than browser-entered sudo.
 - Expanded admin settings so branding, content, invoicing, product, email, and system behavior can be managed from the application.
+- Cleaned the tracked public branch so GitLab source archives no longer ship internal AI workflow material or private planning notes.
+- Added deploy-mode reporting so operators can verify whether a host is on the supported release-directory layout.
 
 ### Fixed
 
@@ -51,8 +53,10 @@ Detailed release notes: [`Documentation/release-notes-v1.0.md`](Documentation/re
 - Existing deployments should follow the baseline migration guidance in `deploy/README.md` to avoid Prisma baseline conflicts on pre-existing databases.
 - Existing hosts using older web-update flows should install the dedicated web-update systemd unit and sudoers entry before relying on browser-triggered updates.
 - Existing hosts should ensure the LessonFlow timers and services are installed and enabled when moving from older cron-based scheduling.
+- Operators can run `sudo ./deploy/deploy.sh --print-deploy-mode` to confirm the host is using the expected release-directory deploy layout.
 
 ### Notes
 
 - This release entry is history-based because the repository has no prior Git release tags.
 - Rollback planning matters because deploy/update flows now interact with shared environment files, release symlinks, systemd units, and scheduled jobs.
+- GitLab release archives now reflect the cleaned public branch rather than the earlier pre-cleanup tag state.
