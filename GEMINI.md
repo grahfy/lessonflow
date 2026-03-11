@@ -18,7 +18,7 @@ LessonFlow is a comprehensive management platform tailored for music schools and
 *   **Language:** TypeScript
 *   **ORM:** Prisma
 *   **Database:** MySQL
-*   **Styling:** Standard CSS (`src/styles/globals.css`) with Radix UI for complex primitives.
+*   **Styling:** Standard CSS in `src/styles/` plus CSS Modules for feature-local UI, with Radix UI for complex primitives.
 *   **Animation:** GSAP (`gsap`) for UI transitions and motion.
 *   **Testing:** Vitest (unit/integration) and Playwright (E2E/Screenshots).
 *   **Utilities:** `pdf-lib` (PDF generation), `nodemailer` (email), `zod` (validation).
@@ -67,7 +67,7 @@ LessonFlow is a comprehensive management platform tailored for music schools and
 *   **Audit Trails:** Most entities (Bookings, Invoices, Credentials) have append-only audit log tables in Prisma.
 *   **Financial Integrity:** Invoices denormalize customer data at the time of creation to ensure historical accuracy even if customer profiles change.
 *   **Branding:** Branding strings are centralized in `src/lib/branding.ts`.
-*   **Styling:** Prefer standard CSS classes in `globals.css` rather than inline styles or utility-first frameworks.
+*   **Styling:** Prefer standard CSS or CSS Modules over inline styles or utility-first frameworks.
 *   **Deployment:** The project uses a "releases" based symlink deployment strategy on Linux servers, managed by scripts in `deploy/`.
 *   **Documentation in Code:** Always comment code extensively when modifying or adding. Provide clear explanations for complex logic, domain-specific decisions, and technical trade-offs to ensure maintainability.
 

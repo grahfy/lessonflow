@@ -4,14 +4,16 @@ import { PropsWithChildren } from "react";
 import { MotionProvider } from "@/components/motion/tween-orchestrator";
 import { PublicSiteFrame } from "@/components/public-site-frame";
 import { GlobalTooltipProvider } from "@/components/ui/global-tooltip-provider";
-import { 
-  PUBLIC_BRAND_NAME, 
-  PRIMARY_SUBJECT, 
-  PRIMARY_LOCATION, 
+import {
   LOGO_URL,
-  getSubjectLabel 
+  PUBLIC_BRAND_NAME,
+  PRIMARY_LOCATION,
+  PRIMARY_SUBJECT,
+  getSubjectLabel,
 } from "@/lib/branding";
 import "@/styles/globals.css";
+import "@/styles/admin.css";
+import "@/styles/extended-features.css";
 
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 

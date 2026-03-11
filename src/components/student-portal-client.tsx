@@ -1,16 +1,18 @@
 "use client";
-import { APP_TIMEZONE } from "@/lib/time";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { type ReactElement, FormEvent, useCallback, useEffect, useState } from "react";
+
 import { Tooltip } from "@/components/admin/ui/tooltip";
+import styles from "@/components/student-portal.module.css";
 import {
   parseStudentPortalPayload,
   type StudentPortalBooking,
   type StudentPortalMaterial,
   type StudentPortalPayload
 } from "@/lib/student-portal/contracts";
-
-import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { APP_TIMEZONE } from "@/lib/time";
 
 type LessonDurationChoice = "min30" | "min60";
 
@@ -27,7 +29,7 @@ type SystemAnnouncement = {
  * Student portal dashboard showing lesson history, learning materials,
  * and self-service lesson request/cancellation actions.
  */
-export function StudentPortalClient() {
+export function StudentPortalClient(): ReactElement {
   const router = useRouter();
   const [data, setData] = useState<StudentPortalPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -206,20 +208,20 @@ export function StudentPortalClient() {
   }
 
   return (
-    <div className="student-portal-shell" data-motion-root="student-portal">
+    <div className={styles["portal-shell"]} data-motion-root="student-portal">
       {showAnnouncement && announcement ? (
-        <div className="admin-card booking-row system-announcement-banner">
-          <div className="system-announcement-content">
-            <span className="student-chip is-success">New Update</span>
+        <div className={cx("admin-card", "booking-row", styles["system-announcement-banner"])}>
+          <div className={styles["system-announcement-content"]}>
+            <span className={cx(styles["chip"], styles["chip-success"])}>New Update</span>
             <strong>System updates were recently applied!</strong>
-            <ul className="system-announcement-list">
+            <ul className={styles["system-announcement-list"]}>
               {announcement.commits.slice(0, 3).map((commit, idx) => (
                 <li key={idx}>{commit.subject}</li>
               ))}
             </ul>
           </div>
           <button 
-            className="btn btn-secondary btn-sm" 
+            className="btn btn-secondary btn-sm"
             type="button" 
             onClick={() => setShowAnnouncement(false)}
           >
@@ -228,33 +230,38 @@ export function StudentPortalClient() {
         </div>
       ) : null}
 
-      <div className="admin-card booking-row student-portal-header">
-        <div className="student-portal-header-copy">
-          <div className="student-portal-header-visual">
-            {/* Optimized WebP keeps the portal header visual fast without oversized payloads. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              className="student-portal-header-illustration"
-              src="/images/student-portal-hero.webp"
-              alt="Illustration of music study books and notes"
-              width={360}
-              height={220}
-              loading="eager"
-              decoding="async"
-            />
-          </div>
-          <p className="kicker">Student Portal</p>
-          <h1>{data?.student.fullName || "Portal"}</h1>
-          <p className="helper-text">Appointments and assigned learning materials.</p>
+      <div className={cx("admin-card", "booking-row", styles["portal-header"])}>
+        <div className={styles["portal-header-visual"]}>
+          {/* Optimized WebP keeps the portal header visual fast without oversized payloads. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            className={styles["portal-header-illustration"]}
+            src="/images/student-portal-hero.webp"
+            alt="Illustration of music study books and notes"
+            width={360}
+            height={220}
+            loading="eager"
+            decoding="async"
+          />
         </div>
-        <div className="student-portal-header-actions">
+        <div className={styles["portal-header-copy"]}>
+          <p className={styles["portal-kicker"]}>Student Portal</p>
+          <h1 className={styles["portal-title"]}>{data?.student.fullName || "Portal"}</h1>
+          <p className={cx("helper-text", styles["portal-helper-text"])}>Appointments and assigned learning materials.</p>
+        </div>
+        <div className={styles["portal-header-actions"]}>
           <Tooltip content="Open the full materials library with every file assigned to your account.">
-            <Link className="btn btn-secondary" href="/student/materials">
+            <Link className={cx("btn", "btn-secondary", styles["portal-header-action-button"])} href="/student/materials">
               Show all learning materials
             </Link>
           </Tooltip>
           <Tooltip content="Sign out of the student portal on this device.">
-            <button className="btn btn-secondary" type="button" onClick={() => void logout()} disabled={loggingOut}>
+            <button
+              className={cx("btn", "btn-secondary", styles["portal-header-action-button"])}
+              type="button"
+              onClick={() => void logout()}
+              disabled={loggingOut}
+            >
               {loggingOut ? "Signing out..." : "Sign out"}
             </button>
           </Tooltip>
@@ -267,17 +274,17 @@ export function StudentPortalClient() {
 
       {!loading && !error && data ? (
         <>
-          <section className="admin-card student-actions-panel">
-            <div className="student-actions-header">
-              <h2>Book or cancel a lesson</h2>
-              <p className="helper-text student-actions-intro">
+          <section className={cx("admin-card", styles["actions-panel"])}>
+            <div className={styles["actions-header"]}>
+              <h2 className={styles["actions-title"]}>Book or cancel a lesson</h2>
+              <p className={cx("helper-text", styles["actions-intro"])}>
                 New bookings are submitted as pending requests and confirmed after owner approval.
               </p>
             </div>
 
-            <div className="student-actions-layout">
-              <form className="student-actions-grid" onSubmit={createBookingRequest}>
-                <h3 className="student-actions-subtitle">Request lesson</h3>
+            <div className={styles["actions-layout"]}>
+              <form className={styles["actions-grid"]} onSubmit={createBookingRequest}>
+                <h3 className={styles["actions-subtitle"]}>Request lesson</h3>
                 <div className="field">
                   <label htmlFor="student-request-start">Request lesson time</label>
                   <input
@@ -310,32 +317,33 @@ export function StudentPortalClient() {
                     <option value="min60">60 min</option>
                   </select>
                 </div>
-                <div className="field student-actions-notes">
+                <div className={cx("field", styles["actions-notes"])}>
                   <label htmlFor="student-request-notes">Notes (optional)</label>
                   <textarea
+                    className={styles["actions-textarea"]}
                     id="student-request-notes"
                     value={requestNotes}
                     onChange={(event) => setRequestNotes(event.target.value)}
                   />
                 </div>
-                <div className="student-actions-cta">
+                <div className={styles["actions-cta"]}>
                   <Tooltip content="Submit this lesson request for owner review and approval.">
-                    <button className="btn btn-primary" type="submit" disabled={requestingBooking}>
+                    <button className={cx("btn", "btn-primary", styles["actions-submit-button"])} type="submit" disabled={requestingBooking}>
                       {requestingBooking ? "Submitting..." : "Request lesson (pending)"}
                     </button>
                   </Tooltip>
                 </div>
               </form>
 
-              <aside className="student-actions-side" aria-label="Cancellation policy and pending requests">
-                <p className="student-policy-warning" role="note">
+              <aside className={styles["actions-side"]} aria-label="Cancellation policy and pending requests">
+                <p className={styles["policy-warning"]} role="note">
                   If less than 24 hours notice is given, the full lesson fee is still payable. If more than 24 hours notice is given, a make-up lesson will be provided within the same week.
                 </p>
 
-                <div className="student-pending-list">
-                  <strong>Pending requests</strong>
+                <div className={styles["pending-list"]}>
+                  <strong className={styles["pending-title"]}>Pending requests</strong>
                   {data.pendingRequests.length ? (
-                    <ul>
+                    <ul className={styles["pending-items"]}>
                       {data.pendingRequests.map((requestRow) => (
                         <li key={requestRow.id}>
                           {formatWhen(requestRow.requestedStartAt)} · {requestRow.lessonMode === "in_person" ? "In-person" : "Video"} ·{" "}
@@ -348,17 +356,17 @@ export function StudentPortalClient() {
                       ))}
                     </ul>
                   ) : (
-                    <p className="helper-text student-pending-empty">No pending requests.</p>
+                    <p className={cx("helper-text", styles["pending-empty"])}>No pending requests.</p>
                   )}
                 </div>
               </aside>
             </div>
           </section>
 
-          <div className="student-portal-grid">
-            <section className="admin-card student-upcoming-panel">
-              <h2>Upcoming appointments</h2>
-              <div className="student-upcoming-viewport">
+          <div className={styles["portal-grid"]}>
+            <section className={cx("admin-card", styles["upcoming-panel"])}>
+              <h2 className={styles["panel-title"]}>Upcoming appointments</h2>
+              <div className={styles["upcoming-viewport"]}>
                 <BookingList
                   bookings={data.upcoming}
                   emptyMessage="No upcoming appointments."
@@ -369,8 +377,8 @@ export function StudentPortalClient() {
                 />
               </div>
             </section>
-            <section className="admin-card student-previous-panel">
-              <h2>Previous appointments</h2>
+            <section className={cx("admin-card", styles["previous-panel"])}>
+              <h2 className={styles["panel-title"]}>Previous appointments</h2>
               <BookingList
                 bookings={data.previous}
                 standaloneMaterials={data.standaloneMaterials || []}
@@ -383,6 +391,10 @@ export function StudentPortalClient() {
       ) : null}
     </div>
   );
+}
+
+function cx(...classNames: Array<string | false | null | undefined>): string {
+  return classNames.filter(Boolean).join(" ");
 }
 
 /**
@@ -405,30 +417,35 @@ function BookingList(input: BookingListProps) {
   }
 
   return (
-    <div className="booking-list student-portal-booking-list">
+    <div className={styles["booking-list"]}>
       {input.bookings.map((booking) => (
-        <article className="booking-item student-portal-booking-item" key={booking.id}>
-          <div className="student-booking-head">
-            <strong>{formatWhen(booking.startAt)}</strong>
+        <article className={cx("booking-item", styles["booking-item"])} key={booking.id}>
+          <div className={styles["booking-head"]}>
+            <strong className={styles["booking-heading"]}>{formatWhen(booking.startAt)}</strong>
           </div>
 
-          <div className="student-booking-chip-row">
-            <span className="student-chip">{describeDuration(booking)}</span>
-            <span className="student-chip">{booking.lessonMode === "in_person" ? "In-person" : "Video"}</span>
-            <span className={`student-chip ${booking.status === "cancelled" ? "is-cancelled" : "is-approved"}`}>
+          <div className={styles["booking-chip-row"]}>
+            <span className={styles["chip"]}>{describeDuration(booking)}</span>
+            <span className={styles["chip"]}>{booking.lessonMode === "in_person" ? "In-person" : "Video"}</span>
+            <span className={cx(styles["chip"], booking.status === "cancelled" ? styles["chip-cancelled"] : styles["chip-approved"])}>
               {booking.status}
             </span>
             {isWithin24Hours(booking.startAt) && booking.status !== "cancelled" ? (
-              <span className="student-chip is-warning">Within 24h: full fee applies</span>
+              <span className={cx(styles["chip"], styles["chip-warning"])}>Within 24h: full fee applies</span>
             ) : null}
-            {input.cancelledBookingIds?.[booking.id] ? <span className="student-chip is-success">Cancelled</span> : null}
+            {input.cancelledBookingIds?.[booking.id] ? <span className={cx(styles["chip"], styles["chip-success"])}>Cancelled</span> : null}
           </div>
 
           {input.variant === "upcoming" && booking.status !== "cancelled" ? (
-            <div className="student-booking-actions">
+            <div className={styles["booking-actions"]}>
               <Tooltip content="Cancel this upcoming lesson. A confirmation prompt will be shown first.">
                 <button
-                  className={`btn btn-danger ${isWithin24Hours(booking.startAt) ? "student-cancel-btn-warning" : ""}`}
+                  className={cx(
+                    "btn",
+                    "btn-danger",
+                    styles["cancel-button"],
+                    isWithin24Hours(booking.startAt) && styles["cancel-button-warning"]
+                  )}
                   type="button"
                   disabled={!!input.cancellingBookingId}
                   onClick={() => {
@@ -444,25 +461,32 @@ function BookingList(input: BookingListProps) {
           ) : null}
 
           {booking.notes ? (
-            <details className="student-booking-details">
+            <details className={styles["booking-details"]}>
               <summary>Lesson notes</summary>
               <p>{booking.notes}</p>
             </details>
           ) : null}
 
-          <div className="student-materials-group">
-            <strong>Learning materials</strong>
+          <div className={styles["materials-group"]}>
+            <strong className={styles["materials-section-title"]}>Learning materials</strong>
             {booking.materials.length ? (
-              <ul className="student-material-list">
+              <ul className={styles["material-list"]}>
                 {booking.materials.map((material) => (
-                  <li key={material.id}>
-                    <span className="student-material-title" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <li className={styles["material-item"]} key={material.id}>
+                    <span className={styles["material-title"]}>
                       <span>{material.description || material.title} ({material.materialType.toUpperCase()})</span>
-                      {material.description ? <span className="helper-text" style={{ fontSize: '0.85em', marginTop: '2px' }}>{material.title}</span> : null}
+                      {material.description ? (
+                        <span className={cx("helper-text", styles["material-title-secondary"])}>{material.title}</span>
+                      ) : null}
                     </span>
-                    <span className="dialog-actions-inline">
+                    <span className={styles["material-actions"]}>
                       {material.materialType === "audio" ? (
-                        <audio className="material-audio-player material-audio-player-student" controls preload="metadata" src={material.previewUrl} />
+                        <audio
+                          className={cx("material-audio-player", styles["audio-player"])}
+                          controls
+                          preload="metadata"
+                          src={material.previewUrl}
+                        />
                       ) : (
                         <Tooltip content="Preview this file in a new browser tab.">
                           <a className="btn btn-secondary" href={material.previewUrl} target="_blank" rel="noreferrer">
@@ -480,28 +504,35 @@ function BookingList(input: BookingListProps) {
                 ))}
               </ul>
             ) : (
-              <span className="student-chip">No materials yet</span>
+              <span className={styles["chip"]}>No materials yet</span>
             )}
           </div>
         </article>
       ))}
       {input.variant === "previous" ? (
-        <article className="booking-item student-portal-booking-item">
-          <div className="student-booking-head">
-            <strong>General learning materials</strong>
+        <article className={cx("booking-item", styles["booking-item"])}>
+          <div className={styles["booking-head"]}>
+            <strong className={styles["booking-heading"]}>General learning materials</strong>
           </div>
-          <div className="student-materials-group">
+          <div className={styles["materials-group"]}>
             {standaloneMaterials.length ? (
-              <ul className="student-material-list">
+              <ul className={styles["material-list"]}>
                 {standaloneMaterials.map((material) => (
-                  <li key={`general-${material.id}`}>
-                    <span className="student-material-title" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <li className={styles["material-item"]} key={`general-${material.id}`}>
+                    <span className={styles["material-title"]}>
                       <span>{material.description || material.title} ({material.materialType.toUpperCase()})</span>
-                      {material.description ? <span className="helper-text" style={{ fontSize: '0.85em', marginTop: '2px' }}>{material.title}</span> : null}
+                      {material.description ? (
+                        <span className={cx("helper-text", styles["material-title-secondary"])}>{material.title}</span>
+                      ) : null}
                     </span>
-                    <span className="dialog-actions-inline">
+                    <span className={styles["material-actions"]}>
                       {material.materialType === "audio" ? (
-                        <audio className="material-audio-player material-audio-player-student" controls preload="metadata" src={material.previewUrl} />
+                        <audio
+                          className={cx("material-audio-player", styles["audio-player"])}
+                          controls
+                          preload="metadata"
+                          src={material.previewUrl}
+                        />
                       ) : (
                         <Tooltip content="Preview this file in a new browser tab.">
                           <a className="btn btn-secondary" href={material.previewUrl} target="_blank" rel="noreferrer">
@@ -519,7 +550,7 @@ function BookingList(input: BookingListProps) {
                 ))}
               </ul>
             ) : (
-              <span className="student-chip">No general materials</span>
+              <span className={styles["chip"]}>No general materials</span>
             )}
           </div>
         </article>

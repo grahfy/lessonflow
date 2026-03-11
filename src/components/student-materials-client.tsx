@@ -21,17 +21,18 @@
 
 "use client";
 
-import { APP_TIMEZONE } from "@/lib/time";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { type ReactElement, useCallback, useEffect, useMemo, useState } from "react";
+
 import { Tooltip } from "@/components/admin/ui/tooltip";
+import styles from "@/components/student-portal.module.css";
 import {
   parseStudentPortalPayload,
   type StudentPortalMaterial,
   type StudentPortalPayload
 } from "@/lib/student-portal/contracts";
-
-import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { APP_TIMEZONE } from "@/lib/time";
 
 /** Local wrapper for material items enriched with booking context. */
 type StudentMaterialEntry = {
@@ -41,7 +42,7 @@ type StudentMaterialEntry = {
   material: StudentPortalMaterial;
 };
 
-export function StudentMaterialsClient() {
+export function StudentMaterialsClient(): ReactElement {
   const router = useRouter();
   const [data, setData] = useState<StudentPortalPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,21 +105,26 @@ export function StudentMaterialsClient() {
   }, [data]);
 
   return (
-    <div className="student-portal-shell" data-motion-root="student-materials">
-      <div className="admin-card booking-row student-portal-header student-materials-header">
-        <div>
-          <p className="kicker">Student Portal</p>
-          <h1>{data?.student.fullName || "Portal"}</h1>
-          <p className="helper-text">All assigned learning materials.</p>
+    <div className={styles["portal-shell"]} data-motion-root="student-materials">
+      <div className={cx("admin-card", "booking-row", styles["portal-header"], styles["materials-header"])}>
+        <div className={styles["portal-header-copy"]}>
+          <p className={styles["portal-kicker"]}>Student Portal</p>
+          <h1 className={styles["portal-title"]}>{data?.student.fullName || "Portal"}</h1>
+          <p className={cx("helper-text", styles["portal-helper-text"])}>All assigned learning materials.</p>
         </div>
-        <div className="student-portal-header-actions">
+        <div className={styles["portal-header-actions"]}>
           <Tooltip content="Return to your student dashboard with upcoming and previous lessons.">
-            <Link className="btn btn-secondary" href="/student/portal">
+            <Link className={cx("btn", "btn-secondary", styles["portal-header-action-button"])} href="/student/portal">
               Back to portal
             </Link>
           </Tooltip>
           <Tooltip content="Sign out of the student portal on this device.">
-            <button className="btn btn-secondary" type="button" onClick={() => void logout()} disabled={loggingOut}>
+            <button
+              className={cx("btn", "btn-secondary", styles["portal-header-action-button"])}
+              type="button"
+              onClick={() => void logout()}
+              disabled={loggingOut}
+            >
               {loggingOut ? "Signing out..." : "Sign out"}
             </button>
           </Tooltip>
@@ -129,15 +135,15 @@ export function StudentMaterialsClient() {
       {error ? <p className="notice error">{error}</p> : null}
 
       {!loading && !error ? (
-        <section className="admin-card student-drive-panel">
-          <div className="student-drive-toolbar">
-            <h2>All learning materials</h2>
-            <p className="helper-text">Your assigned files, arranged like a library list.</p>
+        <section className={cx("admin-card", styles["drive-panel"])}>
+          <div className={styles["drive-toolbar"]}>
+            <h2 className={styles["drive-title"]}>All learning materials</h2>
+            <p className={cx("helper-text", styles["drive-name-meta"])}>Your assigned files, arranged like a library list.</p>
           </div>
           
           {materials.length ? (
-            <div className="student-drive-table-wrap">
-              <table className="student-drive-table">
+            <div className={styles["drive-table-wrap"]}>
+              <table className={styles["drive-table"]}>
                 <thead>
                   <tr>
                     <th>Name</th>
@@ -150,18 +156,20 @@ export function StudentMaterialsClient() {
                 <tbody>
                   {materials.map((entry) => (
                     <tr key={`${entry.bookingId}-${entry.material.id}`}>
-                      <td className="student-drive-name-cell">
-                        <span className={`student-drive-type-dot is-${entry.material.materialType}`} aria-hidden="true" />
-                        <div className="student-drive-name-stack">
+                      <td className={styles["drive-name-cell"]}>
+                        <span className={materialTypeDotClass(entry.material.materialType)} aria-hidden="true" />
+                        <div className={styles["drive-name-stack"]}>
                           {/* 
                              Naming RATIONALE: 
                              Display the descriptive title first, fallback to filename. 
                              This ensures internal filenames (e.g. "lesson_v1.pdf") 
                              don't ruin the professional UI.
                           */}
-                          <strong>{entry.material.description || entry.material.title}</strong>
-                          {entry.material.description ? <span className="helper-text">{entry.material.title}</span> : null}
-                          <span className="helper-text">{formatBytes(entry.material.sizeBytes)}</span>
+                          <strong className={styles["drive-name-title"]}>{entry.material.description || entry.material.title}</strong>
+                          {entry.material.description ? (
+                            <span className={cx("helper-text", styles["drive-name-meta"])}>{entry.material.title}</span>
+                          ) : null}
+                          <span className={cx("helper-text", styles["drive-name-meta"])}>{formatBytes(entry.material.sizeBytes)}</span>
                         </div>
                       </td>
                       <td>{entry.material.materialType.toUpperCase()}</td>
@@ -171,18 +179,28 @@ export function StudentMaterialsClient() {
                           : "General material"}
                       </td>
                       <td>{formatWhen(entry.material.createdAt)}</td>
-                      <td className="student-drive-action-cell">
+                      <td className={styles["drive-action-cell"]}>
                         {entry.material.materialType === "audio" ? (
-                          <audio className="material-audio-player material-audio-player-student" controls preload="metadata" src={entry.material.previewUrl} />
+                          <audio
+                            className={cx("material-audio-player", styles["audio-player"])}
+                            controls
+                            preload="metadata"
+                            src={entry.material.previewUrl}
+                          />
                         ) : (
                           <Tooltip content="Preview this file in a new browser tab.">
-                            <a className="btn btn-secondary" href={entry.material.previewUrl} target="_blank" rel="noreferrer">
+                            <a
+                              className={cx("btn", "btn-secondary", styles["drive-action-button"])}
+                              href={entry.material.previewUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
                               Preview
                             </a>
                           </Tooltip>
                         )}
                         <Tooltip content="Download this file to your device.">
-                          <a className="btn btn-secondary" href={entry.material.downloadUrl}>
+                          <a className={cx("btn", "btn-secondary", styles["drive-action-button"])} href={entry.material.downloadUrl}>
                             Download
                           </a>
                         </Tooltip>
@@ -199,6 +217,14 @@ export function StudentMaterialsClient() {
       ) : null}
     </div>
   );
+}
+
+function cx(...classNames: Array<string | false | null | undefined>): string {
+  return classNames.filter(Boolean).join(" ");
+}
+
+function materialTypeDotClass(materialType: StudentPortalMaterial["materialType"]): string {
+  return cx(styles["drive-type-dot"], styles[`drive-type-dot-${materialType}`]);
 }
 
 /**

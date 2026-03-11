@@ -12,7 +12,7 @@
 - **Admin Standardization:** Use the centralized admin UI library (`src/components/admin/ui`) and data hooks (`src/lib/admin/use-*`) for all administrative features to ensure a unified experience.
 
 ## Design & Aesthetics
-- **Styling:** Prefer standard CSS classes in `src/styles/globals.css`. Avoid inline styles unless necessary for dynamic values.
+- **Styling:** Prefer standard CSS classes in `src/styles/` or CSS Modules for local UI. Avoid inline styles unless necessary for dynamic values.
 - **Animation:** Use GSAP for smooth, purposeful UI transitions. Animations should enhance, not distract from, the user experience.
 - **Consistency:** Maintain consistent spacing and typography across all pages using the established design tokens.
 
