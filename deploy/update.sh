@@ -315,6 +315,26 @@ ssl_email_required_for_domain() {
   return 0
 }
 
+# Reads the preferred SSL contact email from the deployed shared env, allowing
+# operators to persist it as SSL_EMAIL and fall back to ADMIN_EMAIL when needed.
+read_ssl_email_from_shared_env() {
+  local shared_env_path="${SHARED_DIR}/.env"
+  local shared_ssl_email=""
+  local shared_admin_email=""
+
+  [[ -f "${shared_env_path}" ]] || return 1
+
+  shared_ssl_email="$(read_env_file_value_from_update "${shared_env_path}" "SSL_EMAIL" || true)"
+  if [[ -n "${shared_ssl_email}" ]]; then
+    printf '%s\n' "${shared_ssl_email}"
+    return 0
+  fi
+
+  shared_admin_email="$(read_env_file_value_from_update "${shared_env_path}" "ADMIN_EMAIL" || true)"
+  [[ -n "${shared_admin_email}" ]] || return 1
+  printf '%s\n' "${shared_admin_email}"
+}
+
 # Best-effort host config discovery for update.sh defaults. It infers whether
 # SSL is already configured on the server and pre-fills domain/email where
 # readable, so operators do not need to re-toggle SSL settings every run.
@@ -398,6 +418,10 @@ detect_previous_deploy_defaults_from_host() {
         exit
       }
     ' "${cli_ini}" 2>/dev/null || true)"
+  fi
+
+  if [[ -z "${detected_email}" ]]; then
+    detected_email="$(read_ssl_email_from_shared_env || true)"
   fi
 
   if [[ "${ssl_detected}" == true && "${CLI_SSL_FLAG_SET}" != true && "${SSL_SETUP}" != true ]]; then

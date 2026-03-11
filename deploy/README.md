@@ -406,10 +406,10 @@ Visit `https://example.com/setup` to:
 ### 6. Setup SSL Certificate
 
 ```bash
-sudo ./deploy/setup-ssl.sh --email your@email.com
+sudo ./deploy/setup-ssl.sh
 ```
 
-If the live host is already configured, `setup-ssl.sh` will auto-detect the canonical domain from the active Nginx site or `NEXT_PUBLIC_SITE_URL` in `/var/www/lessonflow/shared/.env`. Pass `--domain` to override detection.
+If the live host is already configured, `setup-ssl.sh` will auto-detect the canonical domain from the active Nginx site or `NEXT_PUBLIC_SITE_URL` in `/var/www/lessonflow/shared/.env`. It will also reuse `SSL_EMAIL` from the shared env, or fall back to `ADMIN_EMAIL` when `SSL_EMAIL` is unset. Pass `--domain` or `--email` to override detection.
 
 See [SSL Certificate](#ssl-certificate) section for full details.
 
@@ -422,7 +422,7 @@ See [SSL Certificate](#ssl-certificate) section for full details.
 The included `setup-ssl.sh` script handles everything:
 
 ```bash
-sudo ./deploy/setup-ssl.sh --email your@email.com
+sudo ./deploy/setup-ssl.sh
 ```
 
 This script:
@@ -439,10 +439,18 @@ This script:
 sudo ./deploy/setup-ssl.sh --domain example.com --email your@email.com
 
 # Test with staging server (won't create valid cert)
-sudo ./deploy/setup-ssl.sh --email your@email.com --staging
+sudo ./deploy/setup-ssl.sh --staging
 
 # Force renewal
-sudo ./deploy/setup-ssl.sh --email your@email.com --force
+sudo ./deploy/setup-ssl.sh --force
+```
+
+For first-time SSL setup without `--email`, define one of these in `/var/www/lessonflow/shared/.env`:
+
+```env
+SSL_EMAIL="ops@example.com"
+# or fall back to the existing admin contact
+ADMIN_EMAIL="owner@example.com"
 ```
 
 ### Manual Setup (Alternative)

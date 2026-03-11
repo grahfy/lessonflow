@@ -73,8 +73,10 @@ sudo ./deploy/setup-packages.sh
 Run the deployment script to set up the directory structure and build the application:
 
 ```bash
-sudo ./deploy/deploy.sh --branch main --ssl --domain yourdomain.com --email admin@yourdomain.com
+sudo ./deploy/deploy.sh --branch main --ssl --domain yourdomain.com
 ```
+
+If `/var/www/lessonflow/shared/.env` includes `SSL_EMAIL` or `ADMIN_EMAIL`, the deploy scripts will reuse that address for first-time SSL setup. Pass `--email` to override it for a specific run.
 
 ### 3. Complete Setup
 Visit `https://yourdomain.com/setup` to create your admin account and verify the environment.

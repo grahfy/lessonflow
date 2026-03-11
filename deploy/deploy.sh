@@ -335,6 +335,26 @@ cert_files_exist_for_domain() {
     [[ -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && -f "/etc/letsencrypt/live/${domain}/privkey.pem" ]]
 }
 
+# Reads the preferred SSL contact email from the deployed shared env so first
+# time SSL runs can reuse a persisted value instead of requiring --email.
+read_ssl_email_from_shared_env() {
+    local shared_env_path="${SHARED_DIR}/.env"
+    local shared_ssl_email=""
+    local shared_admin_email=""
+
+    [[ -f "${shared_env_path}" ]] || return 1
+
+    shared_ssl_email="$(read_env_file_value "${shared_env_path}" "SSL_EMAIL" || true)"
+    if [[ -n "${shared_ssl_email}" ]]; then
+        printf '%s\n' "${shared_ssl_email}"
+        return 0
+    fi
+
+    shared_admin_email="$(read_env_file_value "${shared_env_path}" "ADMIN_EMAIL" || true)"
+    [[ -n "${shared_admin_email}" ]] || return 1
+    printf '%s\n' "${shared_admin_email}"
+}
+
 # Pulls a hostname from NEXT_PUBLIC_SITE_URL in shared/.env as a fallback when
 # nginx config has not been established yet on a host.
 read_site_host_from_shared_env() {
@@ -557,6 +577,10 @@ detect_previous_deploy_defaults_from_host() {
                 exit
             }
         ' /etc/letsencrypt/cli.ini 2>/dev/null || true)"
+    fi
+
+    if [[ -z "${SSL_EMAIL}" ]]; then
+        SSL_EMAIL="$(read_ssl_email_from_shared_env || true)"
     fi
 }
 

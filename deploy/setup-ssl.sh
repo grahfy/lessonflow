@@ -152,6 +152,48 @@ read_site_host_from_shared_env() {
     printf '%s\n' "${site_host}"
 }
 
+read_shared_env_value() {
+    local env_file="$1"
+    local key="$2"
+    local line=""
+    local value=""
+
+    [[ -f "${env_file}" ]] || return 1
+
+    line="$(grep -m1 -E "^[[:space:]]*(export[[:space:]]+)?${key}[[:space:]]*=" "${env_file}" 2>/dev/null || true)"
+    [[ -n "${line}" ]] || return 1
+
+    value="${line#*=}"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+
+    if [[ ${#value} -ge 2 && "${value:0:1}" == '"' && "${value: -1}" == '"' ]]; then
+        value="${value:1:${#value}-2}"
+    elif [[ ${#value} -ge 2 && "${value:0:1}" == "'" && "${value: -1}" == "'" ]]; then
+        value="${value:1:${#value}-2}"
+    fi
+
+    printf '%s\n' "${value}"
+}
+
+read_email_from_shared_env() {
+    local shared_env="/var/www/lessonflow/shared/.env"
+    local shared_ssl_email=""
+    local shared_admin_email=""
+
+    [[ -f "${shared_env}" ]] || return 1
+
+    shared_ssl_email="$(read_shared_env_value "${shared_env}" "SSL_EMAIL" || true)"
+    if [[ -n "${shared_ssl_email}" ]]; then
+        printf '%s\n' "${shared_ssl_email}"
+        return 0
+    fi
+
+    shared_admin_email="$(read_shared_env_value "${shared_env}" "ADMIN_EMAIL" || true)"
+    [[ -n "${shared_admin_email}" ]] || return 1
+    printf '%s\n' "${shared_admin_email}"
+}
+
 escape_sed_replacement() {
     printf '%s' "$1" | sed -e 's/[\/&]/\\&/g'
 }
@@ -206,6 +248,10 @@ if [[ -z "${WWW_DOMAIN}" ]]; then
 fi
 
 # Validate email
+if [[ -z "${EMAIL}" ]]; then
+    EMAIL="$(read_email_from_shared_env || true)"
+fi
+
 if [[ -z "${EMAIL}" ]]; then
     log_error "Email address is required for Let's Encrypt notifications"
     echo "Usage: sudo ./deploy/setup-ssl.sh --email your@email.com"
