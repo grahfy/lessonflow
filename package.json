@@ -9,7 +9,7 @@
     "local:full-site": "bash ./scripts/test-full-site-local.sh",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint src/app src/components src/lib --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
     "test:prepare": "node ./scripts/prepare-test-db.cjs",
     "test": "npm run test:prepare && node ./scripts/run-vitest-with-test-db.cjs run",

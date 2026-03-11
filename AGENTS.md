@@ -25,7 +25,7 @@ This repository is a Next.js App Router application.
 - `npm run start`
   Starts the production server.
 - `npm run lint`
-  Runs ESLint checks using Next.js ESLint config.
+  Runs ESLint checks using the ESLint CLI (`next lint` is deprecated and must not be used).
 - `npm run typecheck`
   Runs TypeScript type checking without emitting files.
 - `npm run test`
@@ -128,6 +128,7 @@ export function validateBookingData(data: unknown) {
 - Run `npm run lint` and `npm run typecheck` before committing.
 - Run `npm test` for behavior changes.
 - Run `npm run test:e2e` for full end-to-end workflows.
+- Do not use `next lint` in this repository. Prefer the `npm` scripts or direct ESLint CLI commands instead.
 
 ### Test Organization
 - Unit tests live alongside components: `src/components/foo.tsx` → `src/components/foo.test.ts`.
