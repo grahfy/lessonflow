@@ -52,6 +52,19 @@ The latest tab shows:
 
 This is the fastest place to confirm what code was actually deployed.
 
+## Version footer and About page
+
+LessonFlow also keeps the current release visible in two always-available admin locations:
+
+- a compact footer strip across admin screens that shows the current version
+- the `/admin/about` page, which shows the release tag, commit, creator details, contact email, GitLab repository URL, and GitLab wiki URL
+
+Use these surfaces when:
+
+- support staff need to confirm exactly which version they are viewing
+- an owner needs the project contact and repository links in one place
+- a bug report needs release context without opening the full deployment history dialog
+
 ### History tab
 
 The history tab lets you review earlier deployments and inspect what commits were included in those releases.

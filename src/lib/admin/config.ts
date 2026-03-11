@@ -12,4 +12,5 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { label: "Manual", href: "/admin/manual", tooltip: "Access documentation and operational guides." },
   { label: "Logs", href: "/admin/system-logs", tooltip: "Audit trail of system events and background jobs." },
   { label: "Settings", href: "/admin/settings", tooltip: "Configure school operations and integrations." },
+  { label: "About", href: "/admin/about", tooltip: "Review release version, developer credits, and project links." },
 ];

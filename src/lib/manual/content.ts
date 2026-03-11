@@ -322,7 +322,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
     group: "system",
     audience: "all_admins",
     sourcePath: "Documentation/11-Updates-and-Release-Visibility.md",
-    relatedRoutes: ["/admin/updates/progress", "/admin/bookings"],
+    relatedRoutes: ["/admin/about", "/admin/updates/progress", "/admin/bookings"],
     screenshotIds: []
   },
   {

@@ -1,7 +1,9 @@
 "use client";
 
 import type { CSSProperties, PropsWithChildren } from "react";
+
 import { AdminHeader } from "@/components/admin-header";
+import { AdminBuildInfoFooter } from "@/components/admin/layout/admin-build-info-footer";
 import { AdminNoticeStack } from "@/components/admin/ui/admin-notice";
 import { UpdateNotificationBanner } from "@/components/admin/updates/update-notification-banner";
 
@@ -34,6 +36,7 @@ export function AdminShell({ title, error, notice, loading, style, className, ch
       </div>
 
       <div className="admin-shell-content">{children}</div>
+      <AdminBuildInfoFooter />
     </div>
   );
 }

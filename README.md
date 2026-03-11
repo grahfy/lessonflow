@@ -174,8 +174,16 @@ npm run prisma:migrate
 ## Key Routes
 
 - Public: `/`, `/lessons`, `/teacher`, `/vouchers`, `/videos`, `/contact`, `/book`, `/terms`
-- Admin: `/admin/login`, `/admin/bookings`, `/admin/customers`, `/admin/invoices`, `/admin/reports`, `/admin/settings`, `/admin/manual`, `/admin/system-logs`
+- Admin: `/admin/login`, `/admin/bookings`, `/admin/customers`, `/admin/invoices`, `/admin/reports`, `/admin/settings`, `/admin/manual`, `/admin/system-logs`, `/admin/about`
 - Student: `/student/login`, `/student/portal`, `/student/materials`
+
+## Developer Credits
+
+LessonFlow was developed in `2026` and created by `Dean Thomson`.
+
+- Contact: [contact@grahfmusic.com](mailto:contact@grahfmusic.com)
+- GitLab repository: [https://gitlab.com/grahfmusic/lessonflow.git](https://gitlab.com/grahfmusic/lessonflow.git)
+- GitLab wiki: [https://gitlab.com/grahfmusic/lessonflow/-/wikis/home](https://gitlab.com/grahfmusic/lessonflow/-/wikis/home)
 
 ## License
 
