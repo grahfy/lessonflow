@@ -50,14 +50,15 @@ export function AdminHeader({ title }: AdminHeaderProps) {
           className={`admin-header-nav ${menuOpen ? "is-open" : ""}`}
           aria-hidden={!menuOpen}
         >
-          <div className="admin-header-nav-primary">
+          <nav className="admin-header-nav-primary" aria-label="Admin sections">
             {ADMIN_NAV_ITEMS.map((item) => {
-              const isActive = pathname === item.href;
+              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <Tooltip key={item.href} content={item.tooltip}>
                   <button
                     className={`btn ${isActive ? "btn-primary" : "btn-secondary"}`}
                     type="button"
+                    aria-current={isActive ? "page" : undefined}
                     onClick={() => router.push(item.href)}
                   >
                     {item.label}
@@ -65,7 +66,7 @@ export function AdminHeader({ title }: AdminHeaderProps) {
                 </Tooltip>
               );
             })}
-          </div>
+          </nav>
 
           <div className="admin-header-quick-actions">
             <AdminDeployUpdatesButton />

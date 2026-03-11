@@ -1,5 +1,7 @@
 import { RefObject } from "react";
 import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AdminNoticeStack } from "@/components/admin/ui/admin-notice";
+import { AdminTabBar } from "@/components/admin/ui/admin-tab-bar";
 import { CustomerProfileDialog, type CustomerForm, type CustomerRow } from "./customer-profile-dialog";
 import { CustomerEmailDialog } from "./customer-email-dialog";
 import { CustomerMaterialsDialog } from "./customer-materials-dialog";
@@ -79,31 +81,17 @@ export function CustomerDialogWrapper({
                 )}
             </div>
 
-            <div className="customer-dialog-tabs">
-                <button
-                    type="button"
-                    className={`btn ${activeTab === 'profile' ? 'btn-primary' : 'btn-secondary'}`}
-                    onClick={() => setActiveTab('profile')}
-                >
-                    Profile & Address
-                </button>
-                <button
-                    type="button"
-                    className={`btn ${activeTab === 'emails' ? 'btn-primary' : 'btn-secondary'}`}
-                    onClick={() => setActiveTab('emails')}
-                    disabled={!selectedCustomer}
-                >
-                    Communication
-                </button>
-                <button
-                    type="button"
-                    className={`btn ${activeTab === 'materials' ? 'btn-primary' : 'btn-secondary'}`}
-                    onClick={() => setActiveTab('materials')}
-                    disabled={!selectedCustomer}
-                >
-                    Learning Materials
-                </button>
-            </div>
+            <AdminTabBar
+                activeTab={activeTab}
+                onChange={setActiveTab}
+                className="customer-dialog-tabs"
+                listClassName="customer-dialog-tabs-list"
+                items={[
+                    { key: "profile", label: "Profile & Address" },
+                    { key: "emails", label: "Communication", disabled: !selectedCustomer },
+                    { key: "materials", label: "Learning Materials", disabled: !selectedCustomer }
+                ]}
+            />
         </div>
     );
 
@@ -117,8 +105,11 @@ export function CustomerDialogWrapper({
             description={description}
             id="customer-dialog"
         >
-            {error ? <p className="notice error customer-dialog-notice">{error}</p> : null}
-            {notice ? <p className="notice success customer-dialog-notice">{notice}</p> : null}
+            <AdminNoticeStack
+                error={error}
+                notice={notice}
+                className="customer-dialog-notice-stack"
+            />
 
             {activeTab === 'profile' && (
                 <div className="dialog-layout customer-dialog-panel">

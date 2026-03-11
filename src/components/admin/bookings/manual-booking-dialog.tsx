@@ -4,6 +4,7 @@ import { RefObject } from "react";
 import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { AdminCard } from "@/components/admin/ui/admin-card";
+import { STREET_TYPES } from "@/lib/admin/constants";
 import { type ManualStep, MANUAL_STEP_LABEL, MANUAL_STEP_ORDER, AU_STATES } from "@/lib/admin/types";
 import { toAuState } from "@/lib/admin/utils";
 import { type BookingMatchedCustomer } from "./types";
@@ -137,7 +138,7 @@ export function ManualBookingDialog({
       </div>
 
       <form ref={formRef} onSubmit={e => e.preventDefault()}>
-        <div className="manual-booking-scroll" style={{ display: step === "customer" ? "block" : "none" }} aria-hidden={step !== "customer"}>
+        <div className={`manual-booking-scroll ${step === "customer" ? "is-active" : "is-hidden"}`} aria-hidden={step !== "customer"}>
             <h3 className="manual-section-title">Customer Selection</h3>
             <AdminForm className="manual-grid manual-grid-3">
               <AdminField label="Search existing students" tooltip="Search for an existing customer to pre-fill details.">
@@ -205,7 +206,7 @@ export function ManualBookingDialog({
             </AdminForm>
 
             <h3 className="manual-section-title manual-subsection-heading">Address</h3>
-            <div style={{ marginBottom: "16px" }}>
+            <div className="admin-address-search-row">
               <AddressAutocomplete onAddressSelect={handleAddressSelect} disabled={!!busyAction} />
             </div>
             <AdminForm className="manual-grid manual-grid-3">
@@ -217,18 +218,9 @@ export function ManualBookingDialog({
               </AdminField>
               <AdminField label="Street Type" tooltip="Type of street (e.g., Road, Avenue)." required>
                 <select name="streetType" required defaultValue="Street">
-                  <option value="Street">Street</option>
-                  <option value="Road">Road</option>
-                  <option value="Avenue">Avenue</option>
-                  <option value="Drive">Drive</option>
-                  <option value="Lane">Lane</option>
-                  <option value="Court">Court</option>
-                  <option value="Crescent">Crescent</option>
-                  <option value="Place">Place</option>
-                  <option value="Boulevard">Boulevard</option>
-                  <option value="Terrace">Terrace</option>
-                  <option value="Parade">Parade</option>
-                  <option value="Close">Close</option>
+                  {STREET_TYPES.map((streetType) => (
+                    <option key={streetType} value={streetType}>{streetType}</option>
+                  ))}
                 </select>
               </AdminField>
               <AdminField label="Street Name" tooltip="Name of the street." required className="manual-span-2">
@@ -248,7 +240,7 @@ export function ManualBookingDialog({
             </AdminForm>
           </div>
 
-        <div className="manual-booking-scroll" style={{ display: step === "lesson" ? "block" : "none" }} aria-hidden={step !== "lesson"}>
+        <div className={`manual-booking-scroll ${step === "lesson" ? "is-active" : "is-hidden"}`} aria-hidden={step !== "lesson"}>
             <h3 className="manual-section-title">Lesson Details</h3>
             <AdminForm className="manual-grid manual-grid-3">
               <AdminField label="Mode" tooltip="Physical location or virtual format of the lesson." required>
@@ -283,7 +275,7 @@ export function ManualBookingDialog({
             </AdminForm>
           </div>
 
-        <div className="manual-booking-scroll" style={{ display: step === "schedule" ? "block" : "none" }} aria-hidden={step !== "schedule"}>
+        <div className={`manual-booking-scroll ${step === "schedule" ? "is-active" : "is-hidden"}`} aria-hidden={step !== "schedule"}>
             <h3 className="manual-section-title">Schedule & Confirm</h3>
             <AdminForm className="manual-grid manual-grid-2">
               <AdminField label="Start Time" tooltip="The date and time this lesson is scheduled to begin." required>

@@ -26,6 +26,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
+import { AdminCard } from "@/components/admin/ui/admin-card";
 import { animateIn, animateOut, useTweenOrchestrator } from "@/components/motion/tween-orchestrator";
 import { usePresenceExit } from "@/components/motion/use-presence-exit";
 import { CustomerTable } from "@/components/admin/customers/customer-table";
@@ -76,6 +77,7 @@ export function AdminCustomersClient() {
   const [customerForm, setCustomerForm] = useState<CustomerForm>(emptyCustomerForm());
   const [activeTab, setActiveTab] = useState<"profile" | "emails" | "materials">("profile");
   const [savingCustomer, setSavingCustomer] = useState(false);
+  const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(null);
 
   // Email Composer State
   const [emailComposerSubject, setEmailComposerSubject] = useState("");
@@ -239,7 +241,9 @@ export function AdminCustomersClient() {
 
     setError("");
     setNotice("");
+    setDeletingCustomerId(customer.id);
     const result = await removeCustomerApi(customer.id);
+    setDeletingCustomerId(null);
     
     if (result) {
       setNotice(result.archived ? "Customer archived (has linked bookings)." : "Customer deleted.");
@@ -291,57 +295,58 @@ export function AdminCustomersClient() {
       className="admin-shell-customers"
     >
       <div className="admin-layout-content">
-        <div className="admin-actions-bar">
-          <button className="btn btn-primary" onClick={() => openCustomerDialog(null, true)}>
-            CREATE NEW CUSTOMER
-          </button>
-          
-          <div className="search-box">
-            <label htmlFor={searchInputId}>Search</label>
-            <Tooltip content="Search for students by name, email, or phone number.">
-              <input
-                id={searchInputId}
-                type="text"
-                value={customerQuery}
-                placeholder="Search by name, email, or phone..."
-                onChange={(event) => setCustomerQuery(event.target.value)}
-              />
-            </Tooltip>
-            {/* Inline Sorting Controls */}
-            <div className="admin-sort-inline-row">
-              <span className="admin-inline-field">SORT BY</span>
-              <Tooltip content="Change the primary sorting field for the customer list.">
-                <select
-                  value={sortBy}
-                  onChange={(event) => {
-                    setSortBy(event.target.value as CustomersSortBy);
-                    setPage(1);
-                  }}
-                >
-                  <option value="customer">Customer</option>
-                  <option value="skill_mode">Skill / Mode</option>
-                </select>
+        <AdminCard className="admin-toolbar-card admin-actions-card">
+          <div className="admin-actions-bar">
+            <button className="btn btn-primary" onClick={() => openCustomerDialog(null, true)}>
+              CREATE NEW CUSTOMER
+            </button>
+
+            <div className="search-box">
+              <label htmlFor={searchInputId}>Search</label>
+              <Tooltip content="Search for students by name, email, or phone number.">
+                <input
+                  id={searchInputId}
+                  type="text"
+                  value={customerQuery}
+                  placeholder="Search by name, email, or phone..."
+                  onChange={(event) => setCustomerQuery(event.target.value)}
+                />
               </Tooltip>
-              <Tooltip content={sortDir === "asc" ? "Sort in ascending order." : "Sort in descending order."}>
-                <button
-                  type="button"
-                  className="btn btn-secondary admin-sort-direction-btn"
-                  onClick={() => {
-                    setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
-                    setPage(1);
-                  }}
-                >
-                  {sortDir === "asc" ? "ASC" : "DESC"}
-                </button>
-              </Tooltip>
+              <div className="admin-sort-inline-row">
+                <span className="admin-inline-field">SORT BY</span>
+                <Tooltip content="Change the primary sorting field for the customer list.">
+                  <select
+                    value={sortBy}
+                    onChange={(event) => {
+                      setSortBy(event.target.value as CustomersSortBy);
+                      setPage(1);
+                    }}
+                  >
+                    <option value="customer">Customer</option>
+                    <option value="skill_mode">Skill / Mode</option>
+                  </select>
+                </Tooltip>
+                <Tooltip content={sortDir === "asc" ? "Sort in ascending order." : "Sort in descending order."}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary admin-sort-direction-btn"
+                    onClick={() => {
+                      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+                      setPage(1);
+                    }}
+                  >
+                    {sortDir === "asc" ? "ASC" : "DESC"}
+                  </button>
+                </Tooltip>
+              </div>
             </div>
           </div>
-        </div>
+        </AdminCard>
 
         <CustomerTable
           customers={customers}
           loadingCustomers={loadingCustomers}
-          deletingCustomerId={null}
+          deletingCustomerId={deletingCustomerId}
           page={page}
           pageSize={pageSize}
           totalCount={totalCount}
@@ -372,6 +377,7 @@ export function AdminCustomersClient() {
           customerForm={customerForm}
           setCustomerForm={setCustomerForm}
           savingCustomer={savingCustomer}
+          deletingCustomerId={deletingCustomerId}
           onSaveCustomer={saveCustomer}
           onClose={closeCustomerDialog}
           error={error}
@@ -431,7 +437,6 @@ export function AdminCustomersClient() {
           onStartEdit={() => setIsEditing(true)}
           onDeleteCustomer={() => selectedCustomer && deleteCustomer(selectedCustomer)}
           onViewBillingHistory={() => selectedCustomer && void beginExitTransition(null, 0, () => router.push(`/admin/invoices?q=${encodeURIComponent(selectedCustomer.fullName)}`))}
-          deletingCustomerId={null}
         />
       )}
     </AdminShell>

@@ -1,8 +1,10 @@
 import type { AuState } from "@/lib/admin/types";
 import { AU_STATES } from "@/lib/admin/types";
+import { STREET_TYPES } from "@/lib/admin/constants";
 import { formatDateTime, toAuState, toDigits } from "@/lib/admin/utils";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { AdminCard } from "@/components/admin/ui/admin-card";
+import { AdminNotice } from "@/components/admin/ui/admin-notice";
 import { AddressAutocomplete } from "@/components/admin/ui/address-autocomplete";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 
@@ -179,7 +181,7 @@ export function CustomerProfileDialog({
                                 <option value="advanced">Advanced</option>
                             </select>
                         ) : (
-                            <input value={form.skillLevel} style={{ textTransform: 'capitalize' }} readOnly />
+                            <input value={form.skillLevel} className="admin-input-capitalize" readOnly />
                         )}
                     </AdminField>
                     <AdminField label="Lesson Mode" tooltip="Physical location or virtual format preferred by the student.">
@@ -199,7 +201,7 @@ export function CustomerProfileDialog({
 
                 <h4 className="customer-profile-subhead">Address</h4>
                 {isEditing && (
-                    <div style={{ paddingBottom: '16px' }}>
+                    <div className="admin-address-search-row">
                         <AddressAutocomplete 
                             onAddressSelect={(addr) => updateForm({ ...addr, state: toAuState(addr.state) })} 
                             disabled={savingCustomer} 
@@ -234,18 +236,9 @@ export function CustomerProfileDialog({
                                 value={form.streetType}
                                 onChange={e => updateForm({ streetType: e.target.value })}
                             >
-                                <option value="Street">Street</option>
-                                <option value="Road">Road</option>
-                                <option value="Avenue">Avenue</option>
-                                <option value="Drive">Drive</option>
-                                <option value="Lane">Lane</option>
-                                <option value="Court">Court</option>
-                                <option value="Crescent">Crescent</option>
-                                <option value="Place">Place</option>
-                                <option value="Boulevard">Boulevard</option>
-                                <option value="Terrace">Terrace</option>
-                                <option value="Parade">Parade</option>
-                                <option value="Close">Close</option>
+                                {STREET_TYPES.map((streetType) => (
+                                    <option key={streetType} value={streetType}>{streetType}</option>
+                                ))}
                             </select>
                         ) : (
                             <input value={form.streetType} readOnly />
@@ -283,31 +276,31 @@ export function CustomerProfileDialog({
 
             <div className="dialog-col is-notes customer-tab-section customer-profile-panel">
                 <h4>Portal Credentials</h4>
-                <AdminCard ghost style={{ background: 'rgba(0,0,0,0.03)', padding: '16px', border: '1px solid var(--line)' }}>
+                <AdminCard ghost className="customer-portal-card">
                     <p className="helper-text">Manage access to the student portal. Passwords are encrypted and can be revealed or rotated by admins.</p>
 
-                    <div style={{ marginTop: '16px', display: 'grid', gap: '12px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                            <span style={{ color: 'var(--ink-2)' }}>Generated:</span>
-                            <span style={{ fontWeight: 600 }}>{customer?.portalCredential ? formatDateTime(customer.portalCredential.generatedAt) : "Never"}</span>
+                    <div className="customer-portal-metadata">
+                        <div className="customer-portal-meta-row">
+                            <span className="customer-portal-meta-label">Generated:</span>
+                            <span className="customer-portal-meta-value">{customer?.portalCredential ? formatDateTime(customer.portalCredential.generatedAt) : "Never"}</span>
                         </div>
                         {customer?.portalCredential?.rotatedAt && (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                                <span style={{ color: 'var(--ink-2)' }}>Last Rotated:</span>
-                                <span style={{ fontWeight: 600 }}>{formatDateTime(customer.portalCredential.rotatedAt)}</span>
+                            <div className="customer-portal-meta-row">
+                                <span className="customer-portal-meta-label">Last Rotated:</span>
+                                <span className="customer-portal-meta-value">{formatDateTime(customer.portalCredential.rotatedAt)}</span>
                             </div>
                         )}
 
                         {customer && revealedPortalPasswords[customer.id] && (
-                            <div className="notice success" style={{ margin: '8px 0', padding: '12px', background: 'rgba(69, 204, 138, 0.1)', border: '1px solid rgba(69, 204, 138, 0.3)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <AdminNotice tone="success" className="customer-portal-password-notice">
+                                <div className="customer-portal-password-row">
                                     <div>
-                                        <small style={{ display: 'block', marginBottom: '4px', textTransform: 'uppercase', opacity: 0.8, color: 'var(--ink-0)' }}>Current Password</small>
-                                        <code style={{ fontSize: '1.2rem', fontWeight: 700, letterSpacing: '0.5px', color: '#fff' }}>{revealedPortalPasswords[customer.id]}</code>
+                                        <small className="customer-portal-password-label">Current Password</small>
+                                        <code className="customer-portal-password-value">{revealedPortalPasswords[customer.id]}</code>
                                     </div>
                                     <button 
-                                        className="btn btn-secondary" 
-                                        style={{ padding: '4px 8px', fontSize: '0.7rem' }}
+                                        type="button"
+                                        className="btn btn-secondary customer-portal-copy-btn"
                                         onClick={() => {
                                             void navigator.clipboard.writeText(revealedPortalPasswords[customer.id]);
                                             alert("Password copied to clipboard");
@@ -316,10 +309,10 @@ export function CustomerProfileDialog({
                                         Copy
                                     </button>
                                 </div>
-                            </div>
+                            </AdminNotice>
                         )}
 
-                        <div className="button-row" style={{ marginTop: '8px' }}>
+                        <div className="button-row customer-portal-actions">
                             <Tooltip content="Show current portal password.">
                                 <button
                                     className="btn btn-secondary"
@@ -346,8 +339,8 @@ export function CustomerProfileDialog({
                     </div>
                 </AdminCard>
 
-                <h4 style={{ marginTop: '30px' }}>Actions</h4>
-                <div className="dialog-actions" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '10px' }}>
+                <h4 className="customer-profile-actions-title">Actions</h4>
+                <div className="dialog-actions customer-profile-actions">
                     {isEditing ? (
                         <>
                             <Tooltip content="Save changes to customer profile.">

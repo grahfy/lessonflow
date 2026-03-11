@@ -6,8 +6,10 @@
   --bg-2: #1f1a46;
   --ink-0: #ecf2ff;
   --ink-1: #b9c3e6;
+  --ink-2: #7f91b2;
   --brand-0: #6b8cff;
   --brand-1: #8f72ff;
+  --red: #f87171;
   --line: rgba(255, 255, 255, 0.14);
   --panel: rgba(10, 14, 34, 0.72);
   --panel-strong: rgba(7, 10, 24, 0.9);
@@ -1267,15 +1269,56 @@ h1 {
   letter-spacing: 0.03em;
 }
 
+.admin-field-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.admin-field-label-tooltip {
+  cursor: help;
+  text-decoration: underline dotted;
+}
+
+.admin-input-capitalize {
+  text-transform: capitalize;
+}
+
+.admin-address-search-row {
+  grid-column: 1 / -1;
+  padding: 8px 0 16px;
+}
+
+.admin-visually-hidden-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
 .field input,
 .field select,
 .field textarea {
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.74);
   color: var(--ink-0);
   padding: 10px 12px;
   font: inherit;
+  transition: border-color var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out), background var(--motion-fast) var(--ease-out);
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: rgba(96, 165, 250, 0.66);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+  background: rgba(15, 23, 42, 0.9);
 }
 
 .field textarea {
@@ -1460,6 +1503,14 @@ h1 {
   max-height: min(64vh, 680px);
   overflow-y: auto;
   padding-right: 4px;
+}
+
+.manual-booking-scroll.is-hidden {
+  display: none;
+}
+
+.manual-booking-scroll.is-active {
+  display: block;
 }
 
 .manual-grid .field {
@@ -1678,40 +1729,42 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
   flex-wrap: wrap;
-  padding: 2px 0;
+  padding: 0;
 }
 
 .search-box {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .search-box label {
-  color: var(--ink-1);
-  font-size: 0.85rem;
+  color: var(--ink-2);
+  font-size: 0.72rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
 }
 
 .search-box input {
-  padding: 8px 12px;
+  padding: 10px 14px;
   border-radius: 999px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(15, 23, 42, 0.82);
   color: var(--ink-0);
-  width: 240px;
+  width: 280px;
 }
 
 .search-box select,
 .admin-search-inline-row select,
 .admin-sort-inline-row select {
-  padding: 8px 12px;
+  padding: 10px 14px;
   border-radius: 999px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(15, 23, 42, 0.82);
   color: var(--ink-0);
 }
 
@@ -1719,19 +1772,16 @@ h1 {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .admin-sort-direction-btn {
   min-width: 68px;
 }
 
-.invoice-row-item:hover, .customer-item:hover {
-  background: rgba(255, 255, 255, 0.04) !important;
-}
-
-.admin-shell-customers .invoice-list-card .invoice-row-item,
-.admin-shell-invoices .invoice-list-card .invoice-row-item {
-  background: transparent;
+.invoice-row-item:hover,
+.customer-item:hover {
+  background: rgba(37, 99, 235, 0.08) !important;
 }
 
 .status-badge {
@@ -1779,7 +1829,7 @@ h1 {
 .admin-layout-content {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   min-height: 0;
   flex: 1;
   overflow: hidden;
@@ -1801,48 +1851,48 @@ h1 {
 }
 
 .admin-shell {
-  --brand-0: #22d3ee;
+  --brand-0: #60a5fa;
   --brand-1: #2563eb;
-  --line: rgba(125, 211, 252, 0.26);
-  --panel: rgba(11, 22, 44, 0.78);
-  --panel-strong: rgba(8, 18, 38, 0.92);
-  --admin-shell-border: rgba(56, 189, 248, 0.22);
+  --line: rgba(148, 163, 184, 0.22);
+  --panel: rgba(15, 23, 42, 0.78);
+  --panel-strong: rgba(15, 23, 42, 0.92);
+  --admin-shell-border: rgba(96, 165, 250, 0.2);
   --admin-shell-bg:
-    radial-gradient(circle at 14% 18%, rgba(56, 189, 248, 0.2), transparent 38%),
-    radial-gradient(circle at 86% 30%, rgba(34, 197, 94, 0.18), transparent 44%),
-    linear-gradient(150deg, rgba(8, 18, 38, 0.92), rgba(8, 24, 48, 0.82));
-  --admin-shell-shadow: 0 24px 44px rgba(4, 10, 26, 0.38);
-  --admin-header-border: rgba(56, 189, 248, 0.28);
-  --admin-header-bg: linear-gradient(140deg, rgba(7, 18, 39, 0.9), rgba(4, 53, 94, 0.48));
-  --admin-nav-color: rgba(224, 242, 254, 0.9);
-  --admin-nav-border: rgba(56, 189, 248, 0.18);
-  --admin-nav-bg: rgba(2, 132, 199, 0.08);
-  --admin-nav-hover-color: rgba(224, 242, 254, 0.98);
-  --admin-nav-hover-border: rgba(56, 189, 248, 0.44);
-  --admin-nav-hover-bg: rgba(14, 116, 144, 0.18);
-  --admin-nav-active-color: rgba(240, 253, 250, 0.98);
-  --admin-nav-active-border: rgba(74, 222, 128, 0.46);
-  --admin-nav-active-bg: linear-gradient(120deg, rgba(8, 145, 178, 0.36), rgba(37, 99, 235, 0.38));
-  --admin-btn-primary-bg: linear-gradient(140deg, #0891b2, #2563eb);
-  --admin-btn-primary-border: rgba(125, 211, 252, 0.45);
-  --admin-btn-primary-ink: #ecfeff;
-  --admin-btn-secondary-border: rgba(125, 211, 252, 0.32);
-  --admin-btn-secondary-bg: rgba(2, 132, 199, 0.1);
-  --admin-btn-secondary-ink: rgba(224, 242, 254, 0.96);
-  --admin-btn-secondary-hover-bg: rgba(2, 132, 199, 0.18);
-  --admin-btn-secondary-hover-border: rgba(56, 189, 248, 0.5);
+    radial-gradient(circle at 12% 16%, rgba(59, 130, 246, 0.18), transparent 36%),
+    radial-gradient(circle at 85% 22%, rgba(249, 115, 22, 0.12), transparent 40%),
+    linear-gradient(160deg, rgba(2, 6, 23, 0.98), rgba(15, 23, 42, 0.95) 48%, rgba(17, 24, 39, 0.94));
+  --admin-shell-shadow: 0 30px 80px rgba(2, 8, 23, 0.46);
+  --admin-header-border: rgba(148, 163, 184, 0.22);
+  --admin-header-bg: linear-gradient(160deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.78));
+  --admin-nav-color: rgba(226, 232, 240, 0.9);
+  --admin-nav-border: rgba(148, 163, 184, 0.2);
+  --admin-nav-bg: rgba(148, 163, 184, 0.08);
+  --admin-nav-hover-color: rgba(248, 250, 252, 0.98);
+  --admin-nav-hover-border: rgba(96, 165, 250, 0.4);
+  --admin-nav-hover-bg: rgba(37, 99, 235, 0.16);
+  --admin-nav-active-color: rgba(239, 246, 255, 0.98);
+  --admin-nav-active-border: rgba(147, 197, 253, 0.42);
+  --admin-nav-active-bg: linear-gradient(140deg, rgba(37, 99, 235, 0.42), rgba(29, 78, 216, 0.34));
+  --admin-btn-primary-bg: linear-gradient(140deg, #2563eb, #1d4ed8);
+  --admin-btn-primary-border: rgba(147, 197, 253, 0.48);
+  --admin-btn-primary-ink: #eff6ff;
+  --admin-btn-secondary-border: rgba(148, 163, 184, 0.28);
+  --admin-btn-secondary-bg: linear-gradient(145deg, rgba(30, 41, 59, 0.86), rgba(15, 23, 42, 0.82));
+  --admin-btn-secondary-ink: rgba(226, 232, 240, 0.96);
+  --admin-btn-secondary-hover-bg: linear-gradient(145deg, rgba(37, 99, 235, 0.18), rgba(30, 41, 59, 0.86));
+  --admin-btn-secondary-hover-border: rgba(96, 165, 250, 0.42);
   height: 100dvh;
   max-height: 100dvh;
-  width: min(1300px, 100%);
+  width: min(1440px, 100%);
   margin: 0 auto;
-  padding: 20px;
+  padding: 24px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto minmax(0, 1fr);
-  gap: 14px;
+  gap: 16px;
   overflow: hidden;
   border: 1px solid var(--admin-shell-border);
-  border-radius: 26px;
+  border-radius: 32px;
   background: var(--admin-shell-bg);
   box-shadow: var(--admin-shell-shadow);
 }
@@ -1883,6 +1933,18 @@ h1 {
   animation: notice-fade-in 0.4s ease-out, notice-fade-out 1s ease-in 9s forwards;
 }
 
+.admin-notice-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0;
+}
+
 @keyframes notice-fade-in {
   from { opacity: 0; transform: translateY(-10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -1894,11 +1956,71 @@ h1 {
 }
 
 .admin-card {
-  border: 1px solid rgba(148, 163, 184, 0.26);
-  border-radius: 16px;
-  background: linear-gradient(155deg, rgba(15, 23, 42, 0.86), rgba(30, 41, 59, 0.72));
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 20px;
+  background:
+    linear-gradient(160deg, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.76)),
+    radial-gradient(180% 160% at 0% 0%, rgba(59, 130, 246, 0.08), transparent 48%);
   padding: 20px;
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.25);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 18px 40px rgba(2, 8, 23, 0.28);
+  backdrop-filter: blur(12px);
+}
+
+.admin-toolbar-card {
+  padding: 16px 18px;
+  gap: 12px;
+}
+
+.admin-actions-card,
+.admin-range-card,
+.admin-tab-toolbar,
+.syslog-toolbar-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-actions-card::before,
+.admin-range-card::before,
+.admin-tab-toolbar::before,
+.syslog-toolbar-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(96, 165, 250, 0.75), rgba(59, 130, 246, 0.45), rgba(249, 115, 22, 0.4));
+  pointer-events: none;
+}
+
+.admin-shell .btn {
+  padding: 10px 16px;
+  border-radius: 999px;
+  box-shadow:
+    0 10px 24px rgba(2, 8, 23, 0.24),
+    0 1px 0 rgba(255, 255, 255, 0.05) inset;
+}
+
+.admin-shell .btn::before,
+.admin-shell .btn::after {
+  opacity: 0;
+}
+
+.admin-shell .btn:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 14px 28px rgba(2, 8, 23, 0.3),
+    0 1px 0 rgba(255, 255, 255, 0.08) inset;
+  filter: none;
+}
+
+.admin-shell .btn:active {
+  transform: translateY(0);
+}
+
+.admin-shell .btn-danger {
+  border-color: rgba(248, 113, 113, 0.42);
+  background: linear-gradient(140deg, rgba(220, 38, 38, 0.92), rgba(127, 29, 29, 0.92));
 }
 
 .admin-shell .site-header {
@@ -1941,39 +2063,91 @@ h1 {
   border-color: var(--admin-btn-secondary-hover-border);
 }
 
-.admin-shell-bookings {
-  --admin-shell-border: rgba(56, 189, 248, 0.22);
-  --admin-shell-bg:
-    radial-gradient(circle at 14% 18%, rgba(56, 189, 248, 0.2), transparent 38%),
-    radial-gradient(circle at 86% 30%, rgba(34, 197, 94, 0.18), transparent 44%),
-    linear-gradient(150deg, rgba(8, 18, 38, 0.92), rgba(8, 24, 48, 0.82));
+.admin-field-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.admin-shell-customers {
-  --admin-shell-border: rgba(34, 197, 94, 0.22);
-  --admin-shell-bg:
-    radial-gradient(circle at 18% 18%, rgba(45, 212, 191, 0.16), transparent 38%),
-    radial-gradient(circle at 84% 24%, rgba(20, 184, 166, 0.18), transparent 44%),
-    linear-gradient(150deg, rgba(7, 35, 33, 0.92), rgba(10, 30, 51, 0.82));
-  --admin-shell-shadow: 0 24px 44px rgba(4, 16, 12, 0.34);
+.admin-field-label-tooltip {
+  text-decoration: underline dotted;
+  cursor: help;
 }
 
-.admin-shell-invoices {
-  --admin-shell-border: rgba(167, 139, 250, 0.24);
-  --admin-shell-bg:
-    radial-gradient(circle at 14% 18%, rgba(96, 165, 250, 0.2), transparent 40%),
-    radial-gradient(circle at 86% 28%, rgba(167, 139, 250, 0.16), transparent 44%),
-    linear-gradient(150deg, rgba(10, 23, 54, 0.92), rgba(46, 13, 69, 0.82));
-  --admin-shell-shadow: 0 24px 44px rgba(8, 10, 30, 0.34);
+.admin-tab-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.admin-shell-reports {
-  --admin-shell-border: rgba(196, 181, 253, 0.25);
-  --admin-shell-bg:
-    radial-gradient(circle at 12% 17%, rgba(167, 139, 250, 0.18), transparent 39%),
-    radial-gradient(circle at 84% 26%, rgba(59, 130, 246, 0.15), transparent 44%),
-    linear-gradient(150deg, rgba(24, 13, 44, 0.92), rgba(11, 27, 51, 0.82));
-  --admin-shell-shadow: 0 24px 44px rgba(10, 6, 24, 0.34);
+.admin-tab-nav .btn {
+  min-width: 110px;
+}
+
+.admin-editor-section {
+  gap: 0;
+}
+
+.admin-editor-section-header {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.admin-editor-section-description {
+  margin: 0;
+}
+
+.admin-editor-list {
+  display: grid;
+  gap: 20px;
+}
+
+.admin-editor-section-actions {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.admin-editor-panel {
+  border: 1px solid var(--line);
+}
+
+.admin-editor-panel.is-subdued {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.admin-editor-panel.is-dashed {
+  border-style: dashed;
+  background: transparent;
+}
+
+.admin-editor-panel-title {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.admin-editor-textarea,
+.admin-editor-codearea {
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.admin-editor-textarea {
+  min-height: 120px;
+}
+
+.admin-editor-textarea-sm {
+  min-height: 60px;
+}
+
+.admin-editor-codearea {
+  min-height: 200px;
+}
+
+.admin-editor-codearea-lg {
+  min-height: 220px;
 }
 
 .admin-shell.admin-shell-reports {
@@ -1985,32 +2159,6 @@ h1 {
 
 .admin-shell.admin-shell-reports .admin-shell-content {
   overflow: visible;
-}
-
-.admin-shell-settings {
-  --admin-shell-border: rgba(94, 234, 212, 0.24);
-  --admin-shell-bg:
-    radial-gradient(circle at 15% 20%, rgba(20, 184, 166, 0.18), transparent 39%),
-    radial-gradient(circle at 86% 24%, rgba(59, 130, 246, 0.14), transparent 44%),
-    linear-gradient(150deg, rgba(8, 30, 37, 0.92), rgba(13, 29, 49, 0.82));
-  --admin-shell-shadow: 0 24px 44px rgba(5, 15, 18, 0.34);
-}
-.admin-shell-manual-page {
-  --admin-shell-border: rgba(148, 163, 184, 0.24);
-  --admin-shell-bg:
-    radial-gradient(circle at 16% 18%, rgba(100, 116, 139, 0.17), transparent 38%),
-    radial-gradient(circle at 84% 26%, rgba(59, 130, 246, 0.12), transparent 44%),
-    linear-gradient(150deg, rgba(15, 23, 42, 0.92), rgba(17, 24, 39, 0.84));
-  --admin-shell-shadow: 0 24px 44px rgba(5, 10, 18, 0.34);
-}
-
-.admin-shell-logs {
-  --admin-shell-border: rgba(100, 116, 139, 0.28);
-  --admin-shell-bg:
-    radial-gradient(circle at 12% 16%, rgba(71, 85, 105, 0.2), transparent 40%),
-    radial-gradient(circle at 88% 28%, rgba(56, 189, 248, 0.1), transparent 44%),
-    linear-gradient(150deg, rgba(10, 15, 25, 0.95), rgba(15, 23, 42, 0.88));
-  --admin-shell-shadow: 0 24px 44px rgba(2, 6, 14, 0.42);
 }
 
 /* Deployment Updates Dialog & History */
@@ -2189,6 +2337,11 @@ h1 {
 
 .customer-dialog-tabs {
   display: flex;
+  width: 100%;
+}
+
+.customer-dialog-tabs-list {
+  display: flex;
   gap: 6px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 10px;
@@ -2196,18 +2349,100 @@ h1 {
   background: rgba(255, 255, 255, 0.02);
 }
 
-.customer-dialog-tabs .btn {
+.customer-dialog-tabs-list .btn {
   min-width: 140px;
 }
 
-.customer-dialog-notice {
+.customer-dialog-notice-stack {
   margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.customer-portal-card {
+  background: rgba(255, 255, 255, 0.03);
+  padding: 16px;
+  border: 1px solid var(--line);
+}
+
+.customer-portal-metadata {
+  margin-top: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.customer-portal-meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.85rem;
+}
+
+.customer-portal-meta-label {
+  color: var(--ink-2);
+}
+
+.customer-portal-meta-value {
+  font-weight: 600;
+  text-align: right;
+}
+
+.customer-portal-password-notice {
+  background: rgba(69, 204, 138, 0.1);
+  border: 1px solid rgba(69, 204, 138, 0.3);
+}
+
+.customer-portal-password-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.customer-portal-password-label {
+  display: block;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  opacity: 0.8;
+  color: var(--ink-0);
+}
+
+.customer-portal-password-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #fff;
+}
+
+.customer-portal-copy-btn {
+  padding: 4px 8px;
+  font-size: 0.7rem;
+}
+
+.customer-portal-actions {
+  margin-top: 8px;
+}
+
+.customer-profile-actions-title {
+  margin-top: 30px !important;
+}
+
+.customer-profile-actions {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
 }
 
 .customer-dialog-panel {
   margin-top: 12px;
   height: min(70vh, 760px);
   max-height: none;
+}
+
+.booking-email-panel {
+  margin-top: 12px;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  align-items: stretch;
 }
 
 .customer-profile-panel {
@@ -2256,6 +2491,15 @@ h1 {
 
 .customer-email-history-item:last-child {
   border-bottom: 0;
+}
+
+.admin-email-history-item {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: inherit;
+  border: 0;
+  cursor: pointer;
 }
 
 .customer-email-history-head {
@@ -2410,13 +2654,61 @@ h1 {
   grid-column: 1 / -1;
 }
 
+.address-autocomplete-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.address-autocomplete-input {
+  width: 100%;
+}
+
+.address-autocomplete-loading {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.address-autocomplete-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  max-height: 300px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(10, 14, 34, 0.9);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+}
+
+.address-autocomplete-result {
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--line-light);
+  font-size: 0.9rem;
+}
+
+.address-autocomplete-result:last-child {
+  border-bottom: 0;
+}
+
+.address-autocomplete-result:hover {
+  background: var(--surface-hover);
+}
+
 .admin-settings-section {
   display: grid;
-  gap: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.02);
+  gap: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 16px;
+  padding: 14px;
+  background: rgba(2, 6, 23, 0.28);
 }
 
 .admin-settings-section-title {
@@ -2439,27 +2731,30 @@ h1 {
 .admin-header-row {
   position: relative;
   justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
 }
 
 .admin-console-title {
   margin: 0;
   margin-right: auto;
-  font-size: 1.15rem;
-  letter-spacing: 0.02em;
-  line-height: 1.2;
+  font-size: clamp(1.25rem, 2.2vw, 1.6rem);
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  color: #f8fafc;
 }
 
 .admin-header-controls {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: flex-start;
+  gap: 12px;
   margin-left: auto;
 }
 
 .admin-header-nav {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 12px;
   flex: 1;
 }
 
@@ -2467,6 +2762,7 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  flex: 1;
 }
 
 .admin-header-quick-actions {
@@ -2478,6 +2774,11 @@ h1 {
 
 .admin-header-menu-toggle {
   display: none;
+}
+
+.admin-header-nav-primary .btn,
+.admin-header-quick-actions .btn {
+  min-height: 40px;
 }
 
 .admin-range-row {
@@ -2520,6 +2821,7 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  align-items: center;
 }
 
 .admin-search-inline-row {
@@ -2532,10 +2834,11 @@ h1 {
 .admin-inline-checkbox {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-size: 0.85rem;
   cursor: pointer;
   white-space: nowrap;
+  color: var(--ink-1);
 }
 
 .admin-inline-checkbox input[type="checkbox"] {
@@ -2547,18 +2850,21 @@ h1 {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--ink-1);
-  font-size: 0.82rem;
+  color: var(--ink-2);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .admin-range-row select,
 .admin-range-row input[type="date"] {
-  border-radius: 8px;
+  border-radius: 12px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(15, 23, 42, 0.82);
   color: var(--ink-0);
-  padding: 5px 8px;
-  font-size: 0.8rem;
+  padding: 8px 12px;
+  font-size: 0.84rem;
 }
 
 .admin-range-row select:focus,
@@ -2769,7 +3075,7 @@ h1 {
   position: fixed;
   inset: 0;
   z-index: 70;
-  background: rgba(4, 8, 22, 0.74);
+  background: rgba(2, 6, 23, 0.76);
   display: grid;
   place-items: center;
   padding: 16px;
@@ -2781,21 +3087,29 @@ h1 {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  border-radius: 18px;
-  border: 1px solid var(--line);
-  background: linear-gradient(145deg, rgba(9, 14, 36, 0.98), rgba(8, 12, 30, 0.96));
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background:
+    linear-gradient(160deg, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.94)),
+    radial-gradient(150% 150% at 0% 0%, rgba(59, 130, 246, 0.1), transparent 50%);
   box-shadow: var(--shadow);
-  padding: 16px;
+  padding: 18px;
 }
 
 .admin-shell .dialog-panel {
-  border-color: rgba(167, 139, 250, 0.36);
-  background: linear-gradient(145deg, rgba(7, 18, 46, 0.98), rgba(39, 14, 73, 0.95), rgba(83, 21, 56, 0.93));
+  border-color: rgba(148, 163, 184, 0.18);
+  background:
+    linear-gradient(160deg, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.94)),
+    radial-gradient(150% 150% at 0% 0%, rgba(59, 130, 246, 0.1), transparent 50%);
 }
 
 .dialog-body-scroll {
   flex: 1;
   min-height: 0;
+}
+
+.dialog-body-scroll-locked {
+  overflow-y: hidden;
 }
 
 .booking-dialog-body-lock {
@@ -2831,7 +3145,7 @@ h1 {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
   flex-shrink: 0;
 }
 
@@ -2856,10 +3170,10 @@ h1 {
 
 .dialog-status {
   margin: 0 0 16px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 10px;
-  padding: 8px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(30, 41, 59, 0.58);
+  border-radius: 14px;
+  padding: 10px 12px;
   flex-shrink: 0;
 }
 
@@ -2887,12 +3201,12 @@ h1 {
 
 .dialog-col {
   display: grid;
-  gap: 9px;
+  gap: 10px;
   align-content: start;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.025);
-  padding: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.56);
+  padding: 14px;
 }
 
 .dialog-col.is-notes {
@@ -2929,8 +3243,8 @@ h1 {
 }
 
 .dialog-footer {
-  margin-top: 24px;
-  padding-top: 16px;
+  margin-top: 18px;
+  padding-top: 14px;
   border-top: 1px solid var(--line);
   flex-shrink: 0;
 }
@@ -2942,6 +3256,10 @@ h1 {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.dialog-footer-row-end {
+  justify-content: flex-end;
 }
 
 .dialog-footer-left,
@@ -2972,6 +3290,27 @@ h1 {
 
 .dialog-tabs-left .btn {
   min-width: 140px;
+}
+
+.admin-tab-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.admin-tab-bar-list {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-tab-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 #booking-detail-dialog .dialog-tabs-left .btn {
@@ -3331,18 +3670,20 @@ h1 {
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  border-radius: 22px;
 }
 
 .admin-table-header-row {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
+  padding: 14px 18px;
   gap: 12px;
   width: 100%;
   border: 0;
   border-bottom: 1px solid var(--line);
   border-radius: 0;
   flex-shrink: 0;
+  background: rgba(15, 23, 42, 0.92);
 }
 
 .admin-table-scroll {
@@ -3474,21 +3815,22 @@ h1 {
 .invoice-table-row {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
+  padding: 14px 18px;
   gap: 12px;
   cursor: pointer;
   width: 100%;
   border-radius: 0;
   border: 0;
   border-bottom: 1px solid var(--line);
+  transition: background var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out);
 }
 
 .admin-table-header-row.is-sticky {
   position: sticky;
   top: 0;
   z-index: 5;
-  background: var(--bg-1);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  background: rgba(15, 23, 42, 0.96);
+  box-shadow: 0 6px 18px rgba(2, 8, 23, 0.28);
   width: 100%;
 }
 
@@ -3533,13 +3875,14 @@ h1 {
   display: flex;
   justify-content: flex-end;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 .admin-list-action-btn {
-  padding: 6px 10px;
+  padding: 7px 10px;
   font-size: 0.7rem;
   min-width: 0;
-  flex: 1;
+  flex: 0 0 auto;
 }
 
 .admin-mobile-label {
@@ -3557,7 +3900,7 @@ h1 {
   gap: 14px;
   padding: 16px;
   border-top: 1px solid var(--line);
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(15, 23, 42, 0.72);
   font-size: 0.85rem;
   color: var(--ink-1);
 }
@@ -3612,17 +3955,17 @@ h1 {
   gap: 10px;
   flex-wrap: wrap;
   flex-shrink: 0;
-  padding: 10px 14px;
-  background: rgba(15, 23, 42, 0.7);
-  border: 1px solid rgba(100, 116, 139, 0.28);
-  border-radius: 10px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
 }
 
 .syslog-toolbar-search {
   position: relative;
   flex: 1;
-  min-width: 160px;
-  max-width: 280px;
+  min-width: 220px;
+  max-width: 360px;
 }
 
 .syslog-toolbar-search svg {
@@ -3636,12 +3979,12 @@ h1 {
 
 .syslog-toolbar-search input {
   width: 100%;
-  padding: 7px 12px 7px 32px;
-  border-radius: 6px;
-  border: 1px solid rgba(100, 116, 139, 0.3);
-  background: rgba(0, 0, 0, 0.3);
+  padding: 10px 14px 10px 36px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.82);
   color: var(--ink-0);
-  font-size: 0.82rem;
+  font-size: 0.88rem;
 }
 
 .syslog-toolbar-search input::placeholder {
@@ -3651,25 +3994,25 @@ h1 {
 .syslog-toolbar-field {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .syslog-toolbar-field label {
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   color: var(--ink-2);
   white-space: nowrap;
 }
 
 .syslog-toolbar-field select {
-  padding: 7px 10px;
-  border-radius: 6px;
-  border: 1px solid rgba(100, 116, 139, 0.3);
-  background: rgba(0, 0, 0, 0.3);
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.82);
   color: var(--ink-0);
-  font-size: 0.82rem;
+  font-size: 0.88rem;
 }
 
 .syslog-toolbar-actions {
@@ -3682,9 +4025,11 @@ h1 {
 .syslog-table-wrap {
   display: flex;
   flex-direction: column;
-  background: #0d1117;
-  border: 1px solid rgba(100, 116, 139, 0.22);
-  border-radius: 12px;
+  background:
+    linear-gradient(160deg, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.78)),
+    radial-gradient(180% 160% at 0% 0%, rgba(59, 130, 246, 0.08), transparent 52%);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 22px;
   overflow: hidden;
   flex: 1;
   min-height: 0;
@@ -3874,6 +4219,51 @@ h1 {
   font-size: 0.85rem;
 }
 
+.syslog-pagination-wrap {
+  flex-shrink: 0;
+}
+
+.syslog-report-field {
+  margin-top: 10px;
+}
+
+.syslog-screenshot-preview {
+  position: relative;
+  margin-top: 6px;
+}
+
+.syslog-screenshot-image {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 8px;
+  border: 1px solid rgba(100, 116, 139, 0.3);
+}
+
+.syslog-screenshot-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 4px 6px;
+  min-width: 0;
+  font-size: 0.7rem;
+}
+
+.syslog-screenshot-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  cursor: pointer;
+}
+
+.syslog-screenshot-input {
+  display: none;
+}
+
+.syslog-report-result {
+  margin-top: 12px;
+}
+
 .customer-item:not(.customer-table-row) {
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -3981,7 +4371,8 @@ h1 {
   display: block;
   width: 100%;
   height: auto;
-  aspect-ratio: 18 / 11;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.02);
@@ -4900,6 +5291,10 @@ h1 {
     flex-direction: row !important;
   }
 
+  #booking-detail-dialog .booking-email-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
   .dialog-notes {
     min-height: min(42vh, 360px);
   }
@@ -5174,7 +5569,13 @@ h1 {
     grid-template-columns: 1fr;
   }
 
-  .customer-dialog-tabs .btn {
+  .customer-dialog-tabs-list {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .customer-dialog-tabs-list .btn {
     width: 100%;
     min-width: 0;
   }
@@ -6590,11 +6991,13 @@ h1 {
 }
 
 .admin-manual-toc-panel {
-  border: 1px solid rgba(59, 130, 246, 0.28);
-  border-radius: 16px;
-  background: linear-gradient(140deg, rgba(7, 18, 39, 0.9), rgba(4, 53, 94, 0.48));
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.24);
-  padding: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 20px;
+  background:
+    linear-gradient(160deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.82)),
+    radial-gradient(170% 150% at 0% 0%, rgba(59, 130, 246, 0.08), transparent 48%);
+  box-shadow: 0 18px 40px rgba(2, 8, 23, 0.22);
+  padding: 18px;
   display: grid;
   gap: 12px;
 }
@@ -6610,11 +7013,13 @@ h1 {
 }
 
 .admin-manual-panel {
-  border: 1px solid rgba(148, 163, 184, 0.26);
-  border-radius: 18px;
-  background: linear-gradient(155deg, rgba(15, 23, 42, 0.86), rgba(30, 41, 59, 0.72));
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
-  padding: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 20px;
+  background:
+    linear-gradient(160deg, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.78)),
+    radial-gradient(180% 160% at 0% 0%, rgba(59, 130, 246, 0.08), transparent 52%);
+  box-shadow: 0 18px 40px rgba(2, 8, 23, 0.22);
+  padding: 18px;
   display: grid;
   gap: 12px;
 }
@@ -6997,9 +7402,9 @@ h1 {
 }
 
 .admin-manual-index-card {
-  background: linear-gradient(160deg, rgba(17, 24, 39, 0.84), rgba(30, 58, 138, 0.35));
-  border: 1px solid rgba(125, 211, 252, 0.24);
-  border-radius: 16px;
+  background: linear-gradient(160deg, rgba(15, 23, 42, 0.92), rgba(30, 41, 59, 0.7));
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 18px;
   padding: 14px 14px 12px;
   display: grid;
   gap: 8px;
@@ -7110,4 +7515,3 @@ h1 {
 .update-banner-button:hover {
   background: rgba(255, 255, 255, 0.3);
 }
-

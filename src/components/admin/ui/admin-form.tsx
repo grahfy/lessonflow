@@ -49,10 +49,10 @@ export const AdminField = forwardRef<HTMLDivElement, AdminFieldProps>(
 
     return (
       <div ref={ref} className={classes}>
-        <label htmlFor={htmlFor} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <label htmlFor={htmlFor} className="admin-field-label">
           {tooltip ? (
             <Tooltip content={tooltip}>
-              <span style={{ textDecoration: 'underline dotted', cursor: 'help' }}>{label}</span>
+              <span className="admin-field-label-tooltip">{label}</span>
             </Tooltip>
           ) : (
             label

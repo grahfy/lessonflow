@@ -26,6 +26,7 @@ import { useRouter } from "next/navigation";
 import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
+import { AdminTabNav } from "@/components/admin/ui/admin-tab-nav";
 import { AdminPresetsEditor } from "@/components/admin/settings/presets-editor";
 import { AdminContentEditor } from "@/components/admin/settings/content-editor";
 import { AdminEmailTemplateEditor } from "@/components/admin/settings/email-template-editor";
@@ -36,6 +37,15 @@ import { Tooltip } from "@/components/admin/ui/tooltip";
 import { useSettings, type EnvVarField } from "@/lib/admin/use-settings";
 
 type TabKey = "branding" | "pages" | "emails" | "invoices" | "products" | "system";
+
+const SETTINGS_TABS: Array<{ key: TabKey; label: string; tooltip: string }> = [
+  { key: "branding", label: "Branding", tooltip: "Configure brand names, logos, and contact information." },
+  { key: "pages", label: "Pages", tooltip: "Edit content for the student portal and legal pages." },
+  { key: "emails", label: "Emails", tooltip: "Customize email templates sent to students and staff." },
+  { key: "invoices", label: "Invoices", tooltip: "Manage invoice numbering, payment terms, and visual templates." },
+  { key: "products", label: "Products", tooltip: "Configure catalog items like tuition types and textbooks." },
+  { key: "system", label: "System", tooltip: "Advanced configuration for databases, security, and email delivery routes." }
+];
 
 /**
  * Main Client Component for the Admin Settings route.
@@ -307,27 +317,8 @@ export function AdminSettingsClient() {
       className="admin-shell-settings"
     >
       <div className="admin-layout-content is-scrollable">
-        <AdminCard className="booking-row">
-          <div className="site-nav">
-            <Tooltip content="Configure brand names, logos, and contact information.">
-              <button className={`btn ${activeTab === "branding" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("branding")}>Branding</button>
-            </Tooltip>
-            <Tooltip content="Edit content for the student portal and legal pages.">
-              <button className={`btn ${activeTab === "pages" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("pages")}>Pages</button>
-            </Tooltip>
-            <Tooltip content="Customize email templates sent to students and staff.">
-              <button className={`btn ${activeTab === "emails" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("emails")}>Emails</button>
-            </Tooltip>
-            <Tooltip content="Manage invoice numbering, payment terms, and visual templates.">
-              <button className={`btn ${activeTab === "invoices" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("invoices")}>Invoices</button>
-            </Tooltip>
-            <Tooltip content="Configure catalog items like tuition types and textbooks.">
-              <button className={`btn ${activeTab === "products" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("products")}>Products</button>
-            </Tooltip>
-            <Tooltip content="Advanced configuration for databases, security, and email delivery routes.">
-              <button className={`btn ${activeTab === "system" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("system")}>System</button>
-            </Tooltip>
-          </div>
+        <AdminCard className="admin-toolbar-card admin-tab-toolbar booking-row">
+          <AdminTabNav activeKey={activeTab} items={SETTINGS_TABS} onChange={setActiveTab} />
         </AdminCard>
 
         {!loading && (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { AdminCard } from "@/components/admin/ui/admin-card";
+import { AdminEditorPanel, AdminEditorSection } from "@/components/admin/ui/admin-editor-section";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 
 type InvoiceTemplate = {
@@ -23,10 +23,14 @@ export function AdminInvoiceTemplateEditor() {
     async function load() {
       try {
         const response = await fetch("/api/admin/invoice-templates");
-        if (response.ok) {
-          const data = await response.json();
-          setTemplates(data.templates);
+        if (!response.ok) {
+          setError("Failed to load invoice templates.");
+          return;
         }
+        const data = (await response.json()) as { templates?: InvoiceTemplate[] };
+        setTemplates(Array.isArray(data.templates) ? data.templates : []);
+      } catch {
+        setError("Failed to load invoice templates.");
       } finally {
         setLoading(false);
       }
@@ -63,35 +67,30 @@ export function AdminInvoiceTemplateEditor() {
   if (loading) return <p className="helper-text">Loading invoice templates...</p>;
 
   return (
-    <div className="form-grid">
-      <AdminCard className="field full">
-        <h2 className="admin-settings-section-title">Invoice Content & Terms</h2>
-        <p className="helper-text" style={{ marginBottom: '16px' }}>
-          Standardized text for payment terms, business details and footer notes on generated PDF invoices.
-        </p>
-
-        {notice ? <p className="notice success">{notice}</p> : null}
-        {error ? <p className="notice error">{error}</p> : null}
-
-        <div style={{ display: 'grid', gap: '20px' }}>
-          {templates.map((t) => (
-            <AdminCard key={t.key} style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid var(--line)' }}>
-              <h3 style={{ fontSize: '0.9rem', marginBottom: '12px', textTransform: 'uppercase' }}>{t.key.replace(/_/g, ' ')}</h3>
-              <AdminForm>
-                <AdminField label="Content" tooltip="The actual text content for this template (supports plain text)." fullWidth>
-                  <textarea value={t.content} style={{ minHeight: '120px' }} onChange={e => updateTemplate(t.key, e.target.value)} />
-                </AdminField>
-              </AdminForm>
-            </AdminCard>
-          ))}
-        </div>
-
-        <div className="button-row" style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--line)' }}>
+    <AdminEditorSection
+      title="Invoice Content & Terms"
+      description="Standardized text for payment terms, business details and footer notes on generated PDF invoices."
+      notice={notice}
+      error={error}
+      actions={
           <button className="btn btn-primary" disabled={saving} onClick={saveAll}>
             {saving ? "Saving..." : "Save All Content"}
           </button>
-        </div>
-      </AdminCard>
-    </div>
+      }
+    >
+      {templates.map((template) => (
+        <AdminEditorPanel key={template.key} title={template.key.replace(/_/g, " ")} subdued>
+          <AdminForm>
+            <AdminField label="Content" tooltip="The actual text content for this template (supports plain text)." fullWidth>
+              <textarea
+                className="admin-editor-textarea"
+                value={template.content}
+                onChange={(event) => updateTemplate(template.key, event.target.value)}
+              />
+            </AdminField>
+          </AdminForm>
+        </AdminEditorPanel>
+      ))}
+    </AdminEditorSection>
   );
 }

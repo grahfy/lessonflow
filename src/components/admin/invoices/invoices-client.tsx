@@ -426,79 +426,81 @@ export function AdminInvoicesClient() {
   return (
     <AdminShell title="Invoices" error={error} notice={notice} className="admin-shell-invoices">
       <div className="admin-layout-content">
-        <div className="admin-actions-bar">
-          <div className="admin-actions-group">
-            <Tooltip content="Create a new invoice for a selected customer.">
-              <button className="btn btn-primary" onClick={() => { setCreateOpen(true); void loadCustomers(); }}>
-                CREATE INVOICE
-              </button>
-            </Tooltip>
-            <Tooltip content="Send reminders for all eligible overdue invoices in one action.">
-              <button className="btn btn-secondary" disabled={busyAction === 'bulk-reminders'} onClick={sendBulkReminders}>
-                {busyAction === 'bulk-reminders' ? "SENDING..." : "SEND OVERDUE REMINDERS"}
-              </button>
-            </Tooltip>
-            <Tooltip content="Show only invoices that are past their due date.">
-              <label className="admin-inline-checkbox">
-                <input
-                  type="checkbox"
-                  checked={overdueOnly}
-                  onChange={(e) => {
-                    setOverdueOnly(e.target.checked);
-                    setPage(1);
-                  }}
-                />
-                Overdue only
-              </label>
-            </Tooltip>
-          </div>
-
-          <div className="search-box">
-            <div className="admin-search-inline-row">
-              <label htmlFor={searchInputId}>Search</label>
-              <Tooltip content="Search for invoices by number or customer name.">
-                <input
-                  id={searchInputId}
-                  type="text"
-                  value={query}
-                  placeholder="Search by number or customer..."
-                  onChange={(e) => { setQuery(e.target.value); setPage(1); }}
-                />
-              </Tooltip>
-              <label htmlFor={sortSelectId} className="admin-inline-field">
-                Sort by
-              </label>
-              <Tooltip content="Change the primary sorting field for the invoice list.">
-                <select
-                  id={sortSelectId}
-                  value={sortBy}
-                  onChange={(e) => {
-                    setSortBy(e.target.value as InvoiceSortBy);
-                    setPage(1);
-                  }}
-                >
-                  <option value="invoice_number">Invoice Number</option>
-                  <option value="customer_last_name">Customer (Last Name)</option>
-                  <option value="status">Status</option>
-                  <option value="total">Total</option>
-                  <option value="due_date">Due Date</option>
-                </select>
-              </Tooltip>
-              <Tooltip content={sortDir === "asc" ? "Sort in ascending order." : "Sort in descending order."}>
-                <button
-                  type="button"
-                  className="btn btn-secondary admin-sort-direction-btn"
-                  onClick={() => {
-                    setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
-                    setPage(1);
-                  }}
-                >
-                  {sortDir === "asc" ? "ASC" : "DESC"}
+        <AdminCard className="admin-toolbar-card admin-actions-card">
+          <div className="admin-actions-bar">
+            <div className="admin-actions-group">
+              <Tooltip content="Create a new invoice for a selected customer.">
+                <button className="btn btn-primary" onClick={() => { setCreateOpen(true); void loadCustomers(); }}>
+                  CREATE INVOICE
                 </button>
               </Tooltip>
+              <Tooltip content="Send reminders for all eligible overdue invoices in one action.">
+                <button className="btn btn-secondary" disabled={busyAction === 'bulk-reminders'} onClick={sendBulkReminders}>
+                  {busyAction === 'bulk-reminders' ? "SENDING..." : "SEND OVERDUE REMINDERS"}
+                </button>
+              </Tooltip>
+              <Tooltip content="Show only invoices that are past their due date.">
+                <label className="admin-inline-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={overdueOnly}
+                    onChange={(e) => {
+                      setOverdueOnly(e.target.checked);
+                      setPage(1);
+                    }}
+                  />
+                  Overdue only
+                </label>
+              </Tooltip>
+            </div>
+
+            <div className="search-box">
+              <div className="admin-search-inline-row">
+                <label htmlFor={searchInputId}>Search</label>
+                <Tooltip content="Search for invoices by number or customer name.">
+                  <input
+                    id={searchInputId}
+                    type="text"
+                    value={query}
+                    placeholder="Search by number or customer..."
+                    onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+                  />
+                </Tooltip>
+                <label htmlFor={sortSelectId} className="admin-inline-field">
+                  Sort by
+                </label>
+                <Tooltip content="Change the primary sorting field for the invoice list.">
+                  <select
+                    id={sortSelectId}
+                    value={sortBy}
+                    onChange={(e) => {
+                      setSortBy(e.target.value as InvoiceSortBy);
+                      setPage(1);
+                    }}
+                  >
+                    <option value="invoice_number">Invoice Number</option>
+                    <option value="customer_last_name">Customer (Last Name)</option>
+                    <option value="status">Status</option>
+                    <option value="total">Total</option>
+                    <option value="due_date">Due Date</option>
+                  </select>
+                </Tooltip>
+                <Tooltip content={sortDir === "asc" ? "Sort in ascending order." : "Sort in descending order."}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary admin-sort-direction-btn"
+                    onClick={() => {
+                      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+                      setPage(1);
+                    }}
+                  >
+                    {sortDir === "asc" ? "ASC" : "DESC"}
+                  </button>
+                </Tooltip>
+              </div>
             </div>
           </div>
-        </div>
+        </AdminCard>
 
         <AdminTable
           header={header}

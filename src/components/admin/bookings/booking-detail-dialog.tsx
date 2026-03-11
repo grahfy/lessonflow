@@ -23,22 +23,24 @@
 
 "use client";
 
-import { RefObject, useState } from "react";
-import { AdminDialog } from "@/components/admin/ui/admin-dialog";
-import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
-import { useCaptcha, CaptchaField } from "@/components/captcha";
+import { RefObject } from "react";
+
 import { AdminCard } from "@/components/admin/ui/admin-card";
-import { EmailViewerDialog } from "@/components/admin/ui/email-viewer-dialog";
+import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AdminEmailPanel } from "@/components/admin/ui/admin-email-panel";
+import { AdminField, AdminForm } from "@/components/admin/ui/admin-form";
+import { AdminTabBar } from "@/components/admin/ui/admin-tab-bar";
 import { Tooltip } from "@/components/admin/ui/tooltip";
+import { STREET_TYPES } from "@/lib/admin/constants";
 import { formatDateTime } from "@/lib/admin/formatters";
 import { type BookingEvent } from "@/lib/admin/use-bookings";
 import { type EmailRecord, type SendEmailResult } from "@/lib/admin/use-email-history";
-import { AU_STATES } from "@/lib/admin/types";
+import { AU_STATES, type LearningMaterialRow } from "@/lib/admin/types";
 import { toAuState } from "@/lib/admin/utils";
-import { type BookingDialogForm, type BookingMatchedCustomer } from "./types";
 import { AddressAutocomplete } from "@/components/admin/ui/address-autocomplete";
+
 import { BookingMaterialsDialog } from "./booking-materials-dialog";
-import { type LearningMaterialRow } from "@/lib/admin/types";
+import { type BookingDialogForm, type BookingMatchedCustomer } from "./types";
 
 interface BookingDetailDialogProps {
   isOpen: boolean;
@@ -128,33 +130,6 @@ export function BookingDetailDialog({
   onOpenInvoice,
   materialsDialogProps
 }: BookingDetailDialogProps) {
-  const [selectedEmail, setSelectedEmail] = useState<EmailRecord | null>(null);
-  const captcha = useCaptcha();
-
-  const handleSend = async () => {
-    if (!captcha.validateAnswer()) return;
-    
-    const result = await onSendEmail(emailSubject, emailMessage, captcha.getPayload());
-    
-    if (!result.success) {
-      // Handle CAPTCHA-related errors by refreshing the challenge.
-      const isCaptchaError = result.errorCode && [
-        "CAPTCHA_REQUIRED",
-        "CAPTCHA_INVALID",
-        "CAPTCHA_EXPIRED",
-        "CAPTCHA_RATE_LIMITED"
-      ].includes(result.errorCode);
-
-      if (isCaptchaError) {
-        captcha.onServerError("CAPTCHA verification failed. Please try again.");
-      } else {
-        void captcha.regenerate();
-      }
-    } else {
-      void captcha.regenerate();
-    }
-  };
-
   if (!event || !dialogForm) return null;
 
   /** Local helper for atomic form updates. */
@@ -212,32 +187,38 @@ export function BookingDetailDialog({
           RATIONALE: We separate 'Appointment' from 'Communication' to keep 
           the form clean while still providing deep history access. 
       */}
-      <div className="dialog-tabs dialog-tabs-booking">
-        <div className="dialog-tabs-left">
-          <Tooltip content="View and edit appointment details for this booking.">
-            <button className={`btn ${activeTab === "appointment" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("appointment")}>
-              Appointment
-            </button>
-          </Tooltip>
-          <Tooltip content="View email history and send a custom message to the student.">
-            <button className={`btn ${activeTab === "emails" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("emails")}>
-              Communication
-            </button>
-          </Tooltip>
-          <Tooltip content="View and manage learning materials for this booking.">
-            <button className={`btn ${activeTab === "materials" ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab("materials")}>
-              Learning Materials
-            </button>
-          </Tooltip>
-        </div>
-        {matchedCustomer ? (
-          <Tooltip content="Open the linked customer profile in the customer directory.">
-            <button type="button" className="btn btn-secondary" onClick={onOpenMatchedCustomer}>
-              Open Customer
-            </button>
-          </Tooltip>
-        ) : null}
-      </div>
+      <AdminTabBar
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        className="dialog-tabs dialog-tabs-booking"
+        listClassName="dialog-tabs-left"
+        items={[
+          {
+            key: "appointment",
+            label: "Appointment",
+            tooltip: "View and edit appointment details for this booking."
+          },
+          {
+            key: "emails",
+            label: "Communication",
+            tooltip: "View email history and send a custom message to the student."
+          },
+          {
+            key: "materials",
+            label: "Learning Materials",
+            tooltip: "View and manage learning materials for this booking."
+          }
+        ]}
+        rightSlot={
+          matchedCustomer ? (
+            <Tooltip content="Open the linked customer profile in the customer directory.">
+              <button type="button" className="btn btn-secondary" onClick={onOpenMatchedCustomer}>
+                Open Customer
+              </button>
+            </Tooltip>
+          ) : null
+        }
+      />
 
       <div className={`dialog-layout booking-dialog-layout ${activeTab === 'emails' ? 'customer-dialog-panel' : ''}`}>
           {activeTab === 'appointment' ? (
@@ -288,7 +269,7 @@ export function BookingDetailDialog({
                   </AdminField>
                   
                   {/* UX: Address predictive search for lesson travel or billing accuracy. */}
-                  <div style={{ gridColumn: "1 / -1", padding: "8px 0" }}>
+                  <div className="admin-address-search-row">
                      <AddressAutocomplete 
                         onAddressSelect={(addr) => updateForm({ ...addr, state: toAuState(addr.state) })} 
                         disabled={!!busyAction} 
@@ -306,18 +287,9 @@ export function BookingDetailDialog({
                   </AdminField>
                   <AdminField label="Street Type" tooltip="Type of street (e.g., Road, Avenue).">
                     <select value={dialogForm.streetType} onChange={e => updateForm({ streetType: e.target.value })}>
-                      <option value="Street">Street</option>
-                      <option value="Road">Road</option>
-                      <option value="Avenue">Avenue</option>
-                      <option value="Drive">Drive</option>
-                      <option value="Lane">Lane</option>
-                      <option value="Court">Court</option>
-                      <option value="Crescent">Crescent</option>
-                      <option value="Place">Place</option>
-                      <option value="Boulevard">Boulevard</option>
-                      <option value="Terrace">Terrace</option>
-                      <option value="Parade">Parade</option>
-                      <option value="Close">Close</option>
+                      {STREET_TYPES.map((streetType) => (
+                        <option key={streetType} value={streetType}>{streetType}</option>
+                      ))}
                     </select>
                   </AdminField>
                   <AdminField label="Suburb" tooltip="City or suburb name.">
@@ -394,94 +366,44 @@ export function BookingDetailDialog({
               </div>
             </>
           ) : activeTab === 'emails' ? (
-            <>
-            {/* SECTION: COMMUNICATION HISTORY */}
-            <div className="dialog-col dialog-tab-section">
-              <div className="section-header-with-action">
-                <h3 className="manual-section-title">Email History</h3>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-small"
-                    onClick={onSyncEmail}
-                    disabled={syncingEmail || loadingEmailHistory}
-                  >
-                    {syncingEmail ? "Syncing..." : "Sync Now"}
-                  </button>
+            <AdminEmailPanel
+              emptyLabel="No emails recorded."
+              history={emailHistory}
+              loadingHistory={loadingEmailHistory}
+              subject={emailSubject}
+              setSubject={setEmailSubject}
+              message={emailMessage}
+              setMessage={setEmailMessage}
+              sending={sendingEmail}
+              syncing={syncingEmail}
+              onSend={onSendEmail}
+              onSync={onSyncEmail}
+              panelClassName="booking-email-panel"
+              historyClassName="booking-email-history-card"
+              historyListClassName="email-history-list"
+              historyItemClassName="booking-email-history-item"
+              composerCardClassName="booking-email-composer-card"
+              composerFormClassName="form-grid customer-email-composer-form"
+              messageClassName="dialog-notes booking-email-message-area"
+              messagePlaceholder="Type message here..."
+              captchaIdPrefix="booking-email"
+              renderHistoryHeader={(email) => (
+                <div className="email-history-header booking-email-history-header">
+                  <strong>{email.subject}</strong>
+                  <span className={`status-badge status-${email.status.toLowerCase()}`}>{email.status}</span>
                 </div>
-                <AdminCard ghost className="booking-email-history-card">
-                  {loadingEmailHistory ? (
-                    <p className="helper-text">Loading history...</p>
-                  ) : (
-                    <div className="email-history-list">
-                      {emailHistory.length === 0 ? (
-                        <p className="helper-text">No emails recorded.</p>
-                      ) : (
-                        emailHistory.map(email => (
-                          <div key={email.id} className="email-history-item booking-email-history-item" onClick={() => setSelectedEmail(email)} style={{ cursor: "pointer" }}>
-                            <div className="email-history-header booking-email-history-header">
-                              <strong>{email.subject}</strong>
-                              <span className={`status-badge status-${email.status.toLowerCase()}`}>{email.status}</span>
-                            </div>
-                            <div className="email-history-meta booking-email-history-meta">
-                              {formatDateTime(email.createdAt)}
-                              {email.provider && <span className="email-provider-tag"> · {email.provider.toUpperCase()}</span>}
-                              {email.source && (
-                                <span className="email-source-tag">
-                                  {" "}
-                                  · {email.source === "app" ? "via App" : "via Gmail"}
-                                </span>
-                              )}
-                              {email.error && <span className="booking-email-history-error">· {email.error}</span>}
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </AdminCard>
-              </div>
-
-              {/* SECTION: EMAIL COMPOSER */}
-            <div className="dialog-col dialog-tab-section">
-              <h3 className="manual-section-title">Send Email</h3>
-              <AdminCard ghost className="customer-email-composer-card">
-                <AdminForm className="customer-email-composer-form">
-                  <AdminField label="Subject" tooltip="The subject line of the email." required fullWidth>
-                    <input placeholder="Email subject..." value={emailSubject} onChange={e => setEmailSubject(e.target.value)} />
-                  </AdminField>
-                  <AdminField label="Message" tooltip="The main body text of the email." required fullWidth>
-                    <textarea className="dialog-notes booking-email-message-area" placeholder="Type message here..." value={emailMessage} onChange={e => setEmailMessage(e.target.value)} />
-                  </AdminField>
-                  <div className="button-row button-row-justify customer-email-actions">
-                    <Tooltip content="Clear message fields.">
-                      <button
-                        className="btn btn-secondary"
-                        type="button"
-                        disabled={sendingEmail || (!emailSubject.trim() && !emailMessage.trim())}
-                        onClick={() => {
-                          setEmailSubject("");
-                          setEmailMessage("");
-                        }}
-                      >
-                        Clear Draft
-                      </button>
-                    </Tooltip>
-                    <Tooltip content="Send this custom email to the booking contact.">
-                      <button
-                        className="btn btn-primary"
-                        type="button"
-                        disabled={sendingEmail || !emailSubject.trim() || !emailMessage.trim()}
-                        onClick={handleSend}
-                      >
-                        {sendingEmail ? "Sending..." : "Send Email"}
-                      </button>
-                    </Tooltip>
-                  </div>
-                  <CaptchaField idPrefix="booking-email" captcha={captcha} />
-                </AdminForm>
-              </AdminCard>
-            </div>
-          </>
+              )}
+              renderHistoryMeta={(email) => (
+                <div className="email-history-meta booking-email-history-meta">
+                  {formatDateTime(email.createdAt)}
+                  {email.provider ? <span className="email-provider-tag"> · {email.provider.toUpperCase()}</span> : null}
+                  {email.source ? (
+                    <span className="email-source-tag"> · {email.source === "app" ? "via App" : "via Gmail"}</span>
+                  ) : null}
+                  {email.error ? <span className="booking-email-history-error">· {email.error}</span> : null}
+                </div>
+              )}
+            />
         ) : activeTab === 'materials' ? (
             <>
               {/* SECTION: LEARNING MATERIALS */}
@@ -498,13 +420,6 @@ export function BookingDetailDialog({
           ) : null}
       </div>
     </AdminDialog>
-
-    {/* Specialized sub-dialog for viewing full HTML content of sent emails. */}
-    <EmailViewerDialog
-      isOpen={!!selectedEmail}
-      onClose={() => setSelectedEmail(null)}
-      email={selectedEmail}
-    />
     </>
   );
 }

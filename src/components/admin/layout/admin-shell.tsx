@@ -2,6 +2,7 @@
 
 import type { CSSProperties, PropsWithChildren } from "react";
 import { AdminHeader } from "@/components/admin-header";
+import { AdminNoticeStack } from "@/components/admin/ui/admin-notice";
 import { UpdateNotificationBanner } from "@/components/admin/updates/update-notification-banner";
 
 interface AdminShellProps extends PropsWithChildren {
@@ -29,9 +30,7 @@ export function AdminShell({ title, error, notice, loading, style, className, ch
 
       <div className="admin-shell-messages">
         <UpdateNotificationBanner />
-        {error ? <p className="notice error">{error}</p> : null}
-        {notice ? <p className="notice success">{notice}</p> : null}
-        {loading ? <p className="notice">Loading...</p> : null}
+        <AdminNoticeStack error={error} notice={notice} loading={loading} />
       </div>
 
       <div className="admin-shell-content">{children}</div>

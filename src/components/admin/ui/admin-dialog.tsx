@@ -115,8 +115,11 @@ export function AdminDialog({
         {description && <div className="dialog-status helper-text">{description}</div>}
 
         <div
-          className={`dialog-body-scroll ${bodyClassName || ""}`.trim()}
-          style={{ overflowY: lockBodyScrollArea ? "hidden" : "auto" }}
+          className={[
+            "dialog-body-scroll",
+            lockBodyScrollArea ? "dialog-body-scroll-locked" : "",
+            bodyClassName || ""
+          ].filter(Boolean).join(" ")}
         >
           {children}
         </div>

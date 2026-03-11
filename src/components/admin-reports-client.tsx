@@ -604,7 +604,7 @@ export function AdminReportsClient() {
   return (
     <AdminShell title="Reports Console" error={error} notice={notice} loading={loading} className="admin-shell-reports">
       <div className="admin-layout-content report-layout-content">
-        <div className="admin-card report-toolbar-card">
+        <div className="admin-card admin-toolbar-card report-toolbar-card">
           <div>
             <p className="helper-text report-toolbar-title">Daily, weekly, monthly and yearly operational reporting</p>
             <p className="helper-text">
@@ -650,7 +650,7 @@ export function AdminReportsClient() {
           </div>
         </div>
 
-        <div className="admin-card report-controls-card">
+        <div className="admin-card admin-toolbar-card report-controls-card">
           <div className="report-controls-primary">
             <div className="field report-format-field">
               <label>Date format</label>

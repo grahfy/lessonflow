@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { AdminShell } from "@/components/admin/layout/admin-shell";
+import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AdminNotice } from "@/components/admin/ui/admin-notice";
 import { AlertCircle, CheckCircle, RefreshCw, Bug, Search, Terminal, ChevronRight, ChevronDown, Filter, ImagePlus, X } from "lucide-react";
 import { Pagination } from "@/components/pagination";
 import { Tooltip } from "@/components/admin/ui/tooltip";
@@ -203,75 +205,76 @@ export function SystemLogsClient() {
   return (
     <AdminShell title="System Logs" notice={notice} error={error} className="admin-shell-logs">
       <div className="admin-layout-content">
-        {/* ── Toolbar ── */}
-        <div className="syslog-toolbar">
-          <div className="syslog-toolbar-search">
-            <Search size={14} />
-            <Tooltip content="Search logs by event name or identifier.">
-              <input
-                id="syslog-search"
-                type="text"
-                placeholder="Search logs..."
-                value={eventSearch}
+        <AdminCard className="admin-toolbar-card syslog-toolbar-card">
+          <div className="syslog-toolbar">
+            <div className="syslog-toolbar-search">
+              <Search size={14} />
+              <Tooltip content="Search logs by event name or identifier.">
+                <input
+                  id="syslog-search"
+                  type="text"
+                  placeholder="Search logs..."
+                  value={eventSearch}
+                  onChange={(e) => {
+                    setEventSearch(e.target.value);
+                    setPage(1);
+                  }}
+                />
+              </Tooltip>
+            </div>
+
+            <div className="syslog-toolbar-field">
+              <Tooltip content="Filter logs by severity level.">
+                <label htmlFor="syslog-level">Level</label>
+              </Tooltip>
+              <select
+                id="syslog-level"
+                value={levelFilter}
                 onChange={(e) => {
-                  setEventSearch(e.target.value);
+                  setLevelFilter(e.target.value);
                   setPage(1);
                 }}
-              />
-            </Tooltip>
-          </div>
+              >
+                <option value="">All Levels</option>
+                <option value="info">Info</option>
+                <option value="warn">Warning</option>
+                <option value="error">Error</option>
+              </select>
+            </div>
 
-          <div className="syslog-toolbar-field">
-            <Tooltip content="Filter logs by severity level.">
-              <label htmlFor="syslog-level">Level</label>
-            </Tooltip>
-            <select
-              id="syslog-level"
-              value={levelFilter}
-              onChange={(e) => {
-                setLevelFilter(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="">All Levels</option>
-              <option value="info">Info</option>
-              <option value="warn">Warning</option>
-              <option value="error">Error</option>
-            </select>
+            <div className="syslog-toolbar-actions">
+              <Tooltip content="Apply the current search and level filters to the logs.">
+                <button
+                  className="btn btn-primary"
+                  onClick={fetchLogs}
+                  disabled={loading}
+                >
+                  <Filter size={14} />
+                  FILTER
+                </button>
+              </Tooltip>
+              <Tooltip content="Reload the system logs from the server.">
+                <button
+                  className="btn btn-secondary"
+                  onClick={fetchLogs}
+                  disabled={loading}
+                >
+                  <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+                  REFRESH
+                </button>
+              </Tooltip>
+              <Tooltip content="Open a form to submit a technical issue report to the developer.">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setIsReportingBug(true)}
+                >
+                  <Bug size={14} />
+                  REPORT ISSUE
+                </button>
+              </Tooltip>
+            </div>
           </div>
-
-          <div className="syslog-toolbar-actions">
-            <Tooltip content="Apply the current search and level filters to the logs.">
-              <button
-                className="btn btn-primary"
-                onClick={fetchLogs}
-                disabled={loading}
-              >
-                <Filter size={14} />
-                FILTER
-              </button>
-            </Tooltip>
-            <Tooltip content="Reload the system logs from the server.">
-              <button
-                className="btn btn-secondary"
-                onClick={fetchLogs}
-                disabled={loading}
-              >
-                <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-                REFRESH
-              </button>
-            </Tooltip>
-            <Tooltip content="Open a form to submit a technical issue report to the developer.">
-              <button
-                className="btn btn-secondary"
-                onClick={() => setIsReportingBug(true)}
-              >
-                <Bug size={14} />
-                REPORT ISSUE
-              </button>
-            </Tooltip>
-          </div>
-        </div>
+        </AdminCard>
 
         {/* ── Table container ── */}
         <div className="syslog-table-wrap">
@@ -369,7 +372,7 @@ export function SystemLogsClient() {
         </div>
 
         {/* Pagination */}
-        <div style={{ flexShrink: 0 }}>
+        <div className="syslog-pagination-wrap">
           <Pagination
             currentPage={page}
             totalPages={totalPages}
@@ -439,7 +442,7 @@ export function SystemLogsClient() {
             />
           </div>
 
-          <div className="field" style={{ marginTop: 10 }}>
+          <div className="field syslog-report-field">
             <Tooltip content="Where should the developer reply to this report?">
               <label htmlFor="bug-email" className="admin-inline-field">Your Email</label>
             </Tooltip>
@@ -453,7 +456,7 @@ export function SystemLogsClient() {
             />
           </div>
 
-          <div className="field" style={{ marginTop: 10 }}>
+          <div className="field syslog-report-field">
             <Tooltip content="Please provide steps to reproduce the issue.">
               <label htmlFor="bug-desc" className="admin-inline-field">Description</label>
             </Tooltip>
@@ -468,33 +471,20 @@ export function SystemLogsClient() {
             />
           </div>
 
-          <div className="field" style={{ marginTop: 10 }}>
+          <div className="field syslog-report-field">
             <label className="admin-inline-field">Screenshot (optional)</label>
             {bugScreenshot ? (
-              <div style={{ position: "relative", marginTop: 6 }}>
+              <div className="syslog-screenshot-preview">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={bugScreenshot}
                   alt="Screenshot preview"
-                  style={{
-                    maxWidth: "100%",
-                    maxHeight: 200,
-                    borderRadius: 8,
-                    border: "1px solid rgba(100, 116, 139, 0.3)",
-                  }}
+                  className="syslog-screenshot-image"
                 />
                 <button
                   type="button"
-                  className="btn btn-secondary"
+                  className="btn btn-secondary syslog-screenshot-remove"
                   onClick={() => setBugScreenshot(null)}
-                  style={{
-                    position: "absolute",
-                    top: 6,
-                    right: 6,
-                    padding: "4px 6px",
-                    minWidth: 0,
-                    fontSize: "0.7rem",
-                  }}
                 >
                   <X size={14} />
                   REMOVE
@@ -503,8 +493,7 @@ export function SystemLogsClient() {
             ) : (
               <label
                 htmlFor="bug-screenshot"
-                className="btn btn-secondary"
-                style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 4, cursor: "pointer" }}
+                className="btn btn-secondary syslog-screenshot-trigger"
               >
                 <ImagePlus size={16} />
                 ATTACH SCREENSHOT
@@ -513,17 +502,20 @@ export function SystemLogsClient() {
                   type="file"
                   accept="image/*"
                   onChange={handleScreenshotChange}
-                  style={{ display: "none" }}
+                  className="syslog-screenshot-input"
                 />
               </label>
             )}
           </div>
 
           {reportResult && (
-            <div className={`notice ${reportResult.success ? "success" : "error"}`} style={{ marginTop: 12 }}>
+            <AdminNotice
+              tone={reportResult.success ? "success" : "error"}
+              className="syslog-report-result"
+            >
               {reportResult.success ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
               {reportResult.success ? " Report sent successfully! Thank you." : ` ${reportResult.error}`}
-            </div>
+            </AdminNotice>
           )}
         </form>
       </AdminDialog>

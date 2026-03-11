@@ -563,7 +563,7 @@ export function AdminBookingsClient() {
       className="admin-shell-bookings"
     >
       <div className="admin-layout-content">
-        <AdminCard className="booking-row admin-range-row">
+        <AdminCard className="admin-toolbar-card admin-range-card booking-row admin-range-row">
           <div className="admin-range-primary">
             <div className="button-row admin-range-nav-buttons">
               <Tooltip content="Go to the previous date range.">
@@ -702,7 +702,7 @@ export function AdminBookingsClient() {
           title="Move Lesson Time"
           wide
           footer={
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", width: "100%" }}>
+            <div className="dialog-footer-row dialog-footer-row-end">
               <button className="btn btn-secondary" onClick={() => setIsMoveOpen(false)}>CANCEL</button>
               <button className="btn btn-primary" disabled={!!busyAction} onClick={moveBooking}>
                 {busyAction === "move" ? "MOVING..." : "CONFIRM MOVE"}

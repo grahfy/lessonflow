@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { AdminCard } from "@/components/admin/ui/admin-card";
+import { useEffect, useState } from "react";
+import { AdminEditorPanel, AdminEditorSection } from "@/components/admin/ui/admin-editor-section";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { parseAudInputToCents } from "@/lib/invoices/currency";
 import { toMoneyInput } from "@/lib/admin/formatters";
@@ -14,6 +14,7 @@ import { usePresets, type Preset } from "@/lib/admin/use-presets";
 export function AdminPresetsEditor() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [draftPresets, setDraftPresets] = useState<Preset[]>([]);
   const [newPreset, setNewPreset] = useState<Partial<Preset>>({
     label: "",
     unitPriceCents: 0,
@@ -30,6 +31,10 @@ export function AdminPresetsEditor() {
     onError: setError,
     onAuthError: () => window.location.assign("/admin/login")
   });
+
+  useEffect(() => {
+    setDraftPresets(presets);
+  }, [presets]);
 
   async function addPreset() {
     if (!newPreset.label?.trim()) {
@@ -48,9 +53,12 @@ export function AdminPresetsEditor() {
   }
 
   async function updatePreset(id: string, patch: Partial<Preset>) {
+    const preset = draftPresets.find((item) => item.id === id);
+    if (!preset) return;
+
     setError("");
     setNotice("");
-    const result = await savePresetApi(patch, id);
+    const result = await savePresetApi({ ...preset, ...patch }, id);
     if (result) {
       setNotice("Preset updated.");
       void reloadPresets();
@@ -71,77 +79,100 @@ export function AdminPresetsEditor() {
   if (loading && presets.length === 0) return <p className="helper-text">Loading presets...</p>;
 
   return (
-    <div className="form-grid">
-      <AdminCard className="field full">
-        <h2 className="admin-settings-section-title">Product Presets</h2>
-        <p className="helper-text" style={{ marginBottom: '16px' }}>
-          Standardized price points and descriptions for common billing scenarios.
-        </p>
-
-        {notice ? <p className="notice success">{notice}</p> : null}
-        {error ? <p className="notice error">{error}</p> : null}
-
-        <div style={{ display: 'grid', gap: '16px' }}>
-          {presets.map((p) => (
-            <AdminCard key={p.id} style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid var(--line)' }}>
-              <AdminForm>
-                <AdminField label="Label" tooltip="Short name for this preset (e.g. '1 Hour Lesson')." required>
-                  <input value={p.label} onChange={e => updatePreset(p.id, { label: e.target.value })} />
-                </AdminField>
-                <AdminField label="Price (AUD)" tooltip="Default price in Australian Dollars." required>
-                  <input 
-                    value={toMoneyInput(p.unitPriceCents)} 
-                    onChange={e => updatePreset(p.id, { unitPriceCents: parseAudInputToCents(e.target.value).cents || 0 })} 
-                  />
-                </AdminField>
-                <AdminField label="Default Description" tooltip="Pre-filled text for the invoice line item." fullWidth>
-                  <textarea 
-                    value={p.description} 
-                    style={{ minHeight: '60px' }} 
-                    onChange={e => updatePreset(p.id, { description: e.target.value })} 
-                  />
-                </AdminField>
-                <div className="field full">
-                  <div className="button-row">
-                    <button className="btn btn-danger" onClick={() => deletePreset(p.id)}>Delete Preset</button>
-                  </div>
-                </div>
-              </AdminForm>
-            </AdminCard>
-          ))}
-
-          <AdminCard style={{ border: '1px dashed var(--line)', background: 'transparent' }}>
-            <h3 style={{ fontSize: '0.9rem', marginBottom: '12px' }}>Add New Preset</h3>
-            <AdminForm>
-              <AdminField label="Label" tooltip="Short name for the new preset.">
-                <input 
-                  placeholder="e.g. 10 Week Term" 
-                  value={newPreset.label} 
-                  onChange={e => setNewPreset(prev => ({ ...prev, label: e.target.value }))} 
-                />
-              </AdminField>
-              <AdminField label="Price (AUD)" tooltip="Default price in Australian Dollars.">
-                <input 
-                  placeholder="0.00" 
-                  value={toMoneyInput(newPreset.unitPriceCents || 0)} 
-                  onChange={e => setNewPreset(prev => ({ ...prev, unitPriceCents: parseAudInputToCents(e.target.value).cents || 0 }))} 
-                />
-              </AdminField>
-              <AdminField label="Default Description" tooltip="Pre-filled text for the invoice line item." fullWidth>
-                <textarea 
-                  placeholder="Line item text..." 
-                  value={newPreset.description} 
-                  style={{ minHeight: '60px' }} 
-                  onChange={e => setNewPreset(prev => ({ ...prev, description: e.target.value }))} 
-                />
-              </AdminField>
-              <div className="field full">
-                <button className="btn btn-secondary" onClick={addPreset}>Add Preset</button>
+    <AdminEditorSection
+      title="Product Presets"
+      description="Standardized price points and descriptions for common billing scenarios."
+      notice={notice}
+      error={error}
+    >
+      {draftPresets.map((preset) => (
+        <AdminEditorPanel key={preset.id} subdued>
+          <AdminForm>
+            <AdminField label="Label" tooltip="Short name for this preset (e.g. '1 Hour Lesson')." required>
+              <input
+                value={preset.label}
+                onChange={(event) =>
+                  setDraftPresets((current) =>
+                    current.map((item) => (item.id === preset.id ? { ...item, label: event.target.value } : item))
+                  )
+                }
+              />
+            </AdminField>
+            <AdminField label="Price (AUD)" tooltip="Default price in Australian Dollars." required>
+              <input
+                value={toMoneyInput(preset.unitPriceCents)}
+                onChange={(event) =>
+                  setDraftPresets((current) =>
+                    current.map((item) =>
+                      item.id === preset.id
+                        ? { ...item, unitPriceCents: parseAudInputToCents(event.target.value).cents || 0 }
+                        : item
+                    )
+                  )
+                }
+              />
+            </AdminField>
+            <AdminField label="Default Description" tooltip="Pre-filled text for the invoice line item." fullWidth>
+              <textarea
+                className="admin-editor-textarea admin-editor-textarea-sm"
+                value={preset.description}
+                onChange={(event) =>
+                  setDraftPresets((current) =>
+                    current.map((item) => (item.id === preset.id ? { ...item, description: event.target.value } : item))
+                  )
+                }
+              />
+            </AdminField>
+            <div className="field full">
+              <div className="button-row">
+                <button className="btn btn-secondary" type="button" onClick={() => void updatePreset(preset.id, {})}>
+                  Save Preset
+                </button>
+                <button className="btn btn-danger" type="button" onClick={() => void deletePreset(preset.id)}>
+                  Delete Preset
+                </button>
               </div>
-            </AdminForm>
-          </AdminCard>
-        </div>
-      </AdminCard>
-    </div>
+            </div>
+          </AdminForm>
+        </AdminEditorPanel>
+      ))}
+
+      <AdminEditorPanel title="Add New Preset" dashed>
+        <AdminForm>
+          <AdminField label="Label" tooltip="Short name for the new preset.">
+            <input
+              placeholder="e.g. 10 Week Term"
+              value={newPreset.label}
+              onChange={(event) => setNewPreset((prev) => ({ ...prev, label: event.target.value }))}
+            />
+          </AdminField>
+          <AdminField label="Price (AUD)" tooltip="Default price in Australian Dollars.">
+            <input
+              placeholder="0.00"
+              value={toMoneyInput(newPreset.unitPriceCents || 0)}
+              onChange={(event) =>
+                setNewPreset((prev) => ({
+                  ...prev,
+                  unitPriceCents: parseAudInputToCents(event.target.value).cents || 0
+                }))
+              }
+            />
+          </AdminField>
+          <AdminField label="Default Description" tooltip="Pre-filled text for the invoice line item." fullWidth>
+            <textarea
+              className="admin-editor-textarea admin-editor-textarea-sm"
+              placeholder="Line item text..."
+              value={newPreset.description}
+              onChange={(event) => setNewPreset((prev) => ({ ...prev, description: event.target.value }))}
+            />
+          </AdminField>
+          <div className="field full">
+            <button className="btn btn-secondary" type="button" onClick={() => void addPreset()}>
+              Add Preset
+            </button>
+          </div>
+        </AdminForm>
+      </AdminEditorPanel>
+    </AdminEditorSection>
   );
 }
