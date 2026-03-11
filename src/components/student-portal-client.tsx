@@ -236,7 +236,7 @@ export function StudentPortalClient(): ReactElement {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             className={styles["portal-header-illustration"]}
-            src="/images/student-portal-hero.webp"
+            src="/images/student-portal-notes-tile.svg"
             alt="Illustration of music study books and notes"
             width={360}
             height={220}
