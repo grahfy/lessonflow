@@ -22,8 +22,8 @@ type AdminManualSectionClientProps = {
 };
 
 const GROUP_TITLES: Record<ManualSectionGroup, string> = {
-  foundation: "Start Here",
-  operations: "Daily Operations",
+  foundation: "Orientation",
+  operations: "Operations",
   support: "Support and Student Experience",
   configuration: "Settings and Configuration",
   diagnostics: "Diagnostics and Recovery",
@@ -95,14 +95,14 @@ export function AdminManualSectionClient({
           <div className="admin-manual-toc-panel">
             <h2>{GROUP_TITLES[section.group]}</h2>
             <p className="helper-text">
-              Stay within this section group for related work, or go back to the manual home to change context.
+              Use this group for related articles, or return to the manual index to change context.
             </p>
             <div className="admin-manual-links">
-              <Link className="btn btn-secondary" href="/admin/manual">Manual home</Link>
+              <Link className="btn btn-secondary" href="/admin/manual">Reference index</Link>
               <Link className="btn btn-secondary" href="/admin/manual/troubleshooting-quick-reference">Troubleshooting</Link>
             </div>
 
-            <h3>This section group</h3>
+            <h3>Articles in this group</h3>
             <ol className="admin-manual-list compact">
               {groupSections.map((entry) => (
                 <li key={`toc-${entry.id}`}>
@@ -115,7 +115,7 @@ export function AdminManualSectionClient({
 
             {section.group !== "technical" ? (
               <>
-                <h3>Technical owner</h3>
+                <h3>Technical owner articles</h3>
                 {/* RATIONALE: Non-technical admins often need to escalate into
                     runbook content without losing their place in the main TOC. */}
                 <ol className="admin-manual-list compact">
@@ -140,9 +140,10 @@ export function AdminManualSectionClient({
                   <span className={`admin-manual-audience-badge ${section.audience === "technical_owner" ? "technical" : ""}`}>
                     {section.audience === "technical_owner" ? "Technical Owner" : "All Admins"}
                   </span>
-                  <span className="helper-text">{GROUP_TITLES[section.group]}</span>
+                  <span className="helper-text admin-manual-doc-label">{GROUP_TITLES[section.group]}</span>
                 </div>
-                <p className="lead">{section.summary}</p>
+                <h1 className="admin-manual-article-title">{section.title}</h1>
+                <p className="admin-manual-article-abstract">{section.summary}</p>
               </div>
               <div className="admin-manual-doc-meta">
                 <p className="helper-text">Last updated</p>
@@ -151,21 +152,24 @@ export function AdminManualSectionClient({
             </div>
 
             {section.relatedRoutes.length > 0 ? (
-              <div className="admin-manual-route-pills">
-                {section.relatedRoutes.map((routePath) => (
-                  <span key={`${section.id}-${routePath}`} className="admin-manual-pill">
-                    {routePath}
-                  </span>
-                ))}
-              </div>
+              <section className="admin-manual-route-block" aria-label="Related routes">
+                <p className="helper-text">Related routes</p>
+                <div className="admin-manual-route-pills">
+                  {section.relatedRoutes.map((routePath) => (
+                    <span key={`${section.id}-${routePath}`} className="admin-manual-pill">
+                      {routePath}
+                    </span>
+                  ))}
+                </div>
+              </section>
             ) : null}
 
             <div className="admin-manual-markdown" dangerouslySetInnerHTML={{ __html: section.html }} />
           </section>
 
           {screenshots.length > 0 ? (
-            <section className="admin-manual-panel">
-              <h2>Workflow Screenshots</h2>
+            <section className="admin-manual-panel admin-manual-figure-panel">
+              <h2>Figures and Screenshots</h2>
               <div className="admin-manual-screenshot-grid">
                 {screenshots.map((s) => (
                   <figure key={s.id} className="admin-manual-shot">
@@ -197,14 +201,14 @@ export function AdminManualSectionClient({
             <div className="admin-manual-section-nav">
               {previous ? (
                 <Link className="btn btn-secondary" href={`/admin/manual/${previous.id}`}>
-                  Previous: {previous.title}
+                  Previous article: {previous.title}
                 </Link>
               ) : (
                 <span />
               )}
               {next ? (
                 <Link className="btn btn-secondary" href={`/admin/manual/${next.id}`}>
-                  Next: {next.title}
+                  Next article: {next.title}
                 </Link>
               ) : (
                 <span />

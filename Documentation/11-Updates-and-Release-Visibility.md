@@ -1,123 +1,76 @@
 # Updates and Release Visibility
 
+LessonFlow exposes release information inside the admin console so administrators and owners can understand what has changed without relying on informal memory or off-platform communication. This chapter describes the admin-facing release surfaces and their role in confirming deployment state.
+
 <div class="manual-callout info">
-<strong>Purpose:</strong> LessonFlow shows update information inside the admin console so staff and owners can see what changed without guessing whether the system is on a new version.
+<strong>Boundary note:</strong> This chapter documents visibility into deployed and pending changes. The server-side installation and update procedure is documented separately in the technical-owner runbook.
 </div>
 
-This chapter documents the admin-facing update tools, not the server-side installation steps. Technical deployment procedures are covered in [DigitalOcean Admin Operations Runbook](digitalocean-admin-operations.md).
+## Update Notification Banner
 
-## Update notification banner
+When LessonFlow detects pending commits for the deployed installation, an update banner may appear in the admin experience. The banner is intended to indicate that a change exists, not that the change has already been applied.
 
-When LessonFlow detects new pending commits for the deployed system, a banner can appear in the admin experience announcing that a new version is available.
+The banner may show:
 
-The banner can show:
+- that a new version is available
+- how many commits are pending
+- a <code>View Changes</code> action
 
-- that a new version exists
-- how many commits are waiting
-- a `View Changes` action
+## Pending Changes Modal
 
-Use this as release awareness, not as confirmation that an update has already been applied.
+The pending-changes modal exists to explain what is waiting to be deployed. It helps administrators determine whether an owner or technical owner should take action and provides commit-level context before expectations are set with staff or customers.
 
-## Pending changes modal
+## Deployment Updates Dialog
 
-The pending-changes modal is designed to help admins understand what is waiting to be deployed before they approve or expect a change.
+The admin header exposes an <code>Updates</code> button that opens the deployment updates dialog. This dialog is chiefly useful after an update has already run.
 
-Use it to review:
+### Latest Tab
 
-- commit summaries
-- whether web-triggered updates are configured
-- whether an owner or technical owner should take action
+The Latest tab commonly displays:
 
-## Deployment updates button
-
-The admin header includes an `Updates` button that opens the deployment updates dialog.
-
-This dialog is useful after an update has already been applied.
-
-### Tabs available
-
-- `Latest`
-- `History`
-
-### Latest tab
-
-The latest tab shows:
-
-- applied date/time
+- applied date and time
 - branch
-- release
+- release tag or label
 - current commit
 - previous commit
 - included commits
 
-This is the fastest place to confirm what code was actually deployed.
+This tab is the primary in-app source for confirming what code is currently live.
 
-## Version footer and About page
+### History Tab
 
-LessonFlow also keeps the current release visible in two always-available admin locations:
+The History tab provides earlier deployment records and is used to answer questions such as:
 
-- a compact footer strip across admin screens that shows the current version
-- the `/admin/about` page, which shows the release tag, commit, creator details, contact email, GitLab repository URL, and GitLab wiki URL
+- when a change was deployed
+- whether a fix has already reached production
+- whether a newly observed issue aligns with a recent release
 
-Use these surfaces when:
+## Version References
 
-- support staff need to confirm exactly which version they are viewing
-- an owner needs the project contact and repository links in one place
-- a bug report needs release context without opening the full deployment history dialog
+Release identity also appears in:
 
-### History tab
+- the compact version footer across admin screens
+- the <code>/admin/about</code> page
 
-The history tab lets you review earlier deployments and inspect what commits were included in those releases.
+These locations are useful when a support report needs version context but the full updates dialog is unnecessary.
 
-Use it when:
+## Live Update Progress
 
-- you need to confirm when a behavior changed
-- the owner asks whether a fix has already been deployed
-- you are correlating an issue with a recent release
-
-## Auto-open behavior
-
-The updates dialog can auto-open in the browser when a new deployed commit has not been seen yet on that machine. This is expected behavior and is meant to reduce version confusion.
-
-## Live update progress page
-
-When a web-triggered update runs, LessonFlow can show a live update progress page with streamed output.
-
-The progress page can display states such as:
-
-- connecting
-- updating
-- restarting
-- complete
-- error
-
-It also shows:
-
-- elapsed time
-- estimated build time where available
-- streamed log output
+Where web-triggered updates are enabled, LessonFlow can display a live update progress page with streamed output and status changes such as connecting, updating, restarting, complete, or error.
 
 <div class="manual-callout warning">
-<strong>Do not close the update progress page during an active update unless the technical owner tells you to do so.</strong>
+<strong>Operational caution:</strong> During an active update, the progress page should remain open unless the technical owner instructs otherwise.
 </div>
 
-## What normal admins should do
+## Administrative Roles
 
-Normal admins should use the update tools to:
+| Reader type | Appropriate use of these screens |
+| --- | --- |
+| Normal admin | Confirm whether a change exists, determine current version, include release context in escalations |
+| Technical owner | Correlate deployment timing with behaviour, confirm applied commit history, review web-triggered update progress |
 
-- understand what changed
-- verify whether a fix was already deployed
-- report what release they are on when escalating an issue
+## Related Sections
 
-Normal admins should not treat these screens as permission to run infrastructure changes unless they are also the technical owner.
-
-## What technical owners should do
-
-Technical owners can use the update screens to:
-
-- verify deployed commit history
-- confirm that a web-triggered update actually ran
-- compare current and previous release states
-- correlate operational reports with deployment timing
-
-For the actual update procedure, continue to the technical-owner runbook.
+- [Logs and Bug Reporting](09-Logs-and-Bug-Reporting.md)
+- [Technical Owner Runbook: Installation, Updates, and Deploy Scripts](digitalocean-admin-operations.md)
+- [Troubleshooting and Quick Reference](13-Troubleshooting-and-Quick-Reference.md)

@@ -1,43 +1,41 @@
-# 10. Public Intake and Student Portal
+# Public Intake and Student Portal
+
+The public site and student portal form the outward-facing side of LessonFlow. Public visitors use these routes to make initial contact or request lessons, while existing students use the portal for sign-in, self-service booking activity, cancellation, and materials access. This chapter describes those external surfaces from the perspective of an administrator who may later need to respond inside the admin console.
 
 <div class="manual-callout info">
-<strong>Scope:</strong> This chapter explains what happens when people use the public site or student portal, and what staff should do next inside LessonFlow.
+<strong>Scope note:</strong> This chapter explains the user-facing behaviour of the public booking form, contact form, and portal. It does not replace the internal workflow chapters that describe the corresponding admin actions.
 </div>
 
 ## Public Booking Requests
 
-The public booking form creates a pending request, not a confirmed lesson.
+The public booking form creates a pending request rather than a confirmed lesson.
 
 ![Public booking request page](assets/public-book-page.png)
 
-When a new request arrives:
+Typical consequences of a public booking submission include:
 
-1. open the bookings page
-2. locate the pending request
-3. review the requested time, lesson mode, and customer details
-4. approve, reject, or follow up
+- creation of a pending booking request for admin review
+- requirement for CAPTCHA completion
+- possible guidance toward an introductory lesson duration for new students
+- occasional degraded email outcomes that still preserve the request record
 
-Important public-booking behavior:
-
-- CAPTCHA is required
-- some degraded email cases still save the request successfully
-- new customers may be guided into an introductory lesson duration
+The administrative follow-up path begins in the Bookings workflow.
 
 ## Public Contact Enquiries
 
-The contact form saves a contact submission for follow-up.
+The public contact form records general enquiries for later follow-up.
 
 ![Public contact page](assets/public-contact-page.png)
 
-Treat contact enquiries as support or sales intake, then decide whether the next step is:
+These enquiries may lead to:
 
-- reply with a manual email
-- convert to a booking conversation
-- hold for later follow-up
+- a manual email reply
+- progression into a booking conversation
+- later follow-up without immediate conversion
 
 ## Student Login
 
-Students sign in using:
+Student sign-in requires:
 
 - full name
 - postcode
@@ -45,22 +43,37 @@ Students sign in using:
 
 ![Student portal login page](assets/student-login-page.png)
 
-If a student cannot log in, check the customer record and portal credentials before regenerating the password.
+If a student cannot sign in, the customer record and current portal credential should be reviewed before regeneration is attempted.
 
-## Student Portal Actions
+## Student Portal Functions
 
-Students can:
+The portal provides the following student-facing actions:
 
-- view upcoming appointments
-- view previous appointments
-- request a lesson
-- cancel eligible future bookings
-- access learning materials
+- viewing upcoming appointments
+- viewing previous appointments
+- requesting a lesson
+- cancelling an eligible future booking
+- accessing learning materials
 
 ![Student portal dashboard page](assets/student-portal-page.png)
 
-## Support Notes for Staff
+Portal-originated requests and cancellations remain subject to administrative review and historical context.
 
-- A student portal lesson request becomes a pending request for admin review.
-- A portal cancellation does not mean “ignore the record”; it still matters for history and policy context.
-- “No materials yet” can be normal if nothing has been uploaded.
+## Administrative Interpretation
+
+From an admin perspective, the most important interpretation rules are:
+
+| Portal or public event | Administrative meaning |
+| --- | --- |
+| Public booking request | New pending request requiring calendar review |
+| Public contact enquiry | Support or sales intake requiring response |
+| Student portal request | Pending request originating from an existing student context |
+| Student portal cancellation | A meaningful historical event, not a disappearance of the record |
+| “No materials yet” | Potentially normal state if nothing has been uploaded |
+
+## Related Sections
+
+- [Daily Operations and Booking Lifecycle](03-Daily-Operations-and-Booking-Lifecycle.md)
+- [Customers, Communication, and Portal Support](04-Customers-Communication-and-Portal-Support.md)
+- [Learning Materials and Notifications](06-Learning-Materials-and-Notifications.md)
+- [Troubleshooting and Quick Reference](13-Troubleshooting-and-Quick-Reference.md)

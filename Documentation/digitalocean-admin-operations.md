@@ -1,177 +1,146 @@
 # Technical Owner Runbook: Installation, Updates, and Deploy Scripts
 
+The technical-owner runbook documents the server-side operational procedures used to install, update, verify, and recover a LessonFlow deployment on a VPS. It is intended for the person responsible for hosting and deployment rather than for routine lesson administration.
+
 <div class="manual-callout warning">
-<strong>Audience:</strong> This chapter is for the person responsible for hosting, deployment, and production recovery. It is not required for normal lesson administration.
+<strong>Audience note:</strong> This chapter is not required for everyday booking, billing, or support work. It exists for the operator who maintains the production host and must make controlled changes to services, scripts, and runtime configuration.
 </div>
 
-## What This Runbook Covers
+## Runbook Scope
 
-- first-time installation on a VPS or server
+This runbook covers:
+
+- first-time installation on a server or VPS
 - routine updates
-- when to use each deploy script
+- deploy-script selection
 - service and timer verification
-- safe post-deploy checks
-- where to look if deployment or runtime behavior fails
+- post-deploy checking
+- basic recovery direction
 
-## Installation Flow for a New VPS
+## Initial Installation
 
-Use this sequence when LessonFlow is being installed on a host for the first time.
+Initial installation generally follows this order:
 
-### Step 1: Connect to the VPS
+1. connect to the VPS
+2. place the repository on the host
+3. install required packages
+4. configure filesystem permissions
+5. run the first deployment
+6. configure SSL if required
+7. verify the installation
+
+### VPS Access
 
 ```bash
 ssh <deploy-user>@<server-host>
 ```
 
-Confirm you are on the correct machine before changing anything.
+The host identity should be confirmed before any deployment or configuration action is taken.
 
-### Step 2: Place the repository on the server
-
-Clone or update the LessonFlow repository into the intended deploy location. Follow the host's normal Git access process.
-
-### Step 3: Install required packages
-
-Use the package helper when preparing a fresh host:
+### Package Preparation
 
 ```bash
 sudo ./deploy/setup-packages.sh
 ```
 
-Use this when system dependencies are missing or the host is being prepared for LessonFlow for the first time.
+This helper is intended for fresh hosts or hosts missing required system packages.
 
-### Step 4: Configure filesystem permissions
-
-Grant the intended deployment user the access required to manage releases safely:
+### Permission Preparation
 
 ```bash
 sudo ./deploy/setup-permissions.sh <deploy-user>
 ```
 
-This prepares the web root and deployment permissions expected by the update and deploy flows.
+This step establishes the filesystem access model expected by the deployment scripts.
 
-### Step 5: Run the first deploy
-
-For a first-time installation, use the main deploy script:
+### First Deployment
 
 ```bash
 ./deploy/deploy.sh
 ```
 
-If your deployment process uses branch or release options, use the host's approved invocation pattern.
+The main deploy script is the normal first-install entrypoint and may also be appropriate for lower-level recovery work.
 
-### Step 6: Configure SSL if needed
-
-When the app is reachable on HTTP and the domain is ready, use the SSL helper:
+### SSL Setup
 
 ```bash
 sudo ./deploy/setup-ssl.sh
 ```
 
-Use this only after domain and nginx prerequisites are correct.
+SSL setup should only occur after domain and nginx prerequisites are ready.
 
-### Step 7: Verify the installation
+## Routine Updates
 
-After deployment, confirm:
-
-- the app loads in a browser
-- `/admin/login` is reachable
-- the public site responds
-- the student login route responds
-- `lessonflow.service` is active
-- required timers/services are installed
-
-## Routine Updates on an Existing System
-
-For normal updates on an already-installed host, use:
+For an already-installed system, the standard update path is:
 
 ```bash
 ./deploy/update.sh
 ```
 
-This is the standard operator path for pulling changes, rebuilding, and restarting through the existing deployment model.
+This is the preferred routine path for ordinary code or configuration updates.
 
-Use `update.sh` when:
+## Script Selection
 
-- the app is already installed
-- you want the normal guided update flow
-- you are applying routine code/config changes
+| Script or file | Intended use |
+| --- | --- |
+| `deploy/setup-packages.sh` | Prepare a fresh host with required system packages |
+| `deploy/setup-permissions.sh` | Establish or repair deployment-user access |
+| `deploy/deploy.sh` | First deployment or lower-level recovery deployment |
+| `deploy/update.sh` | Routine update of an existing installation |
+| `deploy/setup-ssl.sh` | SSL configuration after prerequisites are met |
+| `deploy/cron.sh` | Scheduled-job entrypoint |
+| `deploy/backup.sh` | Controlled backup operations |
+| `deploy/maintenance.sh` | Maintenance tasks matching the script’s purpose |
+| `deploy/nginx.conf` | Main nginx configuration template |
+| `deploy/nginx-http.conf` | Transitional or HTTP-only nginx configuration |
+| `deploy/lessonflow.service` | Main systemd unit for the application runtime |
 
-## When to Use `deploy.sh` Instead of `update.sh`
+## Service and Timer Verification
 
-Use `deploy/deploy.sh` for:
+Post-deploy verification should include runtime service and scheduled-job review.
 
-- first-time deployment
-- lower-level deployment work where the main deploy script is the correct entrypoint
-- recovery or reinstall scenarios where the update wrapper is not the right tool
-
-Use `deploy/update.sh` for:
-
-- normal ongoing updates to an existing installation
-
-## Deploy Script Reference
-
-| Script / File | Use it for | Notes |
-| --- | --- | --- |
-| `deploy/setup-packages.sh` | preparing a fresh host | installs required system packages |
-| `deploy/setup-permissions.sh` | deploy-user filesystem access | run when preparing or correcting deployment permissions |
-| `deploy/deploy.sh` | first-time or lower-level deployment | primary deploy script |
-| `deploy/update.sh` | routine updates | safest normal update path |
-| `deploy/setup-ssl.sh` | SSL setup | use only when nginx/domain prerequisites are ready |
-| `deploy/cron.sh` | scheduled job entrypoint | used by timers/services for background jobs |
-| `deploy/backup.sh` | backup operations | use for controlled backup workflows |
-| `deploy/maintenance.sh` | maintenance tasks | use only when the maintenance task matches the need |
-| `deploy/nginx.conf` | main nginx config template | server-facing configuration reference |
-| `deploy/nginx-http.conf` | pre-SSL or HTTP-only nginx config | transitional or HTTP-specific setup |
-| `deploy/lessonflow.service` | systemd app service | main application runtime |
-
-## Services and Timers to Verify
-
-Key runtime units include:
-
-- `lessonflow.service`
-- daily bookings digest timer/service
-- invoice reminders timer/service
-- admin reports timers/services
-- Gmail sync timer/service
-
-Check status with standard host tooling, for example:
+Typical commands include:
 
 ```bash
 systemctl status lessonflow
 systemctl list-timers --all | grep lessonflow
 ```
 
-## Update Visibility from the Admin UI
+The exact set of timers may include daily bookings digest, invoice reminders, admin reports, and Gmail sync units.
 
-The admin console shows:
+## Admin-Side Release Visibility
 
-- update-available banner
-- pending changes dialog
-- deployment history dialog
-- update progress page for web-triggered updates
+The admin console exposes update banners, pending-changes review, deployment history, and a live progress page for web-triggered updates. These surfaces are useful for confirmation and correlation, but they do not replace the shell-side deployment procedure documented here.
 
-These help confirm what changed, but they do not replace the command-line runbook when you need to install, deploy, or recover the host.
+## Post-Deploy Verification
 
-## Post-Deploy Verification Checklist
+After installation or update, confirm:
 
-After any installation or update:
+1. the service is active
+2. the public site responds
+3. <code>/admin/login</code> is reachable
+4. core admin screens open normally
+5. the student login route responds
+6. expected timers and services remain present
 
-1. confirm the service is active
-2. confirm the site responds
-3. confirm admin login works
-4. open bookings, invoices, reports, logs, and settings
-5. confirm the student login route responds
-6. confirm timers/services still exist where expected
+## Recovery Orientation
 
-## Recovery Hints
+If deployment fails, the failure should be categorised before any retry:
 
-If a deployment fails:
+- package problem
+- build problem
+- configuration problem
+- permission problem
+- service problem
 
-- stop and read the output before retrying blindly
-- confirm whether the failure is package, build, config, permission, or service related
-- use the Logs page and host-side service status together
-- do not run test or seed tooling against production data
+Host-side service checks and the in-app Logs page should be used together where appropriate.
 
 <div class="manual-callout danger">
-<strong>Never do this on production:</strong> do not use local test-seeding flows, destructive cleanup scripts, or experimental commands unless you have a deliberate recovery plan and confirmed backups.
+<strong>Production safety:</strong> Test-seeding flows, destructive cleanup commands, and experimental scripts should not be run against production unless there is a deliberate recovery plan and confirmed backups.
 </div>
+
+## Related Sections
+
+- [Settings and Configuration](08-Settings-and-Configuration.md)
+- [Updates and Release Visibility](11-Updates-and-Release-Visibility.md)
+- [Logs and Bug Reporting](09-Logs-and-Bug-Reporting.md)

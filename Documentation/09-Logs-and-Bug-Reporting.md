@@ -1,135 +1,75 @@
-# 09. Logs and Bug Reporting
+# Logs and Bug Reporting
+
+The Logs page is the principal diagnostic surface available to administrators inside LessonFlow. It is intended to confirm what the system recently did, expose relevant metadata, and support evidence-based issue reporting when normal operation becomes unclear.
 
 <div class="manual-callout info">
-<strong>Purpose:</strong> The Logs page is where you confirm what the system recently did. Use it when a workflow fails, behaves unexpectedly, or needs evidence before escalation.
+<strong>Diagnostic principle:</strong> The Logs page is designed to replace guesswork with evidence. It should be the first escalation surface for unexplained behaviour that cannot be resolved through ordinary workflow review.
 </div>
 
-## What This Area Lets You Do
+## Logs Page Functions
 
-- search recent system events
-- filter by severity
-- page through historical log results
-- expand logs that contain structured metadata
-- submit a technical issue report
-- attach a screenshot to the report
+The page supports:
 
-## The Logs Toolbar
+- search across recent events
+- severity filtering
+- paged review of older results
+- expansion of structured metadata
+- submission of issue reports
+- optional screenshot attachment
 
-The toolbar includes:
+## Toolbar Elements
 
-- search field
-- level filter
-- <code>REFRESH</code>
-- <code>REPORT ISSUE</code>
+| Control | Function |
+| --- | --- |
+| Search field | Find events by identifier, source, or workflow term |
+| Level filter | Narrow results to Info, Warning, Error, or all levels |
+| `REFRESH` | Reload the current result set |
+| `REPORT ISSUE` | Open the technical issue dialog |
 
-### Search field
+## Reading Log Entries
 
-Use search to look for an event name or identifier related to the problem you are investigating.
+The logs table typically includes timestamp, level, source, event identifier, and message. Where metadata exists, the row can be expanded to show a fuller structured record.
 
-### Level filter
+Expanded metadata is especially useful when the short message alone does not identify the affected workflow or object.
 
-Available values:
+## First Diagnostic Pass
 
-- All Levels
-- Info
-- Warning
-- Error
-
-Use this to narrow the list to the most relevant severity.
-
-### Refresh
-
-Use <code>REFRESH</code> to reload the current results from the server.
-
-### Report Issue
-
-Use <code>REPORT ISSUE</code> when the problem needs developer or technical-owner follow-up.
-
-## Reading the Logs Table
-
-The table shows:
-
-- timestamp
-- level
-- source
-- event id
-- message
-
-If a row contains metadata, it can be expanded to reveal a formatted metadata block. Use that when the short message does not explain enough on its own.
-
-## Pagination and Result Size
-
-The page includes pagination controls and page-size options. Use these when:
-
-- you need older events
-- your filter matches many results
-- you want a denser or broader view
-
-## What to Check First
-
-When something fails:
+When a workflow behaves unexpectedly, the recommended first pass is:
 
 1. open the Logs page
-2. filter to <code>Error</code> or <code>Warning</code> if appropriate
-3. search by the workflow area, such as booking, invoice, report, portal, or settings
-4. expand any row that looks related
-5. confirm whether the problem is one-off, repeated, or connected to a recent update
+2. filter to <code>Error</code> or <code>Warning</code> where appropriate
+3. search by the relevant area, such as booking, invoice, portal, report, or settings
+4. expand matching rows
+5. determine whether the behaviour is isolated, repeated, or associated with a recent change
 
-## Report Issue Dialog
+## Issue Reporting
 
-The issue-report form includes:
+The issue-report dialog includes:
 
-- Subject
-- Your Email
-- Description
-- optional screenshot attachment
+- subject
+- reply email
+- description
+- optional screenshot
 - automatic inclusion of recent logs
 
-Required minimums:
-
-- subject long enough to explain the issue briefly
-- valid reply email
-- description long enough to describe what happened
-
-The screenshot attachment accepts image files only. Oversized screenshots are rejected.
-
-## What Makes a Good Bug Report
-
-Include:
-
-- what you were trying to do
-- what you clicked
-- what happened instead
-- whether it happens every time
-- which record or screen was involved
-- whether the issue started after a recent update
-
-Good example:
-
-> I opened a sent invoice, clicked `Mark Paid`, and the dialog closed but the invoice still showed as sent after refresh. This happened twice on the same invoice after the update banner appeared this morning.
-
-Poor example:
-
-> Invoices broken.
-
-## When to Escalate
-
-Escalate to the technical owner or developer when:
-
-- the same error keeps reappearing
-- a settings save appears to break another workflow
-- update or restart activity lines up with the failure
-- the message suggests infrastructure, email delivery, or database trouble
-- you cannot safely continue normal operations without clarification
+Good issue reports identify the attempted action, the observed result, whether it repeats, and which record or screen was involved.
 
 <div class="manual-callout warning">
-<strong>Important:</strong> Do not paste secrets, passwords, or unrelated personal information into the bug report. Describe the workflow and attach only the minimum evidence needed.
+<strong>Privacy note:</strong> Secrets, passwords, and unrelated personal information should not be pasted into the report. Only the minimum evidence necessary to explain the failure should be included.
 </div>
 
-## Suggested Workflow for Operators
+## Escalation Conditions
 
-1. Reproduce the issue once if safe.
-2. Check the Logs page.
-3. Expand any relevant metadata row.
-4. Submit a report with the clearest possible subject and description.
-5. Tell the technical owner if the issue blocks lesson operations, billing, or login access.
+Escalation to a technical owner or developer is warranted when:
+
+- the same error recurs
+- a settings save appears to have broken another workflow
+- release or restart activity aligns with the failure
+- the message indicates database, email-delivery, or infrastructure trouble
+- normal lesson operations, billing, or login access cannot continue safely
+
+## Related Sections
+
+- [Settings and Configuration](08-Settings-and-Configuration.md)
+- [Updates and Release Visibility](11-Updates-and-Release-Visibility.md)
+- [Troubleshooting and Quick Reference](13-Troubleshooting-and-Quick-Reference.md)

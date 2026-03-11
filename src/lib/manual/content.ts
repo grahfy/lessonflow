@@ -220,7 +220,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "start-here-features",
     title: "Start Here and Features",
-    summary: "The operating model, feature map, and the safest reading order for new users.",
+    summary: "General orientation to LessonFlow, including its major system areas, reading sequence, and operating principles.",
     group: "foundation",
     audience: "all_admins",
     sourcePath: "Documentation/01-Start-Here-and-Features.md",
@@ -230,7 +230,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "first-time-setup-admin-access",
     title: "First-Time Setup and Admin Access",
-    summary: "How setup, admin login, sign out, and first-day verification work.",
+    summary: "Reference article covering setup state, the setup wizard, admin login, and expected session behaviour.",
     group: "foundation",
     audience: "all_admins",
     sourcePath: "Documentation/02-First-Time-Setup-and-Admin-Access.md",
@@ -240,7 +240,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "daily-operations-booking-lifecycle",
     title: "Daily Operations and Booking Lifecycle",
-    summary: "The daily rhythm for calendar work, approvals, moves, cancellations, and booking-side actions.",
+    summary: "Reference guide to calendar operations, request approval, manual bookings, rescheduling, and cancellation handling.",
     group: "operations",
     audience: "all_admins",
     sourcePath: "Documentation/03-Daily-Operations-and-Booking-Lifecycle.md",
@@ -255,7 +255,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "customers-communication-portal-support",
     title: "Customers, Communication, and Portal Support",
-    summary: "Search, profile edits, portal support, billing history, and customer communication tools.",
+    summary: "Customer-directory reference covering identity maintenance, portal support, billing access, and communication history.",
     group: "support",
     audience: "all_admins",
     sourcePath: "Documentation/04-Customers-Communication-and-Portal-Support.md",
@@ -265,7 +265,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "learning-materials-notifications",
     title: "Learning Materials and Notifications",
-    summary: "Upload materials, help students find them, and use reminder or custom email actions safely.",
+    summary: "Reference article for staff-initiated reminders, custom email, and student-facing learning materials.",
     group: "support",
     audience: "all_admins",
     sourcePath: "Documentation/06-Learning-Materials-and-Notifications.md",
@@ -275,7 +275,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "invoicing-payments",
     title: "Invoicing and Payments",
-    summary: "Create, send, follow up, and correct invoices safely through their lifecycle.",
+    summary: "Billing reference covering invoice creation paths, lifecycle states, reminders, and credit-note corrections.",
     group: "operations",
     audience: "all_admins",
     sourcePath: "Documentation/05-Invoicing-and-Payments.md",
@@ -290,7 +290,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "reports-follow-up",
     title: "Reports and Follow-Up",
-    summary: "Use daily, monthly, yearly, and custom reporting to guide follow-up and owner decisions.",
+    summary: "Reference guide to reporting windows, console controls, and follow-up decisions based on report data.",
     group: "operations",
     audience: "all_admins",
     sourcePath: "Documentation/07-Reports-and-Follow-Up.md",
@@ -300,7 +300,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "settings-configuration",
     title: "Settings and Configuration",
-    summary: "A complete guide to every settings tab, editor, grouped field set, and save action.",
+    summary: "Configuration reference covering settings tabs, shared save behaviour, and technical-owner boundaries.",
     group: "configuration",
     audience: "all_admins",
     sourcePath: "Documentation/08-Settings-and-Configuration.md",
@@ -310,7 +310,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "logs-bug-reporting",
     title: "Logs and Bug Reporting",
-    summary: "Search logs, read metadata, and submit useful technical issue reports with evidence.",
+    summary: "Diagnostic reference for log review, metadata interpretation, and evidence-based issue reporting.",
     group: "diagnostics",
     audience: "all_admins",
     sourcePath: "Documentation/09-Logs-and-Bug-Reporting.md",
@@ -320,7 +320,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "public-intake-student-portal",
     title: "Public Intake and Student Portal",
-    summary: "Understand what website visitors and students experience, and what staff should do next.",
+    summary: "Reference article describing public booking, contact intake, student login, and portal self-service behaviour.",
     group: "support",
     audience: "all_admins",
     sourcePath: "Documentation/10-Public-Intake-and-Student-Portal.md",
@@ -330,7 +330,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "updates-release-visibility",
     title: "Updates and Release Visibility",
-    summary: "Understand update banners, pending changes, deployment history, and live update progress screens.",
+    summary: "Reference guide to in-app release visibility, deployment history, and live update progress surfaces.",
     group: "system",
     audience: "all_admins",
     sourcePath: "Documentation/11-Updates-and-Release-Visibility.md",
@@ -340,7 +340,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "how-lessonflow-works",
     title: "How LessonFlow Works",
-    summary: "A safe high-level overview of the technologies and product layers that work together.",
+    summary: "High-level systems overview describing the product surfaces, data flow, and operational boundaries.",
     group: "system",
     audience: "all_admins",
     sourcePath: "Documentation/12-How-LessonFlow-Works.md",
@@ -350,7 +350,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "troubleshooting-quick-reference",
     title: "Troubleshooting and Quick Reference",
-    summary: "Use the symptom map to find the right operational response quickly.",
+    summary: "Symptom-based troubleshooting reference with first checks, escalation standards, and chapter routing.",
     group: "diagnostics",
     audience: "all_admins",
     sourcePath: "Documentation/13-Troubleshooting-and-Quick-Reference.md",
@@ -360,7 +360,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "technical-owner-runbook",
     title: "Technical Owner Runbook",
-    summary: "Install LessonFlow on a VPS, update it, verify services, and use the deploy script suite safely.",
+    summary: "Technical-owner reference for VPS installation, routine updates, service verification, and recovery orientation.",
     group: "technical",
     audience: "technical_owner",
     sourcePath: "Documentation/digitalocean-admin-operations.md",

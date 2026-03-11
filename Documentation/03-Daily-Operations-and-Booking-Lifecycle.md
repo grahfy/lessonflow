@@ -1,125 +1,107 @@
 # Daily Operations and Booking Lifecycle
 
+The booking calendar is the principal operational surface of LessonFlow. It combines pending requests, confirmed lessons, and lesson-history actions within one workflow, making it the usual starting point for daily administration. This chapter describes the routine operating pattern, the lifecycle states visible in the calendar, and the actions that can be taken from each state.
+
 <div class="manual-callout success">
-<strong>Main operational hub:</strong> The booking calendar is where most admin work starts. Use it first each day before you move into billing or settings.
+<strong>Operational note:</strong> For most schools, the Bookings area functions as the daily control room. Billing, customer support, notifications, and materials frequently begin here even when they conclude on another screen.
 </div>
 
-This chapter combines the daily admin rhythm with the lesson lifecycle, because the two are tightly connected in LessonFlow.
+## Daily Operating Pattern
 
-## Daily rhythm
+A routine day in LessonFlow commonly follows this sequence:
 
-Use this order for routine administration:
+1. review pending requests and upcoming lessons
+2. resolve schedule changes, cancellations, and manual bookings
+3. hand off customer, invoice, or communication issues to the relevant workflow
+4. confirm that urgent follow-up has been recorded
 
-1. open `Bookings`
-2. review pending requests and upcoming lessons
-3. resolve moves, cancellations, and manual booking needs
-4. jump into customer or invoice workflows where needed
-5. finish with reports, logs, or follow-up communication
+This pattern is recommended because the booking calendar exposes the most time-sensitive work first.
 
-## Booking views
+## Calendar Views
 
-The bookings screen supports:
+The bookings interface provides the following views:
 
-- `Day`
-- `Week`
-- `Month`
-- `Year`
-- previous and next range navigation
+- <code>Day</code>
+- <code>Week</code>
+- <code>Month</code>
+- <code>Year</code>
 
-Use `Week` for most day-to-day work. Use `Month` or `Year` when planning ahead.
+The week view is generally the most practical for day-to-day administration, while month and year views are more useful for forward planning and broader schedule review.
 
-## Pending request vs confirmed booking
+## Booking States
 
-Pending requests and confirmed bookings appear in the same calendar, but they do not behave the same way.
+Pending requests and confirmed bookings share the same calendar surface but represent different stages in the lifecycle.
 
-| Record type | What it means | Common next action |
+| Record type | Meaning | Common next actions |
 | --- | --- | --- |
-| Pending request | The customer asked for a lesson but it is not confirmed yet | Review, approve, remind, or send a custom message |
-| Confirmed booking | A scheduled lesson already exists | Edit, move, cancel, notify, assign materials, or invoice |
-| Cancelled record | Historical evidence of a cancelled lesson or request | Review context only; do not treat it as active work |
+| Pending request | A lesson has been requested but not confirmed | Review, approve, remind, or send a custom message |
+| Confirmed booking | A scheduled lesson exists in the live calendar | Edit, move, cancel, notify, assign materials, or invoice |
+| Cancelled record | Historical evidence of a cancelled request or lesson | Review context only; no longer active work |
 
-## Approving a booking request
+## Request Approval
 
-Open the request from the calendar and review:
+Approving a booking request converts intake activity into a live booking workflow. Before approval, the request should be checked for:
 
-- contact details
-- lesson mode
+- customer identity and contact details
+- requested lesson mode
 - requested time
-- notes
-- matched customer suggestions
-
-Use `Approve Request` when you are ready to convert it into a confirmed booking.
+- notes or special circumstances
+- possible customer matches suggested by the system
 
 <div class="manual-callout info">
-<strong>Important:</strong> First approval can also create or attach customer data and ensure a portal credential exists for the student.
+<strong>System behaviour:</strong> Request approval may also attach the booking to an existing customer record, create a new customer, and ensure that a student portal credential exists.
 </div>
 
-## Creating a manual booking
+## Manual Booking Creation
 
-Use `New Booking` when the lesson did not start from the public booking form.
+Manual bookings are used when the lesson did not originate from the public booking form or when administration is acting on information gathered outside the standard intake route.
 
-The manual booking dialog walks through:
+The dialog proceeds through four broad stages:
 
-1. choosing or creating the customer
-2. resolving a duplicate-customer match if one is detected
-3. entering lesson timing and details
-4. saving the booking
+1. customer selection or creation
+2. duplicate-match review where applicable
+3. lesson detail entry
+4. schedule confirmation and save
 
-If LessonFlow detects a likely existing customer, choose the correct path:
+Where a likely duplicate customer is detected, the operator should deliberately choose between using the existing record, updating that record, or creating a distinct new one. Duplicate creation should be treated as an exceptional choice rather than the default.
 
-- use the existing customer
-- update the existing customer from the booking details
-- create a new customer anyway
+## Booking Editing and Movement
 
-Do not ignore a likely match unless you are sure the records are different people.
+Confirmed bookings can be edited to update lesson details, student information, notes, and address data. Rescheduling is performed through the lesson-move flow and should only be done after the intended replacement time is confirmed.
 
-## Editing an existing booking
+Before moving a lesson, confirm:
 
-Confirmed bookings can be opened and adjusted to update:
+- the correct lesson is open
+- the correct week or day is being edited
+- the replacement time has been agreed
 
-- student details
-- lesson details
-- notes
-- address information
-- linked customer context
+## Cancellation
 
-Always save after checking the correct booking is open.
+Cancellation removes the lesson from active scheduling but preserves the historical record. The presence of a cancelled record should therefore be interpreted as retained context rather than a failed deletion.
 
-## Moving a lesson
+## Cross-Workflow Actions
 
-Use `Move Lesson Time` from the booking dialog when the lesson still exists but the time has changed.
+Booking records serve as gateways into other administrative domains:
 
-### Before you move it
+| Booking-side action | Destination workflow |
+| --- | --- |
+| Open Customer | [Customers, Communication, and Portal Support](04-Customers-Communication-and-Portal-Support.md) |
+| Invoice / Billing | [Invoicing and Payments](05-Invoicing-and-Payments.md) |
+| Reminder or custom email actions | [Learning Materials and Notifications](06-Learning-Materials-and-Notifications.md) |
+| Materials actions | [Learning Materials and Notifications](06-Learning-Materials-and-Notifications.md) |
 
-- confirm the new time with the student
-- check it is the correct lesson
-- verify you are not editing the wrong week or day
+## End-of-Day Review
 
-## Cancelling a lesson
+At the end of a normal operating period, administrators should confirm:
 
-Use `Cancel Booking` only when the lesson should no longer happen.
+1. urgent pending requests have been reviewed
+2. schedule changes and cancellations are reflected correctly
+3. lessons that need billing have an invoice path
+4. required follow-up communication has been sent or recorded
 
-Cancelled records remain valuable history. Do not expect them to disappear immediately.
+## Related Sections
 
-## Booking-side actions that lead to other screens
-
-- `Open Customer` -> takes you into the customer profile workflow
-- `Invoice / Billing` -> opens or creates invoice work in the invoices area
-- notification actions -> send booking reminders or custom emails
-- materials actions -> manage lesson-linked learning materials
-
-## End-of-day booking checklist
-
-1. No urgent pending requests left unseen.
-2. Time changes and cancellations have been recorded correctly.
-3. Any lesson that should become billable has an invoice path.
-4. Students received any required reminder or custom follow-up.
-
-## When to escalate
-
-Move to another chapter when the booking work crosses into another domain:
-
-- customer record problem -> [Customers, Communication, and Portal Support](04-Customers-Communication-and-Portal-Support.md)
-- billing issue -> [Invoicing and Payments](05-Invoicing-and-Payments.md)
-- materials issue -> [Learning Materials and Notifications](06-Learning-Materials-and-Notifications.md)
-- unexplained failure -> [Logs and Bug Reporting](09-Logs-and-Bug-Reporting.md)
+- [Customers, Communication, and Portal Support](04-Customers-Communication-and-Portal-Support.md)
+- [Invoicing and Payments](05-Invoicing-and-Payments.md)
+- [Learning Materials and Notifications](06-Learning-Materials-and-Notifications.md)
+- [Logs and Bug Reporting](09-Logs-and-Bug-Reporting.md)

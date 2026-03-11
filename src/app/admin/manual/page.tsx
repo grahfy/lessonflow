@@ -3,7 +3,7 @@ import { requireAdmin } from "@/lib/admin/server-auth";
 import { getAdminManualIndex } from "@/lib/manual/content";
 
 export const metadata = {
-  title: "Booking Console Manual"
+  title: "LessonFlow Reference Manual"
 };
 
 /**

@@ -1,63 +1,62 @@
 # Reports and Follow-Up
 
+The reports area translates LessonFlow activity into administrative summaries that can guide collection, scheduling review, and owner oversight. Rather than serving as a passive statistics page, it functions as a decision-support surface for outstanding billing, cancellations, and net paid earnings.
+
 <div class="manual-callout success">
-<strong>Use reports for decisions, not just numbers.</strong> The reports area turns recent activity into actions: who needs a billing follow-up, whether cancellations are rising, and how current income compares with expectations.
+<strong>Interpretation note:</strong> Reports are most useful when they lead to action. Their value lies in identifying what requires follow-up, not merely in displaying totals.
 </div>
 
-## Report views available
+## Available Report Windows
 
-LessonFlow provides:
+LessonFlow provides the following reporting windows:
 
-- daily report
-- weekly report
-- monthly report
-- yearly report
-- optional custom-range report
+- daily
+- weekly
+- monthly
+- yearly
+- custom range
 
-Each report combines appointments, cancellations, outstanding invoices, overdue totals, and paid earnings.
+Each window may combine appointment activity, cancellations, overdue values, outstanding totals, and paid earnings.
 
-## Controls in the reports console
+## Console Controls
 
-The reports screen includes:
+The reports console includes controls for refresh, report-email dispatch, chart presentation, date formatting, and optional custom-range application.
 
-- `Refresh reports`
-- `Send Today Report`
-- `Send Month Report`
-- `Send Year Report`
-- date format selector
-- chart style selector
-- custom range start/end inputs
-- `Apply Range`
-- `Clear Range`
+| Control group | Typical use |
+| --- | --- |
+| Refresh | Reload current report data |
+| Report email actions | Send a prepared summary to an owner or stakeholder |
+| Chart and date controls | Adjust presentation for review |
+| Custom-range inputs | Investigate a non-standard period |
 
-## Custom range
+## Custom Range
 
-Use a custom range when standard reporting windows do not match the question you are trying to answer.
+Custom range reporting is intended for questions not answered by the default time windows, such as school-holiday periods, short promotional windows, or a specific overdue follow-up interval.
 
-For example:
+Both dates are required, and the start date must not be later than the end date.
 
-- a school holiday period
-- the first two weeks after a promotion
-- a billing follow-up window
+## High-Value Metrics
 
-Both dates are required. If the start date is later than the end date, correct the range before continuing.
-
-## What to watch regularly
+The following metrics are typically the most operationally useful:
 
 | Metric area | Why it matters |
 | --- | --- |
-| Outstanding invoices | Shows how much unpaid billing is still open |
-| Overdue count and total | Shows where follow-up is becoming urgent |
-| Cancelled appointments | Helps identify instability in the schedule |
-| Net paid earnings | Shows what has actually been collected |
+| Outstanding invoices | Indicates the current unpaid balance still in circulation |
+| Overdue totals and counts | Identifies where collection urgency is increasing |
+| Cancelled appointments | Reveals schedule instability or policy pressure |
+| Net paid earnings | Reflects money collected rather than merely billed |
 
-## Daily follow-up routine
+## Routine Follow-Up
 
-1. open the reports screen
-2. review outstanding and overdue values
-3. move into invoices if follow-up is needed
-4. send daily/monthly/yearly report emails only when they serve a real business need
+A common follow-up sequence is:
 
-## When report emails are appropriate
+1. review outstanding and overdue values
+2. identify invoices that require action
+3. move into the invoices workflow where necessary
+4. send report emails only when a stakeholder needs the summary without signing in
 
-Use the report email buttons when the owner needs a snapshot without signing in. If report delivery fails or looks inconsistent, continue with [Logs and Bug Reporting](09-Logs-and-Bug-Reporting.md).
+## Related Sections
+
+- [Invoicing and Payments](05-Invoicing-and-Payments.md)
+- [Logs and Bug Reporting](09-Logs-and-Bug-Reporting.md)
+- [Updates and Release Visibility](11-Updates-and-Release-Visibility.md)

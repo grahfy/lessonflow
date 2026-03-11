@@ -1,85 +1,97 @@
 # First-Time Setup and Admin Access
 
+First-time setup and admin access define the two principal entry states of LessonFlow: an uninitialised installation that requires setup, and an operational installation that routes administrators through the sign-in flow. This chapter describes the setup wizard, the normal login pathway, and the session behaviours that administrators are expected to encounter.
+
 <div class="manual-callout warning">
-<strong>Audience:</strong> The setup wizard is usually completed once by the owner or technical owner. Normal day-to-day staff usually start at the admin login screen.
+<strong>Audience note:</strong> The setup wizard is ordinarily completed once by an owner or technical owner. Most staff begin their work at <code>/admin/login</code> after the system has already been commissioned.
 </div>
 
-This chapter covers two entry states:
+## Entry States
 
-1. the system has not been initialized yet, so `/admin` redirects to `/setup`
-2. the system is already live, so staff sign in at `/admin/login`
+LessonFlow distinguishes between the following entry conditions:
 
-## If LessonFlow is not set up yet
+| State | Typical route behaviour | Intended operator |
+| --- | --- | --- |
+| Uninitialised system | <code>/admin</code> redirects to <code>/setup</code> | Owner or technical owner |
+| Operational system | <code>/admin/login</code> provides the sign-in form | Administrators and owners |
 
-When setup is incomplete, visiting `/admin` sends you to the LessonFlow Setup Wizard.
+This distinction prevents routine staff from operating a system that has not yet completed its baseline configuration.
 
-### What the setup wizard does
+## Setup Wizard
 
-- runs readiness checks
-- lets you review and save environment-backed configuration
-- creates the first admin user
-- redirects into the admin console when initialization succeeds
+When setup is incomplete, the Setup Wizard becomes the authoritative path for initialisation. Its purpose is to confirm runtime readiness, persist environment-backed configuration, and create the first administrative account.
 
-### Readiness checks
+### Readiness Checks
 
-The setup wizard shows checks with `pass`, `warn`, or `fail` states. Re-run checks whenever you change environment values.
+The readiness interface reports results as <code>pass</code>, <code>warn</code>, or <code>fail</code>. These checks are intended to confirm that the environment is viable before initialisation proceeds.
 
-Use the checks list to confirm:
+Operators should use the checks to confirm:
 
-- database connectivity is working
-- the site URL is valid
-- required secrets exist
-- the server environment is in a usable state
+- database connectivity
+- site URL validity
+- presence of required secrets
+- general server readiness
 
-### Environment configuration panel
+The checks should be re-run after configuration changes so the wizard reflects the latest environment state.
 
-Open the environment section when the checks show missing or invalid configuration. Save changes there before trying to initialize the system.
+### Environment Configuration
 
-Use `Re-run checks` after saving so the wizard reads the latest server state.
+The environment configuration panel is used when readiness checks indicate missing or invalid values. It is designed for controlled correction of installation settings prior to first use.
 
-### First admin creation
+The expected sequence is:
 
-Once readiness allows initialization, create the first admin account by entering:
+1. review the failing or warning check
+2. update the relevant configuration value
+3. save the configuration
+4. re-run checks
+5. continue only once the installation is in a usable state
+
+### First Admin Creation
+
+Initialisation concludes with creation of the first admin account. The wizard requires:
 
 - display name
-- email
+- email address
 - password
 - password confirmation
 
-If initialization succeeds, LessonFlow redirects you into the admin console.
+On success, LessonFlow redirects to the admin console and the setup state is treated as complete.
 
-## Admin login
+## Admin Login
 
-Use `/admin/login` after setup is complete.
+The normal administrative entry point is <code>/admin/login</code>. The login form expects the current admin email address and password associated with the installation.
 
-### What you need
+Administrative sessions are tied to the current credential state. If those credentials change in Settings, a fresh login should be expected.
 
-- admin email
-- admin password
+## Session and Sign-Out Behaviour
 
-The login page is protected by the admin session system. If the email or password is changed in Settings, all admins should expect to sign in again.
+Session termination may occur under several normal conditions:
 
-## Sign out and session behavior
+| Cause | Description |
+| --- | --- |
+| Manual sign-out | The user chose to end the session from the admin header |
+| Credential rotation | The password or related authentication material changed |
+| Admin identity change | The configured admin email changed |
+| Expiry or restart | The session ended because of runtime lifecycle behaviour |
 
-Use the `Sign out` button in the admin header when you finish work, especially on shared or staff-facing machines.
+Unexpected return to <code>/admin/login</code> is therefore not always evidence of failure. Administrators should first sign in again and then escalate only if the behaviour repeats without a clear cause.
 
-Sessions can end because of:
+## Initial Verification
 
-- manual sign out
-- credential rotation
-- admin email changes
-- session expiry or server restart
+The first day of use should include a basic verification pass across the principal admin areas:
 
-If you are unexpectedly returned to `/admin/login`, sign back in first. If the problem repeats, continue with [Logs and Bug Reporting](09-Logs-and-Bug-Reporting.md).
-
-## Safe first-day checklist
-
-1. Confirm you can sign in.
-2. Open `Bookings`, `Customers`, `Invoices`, `Reports`, `Logs`, `Manual`, and `Settings`.
-3. Check that the screen headings and navigation behave normally.
-4. Read the first sections of the manual before making live changes.
+1. sign in successfully
+2. open Bookings, Customers, Invoices, Reports, Logs, Manual, and Settings
+3. confirm headings, navigation, and page shells render normally
+4. read the opening chapters of the manual before making live changes
 
 ```text
-Recommended first-day path:
+Typical first-day path:
 /admin/login -> /admin/bookings -> /admin/customers -> /admin/invoices -> /admin/reports
 ```
+
+## Related Sections
+
+- [Start Here and Features](01-Start-Here-and-Features.md)
+- [Settings and Configuration](08-Settings-and-Configuration.md)
+- [Logs and Bug Reporting](09-Logs-and-Bug-Reporting.md)

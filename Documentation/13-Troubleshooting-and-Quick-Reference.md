@@ -1,118 +1,81 @@
 # Troubleshooting and Quick Reference
 
+Troubleshooting in LessonFlow is designed to begin with observed symptoms and move toward evidence, not speculation. This chapter acts as the manual’s quick-reference article for common operator issues, first checks, and escalation standards.
+
 <div class="manual-callout warning">
-<strong>Use this chapter when something feels wrong:</strong> start with the symptom, not with guesswork. If the issue still does not make sense after the relevant checks, move to the logs page or escalate.
+<strong>Reference principle:</strong> Where a problem is unclear, the safest path is to identify the symptom, locate the most relevant chapter, and then use the Logs page if the explanation remains incomplete.
 </div>
 
-## Quick Symptom Map
+## Symptom Map
 
-| Symptom | First place to check |
+| Symptom | First reference |
 | --- | --- |
-| Setup redirects keep returning or the system says setup is incomplete | [02-First-Time-Setup-and-Admin-Access.md](02-First-Time-Setup-and-Admin-Access.md) |
-| Booking request, lesson move, or calendar action does not behave as expected | [03-Daily-Operations-and-Booking-Lifecycle.md](03-Daily-Operations-and-Booking-Lifecycle.md) |
-| Customer profile, portal password, or manual email support is unclear | [04-Customers-Communication-and-Portal-Support.md](04-Customers-Communication-and-Portal-Support.md) |
-| Invoice status blocks an action or payment follow-up looks wrong | [05-Invoicing-and-Payments.md](05-Invoicing-and-Payments.md) |
-| Materials, reminders, or custom notification actions are missing or failed | [06-Learning-Materials-and-Notifications.md](06-Learning-Materials-and-Notifications.md) |
-| Reports, custom ranges, or follow-up summaries look incorrect | [07-Reports-and-Follow-Up.md](07-Reports-and-Follow-Up.md) |
-| A settings field is unclear, blank, or appears to have triggered a restart | [08-Settings-and-Configuration.md](08-Settings-and-Configuration.md) |
-| You need evidence, metadata, or a formal bug report | [09-Logs-and-Bug-Reporting.md](09-Logs-and-Bug-Reporting.md) |
-| VPS installation, update, deploy script, or service checks are involved | [digitalocean-admin-operations.md](digitalocean-admin-operations.md) |
+| Setup loops or repeated “setup incomplete” messaging | [First-Time Setup and Admin Access](02-First-Time-Setup-and-Admin-Access.md) |
+| Booking request, lesson move, or calendar action behaves unexpectedly | [Daily Operations and Booking Lifecycle](03-Daily-Operations-and-Booking-Lifecycle.md) |
+| Customer profile, portal password, or manual email support is unclear | [Customers, Communication, and Portal Support](04-Customers-Communication-and-Portal-Support.md) |
+| Invoice status or follow-up behaviour appears wrong | [Invoicing and Payments](05-Invoicing-and-Payments.md) |
+| Materials or notification actions appear missing or failed | [Learning Materials and Notifications](06-Learning-Materials-and-Notifications.md) |
+| Reports or custom-range summaries look incorrect | [Reports and Follow-Up](07-Reports-and-Follow-Up.md) |
+| A settings field is unclear or a save appears to trigger a restart | [Settings and Configuration](08-Settings-and-Configuration.md) |
+| Evidence, metadata, or formal escalation is required | [Logs and Bug Reporting](09-Logs-and-Bug-Reporting.md) |
+| Installation, update, or host-service work is involved | [Technical Owner Runbook: Installation, Updates, and Deploy Scripts](digitalocean-admin-operations.md) |
 
 ## Common Operator Issues
 
-### I saved settings and got signed out
+### Re-authentication After Settings Save
 
-This is normal when the saved change affects admin identity, credentials, or another setting that forces re-authentication.
+Re-authentication after a settings save is often normal when admin identity or credential-related values were changed.
 
-Check:
+Relevant checks:
 
-- whether you changed the admin email or password area
-- whether the page warned that a restart or credential refresh was queued
-- whether the sign-out happened immediately after <code>Save Configuration</code>
+- whether the admin email or password area was edited
+- whether the save response warned about restart or credential refresh
+- whether the sign-out occurred immediately after save
 
-Next step:
+### Blank Secret Fields
 
-- sign in again with the new confirmed admin credentials
-- reopen [08-Settings-and-Configuration.md](08-Settings-and-Configuration.md) if you need to confirm which setting caused the re-login
+Blank secret inputs usually indicate masked preservation rather than missing data. If the intention is not to rotate the secret, the field should ordinarily be left blank.
 
-### A secret field is blank in Settings
+### Student Cannot Log In
 
-Blank secret inputs usually mean the stored value is masked and preserved unless you deliberately replace it.
+Portal-access problems should first be interpreted as customer-record or credential issues rather than immediate evidence of a portal outage.
 
-Check:
+Relevant checks:
 
-- whether the page says blank secret fields keep the saved value
-- whether you actually intend to rotate that secret
-- whether a technical-owner-only field is being edited by mistake
+- whether the correct customer record is open
+- whether the password was recently regenerated
+- whether the student is using the expected combination of name, postcode, and password
 
-Next step:
+### Reminder or Email Behaviour Appears Wrong
 
-- leave the field blank if you are not intentionally replacing it
-- use [08-Settings-and-Configuration.md](08-Settings-and-Configuration.md) for the field-by-field meaning before saving
+Email issues are often caused by invalid workflow state, incorrect address data, or partial-success conditions rather than a full delivery-system failure.
 
-### A student cannot log in
+### The Failure Is Unclear
 
-Start with the customer record before assuming the portal is broken.
+When the category of failure is not obvious, the recommended progression is:
 
-Check:
+1. identify the last known successful action
+2. determine which screen or domain was involved
+3. reproduce the issue once if safe
+4. inspect [Logs and Bug Reporting](09-Logs-and-Bug-Reporting.md)
+5. escalate with evidence if uncertainty remains
 
-- whether you are looking at the correct customer record
-- whether the portal password was regenerated recently
-- whether the student is using the expected name, postcode, and password combination
+## Escalation Standard
 
-Next step:
+A good escalation usually includes:
 
-- review [04-Customers-Communication-and-Portal-Support.md](04-Customers-Communication-and-Portal-Support.md)
-- then confirm the student-facing flow in [10-Public-Intake-and-Student-Portal.md](10-Public-Intake-and-Student-Portal.md)
-
-### A reminder or email did not behave as expected
-
-Email issues are often workflow-state problems rather than platform failures.
-
-Check:
-
-- whether the item was in a valid state for the action you attempted
-- whether the relevant customer email address is present and correct
-- whether the action reported a partial-success state or warning
-
-Next step:
-
-- review [06-Learning-Materials-and-Notifications.md](06-Learning-Materials-and-Notifications.md)
-- then inspect [09-Logs-and-Bug-Reporting.md](09-Logs-and-Bug-Reporting.md) for delivery or system messages
-
-### The system feels broken, but you are not sure where
-
-When the failure is not obvious, move from symptoms to evidence.
-
-Check:
-
-- which screen you were on
-- what the last successful action was
-- whether the issue is isolated to bookings, invoices, reports, settings, or login
-
-Next step:
-
-1. reproduce the problem once if safe
-2. open [09-Logs-and-Bug-Reporting.md](09-Logs-and-Bug-Reporting.md)
-3. search the logs by area or severity
-4. escalate with evidence if the cause is still unclear
-
-## What a Good Escalation Includes
-
-Include:
-
-- what you were trying to do
-- what you clicked or saved
+- what the operator was attempting to do
+- what was clicked, saved, or submitted
 - what happened instead
 - whether the issue repeats
 - which customer, booking, invoice, or report was involved
-- whether the problem started after settings, updates, or deployment work
+- whether the problem began after settings or release activity
 - any relevant log events or screenshots
 
-Avoid:
+Guesses about root cause should be avoided when evidence is not yet available.
 
-- guessing at the cause without evidence
-- changing unrelated settings while troubleshooting
-- editing technical-owner-only fields unless the runbook explicitly calls for it
+## Related Sections
 
-> Do not guess with high-risk actions. If the system is unclear, pause, confirm, and escalate with evidence.
+- [Logs and Bug Reporting](09-Logs-and-Bug-Reporting.md)
+- [Updates and Release Visibility](11-Updates-and-Release-Visibility.md)
+- [Technical Owner Runbook: Installation, Updates, and Deploy Scripts](digitalocean-admin-operations.md)

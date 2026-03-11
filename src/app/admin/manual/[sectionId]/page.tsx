@@ -8,7 +8,7 @@ export async function generateMetadata(props: { params: Promise<{ sectionId: str
   const params = await props.params;
   const manifest = MANUAL_SECTION_MANIFEST.find((entry) => entry.id === params.sectionId);
   return {
-    title: manifest ? `${manifest.title} Manual` : "Admin Manual"
+    title: manifest ? `${manifest.title} Reference` : "LessonFlow Reference Manual"
   };
 }
 

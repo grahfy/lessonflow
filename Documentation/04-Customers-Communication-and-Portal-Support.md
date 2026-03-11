@@ -1,36 +1,38 @@
 # Customers, Communication, and Portal Support
 
+The customer workflow is the identity and support layer of LessonFlow. It links student records to lesson history, billing context, communication history, and portal access, making it the primary reference area when an administrator needs to correct profile data or assist a student outside the booking calendar itself.
+
 <div class="manual-callout info">
-<strong>Purpose:</strong> Use the customer area when you need to clean up records, help a student access the portal, review communication history, or move from a lesson into billing support.
+<strong>Scope note:</strong> The Customers area is used for confirmed identity and support tasks. It is not only a directory, but also the junction between customer records, communication, portal credentials, and billing history.
 </div>
 
-The customer workflow is the support side of LessonFlow. It connects identity, communication, billing context, portal access, and lesson support.
+## Directory Functions
 
-## Customer directory features
+The customer directory supports the following activities:
 
-The customers area lets you:
+- search and sort of customer records
+- manual customer creation
+- profile editing
+- address maintenance
+- portal credential support
+- billing-history access
+- archive or delete actions where permitted
 
-- search and sort customer records
-- create a new customer manually
-- open an existing profile
-- edit profile and address details
-- open billing history
-- reveal or regenerate portal credentials
-- archive or delete where allowed
+These functions make the directory the preferred starting point for support questions tied to a known student or family.
 
-## Before creating a customer
+## Record Creation and Duplicate Avoidance
 
-Search first by:
+Before a new customer record is created, the directory should be searched by:
 
 - full name
-- email
-- phone
+- email address
+- phone number
 
-Duplicate customer records create problems for billing, portal access, and lesson history. Preventing duplicates is safer than repairing them later.
+Duplicate records complicate portal access, invoice history, and lesson continuity. Preventing duplication is therefore preferable to repairing it later through manual reconciliation.
 
-## Editing a customer profile
+## Profile Maintenance
 
-The customer profile includes:
+The customer profile may include:
 
 - contact details
 - skill level
@@ -38,64 +40,57 @@ The customer profile includes:
 - address information
 - portal credential status
 
-Change only what has been confirmed. If the record already participates in active bookings or invoices, double-check the change before saving.
+Profile changes should be based on confirmed information, particularly where the record is already attached to active bookings or invoices.
 
-## Portal support actions
+## Portal Credential Support
 
-LessonFlow supports student portal access directly from the customer workflow.
+LessonFlow exposes student-portal credential support from the customer workflow so administrators can resolve access issues without leaving the record.
 
-### Available actions
-
-- `Reveal Password`
-- `Regenerate`
-- view whether a portal credential exists
-
-### Use these carefully
+| Action | Purpose | Operational effect |
+| --- | --- | --- |
+| Reveal Password | Show the current credential | Used when the existing credential is still valid |
+| Regenerate | Create a replacement credential | Immediately supersedes the prior credential |
+| Credential status view | Confirm whether a credential exists | Supports diagnosis before intervention |
 
 <div class="manual-callout warning">
-<strong>Portal credential changes affect the student immediately.</strong> Only reveal or regenerate credentials when there is a clear support reason.
+<strong>Immediate effect:</strong> Portal credential changes affect the student as soon as they are saved. Password regeneration should therefore be treated as a deliberate support action rather than a diagnostic shortcut.
 </div>
 
-Reveal the password when a student needs the current credential. Regenerate it when the old credential should no longer be used.
+## Billing History
 
-## Billing history
+The billing-history action provides a direct route from the customer profile to invoice context. It is the preferred path when a student or parent asks about recent invoices, outstanding balances, or prior billing activity.
 
-Use `View Billing History` to jump from the customer workflow into invoice history for that student. This is the fastest path when a parent or student asks about unpaid or recently sent invoices.
+## Communication Tools
 
-## Communication tools
+The communication panel is designed to support both historical review and direct outbound contact.
 
-Customer support includes a communication panel with:
+It may be used to determine:
 
-- email history
-- manual email composer
-- `Sync Now` where connected email providers are available
-- email viewer dialog for previously sent items
+- whether a reminder or invoice email was already sent
+- which subject line or delivery route was used
+- whether the item originated in the app or through Gmail sync
+- whether an error was recorded
 
-### Use the history list to answer questions like:
+Manual email composition remains available for messages that do not fit the automated workflow.
 
-- did we already send this invoice or reminder?
-- what subject line was used?
-- did the email send via the app or Gmail sync?
-- was there an error?
+### Manual Email Practice
 
-### Manual email best practice
+Before sending a manual email, administrators should confirm:
 
-Before sending a custom email:
+1. the correct customer record is open
+2. the recipient address is accurate
+3. the message contains a clear subject and next step
+4. the CAPTCHA check has been completed
 
-1. write a clear subject
-2. explain the action or next step
-3. confirm the right customer is open
-4. pass the CAPTCHA check
+## Archive and Deletion
 
-## Archive vs delete
+Deletion is not necessarily equivalent to immediate hard removal. Records with linked history may instead be archived in order to preserve operational context.
 
-Deleting is not always a true removal. If the customer has linked history, LessonFlow may archive the record instead of hard-deleting it.
+Archive or delete actions should therefore be reserved for cases in which the record should no longer appear in ordinary active work and the historical impact is understood.
 
-Use archive/delete only when you are sure the record should no longer appear in active work.
+## Related Sections
 
-## When this chapter connects to other work
-
-- lesson issue -> [Daily Operations and Booking Lifecycle](03-Daily-Operations-and-Booking-Lifecycle.md)
-- material upload or preview -> [Learning Materials and Notifications](06-Learning-Materials-and-Notifications.md)
-- invoice question -> [Invoicing and Payments](05-Invoicing-and-Payments.md)
-- portal login issue -> [Public Intake and Student Portal](10-Public-Intake-and-Student-Portal.md)
+- [Daily Operations and Booking Lifecycle](03-Daily-Operations-and-Booking-Lifecycle.md)
+- [Invoicing and Payments](05-Invoicing-and-Payments.md)
+- [Learning Materials and Notifications](06-Learning-Materials-and-Notifications.md)
+- [Public Intake and Student Portal](10-Public-Intake-and-Student-Portal.md)
