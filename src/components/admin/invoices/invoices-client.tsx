@@ -458,8 +458,10 @@ export function AdminInvoicesClient() {
                 </label>
               </Tooltip>
 
-              <div className="search-box admin-search-box">
-                <label htmlFor={searchInputId}>Search</label>
+              <div className="search-box admin-search-box admin-sort-inline-row admin-invoice-search-control">
+                <label htmlFor={searchInputId} className="admin-inline-field">
+                  Search
+                </label>
                 <Tooltip content="Search for invoices by number or customer name.">
                   <input
                     id={searchInputId}
