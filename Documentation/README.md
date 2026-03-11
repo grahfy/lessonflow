@@ -31,6 +31,10 @@ Start with:
 
 - [DigitalOcean Admin Operations Runbook](digitalocean-admin-operations.md)
 
+## Release Notes
+
+- [Version 1.0](release-notes-v1.0.md)
+
 ## Screenshot Pipeline
 
 The screenshot pipeline keeps the manual visually aligned with the current UI.
