@@ -63,6 +63,24 @@ export function getUpdatesGitRepoPath(): string {
 }
 
 /**
+ * Returns the OS user that should run web-triggered deploys.
+ *
+ * RATIONALE: Browser-triggered updates must execute as the deployment user,
+ * not the app runtime user (`www-data`), so release creation and git access
+ * follow the same permission model as manual deploys.
+ */
+export function getUpdatesDeployUser(): string {
+  return (process.env.UPDATES_DEPLOY_USER || "").trim();
+}
+
+/**
+ * Returns the systemd unit used to launch a browser-triggered update.
+ */
+export function getWebUpdateServiceName(): string {
+  return (process.env.UPDATES_WEB_SYSTEMD_SERVICE_NAME || "lessonflow-web-update.service").trim();
+}
+
+/**
  * Helper to build the exact login link for portal invitations.
  */
 export function getStudentPortalLoginUrl(): string {

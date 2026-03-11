@@ -4,11 +4,13 @@ import { POST as executeUpdateRoute } from "@/app/api/admin/updates/execute/rout
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 import fs from "node:fs";
-import { spawn } from "node:child_process";
+import { spawnSync } from "node:child_process";
 
 vi.mock("node:child_process", () => ({
-  spawn: vi.fn(() => ({
-    unref: vi.fn()
+  spawnSync: vi.fn(() => ({
+    status: 0,
+    stdout: "",
+    stderr: ""
   }))
 }));
 
@@ -33,6 +35,8 @@ describe("admin-updates-execute-api", () => {
   beforeEach(async () => {
     await clearData();
     vi.clearAllMocks();
+    vi.stubEnv("UPDATES_DEPLOY_USER", "deploy");
+    vi.stubEnv("UPDATES_GIT_REPO_PATH", "/srv/lessonflow-repo");
   });
 
   it("returns 401 for unauthorized requests", async () => {
@@ -45,7 +49,11 @@ describe("admin-updates-execute-api", () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);
 
-    (fs.existsSync as any).mockReturnValue(false);
+    (fs.existsSync as any).mockImplementation((target: string) => {
+      if (target === "/srv/lessonflow-repo/.git") return true;
+      if (target === "/etc/systemd/system/lessonflow-web-update.service") return true;
+      return false;
+    });
 
     const request = new NextRequest("http://localhost/api/admin/updates/execute", {
       method: "POST",
@@ -59,7 +67,14 @@ describe("admin-updates-execute-api", () => {
 
     expect(response.status).toBe(200);
     expect(data.ok).toBe(true);
-    expect(spawn).toHaveBeenCalled();
+    expect(spawnSync).toHaveBeenCalledWith(
+      "sudo",
+      ["-n", "systemctl", "start", "lessonflow-web-update.service"],
+      expect.objectContaining({
+        cwd: expect.any(String),
+        encoding: "utf8"
+      })
+    );
   });
 
   it("returns 409 if update is already in progress", async () => {
@@ -84,5 +99,25 @@ describe("admin-updates-execute-api", () => {
     expect(response.status).toBe(409);
     
     process.kill = originalKill;
+  });
+
+  it("returns 503 when the web update runner is not configured", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    (fs.existsSync as any).mockReturnValue(false);
+
+    const request = new NextRequest("http://localhost/api/admin/updates/execute", {
+      method: "POST",
+      headers: {
+        cookie: `${getSessionCookieName()}=${token}`
+      }
+    });
+
+    const response = await executeUpdateRoute(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(data.error).toMatch(/Web-triggered updates are not configured/i);
   });
 });

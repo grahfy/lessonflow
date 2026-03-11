@@ -166,9 +166,7 @@ run_sudo_cmd() {
     if [[ ${EUID} -eq 0 ]]; then
         "$@"
     elif [[ -n "${MGS_SUDO_PASSWORD:-}" ]]; then
-        local user_arg=""
-        [[ -n "${MGS_SUDO_USER:-}" ]] && user_arg="-u ${MGS_SUDO_USER}"
-        printf '%s\n' "$MGS_SUDO_PASSWORD" | sudo -S -p '' ${user_arg} "$@"
+        printf '%s\n' "$MGS_SUDO_PASSWORD" | sudo -S -p '' "$@"
     elif command -v sudo >/dev/null 2>&1; then
         sudo "$@"
     else
@@ -242,6 +240,30 @@ print_banner() {
     local app_version
     app_version="$(get_app_version)"
     print_box_banner "LessonFlow Deploy v1.0"
+}
+
+# Renders the host-side systemd unit used by the browser-triggered update flow.
+# We keep it separate from the main app unit because the runner must execute as
+# the deploy user rather than the runtime user (`www-data`).
+render_web_update_service_template() {
+    local template_path="$1"
+    local output_path="$2"
+    local deploy_user="${UPDATES_DEPLOY_USER:-}"
+
+    if [[ -z "${deploy_user}" ]]; then
+        log_warn "Skipping web update service install: UPDATES_DEPLOY_USER is not set."
+        return 1
+    fi
+
+    if [[ ! -f "${template_path}" ]]; then
+        log_warn "Skipping web update service install: template missing (${template_path})."
+        return 1
+    fi
+
+    sed \
+        -e "s/{{APP_NAME}}/${APP_NAME}/g" \
+        -e "s/{{DEPLOY_USER}}/${deploy_user}/g" \
+        "${template_path}" > "${output_path}"
 }
 
 # Standardized info line for quick, readable progress output.
@@ -3413,6 +3435,33 @@ fi
 
 if [[ "${SERVICE_SOURCE_IS_TEMP}" == true ]]; then
     rm -f "${SERVICE_SOURCE}" || true
+fi
+
+WEB_UPDATE_SERVICE_FILE="/etc/systemd/system/${APP_NAME}-web-update.service"
+WEB_UPDATE_TEMPLATE="${NEW_RELEASE_DIR}/deploy/web-update.service.template"
+if [[ -f "${WEB_UPDATE_TEMPLATE}" ]]; then
+    WEB_UPDATE_SERVICE_SOURCE="$(mktemp)"
+    WEB_UPDATE_SERVICE_SOURCE_READY=false
+
+    if render_web_update_service_template "${WEB_UPDATE_TEMPLATE}" "${WEB_UPDATE_SERVICE_SOURCE}"; then
+        WEB_UPDATE_SERVICE_SOURCE_READY=true
+    fi
+
+    if [[ "${WEB_UPDATE_SERVICE_SOURCE_READY}" == true ]]; then
+        if [[ ! -f "${WEB_UPDATE_SERVICE_FILE}" ]]; then
+            log_info "Installing web update systemd service..."
+            run_sudo_cmd cp "${WEB_UPDATE_SERVICE_SOURCE}" "${WEB_UPDATE_SERVICE_FILE}"
+            run_sudo_cmd systemctl daemon-reload
+        elif ! cmp -s "${WEB_UPDATE_SERVICE_SOURCE}" "${WEB_UPDATE_SERVICE_FILE}"; then
+            log_info "Updating web update systemd service..."
+            run_sudo_cmd cp "${WEB_UPDATE_SERVICE_SOURCE}" "${WEB_UPDATE_SERVICE_FILE}"
+            run_sudo_cmd systemctl daemon-reload
+        else
+            log_info "Web update systemd service already up to date"
+        fi
+    fi
+
+    rm -f "${WEB_UPDATE_SERVICE_SOURCE}" || true
 fi
 
 # Ensure nginx config is installed/updated (use HTTPS template after certs exist).

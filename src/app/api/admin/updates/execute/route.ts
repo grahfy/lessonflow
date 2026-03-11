@@ -1,9 +1,10 @@
-import { spawn } from "node:child_process";
-import { NextRequest, NextResponse } from "next/server";
-import { requireAdminFromRequest } from "@/lib/admin-route";
-import { getUpdatesGitRepoPath } from "@/lib/env";
-import path from "node:path";
 import fs from "node:fs";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
+import { NextRequest, NextResponse } from "next/server";
+
+import { requireAdminFromRequest } from "@/lib/admin-route";
+import { getWebUpdateRunnerStatus } from "@/lib/updates-runner";
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,7 +13,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const repoRoot = getUpdatesGitRepoPath();
     const appRoot = process.cwd();
     const lockFile = path.join(appRoot, ".data", "update.lock");
 
@@ -29,29 +29,34 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Parse sudo credentials from request body
-    const body = await request.json().catch(() => ({}));
-    const { sudoUser, sudoPassword } = body;
+    const runner = getWebUpdateRunnerStatus();
+    if (!runner.configured) {
+      return NextResponse.json(
+        {
+          error: runner.message || "Web-triggered updates are not configured on this host."
+        },
+        { status: 503 }
+      );
+    }
 
-    console.log(`[Updates API] Triggering update. Sudo creds present: user=${!!sudoUser}, pass=${!!sudoPassword} (len=${sudoPassword?.length || 0})`);
-
-    // Trigger the update script in the background
-    const scriptPath = path.join(appRoot, "scripts", "trigger-update.sh");
-    
-    // We use spawn and detach so the script keeps running even if the 
-    // Next.js request handler finishes.
-    const child = spawn("bash", [scriptPath, repoRoot], {
-      detached: true,
-      stdio: "ignore",
+    const startResult = spawnSync("sudo", ["-n", "systemctl", "start", runner.serviceName], {
       cwd: appRoot,
-      env: {
-        ...process.env,
-        MGS_SUDO_USER: sudoUser || "",
-        MGS_SUDO_PASSWORD: sudoPassword || ""
-      }
+      encoding: "utf8"
     });
 
-    child.unref();
+    if (startResult.error || startResult.status !== 0) {
+      const stderr = startResult.stderr?.trim();
+      const stdout = startResult.stdout?.trim();
+      const details = stderr || stdout;
+      return NextResponse.json(
+        {
+          error: details
+            ? `Unable to start the host update runner. ${details}`
+            : "Unable to start the host update runner. Confirm the web-update systemd unit and sudoers entry are installed."
+        },
+        { status: 503 }
+      );
+    }
 
     return NextResponse.json({
       ok: true,

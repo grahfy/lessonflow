@@ -4,8 +4,19 @@ import { GET as getUpdateStatusRoute } from "@/app/api/admin/updates/status/rout
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 import * as updatesService from "@/lib/services/updates-service";
+import fs from "node:fs";
 
 vi.mock("@/lib/services/updates-service");
+vi.mock("node:fs", async () => {
+  const actual = await vi.importActual("node:fs") as typeof import("node:fs");
+  return {
+    ...actual,
+    default: {
+      ...actual,
+      existsSync: vi.fn()
+    }
+  };
+});
 
 async function clearData() {
   await prisma.adminUser.deleteMany();
@@ -15,6 +26,8 @@ describe("admin-updates-status-api", () => {
   beforeEach(async () => {
     await clearData();
     vi.clearAllMocks();
+    vi.stubEnv("UPDATES_DEPLOY_USER", "deploy");
+    vi.stubEnv("UPDATES_GIT_REPO_PATH", "/srv/lessonflow-repo");
   });
 
   it("returns 401 for unauthorized requests", async () => {
@@ -35,6 +48,12 @@ describe("admin-updates-status-api", () => {
     };
     const mockCommits = [{ sha: "remote", author: "A", date: "D", message: "M" }];
 
+    (fs.existsSync as any).mockImplementation((target: string) => {
+      if (target === "/srv/lessonflow-repo/.git") return true;
+      if (target === "/etc/systemd/system/lessonflow-web-update.service") return true;
+      return false;
+    });
+
     vi.spyOn(updatesService, "getUpdateStatus").mockResolvedValue(mockStatus);
     vi.spyOn(updatesService, "getPendingCommits").mockResolvedValue(mockCommits);
 
@@ -51,5 +70,7 @@ describe("admin-updates-status-api", () => {
     expect(data.ok).toBe(true);
     expect(data.updateAvailable).toBe(true);
     expect(data.pendingCommits).toHaveLength(1);
+    expect(data.webTriggerConfigured).toBe(true);
+    expect(data.webTriggerMessage).toBeNull();
   });
 });

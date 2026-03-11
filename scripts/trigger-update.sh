@@ -44,11 +44,9 @@ echo "Starting update process at $(date)" > "$LOG_FILE"
 # --allow-dirty is included because the web server might have made 
 # tiny environment-specific changes or tracking files.
 # MGS_SKIP_DEPLOY_SHARED_ENV_REVIEW_PROMPT=1 skips the .env review.
-# sudo -n (non-interactive) is used for the actual deployment.
+# Privileged operations happen inside deploy/update.sh via targeted sudo rules.
 export MGS_SKIP_DEPLOY_SHARED_ENV_REVIEW_PROMPT=1
 export MGS_SKIP_SELF_UPDATE_KEYPRESS=1
-export MGS_SUDO_USER="${MGS_SUDO_USER:-}"
-export MGS_SUDO_PASSWORD="${MGS_SUDO_PASSWORD:-}"
 
 cd "$REPO_ROOT"
 

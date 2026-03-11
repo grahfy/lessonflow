@@ -39,3 +39,28 @@ If you are deploying for the first time, you must configure permissions so the d
 
 Once configured, simply run `./deploy/update.sh` as the deployment user. The script will automatically escalate privileges via `sudo` only for specific system commands, keeping the main build process isolated to your user permissions.
 
+### Enable Browser-Triggered Updates
+The admin console update button now starts a dedicated host-side systemd runner instead of asking for sudo credentials in the browser.
+
+1. **Set the deploy user in the shared environment:**
+   ```bash
+   sudo nano /var/www/lessonflow/shared/.env
+   ```
+   Add:
+   ```bash
+   UPDATES_DEPLOY_USER=<your_deployment_user>
+   ```
+
+2. **Install the runtime-user trigger rule:**
+   ```bash
+   sudo cp deploy/web-update-trigger.sudoers.template /etc/sudoers.d/lessonflow-web-update
+   sudo sed -i 's/<APP_RUNTIME_USER>/www-data/g' /etc/sudoers.d/lessonflow-web-update
+   sudo chmod 0440 /etc/sudoers.d/lessonflow-web-update
+   ```
+
+3. **Deploy once so the web-update service unit is installed/updated:**
+   ```bash
+   ./deploy/update.sh --branch main
+   ```
+
+After these steps, the admin update modal will launch `lessonflow-web-update.service`, which runs the deploy flow as the configured deployment user while preserving the existing in-app log/progress screen.

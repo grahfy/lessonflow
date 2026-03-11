@@ -1,0 +1,22 @@
+# LessonFlow - Web Update Runner
+# Install/update: copied automatically by deploy.sh when UPDATES_DEPLOY_USER is set.
+
+[Unit]
+Description={{APP_NAME}} Web Update Runner
+After=network.target
+ConditionPathExists=/var/www/{{APP_NAME}}/current/scripts/start-web-update-service.sh
+
+[Service]
+Type=oneshot
+User={{DEPLOY_USER}}
+Group=www-data
+WorkingDirectory=/var/www/{{APP_NAME}}/current
+EnvironmentFile=-/var/www/{{APP_NAME}}/shared/.env
+ExecStart=/usr/bin/env bash /var/www/{{APP_NAME}}/current/scripts/start-web-update-service.sh
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

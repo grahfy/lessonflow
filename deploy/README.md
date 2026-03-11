@@ -274,6 +274,10 @@ GMAIL_CLIENT_SECRET=""
 GMAIL_REFRESH_TOKEN=""
 GMAIL_USER_EMAIL="admin@example.com"
 
+# Browser-triggered updates
+UPDATES_GIT_REPO_PATH="/opt/melbourne-guitar-school"
+UPDATES_DEPLOY_USER="deploy"
+
 # Learning Materials Storage
 LEARNING_MATERIALS_STORAGE_DRIVER="local"
 LEARNING_MATERIALS_LOCAL_ROOT="/var/www/lessonflow/data/learning-materials"
@@ -346,6 +350,23 @@ sudo systemctl daemon-reload
 sudo systemctl enable lessonflow
 sudo systemctl start lessonflow
 ```
+
+### 2b. Enable Browser-Triggered Updates
+
+The admin update button now starts a dedicated host-side systemd runner. It no longer accepts sudo credentials in the browser.
+
+```bash
+# Allow the runtime user to start the dedicated web-update service
+sudo cp deploy/web-update-trigger.sudoers.template /etc/sudoers.d/lessonflow-web-update
+sudo sed -i 's/<APP_RUNTIME_USER>/www-data/g' /etc/sudoers.d/lessonflow-web-update
+sudo chmod 0440 /etc/sudoers.d/lessonflow-web-update
+
+# Run a deploy/update after setting UPDATES_DEPLOY_USER in shared/.env
+# so deploy.sh installs /etc/systemd/system/lessonflow-web-update.service
+./deploy/update.sh --branch main
+```
+
+The dedicated runner executes the deploy flow as `UPDATES_DEPLOY_USER`; the app runtime user is only allowed to start that specific systemd unit.
 
 ### 3. Install Nginx Configuration
 

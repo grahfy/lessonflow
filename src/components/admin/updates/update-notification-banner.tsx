@@ -8,6 +8,8 @@ interface UpdateStatusResponse {
   ok: boolean;
   updateAvailable: boolean;
   pendingCommits: CommitMetadata[];
+  webTriggerConfigured?: boolean;
+  webTriggerMessage?: string | null;
 }
 
 export function UpdateNotificationBanner() {
@@ -51,6 +53,8 @@ export function UpdateNotificationBanner() {
       {showModal && (
         <PendingChangesModal 
           commits={status.pendingCommits} 
+          webTriggerConfigured={status.webTriggerConfigured ?? true}
+          webTriggerMessage={status.webTriggerMessage ?? ""}
           onClose={() => setShowModal(false)} 
         />
       )}

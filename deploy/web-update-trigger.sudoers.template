@@ -1,0 +1,11 @@
+# Allows the app runtime user to start the dedicated host-side web update runner
+# without granting it broader deploy privileges.
+#
+# Install:
+#   sudo cp deploy/web-update-trigger.sudoers.template /etc/sudoers.d/lessonflow-web-update
+#   sudo sed -i 's/<APP_RUNTIME_USER>/www-data/g' /etc/sudoers.d/lessonflow-web-update
+#   sudo chmod 0440 /etc/sudoers.d/lessonflow-web-update
+
+<APP_RUNTIME_USER> ALL=(root) NOPASSWD: /usr/bin/systemctl start lessonflow-web-update.service, \
+                                        /usr/bin/systemctl status lessonflow-web-update.service, \
+                                        /usr/bin/systemctl is-active lessonflow-web-update.service
