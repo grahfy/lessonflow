@@ -9,7 +9,7 @@ This repository is a Next.js App Router application.
   - Admin: `/admin/login`, `/admin/bookings`, `/admin/customers`, `/admin/invoices`, `/admin/reports`, `/admin/settings`, `/admin/manual`
   - APIs: `src/app/api/**`
 - Shared UI and client behavior live in `src/components`.
-- Global styles live in `src/styles/globals.css`.
+- Shared global styles live in `src/styles/`, with route or feature-local styles moving into additional CSS files or CSS Modules where appropriate.
 - Shared data and utilities live in `src/lib`.
 - Prisma generated client in `src/generated/prisma/client`.
 - Planning artifacts live in `thoughts/`:
@@ -118,7 +118,7 @@ export function validateBookingData(data: unknown) {
 - Return consistent response structures from API routes.
 
 ### CSS & Styling
-- Use global CSS variables in `src/styles/globals.css` for theming.
+- Use global CSS variables in `src/styles/globals.css` for theming, and prefer CSS Modules for feature-local frontend styling.
 - Use Tailwind-style class composition or CSS modules.
 - Avoid inline styles except for dynamic values.
 
@@ -164,8 +164,13 @@ Use Conventional Commits format:
 
 Commit messages must be detailed and human-readable, not terse shorthand.
 - Write a clear subject that describes the user-visible or engineering outcome.
+- Write the body so an end-user or non-technical stakeholder can understand the fix or new feature without needing repo-specific context.
 - Use a multiline body that explains what changed and why it was necessary.
+- Write the body as full paragraphs, not sentence fragments or a bullet-only changelog.
+- Do not use a subject-only commit message except for truly trivial housekeeping changes.
 - Prefer plain language over internal abbreviations unless the abbreviation is already standard in the repo.
+- Start with the customer-facing impact first, then add implementation detail only if it helps clarify scope.
+- Prefer at least two short paragraphs when the change affects behavior, UI, architecture, data flow, or deployment.
 
 Use multiline commit messages:
 ```bash
