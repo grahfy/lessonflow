@@ -28,6 +28,8 @@ describe("student-portal-booking-actions", () => {
   it("creates pending booking requests linked to the student customer", async () => {
     const customer = await prisma.customer.create({
       data: customerSnapshotFromInput({
+        firstName: "Action",
+        lastName: "Student",
         name: "Action Student",
         email: "action.student@example.com",
         phone: "0400555000",
@@ -70,6 +72,8 @@ describe("student-portal-booking-actions", () => {
       }
     });
     expect(created.status).toBe("pending");
+    expect(created.firstName).toBe("Action");
+    expect(created.lastName).toBe("Student");
     expect(created.lessonMode).toBe("video");
     expect(created.lessonDuration).toBe("min30");
   });

@@ -23,6 +23,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const fullNameParts = student.fullName.trim().split(/\s+/).filter(Boolean);
+  const firstName = student.firstName.trim() || fullNameParts[0] || "";
+  const lastName = student.lastName.trim() || fullNameParts.slice(1).join(" ");
+
   const body = await request.json().catch(() => null);
   const parsed = studentPortalBookingRequestInputSchema.safeParse(body);
   if (!parsed.success) {
@@ -58,6 +62,8 @@ export async function POST(request: NextRequest) {
   // Student portal creates pending requests only; admin approval converts them into bookings.
   const created = await prisma.bookingRequest.create({
     data: {
+      firstName,
+      lastName,
       name: student.fullName,
       email: student.email,
       phone: student.phone,
