@@ -5,7 +5,7 @@
 
 [Unit]
 Description=LessonFlow Admin Reports Weekly
-Documentation=https://github.com/your-org/lessonflow-website
+Documentation=https://gitlab.com/grahfmusic/lessonflow
 After=network.target lessonflow.service
 Wants=lessonflow.service
 

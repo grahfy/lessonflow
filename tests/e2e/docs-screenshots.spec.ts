@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { expect, test } from "@playwright/test";
+import { test } from "@playwright/test";
 
 const outputDir = path.resolve(process.cwd(), "Documentation/assets");
 
@@ -19,9 +19,26 @@ async function stabilizePage(page: import("@playwright/test").Page) {
         transition-delay: 0s !important;
         scroll-behavior: auto !important;
       }
+
+      .deploy-updates-backdrop {
+        display: none !important;
+        pointer-events: none !important;
+      }
     `
   }).catch(() => null);
   await page.waitForTimeout(300);
+}
+
+async function dismissDeployUpdatesModal(page: import("@playwright/test").Page) {
+  const modal = page.getByRole("dialog", { name: /deployment updates/i });
+  if (!(await modal.isVisible().catch(() => false))) {
+    return;
+  }
+
+  await modal.getByRole("button", { name: /^close$/i }).click({ force: true }).catch(async () => {
+    await page.keyboard.press("Escape").catch(() => null);
+  });
+  await modal.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => null);
 }
 
 async function saveShot(page: import("@playwright/test").Page, fileName: string) {
@@ -51,17 +68,52 @@ async function gotoWithRetry(page: import("@playwright/test").Page, urlPath: str
   }
 }
 
+async function createCaptchaPayload(request: import("@playwright/test").APIRequestContext) {
+  const captchaResponse = await request.get("/api/captcha");
+  if (!captchaResponse.ok()) {
+    return null;
+  }
+
+  const captcha = (await captchaResponse.json()) as {
+    token?: string;
+    imageDataUrl?: string;
+  } | null;
+
+  const token = String(captcha?.token || "").trim();
+  const imageDataUrl = String(captcha?.imageDataUrl || "");
+  if (!token || !imageDataUrl.startsWith("data:image/svg+xml;base64,")) {
+    return null;
+  }
+
+  const svg = Buffer.from(imageDataUrl.split(",")[1] || "", "base64").toString("utf8");
+  const answer = Array.from(svg.matchAll(/<text[^>]*>([^<]+)<\/text>/g))
+    .map((match) => match[1])
+    .join("")
+    .trim();
+
+  if (!answer) {
+    return null;
+  }
+
+  return { captchaToken: token, captchaAnswer: answer };
+}
+
 async function loginAdminIfConfigured(page: import("@playwright/test").Page): Promise<boolean> {
   const email = process.env.DOCS_SCREENSHOTS_ADMIN_EMAIL;
   const password = process.env.DOCS_SCREENSHOTS_ADMIN_PASSWORD;
   if (!email || !password) return false;
 
-  // Prefer API login to avoid UI-captcha coupling in screenshot automation.
+  const captchaPayload = await createCaptchaPayload(page.request);
+  if (!captchaPayload) {
+    return false;
+  }
+
   const loginResponse = await page.request.post("/api/admin/login", {
     data: {
       email,
       password,
-      website: ""
+      website: "",
+      ...captchaPayload
     }
   });
   if (!loginResponse.ok()) {
@@ -71,6 +123,7 @@ async function loginAdminIfConfigured(page: import("@playwright/test").Page): Pr
   await gotoWithRetry(page, "/admin/bookings");
   await waitForPageSettle(page);
   await stabilizePage(page);
+  await dismissDeployUpdatesModal(page);
 
   return /\/admin\/(bookings|invoices|reports|settings|manual)/.test(page.url());
 }
@@ -81,14 +134,18 @@ async function captureStudentPortalIfConfigured(page: import("@playwright/test")
   const password = process.env.DOCS_SCREENSHOTS_STUDENT_PASSWORD;
   if (!fullName || !postcode || !password) return false;
 
+  const captchaPayload = await createCaptchaPayload(page.request);
+  if (!captchaPayload) {
+    return false;
+  }
+
   const loginResponse = await page.request.post("/api/student/login", {
     data: {
       fullName,
       postcode,
       password,
       website: "",
-      captchaToken: "docs-screenshot",
-      captchaAnswer: "docs-screenshot"
+      ...captchaPayload
     }
   });
   if (!loginResponse.ok()) {
@@ -153,12 +210,14 @@ test.describe("documentation screenshots", () => {
       { path: "/admin/manual", file: "admin-manual-page.png", waitFor: "Operations Manual" },
       { path: "/admin/reports", file: "admin-reports-dashboard.png", waitFor: "Reports Console" },
       { path: "/admin/settings", file: "admin-settings-page.png", waitFor: "Admin Configuration" },
+      { path: "/admin/system-logs", file: "system-logs-page.png", waitFor: "System Logs" },
       { path: "/admin/invoices", file: "invoice-console-list-and-filters.png", waitFor: "Invoices" },
       { path: "/admin/bookings", file: "booking-calendar-week-view.png", waitFor: "Bookings" }
     ];
 
     for (const capture of adminCaptures) {
       await gotoWithRetry(page, capture.path);
+      await dismissDeployUpdatesModal(page);
       if (capture.waitFor) {
         await page.getByText(new RegExp(capture.waitFor, "i")).first().waitFor({ timeout: 10_000 }).catch(() => null);
       }
@@ -169,11 +228,12 @@ test.describe("documentation screenshots", () => {
 
     // Booking console dialog-level captures.
     await gotoWithRetry(page, "/admin/bookings");
-    await page.getByText(/add manual booking/i).first().waitFor({ timeout: 10_000 });
+    await dismissDeployUpdatesModal(page);
+    await page.getByRole("button", { name: /new booking/i }).first().waitFor({ timeout: 10_000 });
     await waitForPageSettle(page);
     await stabilizePage(page);
 
-    await page.getByRole("button", { name: /add manual booking/i }).click();
+    await page.getByRole("button", { name: /new booking/i }).click();
     const manualDialog = page
       .locator(".dialog-panel.dialog-panel-wide")
       .filter({ has: page.getByRole("heading", { name: /add manual booking/i }) })
@@ -187,12 +247,13 @@ test.describe("documentation screenshots", () => {
     await manualDialog.waitFor({ state: "hidden", timeout: 10_000 }).catch(() => null);
 
     await gotoWithRetry(page, "/admin/customers");
+    await dismissDeployUpdatesModal(page);
     await page.getByRole("heading", { name: /customers/i }).first().waitFor({ timeout: 10_000 });
     await waitForPageSettle(page);
     await stabilizePage(page);
     await saveShot(page, "customer-directory-list.png");
 
-    await page.getByRole("button", { name: /create new customer/i }).first().click();
+    await page.getByRole("button", { name: /new customer/i }).first().click();
     const customerEditorDialog = page
       .locator(".dialog-panel")
       .filter({ has: page.getByRole("heading", { name: /customer details/i }) })
@@ -206,6 +267,7 @@ test.describe("documentation screenshots", () => {
     await customerEditorDialog.waitFor({ state: "hidden", timeout: 10_000 }).catch(() => null);
 
     await gotoWithRetry(page, "/admin/bookings");
+    await dismissDeployUpdatesModal(page);
     await waitForPageSettle(page);
     await stabilizePage(page);
     const bookingEvent = page.locator(".calendar-event.event-green, .calendar-event").first();
@@ -239,6 +301,7 @@ test.describe("documentation screenshots", () => {
 
     // Invoice console dialog-level captures.
     await gotoWithRetry(page, "/admin/invoices");
+    await dismissDeployUpdatesModal(page);
     await page.getByText(/invoices/i).first().waitFor({ timeout: 10_000 });
     await waitForPageSettle(page);
     await stabilizePage(page);
@@ -270,6 +333,7 @@ test.describe("documentation screenshots", () => {
     await invoiceDetailDialog.waitFor({ state: "hidden", timeout: 10_000 }).catch(() => null);
 
     await gotoWithRetry(page, "/admin/invoices");
+    await dismissDeployUpdatesModal(page);
     await waitForPageSettle(page);
     await stabilizePage(page);
 

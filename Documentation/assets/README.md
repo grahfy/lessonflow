@@ -4,6 +4,8 @@ This folder stores screenshot assets used by:
 - `Documentation/*.md` guides, and
 - the in-app admin manual (`/admin/manual`) via `public/documentation/screenshots/` sync.
 
+The current manual structure expects screenshots for the core admin, student, public, and diagnostic workflows. Existing baseline coverage includes bookings, customers, invoices, reports, settings, manual, and student/public pages. As the manual grows, add captures for any new section that benefits from a real UI example rather than descriptive prose alone.
+
 ## Capture Workflow
 1. Seed deterministic demo data:
    - `npm run docs:screenshots:seed`
@@ -29,4 +31,5 @@ This folder stores screenshot assets used by:
 Recapture screenshots whenever:
 - major labels/buttons change,
 - modal layouts are redesigned,
-- manual steps are updated.
+- manual steps are updated,
+- logs/settings/manual structure changes enough that the current image no longer matches the documented workflow.

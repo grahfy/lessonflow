@@ -4,6 +4,14 @@ import path from "node:path";
 import { marked } from "marked";
 
 export type ManualAudience = "all_admins" | "technical_owner";
+export type ManualSectionGroup =
+  | "foundation"
+  | "operations"
+  | "support"
+  | "configuration"
+  | "diagnostics"
+  | "system"
+  | "technical";
 
 export type ManualScreenshot = {
   id: string;
@@ -18,6 +26,7 @@ export type ManualSectionManifest = {
   id: string;
   title: string;
   summary: string;
+  group: ManualSectionGroup;
   audience: ManualAudience;
   sourcePath: string;
   relatedRoutes: string[];
@@ -40,11 +49,6 @@ export type AdminManualIndex = {
   screenshots: ManualScreenshot[];
 };
 
-/**
- * Shared screenshot metadata reused by the docs, screenshot sync pipeline, and
- * the in-app admin manual. This keeps alt/caption text centralized so manual
- * UI tweaks do not drift from doc asset intent.
- */
 export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
   {
     id: "admin-login-page",
@@ -52,7 +56,7 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
     publicPath: "/documentation/screenshots/admin-login-page.png",
     documentationPath: "Documentation/assets/admin-login-page.png",
     alt: "Admin login page",
-    caption: "Sign in to the booking console with the owner/admin account."
+    caption: "Owner and staff use the admin login page to access the console."
   },
   {
     id: "booking-calendar-week-view",
@@ -60,7 +64,7 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
     publicPath: "/documentation/screenshots/booking-calendar-week-view.png",
     documentationPath: "Documentation/assets/booking-calendar-week-view.png",
     alt: "Booking calendar week view",
-    caption: "Weekly calendar view for confirmed bookings and pending requests."
+    caption: "The weekly calendar combines confirmed lessons and pending requests."
   },
   {
     id: "manual-booking-dialog-customer-step",
@@ -68,7 +72,7 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
     publicPath: "/documentation/screenshots/manual-booking-dialog-customer-step.png",
     documentationPath: "Documentation/assets/manual-booking-dialog-customer-step.png",
     alt: "Manual booking dialog customer step",
-    caption: "Manual booking flow lets admin select or create a matching customer."
+    caption: "Manual bookings can attach to an existing customer or create a new record."
   },
   {
     id: "booking-detail-dialog-notes-and-actions",
@@ -76,7 +80,7 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
     publicPath: "/documentation/screenshots/booking-detail-dialog-notes-and-actions.png",
     documentationPath: "Documentation/assets/booking-detail-dialog-notes-and-actions.png",
     alt: "Booking detail dialog actions",
-    caption: "Booking detail dialog contains edit, move, notify and invoice actions."
+    caption: "Booking detail shows edit, move, notify, materials, and billing actions."
   },
   {
     id: "booking-create-invoice-dialog",
@@ -84,7 +88,7 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
     publicPath: "/documentation/screenshots/booking-create-invoice-dialog.png",
     documentationPath: "Documentation/assets/booking-create-invoice-dialog.png",
     alt: "Create invoice from booking dialog",
-    caption: "Create an invoice from the booking context without leaving the calendar."
+    caption: "A confirmed booking can open the billing flow without leaving the lesson context."
   },
   {
     id: "customer-directory-list",
@@ -92,7 +96,7 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
     publicPath: "/documentation/screenshots/customer-directory-list.png",
     documentationPath: "Documentation/assets/customer-directory-list.png",
     alt: "Customer directory list",
-    caption: "Customer directory list for search, edit, archive and portal access actions."
+    caption: "The customer directory is the support hub for profile, portal, and billing access."
   },
   {
     id: "customer-editor-create",
@@ -100,7 +104,7 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
     publicPath: "/documentation/screenshots/customer-editor-create.png",
     documentationPath: "Documentation/assets/customer-editor-create.png",
     alt: "Customer create dialog",
-    caption: "Create or edit customer details in the admin customer editor form."
+    caption: "Customer records can be created or edited directly inside the admin console."
   },
   {
     id: "invoice-console-list-and-filters",
@@ -108,7 +112,7 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
     publicPath: "/documentation/screenshots/invoice-console-list-and-filters.png",
     documentationPath: "Documentation/assets/invoice-console-list-and-filters.png",
     alt: "Invoice console list and filters",
-    caption: "Invoice console filters by status, aging and outstanding balances."
+    caption: "The invoices list highlights status, overdue balances, and follow-up candidates."
   },
   {
     id: "invoice-create-dialog",
@@ -116,15 +120,15 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
     publicPath: "/documentation/screenshots/invoice-create-dialog.png",
     documentationPath: "Documentation/assets/invoice-create-dialog.png",
     alt: "Invoice create dialog",
-    caption: "Invoice create dialog supports manual line items and lesson package presets."
+    caption: "Standalone and lesson-based invoice creation both begin from the invoice create dialog."
   },
   {
     id: "invoice-detail-send-and-download-pdf",
     fileName: "invoice-detail-send-and-download-pdf.png",
     publicPath: "/documentation/screenshots/invoice-detail-send-and-download-pdf.png",
     documentationPath: "Documentation/assets/invoice-detail-send-and-download-pdf.png",
-    alt: "Invoice detail send and PDF actions",
-    caption: "Send invoice emails, reminders and PDF downloads from the invoice detail dialog."
+    alt: "Invoice detail actions",
+    caption: "Invoice detail provides send, remind, payment, and PDF actions according to status."
   },
   {
     id: "invoice-filters-outstanding-aging",
@@ -132,7 +136,7 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
     publicPath: "/documentation/screenshots/invoice-filters-outstanding-aging.png",
     documentationPath: "Documentation/assets/invoice-filters-outstanding-aging.png",
     alt: "Invoice outstanding aging filters",
-    caption: "Outstanding-only and aging filters support reminder and follow-up routines."
+    caption: "Outstanding-only and aging filters help owners focus on overdue billing."
   },
   {
     id: "public-book-page",
@@ -140,7 +144,7 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
     publicPath: "/documentation/screenshots/public-book-page.png",
     documentationPath: "Documentation/assets/public-book-page.png",
     alt: "Public booking request page",
-    caption: "Public booking form where new students submit a booking request."
+    caption: "New students use the public booking form to request lessons."
   },
   {
     id: "public-contact-page",
@@ -148,7 +152,7 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
     publicPath: "/documentation/screenshots/public-contact-page.png",
     documentationPath: "Documentation/assets/public-contact-page.png",
     alt: "Public contact page",
-    caption: "Public contact form used for general enquiries."
+    caption: "General enquiries arrive through the public contact form."
   },
   {
     id: "student-login-page",
@@ -156,7 +160,7 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
     publicPath: "/documentation/screenshots/student-login-page.png",
     documentationPath: "Documentation/assets/student-login-page.png",
     alt: "Student portal login page",
-    caption: "Student portal login page for name/postcode/password access."
+    caption: "Students sign in with name, postcode, and a generated portal password."
   },
   {
     id: "student-portal-page",
@@ -164,7 +168,7 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
     publicPath: "/documentation/screenshots/student-portal-page.png",
     documentationPath: "Documentation/assets/student-portal-page.png",
     alt: "Student portal dashboard page",
-    caption: "Student portal dashboard with appointments and learning materials."
+    caption: "The student portal shows appointments, requests, and learning materials."
   },
   {
     id: "admin-settings-page",
@@ -172,7 +176,7 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
     publicPath: "/documentation/screenshots/admin-settings-page.png",
     documentationPath: "Documentation/assets/admin-settings-page.png",
     alt: "Admin settings page",
-    caption: "Admin settings screen for supported environment-backed configuration."
+    caption: "The settings area combines branding, content, invoice, product, and system configuration."
   },
   {
     id: "admin-reports-dashboard",
@@ -180,7 +184,15 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
     publicPath: "/documentation/screenshots/admin-reports-dashboard.png",
     documentationPath: "Documentation/assets/admin-reports-dashboard.png",
     alt: "Admin reports dashboard",
-    caption: "Reports dashboard with daily/weekly/monthly/yearly metrics and comparisons."
+    caption: "Reports help owners review activity, overdue balances, and earnings trends."
+  },
+  {
+    id: "system-logs-page",
+    fileName: "system-logs-page.png",
+    publicPath: "/documentation/screenshots/system-logs-page.png",
+    documentationPath: "Documentation/assets/system-logs-page.png",
+    alt: "System logs page",
+    caption: "The logs page helps staff confirm recent system events and collect evidence before escalation."
   },
   {
     id: "admin-manual-page",
@@ -188,36 +200,39 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
     publicPath: "/documentation/screenshots/admin-manual-page.png",
     documentationPath: "Documentation/assets/admin-manual-page.png",
     alt: "Admin manual page",
-    caption: "In-app admin manual with TOC, coverage matrix and detailed guide sections."
+    caption: "The in-app manual turns the repository docs into a navigable operator reference."
   }
 ];
 
 export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
-    id: "getting-started",
-    title: "Getting Started",
-    summary: "Start here if you are new. Learn what each admin screen is for and what to do first.",
+    id: "start-here-features",
+    title: "Start Here and Features",
+    summary: "The operating model, feature map, and the safest reading order for new users.",
+    group: "foundation",
     audience: "all_admins",
-    sourcePath: "Documentation/01-Getting-Started.md",
-    relatedRoutes: ["/admin/login", "/admin/bookings", "/admin/invoices"],
-    screenshotIds: []
+    sourcePath: "Documentation/01-Start-Here-and-Features.md",
+    relatedRoutes: ["/admin/manual", "/admin/bookings", "/admin/settings"],
+    screenshotIds: ["admin-manual-page"]
   },
   {
-    id: "admin-login-access",
-    title: "Admin Login and Access",
-    summary: "How to sign in/out, what to do when login fails, and why sessions can expire.",
+    id: "first-time-setup-admin-access",
+    title: "First-Time Setup and Admin Access",
+    summary: "How setup, admin login, sign out, and first-day verification work.",
+    group: "foundation",
     audience: "all_admins",
-    sourcePath: "Documentation/02-Admin-Login-and-Access.md",
-    relatedRoutes: ["/admin/login"],
+    sourcePath: "Documentation/02-First-Time-Setup-and-Admin-Access.md",
+    relatedRoutes: ["/setup", "/admin", "/admin/login"],
     screenshotIds: ["admin-login-page"]
   },
   {
-    id: "booking-management",
-    title: "Booking Management",
-    summary: "Your calendar screen. Approve requests, move/cancel lessons, message customers, and create invoices.",
+    id: "daily-operations-booking-lifecycle",
+    title: "Daily Operations and Booking Lifecycle",
+    summary: "The daily rhythm for calendar work, approvals, moves, cancellations, and booking-side actions.",
+    group: "operations",
     audience: "all_admins",
-    sourcePath: "Documentation/03-Booking-Management.md",
-    relatedRoutes: ["/admin/bookings", "/book"],
+    sourcePath: "Documentation/03-Daily-Operations-and-Booking-Lifecycle.md",
+    relatedRoutes: ["/admin/bookings"],
     screenshotIds: [
       "booking-calendar-week-view",
       "manual-booking-dialog-customer-step",
@@ -226,103 +241,119 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
     ]
   },
   {
-    id: "customer-directory",
-    title: "Customer Directory",
-    summary: "Find customers fast, avoid duplicates, update details, and jump to invoice history.",
+    id: "customers-communication-portal-support",
+    title: "Customers, Communication, and Portal Support",
+    summary: "Search, profile edits, portal support, billing history, and customer communication tools.",
+    group: "support",
     audience: "all_admins",
-    sourcePath: "Documentation/04-Customer-Directory.md",
-    relatedRoutes: ["/admin/bookings"],
+    sourcePath: "Documentation/04-Customers-Communication-and-Portal-Support.md",
+    relatedRoutes: ["/admin/customers", "/admin/bookings", "/admin/invoices"],
     screenshotIds: ["customer-directory-list", "customer-editor-create"]
   },
   {
-    id: "invoice-management",
-    title: "Invoice Management",
-    summary: "Create invoices, send PDFs, follow up overdue accounts, mark paid, and use credit notes safely.",
+    id: "learning-materials-notifications",
+    title: "Learning Materials and Notifications",
+    summary: "Upload materials, help students find them, and use reminder or custom email actions safely.",
+    group: "support",
     audience: "all_admins",
-    sourcePath: "Documentation/05-Invoice-Management.md",
+    sourcePath: "Documentation/06-Learning-Materials-and-Notifications.md",
+    relatedRoutes: ["/admin/bookings", "/admin/customers", "/student/portal"],
+    screenshotIds: ["student-portal-page"]
+  },
+  {
+    id: "invoicing-payments",
+    title: "Invoicing and Payments",
+    summary: "Create, send, follow up, and correct invoices safely through their lifecycle.",
+    group: "operations",
+    audience: "all_admins",
+    sourcePath: "Documentation/05-Invoicing-and-Payments.md",
     relatedRoutes: ["/admin/invoices", "/admin/bookings"],
-    screenshotIds: ["invoice-console-list-and-filters", "invoice-create-dialog", "invoice-detail-send-and-download-pdf"]
+    screenshotIds: [
+      "invoice-console-list-and-filters",
+      "invoice-create-dialog",
+      "invoice-detail-send-and-download-pdf",
+      "invoice-filters-outstanding-aging"
+    ]
   },
   {
-    id: "email-notifications",
-    title: "Email and Notifications",
-    summary: "What emails are sent, what is automatic vs manual, and what “queued” means when delivery is not configured.",
+    id: "reports-follow-up",
+    title: "Reports and Follow-Up",
+    summary: "Use daily, monthly, yearly, and custom reporting to guide follow-up and owner decisions.",
+    group: "operations",
     audience: "all_admins",
-    sourcePath: "Documentation/06-Email-and-Notifications.md",
-    relatedRoutes: ["/admin/bookings", "/admin/invoices"],
-    screenshotIds: []
+    sourcePath: "Documentation/07-Reports-and-Follow-Up.md",
+    relatedRoutes: ["/admin/reports", "/admin/invoices"],
+    screenshotIds: ["admin-reports-dashboard", "invoice-filters-outstanding-aging"]
   },
   {
-    id: "reports-outstanding-followup",
-    title: "Outstanding and Follow-Up Routines",
-    summary: "Simple daily and weekly steps to keep overdue invoices under control.",
+    id: "settings-configuration",
+    title: "Settings and Configuration",
+    summary: "A complete guide to every settings tab, editor, grouped field set, and save action.",
+    group: "configuration",
     audience: "all_admins",
-    sourcePath: "Documentation/07-Reports-Outstanding-and-Follow-Up.md",
-    relatedRoutes: ["/admin/invoices", "/admin/reports"],
-    screenshotIds: ["invoice-filters-outstanding-aging"]
-  },
-  {
-    id: "admin-settings-system-configuration",
-    title: "Admin Settings and System Configuration",
-    summary: "How to change settings safely, keep secrets, and update admin login details.",
-    audience: "all_admins",
-    sourcePath: "Documentation/10-Admin-Settings-and-System-Configuration.md",
+    sourcePath: "Documentation/08-Settings-and-Configuration.md",
     relatedRoutes: ["/admin/settings"],
     screenshotIds: ["admin-settings-page"]
   },
   {
-    id: "admin-reports-dashboard",
-    title: "Admin Reports Dashboard",
-    summary: "A quick dashboard for appointments, outstanding invoices, earnings, and comparisons.",
+    id: "logs-bug-reporting",
+    title: "Logs and Bug Reporting",
+    summary: "Search logs, read metadata, and submit useful technical issue reports with evidence.",
+    group: "diagnostics",
     audience: "all_admins",
-    sourcePath: "Documentation/11-Admin-Reports-Dashboard.md",
-    relatedRoutes: ["/admin/reports"],
-    screenshotIds: ["admin-reports-dashboard"]
+    sourcePath: "Documentation/09-Logs-and-Bug-Reporting.md",
+    relatedRoutes: ["/admin/system-logs"],
+    screenshotIds: ["system-logs-page"]
   },
   {
-    id: "student-portal-learning-materials",
-    title: "Student Portal and Learning Materials",
-    summary: "How students log in, where materials live, and how to help when a student is stuck.",
+    id: "public-intake-student-portal",
+    title: "Public Intake and Student Portal",
+    summary: "Understand what website visitors and students experience, and what staff should do next.",
+    group: "support",
     audience: "all_admins",
-    sourcePath: "Documentation/12-Student-Portal-and-Learning-Materials.md",
-    relatedRoutes: ["/student/login", "/student/portal", "/admin/bookings"],
-    screenshotIds: ["student-login-page", "student-portal-page"]
+    sourcePath: "Documentation/10-Public-Intake-and-Student-Portal.md",
+    relatedRoutes: ["/book", "/contact", "/student/login", "/student/portal"],
+    screenshotIds: ["public-book-page", "public-contact-page", "student-login-page", "student-portal-page"]
   },
   {
-    id: "public-booking-and-contact-forms",
-    title: "Public Booking and Contact Forms",
-    summary: "What visitors see after submitting a form, and what you do next inside the admin console.",
+    id: "updates-release-visibility",
+    title: "Updates and Release Visibility",
+    summary: "Understand update banners, pending changes, deployment history, and live update progress screens.",
+    group: "system",
     audience: "all_admins",
-    sourcePath: "Documentation/13-Public-Booking-and-Contact-Forms.md",
-    relatedRoutes: ["/book", "/contact", "/admin/bookings"],
-    screenshotIds: ["public-book-page", "public-contact-page"]
-  },
-  {
-    id: "troubleshooting-faq",
-    title: "Troubleshooting and FAQs",
-    summary: "Quick fixes for the most common problems (login, bookings, invoices, emails).",
-    audience: "all_admins",
-    sourcePath: "Documentation/08-Troubleshooting-and-FAQs.md",
-    relatedRoutes: ["/admin/login", "/admin/bookings", "/admin/invoices", "/admin/reports"],
+    sourcePath: "Documentation/11-Updates-and-Release-Visibility.md",
+    relatedRoutes: ["/admin/updates/progress", "/admin/bookings"],
     screenshotIds: []
   },
   {
-    id: "glossary",
-    title: "Glossary",
-    summary: "Simple definitions for words used in the app (so you can keep working without guessing).",
+    id: "how-lessonflow-works",
+    title: "How LessonFlow Works",
+    summary: "A safe high-level overview of the technologies and product layers that work together.",
+    group: "system",
     audience: "all_admins",
-    sourcePath: "Documentation/09-Glossary.md",
-    relatedRoutes: [],
+    sourcePath: "Documentation/12-How-LessonFlow-Works.md",
+    relatedRoutes: ["/admin/manual"],
     screenshotIds: []
   },
   {
-    id: "deploy-update-runbook",
-    title: "Deploy / Update Runbook (Technical Owner)",
-    summary: "For the person managing hosting: deploys, cron jobs, and service checks on the droplet.",
+    id: "troubleshooting-quick-reference",
+    title: "Troubleshooting and Quick Reference",
+    summary: "Use the symptom map to find the right operational response quickly.",
+    group: "diagnostics",
+    audience: "all_admins",
+    sourcePath: "Documentation/13-Troubleshooting-and-Quick-Reference.md",
+    relatedRoutes: ["/admin/system-logs", "/admin/login", "/admin/bookings"],
+    screenshotIds: []
+  },
+  {
+    id: "technical-owner-runbook",
+    title: "Technical Owner Runbook",
+    summary: "Install LessonFlow on a VPS, update it, verify services, and use the deploy script suite safely.",
+    group: "technical",
     audience: "technical_owner",
     sourcePath: "Documentation/digitalocean-admin-operations.md",
-    relatedRoutes: ["/admin/settings", "/admin/reports"],
-    screenshotIds: ["admin-manual-page"]
+    relatedRoutes: ["/admin/updates/progress", "/admin/settings", "/admin/system-logs"],
+    screenshotIds: []
   }
 ];
 
@@ -334,12 +365,8 @@ const DOC_BASENAME_TO_SECTION_ID = new Map(
 );
 
 function rewriteDocAssetImagePaths(markdown: string): string {
-  // Manual renders docs inside /admin/manual, so repo-local image links like
-  // "assets/foo.png" must be rewritten to the public path served by Next.js.
   const withImages = markdown.replace(/\((?:\.\/)?assets\/([^)]+)\)/g, "(/documentation/screenshots/$1)");
 
-  // Local markdown cross-links should navigate to the in-app manual pages
-  // instead of broken repo-relative file URLs.
   return withImages.replace(/\(((?:Documentation\/)?[^)]+\.md)\)/g, (fullMatch, target) => {
     const fileName = path.basename(String(target));
     const sectionId = DOC_BASENAME_TO_SECTION_ID.get(fileName);
@@ -366,24 +393,15 @@ async function readWhitelistedDocMarkdown(relativeDocPath: string): Promise<{ ma
   };
 }
 
-/**
- * Reads whitelisted doc file timestamps and prepares the in-app manual index
- * data. This intentionally avoids loading/parsing all markdown so the manual
- * landing page stays fast.
- */
 export async function getAdminManualIndex(): Promise<AdminManualIndex> {
   const updatedAtEntries = await Promise.all(
     MANUAL_SECTION_MANIFEST.map(async (section) => {
-      const normalized = path.normalize(section.sourcePath);
-      if (!WHITELISTED_DOC_PATHS.has(normalized)) {
-        throw new Error(`Manual doc path not whitelisted: ${section.sourcePath}`);
-      }
-
-      const absolutePath = path.resolve(process.cwd(), normalized);
+      const absolutePath = path.resolve(process.cwd(), path.normalize(section.sourcePath));
       const stats = await fs.stat(absolutePath);
       return [section.id, stats.mtime.toISOString()] as const;
     })
   );
+
   const updatedAtById = new Map(updatedAtEntries);
 
   return {
@@ -396,10 +414,6 @@ export async function getAdminManualIndex(): Promise<AdminManualIndex> {
   };
 }
 
-/**
- * Loads and renders a single manual section. This is used by `/admin/manual/[id]`
- * so the UI only parses the doc the admin is currently viewing.
- */
 export async function getAdminManualSection(sectionId: string): Promise<AdminManualSection | null> {
   const sectionManifest = MANIFEST_BY_ID.get(sectionId);
   if (!sectionManifest) {

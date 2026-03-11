@@ -5,7 +5,7 @@
 
 [Unit]
 Description=Melbourne Guitar School Next.js Application
-Documentation=https://github.com/your-org/lessonflow-website
+Documentation=https://gitlab.com/grahfmusic/lessonflow
 After=network.target mysql.service
 Wants=mysql.service
 StartLimitIntervalSec=300

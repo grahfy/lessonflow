@@ -1,33 +1,53 @@
-# LessonFlow Admin Operations Manual
+# LessonFlow Operations Manual
 
 <div class="manual-callout info">
-<strong>Manual Purpose:</strong> This manual explains how to run LessonFlow day to day, from first login through bookings, customer care, invoicing, reporting, and operational troubleshooting.
+<strong>Source of truth:</strong> These markdown files are the authored manual for LessonFlow. The in-app manual at <code>/admin/manual</code> renders the same content for live use inside the admin console.
 </div>
 
-This documentation is written as an end-user operations handbook for real administrative work, not as developer reference notes. Each section is designed to be read in full so that an operator understands both what to click and why the step matters. The language assumes you are responsible for reliable outcomes such as confirmed lessons, accurate customer records, and invoices that move cleanly from draft to payment completion.
+This manual is written for school owners, administrators, and technical owners who need to operate LessonFlow safely and confidently. It explains what the platform can do, how the workflows fit together, and how to maintain the system without exposing sensitive implementation details.
 
-The handbook is specifically tailored for music teachers, private studio operators, and music school administration teams who manage timetables, student progress touchpoints, and parent or student billing cycles.
+## Read This First
 
-If you are new to LessonFlow, begin with the opening sequence and read the first five sections in order. That flow builds the mental model needed to operate the platform confidently: access control, booking workflow, customer profile management, and billing execution. Once those foundations are in place, the remaining chapters support advanced daily routines, issue recovery, and technical owner responsibilities.
+Start with:
 
-The in-app manual at `/admin/manual` renders the same content and should be treated as the operational source of truth during live work. Repository markdown files remain the authored base, while the in-app experience adds structured navigation and screenshot context.
+1. [Start Here and Features](01-Start-Here-and-Features.md)
+2. [First-Time Setup and Admin Access](02-First-Time-Setup-and-Admin-Access.md)
+3. [Daily Operations and Booking Lifecycle](03-Daily-Operations-and-Booking-Lifecycle.md)
 
-## Recommended Reading Sequence
+## Core Operations
 
-For first-day onboarding, read the following sequence from start to finish: [01-Getting-Started.md](01-Getting-Started.md), [02-Admin-Login-and-Access.md](02-Admin-Login-and-Access.md), [03-Booking-Management.md](03-Booking-Management.md), [04-Customer-Directory.md](04-Customer-Directory.md), and [05-Invoice-Management.md](05-Invoice-Management.md).
+- [Customers, Communication, and Portal Support](04-Customers-Communication-and-Portal-Support.md)
+- [Invoicing and Payments](05-Invoicing-and-Payments.md)
+- [Learning Materials and Notifications](06-Learning-Materials-and-Notifications.md)
+- [Reports and Follow-Up](07-Reports-and-Follow-Up.md)
+- [Settings and Configuration](08-Settings-and-Configuration.md)
+- [Logs and Bug Reporting](09-Logs-and-Bug-Reporting.md)
+- [Public Intake and Student Portal](10-Public-Intake-and-Student-Portal.md)
+- [Updates and Release Visibility](11-Updates-and-Release-Visibility.md)
+- [How LessonFlow Works](12-How-LessonFlow-Works.md)
+- [Troubleshooting and Quick Reference](13-Troubleshooting-and-Quick-Reference.md)
 
-For routine operations after onboarding, work primarily with [03-Booking-Management.md](03-Booking-Management.md), [05-Invoice-Management.md](05-Invoice-Management.md), [06-Email-and-Notifications.md](06-Email-and-Notifications.md), and [07-Reports-Outstanding-and-Follow-Up.md](07-Reports-Outstanding-and-Follow-Up.md).
+## Technical Owner
 
-For issue handling and support, use [08-Troubleshooting-and-FAQs.md](08-Troubleshooting-and-FAQs.md) as your first reference, then follow the cross-links in that chapter to the workflow-specific sections.
+- [DigitalOcean Admin Operations Runbook](digitalocean-admin-operations.md)
 
-## Complete Section Index
+## Screenshot Pipeline
 
-[01-Getting-Started.md](01-Getting-Started.md) establishes operational context, responsibility boundaries, and first-day orientation. [02-Admin-Login-and-Access.md](02-Admin-Login-and-Access.md) covers secure sign-in behavior and access recovery. [03-Booking-Management.md](03-Booking-Management.md) documents request approval, appointment edits, movement, cancellation, and booking-side actions. [04-Customer-Directory.md](04-Customer-Directory.md) explains profile quality standards, merge discipline, and portal support implications. [05-Invoice-Management.md](05-Invoice-Management.md) defines lifecycle transitions, sending, follow-up, and payment correction routines. [06-Email-and-Notifications.md](06-Email-and-Notifications.md) details delivery expectations and communication controls. [07-Reports-Outstanding-and-Follow-Up.md](07-Reports-Outstanding-and-Follow-Up.md) describes cadence-based financial follow-up. [08-Troubleshooting-and-FAQs.md](08-Troubleshooting-and-FAQs.md) provides structured triage. [09-Glossary.md](09-Glossary.md) keeps terminology consistent. [10-Admin-Settings-and-System-Configuration.md](10-Admin-Settings-and-System-Configuration.md) covers high-impact configuration management. [11-Admin-Reports-Dashboard.md](11-Admin-Reports-Dashboard.md) explains metric interpretation. [12-Student-Portal-and-Learning-Materials.md](12-Student-Portal-and-Learning-Materials.md) supports student-facing operational assistance. [13-Public-Booking-and-Contact-Forms.md](13-Public-Booking-and-Contact-Forms.md) explains intake workflow conversion. [digitalocean-admin-operations.md](digitalocean-admin-operations.md) is reserved for technical owners.
+The screenshot pipeline keeps the manual visually aligned with the current UI.
 
-## Screenshot and Visual Reference Pipeline
+1. Seed deterministic demo data:
+   ```bash
+   npm run docs:screenshots:seed
+   ```
+2. Capture UI screenshots with Playwright:
+   ```bash
+   npm run docs:screenshots
+   ```
+3. Sync captured assets into the public manual path:
+   ```bash
+   npm run docs:screenshots:sync
+   ```
 
-Screenshot assets are authored into `Documentation/assets/` and mirrored into `public/documentation/screenshots/` for in-app manual rendering. The canonical refresh workflow remains `npm run docs:screenshots:seed`, then `npm run docs:screenshots`, then `npm run docs:screenshots:sync`. This sequence should run whenever UI labels, major layouts, or action positions change.
+## Update Discipline
 
-## Governance and Update Discipline
-
-Manual quality depends on keeping procedure text synchronized with production behavior. When a workflow changes, the associated documentation section must be updated in the same release window. If a change affects what an operator sees on screen, screenshot refresh is required. If a change alters outcomes or prerequisites, the relevant chapter must include the new operational rationale, not just a label update. This governance rule prevents silent drift between software behavior and user instruction.
+If a workflow changes, the relevant manual chapter must change in the same delivery cycle. If the UI changes significantly, refresh the screenshots too. The goal is to keep the manual operationally trustworthy, not merely close to the truth.

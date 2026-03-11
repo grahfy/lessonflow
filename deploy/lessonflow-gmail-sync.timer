@@ -5,7 +5,7 @@
 
 [Unit]
 Description=Run Gmail Sync every 2 minutes
-Documentation=https://github.com/your-org/lessonflow-website
+Documentation=https://gitlab.com/grahfmusic/lessonflow
 
 [Timer]
 # Run every 2 minutes

@@ -5,27 +5,69 @@ import Link from "next/link";
 import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { Tooltip } from "@/components/admin/ui/tooltip";
-import type { AdminManualIndex, AdminManualSectionIndex } from "@/lib/manual/content";
+import type {
+  AdminManualIndex,
+  AdminManualSectionIndex,
+  ManualSectionGroup
+} from "@/lib/manual/content";
 
 type AdminManualClientProps = {
   content: AdminManualIndex;
 };
 
-function sectionGroups(sections: AdminManualSectionIndex[]) {
-  return {
-    allAdmins: sections.filter((s) => s.audience === "all_admins"),
-    techOwners: sections.filter((s) => s.audience === "technical_owner")
-  };
+const SECTION_GROUPS: Array<{ key: ManualSectionGroup; title: string; description: string }> = [
+  {
+    key: "foundation",
+    title: "Start Here",
+    description: "Orientation, setup, admin access, and the big-picture feature map."
+  },
+  {
+    key: "operations",
+    title: "Daily Operations",
+    description: "The workflows most schools use every day to keep lessons and billing moving."
+  },
+  {
+    key: "support",
+    title: "Support and Student Experience",
+    description: "Customer support, communication, materials, and public or portal-facing flows."
+  },
+  {
+    key: "configuration",
+    title: "Settings and Configuration",
+    description: "Business configuration and advanced app editors."
+  },
+  {
+    key: "diagnostics",
+    title: "Diagnostics and Recovery",
+    description: "Logs, bug reporting, and fast symptom-based troubleshooting."
+  },
+  {
+    key: "system",
+    title: "System Awareness",
+    description: "Release visibility and safe high-level platform understanding."
+  },
+  {
+    key: "technical",
+    title: "Technical Owner Runbook",
+    description: "Installation, deploy scripts, services, timers, and VPS-level maintenance."
+  }
+];
+
+const START_HERE_LINKS = [
+  "start-here-features",
+  "first-time-setup-admin-access",
+  "daily-operations-booking-lifecycle",
+  "invoicing-payments"
+] as const;
+
+function sectionsForGroup(sections: AdminManualSectionIndex[], group: ManualSectionGroup) {
+  return sections.filter((section) => section.group === group);
 }
 
-/**
- * Main admin manual landing page client.
- *
- * This page intentionally avoids rendering the full docs content so new operators
- * can pick a task quickly without scrolling a huge page.
- */
 export function AdminManualClient({ content }: AdminManualClientProps) {
-  const grouped = sectionGroups(content.sections);
+  const startHereSections = START_HERE_LINKS
+    .map((id) => content.sections.find((section) => section.id === id))
+    .filter((section): section is AdminManualSectionIndex => Boolean(section));
 
   return (
     <AdminShell title="Manual" className="admin-shell-manual admin-shell-manual-page">
@@ -34,29 +76,16 @@ export function AdminManualClient({ content }: AdminManualClientProps) {
           <div className="admin-manual-toc-panel">
             <h2>Start Here</h2>
             <p className="helper-text">
-              New to the console? Follow the first few guides in order. You can always come back here.
+              Use the first sections in order, then return here by job type whenever you need a refresher.
             </p>
             <div className="admin-manual-links">
-              <Tooltip content="Introduction to the LessonFlow platform.">
-                <Link className="btn btn-primary" href="/admin/manual/getting-started">
-                  1. Getting Started
-                </Link>
-              </Tooltip>
-              <Tooltip content="How to access and manage your account.">
-                <Link className="btn btn-secondary" href="/admin/manual/admin-login-access">
-                  2. Login and Access
-                </Link>
-              </Tooltip>
-              <Tooltip content="Managing the lesson calendar and calendar views.">
-                <Link className="btn btn-secondary" href="/admin/manual/booking-management">
-                  3. Bookings (calendar)
-                </Link>
-              </Tooltip>
-              <Tooltip content="Creating and managing customer invoices.">
-                <Link className="btn btn-secondary" href="/admin/manual/invoice-management">
-                  4. Invoices (billing)
-                </Link>
-              </Tooltip>
+              {startHereSections.map((section, index) => (
+                <Tooltip key={section.id} content={section.summary}>
+                  <Link className={index === 0 ? "btn btn-primary" : "btn btn-secondary"} href={`/admin/manual/${section.id}`}>
+                    {index + 1}. {section.title}
+                  </Link>
+                </Tooltip>
+              ))}
             </div>
           </div>
         </aside>
@@ -64,60 +93,46 @@ export function AdminManualClient({ content }: AdminManualClientProps) {
         <div className="admin-manual-content-column">
           <section className="admin-manual-panel admin-manual-hero">
             <p className="admin-manual-hero-kicker">Operations Manual</p>
-            <h2>LessonFlow Admin Handbook</h2>
+            <h2>LessonFlow Handbook</h2>
             <p className="helper-text">
-              Updated procedural guide for bookings, customers, invoicing, reporting, student portal support, and technical operations.
+              A task-first guide for operators, owners, and technical owners. The repository docs and in-app manual are kept aligned so the procedures stay usable during live work.
             </p>
             <div className="admin-manual-route-pills">
-              <span className="admin-manual-pill">Version: 2026.03</span>
-              <span className="admin-manual-pill">Scope: Admin + Student + Public flows</span>
-              <span className="admin-manual-pill">Includes screenshot-backed steps</span>
+              <span className="admin-manual-pill">Scope: admin + student + public + VPS operations</span>
+              <span className="admin-manual-pill">Formatting: screenshot-backed procedures and command-safe docs</span>
+              <span className="admin-manual-pill">Source of truth: Documentation/</span>
             </div>
           </section>
 
-          <section className="admin-manual-panel">
-            <h2>Daily Operations</h2>
-            <p className="helper-text">Standard procedures for managing students and lessons.</p>
-            <div className="admin-manual-index-grid">
-              {grouped.allAdmins.map((section) => (
-                <Tooltip key={section.id} content={`Read ${section.title}`}>
-                  <Link href={`/admin/manual/${section.id}`} className="admin-manual-index-card">
-                    <div className="admin-manual-index-card-head">
-                      <h3>{section.title}</h3>
-                      <span className="admin-manual-audience-badge">All Admins</span>
-                    </div>
-                    <p>{section.summary}</p>
-                    <div className="admin-manual-index-card-actions">
-                      <span className="btn btn-secondary">Open Section</span>
-                    </div>
-                  </Link>
-                </Tooltip>
-              ))}
-            </div>
-          </section>
+          {SECTION_GROUPS.map((group) => {
+            const sections = sectionsForGroup(content.sections, group.key);
+            if (sections.length === 0) return null;
 
-          {grouped.techOwners.length > 0 ? (
-            <section className="admin-manual-panel">
-              <h2>Technical & System</h2>
-              <p className="helper-text">Advanced guides for school owners and technical admins.</p>
-              <div className="admin-manual-index-grid">
-                {grouped.techOwners.map((section) => (
-                  <Tooltip key={section.id} content={`Read ${section.title} (Technical Admin only)`}>
-                    <Link href={`/admin/manual/${section.id}`} className="admin-manual-index-card">
-                      <div className="admin-manual-index-card-head">
-                        <h3>{section.title}</h3>
-                        <span className="admin-manual-audience-badge technical">Technical Owner</span>
-                      </div>
-                      <p>{section.summary}</p>
-                      <div className="admin-manual-index-card-actions">
-                        <span className="btn btn-secondary">Open Section</span>
-                      </div>
-                    </Link>
-                  </Tooltip>
-                ))}
-              </div>
-            </section>
-          ) : null}
+            return (
+              <section key={group.key} className="admin-manual-panel">
+                <h2>{group.title}</h2>
+                <p className="helper-text">{group.description}</p>
+                <div className="admin-manual-index-grid">
+                  {sections.map((section) => (
+                    <Tooltip key={section.id} content={`Read ${section.title}`}>
+                      <Link href={`/admin/manual/${section.id}`} className="admin-manual-index-card">
+                        <div className="admin-manual-index-card-head">
+                          <h3>{section.title}</h3>
+                          <span className={`admin-manual-audience-badge ${section.audience === "technical_owner" ? "technical" : ""}`}>
+                            {section.audience === "technical_owner" ? "Technical Owner" : "All Admins"}
+                          </span>
+                        </div>
+                        <p>{section.summary}</p>
+                        <div className="admin-manual-index-card-actions">
+                          <span className="btn btn-secondary">Open Section</span>
+                        </div>
+                      </Link>
+                    </Tooltip>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
         </div>
       </AdminCard>
     </AdminShell>

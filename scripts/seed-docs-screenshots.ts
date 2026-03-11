@@ -8,6 +8,7 @@ import { PrismaClient } from "../src/generated/prisma/client";
 
 const projectRoot = process.cwd();
 const checklistPath = path.join(projectRoot, "Documentation", "assets", "SCREENSHOT_SEED_CHECKLIST.md");
+const learningMaterialsRoot = path.join(projectRoot, ".data", "learning-materials");
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -74,6 +75,12 @@ This project includes a deterministic screenshot seeder.
 `;
   fs.writeFileSync(checklistPath, checklist, "utf8");
   console.log(`Wrote screenshot seed checklist to ${path.relative(projectRoot, checklistPath)}`);
+}
+
+function writeDemoMaterial(relativePath: string, content: Buffer | string) {
+  const absolutePath = path.join(learningMaterialsRoot, relativePath);
+  fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+  fs.writeFileSync(absolutePath, content);
 }
 
 function cents(amount: any) {
@@ -450,6 +457,12 @@ async function seed() {
       ]
     });
 
+    writeDemoMaterial(
+      "docs-demo/alex/warmup-sheet.pdf",
+      Buffer.from("%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n", "utf8")
+    );
+    writeDemoMaterial("docs-demo/alex/backing-track.mp3", Buffer.from("ID3docs-demo-audio", "utf8"));
+
     const sellerBusinessName = process.env.INVOICE_BUSINESS_NAME || "Melbourne Guitar School";
     const sellerAbn = process.env.INVOICE_BUSINESS_ABN || "12345678901";
     const sellerEmail = process.env.SMTP_FROM || "Melbourne Guitar School <no-reply@example.com>";
@@ -649,4 +662,3 @@ main().catch((error) => {
   console.error(error);
   process.exit(1);
 });
-

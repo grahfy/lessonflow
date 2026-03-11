@@ -1,13 +1,13 @@
 # Screenshot Seed Checklist
 
-Last seeded: 2026-03-03T17:26:48.058Z
+Last seeded: 2026-03-11T14:03:13.703Z
 
 ## Demo Credentials
-- Admin email: `admin@example.com`
-- Admin password: `admin123`
+- Admin email: `owner@example.com`
+- Admin password: `DocsDemoAdmin!23`
 - Student login name: `Alex Student`
 - Student postcode: `3000`
-- Student password: `student123`
+- Student password: `StudentDemo!23`
 
 ## Dataset Summary
 - Customers: 2

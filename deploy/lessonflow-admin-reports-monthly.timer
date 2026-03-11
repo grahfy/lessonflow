@@ -5,7 +5,7 @@
 
 [Unit]
 Description=Run Admin Reports Monthly on the 1st at 8:15 AM
-Documentation=https://github.com/your-org/lessonflow-website
+Documentation=https://gitlab.com/grahfmusic/lessonflow
 
 [Timer]
 # Run monthly on the 1st at 8:15 AM

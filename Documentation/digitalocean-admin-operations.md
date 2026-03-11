@@ -1,66 +1,177 @@
-# DigitalOcean Admin Operations Runbook (Technical Owner)
+# Technical Owner Runbook: Installation, Updates, and Deploy Scripts
 
 <div class="manual-callout warning">
-<strong>Audience:</strong> This chapter is for technical owners and deployment operators responsible for infrastructure-level reliability.
+<strong>Audience:</strong> This chapter is for the person responsible for hosting, deployment, and production recovery. It is not required for normal lesson administration.
 </div>
 
-This runbook defines how LessonFlow is maintained in a DigitalOcean-hosted environment. It should be used during planned deployments, post-change verification, incident response, and credential rotation windows. The objective is controlled change with predictable rollback paths.
+## What This Runbook Covers
 
-A safe deployment sequence includes code update, dependency installation, migration execution, application build, service restart, and explicit post-deploy verification. Skipping verification is not acceptable; successful restart alone does not prove workflow correctness.
+- first-time installation on a VPS or server
+- routine updates
+- when to use each deploy script
+- service and timer verification
+- safe post-deploy checks
+- where to look if deployment or runtime behavior fails
 
-Post-deploy validation should include admin login, booking console load, invoice console load, and student portal route availability. If any critical route fails, halt further changes and investigate before normal operations resume.
+## Installation Flow for a New VPS
 
-Scheduled job reliability must be monitored continuously. Reminder jobs and other timed tasks should be checked for execution success and error patterns. Re-running failed jobs without diagnosis can duplicate side effects, so root-cause confirmation should happen before rerun.
+Use this sequence when LessonFlow is being installed on a host for the first time.
 
-Rollback readiness is part of every deployment plan. Maintain access to a known-good release state and confirm schema compatibility assumptions before applying rollback in production.
+### Step 1: Connect to the VPS
 
-Operational safety rules are strict: never run destructive data operations without backup confidence, never point seed/test tooling at production data, and always rotate sensitive secrets after exposure or incident suspicion.
+```bash
+ssh <deploy-user>@<server-host>
+```
 
-## Deployment Permissions and sudo
+Confirm you are on the correct machine before changing anything.
 
-Deployments previously required the deployment user to run the update script entirely via `sudo`. This has been updated to use granular privileges and ensure least privilege access.
+### Step 2: Place the repository on the server
 
-### Setting up a Deployment User
-If you are deploying for the first time, you must configure permissions so the deployment user can access the web root and restart services without `sudo` prompting.
+Clone or update the LessonFlow repository into the intended deploy location. Follow the host's normal Git access process.
 
-1. **Set up web root permissions:**
-   ```bash
-   sudo ./deploy/setup-permissions.sh <your_deployment_user>
-   ```
-   This script adds your user to the `www-data` group and sets `/var/www/lessonflow` to be group-writable so the build process can create releases.
+### Step 3: Install required packages
 
-2. **Configure passwordless service restarts:**
-   ```bash
-   sudo cp deploy/sudoers.template /etc/sudoers.d/lessonflow
-   sudo sed -i 's/<DEPLOY_USER>/<your_deployment_user>/g' /etc/sudoers.d/lessonflow
-   sudo chmod 0440 /etc/sudoers.d/lessonflow
-   ```
-   This allows the deployment user to restart `lessonflow`, `nginx`, and `cron` via `systemctl` during the deploy process without requiring an interactive password prompt.
+Use the package helper when preparing a fresh host:
 
-Once configured, simply run `./deploy/update.sh` as the deployment user. The script will automatically escalate privileges via `sudo` only for specific system commands, keeping the main build process isolated to your user permissions.
+```bash
+sudo ./deploy/setup-packages.sh
+```
 
-### Enable Browser-Triggered Updates
-The admin console update button now starts a dedicated host-side systemd runner instead of asking for sudo credentials in the browser.
+Use this when system dependencies are missing or the host is being prepared for LessonFlow for the first time.
 
-1. **Set the deploy user in the shared environment:**
-   ```bash
-   sudo nano /var/www/lessonflow/shared/.env
-   ```
-   Add:
-   ```bash
-   UPDATES_DEPLOY_USER=<your_deployment_user>
-   ```
+### Step 4: Configure filesystem permissions
 
-2. **Install the runtime-user trigger rule:**
-   ```bash
-   sudo cp deploy/web-update-trigger.sudoers.template /etc/sudoers.d/lessonflow-web-update
-   sudo sed -i 's/<APP_RUNTIME_USER>/www-data/g' /etc/sudoers.d/lessonflow-web-update
-   sudo chmod 0440 /etc/sudoers.d/lessonflow-web-update
-   ```
+Grant the intended deployment user the access required to manage releases safely:
 
-3. **Deploy once so the web-update service unit is installed/updated:**
-   ```bash
-   ./deploy/update.sh --branch main
-   ```
+```bash
+sudo ./deploy/setup-permissions.sh <deploy-user>
+```
 
-After these steps, the admin update modal will launch `lessonflow-web-update.service`, which runs the deploy flow as the configured deployment user while preserving the existing in-app log/progress screen.
+This prepares the web root and deployment permissions expected by the update and deploy flows.
+
+### Step 5: Run the first deploy
+
+For a first-time installation, use the main deploy script:
+
+```bash
+./deploy/deploy.sh
+```
+
+If your deployment process uses branch or release options, use the host's approved invocation pattern.
+
+### Step 6: Configure SSL if needed
+
+When the app is reachable on HTTP and the domain is ready, use the SSL helper:
+
+```bash
+sudo ./deploy/setup-ssl.sh
+```
+
+Use this only after domain and nginx prerequisites are correct.
+
+### Step 7: Verify the installation
+
+After deployment, confirm:
+
+- the app loads in a browser
+- `/admin/login` is reachable
+- the public site responds
+- the student login route responds
+- `lessonflow.service` is active
+- required timers/services are installed
+
+## Routine Updates on an Existing System
+
+For normal updates on an already-installed host, use:
+
+```bash
+./deploy/update.sh
+```
+
+This is the standard operator path for pulling changes, rebuilding, and restarting through the existing deployment model.
+
+Use `update.sh` when:
+
+- the app is already installed
+- you want the normal guided update flow
+- you are applying routine code/config changes
+
+## When to Use `deploy.sh` Instead of `update.sh`
+
+Use `deploy/deploy.sh` for:
+
+- first-time deployment
+- lower-level deployment work where the main deploy script is the correct entrypoint
+- recovery or reinstall scenarios where the update wrapper is not the right tool
+
+Use `deploy/update.sh` for:
+
+- normal ongoing updates to an existing installation
+
+## Deploy Script Reference
+
+| Script / File | Use it for | Notes |
+| --- | --- | --- |
+| `deploy/setup-packages.sh` | preparing a fresh host | installs required system packages |
+| `deploy/setup-permissions.sh` | deploy-user filesystem access | run when preparing or correcting deployment permissions |
+| `deploy/deploy.sh` | first-time or lower-level deployment | primary deploy script |
+| `deploy/update.sh` | routine updates | safest normal update path |
+| `deploy/setup-ssl.sh` | SSL setup | use only when nginx/domain prerequisites are ready |
+| `deploy/cron.sh` | scheduled job entrypoint | used by timers/services for background jobs |
+| `deploy/backup.sh` | backup operations | use for controlled backup workflows |
+| `deploy/maintenance.sh` | maintenance tasks | use only when the maintenance task matches the need |
+| `deploy/nginx.conf` | main nginx config template | server-facing configuration reference |
+| `deploy/nginx-http.conf` | pre-SSL or HTTP-only nginx config | transitional or HTTP-specific setup |
+| `deploy/lessonflow.service` | systemd app service | main application runtime |
+
+## Services and Timers to Verify
+
+Key runtime units include:
+
+- `lessonflow.service`
+- daily bookings digest timer/service
+- invoice reminders timer/service
+- admin reports timers/services
+- Gmail sync timer/service
+
+Check status with standard host tooling, for example:
+
+```bash
+systemctl status lessonflow
+systemctl list-timers --all | grep lessonflow
+```
+
+## Update Visibility from the Admin UI
+
+The admin console shows:
+
+- update-available banner
+- pending changes dialog
+- deployment history dialog
+- update progress page for web-triggered updates
+
+These help confirm what changed, but they do not replace the command-line runbook when you need to install, deploy, or recover the host.
+
+## Post-Deploy Verification Checklist
+
+After any installation or update:
+
+1. confirm the service is active
+2. confirm the site responds
+3. confirm admin login works
+4. open bookings, invoices, reports, logs, and settings
+5. confirm the student login route responds
+6. confirm timers/services still exist where expected
+
+## Recovery Hints
+
+If a deployment fails:
+
+- stop and read the output before retrying blindly
+- confirm whether the failure is package, build, config, permission, or service related
+- use the Logs page and host-side service status together
+- do not run test or seed tooling against production data
+
+<div class="manual-callout danger">
+<strong>Never do this on production:</strong> do not use local test-seeding flows, destructive cleanup scripts, or experimental commands unless you have a deliberate recovery plan and confirmed backups.
+</div>

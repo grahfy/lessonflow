@@ -39,8 +39,8 @@ The `setup-packages.sh` script automatically detects your OS and installs all de
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/lessonflow-website.git
-cd lessonflow-website
+git clone https://gitlab.com/grahfmusic/lessonflow.git
+cd lessonflow
 
 # Run automated setup (detects OS automatically)
 sudo ./deploy/setup-packages.sh
@@ -310,8 +310,8 @@ From your local machine or the server:
 
 ```bash
 # Clone or copy the application
-git clone https://github.com/your-org/lessonflow-website.git
-cd lessonflow-website
+git clone https://gitlab.com/grahfmusic/lessonflow.git
+cd lessonflow
 
 # Run deployment script (first time)
 # Tip: running without flags opens an interactive prompt in a TTY
@@ -724,10 +724,10 @@ sudo ./deploy/update.sh
 sudo ./deploy/update.sh --skip-cron
 
 # Or specify branch + SSL in one command
-sudo ./deploy/update.sh --branch main --ssl --domain example.com --email admin@example.com
+sudo ./deploy/update.sh --branch main --ssl --domain example.com
 
 # Or run non-interactively with SSL setup in one step
-sudo ./deploy/deploy.sh --branch main --ssl --domain example.com --email admin@example.com
+sudo ./deploy/deploy.sh --branch main --ssl --domain example.com
 ```
 
 ### Zero-Downtime Deploys

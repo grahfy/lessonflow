@@ -5,7 +5,7 @@
 
 [Unit]
 Description=Run Admin Reports Weekly on Monday at 8:00 AM
-Documentation=https://github.com/your-org/lessonflow-website
+Documentation=https://gitlab.com/grahfmusic/lessonflow
 
 [Timer]
 # Run weekly on Monday at 8:00 AM

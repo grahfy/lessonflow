@@ -10,7 +10,8 @@ import type {
   AdminManualIndex,
   AdminManualSection,
   AdminManualSectionIndex,
-  ManualScreenshot
+  ManualScreenshot,
+  ManualSectionGroup
 } from "@/lib/manual/content";
 
 type AdminManualSectionClientProps = {
@@ -20,9 +21,20 @@ type AdminManualSectionClientProps = {
   next: AdminManualSectionIndex | null;
 };
 
-/**
- * Main client for a specific manual guide page.
- */
+const GROUP_TITLES: Record<ManualSectionGroup, string> = {
+  foundation: "Start Here",
+  operations: "Daily Operations",
+  support: "Support and Student Experience",
+  configuration: "Settings and Configuration",
+  diagnostics: "Diagnostics and Recovery",
+  system: "System Awareness",
+  technical: "Technical Owner Runbook"
+};
+
+function sectionsForGroup(index: AdminManualIndex, group: ManualSectionGroup) {
+  return index.sections.filter((entry) => entry.group === group);
+}
+
 export function AdminManualSectionClient({
   index,
   section,
@@ -65,26 +77,25 @@ export function AdminManualSectionClient({
       .filter((screenshot): screenshot is ManualScreenshot => Boolean(screenshot));
   }, [index.screenshots, section.screenshotIds]);
 
-  const allAdminSections = index.sections.filter((entry) => entry.audience === "all_admins");
-  const technicalSections = index.sections.filter((entry) => entry.audience === "technical_owner");
+  const groupSections = sectionsForGroup(index, section.group);
 
   return (
     <AdminShell title="Manual" className="admin-shell-manual admin-shell-manual-page">
       <AdminCard className="admin-manual-layout">
         <aside className="admin-manual-toc">
           <div className="admin-manual-toc-panel">
-            <h2>Guides</h2>
+            <h2>{GROUP_TITLES[section.group]}</h2>
             <p className="helper-text">
-              Pick one guide at a time. Use the next/previous buttons at the bottom to keep going.
+              Stay within this section group for related work, or go back to the manual home to change context.
             </p>
             <div className="admin-manual-links">
               <Link className="btn btn-secondary" href="/admin/manual">Manual home</Link>
-              <Link className="btn btn-secondary" href="/admin/manual/troubleshooting-faq">Troubleshooting</Link>
+              <Link className="btn btn-secondary" href="/admin/manual/troubleshooting-quick-reference">Troubleshooting</Link>
             </div>
 
-            <h3>Daily admin work</h3>
+            <h3>This section group</h3>
             <ol className="admin-manual-list compact">
-              {allAdminSections.map((entry) => (
+              {groupSections.map((entry) => (
                 <li key={`toc-${entry.id}`}>
                   <Link className={entry.id === section.id ? "is-active" : ""} href={`/admin/manual/${entry.id}`}>
                     {entry.title}
@@ -93,12 +104,12 @@ export function AdminManualSectionClient({
               ))}
             </ol>
 
-            {technicalSections.length > 0 ? (
+            {section.group !== "technical" ? (
               <>
-                <h3>Technical & System</h3>
+                <h3>Technical owner</h3>
                 <ol className="admin-manual-list compact">
-                  {technicalSections.map((entry) => (
-                    <li key={`toc-${entry.id}`}>
+                  {sectionsForGroup(index, "technical").map((entry) => (
+                    <li key={`toc-tech-${entry.id}`}>
                       <Link className={entry.id === section.id ? "is-active" : ""} href={`/admin/manual/${entry.id}`}>
                         {entry.title}
                       </Link>
@@ -118,7 +129,7 @@ export function AdminManualSectionClient({
                   <span className={`admin-manual-audience-badge ${section.audience === "technical_owner" ? "technical" : ""}`}>
                     {section.audience === "technical_owner" ? "Technical Owner" : "All Admins"}
                   </span>
-                  <span className="helper-text">Manual Section</span>
+                  <span className="helper-text">{GROUP_TITLES[section.group]}</span>
                 </div>
                 <p className="lead">{section.summary}</p>
               </div>

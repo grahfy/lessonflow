@@ -92,6 +92,8 @@ NO_COLOR=false
 IS_TTY=false
 SPINNER_PID=""
 SPINNER_MSG=""
+SPINNER_LOG_FILE=""
+SPINNER_STARTED_AT=""
 SPINNER_FRAMES=( "⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏" )
 DEPLOY_TUI_PANEL_WIDTH=92
 DEPLOY_TUI_PANEL_WIDTH_MAX=120
@@ -597,6 +599,146 @@ log_error() {
 # Standardized warning line used for recoverable issues.
 log_warn() {
     echo -e "${YELLOW}▲${NC} $1"
+}
+
+format_duration_seconds() {
+    local total_seconds="$1"
+    local minutes=0
+    local seconds=0
+
+    if [[ -z "${total_seconds}" || ! "${total_seconds}" =~ ^[0-9]+$ ]]; then
+        echo "0s"
+        return 0
+    fi
+
+    minutes=$((total_seconds / 60))
+    seconds=$((total_seconds % 60))
+
+    if (( minutes == 0 )); then
+        echo "${seconds}s"
+        return 0
+    fi
+
+    if (( seconds == 0 )); then
+        echo "${minutes}m"
+        return 0
+    fi
+
+    echo "${minutes}m ${seconds}s"
+}
+
+estimate_next_build_eta_from_log() {
+    local log_file="$1"
+    local static_progress=""
+    local completed=0
+    local total=0
+    local remaining=0
+    local estimated_seconds=0
+
+    [[ -n "${log_file}" && -f "${log_file}" ]] || return 1
+
+    static_progress="$(grep -oE 'Generating static pages \([0-9]+/[0-9]+\)' "${log_file}" 2>/dev/null | tail -n 1 || true)"
+    if [[ -n "${static_progress}" ]]; then
+        completed="${static_progress#*(}"
+        completed="${completed%%/*}"
+        total="${static_progress#*/}"
+        total="${total%)}"
+
+        if [[ "${completed}" =~ ^[0-9]+$ && "${total}" =~ ^[0-9]+$ && "${total}" -gt 0 ]]; then
+            remaining=$(( total - completed ))
+            (( remaining < 0 )) && remaining=0
+            estimated_seconds=$(( remaining * 14 / 10 + 12 ))
+            (( estimated_seconds < 20 )) && estimated_seconds=20
+            echo "ETA $(format_duration_seconds "${estimated_seconds}")"
+            return 0
+        fi
+    fi
+
+    if grep -q "Collecting build traces" "${log_file}" 2>/dev/null || grep -q "Finalizing page optimization" "${log_file}" 2>/dev/null; then
+        echo "ETA under 1m"
+        return 0
+    fi
+
+    if grep -q "Compiled successfully in" "${log_file}" 2>/dev/null; then
+        echo "ETA about 1m"
+        return 0
+    fi
+
+    if grep -q "Creating an optimized production build" "${log_file}" 2>/dev/null; then
+        echo "ETA about 2-4m"
+        return 0
+    fi
+
+    if grep -q "Building Next.js application" "${log_file}" 2>/dev/null; then
+        echo "ETA about 3-5m"
+        return 0
+    fi
+
+    return 1
+}
+
+estimate_install_dependencies_eta() {
+    local elapsed_seconds="$1"
+
+    if [[ -z "${elapsed_seconds}" || ! "${elapsed_seconds}" =~ ^[0-9]+$ ]]; then
+        return 1
+    fi
+
+    if (( elapsed_seconds < 20 )); then
+        echo "ETA about 1-3m"
+        return 0
+    fi
+
+    if (( elapsed_seconds < 90 )); then
+        echo "ETA about 1-2m"
+        return 0
+    fi
+
+    if (( elapsed_seconds < 150 )); then
+        echo "ETA under 1m"
+        return 0
+    fi
+
+    echo "ETA finishing soon"
+}
+
+spinner_progress_suffix() {
+    local msg="$1"
+    local log_file="$2"
+    local now=""
+    local elapsed_seconds=0
+    local elapsed_label=""
+    local eta_label=""
+
+    now="$(date +%s)"
+    if [[ -n "${SPINNER_STARTED_AT}" && "${SPINNER_STARTED_AT}" =~ ^[0-9]+$ && "${now}" =~ ^[0-9]+$ ]]; then
+        elapsed_seconds=$(( now - SPINNER_STARTED_AT ))
+        (( elapsed_seconds < 0 )) && elapsed_seconds=0
+        elapsed_label="elapsed $(format_duration_seconds "${elapsed_seconds}")"
+    fi
+
+    if [[ "${msg}" == "Building Next.js application" ]]; then
+        eta_label="$(estimate_next_build_eta_from_log "${log_file}" || true)"
+    elif [[ "${msg}" == "Installing production dependencies (npm ci)" ]]; then
+        eta_label="$(estimate_install_dependencies_eta "${elapsed_seconds}" || true)"
+    fi
+
+    if [[ -n "${elapsed_label}" && -n "${eta_label}" ]]; then
+        echo "${elapsed_label} | ${eta_label}"
+        return 0
+    fi
+
+    if [[ -n "${elapsed_label}" ]]; then
+        echo "${elapsed_label}"
+        return 0
+    fi
+
+    if [[ -n "${eta_label}" ]]; then
+        echo "${eta_label}"
+        return 0
+    fi
+
+    echo "working..."
 }
 
 # Emit a section heading to visually separate deploy phases.
@@ -2235,17 +2377,22 @@ print_deploy_summary() {
 # Background spinner used by run_step for long-running commands while preserving command logs.
 start_spinner() {
     local msg="$1"
+    local log_file="${2:-}"
     local i=0
     local frame_count="${#SPINNER_FRAMES[@]}"
+    local suffix=""
 
     [[ "${NO_SPINNER}" == true || "${IS_TTY}" != true ]] && return 0
 
     SPINNER_MSG="${msg}"
+    SPINNER_LOG_FILE="${log_file}"
+    SPINNER_STARTED_AT="$(date +%s)"
     (
         while true; do
-            printf "\r${CYAN}%s${NC} %s ${DIM}%s${NC}" "${SPINNER_FRAMES[$i]}" "${SPINNER_MSG}" "working..."
+            suffix="$(spinner_progress_suffix "${SPINNER_MSG}" "${SPINNER_LOG_FILE}")"
+            printf "\r${CYAN}%s${NC} %s ${DIM}%s${NC}" "${SPINNER_FRAMES[$i]}" "${SPINNER_MSG}" "${suffix}"
             i=$(( (i + 1) % frame_count ))
-            sleep 0.08
+            sleep 0.2
         done
     ) &
     SPINNER_PID=$!
@@ -2275,6 +2422,8 @@ stop_spinner() {
     printf "\r${final_color}%s${NC} %s%*s\n" "${final_icon}" "${SPINNER_MSG}" 10 ""
     SPINNER_PID=""
     SPINNER_MSG=""
+    SPINNER_LOG_FILE=""
+    SPINNER_STARTED_AT=""
 }
 
 # Run a command with captured output and a spinner; on failure, print the tail of the log.
@@ -2285,7 +2434,7 @@ run_step() {
     local log_file
     log_file="$(mktemp)"
 
-    start_spinner "${message}"
+    start_spinner "${message}" "${log_file}"
     if "$@" >"${log_file}" 2>&1; then
         stop_spinner "ok"
         [[ "${NO_SPINNER}" == true || "${IS_TTY}" != true ]] && log_info "${message}"
@@ -2726,24 +2875,47 @@ try {
 }
 
 // 2. Record in database via API
-if (cronSecret && siteUrl) {
-  const url = `${siteUrl.replace(/\/+$/, "")}/api/admin/deploy-updates/record`;
-  
-  // Use a simple fetch-like approach with built-in modules or just assume it's best-effort.
-  // Since we don't want to add dependencies to the deploy script, we'll use a sub-process curl or node's https.
-  try {
-    const data = JSON.stringify(payload);
-    execFileSync("curl", [
-      "-X", "POST",
-      "-H", "Content-Type: application/json",
-      "-H", `Authorization: Bearer ${cronSecret}`,
-      "-d", data,
-      "--silent",
-      "--max-time", "10",
-      url
-    ]);
-  } catch (err) {
-    process.stderr.write(`Warning: Failed to record deployment in database: ${err.message}\n`);
+if (cronSecret) {
+  const candidateBaseUrls = Array.from(
+    new Set(
+      ["http://127.0.0.1:3000", siteUrl]
+        .map((value) => (value || "").trim().replace(/\/+$/, ""))
+        .filter(Boolean)
+    )
+  );
+
+  const data = JSON.stringify(payload);
+  const failures = [];
+
+  for (const baseUrl of candidateBaseUrls) {
+    const url = `${baseUrl}/api/admin/deploy-updates/record`;
+
+    try {
+      execFileSync("curl", [
+        "--request", "POST",
+        "--header", "Content-Type: application/json",
+        "--header", `Authorization: Bearer ${cronSecret}`,
+        "--data", data,
+        "--silent",
+        "--show-error",
+        "--fail",
+        "--max-time", "10",
+        "--retry", "5",
+        "--retry-delay", "2",
+        "--retry-connrefused",
+        url
+      ], {
+        stdio: ["ignore", "pipe", "pipe"]
+      });
+      failures.length = 0;
+      break;
+    } catch (err) {
+      failures.push(`${baseUrl}: ${err.message}`);
+    }
+  }
+
+  if (failures.length > 0) {
+    process.stderr.write(`Warning: Failed to record deployment in database: ${failures.join(" | ")}\n`);
   }
 }
 NODE

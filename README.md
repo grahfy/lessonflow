@@ -63,8 +63,8 @@ LessonFlow includes a custom deployment engine for Linux servers (Ubuntu, Debian
 Clone the repository on your server and run the automated package installer:
 
 ```bash
-git clone https://github.com/your-org/lessonflow-website.git
-cd lessonflow-website
+git clone https://gitlab.com/grahfmusic/lessonflow.git
+cd lessonflow
 sudo ./deploy/setup-packages.sh
 ```
 *This installs Node.js 20, MySQL/MariaDB, Nginx, Certbot, and configures the firewall.*
