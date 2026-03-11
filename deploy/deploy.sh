@@ -249,6 +249,11 @@ render_web_update_service_template() {
     local template_path="$1"
     local output_path="$2"
     local deploy_user="${UPDATES_DEPLOY_USER:-}"
+    local shared_env_path="${SHARED_DIR}/.env"
+
+    if [[ -z "${deploy_user}" && -f "${shared_env_path}" ]]; then
+        deploy_user="$(read_env_file_value "${shared_env_path}" "UPDATES_DEPLOY_USER" || true)"
+    fi
 
     if [[ -z "${deploy_user}" ]]; then
         log_warn "Skipping web update service install: UPDATES_DEPLOY_USER is not set."
@@ -3479,22 +3484,22 @@ if [[ -f "${NGINX_CERT_CHAIN}" && -f "${NGINX_CERT_KEY}" ]]; then
 fi
 
 log_info "Syncing nginx configuration from $(basename "${NGINX_TEMPLATE_SOURCE}")..."
-mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
+run_sudo_cmd mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
 if [[ -f "${NGINX_SITE_AVAILABLE}" ]]; then
-    cp "${NGINX_SITE_AVAILABLE}" "${NGINX_SITE_AVAILABLE}.bak"
+    run_sudo_cmd cp "${NGINX_SITE_AVAILABLE}" "${NGINX_SITE_AVAILABLE}.bak"
 fi
-cp "${NGINX_TEMPLATE_SOURCE}" "${NGINX_SITE_AVAILABLE}"
-ln -sf "${NGINX_SITE_AVAILABLE}" "${NGINX_SITE_ENABLED}"
-rm -f /etc/nginx/sites-enabled/default
+run_sudo_cmd cp "${NGINX_TEMPLATE_SOURCE}" "${NGINX_SITE_AVAILABLE}"
+run_sudo_cmd ln -sf "${NGINX_SITE_AVAILABLE}" "${NGINX_SITE_ENABLED}"
+run_sudo_cmd rm -f /etc/nginx/sites-enabled/default
 
-if nginx -t; then
+if run_sudo_cmd nginx -t; then
     log_info "Nginx configuration test passed"
 else
     log_error "Nginx configuration test failed"
     if [[ -f "${NGINX_SITE_AVAILABLE}.bak" ]]; then
         log_warn "Restoring previous nginx configuration backup..."
-        cp "${NGINX_SITE_AVAILABLE}.bak" "${NGINX_SITE_AVAILABLE}"
-        nginx -t >/dev/null 2>&1 || true
+        run_sudo_cmd cp "${NGINX_SITE_AVAILABLE}.bak" "${NGINX_SITE_AVAILABLE}"
+        run_sudo_cmd nginx -t >/dev/null 2>&1 || true
     fi
     exit 1
 fi
