@@ -1738,8 +1738,17 @@
 }
 
 .invoice-dialog-preset-select {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 12px;
   padding: 8px;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(15, 23, 42, 0.74);
+  color: var(--ink-0);
+  font: inherit;
+}
+
+.invoice-dialog-preset-select option {
+  background: rgba(15, 23, 42, 0.98);
+  color: var(--ink-0);
 }
 
 .invoice-dialog-status-card {

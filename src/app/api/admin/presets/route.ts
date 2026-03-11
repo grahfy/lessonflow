@@ -35,14 +35,20 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => null);
-    if (!body || !body.label || !body.description || typeof body.unitPriceCents !== "number") {
+    if (
+      !body ||
+      typeof body.label !== "string" ||
+      body.label.trim().length === 0 ||
+      typeof body.unitPriceCents !== "number" ||
+      (body.description !== undefined && typeof body.description !== "string")
+    ) {
       return NextResponse.json({ ok: false, error: "Missing required fields." }, { status: 400 });
     }
 
     const preset = await prisma.invoiceProductPreset.create({
       data: {
         label: body.label,
-        description: body.description,
+        description: body.description || "",
         unitPriceCents: body.unitPriceCents,
         sortOrder: body.sortOrder || 0
       }

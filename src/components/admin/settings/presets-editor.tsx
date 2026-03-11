@@ -84,6 +84,7 @@ export function AdminPresetsEditor() {
       description="Standardized price points and descriptions for common billing scenarios."
       notice={notice}
       error={error}
+      listClassName="admin-editor-list-two-column"
     >
       {draftPresets.map((preset) => (
         <AdminEditorPanel key={preset.id} subdued>

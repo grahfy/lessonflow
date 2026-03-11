@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { CommitMetadata } from "@/lib/services/updates-service";
 
@@ -43,9 +44,19 @@ export function PendingChangesModal({
     }
   }
 
-  return (
-    <div className="dialog-backdrop" onClick={onClose}>
-      <div className="dialog-panel dialog-panel-wide deploy-updates-dialog" onClick={(e) => e.stopPropagation()}>
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div className="dialog-backdrop deploy-updates-backdrop" onClick={onClose}>
+      <div
+        className="dialog-panel dialog-panel-wide deploy-updates-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Available repository updates"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="dialog-head">
           <h3>Available repository updates</h3>
           <button className="btn btn-secondary" type="button" disabled={loading} onClick={onClose}>Close</button>
@@ -91,9 +102,9 @@ export function PendingChangesModal({
 
           <div className="dialog-actions" style={{ marginTop: '24px', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
             {!confirming ? (
-              <button 
-                className="btn btn-primary" 
-                type="button" 
+              <button
+                className="btn btn-primary"
+                type="button"
                 disabled={loading || !webTriggerConfigured}
                 onClick={() => setConfirming(true)}
               >
@@ -111,6 +122,7 @@ export function PendingChangesModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

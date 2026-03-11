@@ -19,10 +19,12 @@
  *    future public access.
  */
 
+import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 
 import bcrypt from "bcryptjs";
+import { parse as parseDotenv } from "dotenv";
 import { z } from "zod";
 
 import { prisma } from "@/lib/db";
@@ -361,13 +363,13 @@ export const CONFIGURABLE_ENV_VARS = [
   {
     key: "INVOICE_DEFAULT_TAX_MODE",
     title: "Default Tax Mode",
-    description: "Default tax mode for invoices (gst_free, gst_inclusive, or gst_exclusive).",
-    placeholder: "gst_free",
+    description: "Default tax mode for invoices (taxable or gst_free).",
+    placeholder: "taxable",
     isRequired: false,
     isSecret: false,
     validation: (v: string) => {
       if (!v.trim()) return null;
-      if (!["gst_free", "gst_inclusive", "gst_exclusive"].includes(v)) return "Invalid tax mode";
+      if (!["taxable", "gst_free"].includes(v)) return "Invalid tax mode";
       return null;
     }
   },
@@ -920,6 +922,28 @@ function getEnvFilePath(): string {
 }
 
 /**
+ * Reads the managed env keys from the active runtime first, with the persisted .env file as a
+ * fallback for values that have not been loaded into the current process.
+ */
+function getStoredEnvValues(): Record<string, string> {
+  let fileValues: Record<string, string> = {};
+
+  try {
+    fileValues = parseDotenv(fsSync.readFileSync(getEnvFilePath(), "utf-8"));
+  } catch {
+    fileValues = {};
+  }
+
+  const values: Record<string, string> = {};
+  for (const envVar of CONFIGURABLE_ENV_VARS) {
+    const fileValue = fileValues[envVar.key];
+    values[envVar.key] = process.env[envVar.key] || (typeof fileValue === "string" ? fileValue : "");
+  }
+
+  return values;
+}
+
+/**
  * Writes all env vars to the .env file (preserves comments and unknown vars).
  */
 async function writeEnvFile(vars: Map<string, string>, managedKeys?: Set<string>): Promise<void> {
@@ -989,9 +1013,10 @@ async function writeEnvFile(vars: Map<string, string>, managedKeys?: Set<string>
  */
 export function getCurrentEnvValues(): Record<string, string> {
   const result: Record<string, string> = {};
+  const currentValues = getStoredEnvValues();
 
   for (const envVar of CONFIGURABLE_ENV_VARS) {
-    const value = process.env[envVar.key] || "";
+    const value = currentValues[envVar.key] || "";
     // Only mask if it's a secret AND it's not a placeholder
     if (envVar.isSecret && value && !isLikelyPlaceholder(value)) {
       result[envVar.key] = "***SET***";
@@ -1043,6 +1068,7 @@ export function validateEnvConfig(input: Record<string, string>): Record<string,
  */
 export async function saveEnvConfig(input: Record<string, string>): Promise<{ success: boolean; errors?: Record<string, string> }> {
   const errors = validateEnvConfig(input);
+  const currentValues = getStoredEnvValues();
 
   if (Object.keys(errors).length > 0) {
     return { success: false, errors };
@@ -1054,11 +1080,13 @@ export async function saveEnvConfig(input: Record<string, string>): Promise<{ su
     const value = input[envVar.key] || "";
     if (value && value !== "***SET***") {
       vars.set(envVar.key, value);
+      process.env[envVar.key] = value;
+    } else if (envVar.isSecret && currentValues[envVar.key]) {
+      vars.set(envVar.key, currentValues[envVar.key]);
+      process.env[envVar.key] = currentValues[envVar.key];
     } else {
-      const existingValue = process.env[envVar.key];
-      if (existingValue) {
-        vars.set(envVar.key, existingValue);
-      }
+      vars.set(envVar.key, "");
+      delete process.env[envVar.key];
     }
   }
 
@@ -1076,13 +1104,14 @@ export async function saveAdminSettingsConfig(
   options: { currentAdminId: string }
 ): Promise<AdminSettingsSaveResult> {
   const validationInput: Record<string, string> = {};
+  const currentValues = getStoredEnvValues();
   for (const envVar of CONFIGURABLE_ENV_VARS) {
     const rawValue = input[envVar.key] || "";
     if (envVar.isSecret && !rawValue.trim()) {
       // In the admin settings screen, blank secret inputs mean "keep current value" when a secret
       // is already configured. Validate against the currently loaded env value so required secrets
       // don't fail validation unnecessarily.
-      validationInput[envVar.key] = process.env[envVar.key] || "";
+      validationInput[envVar.key] = currentValues[envVar.key] || "";
       continue;
     }
     validationInput[envVar.key] = rawValue;
@@ -1144,11 +1173,12 @@ export async function saveAdminSettingsConfig(
       vars.set(envVar.key, value);
       // Update in-memory process.env so the current process sees the change immediately
       process.env[envVar.key] = value;
+    } else if (envVar.isSecret && currentValues[envVar.key]) {
+      vars.set(envVar.key, currentValues[envVar.key]);
+      process.env[envVar.key] = currentValues[envVar.key];
     } else {
-      const existingValue = process.env[envVar.key];
-      if (existingValue) {
-        vars.set(envVar.key, existingValue);
-      }
+      vars.set(envVar.key, "");
+      delete process.env[envVar.key];
     }
   }
 

@@ -18,10 +18,12 @@
  */
 
 "use client";
-import { APP_TIMEZONE } from "@/lib/time";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+
 import { Tooltip } from "@/components/admin/ui/tooltip";
+import { APP_TIMEZONE } from "@/lib/time";
 
 /** 
  * Represents a single Git commit included in a deployment payload.
@@ -210,26 +212,25 @@ export function AdminDeployUpdatesButton() {
     }
   }
 
-  return (
-    <>
-      <Tooltip content="Review recent code deployments and updates to the platform.">
-        <button className="btn btn-secondary" type="button" disabled={loading} onClick={() => void loadAndMaybeOpen({ forceOpen: true })}>
-          {loading ? "Loading..." : "Updates"}
-        </button>
-      </Tooltip>
-
-      {open ? (
-        <div className="dialog-backdrop" onClick={closeModal}>
-          <div className="dialog-panel dialog-panel-wide deploy-updates-dialog" onClick={(event) => event.stopPropagation()}>
+  const updatesDialog = open && typeof document !== "undefined"
+    ? createPortal(
+        <div className="dialog-backdrop deploy-updates-backdrop" onClick={closeModal}>
+          <div
+            className="dialog-panel dialog-panel-wide deploy-updates-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Deployment updates"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="dialog-head">
               <div className="deploy-updates-tabs">
-                <button 
+                <button
                   className={`tab-link ${activeTab === "latest" ? "active" : ""}`}
                   onClick={() => setActiveTab("latest")}
                 >
                   Latest
                 </button>
-                <button 
+                <button
                   className={`tab-link ${activeTab === "history" ? "active" : ""}`}
                   onClick={() => setActiveTab("history")}
                 >
@@ -289,7 +290,7 @@ export function AdminDeployUpdatesButton() {
                   <div className="deploy-history-list">
                     {history.map((item) => (
                       <div key={item.commit} className={`deploy-history-item ${expandedHistoryCommit === item.commit ? "expanded" : ""}`}>
-                        <div 
+                        <div
                           className="deploy-history-item-summary"
                           onClick={() => setExpandedHistoryCommit(expandedHistoryCommit === item.commit ? null : item.commit)}
                         >
@@ -304,7 +305,7 @@ export function AdminDeployUpdatesButton() {
                             <span className="expand-icon">{expandedHistoryCommit === item.commit ? "−" : "+"}</span>
                           </div>
                         </div>
-                        
+
                         {expandedHistoryCommit === item.commit && (
                           <div className="deploy-history-item-details">
                             {(item.commits || []).map((commit) => (
@@ -326,8 +327,19 @@ export function AdminDeployUpdatesButton() {
               </div>
             )}
           </div>
-        </div>
-      ) : null}
+        </div>,
+        document.body
+      )
+    : null;
+
+  return (
+    <>
+      <Tooltip content="Review recent code deployments and updates to the platform.">
+        <button className="btn btn-secondary" type="button" disabled={loading} onClick={() => void loadAndMaybeOpen({ forceOpen: true })}>
+          {loading ? "Loading..." : "Updates"}
+        </button>
+      </Tooltip>
+      {updatesDialog}
     </>
   );
 }

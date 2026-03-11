@@ -317,7 +317,7 @@ export function AdminSettingsClient() {
       className="admin-shell-settings"
     >
       <div className="admin-layout-content is-scrollable">
-        <AdminCard className="admin-toolbar-card admin-tab-toolbar booking-row">
+        <AdminCard className="admin-toolbar-card admin-tab-toolbar booking-row admin-actions-bar">
           <AdminTabNav activeKey={activeTab} items={SETTINGS_TABS} onChange={setActiveTab} />
         </AdminCard>
 

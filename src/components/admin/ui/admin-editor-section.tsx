@@ -11,6 +11,7 @@ interface AdminEditorSectionProps extends PropsWithChildren {
   notice?: string;
   error?: string;
   actions?: ReactNode;
+  listClassName?: string;
 }
 
 interface AdminEditorPanelProps extends PropsWithChildren {
@@ -29,8 +30,11 @@ export function AdminEditorSection({
   notice,
   error,
   actions,
+  listClassName,
   children
 }: AdminEditorSectionProps) {
+  const listClasses = ["admin-editor-list", listClassName].filter(Boolean).join(" ");
+
   return (
     <div className="form-grid">
       <AdminCard className="field full admin-editor-section">
@@ -41,7 +45,7 @@ export function AdminEditorSection({
 
         <AdminNoticeStack error={error} notice={notice} />
 
-        <div className="admin-editor-list">{children}</div>
+        <div className={listClasses}>{children}</div>
 
         {actions ? <div className="admin-editor-section-actions">{actions}</div> : null}
       </AdminCard>

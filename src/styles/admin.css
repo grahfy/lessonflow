@@ -742,6 +742,11 @@
   gap: 20px;
 }
 
+.admin-editor-list-two-column {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
 .admin-editor-section-actions {
   margin-top: 24px;
   padding-top: 16px;
@@ -750,6 +755,12 @@
 
 .admin-editor-panel {
   border: 1px solid var(--line);
+}
+
+@media (max-width: 980px) {
+  .admin-editor-list-two-column {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .admin-editor-panel.is-subdued {
@@ -773,20 +784,28 @@
   font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
 }
 
-.admin-editor-textarea {
+.field textarea.admin-editor-textarea {
   min-height: 120px;
 }
 
-.admin-editor-textarea-sm {
+.field textarea.admin-editor-textarea-sm {
   min-height: 60px;
 }
 
-.admin-editor-codearea {
+.field textarea.admin-editor-codearea {
   min-height: 200px;
 }
 
-.admin-editor-codearea-lg {
+.field textarea.admin-editor-codearea-lg {
   min-height: 220px;
+}
+
+.field textarea.admin-content-editor-codearea {
+  min-height: 360px;
+}
+
+.field textarea.admin-email-template-codearea {
+  min-height: 320px;
 }
 
 .admin-shell.admin-shell-reports {
@@ -1933,6 +1952,10 @@
   display: grid;
   place-items: center;
   padding: 12px;
+}
+
+.deploy-updates-backdrop {
+  z-index: 13010;
 }
 
 .dialog-panel {

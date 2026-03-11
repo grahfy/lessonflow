@@ -102,6 +102,7 @@ export function AdminEmailTemplateEditor() {
       description={<>Customize the subjects and content of automated system emails. Use {"{{ placeholders }}"} for dynamic content.</>}
       notice={notice}
       error={error}
+      listClassName="admin-editor-list-two-column"
       actions={
           <button className="btn btn-primary" disabled={saving} onClick={saveAll}>
             {saving ? "Saving..." : "Save All Templates"}
@@ -116,7 +117,7 @@ export function AdminEmailTemplateEditor() {
             </AdminField>
             <AdminField label="Body" tooltip="The HTML content of the email." required fullWidth>
               <textarea
-                className="admin-editor-codearea"
+                className="admin-editor-codearea admin-email-template-codearea"
                 value={template.body}
                 onChange={(event) => updateTemplate(template.key, { body: event.target.value })}
               />

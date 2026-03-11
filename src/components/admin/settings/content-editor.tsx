@@ -110,6 +110,7 @@ export function AdminContentEditor() {
       description="Edit the text shown on public-facing pages of the platform."
       notice={notice}
       error={error}
+      listClassName="admin-editor-list-two-column"
       actions={
           <button className="btn btn-primary" disabled={saving} onClick={saveAll}>
             {saving ? "Saving..." : "Save All Content"}
@@ -127,7 +128,7 @@ export function AdminContentEditor() {
             </AdminField>
             <AdminField label="Section Content (JSON)" tooltip="The structured text or data for this section (Edit carefully!)." fullWidth>
               <textarea
-                className="admin-editor-codearea admin-editor-codearea-lg"
+                className="admin-editor-codearea admin-editor-codearea-lg admin-content-editor-codearea"
                 value={section.contentText}
                 onChange={(event) => updateSection(section.key, { contentText: event.target.value })}
               />
