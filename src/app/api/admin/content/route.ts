@@ -1,7 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
+
+type ContentEntryInput = {
+  pagePath: string;
+  sectionKey: string;
+  content: Prisma.InputJsonValue | typeof Prisma.JsonNull;
+};
+
+function isContentEntry(value: unknown): value is ContentEntryInput {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<ContentEntryInput>;
+  return (
+    typeof candidate.pagePath === "string" &&
+    candidate.pagePath.trim().length > 0 &&
+    typeof candidate.sectionKey === "string" &&
+    candidate.sectionKey.trim().length > 0 &&
+    candidate.content !== undefined
+  );
+}
 
 export async function GET(request: NextRequest) {
   const admin = await requireAdminFromRequest(request);
@@ -37,30 +59,38 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { pagePath, sectionKey, content } = body;
+    const entries = (Array.isArray(body?.entries) ? body.entries : [body]) as unknown[];
 
-    if (!pagePath || !sectionKey || !content) {
+    if (entries.length === 0 || !entries.every(isContentEntry)) {
       return NextResponse.json({ ok: false, error: "Missing required fields" }, { status: 400 });
     }
 
-    const updated = await prisma.publicPageContent.upsert({
-      where: {
-        pagePath_sectionKey: {
-          pagePath,
-          sectionKey
-        }
-      },
-      update: {
-        content
-      },
-      create: {
-        pagePath,
-        sectionKey,
-        content
-      }
-    });
+    const updated = await prisma.$transaction(
+      entries.map((entry: ContentEntryInput) =>
+        prisma.publicPageContent.upsert({
+          where: {
+            pagePath_sectionKey: {
+              pagePath: entry.pagePath,
+              sectionKey: entry.sectionKey
+            }
+          },
+          update: {
+            content: entry.content
+          },
+          create: {
+            pagePath: entry.pagePath,
+            sectionKey: entry.sectionKey,
+            content: entry.content
+          }
+        })
+      )
+    );
 
-    return NextResponse.json({ ok: true, content: updated });
+    return NextResponse.json({
+      ok: true,
+      content: updated,
+      savedCount: updated.length
+    });
   } catch (error) {
     return jsonUnexpectedError(error, "Failed to save content.");
   }

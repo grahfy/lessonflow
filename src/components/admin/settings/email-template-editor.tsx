@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { AdminCard } from "@/components/admin/ui/admin-card";
+import { AdminEditorPanel, AdminEditorSection } from "@/components/admin/ui/admin-editor-section";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 
 type EmailTemplate = {
@@ -65,21 +65,19 @@ export function AdminEmailTemplateEditor() {
         return;
       }
 
-      const responses = await Promise.all(
-        templates.map((template) =>
-          fetch("/api/admin/email-templates", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              templateKey: template.key,
-              subject: template.subject,
-              htmlBody: template.body
-            })
-          })
-        )
-      );
+      const response = await fetch("/api/admin/email-templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          templates: templates.map((template) => ({
+            templateKey: template.key,
+            subject: template.subject,
+            htmlBody: template.body
+          }))
+        })
+      });
 
-      if (responses.some((response) => !response.ok)) {
+      if (!response.ok) {
         setError("Failed to save templates.");
         return;
       }
@@ -99,38 +97,33 @@ export function AdminEmailTemplateEditor() {
   if (loading) return <p className="helper-text">Loading templates...</p>;
 
   return (
-    <div className="form-grid">
-      <AdminCard className="field full">
-        <h2 className="admin-settings-section-title">Email Templates</h2>
-        <p className="helper-text" style={{ marginBottom: '16px' }}>
-          Customize the subjects and content of automated system emails. Use {"{{ placeholders }}"} for dynamic content.
-        </p>
-
-        {notice ? <p className="notice success">{notice}</p> : null}
-        {error ? <p className="notice error">{error}</p> : null}
-
-        <div style={{ display: 'grid', gap: '20px' }}>
-          {templates.map((t) => (
-            <AdminCard key={t.key} style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid var(--line)' }}>
-              <h3 style={{ fontSize: '0.9rem', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t.key.replace(/_/g, ' ')}</h3>
-              <AdminForm>
-                <AdminField label="Subject" tooltip="The subject line of this automated email." required fullWidth>
-                  <input value={t.subject} onChange={e => updateTemplate(t.key, { subject: e.target.value })} />
-                </AdminField>
-                <AdminField label="Body" tooltip="The HTML content of the email." required fullWidth>
-                  <textarea value={t.body} style={{ minHeight: '200px', fontFamily: 'monospace' }} onChange={e => updateTemplate(t.key, { body: e.target.value })} />
-                </AdminField>
-              </AdminForm>
-            </AdminCard>
-          ))}
-        </div>
-
-        <div className="button-row" style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--line)' }}>
+    <AdminEditorSection
+      title="Email Templates"
+      description={<>Customize the subjects and content of automated system emails. Use {"{{ placeholders }}"} for dynamic content.</>}
+      notice={notice}
+      error={error}
+      actions={
           <button className="btn btn-primary" disabled={saving} onClick={saveAll}>
             {saving ? "Saving..." : "Save All Templates"}
           </button>
-        </div>
-      </AdminCard>
-    </div>
+      }
+    >
+      {templates.map((template) => (
+        <AdminEditorPanel key={template.key} title={template.key.replace(/_/g, " ")} subdued>
+          <AdminForm>
+            <AdminField label="Subject" tooltip="The subject line of this automated email." required fullWidth>
+              <input value={template.subject} onChange={(event) => updateTemplate(template.key, { subject: event.target.value })} />
+            </AdminField>
+            <AdminField label="Body" tooltip="The HTML content of the email." required fullWidth>
+              <textarea
+                className="admin-editor-codearea"
+                value={template.body}
+                onChange={(event) => updateTemplate(template.key, { body: event.target.value })}
+              />
+            </AdminField>
+          </AdminForm>
+        </AdminEditorPanel>
+      ))}
+    </AdminEditorSection>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { AdminCard } from "@/components/admin/ui/admin-card";
+import { AdminEditorPanel, AdminEditorSection } from "@/components/admin/ui/admin-editor-section";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 
 type ContentSection = {
@@ -79,17 +79,13 @@ export function AdminContentEditor() {
         }
       }
 
-      const responses = await Promise.all(
-        parsedSections.map((section) =>
-          fetch("/api/admin/content", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(section)
-          })
-        )
-      );
+      const response = await fetch("/api/admin/content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: parsedSections })
+      });
 
-      if (responses.some((response) => !response.ok)) {
+      if (!response.ok) {
         setError("Failed to save content.");
         return;
       }
@@ -109,44 +105,36 @@ export function AdminContentEditor() {
   if (loading) return <p className="helper-text">Loading content...</p>;
 
   return (
-    <div className="form-grid">
-      <AdminCard className="field full">
-        <h2 className="admin-settings-section-title">Page Content</h2>
-        <p className="helper-text" style={{ marginBottom: '16px' }}>
-          Edit the text shown on public-facing pages of the platform.
-        </p>
-
-        {notice ? <p className="notice success">{notice}</p> : null}
-        {error ? <p className="notice error">{error}</p> : null}
-
-        <div style={{ display: 'grid', gap: '20px' }}>
-          {sections.map((section) => (
-            <AdminCard key={section.key} style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid var(--line)' }}>
-              <AdminForm>
-                <AdminField label="Page Path" tooltip="The URL path where this content is used." fullWidth>
-                  <input value={section.pagePath} readOnly />
-                </AdminField>
-                <AdminField label="Section Key" tooltip="Unique identifier for this specific content block." fullWidth>
-                  <input value={section.sectionKey} readOnly />
-                </AdminField>
-                <AdminField label="Section Content (JSON)" tooltip="The structured text or data for this section (Edit carefully!)." fullWidth>
-                  <textarea
-                    value={section.contentText}
-                    style={{ minHeight: '220px', fontFamily: 'monospace' }}
-                    onChange={(event) => updateSection(section.key, { contentText: event.target.value })}
-                  />
-                </AdminField>
-              </AdminForm>
-            </AdminCard>
-          ))}
-        </div>
-
-        <div className="button-row" style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--line)' }}>
+    <AdminEditorSection
+      title="Page Content"
+      description="Edit the text shown on public-facing pages of the platform."
+      notice={notice}
+      error={error}
+      actions={
           <button className="btn btn-primary" disabled={saving} onClick={saveAll}>
             {saving ? "Saving..." : "Save All Content"}
           </button>
-        </div>
-      </AdminCard>
-    </div>
+      }
+    >
+      {sections.map((section) => (
+        <AdminEditorPanel key={section.key} subdued>
+          <AdminForm>
+            <AdminField label="Page Path" tooltip="The URL path where this content is used." fullWidth>
+              <input value={section.pagePath} readOnly />
+            </AdminField>
+            <AdminField label="Section Key" tooltip="Unique identifier for this specific content block." fullWidth>
+              <input value={section.sectionKey} readOnly />
+            </AdminField>
+            <AdminField label="Section Content (JSON)" tooltip="The structured text or data for this section (Edit carefully!)." fullWidth>
+              <textarea
+                className="admin-editor-codearea admin-editor-codearea-lg"
+                value={section.contentText}
+                onChange={(event) => updateSection(section.key, { contentText: event.target.value })}
+              />
+            </AdminField>
+          </AdminForm>
+        </AdminEditorPanel>
+      ))}
+    </AdminEditorSection>
   );
 }
