@@ -34,6 +34,7 @@ tsconfig.tsbuildinfo
 *.exp
 
 # Local/private development notes and scratch files
+AGENTS.md
 CLAUDE.md
 GEMINI.md
 old_file.tsx
