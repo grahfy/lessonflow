@@ -3331,10 +3331,13 @@ fi
 # Prisma operations, and the build all share the same memory configuration.
 ensure_build_node_options
 
-# Link shared environment file
+# Copy shared environment file into the release for the build step. Next's
+# standalone output generation copies `.env` into `.next/standalone`, and doing
+# that from a symlink to the shared env can fail with EACCES on some hosts.
+# We switch back to the shared symlink after the build succeeds.
 if [[ -f "${SHARED_DIR}/.env" ]]; then
-    ln -sf "${SHARED_DIR}/.env" "${NEW_RELEASE_DIR}/.env"
-    log_info "Linked shared environment file"
+    cp "${SHARED_DIR}/.env" "${NEW_RELEASE_DIR}/.env"
+    log_info "Copied shared environment file into release"
 else
     log_warn "No shared .env file found at ${SHARED_DIR}/.env"
 fi
@@ -3391,6 +3394,12 @@ if [[ -d ".next/standalone" ]]; then
     fi
     mkdir -p ".next/standalone/.next"
     cp -r ".next/static" ".next/standalone/.next/"
+fi
+
+if [[ -f "${SHARED_DIR}/.env" ]]; then
+    rm -f "${NEW_RELEASE_DIR}/.env"
+    ln -sf "${SHARED_DIR}/.env" "${NEW_RELEASE_DIR}/.env"
+    log_info "Re-linked shared environment file"
 fi
 
 # Remove transient build caches from the release after assets are copied. The
