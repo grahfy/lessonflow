@@ -4,43 +4,93 @@
   <img src="lessonflow_logo.jpg" alt="LessonFlow logo" width="384"/>
 </p>
 
-LessonFlow is an MIT-licensed platform for music teachers and studios that unifies scheduling, customer records, invoicing, reporting, and student learning materials.
+LessonFlow is a self-hosted operations platform for music teachers and studios. It brings public lesson enquiries, booking administration, customer records, invoicing, reporting, student learning materials, and operational tooling into one system that can run on your own VPS.
 
-It is designed for self-hosted operations where a small team needs one system for day-to-day lesson administration.
+It is designed for small teams that want one admin console for day-to-day school operations without stitching together a calendar app, invoicing tool, portal, CMS, and deployment runbook.
 
-## Feature Highlights
+## What LessonFlow Includes
 
-- **Scheduling:** Public lesson enquiry and booking request flows with admin approval workflows. Day/week/month views.
-- **Invoicing:** Full financial lifecycle (`draft`, `sent`, `paid`, `void`), PDF generation, credit notes, and automated reminders.
-- **Customer Directory:** Centralized profile management with complete booking and invoice history.
-- **Student Portal:** Secure authenticated access for students to view schedules and assigned learning materials (Audio/PDF).
-- **Reporting:** Operational and revenue dashboards, including invoice aging and billing visibility.
-- **In-app System Updates:** Trigger and monitor application updates directly from the admin console with real-time logging.
-- **Anti-bot Protection:** Built-in SVG-based CAPTCHA and honeypot validation for all public-facing forms.
-- **Gmail Integration:** Native support for sending and syncing emails via the Gmail API.
-- **White-label CMS:** Dynamic control over public page content, branding, and SEO metadata via admin settings.
-- **Automatic Geo-detection:** Intelligent request country resolution for localized student and admin context.
-- **In-app Manual:** Comprehensive searchable operator manual (`/admin/manual`) synchronized with repository documentation.
-- **Gift Vouchers:** Public-facing voucher sales page with digital delivery and GiftUp integration.
-- **Video Showcase:** Public media page displaying teacher performance videos and original music.
-- **Terms & Conditions:** Dedicated public page for voucher and service terms.
-- **System Logs:** Admin-accessible diagnostic logs for troubleshooting (`/admin/system-logs`).
-- **CAPTCHA Protection:** SVG-based verification for admin email actions on booking requests.
-- **Modernized Scheduling:** Replaced legacy cron with systemd timers for reliable scheduled jobs.
-- **Enhanced Admin UX:** Mobile-friendly layouts, table pagination, inline tooltips, and improved dialog designs.
+- **Public website and lead capture**: Home, lessons, teacher, vouchers, videos, terms, contact, and booking pages, with editable public content and SEO-aware page management.
+- **Protected intake forms**: Booking and contact flows protected by CAPTCHA and honeypot checks, designed to feed directly into admin follow-up workflows.
+- **Admin scheduling console**: Day, week, month, and year calendar views with approval workflows, manual bookings, reschedules, cancellations, reminders, and invoice creation from booking context.
+- **Customer operations**: Searchable customer directory, contact-detail editing, booking and invoice history, portal credential management, and safe archive/delete workflows.
+- **Billing and follow-up**: Draft or send-now invoices, invoice presets, PDF generation, resend and reminder actions, overdue filtering, payment state changes, voiding, and credit-note support.
+- **Student portal and materials**: Secure student login, appointment visibility, request and cancellation actions, and access to assigned PDFs and audio learning materials.
+- **Reports and owner visibility**: Daily, weekly, monthly, yearly, and custom-range reporting, invoice aging visibility, and summary workflows for operational follow-up.
+- **Admin settings and whitelabel controls**: Branding, invoice, content, email, product, and system configuration from the admin console.
+- **System operations and diagnostics**: Admin system logs, bug-report workflows, in-app update visibility, and synchronized operator documentation in `/admin/manual`.
+- **Deployment and maintenance tooling**: VPS install, release, rollback, timer, and maintenance scripts built for `systemd + nginx + MariaDB` environments.
+- **Supporting integrations and utilities**: Gmail-based email workflows, geo detection, public voucher support, in-app manual screenshots, and white-label content management.
 
-## Documentation Map
+## Feature Inventory
 
-Use these docs based on what you are doing:
+### Public-facing functions
+- Marketing and trust pages: `/`, `/lessons`, `/teacher`, `/videos`, `/terms`
+- Enquiry and conversion flows: `/book`, `/contact`, `/vouchers`
+- CAPTCHA and honeypot validation for public form submissions
+- Editable public copy, branding, and metadata through admin-managed content settings
 
-- Local setup and day-to-day dev workflows: [`LOCAL-DEVELOPMENT.md`](LOCAL-DEVELOPMENT.md)
-- VPS deployment runbook: [`deploy/README.md`](deploy/README.md)
-- Admin operations handbook index: [`Documentation/README.md`](Documentation/README.md)
-- Technical operations for hosted environments: [`Documentation/digitalocean-admin-operations.md`](Documentation/digitalocean-admin-operations.md)
+### Admin console functions
+- Admin login, first-run setup, and protected admin routing
+- Bookings console with lesson approval, manual creation, edit, move, cancel, and reminder actions
+- Customer directory with profile editing, communication context, billing history, and portal support
+- Invoices console with create, send, resend, remind, mark paid/unpaid, void, delete, and PDF actions
+- Reports console with operational and revenue visibility plus overdue follow-up support
+- Settings console for branding, invoice settings, products, content, email, and system configuration
+- Manual console for screenshot-backed operator documentation
+- System logs page for event review and bug-report submission
+- Update progress and deployment visibility inside the admin experience
 
-## Quick Start (Local Development)
+### Student and owner support functions
+- Student login with generated credentials and verification checks
+- Student portal for lesson visibility, request handling, cancellation flow, and materials access
+- Learning-material upload, preview, assignment, and deletion workflows
+- Owner-facing reporting, billing follow-up, and release/update awareness
 
-Requirements: Node.js 20+, Docker + Docker Compose.
+### Platform and operational functions
+- MariaDB + Prisma data layer for bookings, customers, invoices, materials, and operational history
+- Scheduled background jobs via `systemd` timers for reminders, sync, and reporting
+- Self-hosted deployment scripts for install, update, rollback, SSL, backup, and maintenance
+- Repository handbook plus in-app manual kept aligned with screenshot automation
+
+## Why Teams Evaluate It
+
+- Built for **self-hosting**, with deployment scripts for low-power VPS environments using `systemd + nginx + MariaDB`.
+- Covers the full school workflow from **lead capture to invoicing to student follow-up**.
+- Keeps operator-facing knowledge close to the product with a synchronized **repository handbook and in-app manual**.
+- Includes tooling for ongoing operations, not just the app UI: **updates, reports, screenshot-backed docs, and service runbooks**.
+
+## Product Screenshots
+
+### Bookings Console
+![LessonFlow bookings console](public/documentation/screenshots/booking-calendar-week-view.png)
+The bookings console is the operational hub for approvals, lesson management, and calendar visibility.
+
+### Invoices and Follow-Up
+![LessonFlow invoices console](public/documentation/screenshots/invoice-console-list-and-filters.png)
+The invoices view surfaces billing status, overdue balances, and reminder workflows in one place.
+
+### Reports Dashboard
+![LessonFlow reports dashboard](public/documentation/screenshots/admin-reports-dashboard.png)
+Owners can review activity, earnings, and overdue trends without leaving the admin console.
+
+### Settings and Configuration
+![LessonFlow settings page](public/documentation/screenshots/admin-settings-page.png)
+Branding, content, invoicing, products, and system configuration are all managed from admin settings.
+
+### Student Portal
+![LessonFlow student portal](public/documentation/screenshots/student-portal-page.png)
+Students can review appointments and access assigned learning materials from their portal.
+
+### Public Booking Flow
+![LessonFlow public booking page](public/documentation/screenshots/public-book-page.png)
+Public intake starts on the booking page and feeds directly into the admin workflow.
+
+## Quick Start
+
+Requirements:
+- Node.js 20+
+- Docker with Compose support
 
 ```bash
 npm ci
@@ -53,105 +103,79 @@ npm run dev
 
 Then open:
 - App: `http://localhost:3000`
-- First-run setup wizard: `http://localhost:3000/setup`
+- Setup wizard: `http://localhost:3000/setup`
 
-## Production Installation (VPS)
+For a fuller local workflow, seeded demo data, and troubleshooting, use [`LOCAL-DEVELOPMENT.md`](LOCAL-DEVELOPMENT.md).
 
-LessonFlow includes a custom deployment engine for Linux servers (Ubuntu, Debian, RHEL, Arch, etc.).
+## Self-Hosting on a VPS
 
-### 1. Server Preparation
-Clone the repository on your server and run the automated package installer:
+LessonFlow ships with deployment scripts for Linux VPS environments.
 
 ```bash
 git clone https://gitlab.com/grahfmusic/lessonflow.git
 cd lessonflow
 sudo ./deploy/setup-packages.sh
-```
-*This installs Node.js 20, MySQL/MariaDB, Nginx, Certbot, and configures the firewall.*
-
-### 2. Initial Deployment
-Run the deployment script to set up the directory structure and build the application:
-
-```bash
 sudo ./deploy/deploy.sh --branch main --ssl --domain yourdomain.com
 ```
 
-If `/var/www/lessonflow/shared/.env` includes `SSL_EMAIL` or `ADMIN_EMAIL`, the deploy scripts will reuse that address for first-time SSL setup. Pass `--email` to override it for a specific run.
+After deployment, finish setup in the browser at `https://yourdomain.com/setup`.
 
-### 3. Complete Setup
-Visit `https://yourdomain.com/setup` to create your admin account and verify the environment.
+Deploy model:
+- `deploy/update.sh` advances the persistent source checkout with `git fetch/pull`.
+- `deploy/deploy.sh` builds a fresh timestamped release under `/var/www/lessonflow/releases/` and repoints `/var/www/lessonflow/current`.
+- `sudo ./deploy/deploy.sh --print-deploy-mode` reports the current host layout.
 
-For detailed VPS instructions, see [`deploy/README.md`](deploy/README.md).
+For full install, update, rollback, SSL, timer, and troubleshooting guidance, see [`deploy/README.md`](deploy/README.md).
 
-## Common Commands
+## Documentation Map
+
+- Local setup and daily developer workflow: [`LOCAL-DEVELOPMENT.md`](LOCAL-DEVELOPMENT.md)
+- VPS deployment and maintenance: [`deploy/README.md`](deploy/README.md)
+- Operator handbook index: [`Documentation/README.md`](Documentation/README.md)
+- Technical owner runbook: [`Documentation/digitalocean-admin-operations.md`](Documentation/digitalocean-admin-operations.md)
+- Detailed release notes: [`Documentation/release-notes-v1.0.md`](Documentation/release-notes-v1.0.md)
+- Release maintainer checklist: [`Documentation/release-maintainer-checklist.md`](Documentation/release-maintainer-checklist.md)
+
+## Core Commands
 
 ```bash
-# App lifecycle
-npm run dev           # Start development server
-npm run build         # Create production build
-npm run start         # Start production server
-npm run clean         # Remove build artifacts and stale caches
+# Development
+npm run dev
+npm run build
+npm run start
 
-# Quality checks
-npm run lint          # Run ESLint
-npm run typecheck     # Run TypeScript compiler check
+# Quality
+npm run lint
+npm run typecheck
 
 # Tests
-npm run test:prepare  # Setup test database
-npm run test          # Run Vitest integration tests
-npm run test:e2e      # Run Playwright E2E tests
+npm run test
+npm run test:e2e
 
-# Docs screenshots
-npm run docs:screenshots:update   # Capture and sync screenshots for manual
+# Manual screenshots
+npm run docs:screenshots:seed
+npm run docs:screenshots
+npm run docs:screenshots:sync
 
 # Prisma
-npm run prisma:generate  # Update Prisma client
-npm run prisma:migrate   # Run database migrations
-npm run prisma:studio    # Open database explorer
+npm run prisma:generate
+npm run prisma:migrate
 ```
 
-## Important Routes
+## Stack
 
-Public:
-- `/` (Home), `/lessons`, `/teacher`, `/vouchers`, `/videos`, `/contact`, `/book` (Booking request), `/terms`
+- Next.js 15 App Router
+- TypeScript 5
+- MariaDB with Prisma
+- Radix UI and GSAP
+- Zod validation
+- Vitest and Playwright
 
-Admin:
-- `/admin/login`, `/admin/bookings`, `/admin/customers`, `/admin/invoices`, `/admin/reports`, `/admin/settings`, `/admin/manual`, `/admin/system-logs`, `/admin/updates`
+## Key Routes
 
-Student:
-- `/student/login`, `/student/portal`, `/student/materials`
-
-## Deploy & Maintenance Scripts
-
-Located in [`deploy/`](deploy/), these scripts handle the server lifecycle:
-
-- **`setup-packages.sh`**: One-time server bootstrap. Detects OS and installs all dependencies.
-- **`deploy.sh`**: The core release engine. Handles builds, migrations, Nginx sync, and systemd timer setup.
-  - `sudo ./deploy/deploy.sh --interactive` (Recommended for first-time or manual deploys)
-  - `sudo ./deploy/deploy.sh --rollback` (Instant zero-downtime rollback to previous release)
-- **`update.sh`**: Wrapper for `git pull` + `deploy.sh`. Used for routine updates.
-  - `sudo ./deploy/update.sh --interactive`
-- **`setup-ssl.sh`**: Automates Let's Encrypt certificate acquisition and Nginx SSL config.
-- **`maintenance.sh`**: Operational upkeep, cache cleaning, and service restarts.
-- **`backup.sh`**: Database and application data backup helper.
-- **`cron.sh`**: The entrypoint for scheduled jobs using systemd timers (reminders, digests, reports).
-
-## Whitelabel and Branding
-
-LessonFlow supports deep rebranding and content customization without code changes.
-
-Primary configuration surfaces:
-- **Environment Variables:** Global branding and secrets in `.env`.
-- **Admin Settings:** Real-time control over colors, logos, and email templates via `/admin/settings`.
-- **Public CMS:** Edit marketing copy and metrics for public pages directly in the browser.
-
-## Screenshots
-
-### Admin Dashboard (Bookings Console)
-![LessonFlow admin dashboard bookings console](public/documentation/screenshots/booking-calendar-week-view.png)
-
-### Admin Reports Dashboard
-![LessonFlow admin reports dashboard](public/documentation/screenshots/admin-reports-dashboard.png)
+- Public: `/`, `/lessons`, `/teacher`, `/vouchers`, `/videos`, `/contact`, `/book`, `/terms`
+- Admin: `/admin/login`, `/admin/bookings`, `/admin/customers`, `/admin/invoices`, `/admin/reports`, `/admin/settings`, `/admin/manual`, `/admin/system-logs`
+- Student: `/student/login`, `/student/portal`, `/student/materials`
 
 ## License
 

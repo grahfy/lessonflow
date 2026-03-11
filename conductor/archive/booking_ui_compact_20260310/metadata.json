@@ -1,8 +1,0 @@
-{
-  "track_id": "booking_ui_compact_20260310",
-  "type": "refactor",
-  "status": "new",
-  "created_at": "2026-03-10T10:00:00Z",
-  "updated_at": "2026-03-10T10:00:00Z",
-  "description": "re-adjust admin booking popup ui so i can see everything without scrolling up and down"
-}

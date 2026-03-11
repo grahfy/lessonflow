@@ -4,6 +4,9 @@ This folder stores screenshot assets used by:
 - `Documentation/*.md` guides, and
 - the in-app admin manual (`/admin/manual`) via `public/documentation/screenshots/` sync.
 
+`Documentation/assets/` is the authored source of truth.
+`public/documentation/screenshots/` is the synced runtime/public copy used by the app and repo-facing screenshots.
+
 The current manual structure expects screenshots for the core admin, student, public, and diagnostic workflows. Existing baseline coverage includes bookings, customers, invoices, reports, settings, manual, and student/public pages. As the manual grows, add captures for any new section that benefits from a real UI example rather than descriptive prose alone.
 
 ## Capture Workflow

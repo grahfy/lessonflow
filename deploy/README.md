@@ -84,6 +84,11 @@ cd /var/www/lessonflow/current
 sudo ./deploy/update.sh --branch main
 ```
 
+Deploy model:
+- `update.sh` pulls the persistent source checkout forward with `git fetch/pull`.
+- `deploy.sh` then builds a fresh timestamped release under `/var/www/lessonflow/releases/` and repoints `/var/www/lessonflow/current`.
+- Check the current host layout any time with `sudo ./deploy/deploy.sh --print-deploy-mode`.
+
 Recommended defaults:
 - `Dependencies`: ON for normal releases (turn OFF only when you know lockfiles/deps did not change)
 - `Cron jobs sync`: ON so the managed cron block stays aligned with supported jobs
@@ -332,6 +337,7 @@ Notes:
 - The deploy script prunes old Node/npm temp files in `/tmp`, `/var/tmp`, and npm cache temp before builds to reduce ENOSPC failures.
 - Use `--no-spinner --no-color` for CI/log-only environments.
 - `deploy/update.sh` wraps `git fetch/pull` + `deploy.sh` with the same interactive/spinner UI.
+- `deploy/deploy.sh --print-deploy-mode` reports whether the host is already using the supported release-directory layout or still looks legacy/in-place.
 - Both scripts now expose `Dependencies` and `Cron jobs sync` as first-class TUI main-menu options.
 - `deploy.sh` / `update.sh` self-update at startup via `git pull` (when applicable), show detailed commit changes, wait for a keypress in TTY mode, and restart back to the main menu if the script code changed.
 - `deploy.sh` and `update.sh` banners now render dynamically and include the app version from `package.json`, so longer titles do not break the right border.
@@ -736,6 +742,12 @@ The deployment script keeps the last 5 releases. If something goes wrong:
 
 ```bash
 sudo ./deploy/deploy.sh --rollback
+```
+
+To confirm the host is on the expected layout before or after an update:
+
+```bash
+sudo ./deploy/deploy.sh --print-deploy-mode
 ```
 
 ---

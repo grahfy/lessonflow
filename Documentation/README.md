@@ -34,6 +34,7 @@ Start with:
 ## Release Notes
 
 - [Version 1.0](release-notes-v1.0.md)
+- [Release Maintainer Checklist](release-maintainer-checklist.md)
 
 ## Screenshot Pipeline
 

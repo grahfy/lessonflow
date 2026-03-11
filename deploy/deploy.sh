@@ -77,6 +77,7 @@ INSTALL_APP_SERVICE_IF_NEEDED=false
 INSTALL_CRON_JOBS_IF_NEEDED=false
 AUTO_BOOTSTRAP=true
 UPDATE_PRISMA_ONLY=false
+PRINT_DEPLOY_MODE_ONLY=false
 SSL_SETUP=false
 SSL_DOMAIN=""
 SSL_EMAIL=""
@@ -102,6 +103,10 @@ TEMP_BUILD_SWAP_CREATED_FILE=false
 DEPLOY_GIT_REPO_ROOT=""
 DEPLOY_PREVIOUS_COMMIT_HASH=""
 DEPLOY_TARGET_COMMIT_HASH=""
+DEPLOY_MODE="release-directory"
+DEPLOY_MODE_DETAIL=""
+DEPLOY_MODE_RUNTIME_PATH=""
+DEPLOY_MODE_WARNING=""
 
 # Colors for output
 RED='\033[0;31m'
@@ -137,6 +142,7 @@ Options:
   --install-app-service  Install/update the app systemd unit and enable service
   --install-cron-jobs  Install/update systemd timer units for scheduled jobs (default: ON)
   --no-auto-bootstrap  Disable automatic bootstrap detection for missing host setup
+  --print-deploy-mode  Detect deploy layout/status and exit
   --ssl             Run SSL setup after deployment
   --domain DOMAIN   Domain for SSL certificate
   --email EMAIL     Email for SSL certificate
@@ -2181,6 +2187,130 @@ print_summary_row() {
     printf "  %-16b %b%s%b\n" "${DIM}${label}:${NC}" "${CYAN}" "${clipped_value}" "${NC}"
 }
 
+path_targets_release_dir() {
+    local candidate="$1"
+
+    [[ -n "${candidate}" ]] || return 1
+    [[ "${candidate}" == "${RELEASES_DIR}" || "${candidate}" == "${RELEASES_DIR}/"* ]]
+}
+
+current_symlink_points_to_release_dir() {
+    local raw_target=""
+    local resolved_target=""
+
+    [[ -L "${CURRENT_LINK}" ]] || return 1
+
+    raw_target="$(readlink "${CURRENT_LINK}" 2>/dev/null || true)"
+    resolved_target="$(readlink -f "${CURRENT_LINK}" 2>/dev/null || true)"
+
+    path_targets_release_dir "${raw_target}" || path_targets_release_dir "${resolved_target}"
+}
+
+is_release_layout_available() {
+    if [[ -d "${RELEASES_DIR}" ]]; then
+        return 0
+    fi
+
+    current_symlink_points_to_release_dir
+}
+
+is_legacy_in_place_checkout() {
+    if [[ -e "${CURRENT_LINK}" && ! -L "${CURRENT_LINK}" && -f "${CURRENT_LINK}/package.json" ]]; then
+        return 0
+    fi
+
+    if [[ ! -e "${CURRENT_LINK}" && -f "${DEPLOY_DIR}/package.json" ]]; then
+        return 0
+    fi
+
+    return 1
+}
+
+deploy_mode_label() {
+    case "${DEPLOY_MODE}" in
+        release-directory) echo "release-directory" ;;
+        release-bootstrap) echo "release-directory (bootstrap)" ;;
+        legacy-in-place) echo "legacy in-place" ;;
+        legacy-mixed) echo "legacy/in-place mixed with releases" ;;
+        broken-current-link) echo "broken current symlink" ;;
+        *) echo "${DEPLOY_MODE}" ;;
+    esac
+}
+
+detect_deploy_mode() {
+    local current_raw_target=""
+    local current_resolved_target=""
+    local latest_release=""
+
+    DEPLOY_MODE="release-directory"
+    DEPLOY_MODE_DETAIL="Timestamped release directories are the default deploy path."
+    DEPLOY_MODE_RUNTIME_PATH="${CURRENT_LINK}"
+    DEPLOY_MODE_WARNING=""
+
+    if [[ -L "${CURRENT_LINK}" ]]; then
+        current_raw_target="$(readlink "${CURRENT_LINK}" 2>/dev/null || true)"
+        current_resolved_target="$(readlink -f "${CURRENT_LINK}" 2>/dev/null || true)"
+
+        if current_symlink_points_to_release_dir; then
+            DEPLOY_MODE="release-directory"
+            DEPLOY_MODE_DETAIL="current points at a timestamped release under ${RELEASES_DIR}."
+            DEPLOY_MODE_RUNTIME_PATH="${current_resolved_target:-${current_raw_target}}"
+            return 0
+        fi
+
+        DEPLOY_MODE="broken-current-link"
+        DEPLOY_MODE_DETAIL="current exists as a symlink, but its target is not under ${RELEASES_DIR}."
+        DEPLOY_MODE_RUNTIME_PATH="${current_raw_target:-${CURRENT_LINK}}"
+        DEPLOY_MODE_WARNING="Repair the current symlink before relying on rollback semantics."
+        return 0
+    fi
+
+    if [[ -e "${CURRENT_LINK}" && ! -L "${CURRENT_LINK}" && -f "${CURRENT_LINK}/package.json" ]]; then
+        DEPLOY_MODE_RUNTIME_PATH="${CURRENT_LINK}"
+
+        if is_release_layout_available; then
+            DEPLOY_MODE="legacy-mixed"
+            DEPLOY_MODE_DETAIL="current is an in-place checkout instead of a release symlink."
+            DEPLOY_MODE_WARNING="Release directories exist, but the live runtime is still legacy/in-place."
+        else
+            DEPLOY_MODE="legacy-in-place"
+            DEPLOY_MODE_DETAIL="Live runtime appears to be an in-place checkout at ${CURRENT_LINK}."
+            DEPLOY_MODE_WARNING="This deploy will bootstrap ${RELEASES_DIR} and switch back to release-directory mode."
+        fi
+        return 0
+    fi
+
+    if [[ ! -e "${CURRENT_LINK}" && -f "${DEPLOY_DIR}/package.json" ]]; then
+        DEPLOY_MODE="legacy-in-place"
+        DEPLOY_MODE_DETAIL="App files appear to live directly under ${DEPLOY_DIR}."
+        DEPLOY_MODE_RUNTIME_PATH="${DEPLOY_DIR}"
+        DEPLOY_MODE_WARNING="This deploy will bootstrap ${RELEASES_DIR} and use ${CURRENT_LINK} as the runtime symlink."
+        return 0
+    fi
+
+    latest_release="$(ls -1dt "${RELEASES_DIR}"/* 2>/dev/null | head -n 1 || true)"
+    if [[ -n "${latest_release}" ]]; then
+        DEPLOY_MODE="release-bootstrap"
+        DEPLOY_MODE_DETAIL="Release directories exist; current will be linked or repaired during deploy."
+        DEPLOY_MODE_RUNTIME_PATH="${latest_release}"
+        return 0
+    fi
+
+    DEPLOY_MODE="release-bootstrap"
+    DEPLOY_MODE_DETAIL="Fresh bootstrap; deploy.sh will create timestamped releases under ${RELEASES_DIR}."
+    DEPLOY_MODE_RUNTIME_PATH="${CURRENT_LINK}"
+}
+
+print_deploy_mode_report() {
+    detect_deploy_mode
+    printf 'Deploy mode: %s\n' "$(deploy_mode_label)"
+    printf 'Detail: %s\n' "${DEPLOY_MODE_DETAIL}"
+    printf 'Runtime path: %s\n' "${DEPLOY_MODE_RUNTIME_PATH}"
+    if [[ -n "${DEPLOY_MODE_WARNING}" ]]; then
+        printf 'Warning: %s\n' "${DEPLOY_MODE_WARNING}"
+    fi
+}
+
 deploy_migration_mode_label() {
     if [[ "${DB_PUSH}" == true ]]; then
         echo "db-push (skip migrations)"
@@ -2349,11 +2479,14 @@ run_interactive_setup() {
 
 # Print a compact summary before executing so deploy choices are explicit.
 print_deploy_summary() {
+    detect_deploy_mode
     section "Deploy Summary"
     echo -e "  ${BOLD}Overview${NC}"
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     print_summary_row "App" "${APP_NAME}"
     print_summary_row "Branch" "${BRANCH}"
+    print_summary_row "Deploy mode" "$(deploy_mode_label)"
+    print_summary_row "Runtime path" "${DEPLOY_MODE_RUNTIME_PATH}"
     print_summary_row "Database mode" "$(deploy_migration_mode_label)"
     print_summary_row "Auto bootstrap" "$(bool_word "${AUTO_BOOTSTRAP}")"
     print_summary_row "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")"
@@ -2364,6 +2497,12 @@ print_deploy_summary() {
     print_summary_row "Install Nginx" "$(bool_word "${INSTALL_NGINX_IF_NEEDED}")"
     print_summary_row "SSL setup" "$(bool_word "${SSL_SETUP}")"
     print_summary_row "Spinner UI" "$(spinner_ui_word)"
+    if [[ -n "${DEPLOY_MODE_WARNING}" ]]; then
+        print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
+        echo -e "  ${BOLD}${YELLOW}Deploy mode warning${NC}"
+        print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
+        print_summary_row "Warning" "${DEPLOY_MODE_WARNING}"
+    fi
     if [[ "${SSL_SETUP}" == true ]]; then
         print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
         echo -e "  ${BOLD}SSL${NC}"
@@ -3395,6 +3534,7 @@ while [[ $# -gt 0 ]]; do
         --install-app-service) INSTALL_APP_SERVICE_IF_NEEDED=true; shift ;;
         --install-cron-jobs) INSTALL_CRON_JOBS_IF_NEEDED=true; shift ;;
         --no-auto-bootstrap) AUTO_BOOTSTRAP=false; shift ;;
+        --print-deploy-mode) PRINT_DEPLOY_MODE_ONLY=true; shift ;;
         --update-prisma) UPDATE_PRISMA_ONLY=true; shift ;;
         --help|-h)
             show_usage
@@ -3403,6 +3543,11 @@ while [[ $# -gt 0 ]]; do
         *) log_error "Unknown argument: $1"; exit 1 ;;
     esac
 done
+
+if [[ "${PRINT_DEPLOY_MODE_ONLY}" == true ]]; then
+    print_deploy_mode_report
+    exit 0
+fi
 
 # Detects legacy deployment naming and migrates host paths/service/nginx/cron to
 # lessonflow so future update.sh/deploy.sh runs stay on the current runtime.
@@ -3597,6 +3742,7 @@ check_legacy_migration
 repair_current_symlink_drift
 detect_previous_deploy_defaults_from_host
 auto_enable_bootstrap_defaults_deploy
+detect_deploy_mode
 
 if [[ "${MGS_RETURN_TO_MENU_AFTER_SELF_UPDATE:-}" == "1" && "${IS_TTY}" == true && "${ROLLBACK}" == false ]]; then
     INTERACTIVE=true
@@ -3703,6 +3849,11 @@ fi
 section "Deployment"
 log_info "Starting deployment of branch: ${BRANCH}"
 log_info "Deploy directory: ${DEPLOY_DIR}"
+log_info "Deploy mode: $(deploy_mode_label)"
+log_info "Runtime path: ${DEPLOY_MODE_RUNTIME_PATH}"
+if [[ -n "${DEPLOY_MODE_WARNING}" ]]; then
+    log_warn "${DEPLOY_MODE_WARNING}"
+fi
 
 # Resolve the application source directory independently from the caller's cwd.
 # This allows operators to run ./deploy/update.sh from inside ./deploy without
@@ -3788,6 +3939,11 @@ else
     # Copy current directory
     rsync -a --exclude='node_modules' --exclude='.next' --exclude='.git' \
           --exclude='*.log' --exclude='prisma/*.db' \
+          --exclude='.agent' --exclude='.opencode' --exclude='conductor' --exclude='thoughts' \
+          --exclude='.sisyphus' --exclude='CLAUDE.md' --exclude='GEMINI.md' \
+          --exclude='old_file.tsx' --exclude='get-users.ts' --exclude='check-pass.ts' \
+          --exclude='invoice-presets-management.md' --exclude='latest-deploy-update-test.json' \
+          --exclude='rebase.txt' --exclude='scn1.png' --exclude='settings-*.png' \
           "${SOURCE_DIR}/" "${NEW_RELEASE_DIR}/"
 fi
 

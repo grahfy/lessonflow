@@ -5,7 +5,12 @@ dist
 .DS_Store
 *.log
 .data/
+.sisyphus/
 .serena/
+.agent/
+.opencode/
+conductor/
+thoughts/
 .next_cache_errfix_*/
 test-results/
 invoice_template.png
@@ -27,3 +32,15 @@ src/generated/prisma/
 
 tsconfig.tsbuildinfo
 *.exp
+
+# Local/private development notes and scratch files
+CLAUDE.md
+GEMINI.md
+old_file.tsx
+get-users.ts
+check-pass.ts
+invoice-presets-management.md
+latest-deploy-update-test.json
+rebase.txt
+scn1.png
+settings-*.png
