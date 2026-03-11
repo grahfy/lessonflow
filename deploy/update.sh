@@ -297,6 +297,24 @@ cert_files_exist_for_domain() {
   [[ -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && -f "/etc/letsencrypt/live/${domain}/privkey.pem" ]]
 }
 
+ssl_email_required_for_domain() {
+  local domain="$1"
+
+  [[ -n "${domain}" ]] || return 0
+
+  if cert_files_exist_for_domain "${domain}"; then
+    return 1
+  fi
+
+  if [[ "${domain}" == www.* ]]; then
+    cert_files_exist_for_domain "${domain#www.}" && return 1
+  else
+    cert_files_exist_for_domain "www.${domain}" && return 1
+  fi
+
+  return 0
+}
+
 # Best-effort host config discovery for update.sh defaults. It infers whether
 # SSL is already configured on the server and pre-fills domain/email where
 # readable, so operators do not need to re-toggle SSL settings every run.
@@ -1429,7 +1447,11 @@ status_chip() {
 }
 
 tui_clear_screen() {
-  [[ "${IS_TTY}" == true ]] && clear
+  [[ "${IS_TTY}" == true ]] || return 0
+
+  if ! clear 2>/dev/null; then
+    printf '\033[H\033[2J\033[3J'
+  fi
 }
 
 print_tui_panel_rule() {
@@ -2186,9 +2208,16 @@ run_interactive_setup() {
         install_app_systemd_service_from_update || true
         ;;
       s)
-        if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true && ( -z "${SSL_DOMAIN}" || -z "${SSL_EMAIL}" ) ]]; then
-          log_warn "SSL setup still needs a detected or explicit domain/email before deploy can start."
-          continue
+        if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true ]]; then
+          if [[ -z "${SSL_DOMAIN}" ]]; then
+            log_warn "SSL setup still needs a detected or explicit domain before deploy can start."
+            continue
+          fi
+
+          if [[ -z "${SSL_EMAIL}" ]] && ssl_email_required_for_domain "${SSL_DOMAIN}"; then
+            log_warn "SSL setup still needs a certbot email before deploy can start because no existing live certificate was found for ${SSL_DOMAIN}."
+            continue
+          fi
         fi
         break
         ;;
@@ -2266,8 +2295,13 @@ run_deploy() {
   local effective_ssl_email="${SSL_EMAIL}"
 
   if [[ "${SSL_SETUP}" == true ]]; then
-    if [[ -z "${effective_ssl_domain}" || -z "${effective_ssl_email}" ]]; then
-      log_error "SSL setup requires a detected or explicit domain/email. Re-run with --domain/--email or configure the live host Nginx/certbot settings first."
+    if [[ -z "${effective_ssl_domain}" ]]; then
+      log_error "SSL setup requires a detected or explicit domain. Re-run with --domain or configure the live host Nginx settings first."
+      exit 1
+    fi
+
+    if [[ -z "${effective_ssl_email}" ]] && ssl_email_required_for_domain "${effective_ssl_domain}"; then
+      log_error "SSL setup requires a certbot email when no existing live certificate was found for ${effective_ssl_domain}. Re-run with --email or configure certbot on the host first."
       exit 1
     fi
   fi
@@ -2278,7 +2312,10 @@ run_deploy() {
   [[ "${SKIP_CRON_SETUP}" == true ]] && deploy_args+=( "--skip-cron" )
   [[ "${SKIP_MIGRATE}" == true ]] && deploy_args+=( "--skip-migrate" )
   [[ "${DB_PUSH}" == true ]] && deploy_args+=( "--db-push" )
-  [[ "${SSL_SETUP}" == true ]] && deploy_args+=( "--ssl" "--domain" "${effective_ssl_domain}" "--email" "${effective_ssl_email}" )
+  if [[ "${SSL_SETUP}" == true ]]; then
+    deploy_args+=( "--ssl" "--domain" "${effective_ssl_domain}" )
+    [[ -n "${effective_ssl_email}" ]] && deploy_args+=( "--email" "${effective_ssl_email}" )
+  fi
   [[ "${INSTALL_NGINX_IF_NEEDED}" == true ]] && deploy_args+=( "--install-nginx" )
   [[ "${INSTALL_PHP_FPM_IF_NEEDED}" == true ]] && deploy_args+=( "--install-php-fpm-if-needed" )
   [[ "${INSTALL_CRON_IF_NEEDED}" == true ]] && deploy_args+=( "--install-cron" )
@@ -2495,9 +2532,16 @@ if [[ "${DB_PUSH}" == true ]]; then
   SKIP_MIGRATE=true
 fi
 
-if [[ "${SSL_SETUP}" == true && ( -z "${SSL_DOMAIN}" || -z "${SSL_EMAIL}" ) && "${INTERACTIVE}" == false ]]; then
-  log_error "SSL setup requires a detected or explicit domain/email when running non-interactively."
-  exit 1
+if [[ "${SSL_SETUP}" == true && "${INTERACTIVE}" == false ]]; then
+  if [[ -z "${SSL_DOMAIN}" ]]; then
+    log_error "SSL setup requires a detected or explicit domain when running non-interactively."
+    exit 1
+  fi
+
+  if [[ -z "${SSL_EMAIL}" ]] && ssl_email_required_for_domain "${SSL_DOMAIN}"; then
+    log_error "SSL setup requires a certbot email when no existing live certificate was found for ${SSL_DOMAIN}."
+    exit 1
+  fi
 fi
 
 if [[ "${INTERACTIVE}" == true ]]; then
