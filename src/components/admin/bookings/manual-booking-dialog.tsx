@@ -37,10 +37,17 @@ interface ManualBookingDialogProps {
   busyAction: string | null;
 }
 
+/** Restricts numeric-only inputs without allowing hidden punctuation through. */
 function toDigits(val: string, max: number) {
   return val.replace(/\D/g, "").slice(0, max);
 }
 
+/**
+ * Multi-step dialog for creating a manual booking from the admin calendar.
+ *
+ * RATIONALE: The flow intentionally separates customer, lesson, and scheduling
+ * data so admins can resolve customer matches before committing a booking row.
+ */
 export function ManualBookingDialog({
   isOpen,
   onClose,
@@ -68,6 +75,11 @@ export function ManualBookingDialog({
 }: ManualBookingDialogProps) {
   const stepIndex = MANUAL_STEP_ORDER.indexOf(step);
 
+  /**
+   * Applies address-autocomplete results directly to the uncontrolled form
+   * fields so admins keep the speed of native inputs without mirroring every
+   * address field in React state.
+   */
   const handleAddressSelect = (addr: ParsedAddress) => {
     if (!formRef.current) return;
     const form = formRef.current;
@@ -79,6 +91,8 @@ export function ManualBookingDialog({
       }
     };
 
+    // NOTE: AddressAutocomplete returns normalized text, but state still needs
+    // to be clamped to the app's supported AU state union.
     updateInput("unitNumber", addr.unitNumber);
     updateInput("houseNumber", addr.houseNumber);
     updateInput("streetName", addr.streetName);
@@ -117,6 +131,9 @@ export function ManualBookingDialog({
             ) : (
               <Tooltip content="Proceed to the next step.">
                 <button className="btn btn-primary" onClick={() => setStep(MANUAL_STEP_ORDER[stepIndex + 1])}>
+                  {/* RATIONALE: Step labels reinforce what data will be reviewed
+                      next, which matters because the form is split across hidden
+                      panes instead of one long scrolling sheet. */}
                   Next: {MANUAL_STEP_LABEL[MANUAL_STEP_ORDER[stepIndex + 1]]}
                 </button>
               </Tooltip>
@@ -155,6 +172,8 @@ export function ManualBookingDialog({
                     const cid = e.target.value;
                     setManualCustomerId(cid);
                     const selected = customerOptions.find(c => c.id === cid);
+                    // RATIONALE: Selecting a known customer pre-fills the form so
+                    // admins can edit only what differs for this booking.
                     if (selected) onApplyCustomer(selected);
                   }}
                 >
@@ -292,6 +311,8 @@ export function ManualBookingDialog({
                       const next = event.currentTarget.checked;
                       setIsRecurring(next);
                       if (!next && formRef.current) {
+                        // NOTE: Clear the hidden end-date field when recurrence
+                        // is disabled so a stale value is not submitted later.
                         const recurrenceField = formRef.current.elements.namedItem("recurrenceEndAt");
                         if (recurrenceField && "value" in recurrenceField) {
                           recurrenceField.value = "";
@@ -314,6 +335,9 @@ export function ManualBookingDialog({
                   <Tooltip content="Apply the booking to this existing customer profile.">
                     <button 
                       className="btn btn-primary" 
+                      // RATIONALE: The primary action respects the checkbox state
+                      // so admins can decide whether the booking should also
+                      // refresh the existing customer profile details.
                       onClick={() => onResolveMatch(updateCustomerFromBooking ? "update_existing" : "use_existing")}
                     >
                       Use Existing

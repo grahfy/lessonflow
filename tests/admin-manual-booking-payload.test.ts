@@ -33,6 +33,8 @@ describe("buildManualBookingPayload", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
+    // NOTE: Non-recurring payloads should omit recurrence metadata entirely so
+    // the admin create route does not infer weekly-series behavior.
     expect(result.payload.isRecurring).toBe(false);
     expect(result.payload.recurrenceEndAt).toBeUndefined();
     expect(result.payload.name).toBe("Taylor Student");
@@ -80,6 +82,8 @@ describe("buildManualBookingPayload", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
+    // RATIONALE: The API still uses the canonical enum plus optional custom
+    // minutes, so "custom" in the form layer normalizes back to `min60`.
     expect(result.payload.lessonDuration).toBe("min60");
     expect(result.payload.customDurationMinutes).toBe(45);
   });

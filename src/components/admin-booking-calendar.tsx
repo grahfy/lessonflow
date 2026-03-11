@@ -47,10 +47,12 @@ type Props = {
   onSelect: (event: AdminCalendarEvent) => void;
 };
 
+/** Human-readable heading for one calendar day cell or day-view header. */
 function dayLabel(date: Date): string {
   return format(date, "EEE d MMM");
 }
 
+/** Formats event times in the app's canonical timezone rather than browser local time. */
 function eventTime(iso: string): string {
   return new Intl.DateTimeFormat("en-AU", {
     hour: "2-digit",
@@ -60,6 +62,7 @@ function eventTime(iso: string): string {
   }).format(parseISO(iso));
 }
 
+/** Checks whether an event starts on the given rendered calendar day. */
 function eventDay(event: AdminCalendarEvent, day: Date): boolean {
   return isSameDay(parseISO(event.startAt), day);
 }
@@ -96,6 +99,7 @@ function eventMonth(event: AdminCalendarEvent, monthStart: Date): boolean {
   return isSameMonth(parseISO(event.startAt), monthStart);
 }
 
+/** Shared day cell for day/week/month views. */
 function DayCell(props: {
   day: Date;
   events: AdminCalendarEvent[];
@@ -170,6 +174,10 @@ function YearMonthCell(props: {
   );
 }
 
+/**
+ * Presentational booking calendar that renders the same event set across day,
+ * week, month, and year views.
+ */
 export function AdminBookingCalendar(props: Props) {
   const baseDate = parseISO(`${props.date}T00:00:00`);
 

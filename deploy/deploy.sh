@@ -179,6 +179,8 @@ detect_source_mode_for_path() {
     fi
 
     if [[ -d "${resolved_dir}/.git" ]]; then
+        # RATIONALE: A real `.git` directory means this source tree can support
+        # fetch/pull style maintenance and commit introspection during deploys.
         DETECTED_SOURCE_PATH="${resolved_dir}"
         SOURCE_MODE="git"
         SOURCE_MODE_DETAIL="Persistent git checkout"
@@ -186,6 +188,8 @@ detect_source_mode_for_path() {
     fi
 
     if [[ -f "${resolved_dir}/package.json" && -f "${resolved_dir}/package-lock.json" && -d "${resolved_dir}/deploy" ]]; then
+        # NOTE: Archive/copy mode intentionally requires the deploy folder and
+        # lockfile so the wrapper can trust this is a full releasable source tree.
         DETECTED_SOURCE_PATH="${resolved_dir}"
         SOURCE_MODE="archive"
         SOURCE_MODE_DETAIL="Extracted release archive or copied source tree"
@@ -227,9 +231,13 @@ resolve_source_dir_for_deploy() {
     elif [[ -f "${SCRIPT_DIR}/../package.json" && -d "${SCRIPT_DIR}/../deploy" ]]; then
         resolved="$(cd "${SCRIPT_DIR}/.." 2>/dev/null && pwd || printf '%s' "${SCRIPT_DIR}/..")"
     else
+        # NOTE: Keep the caller-provided path as a last resort so later errors
+        # can report the exact unresolved location the operator passed in.
         resolved="${SOURCE_DIR}"
     fi
 
+    # RATIONALE: Normalizing to one resolved source root early keeps later copy,
+    # ownership, and source-mode checks consistent regardless of cwd.
     detect_source_mode_for_path "${resolved}" || true
     SOURCE_DIR="${DETECTED_SOURCE_PATH:-${resolved}}"
 }
@@ -932,6 +940,10 @@ ensure_shared_env_file() {
         log_info "Created shared .env from template: ${shared_env_path}"
     else
         # Merge missing keys from template into existing shared env
+        # RATIONALE: Existing values are preserved because production hosts may
+        # already contain secrets or host-specific overrides not present in git.
+        # NOTE: This merge is append-only by design. Deploys should surface new
+        # config knobs without clobbering previously curated production values.
         local temp_env
         temp_env="$(mktemp)"
         cp "${shared_env_path}" "${temp_env}"
@@ -958,6 +970,8 @@ ensure_shared_env_file() {
 
     # Auto-generate CRON_SECRET if missing or empty
     if ! grep -q "^[[:space:]]*CRON_SECRET=[^[:space:]]" "${shared_env_path}"; then
+        # NOTE: Cron/systemd job calls need a secret on first deploy even before
+        # an operator has manually curated the shared env file.
         local new_secret
         new_secret="$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)"
         if grep -q "^[[:space:]]*CRON_SECRET=" "${shared_env_path}"; then
@@ -1452,6 +1466,8 @@ setup_mysql_and_database_from_shared_env() {
         localhost|127.0.0.1)
             ;;
         *)
+            # RATIONALE: This helper is only safe for single-host VPS installs.
+            # Remote database provisioning must stay an explicit manual step.
             log_error "DATABASE_URL host is '${DB_URL_HOST}', which is not a local MySQL host."
             log_error "This helper only installs a local MySQL server and creates a local database."
             return 1
@@ -1465,6 +1481,8 @@ setup_mysql_and_database_from_shared_env() {
     ensure_mysql_installed_for_env_db_setup
     ensure_mysql_service_running_for_env_db_setup
 
+    # NOTE: Existence is checked through INFORMATION_SCHEMA so rerunning the
+    # helper is idempotent and does not rely on parsing CLI error text.
     escaped_db_name="${DB_URL_NAME//\'/\'\'}"
     db_identifier="${DB_URL_NAME//\`/\`\`}"
     exists_sql="SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '${escaped_db_name}' LIMIT 1;"
@@ -1511,6 +1529,9 @@ run_migrations() {
         return 1
     fi
 
+    # NOTE: Only the very first migration is eligible for automatic baseline
+    # recovery. Later migrations may contain real schema/data changes that must
+    # not be silently skipped on a production database.
     # Try migrate deploy first and capture output so we can detect safe baseline
     # recovery cases precisely instead of baselining on every migration failure.
     local migrate_output=""
@@ -1540,6 +1561,8 @@ run_migrations() {
     fi
 
     if [[ "${should_baseline}" == false ]]; then
+        # NOTE: Anything outside the explicit baseline cases is treated as a
+        # real migration failure and left for operator review.
         log_error "Migration failed for a non-baseline reason. Aborting automatic recovery."
         return "${migrate_status}"
     fi

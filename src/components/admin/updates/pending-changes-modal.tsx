@@ -13,6 +13,10 @@ interface PendingChangesModalProps {
   onClose: () => void;
 }
 
+/**
+ * Portal-based confirmation modal for running host update workflows from the
+ * admin UI.
+ */
 export function PendingChangesModal({
   commits,
   webTriggerConfigured,
@@ -25,6 +29,10 @@ export function PendingChangesModal({
   const [error, setError] = useState("");
   const { safeFetch, handleApiError } = useSafeFetch({ onError: setError });
 
+  /**
+   * Starts the server-side update runner and hands the admin off to the
+   * dedicated progress screen once the command has been accepted.
+   */
   async function handleUpdate() {
     setLoading(true);
     setError("");
@@ -51,6 +59,8 @@ export function PendingChangesModal({
   }
 
   return createPortal(
+    // RATIONALE: Render into `document.body` so the modal is not clipped by any
+    // admin shell overflow/stacking contexts while deployment UI is open.
     <div className="dialog-backdrop deploy-updates-backdrop" onClick={onClose}>
       <div
         className="dialog-panel dialog-panel-wide deploy-updates-dialog"
@@ -108,6 +118,8 @@ export function PendingChangesModal({
                 className="btn btn-primary"
                 type="button"
                 disabled={loading || !webTriggerConfigured}
+                // NOTE: Deployment requires an explicit second click so the
+                // commit list can be reviewed before the host runner starts.
                 onClick={() => setConfirming(true)}
               >
                 Update Now

@@ -63,6 +63,8 @@ describe("admin-customer-email", () => {
 
     const res = await POST(req, { params: Promise.resolve({ id: customer.id }) });
     
+    // NOTE: Production mode should reject the send before any outbound row is
+    // recorded when the captcha challenge is invalid.
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toContain("CAPTCHA");
@@ -104,6 +106,8 @@ describe("admin-customer-email", () => {
 
     const res = await POST(req, { params: Promise.resolve({ id: customer.id }) });
     
+    // RATIONALE: A valid captcha should preserve the normal queued-no-smtp
+    // behavior rather than introducing a separate success contract.
     expect(res.status).toBe(200);
     const data = await res.json() as { ok: boolean; status?: string; message?: string };
     expect(data.ok).toBe(true);

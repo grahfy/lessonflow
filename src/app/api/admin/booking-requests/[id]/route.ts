@@ -49,6 +49,7 @@ const requestEditSchema = z.object({
   recurrenceEndAt: z.string().datetime({ offset: true }).nullable().optional()
 });
 
+/** Formats the recurring-series start time in the app's canonical local timezone. */
 function localTime(date: Date): string {
   return new Intl.DateTimeFormat("en-AU", {
     timeZone: APP_TIMEZONE,
@@ -81,6 +82,9 @@ async function resolveCustomerIdForApproval(input: {
   };
 }): Promise<string> {
   if (input.bookingRequest.customerId) {
+    // RATIONALE: When an admin or public flow already linked a customer to the
+    // request, approval should preserve that relationship rather than re-match
+    // by contact details and risk switching to a different family profile.
     const linked = await input.tx.customer.findUnique({
       where: {
         id: input.bookingRequest.customerId
@@ -91,6 +95,9 @@ async function resolveCustomerIdForApproval(input: {
     }
   }
 
+  // NOTE: Deterministic matching is intentionally limited to normalized email
+  // and phone. Name-only matching is too ambiguous for an approval pathway that
+  // can create bookings, portal credentials, and customer-facing email.
   const existing = await input.tx.customer.findFirst({
     where: {
       isArchived: false,
@@ -107,6 +114,9 @@ async function resolveCustomerIdForApproval(input: {
     return existing.id;
   }
 
+  // RATIONALE: Approval is allowed to bootstrap a new customer because the
+  // request has passed through admin review and now becomes a first-class
+  // student record in the system.
   const normalizedState = auStateSchema.safeParse(input.bookingRequest.state);
 
   const created = await input.tx.customer.create({
@@ -198,6 +208,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             recurrenceEndAt: bookingRequest.recurrenceEndAt
           });
 
+          // NOTE: The request remains the provenance link for every generated
+          // booking row so later admin investigation can trace the series back
+          // to the original request details and approval action.
           await tx.booking.createMany({
             data: starts.map((startAt) => ({
               firstName: bookingRequest.firstName,
@@ -286,6 +299,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
       // Send customer email after transaction commit to avoid sending approvals that failed to persist.
       // Audit log entry is recorded by the event wrapper.
+      // RATIONALE: The credential helper returns a plaintext password only when a
+      // credential is created/rotated during this approval. Existing customers
+      // keep their current portal access and therefore receive no new password.
       await sendCustomerBookingStatusEmail({
         email: approvalResult.updated.email,
         name: approvalResult.updated.name,
@@ -326,6 +342,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       await sendCustomerBookingStatusEmail({
         email: updated.email,
         name: updated.name,
+        // NOTE: The shared booking-status email templates use the cancelled copy
+        // path for both admin rejection and student-side cancellation outcomes.
         status: "cancelled",
         when: updated.requestedStartAt,
         audit: {
@@ -354,6 +372,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       await sendCustomerBookingStatusEmail({
         email: updated.email,
         name: updated.name,
+        // RATIONALE: Admin-driven cancellation uses the same outward-facing
+        // customer messaging as rejection because the lesson will not proceed.
         status: "cancelled",
         when: updated.requestedStartAt,
         audit: {
@@ -371,6 +391,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         return NextResponse.json({ error: "Only pending requests can be moved." }, { status: 400 });
       }
 
+      // NOTE: Move is intentionally narrow: it only reschedules the request
+      // timestamp and leaves the rest of the intake data untouched.
       const newStart = new Date(String(body?.newStartAt || ""));
       if (Number.isNaN(newStart.getTime())) {
         return NextResponse.json({ error: "Invalid new start date." }, { status: 400 });
@@ -422,25 +444,28 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         state: nextState,
         postcode: nextPostcode
       });
-    const hasMandatory =
-      !!nextName.trim() &&
-      !!nextEmail.trim() &&
-      !!nextHouseNumber.trim() &&
-      !!nextStreetName.trim() &&
-      !!nextStreetType.trim() &&
-      !!nextSuburb.trim();
-    const validPhone = auPhoneSchema.safeParse(nextPhone).success;
-    const validState = auStateSchema.safeParse(nextState).success;
-    const validPostcode = auPostcodeSchema.safeParse(nextPostcode).success;
-    if (!hasMandatory || !validPhone || !validState || !validPostcode) {
-      return NextResponse.json(
-        {
-          error:
-            "Name, email, phone, house number, street name, street type, suburb, state and postcode are required with valid AU formats."
-        },
-        { status: 400 }
-      );
-    }
+      // RATIONALE: Partial edits still need a fully valid request record. We
+      // therefore validate the merged next-state instead of only the provided
+      // patch fields, which prevents accidentally blanking required data.
+      const hasMandatory =
+        !!nextName.trim() &&
+        !!nextEmail.trim() &&
+        !!nextHouseNumber.trim() &&
+        !!nextStreetName.trim() &&
+        !!nextStreetType.trim() &&
+        !!nextSuburb.trim();
+      const validPhone = auPhoneSchema.safeParse(nextPhone).success;
+      const validState = auStateSchema.safeParse(nextState).success;
+      const validPostcode = auPostcodeSchema.safeParse(nextPostcode).success;
+      if (!hasMandatory || !validPhone || !validState || !validPostcode) {
+        return NextResponse.json(
+          {
+            error:
+              "Name, email, phone, house number, street name, street type, suburb, state and postcode are required with valid AU formats."
+          },
+          { status: 400 }
+        );
+      }
 
       await prisma.bookingRequest.update({
         where: { id },
@@ -514,8 +539,9 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Request not found." }, { status: 404 });
     }
 
-    // Approved requests are represented by booking rows; deleting them should happen via the
-    // booking route to preserve clear workflow semantics.
+    // RATIONALE: Once approved, the request is no longer the operational source
+    // of truth. The booking rows created from it must be managed through the
+    // booking APIs so audit/workflow semantics stay consistent.
     if (existing.status === "approved") {
       return NextResponse.json(
         {

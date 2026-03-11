@@ -16,6 +16,13 @@ const importPayloadSchema = z.object({
 
 type CsvRow = Record<string, unknown>;
 
+/**
+ * Reads the first populated cell across several header aliases.
+ *
+ * RATIONALE: Customer CSV imports may come from different spreadsheets or
+ * manual exports, so we accept a small set of common header variants rather
+ * than forcing one exact column naming convention.
+ */
 function readRowString(row: CsvRow, keys: string[]): string {
   for (const key of keys) {
     const value = row[key];
@@ -29,6 +36,7 @@ function readRowString(row: CsvRow, keys: string[]): string {
   return "";
 }
 
+/** Normalizes free-form skill labels into the product's supported enum. */
 function normalizeSkillLevel(raw: string): "beginner" | "intermediate" | "advanced" {
   const value = raw.trim().toLowerCase();
   if (value === "intermediate" || value === "advanced") {
@@ -37,6 +45,7 @@ function normalizeSkillLevel(raw: string): "beginner" | "intermediate" | "advanc
   return "beginner";
 }
 
+/** Maps common online/virtual wording onto the stored lesson mode enum. */
 function normalizeLessonMode(raw: string): "in_person" | "video" {
   const value = raw.trim().toLowerCase();
   if (value === "video" || value === "online" || value === "virtual") {
@@ -45,6 +54,13 @@ function normalizeLessonMode(raw: string): "in_person" | "video" {
   return "in_person";
 }
 
+/**
+ * Imports a batch of admin-supplied customer rows.
+ *
+ * RATIONALE: The route validates payload size, rate-limits per admin IP, and
+ * resolves dedupe matches before creating any customer row so the import tool
+ * stays safe to use against live data.
+ */
 export async function POST(request: NextRequest) {
   try {
     const admin = await requireAdminFromRequest(request);
@@ -132,6 +148,8 @@ export async function POST(request: NextRequest) {
 
       const dedupeClauses: Array<{ normalizedEmail?: string; normalizedPhone?: string }> = [];
       if (customerData.normalizedEmail) {
+        // NOTE: We detect duplicates inside the upload before touching Prisma so
+        // the admin gets row-level feedback instead of a generic unique error.
         if (seenNormalizedEmails.has(customerData.normalizedEmail)) {
           errors.push(`Row ${rowNumber}: Duplicate email in import payload.`);
           continue;
@@ -160,6 +178,9 @@ export async function POST(request: NextRequest) {
         }
       });
       if (existingCustomer) {
+        // RATIONALE: Matching active customers are treated as a recoverable
+        // import error rather than merged automatically. Silent merges here
+        // would risk overwriting the wrong family/student profile.
         errors.push(`Row ${rowNumber}: Matching customer already exists (${existingCustomer.fullName}).`);
         continue;
       }
@@ -186,6 +207,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       importedCount: createdCustomerIds.length,
+      // NOTE: Partial success is intentional. Admins can fix only the rejected
+      // rows and re-run the import without losing successfully created entries.
       errors: errors.length > 0 ? errors : undefined
     });
   } catch (error) {

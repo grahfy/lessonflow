@@ -34,7 +34,11 @@ export interface UseBookingsResult {
 }
 
 /**
- * Hook to manage admin booking operations.
+ * Centralizes admin calendar loading plus booking/request mutation calls.
+ *
+ * RATIONALE: The bookings screen works with two related backends
+ * (`/bookings` and `/booking-requests`) that share UI affordances but differ in
+ * payload shape. This hook hides those endpoint quirks from the calendar client.
  */
 export function useBookings(options: { onAuthError?: () => void; onError?: (msg: string) => void } = {}): UseBookingsResult {
     const { onAuthError, onError } = options;
@@ -43,6 +47,7 @@ export function useBookings(options: { onAuthError?: () => void; onError?: (msg:
 
     const { safeFetch, handleApiError } = useSafeFetch({ onAuthError, onError });
 
+    /** Loads the unified event list for the requested calendar view/date window. */
     const load = useCallback(async (view: string, date: string) => {
         setLoading(true);
         try {
@@ -60,6 +65,10 @@ export function useBookings(options: { onAuthError?: () => void; onError?: (msg:
         }
     }, [safeFetch, handleApiError, onError]);
 
+    /**
+     * Updates either a booking or a booking request using the correct admin route
+     * and payload shape for that entity type.
+     */
     const update = useCallback(async (id: string, entityType: "booking" | "booking_request", action: string, payload: BookingUpdatePayload): Promise<boolean> => {
         const base = entityType === "booking" ? "bookings" : "booking-requests";
         const endpoint = `/api/admin/${base}/${id}`;
@@ -68,7 +77,9 @@ export function useBookings(options: { onAuthError?: () => void; onError?: (msg:
         const payloadNewStartAt = typeof payload.newStartAt === "string" ? payload.newStartAt : null;
         const payloadStartAtLocal = typeof payload.startAtLocal === "string" ? payload.startAtLocal : null;
         
-        // Handle API specific mappings
+        // Handle API specific mappings.
+        // NOTE: Booking requests still speak in terms of `requestedStartAt`,
+        // while bookings accept `newStartAt` for move operations.
         if (entityType === "booking_request") {
             if (action === "move" && payloadNewStartAt) {
                 body.requestedStartAt = new Date(payloadNewStartAt).toISOString();
@@ -99,6 +110,7 @@ export function useBookings(options: { onAuthError?: () => void; onError?: (msg:
         }
     }, [safeFetch, handleApiError]);
 
+    /** Deletes either entity type through its matching admin route. */
     const remove = useCallback(async (id: string, entityType: "booking" | "booking_request"): Promise<boolean> => {
         const base = entityType === "booking" ? "bookings" : "booking-requests";
         try {

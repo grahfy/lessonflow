@@ -21,6 +21,7 @@ function jobRequest(secret?: string, body?: Record<string, unknown>) {
   });
 }
 
+/** Seeds one overdue sent invoice that should qualify for reminder processing. */
 async function seedSentOverdueInvoice(invoiceNumber: string, dueDaysAgo: number) {
   const owner = await prisma.adminUser.findFirst();
 
@@ -67,6 +68,8 @@ async function seedSentOverdueInvoice(invoiceNumber: string, dueDaysAgo: number)
 
 describe("jobs-invoice-reminders", () => {
   beforeEach(async () => {
+    // NOTE: The reminder job reads invoices, creates outbound email, and writes
+    // audit rows, so all three surfaces must be reset for deterministic counts.
     await prisma.invoiceAuditLog.deleteMany();
     await prisma.invoiceLineItem.deleteMany();
     await prisma.invoice.deleteMany();
@@ -111,6 +114,8 @@ describe("jobs-invoice-reminders", () => {
         toEmail: "cron.student@example.com"
       }
     });
+    // RATIONALE: The cron route should both update domain state and enqueue the
+    // actual outbound email, not just report eligibility counts.
     expect(outbound.length).toBeGreaterThan(0);
   });
 });

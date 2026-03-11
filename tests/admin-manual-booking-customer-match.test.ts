@@ -17,6 +17,10 @@ function adminPost(body: Record<string, unknown>, token: string): NextRequest {
   });
 }
 
+/**
+ * Produces the minimal manual-booking payload and lets each scenario override
+ * only the match-specific fields under test.
+ */
 function basePayload(startAt: string) {
   return {
     firstName: "Taylor",
@@ -41,6 +45,8 @@ function basePayload(startAt: string) {
 
 describe("admin-manual-booking-customer-match", () => {
   beforeEach(async () => {
+    // NOTE: Manual booking can create both direct bookings and recurring series,
+    // so cleanup must remove both paths before each deterministic scenario.
     await prisma.bookingAuditLog.deleteMany();
     await prisma.booking.deleteMany();
     await prisma.bookingSeries.deleteMany();
@@ -95,6 +101,8 @@ describe("admin-manual-booking-customer-match", () => {
     const conflictRes = await POST(adminPost(basePayload(startAt), token));
     expect(conflictRes.status).toBe(409);
     const conflictBody = (await conflictRes.json()) as { code?: string; customer?: { id: string } };
+    // RATIONALE: The route returns enough detail for the admin dialog to offer
+    // "use existing" or "update existing" instead of silently creating a clone.
     expect(conflictBody.code).toBe("CUSTOMER_MATCH");
     expect(conflictBody.customer?.id).toBe(existing.id);
 
@@ -158,6 +166,8 @@ describe("admin-manual-booking-customer-match", () => {
     const customer = await prisma.customer.findUniqueOrThrow({
       where: { id: existing.id }
     });
+    // NOTE: updateCustomerFromBooking is opt-in because a new booking's intake
+    // details are not always authoritative for the existing customer profile.
     expect(customer.fullName).toBe("Taylor Updated");
     expect(customer.skillLevel).toBe("intermediate");
   });
@@ -185,6 +195,8 @@ describe("admin-manual-booking-customer-match", () => {
       orderBy: { startAt: "asc" }
     });
     expect(bookings.length).toBeGreaterThan(1);
+    // RATIONALE: Recurring manual bookings expand into multiple rows, so each
+    // generated booking must keep the structured name fields for later edits.
     for (const booking of bookings) {
       expect(booking.firstName).toBe("Taylor");
       expect(booking.lastName).toBe("Student");

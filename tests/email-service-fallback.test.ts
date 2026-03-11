@@ -59,6 +59,8 @@ describe("email-service-fallback", () => {
       html: "<p>Hello</p>"
     });
 
+    // RATIONALE: Preferred-provider settings should degrade gracefully rather
+    // than dropping mail when only the secondary transport is usable.
     expect(result).toEqual({ status: "sent" });
     expect(mockSendGmailEmail).not.toHaveBeenCalled();
     expect(mockCreateTransport).toHaveBeenCalledTimes(1);
@@ -91,6 +93,8 @@ describe("email-service-fallback", () => {
       html: "<p>Hello</p>"
     });
 
+    // NOTE: The owner visibility contract should survive provider failover, not
+    // disappear when SMTP hands off to Gmail.
     expect(result).toEqual({ status: "sent" });
     expect(mockSendGmailEmail).toHaveBeenCalledWith({
       to: "student@example.com",

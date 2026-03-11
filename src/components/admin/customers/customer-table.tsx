@@ -17,6 +17,13 @@ interface Props {
     onViewInvoices: (name: string) => void;
 }
 
+/**
+ * Customer directory table with row-level open behavior plus inline actions.
+ *
+ * RATIONALE: The whole row is clickable for speed in admin workflows, but
+ * action buttons still need to remain independently operable without opening
+ * the dialog accidentally.
+ */
 export function CustomerTable({
     customers,
     loadingCustomers,
@@ -66,6 +73,8 @@ export function CustomerTable({
                     className="customer-item invoice-row-item customer-table-row admin-list-row-button"
                     onClick={() => onOpenCustomerDialog(customer, false)}
                     onKeyDown={(event) => {
+                        // NOTE: Mirror button semantics so keyboard users can
+                        // open the dialog from a row that is rendered as a div.
                         if (event.key === "Enter" || event.key === " ") {
                             event.preventDefault();
                             onOpenCustomerDialog(customer, false);
@@ -104,6 +113,8 @@ export function CustomerTable({
 
                     <Separator />
                     <div className="customer-item-actions admin-list-actions admin-list-col-actions" onClick={e => e.stopPropagation()}>
+                        {/* RATIONALE: Stop propagation so Billing/Open/Delete do
+                            not also trigger the row's generic open handler. */}
                         <span className="admin-mobile-label">Actions</span>
                         <Tooltip content="Open this customer's invoice history and billing records.">
                             <button

@@ -42,6 +42,8 @@ export function Tooltip({
     return props.disabled === true || props["aria-disabled"] === true || props["aria-disabled"] === "true";
   }, [children]);
 
+  // RATIONALE: Touch devices cannot rely on hover, so tap-to-open is opt-in
+  // and only enabled when the pointer environment is coarse/non-hovering.
   const touchEnabled = openOnTap && touchLikePointer;
 
   useEffect(() => {
@@ -69,6 +71,8 @@ export function Tooltip({
     triggerDisabled || !isValidElement(children) ? (
       <span
         className={`ui-tooltip-trigger${triggerDisabled ? " is-disabled" : ""}`}
+        // NOTE: Disabled buttons do not emit pointer/focus events, so wrapping
+        // them keeps explanatory tooltips accessible for unavailable actions.
         tabIndex={triggerDisabled ? 0 : undefined}
       >
         {children}
@@ -85,6 +89,8 @@ export function Tooltip({
           if (!touchEnabled || event.pointerType === "mouse") {
             return;
           }
+          // NOTE: Tapping a tooltip trigger on mobile toggles visibility so the
+          // same control can reveal helper text without a hover gesture.
           setOpen((prev) => !prev);
         }}
       >

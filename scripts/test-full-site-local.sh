@@ -110,6 +110,8 @@ start_mariadb_container() {
   fi
   
   if docker ps -a --format "{{.Names}}" | grep -q "^${svc}$"; then
+    # RATIONALE: Reusing containers keeps repeated smoke runs fast and avoids
+    # wiping a developer's local databases unless they explicitly opt in.
     log "Starting existing $svc container..."
     docker start "$svc" >/dev/null
   else
@@ -183,6 +185,8 @@ if [[ "$SKIP_TESTS" -eq 0 ]]; then
   
   if ! npm test; then
     TESTS_FAILED=1
+    # NOTE: The script keeps going after test failures so the same setup can be
+    # reused for manual UI verification without rerunning all prep work.
     log "Automated tests failed. Continuing so you can still test the site manually."
   fi
 fi

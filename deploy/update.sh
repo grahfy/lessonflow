@@ -175,6 +175,8 @@ detect_source_mode_for_path() {
   fi
 
   if [[ -d "${resolved_dir}/.git" ]]; then
+    # RATIONALE: Git mode unlocks fetch/pull, remote-update previews, and branch
+    # selection. Without `.git`, the wrapper must treat the tree as a static snapshot.
     DETECTED_SOURCE_PATH="${resolved_dir}"
     SOURCE_MODE="git"
     SOURCE_MODE_DETAIL="Persistent git checkout"
@@ -182,6 +184,8 @@ detect_source_mode_for_path() {
   fi
 
   if [[ -f "${resolved_dir}/package.json" && -f "${resolved_dir}/package-lock.json" && -d "${resolved_dir}/deploy" ]]; then
+    # NOTE: Archive mode still expects a complete app source tree, just without
+    # VCS metadata. That lets update.sh skip git while still delegating to deploy.sh.
     DETECTED_SOURCE_PATH="${resolved_dir}"
     SOURCE_MODE="archive"
     SOURCE_MODE_DETAIL="Extracted release archive or copied source tree"
@@ -221,9 +225,13 @@ resolve_source_root_for_update() {
   elif [[ -f "${SCRIPT_DIR}/../package.json" && -d "${SCRIPT_DIR}/../deploy" ]]; then
     resolved="$(cd "${SCRIPT_DIR}/.." 2>/dev/null && pwd || printf '%s' "${SCRIPT_DIR}/..")"
   else
+    # NOTE: Falling back to PWD preserves a debuggable path even when update.sh
+    # is launched from an incomplete or mislocated snapshot.
     resolved="${PWD}"
   fi
 
+  # RATIONALE: Source resolution is centralized here so every later decision
+  # (pull allowed, branch default, deploy handoff) works from the same root.
   detect_source_mode_for_path "${resolved}" || true
   REPO_ROOT="${DETECTED_SOURCE_PATH:-${resolved}}"
 }
@@ -1431,6 +1439,8 @@ auto_enable_bootstrap_defaults_from_update() {
   fi
 
   if ! command -v nginx >/dev/null 2>&1; then
+    # RATIONALE: Updates still need nginx wiring on hosts that never completed
+    # the original bootstrap, otherwise the app can deploy but stay unreachable.
     INSTALL_NGINX_IF_NEEDED=true
     changed=true
     enabled_flags+=( "install-nginx" )
@@ -1454,6 +1464,8 @@ auto_enable_bootstrap_defaults_from_update() {
   fi
 
   if [[ ! -d "${DEPLOY_DIR}" || ! -L "${CURRENT_LINK}" ]]; then
+    # NOTE: Missing deploy/current structure usually means first-run setup or
+    # partial host drift, so updates promote the service/timer repair path too.
     INSTALL_APP_SERVICE_IF_NEEDED=true
     INSTALL_CRON_JOBS_IF_NEEDED=true
     changed=true
@@ -1462,6 +1474,8 @@ auto_enable_bootstrap_defaults_from_update() {
 
   # Auto-enable cron jobs (timers) installation if neither timers nor legacy cron block is present.
   if ! managed_systemd_timers_present_from_update && ! managed_cron_block_present_from_update; then
+    # NOTE: This keeps update.sh capable of repairing older hosts that never
+    # finished the migration from cron entries to managed systemd timers.
     INSTALL_CRON_JOBS_IF_NEEDED=true
     changed=true
     enabled_flags+=( "install-cron-jobs" )
@@ -1484,19 +1498,16 @@ update_prisma_from_update() {
 
   local deploy_args=()
   deploy_args+=( "--branch" "${BRANCH}" )
+  # NOTE: The branch arg is still forwarded in archive mode because deploy.sh
+  # ignores git-only operations after source-mode detection, keeping the call
+  # shape uniform between git and snapshot deployments.
   [[ "${AUTO_BOOTSTRAP}" == false ]] && deploy_args+=( "--no-auto-bootstrap" )
   [[ "${DB_PUSH}" == true ]] && deploy_args+=( "--db-push" )
   [[ "${NO_SPINNER}" == true ]] && deploy_args+=( "--no-spinner" )
   [[ "${NO_COLOR}" == true ]] && deploy_args+=( "--no-color" )
 
-  # The 'D' action in deploy.sh triggers update_prisma via the interactive flow
-  # or specific bootstrap flags. Since we want to run ONLY update_prisma, we
-  # use the --interactive flag with a mocked input or just pass the bootstrap flag
-  # if we add one to deploy.sh.
-  #
-  # Refinement: I will add a --update-prisma flag to deploy.sh to make this 
-  # delegation cleaner and non-interactive.
-  
+  # RATIONALE: Prisma maintenance stays delegated to deploy.sh so one script
+  # remains authoritative for env bootstrapping, sudo policy, and schema safety.
   log_info "Delegating Prisma update to deploy.sh..."
   
   if should_use_sudo_for_deploy; then

@@ -8,6 +8,8 @@ import { prisma } from "@/lib/db";
 
 describe("invoice-domain", () => {
   beforeEach(async () => {
+    // RATIONALE: Numbering helpers inspect existing invoice rows, so the DB
+    // must start clean for deterministic sequence assertions.
     await prisma.invoiceAuditLog.deleteMany();
     await prisma.invoiceLineItem.deleteMany();
     await prisma.invoice.deleteMany();
@@ -90,6 +92,7 @@ describe("invoice-domain", () => {
     });
 
     const second = await generateNextInvoiceNumber(prisma, issueDate);
+    // NOTE: The test exercises both the empty-state seed and the increment path.
     expect(second).toBe("MGS-2026-0002");
   });
 

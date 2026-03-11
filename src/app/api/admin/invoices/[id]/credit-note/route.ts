@@ -45,6 +45,8 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Credit notes cannot be reversed with another credit note." }, { status: 400 });
   }
   if (original.status !== "sent" && original.status !== "paid") {
+    // RATIONALE: Draft invoices can still be edited or deleted directly. Credit
+    // notes are reserved for already-issued documents that must preserve history.
     return NextResponse.json({ error: "Only sent or paid invoices can be credited." }, { status: 400 });
   }
 
@@ -103,6 +105,8 @@ export async function POST(request: NextRequest, { params }: Params) {
         lineItems: {
           create: original.lineItems.map((lineItem) => ({
             kind: lineItem.kind,
+            // NOTE: Credit-note rows stay human-readable in PDFs/admin views by
+            // prefixing the original description instead of hiding the source.
             description: `Credit note: ${lineItem.description}`,
             quantity: Math.max(1, Math.abs(lineItem.quantity)),
             unitPriceCents: -Math.abs(lineItem.unitPriceCents),
@@ -139,6 +143,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       }
     });
 
+    // RATIONALE: Touch the original invoice's `updatedById` so later admin
+    // history views show that a corrective document was created against it.
     await tx.invoice.update({
       where: { id: original.id },
       data: {

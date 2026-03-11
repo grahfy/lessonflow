@@ -162,6 +162,8 @@ import PrismaGenerated from "./src/generated/prisma/client.ts";
   const prisma = new PrismaGenerated.PrismaClient({ adapter });
 
   try {
+    // RATIONALE: Listing only safe metadata helps operators identify the target
+    // account without exposing password hashes or any other sensitive fields.
     const admins = await prisma.adminUser.findMany({
       orderBy: { createdAt: "asc" },
       select: {
@@ -219,6 +221,7 @@ prompt_for_missing_inputs() {
     log_warn "Using password passed via --password. Prefer interactive prompt to avoid shell history exposure."
   fi
 
+  # NOTE: Emails are normalized to match the DB's lowercase uniqueness contract.
   TARGET_ADMIN_EMAIL="$(printf '%s' "${TARGET_ADMIN_EMAIL}" | tr '[:upper:]' '[:lower:]' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
 
   if [[ -z "${TARGET_ADMIN_EMAIL}" ]]; then
@@ -250,8 +253,8 @@ import PrismaGenerated from "./src/generated/prisma/client.ts";
     throw new Error("DATABASE_URL is not set");
   }
 
-  const adapter = new PrismaMariaDb(connectionString);
-  const prisma = new PrismaGenerated.PrismaClient({ adapter });
+    const adapter = new PrismaMariaDb(connectionString);
+    const prisma = new PrismaGenerated.PrismaClient({ adapter });
 
   try {
     const email = String(process.env.ADMIN_EMAIL_TO_RESET || "").trim().toLowerCase();
@@ -267,6 +270,8 @@ import PrismaGenerated from "./src/generated/prisma/client.ts";
     });
 
     if (!user) {
+      // RATIONALE: When the requested admin is missing, print the known emails so
+      // an operator can recover without opening the database manually.
       const admins = await prisma.adminUser.findMany({
         orderBy: { createdAt: "asc" },
         select: { email: true, isActive: true }
@@ -286,6 +291,8 @@ import PrismaGenerated from "./src/generated/prisma/client.ts";
       where: { email },
       data: {
         passwordHash,
+        // NOTE: Resetting a password is also an account recovery path, so we
+        // reactivate the admin if it had previously been disabled.
         isActive: true
       }
     });
@@ -318,6 +325,8 @@ main() {
 
   prompt_for_missing_inputs
   reset_password
+  # RATIONALE: Admin auth reads password hashes from the database on login, so
+  # no process reload is needed after the credential row is updated.
   log_info "Done. No app restart is required for a DB password reset."
 }
 

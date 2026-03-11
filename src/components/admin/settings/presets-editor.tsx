@@ -9,7 +9,10 @@ import { usePresets, type Preset } from "@/lib/admin/use-presets";
 
 /**
  * Editor for product/invoice presets.
- * Refactored to use centralized UI components and hooks.
+ *
+ * RATIONALE: Presets are maintained as a lightweight admin-managed catalog, but
+ * the editor keeps local draft state so owners can type freely before sending a
+ * save/delete mutation for a specific row.
  */
 export function AdminPresetsEditor() {
   const [error, setError] = useState("");
@@ -33,9 +36,12 @@ export function AdminPresetsEditor() {
   });
 
   useEffect(() => {
+    // NOTE: Mirror server presets into local editable rows so text/money inputs
+    // remain responsive without mutating the hook's source data directly.
     setDraftPresets(presets);
   }, [presets]);
 
+  /** Creates a brand new preset from the add form. */
   async function addPreset() {
     if (!newPreset.label?.trim()) {
       setError("Label is required.");
@@ -52,6 +58,7 @@ export function AdminPresetsEditor() {
     }
   }
 
+  /** Persists edits for one existing preset row. */
   async function updatePreset(id: string, patch: Partial<Preset>) {
     const preset = draftPresets.find((item) => item.id === id);
     if (!preset) return;
@@ -65,6 +72,7 @@ export function AdminPresetsEditor() {
     }
   }
 
+  /** Removes a preset after explicit confirmation from the admin. */
   async function deletePreset(id: string) {
     if (!window.confirm("Are you sure you want to delete this preset?")) return;
     setError("");

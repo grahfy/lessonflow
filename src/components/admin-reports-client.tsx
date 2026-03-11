@@ -63,6 +63,13 @@ type AdminReportsResponse = AdminReportsDashboard & {
   error?: string;
 };
 
+/**
+ * Parses JSON only when the backend actually returned JSON.
+ *
+ * RATIONALE: Admin routes can fail behind auth middleware or dev-server HTML
+ * overlays. Returning `null` here keeps the dashboard on a predictable error
+ * path instead of throwing a secondary JSON parse exception.
+ */
 async function readJsonSafe<T>(response: Response): Promise<T | null> {
   const contentType = response.headers.get("content-type") || "";
   if (!contentType.toLowerCase().includes("application/json")) {
@@ -114,10 +121,15 @@ function formatDate(date: Date, mode: ReportDateFormat, withTime = false): strin
   }).format(date);
 }
 
+/** Formats a UTC-ish payload date using the application's Melbourne timezone. */
 function toMelbourneDate(value: string): Date {
   return new Date(new Date(value).toLocaleString("en-US", { timeZone: APP_TIMEZONE }));
 }
 
+/**
+ * Builds the period card label while preserving the backend's canonical window
+ * boundaries instead of recomputing them in the client.
+ */
 function formatPeriodLabel(period: PeriodReport, mode: ReportDateFormat): string {
   const start = toMelbourneDate(period.start);
   const end = toMelbourneDate(period.end);
@@ -137,6 +149,7 @@ function formatPeriodLabel(period: PeriodReport, mode: ReportDateFormat): string
   return `This year (${formatDate(start, mode)} - ${formatDate(end, mode)})`;
 }
 
+/** Rewrites the previous-period label for compact date mode when needed. */
 function formatPreviousLabel(
   period: PeriodReport | CustomRangeReport,
   mode: ReportDateFormat
@@ -153,6 +166,7 @@ function formatPreviousLabel(
   return `Previous year (${formatDate(start, mode)} - ${formatDate(end, mode)})`;
 }
 
+/** Splits labels like "Previous week (1 Jan - 7 Jan)" into displayable parts. */
 function splitComparisonLabel(label: string): { primary: string; secondary?: string } {
   const openParenIndex = label.indexOf("(");
   const closeParenIndex = label.lastIndexOf(")");
@@ -165,6 +179,7 @@ function splitComparisonLabel(label: string): { primary: string; secondary?: str
   return { primary: label };
 }
 
+/** Converts the trend key into a stable Date for compact axis formatting. */
 function parseTrendKey(key: string): Date {
   return new Date(`${key}T00:00:00`);
 }
@@ -238,6 +253,8 @@ function MiniBarChart({
   const labelStep = points.length > 10 ? Math.ceil(points.length / 6) : 1;
   const firstLabel = formatTrendLabel(points[0], grain, dateFormat);
   const lastLabel = formatTrendLabel(points[points.length - 1], grain, dateFormat);
+  // RATIONALE: SVG coordinates are precomputed once so the render branch can
+  // switch between bar, line, and area modes without duplicating geometry math.
   const pointsWithCoords = points.map((point, index) => {
     const value = point[valueKey];
     const normalized = maxValue <= 0 ? 0 : Math.max(0, value) / maxValue;
@@ -296,6 +313,7 @@ function MiniBarChart({
   );
 }
 
+/** Shared chart card for one grain of report comparison data. */
 function TrendPanel({
   title,
   points,
@@ -348,6 +366,7 @@ function TrendPanel({
   );
 }
 
+/** Snapshot card for the fixed daily/weekly/monthly/yearly report windows. */
 function PeriodCard({ period, dateFormat }: { period: PeriodReport; dateFormat: ReportDateFormat }) {
   const previousPeriodLabel = splitComparisonLabel(formatPreviousLabel(period, dateFormat));
   const stats = useMemo(
@@ -407,6 +426,7 @@ function PeriodCard({ period, dateFormat }: { period: PeriodReport; dateFormat: 
   );
 }
 
+/** Summary card for the optional admin-selected custom reporting window. */
 function CustomRangeCard({ period, dateFormat }: { period: CustomRangeReport; dateFormat: ReportDateFormat }) {
   const previousPeriodLabel = splitComparisonLabel(formatPreviousLabel(period, dateFormat));
   const stats = useMemo(
@@ -493,6 +513,13 @@ export function AdminReportsClient() {
     yearly: true
   });
 
+  /**
+   * Loads the reports dashboard and optionally overlays a custom date window.
+   *
+   * RATIONALE: "initial" and "refresh" loading states are split so the page can
+   * stay interactive during explicit refreshes instead of dropping back to a
+   * full-screen loading shell every time an admin tweaks filters.
+   */
   async function load(mode: "initial" | "refresh" = "initial", customRange?: { start: string; end: string } | null) {
     if (mode === "initial") setLoading(true);
     if (mode === "refresh") setRefreshing(true);
@@ -507,6 +534,8 @@ export function AdminReportsClient() {
             : null
           : customRange;
       if (activeRange) {
+        // NOTE: The backend owns custom range aggregation. The client only
+        // forwards raw ISO date inputs and renders whatever summary comes back.
         params.set("start", activeRange.start);
         params.set("end", activeRange.end);
       }
@@ -567,6 +596,10 @@ export function AdminReportsClient() {
     void load("refresh", null);
   }
 
+  /**
+   * Triggers owner-facing report delivery for one of the pre-defined summary
+   * periods exposed by the backend.
+   */
   async function sendReportEmail(period: "daily" | "monthly" | "yearly") {
     setError("");
     setNotice("");
@@ -602,6 +635,8 @@ export function AdminReportsClient() {
   }
 
   const visibleTrendKeys = useMemo(
+    // RATIONALE: We derive the list once so chart rendering stays ordered and
+    // the JSX below does not repeat checkbox-state filtering work on every pass.
     () => (Object.entries(visibleComparisons).filter(([, on]) => on).map(([key]) => key) as TrendGrainKey[]),
     [visibleComparisons]
   );

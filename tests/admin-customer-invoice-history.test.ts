@@ -18,6 +18,8 @@ function adminRequest(url: string, method: "GET" | "POST", token: string, body?:
 
 describe("admin-customer-invoice-history", () => {
   beforeEach(async () => {
+    // RATIONALE: Customer invoice history joins billing rows back through
+    // bookings and customers, so each scenario starts from a clean billing graph.
     await prisma.invoiceAuditLog.deleteMany();
     await prisma.invoiceLineItem.deleteMany();
     await prisma.invoice.deleteMany();
@@ -99,6 +101,8 @@ describe("admin-customer-invoice-history", () => {
     expect(listRes.status).toBe(200);
     const listBody = (await listRes.json()) as { invoices: Array<{ customerId: string; customerEmail: string }> };
 
+    // NOTE: The customer-specific endpoint should never leak invoices from the
+    // broader admin list, even when other invoice search filters exist elsewhere.
     expect(listBody.invoices.length).toBe(1);
     expect(listBody.invoices[0].customerId).toBe(customer.id);
     expect(listBody.invoices[0].customerEmail).toBe("invoice.student@example.com");
@@ -186,6 +190,8 @@ describe("admin-customer-invoice-history", () => {
       ]
     });
     const createRes = await POST(createReq, { params: Promise.resolve({ id: customerA.id }) });
+    // RATIONALE: Cross-customer booking linking would corrupt invoice history
+    // and payment follow-up, so the route must reject it explicitly.
     expect(createRes.status).toBe(400);
   });
 });

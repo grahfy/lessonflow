@@ -12,6 +12,12 @@ interface ImportCustomersDialogProps {
   onSuccess: () => void;
 }
 
+/**
+ * CSV import dialog for bulk customer creation.
+ *
+ * RATIONALE: Parsing happens client-side so obvious CSV structure errors can be
+ * caught before the admin import route spends time validating each row.
+ */
 export function ImportCustomersDialog({ open, onOpenChange, onSuccess }: ImportCustomersDialogProps) {
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +37,8 @@ export function ImportCustomersDialog({ open, onOpenChange, onSuccess }: ImportC
       skipEmptyLines: true,
       complete: async (results) => {
         try {
+          // NOTE: We send Papa's row objects directly because the server route
+          // owns header aliasing, normalization, dedupe, and partial-success reporting.
           const response = await safeFetch("/api/admin/customers/import", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -44,6 +52,8 @@ export function ImportCustomersDialog({ open, onOpenChange, onSuccess }: ImportC
 
           const data = await response.json();
           if (data.errors?.length > 0) {
+            // RATIONALE: Partial success is normal for imports, so the dialog
+            // surfaces the imported count and leaves the row-level details in the console.
             console.warn("Import completed with some errors:", data.errors);
             alert(`Imported ${data.importedCount} customers. ${data.errors.length} failed. Check console for details.`);
           } else {

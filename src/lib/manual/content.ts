@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { marked } from "marked";
 
+/** Audience segments used to tailor the in-app manual navigation and badges. */
 export type ManualAudience = "all_admins" | "technical_owner";
 export type ManualSectionGroup =
   | "foundation"
@@ -49,6 +50,10 @@ export type AdminManualIndex = {
   screenshots: ManualScreenshot[];
 };
 
+/**
+ * Stable screenshot registry used by both the manual UI and the Playwright
+ * docs-capture workflow.
+ */
 export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
   {
     id: "admin-login-page",
@@ -204,6 +209,13 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
   }
 ];
 
+/**
+ * Canonical manual section manifest.
+ *
+ * RATIONALE: The app renders documentation by whitelisting explicit markdown
+ * sources instead of scanning the filesystem at runtime, which keeps routing,
+ * audience metadata, related routes, and screenshot mappings deterministic.
+ */
 export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
   {
     id: "start-here-features",
@@ -364,6 +376,10 @@ const DOC_BASENAME_TO_SECTION_ID = new Map(
   MANUAL_SECTION_MANIFEST.map((section) => [path.basename(section.sourcePath), section.id] as const)
 );
 
+/**
+ * Rewrites markdown asset links so repo-relative docs render correctly inside
+ * the app shell and cross-link to manual routes instead of raw files.
+ */
 function rewriteDocAssetImagePaths(markdown: string): string {
   const withImages = markdown.replace(/\((?:\.\/)?assets\/([^)]+)\)/g, "(/documentation/screenshots/$1)");
 
@@ -378,6 +394,13 @@ function rewriteDocAssetImagePaths(markdown: string): string {
   });
 }
 
+/**
+ * Reads a documentation markdown file only if it was declared in the manifest.
+ *
+ * RATIONALE: The manual route should never act as a general filesystem reader.
+ * The whitelist keeps content routing explicit and avoids accidental exposure of
+ * arbitrary repository files through route params.
+ */
 async function readWhitelistedDocMarkdown(relativeDocPath: string): Promise<{ markdown: string; updatedAt: string }> {
   const normalized = path.normalize(relativeDocPath);
   if (!WHITELISTED_DOC_PATHS.has(normalized)) {
@@ -393,6 +416,7 @@ async function readWhitelistedDocMarkdown(relativeDocPath: string): Promise<{ ma
   };
 }
 
+/** Builds the lightweight section index used by the manual landing page/TOC. */
 export async function getAdminManualIndex(): Promise<AdminManualIndex> {
   const updatedAtEntries = await Promise.all(
     MANUAL_SECTION_MANIFEST.map(async (section) => {
@@ -414,6 +438,7 @@ export async function getAdminManualIndex(): Promise<AdminManualIndex> {
   };
 }
 
+/** Loads one manual section and pre-renders the markdown into HTML for the page. */
 export async function getAdminManualSection(sectionId: string): Promise<AdminManualSection | null> {
   const sectionManifest = MANIFEST_BY_ID.get(sectionId);
   if (!sectionManifest) {
@@ -435,6 +460,7 @@ export async function getAdminManualSection(sectionId: string): Promise<AdminMan
   };
 }
 
+/** Returns the screenshot metadata referenced by one section manifest entry. */
 export function getManualScreenshotsForSection(sectionId: string): ManualScreenshot[] {
   const manifest = MANIFEST_BY_ID.get(sectionId);
   if (!manifest) {

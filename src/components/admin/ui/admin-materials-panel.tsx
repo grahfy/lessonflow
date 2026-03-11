@@ -26,6 +26,13 @@ interface AdminMaterialsPanelProps {
   };
 }
 
+/**
+ * Reusable panel for viewing and uploading student learning materials.
+ *
+ * RATIONALE: Booking/customer dialogs share the same material workflow but
+ * differ slightly in upload context. Keeping the view/upload UI here ensures
+ * captcha rules, file affordances, and booking-assignment behavior stay aligned.
+ */
 export function AdminMaterialsPanel({
   materialsLoading,
   materialsList,
@@ -40,12 +47,18 @@ export function AdminMaterialsPanel({
   const captcha = useCaptcha();
   const [selectedFileName, setSelectedFileName] = useState("No file selected");
 
+  /**
+   * Validates the human check before handing the actual file upload off to the
+   * parent mutation handler.
+   */
   function handleUpload() {
     if (!captcha.validateAnswer()) {
       return;
     }
 
     onUpload(captcha.getPayload());
+    // NOTE: Each upload attempt gets a fresh challenge to prevent accidental
+    // replay with a stale captcha answer after the form contents change.
     void captcha.regenerate();
   }
 
@@ -77,6 +90,9 @@ export function AdminMaterialsPanel({
                           className="btn btn-secondary"
                           type="button"
                           onClick={() =>
+                            // RATIONALE: Admins often need the browser's native
+                            // PDF/audio/image controls, so we open the raw file
+                            // route instead of rendering previews inline only.
                             window.open(`/api/admin/learning-materials/${material.id}`, "_blank")
                           }
                         >
@@ -142,6 +158,8 @@ export function AdminMaterialsPanel({
                     value={bookingField.bookingId}
                     onChange={(event) => bookingField.onChange(event.target.value)}
                   >
+                    {/* RATIONALE: Unassigned uploads remain visible across the
+                        student portal instead of disappearing with one lesson. */}
                     <option value="">Unassigned upload (all lessons)</option>
                     {bookingField.bookings.map((booking) => (
                       <option key={booking.id} value={booking.id}>
@@ -164,6 +182,8 @@ export function AdminMaterialsPanel({
                   className="admin-visually-hidden-input"
                   onChange={(event) => {
                     const file = event.currentTarget.files?.[0];
+                    // NOTE: We mirror the selected filename outside the hidden
+                    // native input so the custom button UI stays accessible.
                     setSelectedFileName(file?.name || "No file selected");
                   }}
                 />

@@ -36,6 +36,8 @@ describe("booking-rules", () => {
       recurrenceEndAt: end
     });
 
+    // NOTE: The public booking schema intentionally allows current-year future
+    // recurring requests that include the full required address/contact fields.
     expect(parsed.success).toBe(true);
   });
 
@@ -73,6 +75,8 @@ describe("booking-rules", () => {
       currentYear: 2026
     });
 
+    // RATIONALE: Recurrence generation is inclusive of the start date and then
+    // advances in weekly steps until the inclusive recurrence end boundary.
     expect(dates.length).toBe(3);
     expect(dates[1].toISOString()).toBe("2026-03-09T10:00:00.000Z");
   });

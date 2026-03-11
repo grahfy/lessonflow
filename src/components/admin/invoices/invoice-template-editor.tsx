@@ -13,7 +13,11 @@ type InvoiceTemplateState = {
 };
 
 /**
- * Whitelabel interface for editing invoice-related content (notes, terms).
+ * Admin editor for invoice-branding and PDF text content.
+ *
+ * RATIONALE: These values feed generated invoice artifacts, so the UI loads the
+ * whole template as one object and saves it atomically instead of patching
+ * individual fields in separate requests.
  */
 export function AdminInvoiceTemplateEditor() {
   const [template, setTemplate] = useState<InvoiceTemplateState>({
@@ -29,6 +33,7 @@ export function AdminInvoiceTemplateEditor() {
   const { safeFetch, handleApiError } = useSafeFetch({ onError: setError });
 
   useEffect(() => {
+    /** Loads the stored template object and applies defaults for missing fields. */
     async function load() {
       try {
         const response = await safeFetch("/api/admin/invoice-template");
@@ -55,6 +60,7 @@ export function AdminInvoiceTemplateEditor() {
     void load();
   }, [safeFetch, handleApiError]);
 
+  /** Saves the full template payload back to the admin invoice-template route. */
   async function saveAll() {
     setSaving(true);
     setError("");
@@ -77,6 +83,7 @@ export function AdminInvoiceTemplateEditor() {
     }
   }
 
+  /** Updates one property in the in-memory template draft. */
   function updateTemplate<K extends keyof InvoiceTemplateState>(key: K, value: InvoiceTemplateState[K]) {
     setTemplate((current) => ({
       ...current,

@@ -68,7 +68,12 @@ export interface UseInvoicesResult {
 export type InvoiceAction = "send" | "remind" | "restore" | InvoiceLifecycleAction;
 
 /**
- * Hook to manage admin invoice data operations.
+ * Centralizes the admin invoices screen's fetch/mutation behavior.
+ *
+ * RATIONALE: The invoices UI drives several independent actions against different
+ * route handlers (list, create, edit, lifecycle transitions, reminders, delete).
+ * Keeping them behind one hook lets the page coordinate auth failures and error
+ * messaging consistently without duplicating request wiring.
  */
 export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult {
     const { pageSize = 25, onAuthError, onError } = options;
@@ -103,6 +108,9 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
             }
             const data = await response.json();
             setInvoices(data.invoices || []);
+            // RATIONALE: Older admin flows and newer paginated responses use
+            // slightly different count keys. We tolerate both so UI upgrades do
+            // not require lockstep deployment with API naming changes.
             const resolvedTotalCount =
                 typeof data.totalCount === "number"
                     ? data.totalCount
@@ -150,6 +158,9 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
         let endpoint = `/api/admin/invoices/${id}`;
         let method = "POST";
 
+        // RATIONALE: "send" and "remind" have dedicated side-effect routes,
+        // while lifecycle status transitions remain PATCHes on the main
+        // document endpoint. The hook hides that contract split from the page.
         if (action === "send") endpoint = `/api/admin/invoices/${id}/send`;
         else if (action === "remind") endpoint = `/api/admin/invoices/${id}/remind`;
         else if (action === "mark_paid" || action === "mark_unpaid" || action === "void" || action === "restore") {
@@ -191,6 +202,9 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
 
             const data = await response.json();
             const newInvoice = data.invoice as InvoiceRow;
+            // NOTE: We optimistically prepend the new draft so the admin sees
+            // feedback immediately, but callers still reload after important
+            // follow-up actions (for example send/open) to reconcile server data.
             setInvoices(prev => [newInvoice, ...prev]);
             setTotalCount(prev => prev + 1);
             return newInvoice;
@@ -201,6 +215,9 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
 
     const sendBulkReminders = useCallback(async (): Promise<number | null> => {
         try {
+            // RATIONALE: The reminders endpoint is command-style. An empty JSON
+            // body keeps the request explicit and avoids framework/body-parser
+            // inconsistencies around POSTs with no payload.
             const response = await safeFetch("/api/admin/invoices/reminders", { 
                 method: "POST",
                 headers: { "Content-Type": "application/json" },

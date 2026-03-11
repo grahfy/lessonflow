@@ -116,6 +116,8 @@ function Start-MariaDBContainer {
     $existing = docker ps -a --format "{{.Names}}" | Where-Object { $_ -eq $ContainerName }
     
     if ($existing) {
+        # RATIONALE: Reuse existing containers so local smoke runs remain fast
+        # and do not destroy developer data between repeated verification passes.
         $running = docker ps --format "{{.Names}}" | Where-Object { $_ -eq $ContainerName }
         if (-not $running) {
             Log "Starting existing container: $ContainerName"
@@ -169,6 +171,8 @@ if (-not $DB_URL) {
 
 $TEST_DB_URL = Get-TestDatabaseUrl
 if (-not $TEST_DB_URL) {
+    # NOTE: Fall back to the dev DB URL with the conventional test DB/port swap
+    # so Windows users can get running even when .env.test.local is absent.
     $TEST_DB_URL = $DB_URL -replace '/mgs_dev', '/mgs_test'
     $TEST_DB_URL = $TEST_DB_URL -replace ':3306/', ':3307/'
 }
@@ -228,7 +232,9 @@ if ($Seed) {
     npx tsx scripts/clear-all-data.ts 2>$null
 }
 
-# Seed whitelabel defaults
+# Seed whitelabel defaults.
+# RATIONALE: The site shells rely on these defaults even in local smoke runs, so
+# the script always seeds them before optional fake student/customer data.
 Log "Seeding whitelabel defaults..."
 npx tsx scripts/seed-whitelabel-defaults.ts
 

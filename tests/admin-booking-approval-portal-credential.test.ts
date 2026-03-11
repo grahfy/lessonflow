@@ -16,6 +16,10 @@ function adminPatch(id: string, token: string, body: Record<string, unknown>) {
   });
 }
 
+/**
+ * Shared request fixture so approval tests stay focused on downstream effects
+ * like customer linking, booking creation, and portal credential delivery.
+ */
 function baseRequestData(overrides?: Partial<Parameters<typeof prisma.bookingRequest.create>[0]["data"]>) {
   return {
     firstName: "Alex",
@@ -41,6 +45,8 @@ function baseRequestData(overrides?: Partial<Parameters<typeof prisma.bookingReq
 
 describe("admin-booking-approval-portal-credential", () => {
   beforeEach(async () => {
+    // RATIONALE: Approval can fan out into bookings, emails, audit logs, and
+    // portal credentials, so the cleanup order mirrors those dependencies.
     await prisma.learningMaterial.deleteMany();
     await prisma.customerPortalCredentialAuditLog.deleteMany();
     await prisma.customerPortalCredential.deleteMany();
@@ -137,6 +143,8 @@ describe("admin-booking-approval-portal-credential", () => {
       { params: Promise.resolve({ id: secondRequest.id }) }
     );
 
+    // NOTE: The same customer should be matched and reuse the existing portal
+    // credential, but an approval email still goes out for the new booking.
     const credentials = await prisma.customerPortalCredential.findMany();
     expect(credentials).toHaveLength(1);
     expect(credentials[0]?.id).toBe(credentialAfterFirst.id);
@@ -180,6 +188,8 @@ describe("admin-booking-approval-portal-credential", () => {
       orderBy: { startAt: "asc" }
     });
     expect(createdBookings.length).toBeGreaterThan(1);
+    // RATIONALE: Recurring approvals create derived bookings plus a series row;
+    // both must retain the split first/last name fields for later editing.
     for (const booking of createdBookings) {
       expect(booking.firstName).toBe("Alex");
       expect(booking.lastName).toBe("Student");

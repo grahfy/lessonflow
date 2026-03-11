@@ -75,6 +75,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 
   if (existing.documentType === "credit_note" && parsed.data.action === "edit" && parsed.data.lineItems?.length) {
+    // RATIONALE: Credit notes are accounting corrections that should preserve
+    // their original financial breakdown. Admins may still adjust notes/due
+    // date metadata, but not rewrite the credited line items after issuance.
     return NextResponse.json(
       { error: "Credit-note line items are immutable. Update notes or due date only." },
       { status: 400 }
@@ -109,6 +112,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (parsed.data.action === "mark_paid" || parsed.data.action === "mark_unpaid" || parsed.data.action === "void") {
     const action: InvoiceLifecycleAction = parsed.data.action;
     const currentStatus = existing.status as InvoiceLifecycleStatus;
+    // NOTE: Transition rules live in the shared invoices domain module so UI and
+    // API agree on what lifecycle actions are legal from each status.
     if (!canApplyInvoiceAction(currentStatus, action)) {
       return NextResponse.json(
         {
@@ -203,6 +208,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   const lineItemsProvided = Boolean(parsed.data.lineItems?.length);
   const sourceLineItems = lineItemsProvided && parsed.data.lineItems ? parsed.data.lineItems : existing.lineItems;
+  // RATIONALE: Tax-mode changes must be applied against the full working set of
+  // line items, even when the admin only toggles GST behavior and leaves the
+  // descriptions/quantities untouched.
   const baseLineDrafts: InvoiceLineItemDraft[] = sourceLineItems.map((lineItem, index) => ({
     description: lineItem.description,
     quantity: lineItem.quantity,
@@ -217,6 +225,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   const updated = await prisma.$transaction(async (tx) => {
     if (lineItemsProvided || parsed.data.taxMode) {
+      // RATIONALE: Replacing the line-item set inside one transaction keeps the
+      // invoice totals and stored line rows in sync. Partial updates here would
+      // risk stale totals or mismatched tax calculations.
       await tx.invoiceLineItem.deleteMany({ where: { invoiceId: id } });
       await tx.invoiceLineItem.createMany({
         data: calculation.lineItems.map((lineItem) => ({
@@ -285,6 +296,9 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   }
 
   if (existing.documentType === "invoice" && (existing.status === "sent" || existing.status === "paid")) {
+    // RATIONALE: Issued financial documents should remain part of the audit
+    // trail. Operators must correct them with credit notes rather than hiding
+    // them via delete once they have been sent or paid.
     return NextResponse.json(
       { error: "Sent or paid invoices cannot be deleted. Create a credit note instead." },
       { status: 400 }

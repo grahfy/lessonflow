@@ -21,6 +21,8 @@ function adminRequest(url: string, method: "GET" | "POST" | "PATCH", token: stri
 
 describe("admin-invoices", () => {
   beforeEach(async () => {
+    // RATIONALE: Invoice flows span billing rows, line items, bookings, and
+    // sometimes booking-originated invoice creation, so tests reset the full graph.
     await prisma.invoiceAuditLog.deleteMany();
     await prisma.invoiceLineItem.deleteMany();
     await prisma.invoice.deleteMany();
@@ -88,6 +90,8 @@ describe("admin-invoices", () => {
     const outstandingAfterRes = await GET(outstandingAfterReq);
     expect(outstandingAfterRes.status).toBe(200);
     const outstandingAfterBody = (await outstandingAfterRes.json()) as { invoices: Array<{ id: string }> };
+    // NOTE: Once paid, the invoice should disappear from the outstanding view
+    // even if its original due date is still in the past.
     expect(outstandingAfterBody.invoices.some((invoice) => invoice.id === createdBody.invoice.id)).toBe(false);
   });
 
@@ -250,6 +254,8 @@ describe("admin-invoices", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { invoices: Array<{ invoiceNumber: string; agingBucket: string }> };
 
+    // RATIONALE: Aging filters drive collection follow-up, so the bucket result
+    // must line up with the invoice that is materially overdue.
     expect(body.invoices.length).toBe(1);
     expect(body.invoices[0].invoiceNumber).toBe("MGS-2026-8802");
     expect(body.invoices[0].agingBucket).toBe("overdue_31_plus");

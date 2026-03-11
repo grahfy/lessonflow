@@ -10,15 +10,22 @@ interface AdminHeaderProps {
   title: string;
 }
 
+/**
+ * Shared admin shell header with section navigation, deploy visibility, and
+ * mobile-friendly menu behavior.
+ */
 export function AdminHeader({ title }: AdminHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
+    // NOTE: Close the mobile menu on route change so stale open state does not
+    // leak across section navigations.
     setMenuOpen(false);
   }, [pathname]);
 
+  /** Ends the admin session and sends the browser back to the login screen. */
   async function logout() {
     try {
       await fetch("/api/admin/logout", { method: "POST" });
@@ -62,6 +69,8 @@ export function AdminHeader({ title }: AdminHeaderProps) {
                     className={`btn ${isActive ? "btn-primary" : "btn-secondary"}`}
                     type="button"
                     aria-current={isActive ? "page" : undefined}
+                    // RATIONALE: Buttons route through the App Router while
+                    // preserving the admin shell instead of forcing full reloads.
                     onClick={() => router.push(item.href)}
                   >
                     {item.label}

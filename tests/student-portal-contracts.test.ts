@@ -55,6 +55,8 @@ describe("student-portal-contracts", () => {
         }
       ]
     });
+    // NOTE: Booking mapping also recursively normalizes nested materials, which
+    // is why this test asserts the derived materials array rather than only top-level fields.
     expect(booking.materials).toHaveLength(1);
 
     const pendingRequest = mapStudentPortalPendingRequest({
@@ -108,6 +110,8 @@ describe("student-portal-contracts", () => {
       standaloneMaterials: [],
       pendingRequests: []
     });
+    // RATIONALE: Upcoming bookings must already be confirmed/cancelled/etc.;
+    // "pending" belongs to the separate pendingRequests collection.
     expect(invalid.success).toBe(false);
   });
 });

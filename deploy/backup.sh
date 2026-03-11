@@ -87,6 +87,8 @@ EOF
 # Load configuration from shared .env
 load_config() {
   if [[ -f "${SHARED_DIR}/.env" ]]; then
+    # NOTE: Backup config is read directly from the deployed shared env so cron
+    # jobs use the same cloud credentials/runtime settings as the live app host.
     # Cloud provider configuration
     BACKUP_CLOUD_PROVIDER="$(grep -o 'BACKUP_CLOUD_PROVIDER[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || echo "none")"
     BACKUP_CLOUD_FOLDER="$(grep -o 'BACKUP_CLOUD_FOLDER[[:space:]]*=[[:space:]]*"[^"]*"' "${SHARED_DIR}/.env" 2>/dev/null | sed 's/.*= *"\([^"]*\)"/\1/' || echo "lessonflow-backups")"
@@ -121,7 +123,9 @@ create_database_dump() {
     log_error "DATABASE_URL not found in shared .env"
     return 1
   fi
-  
+
+  # NOTE: The backup script parses DATABASE_URL directly instead of sourcing
+  # the env file so secrets/config remain data, not executable shell input.
   # Parse MySQL credentials from DATABASE_URL
   local db_user="" db_pass="" db_host="" db_port="3306" db_name=""
   local url_without_prefix="${database_url#mysql://}"
@@ -198,6 +202,8 @@ create_backup_archive() {
   
   # 1. Database dump
   if ! create_database_dump "${temp_dir}/${backup_name}/database.sql"; then
+    # RATIONALE: A failed DB dump should not discard filesystem/config backups;
+    # operators still get a partial archive plus an explicit warning in logs.
     log "Warning: Database dump failed, continuing with other backups"
   else
     log "✓ Database dump created"
@@ -205,6 +211,8 @@ create_backup_archive() {
   
   # 2. Shared .env file
   if [[ -f "${SHARED_DIR}/.env" ]]; then
+    # RATIONALE: Restoring the app without its deployed shared env would leave
+    # secrets, cron auth, and provider credentials out of sync with the data.
     cp "${SHARED_DIR}/.env" "${temp_dir}/${backup_name}/"
     log "✓ Included shared .env"
   fi
@@ -218,12 +226,16 @@ create_backup_archive() {
   
   # 4. Documentation
   if [[ -d "${REPO_ROOT}/Documentation" ]]; then
+    # NOTE: Operational docs/screenshots live outside the DB and are part of
+    # the admin experience, so they travel with backups alongside user assets.
     cp -r "${REPO_ROOT}/Documentation" "${temp_dir}/${backup_name}/"
     log "✓ Included documentation"
   fi
-  
+
   # 5. SEO config
   if [[ -f "${SEO_CONFIG_FILE}" ]]; then
+    # NOTE: SEO config is repo state rather than user content, but losing it on
+    # a VPS restore would change public metadata unexpectedly.
     cp "${SEO_CONFIG_FILE}" "${temp_dir}/${backup_name}/"
     log "✓ Included SEO config"
   fi

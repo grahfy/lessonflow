@@ -75,6 +75,7 @@ export function getMotionItemLimit(scope: MotionScope): number {
   return MAX_STAGGER_ITEMS_PUBLIC;
 }
 
+/** Infers which motion budget/profile applies to the current rendered root. */
 export function inferMotionScope(root: HTMLElement | null): MotionScope {
   if (!root) {
     return "public";
@@ -92,6 +93,7 @@ export function inferMotionScope(root: HTMLElement | null): MotionScope {
   return "public";
 }
 
+/** Deduplicates DOM nodes while preserving their original discovery order. */
 function uniqueElements(items: HTMLElement[]): HTMLElement[] {
   const seen = new Set<HTMLElement>();
   const unique: HTMLElement[] = [];
@@ -105,6 +107,7 @@ function uniqueElements(items: HTMLElement[]): HTMLElement[] {
   return unique;
 }
 
+/** Rejects hidden/skipped DOM nodes before they enter a GSAP sequence. */
 function isVisibleElement(element: HTMLElement): boolean {
   if (element.dataset.motionSkip === "true") {
     return false;
@@ -123,6 +126,10 @@ function isVisibleElement(element: HTMLElement): boolean {
   return rects.length > 0;
 }
 
+/**
+ * Collects motion targets for a root, preferring explicit annotations and only
+ * falling back to generic selectors for older pages.
+ */
 function collectMotionItems(root: HTMLElement, scope: MotionScope, explicitItems?: HTMLElement[]): HTMLElement[] {
   const rootIsScoped = root.hasAttribute("data-motion-root");
   const isItemInsideScopedRoot = (item: HTMLElement) => {
@@ -152,6 +159,7 @@ function collectMotionItems(root: HTMLElement, scope: MotionScope, explicitItems
   return visibleItems.slice(0, getMotionItemLimit(scope));
 }
 
+/** Selects a stable ordered subset for directional public-page slide transitions. */
 function collectDirectionalPublicItems(root: HTMLElement): HTMLElement[] {
   const view = findDirectionalStage(root);
   const order = [
@@ -177,6 +185,7 @@ function collectDirectionalPublicItems(root: HTMLElement): HTMLElement[] {
   return uniqueElements(requested).filter(isVisibleElement).slice(0, MAX_DIRECTIONAL_ITEMS_PUBLIC);
 }
 
+/** Finds the element that should receive whole-view directional translation. */
 function findDirectionalStage(root: HTMLElement): HTMLElement {
   return (
     root.querySelector<HTMLElement>("[data-motion-stage='true']") ||
@@ -185,14 +194,17 @@ function findDirectionalStage(root: HTMLElement): HTMLElement {
   );
 }
 
+/** Computes how far a page should travel during horizontal transitions. */
 function getDirectionalDistance(stage: HTMLElement): number {
   return Math.max(420, stage.clientWidth + 64);
 }
 
+/** Computes the smaller follower offset used for child elements in slide transitions. */
 function getDirectionalOffset(stage: HTMLElement): number {
   return Math.min(96, Math.max(52, Math.round(stage.clientWidth * 0.11)));
 }
 
+/** Clears and unregisters any in-flight timeline already attached to this root. */
 function clearTimeline(root: HTMLElement): void {
   const existing = timelineRegistry.get(root);
   if (!existing) {
@@ -202,6 +214,10 @@ function clearTimeline(root: HTMLElement): void {
   timelineRegistry.delete(root);
 }
 
+/**
+ * Runs a GSAP timeline with a hard timeout so route transitions cannot stall
+ * forever if the DOM changes mid-animation.
+ */
 function runTimelineWithWatchdog(timeline: gsap.core.Timeline, timeoutMs: number): Promise<void> {
   return new Promise((resolve) => {
     let finished = false;
@@ -291,6 +307,8 @@ export async function animateIn(root: HTMLElement | null, options: AnimationOpti
   }
 
   if (useHorizontalMotion && directionalStage) {
+    // RATIONALE: Public page transitions slide the whole stage plus a smaller
+    // child offset to create directional continuity between routes.
     const stageDistance = getDirectionalDistance(directionalStage);
     const itemOffset = getDirectionalOffset(directionalStage);
     gsap.set(directionalStage, {
@@ -391,6 +409,8 @@ export async function animateOut(root: HTMLElement | null, options: AnimationOpt
 
   const timeline = gsap.timeline();
   if (useHorizontalMotion && directionalStage) {
+    // NOTE: Exit motion mirrors the public-page slide system but uses shorter
+    // durations so navigation feels responsive before the next page animates in.
     const stageDistance = getDirectionalDistance(directionalStage);
     const itemOffset = getDirectionalOffset(directionalStage);
     if (items.length) {
@@ -483,6 +503,8 @@ export function MotionProvider({ children }: PropsWithChildren) {
       if (pendingDirectionRef.current !== 0) {
         return pendingDirectionRef.current;
       }
+      // NOTE: When navigation did not explicitly specify a direction, infer it
+      // from route structure so browser back/forward still feel consistent.
       return getRouteDirection(previous, pathname);
     })();
 

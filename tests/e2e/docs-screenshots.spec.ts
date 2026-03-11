@@ -5,10 +5,15 @@ import { test } from "@playwright/test";
 
 const outputDir = path.resolve(process.cwd(), "Documentation/assets");
 
+/** Resolves screenshot output into the docs asset directory used by the manual. */
 function docsScreenshotPath(fileName: string) {
   return path.join(outputDir, fileName);
 }
 
+/**
+ * Disables motion and transient overlays so screenshot output stays stable
+ * across runs, especially in local dev where entrance animations can drift.
+ */
 async function stabilizePage(page: import("@playwright/test").Page) {
   await page.addStyleTag({
     content: `
@@ -29,6 +34,7 @@ async function stabilizePage(page: import("@playwright/test").Page) {
   await page.waitForTimeout(300);
 }
 
+/** Closes the deployment updates modal when it appears during authenticated runs. */
 async function dismissDeployUpdatesModal(page: import("@playwright/test").Page) {
   const modal = page.getByRole("dialog", { name: /deployment updates/i });
   if (!(await modal.isVisible().catch(() => false))) {
@@ -41,20 +47,27 @@ async function dismissDeployUpdatesModal(page: import("@playwright/test").Page) 
   await modal.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => null);
 }
 
+/** Saves a full-page screenshot into the documentation asset tree. */
 async function saveShot(page: import("@playwright/test").Page, fileName: string) {
   fs.mkdirSync(outputDir, { recursive: true });
   await page.screenshot({ path: docsScreenshotPath(fileName), fullPage: true });
 }
 
+/** Saves a screenshot of a specific dialog/locator for focused manual images. */
 async function saveLocatorShot(locator: import("@playwright/test").Locator, fileName: string) {
   fs.mkdirSync(outputDir, { recursive: true });
   await locator.screenshot({ path: docsScreenshotPath(fileName) });
 }
 
+/** Waits for network quiet without failing the capture on slow dev-only polling. */
 async function waitForPageSettle(page: import("@playwright/test").Page) {
   await page.waitForLoadState("networkidle", { timeout: 8_000 }).catch(() => null);
 }
 
+/**
+ * Retries one navigation when the Next.js dev server aborts the first load
+ * during compile/hot-reload churn.
+ */
 async function gotoWithRetry(page: import("@playwright/test").Page, urlPath: string) {
   try {
     return await page.goto(urlPath, { waitUntil: "domcontentloaded" });
@@ -68,6 +81,10 @@ async function gotoWithRetry(page: import("@playwright/test").Page, urlPath: str
   }
 }
 
+/**
+ * Solves the test captcha by reading the generated SVG text directly from the
+ * app's API response instead of attempting OCR in Playwright.
+ */
 async function createCaptchaPayload(request: import("@playwright/test").APIRequestContext) {
   const captchaResponse = await request.get("/api/captcha");
   if (!captchaResponse.ok()) {
@@ -98,6 +115,7 @@ async function createCaptchaPayload(request: import("@playwright/test").APIReque
   return { captchaToken: token, captchaAnswer: answer };
 }
 
+/** Logs in through the real admin API when docs screenshot credentials exist. */
 async function loginAdminIfConfigured(page: import("@playwright/test").Page): Promise<boolean> {
   const email = process.env.DOCS_SCREENSHOTS_ADMIN_EMAIL;
   const password = process.env.DOCS_SCREENSHOTS_ADMIN_PASSWORD;
@@ -128,6 +146,7 @@ async function loginAdminIfConfigured(page: import("@playwright/test").Page): Pr
   return /\/admin\/(bookings|invoices|reports|settings|manual)/.test(page.url());
 }
 
+/** Captures the student portal dashboard when demo portal credentials exist. */
 async function captureStudentPortalIfConfigured(page: import("@playwright/test").Page): Promise<boolean> {
   const fullName = process.env.DOCS_SCREENSHOTS_STUDENT_FULL_NAME;
   const postcode = process.env.DOCS_SCREENSHOTS_STUDENT_POSTCODE;
@@ -178,6 +197,9 @@ test.describe("documentation screenshots", () => {
     for (const capture of captures) {
       const response = await gotoWithRetry(page, capture.path);
       if (capture.optional && response && response.status() >= 500) {
+        // NOTE: Local docs capture often runs before MySQL-backed admin pages
+        // are available, so admin login is treated as optional rather than
+        // failing the whole screenshot suite.
         test.info().annotations.push({
           type: "note",
           description: `Skipped ${capture.file} because ${capture.path} returned ${response.status()} (likely missing local MySQL DATABASE_URL).`
@@ -227,6 +249,8 @@ test.describe("documentation screenshots", () => {
     }
 
     // Booking console dialog-level captures.
+    // RATIONALE: These are locator screenshots rather than full pages because
+    // the manual references the dialog workflows directly.
     await gotoWithRetry(page, "/admin/bookings");
     await dismissDeployUpdatesModal(page);
     await page.getByRole("button", { name: /new booking/i }).first().waitFor({ timeout: 10_000 });

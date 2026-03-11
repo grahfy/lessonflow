@@ -3,6 +3,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 const adminEmail = process.env.DOCS_SCREENSHOTS_ADMIN_EMAIL;
 const adminPassword = process.env.DOCS_SCREENSHOTS_ADMIN_PASSWORD;
 
+/** Authenticates through the real admin API to avoid brittle form interactions in setup. */
 async function loginAdmin(page: Page, email: string, password: string): Promise<void> {
   await page.goto("/admin/login", { waitUntil: "domcontentloaded" });
 
@@ -17,6 +18,7 @@ async function loginAdmin(page: Page, email: string, password: string): Promise<
   expect(response.ok(), "Admin login via API should succeed for mobile e2e checks.").toBeTruthy();
 }
 
+/** Fails when the current page layout exceeds the mobile viewport width. */
 async function assertNoHorizontalOverflow(page: Page, label: string): Promise<void> {
   const metrics = await page.evaluate(() => ({
     viewportWidth: window.innerWidth,
@@ -30,6 +32,7 @@ async function assertNoHorizontalOverflow(page: Page, label: string): Promise<vo
   ).toBeLessThanOrEqual(1);
 }
 
+/** Ensures the dialog bounding box stays within the mobile viewport. */
 async function assertDialogFitsViewport(page: Page, dialog: Locator, label: string): Promise<void> {
   const box = await dialog.boundingBox();
   expect(box, `${label} dialog should be visible`).not.toBeNull();
@@ -42,6 +45,10 @@ async function assertDialogFitsViewport(page: Page, dialog: Locator, label: stri
   expect(box.x + box.width, `${label} dialog should fit inside mobile viewport width`).toBeLessThanOrEqual((viewport?.width || 390) + 1);
 }
 
+/**
+ * Finds visible descendants that protrude beyond the viewport so regressions
+ * can be debugged from the failing node metadata.
+ */
 async function assertNoDialogContentOverflow(page: Page, dialog: Locator, label: string): Promise<void> {
   const offenders = await dialog.evaluate((dialogNode) => {
     const viewportWidth = window.innerWidth;
@@ -99,6 +106,8 @@ test.describe("admin mobile responsiveness", () => {
     for (const route of routes) {
       await page.goto(route.path, { waitUntil: "domcontentloaded" });
       await page.getByRole("heading", { name: route.heading }).first().waitFor({ timeout: 12_000 });
+      // RATIONALE: Route-level overflow checks catch layout regressions before
+      // drilling into the more specific dialog scenarios below.
       await assertNoHorizontalOverflow(page, route.path);
     }
 
@@ -160,7 +169,9 @@ test.describe("admin mobile responsiveness", () => {
     expect(canScrollSettings.end, "Settings page should support downward scrolling on mobile.").toBeGreaterThanOrEqual(canScrollSettings.start);
     await assertNoHorizontalOverflow(page, "/admin/settings scroll state");
 
-    // Verify Latest Updates and Sign Out are in the mobile menu
+    // Verify Latest Updates and Sign Out are in the mobile menu.
+    // NOTE: These controls moved behind the header sheet, so they need an
+    // explicit regression assertion separate from page-overflow checks.
     await page.goto("/admin/bookings", { waitUntil: "domcontentloaded" });
     const toggle = page.getByRole("button", { name: /^menu$/i }).first();
     await toggle.click();

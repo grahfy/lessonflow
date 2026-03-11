@@ -13,7 +13,11 @@ type ContentSection = {
 };
 
 /**
- * Whitelabel interface for editing public-facing page content (FAQs, Home, etc).
+ * JSON editor for public-site content blocks stored in the admin content API.
+ *
+ * RATIONALE: Content is edited as raw JSON because the same storage supports
+ * several page/section shapes; this editor favors fidelity over a bespoke form
+ * for every public-page content model.
  */
 export function AdminContentEditor() {
   const [sections, setSections] = useState<ContentSection[]>([]);
@@ -24,6 +28,7 @@ export function AdminContentEditor() {
   const { safeFetch, handleApiError } = useSafeFetch({ onError: setError });
 
   useEffect(() => {
+    /** Loads content entries and stringifies them for safe textarea editing. */
     async function load() {
       try {
         const response = await safeFetch("/api/admin/content");
@@ -58,6 +63,12 @@ export function AdminContentEditor() {
     void load();
   }, [safeFetch, handleApiError]);
 
+  /**
+   * Parses each edited JSON block and submits the normalized entry list.
+   *
+   * NOTE: Validation happens per-section so admins get a targeted error naming
+   * the offending page/section pair instead of a generic save failure.
+   */
   async function saveAll() {
     setSaving(true);
     setError("");
@@ -101,6 +112,7 @@ export function AdminContentEditor() {
     }
   }
 
+  /** Applies textarea edits to one section draft without mutating other rows. */
   function updateSection(key: string, patch: Partial<ContentSection>) {
     setSections((prev) => prev.map((section) => (section.key === key ? { ...section, ...patch } : section)));
   }

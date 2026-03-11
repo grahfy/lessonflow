@@ -34,6 +34,10 @@ type EditableLineItem = {
 type CreateInvoiceBasis = "lesson_based" | "standalone" | (string & {});
 type InvoiceDisplayStatus = InvoiceRow["status"] | "overdue";
 
+/**
+ * Promotes sufficiently overdue unpaid invoices into a dedicated display state
+ * without mutating the persisted invoice lifecycle value.
+ */
 function getDisplayStatus(invoice: InvoiceRow, overdueOnly: boolean): InvoiceDisplayStatus {
   if (
     overdueOnly &&
@@ -47,6 +51,7 @@ function getDisplayStatus(invoice: InvoiceRow, overdueOnly: boolean): InvoiceDis
   return invoice.status;
 }
 
+/** Formats stored cent values for display in the invoices console. */
 function toCurrency(cents: number, currency: string) {
   return new Intl.NumberFormat("en-AU", {
     style: "currency",
@@ -56,7 +61,11 @@ function toCurrency(cents: number, currency: string) {
 
 /**
  * Admin invoices console client.
- * Refactored to use centralized UI components and hooks.
+ *
+ * RATIONALE: This screen coordinates list state, deep-linkable dialog opens,
+ * draft creation, lifecycle actions, and customer handoff transitions. The
+ * hooks keep API details centralized, while the page owns the cross-dialog
+ * state that determines what admins see next.
  */
 export function AdminInvoicesClient() {
   const router = useRouter();
@@ -104,6 +113,8 @@ export function AdminInvoicesClient() {
   const [createDueAt, setCreateDueAt] = useState("");
   const [createTaxMode, setCreateTaxMode] = useState<InvoiceTaxMode>("taxable");
 
+  // NOTE: Auth failures are handled here instead of each button click so all
+  // invoice hooks share the same redirect behavior.
   const onAuthError = useCallback(() => window.location.assign("/admin/login"), []);
 
   // Data Hooks
@@ -128,6 +139,14 @@ export function AdminInvoicesClient() {
   const { customers: customerOptions, load: loadCustomers } = useCustomers({ pageSize: 250, onAuthError, onError: setError });
 
   // Actions
+  /**
+   * Opens the detail dialog and hydrates its editable fields from the selected
+   * invoice row.
+   *
+   * RATIONALE: The dialog maintains its own mutable copy of notes, names, due
+   * date, and line items so admins can make local edits without immediately
+   * mutating the list row state underneath.
+   */
   const openDetail = useCallback((invoice: InvoiceRow) => {
     setSelectedInvoice(invoice);
     setEditingNotes(invoice.notes || "");
@@ -162,6 +181,9 @@ export function AdminInvoicesClient() {
     let shouldReplace = false;
 
     if (shouldOpenCreate && !createOpen) {
+      // RATIONALE: Other admin surfaces can deep-link into invoice creation.
+      // The query params act like a one-time instruction and are cleared
+      // immediately after the dialog state has been hydrated.
       setCreateOpen(true);
       void loadCustomers();
       if (customerId) {
@@ -178,6 +200,9 @@ export function AdminInvoicesClient() {
 
       void (async () => {
         try {
+          // NOTE: We refetch the just-created invoice instead of trusting the
+          // list payload because a create/send flow can redirect here with an ID
+          // before the list has been reloaded with the full detail payload.
           const response = await fetch(`/api/admin/invoices/${openInvoiceId}`, { cache: "no-store" });
           if (response.status === 401) {
             onAuthError();
@@ -200,6 +225,8 @@ export function AdminInvoicesClient() {
 
     if (shouldReplace) {
       const query = nextParams.toString();
+      // NOTE: `replace` avoids polluting browser history with one-shot dialog
+      // bootstrap params that should not reopen on every Back navigation.
       router.replace(query ? `/admin/invoices?${query}` : "/admin/invoices", { scroll: false });
     }
   }, [searchParams, createOpen, loadCustomers, onAuthError, openDetail, router]);
@@ -246,6 +273,9 @@ export function AdminInvoicesClient() {
     setEditingLineItems((prev) => prev.map((li) => (li.key === key ? { ...li, ...patch } : li)));
   };
 
+  /**
+   * Persists the editable detail dialog fields back to the invoice route.
+   */
   async function saveInvoiceEdits() {
     if (!selectedInvoice) return;
     setBusyAction("save");
@@ -272,10 +302,16 @@ export function AdminInvoicesClient() {
     if (result) {
       setSelectedInvoice(result);
       setNotice("Invoice saved successfully.");
+      // RATIONALE: Refresh the backing list after saving so badges, totals, and
+      // pagination rows stay aligned with whatever the server recalculated.
       void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
     }
   }
 
+  /**
+   * Runs one lifecycle action from the detail dialog and refreshes both the
+   * open dialog and the surrounding table state.
+   */
   async function performAction(action: InvoiceAction) {
     if (!selectedInvoice) return;
     if (action === "void" && !window.confirm("Are you sure you want to void this invoice? This cannot be undone.")) return;
@@ -293,10 +329,18 @@ export function AdminInvoicesClient() {
       } else {
         setNotice(`Action '${action}' completed.`);
       }
+      // NOTE: The table may derive status or overdue display differently from
+      // the dialog, so we always reconcile from the server after an action.
       void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
     }
   }
 
+  /**
+   * Creates a new invoice draft and optionally chains a send action.
+   *
+   * RATIONALE: Create-and-send is intentionally modelled as two steps so the UI
+   * can still recover cleanly when creation succeeds but outbound email fails.
+   */
   async function createInvoice(shouldSend: boolean = false) {
     const customer = customerOptions.find(c => c.id === createSelectedCustomerId);
     if (!customer) {
@@ -338,6 +382,8 @@ export function AdminInvoicesClient() {
           }];
         }
         if (createInvoiceBasis === "presets") {
+          // NOTE: Presets are resolved client-side so the create route receives
+          // an explicit immutable line-item payload rather than preset IDs.
           const selectedPresets = presets.filter(p => createSelectedPresetIds.includes(p.id));
           return selectedPresets.map(preset => ({
             description: preset.description,
@@ -363,6 +409,8 @@ export function AdminInvoicesClient() {
         void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
       } else {
         setCreateOpen(false);
+        // RATIONALE: When email delivery fails, we still surface the draft so an
+        // admin can inspect or resend it rather than losing the newly created document.
         setNotice("Invoice created but failed to send. Now open in draft.");
         openDetail(result);
         void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
@@ -402,6 +450,12 @@ export function AdminInvoicesClient() {
     : false;
   const selectedInvoiceDisplayStatus = selectedInvoice ? getDisplayStatus(selectedInvoice, overdueOnly) : null;
 
+  /**
+   * Navigates to the linked customer after closing the detail dialog.
+   *
+   * RATIONALE: The tween orchestrator preserves the app-shell transition flow so
+   * moving from billing into customer support feels like one continuous admin task.
+   */
   const openLinkedCustomer = () => {
     if (!selectedInvoice?.customerId) return;
     closeDetail();
@@ -570,6 +624,8 @@ export function AdminInvoicesClient() {
               </div>
               <Separator />
               <div className="customer-item-actions admin-list-actions admin-list-col-actions" onClick={e => e.stopPropagation()}>
+                {/* NOTE: Action buttons stop propagation so row-level click-to-open
+                    does not fire when the admin only wants the PDF/delete affordance. */}
                 <span className="admin-mobile-label">Actions</span>
                 <Tooltip content="Open this invoice as a PDF in a new tab.">
                   <button
@@ -599,6 +655,8 @@ export function AdminInvoicesClient() {
                         setBusyAction(`delete-${inv.id}`);
                         await removeInvoiceApi(inv.id);
                         setBusyAction(null);
+                        // RATIONALE: Delete changes pagination and filter counts,
+                        // so the table must be reloaded from the current server view.
                         void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
                       }
                     }}
@@ -842,6 +900,8 @@ export function AdminInvoicesClient() {
                   <select value={createInvoiceBasis} onChange={(e) => setCreateInvoiceBasis(e.target.value as CreateInvoiceBasis)}>
                     <option value="lesson_based">Lessons (Calculated from bookings)</option>
                     <option value="standalone">Standalone (Manual line items)</option>
+                    {/* RATIONALE: Preset-driven creation is only useful once at
+                        least one preset exists, so the option is hidden otherwise. */}
                     {presets.length > 0 && (
                       <option value="presets">Multiple Presets (Select below)...</option>
                     )}

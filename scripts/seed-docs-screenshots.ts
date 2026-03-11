@@ -18,30 +18,39 @@ if (!connectionString) {
 const adapter = new PrismaMariaDb(connectionString);
 const prisma = new PrismaClient({ adapter });
 
+/** Normalizes names into the same search form used by the live app. */
 function normalizeName(value: any) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+/** Builds a deduplicated token string for customer name search helpers. */
 function buildNameTokens(value: any) {
   const normalized = normalizeName(value);
   if (!normalized) return null;
   return [...new Set(normalized.split(" ").filter(Boolean))].join(" ");
 }
 
+/** Lowercases emails so screenshot fixtures behave like production matching. */
 function normalizeEmail(value: any) {
   return String(value || "").trim().toLowerCase();
 }
 
+/** Strips punctuation/spaces from phone numbers for matching and seeding. */
 function normalizePhone(value: any) {
   return String(value || "").replace(/\D/g, "");
 }
 
+/** Derives a 32-byte AES key from whichever secret is available in the env. */
 function deriveEncryptionKey(secret: any) {
   const trimmed = String(secret || "").trim();
   if (!trimmed) throw new Error("Missing encryption secret");
   return crypto.createHash("sha256").update(trimmed, "utf8").digest();
 }
 
+/**
+ * Mirrors the app's student-portal password encryption format so seeded demo
+ * credentials can be revealed and rotated through the real admin workflows.
+ */
 function encryptPortalSecret(plaintext: any) {
   const explicit = process.env.STUDENT_PORTAL_PASSWORD_ENCRYPTION_KEY?.trim();
   const fallback = process.env.ADMIN_SESSION_SECRET || "dev-student-portal-encryption-key";
@@ -53,6 +62,13 @@ function encryptPortalSecret(plaintext: any) {
   return ["v1", iv.toString("base64url"), encrypted.toString("base64url"), tag.toString("base64url")].join(".");
 }
 
+/**
+ * Writes the operator checklist consumed by the docs screenshot workflow.
+ *
+ * RATIONALE: The screenshots are only reproducible when the seed, app, and
+ * capture run against the same disposable database, so the script leaves a
+ * lightweight reminder next to the documentation assets.
+ */
 function writeChecklist() {
   const checklist = `# Screenshot Seed Checklist
 
@@ -77,21 +93,25 @@ This project includes a deterministic screenshot seeder.
   console.log(`Wrote screenshot seed checklist to ${path.relative(projectRoot, checklistPath)}`);
 }
 
+/** Writes deterministic placeholder files into the local learning-material store. */
 function writeDemoMaterial(relativePath: string, content: Buffer | string) {
   const absolutePath = path.join(learningMaterialsRoot, relativePath);
   fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
   fs.writeFileSync(absolutePath, content);
 }
 
+/** Converts dollar amounts into the integer cent values stored in the DB. */
 function cents(amount: any) {
   return Math.round(amount * 100);
 }
 
+/** Reassembles an address string from the normalized customer fields. */
 function makeAddress(input: any) {
   const unit = input.unitNumber ? `${input.unitNumber}/` : "";
   return `${unit}${input.houseNumber} ${input.streetName} ${input.streetType}, ${input.suburb} ${input.state} ${input.postcode}`.trim();
 }
 
+/** Mirrors invoice line calculations used by the app so screenshots show valid totals. */
 function lineCalc(quantity: any, unitPriceCents: any, taxMode: any) {
   const subtotal = quantity * unitPriceCents;
   const gst = taxMode === "taxable" ? Math.round(subtotal / 11) : 0;
@@ -102,10 +122,12 @@ function lineCalc(quantity: any, unitPriceCents: any, taxMode: any) {
   };
 }
 
+/** Convenience helper for creating booking end-times from a start date. */
 function addMinutes(date: any, minutes: any) {
   return new Date(date.getTime() + minutes * 60_000);
 }
 
+/** Creates demo-relative dates while preserving readable fixture intent. */
 function daysFromNow(days: any, hour: any, minute = 0) {
   const d = new Date();
   d.setDate(d.getDate() + days);
@@ -113,6 +135,11 @@ function daysFromNow(days: any, hour: any, minute = 0) {
   return d;
 }
 
+/**
+ * Seeds a fully navigable demo environment for manual screenshots and docs
+ * capture, including admin auth, customers, bookings, portal credentials,
+ * materials, invoices, and email history.
+ */
 async function seed() {
   const dbUrl = process.env.DATABASE_URL || "";
   if (!dbUrl.startsWith("mysql://")) {
@@ -126,6 +153,8 @@ async function seed() {
 
   try {
     console.log("Resetting docs demo data...");
+    // RATIONALE: Delete in dependency order so the script can be rerun on the
+    // same disposable database without manual cleanup between screenshot passes.
     await prisma.$transaction([
       prisma.invoiceAuditLog.deleteMany({}),
       prisma.invoiceLineItem.deleteMany({}),
@@ -461,6 +490,8 @@ async function seed() {
       "docs-demo/alex/warmup-sheet.pdf",
       Buffer.from("%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n", "utf8")
     );
+    // NOTE: These placeholders are intentionally tiny. The screenshot workflow
+    // only needs stable file metadata and a downloadable blob, not rich content.
     writeDemoMaterial("docs-demo/alex/backing-track.mp3", Buffer.from("ID3docs-demo-audio", "utf8"));
 
     const sellerBusinessName = process.env.INVOICE_BUSINESS_NAME || "Melbourne Guitar School";

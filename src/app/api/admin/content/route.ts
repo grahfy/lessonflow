@@ -10,6 +10,7 @@ type ContentEntryInput = {
   content: Prisma.InputJsonValue | typeof Prisma.JsonNull;
 };
 
+/** Guards the admin content upsert route against malformed entry payloads. */
 function isContentEntry(value: unknown): value is ContentEntryInput {
   if (!value || typeof value !== "object") {
     return false;
@@ -25,6 +26,7 @@ function isContentEntry(value: unknown): value is ContentEntryInput {
   );
 }
 
+/** Returns either one content block or the full public-content collection. */
 export async function GET(request: NextRequest) {
   const admin = await requireAdminFromRequest(request);
   if (!admin) {
@@ -51,6 +53,12 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ ok: true, content: allContent });
 }
 
+/**
+ * Upserts one or many public content blocks from the admin editor.
+ *
+ * RATIONALE: The endpoint accepts either a single entry or an `entries[]` array
+ * so both targeted saves and bulk editor submissions can share one contract.
+ */
 export async function POST(request: NextRequest) {
   try {
     const admin = await requireAdminFromRequest(request);
@@ -66,6 +74,8 @@ export async function POST(request: NextRequest) {
     }
 
     const updated = await prisma.$transaction(
+      // NOTE: Upserting inside one transaction keeps the editor's bulk-save
+      // semantics atomic from the admin's perspective.
       entries.map((entry: ContentEntryInput) =>
         prisma.publicPageContent.upsert({
           where: {

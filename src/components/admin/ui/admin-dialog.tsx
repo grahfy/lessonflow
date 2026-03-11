@@ -20,6 +20,13 @@ let activeDialogCount = 0;
 let originalBodyOverflow = "";
 let originalBodyPaddingRight = "";
 
+/**
+ * Locks body scroll for the outer page while at least one admin dialog is open.
+ *
+ * RATIONALE: The dialog system is shared across nested/stacked admin flows, so
+ * we reference-count open dialogs instead of blindly toggling body styles per
+ * instance and accidentally re-enabling scroll too early.
+ */
 function lockBodyScroll(): void {
   if (typeof document === "undefined" || typeof window === "undefined") return;
 
@@ -39,6 +46,7 @@ function lockBodyScroll(): void {
   }
 }
 
+/** Restores the original body scroll styles once the last dialog closes. */
 function unlockBodyScroll(): void {
   if (typeof document === "undefined") return;
   if (activeDialogCount === 0) return;
@@ -106,6 +114,8 @@ export function AdminDialog({
       <div 
         id={id}
         className={`dialog-panel ${wide ? 'dialog-panel-wide' : ''}`}
+        // NOTE: Stop propagation so click-away close only applies to the
+        // backdrop, not interactive controls inside the dialog panel.
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

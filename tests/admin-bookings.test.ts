@@ -9,6 +9,8 @@ import { GET } from "@/app/api/admin/bookings/route";
 
 describe("admin-bookings", () => {
   beforeEach(async () => {
+    // NOTE: The bookings calendar reads both bookings and booking requests into
+    // one unified event list, so both tables must be reset between tests.
     await prisma.bookingAuditLog.deleteMany();
     await prisma.booking.deleteMany();
     await prisma.bookingSeries.deleteMany();
@@ -124,6 +126,8 @@ describe("admin-bookings", () => {
       events: Array<{ title: string; color: string }>;
     };
     const titles = body.events.map((event) => event.title);
+    // RATIONALE: Pending requests are only shown when they fall inside the
+    // selected range, while confirmed bookings always contribute real events.
     expect(titles).toContain("In Range Booking");
     expect(titles).toContain("Pending In Range");
     expect(titles).not.toContain("Pending Out Of Range");

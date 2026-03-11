@@ -31,10 +31,15 @@ const GROUP_TITLES: Record<ManualSectionGroup, string> = {
   technical: "Technical Owner Runbook"
 };
 
+/** Returns only the section index entries that belong to one navigation group. */
 function sectionsForGroup(index: AdminManualIndex, group: ManualSectionGroup) {
   return index.sections.filter((entry) => entry.group === group);
 }
 
+/**
+ * Renders a single admin manual article, including local group navigation and
+ * optional screenshot lightbox handling.
+ */
 export function AdminManualSectionClient({
   index,
   section,
@@ -55,6 +60,8 @@ export function AdminManualSectionClient({
       }
     };
 
+    // RATIONALE: The screenshot viewer behaves like a modal. Locking body
+    // scroll avoids the background document jumping underneath large images.
     document.body.style.overflow = "hidden";
     document.addEventListener("keydown", onEscape);
 
@@ -72,6 +79,8 @@ export function AdminManualSectionClient({
   }, [section.updatedAt]);
 
   const screenshots = useMemo(() => {
+    // NOTE: Section content stores screenshot IDs so the documentation content
+    // file can be reordered without duplicating screenshot metadata per section.
     return (section.screenshotIds || [])
       .map((id) => index.screenshots.find((s) => s.id === id))
       .filter((screenshot): screenshot is ManualScreenshot => Boolean(screenshot));
@@ -107,6 +116,8 @@ export function AdminManualSectionClient({
             {section.group !== "technical" ? (
               <>
                 <h3>Technical owner</h3>
+                {/* RATIONALE: Non-technical admins often need to escalate into
+                    runbook content without losing their place in the main TOC. */}
                 <ol className="admin-manual-list compact">
                   {sectionsForGroup(index, "technical").map((entry) => (
                     <li key={`toc-tech-${entry.id}`}>
@@ -205,6 +216,8 @@ export function AdminManualSectionClient({
 
       {activeScreenshot ? (
         <div className="modal-overlay" onClick={closeScreenshot} role="dialog" aria-modal="true" aria-label={activeScreenshot.alt}>
+          {/* NOTE: Clicks on the inner panel are stopped so the same overlay can
+              support both click-away close and interactive image controls. */}
           <div className="modal-content admin-manual-modal-content" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" onClick={closeScreenshot} aria-label="Close screenshot">
               ×

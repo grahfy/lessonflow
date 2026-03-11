@@ -8,7 +8,9 @@ import { AdminNotice } from "@/components/admin/ui/admin-notice";
 import { AddressAutocomplete } from "@/components/admin/ui/address-autocomplete";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 
-// Types derived from admin-customers-client.tsx
+// Types derived from admin-customers-client.tsx.
+// NOTE: This dialog stays presentation-focused; the parent client owns data
+// fetching/mutations and passes down the active customer plus callbacks.
 export type CustomerRow = {
     id: string;
     firstName: string;
@@ -51,6 +53,7 @@ export type CustomerForm = {
     postcode: string;
 };
 
+/** Empty baseline for create/reset flows before a customer is selected. */
 export function emptyCustomerForm(): CustomerForm {
     return {
         firstName: "",
@@ -70,6 +73,12 @@ export function emptyCustomerForm(): CustomerForm {
     };
 }
 
+/**
+ * Builds the editable form state from the customer table row shape.
+ *
+ * RATIONALE: Older rows may only have `fullName`, so the dialog backfills first
+ * and last name segments to keep the edit form consistent during migrations.
+ */
 export function customerFormFromRow(customer: CustomerRow): CustomerForm {
     let firstName = customer.firstName;
     let lastName = customer.lastName;
@@ -133,6 +142,7 @@ export function CustomerProfileDialog({
     onRevealPortalPassword,
     onRegeneratePortalPassword
 }: Props) {
+    /** Local convenience wrapper so field components can patch one key at a time. */
     const updateForm = (patch: Partial<CustomerForm>) => setForm(prev => ({ ...prev, ...patch }));
 
     return (
@@ -202,6 +212,8 @@ export function CustomerProfileDialog({
                 <h4 className="customer-profile-subhead">Address</h4>
                 <div className="admin-address-search-row">
                     <AddressAutocomplete
+                        // NOTE: Autocomplete can return free-form state strings,
+                        // so we normalize them into the app's AU state union.
                         onAddressSelect={(addr) => updateForm({ ...addr, state: toAuState(addr.state) })}
                         disabled={!isEditing || savingCustomer}
                     />
@@ -300,6 +312,9 @@ export function CustomerProfileDialog({
                                         type="button"
                                         className="btn btn-secondary customer-portal-copy-btn"
                                         onClick={() => {
+                                            // RATIONALE: Revealed credentials are
+                                            // short-lived in the UI, so clipboard
+                                            // copy reduces transcription mistakes.
                                             void navigator.clipboard.writeText(revealedPortalPasswords[customer.id]);
                                             alert("Password copied to clipboard");
                                         }}
@@ -315,6 +330,9 @@ export function CustomerProfileDialog({
                                 <button
                                     className="btn btn-secondary"
                                     type="button"
+                                    // NOTE: Credential actions are disabled while
+                                    // editing so the dialog cannot mix profile
+                                    // saves with security-sensitive mutations.
                                     disabled={!customer || !customer.portalCredential || portalCredentialBusyCustomerId === customer.id || isEditing}
                                     onClick={() => customer && onRevealPortalPassword()}
                                 >
@@ -326,6 +344,10 @@ export function CustomerProfileDialog({
                                     className="btn btn-secondary"
                                     type="button"
                                     disabled={!customer || portalCredentialBusyCustomerId === customer.id || isEditing}
+                                    // RATIONALE: Password generation is available
+                                    // even when a credential does not yet exist,
+                                    // which lets admins bootstrap portal access
+                                    // from the same profile surface.
                                     onClick={() => customer && onRegeneratePortalPassword()}
                                 >
                                     {customer && portalCredentialBusyCustomerId === customer.id 

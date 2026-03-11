@@ -61,6 +61,10 @@ type Props = {
     onMaterialBookingSelect: (bookingId: string) => void;
 };
 
+/**
+ * Composes the tabbed customer dialog from profile, email, and materials
+ * subviews while keeping the outer modal shell consistent.
+ */
 export function CustomerDialogWrapper({
     dialogRootRef,
     selectedCustomer,
@@ -71,6 +75,8 @@ export function CustomerDialogWrapper({
     onClose,
     ...rest
 }: Props) {
+    // RATIONALE: The dialog description doubles as the tab/navigation header so
+    // the modal chrome stays compact even when each tab has its own dense UI.
     const description = (
         <div className="customer-dialog-description">
             <div>
@@ -113,6 +119,8 @@ export function CustomerDialogWrapper({
 
             {activeTab === 'profile' && (
                 <div className="dialog-layout customer-dialog-panel">
+                    {/* NOTE: The profile tab keeps its own two-column layout,
+                        unlike email/materials which render their own shells. */}
                     <CustomerProfileDialog
                         customer={selectedCustomer}
                         isEditing={rest.isEditing}

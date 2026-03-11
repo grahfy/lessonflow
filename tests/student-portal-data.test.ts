@@ -12,6 +12,8 @@ import { createStudentSessionToken, getStudentSessionCookieName } from "@/lib/st
 
 describe("student-portal-data", () => {
   beforeEach(async () => {
+    // RATIONALE: Portal responses depend on both relational DB rows and the
+    // on-disk materials store, so each scenario resets both surfaces.
     await prisma.learningMaterial.deleteMany();
     await prisma.customerPortalCredentialAuditLog.deleteMany();
     await prisma.customerPortalCredential.deleteMany();
@@ -114,6 +116,8 @@ describe("student-portal-data", () => {
     const portalResponse = await studentPortal(portalRequest);
     expect(portalResponse.status).toBe(200);
     const payload = studentPortalPayloadSchema.parse(await portalResponse.json());
+    // NOTE: The contract intentionally separates upcoming vs previous lessons so
+    // the portal UI can render next actions before history/archive content.
     expect(payload.upcoming.map((row) => row.id)).toContain(upcomingBooking.id);
     expect(payload.previous.map((row) => row.id)).toContain(previousBooking.id);
     expect(payload.upcoming[0]?.materials[0]?.id).toBe(material.id);
@@ -187,6 +191,8 @@ describe("student-portal-data", () => {
       params: Promise.resolve({ id: material.id })
     });
     expect(response.status).toBe(200);
+    // RATIONALE: These assertions guard the actual download contract that media
+    // players and browser save dialogs rely on, not just route reachability.
     expect(response.headers.get("content-type")).toBe("audio/mpeg");
     expect(response.headers.get("content-disposition") || "").toContain("Warmup track");
   });

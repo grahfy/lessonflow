@@ -12,7 +12,11 @@ type EmailTemplate = {
 };
 
 /**
- * Whitelabel interface for editing system email templates.
+ * Editor for stored outbound email subject/body templates.
+ *
+ * RATIONALE: Template rows are loaded as editable drafts so admins can review
+ * several automated emails in one session and then submit one consolidated save
+ * request instead of incurring partial-update drift between templates.
  */
 export function AdminEmailTemplateEditor() {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
@@ -23,6 +27,7 @@ export function AdminEmailTemplateEditor() {
   const { safeFetch, handleApiError } = useSafeFetch({ onError: setError });
 
   useEffect(() => {
+    /** Loads the persisted template rows and maps API fields into UI drafts. */
     async function load() {
       try {
         const response = await safeFetch("/api/admin/email-templates");
@@ -58,6 +63,7 @@ export function AdminEmailTemplateEditor() {
     void load();
   }, [safeFetch, handleApiError]);
 
+  /** Saves every template row in one request so subject/body pairs stay aligned. */
   async function saveAll() {
     setSaving(true);
     setError("");
@@ -93,6 +99,7 @@ export function AdminEmailTemplateEditor() {
     }
   }
 
+  /** Updates one template draft in local state. */
   function updateTemplate(key: string, patch: Partial<EmailTemplate>) {
     setTemplates((current) => current.map((template) => (
       template.key === key ? { ...template, ...patch } : template

@@ -45,6 +45,7 @@ type EnvSaveResponse = {
   fieldErrors?: Record<string, string>;
 };
 
+/** Displays one readiness check result from the server-side setup evaluation. */
 function SetupCheckRow({ check }: { check: SetupCheck }) {
   return (
     <li className={`setup-check setup-check-${check.status}`}>
@@ -84,6 +85,7 @@ export function SetupWizard({ initialReadiness }: SetupWizardProps) {
     return `${readiness.passCount} passed, ${readiness.warnCount} warnings, ${readiness.failCount} failures`;
   }, [readiness.failCount, readiness.passCount, readiness.warnCount]);
 
+  /** Refreshes server-derived readiness checks without resetting the whole page. */
   async function refreshChecks() {
     setIsRefreshingChecks(true);
     setError("");
@@ -134,6 +136,12 @@ export function SetupWizard({ initialReadiness }: SetupWizardProps) {
     }
   }, []);
 
+  /**
+   * Persists the editable environment variable values shown in the setup panel.
+   *
+   * RATIONALE: The browser only submits string values keyed by env var name; the
+   * server owns secret handling, validation, and writing the effective config.
+   */
   async function saveEnvConfig(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSavingEnv(true);
@@ -182,10 +190,13 @@ export function SetupWizard({ initialReadiness }: SetupWizardProps) {
 
   useEffect(() => {
     if (envConfigOpen && envVars.length === 0) {
+      // NOTE: The env editor is lazy-loaded so first paint can focus on setup
+      // readiness instead of immediately fetching every configurable variable.
       loadEnvVars();
     }
   }, [envConfigOpen, envVars.length, loadEnvVars]);
 
+  /** Creates the first admin after the server revalidates readiness and policy. */
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmitting(true);
@@ -222,6 +233,8 @@ export function SetupWizard({ initialReadiness }: SetupWizardProps) {
           .join(" ")
           .trim();
 
+        // RATIONALE: Field-level validation can come back as a map, but the
+        // setup shell still needs a compact summary message for the notice area.
         setError(fieldErrorMessage || body.error || "Setup initialization failed.");
         return;
       }

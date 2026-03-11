@@ -14,6 +14,8 @@ import { createStudentSessionToken, getStudentSessionCookieName } from "@/lib/st
 
 describe("student-portal-booking-actions", () => {
   beforeEach(async () => {
+    // RATIONALE: Student booking actions can create emails/audit rows as well
+    // as request/booking records, so cleanup needs to reset the full graph.
     await prisma.learningMaterial.deleteMany();
     await prisma.customerPortalCredentialAuditLog.deleteMany();
     await prisma.customerPortalCredential.deleteMany();
@@ -61,6 +63,8 @@ describe("student-portal-booking-actions", () => {
     const response = await createStudentBooking(request);
     expect(response.status).toBe(201);
     const createPayload = studentPortalBookingRequestResponseSchema.parse(await response.json());
+    // NOTE: The response schema is part of the contract for optimistic portal
+    // UI updates, not just a convenience wrapper around the DB row.
     expect(createPayload.request.status).toBe("pending");
 
     const created = await prisma.bookingRequest.findFirstOrThrow({
@@ -142,6 +146,8 @@ describe("student-portal-booking-actions", () => {
         action: "cancelled"
       }
     });
+    // RATIONALE: Portal cancellations must leave an audit trail because they
+    // affect attendance, reminder flows, and possible billing follow-up.
     expect(log).not.toBeNull();
   });
 });

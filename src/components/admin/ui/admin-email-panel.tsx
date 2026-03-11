@@ -41,6 +41,14 @@ interface AdminEmailPanelProps {
   renderHistoryMeta: (email: EmailRecord) => ReactNode;
 }
 
+/**
+ * Shared admin email history + composer shell.
+ *
+ * RATIONALE: Customer, booking, and invoice screens all expose the same core
+ * email workflow, but each needs its own history metadata rendering. This
+ * wrapper standardizes compose validation, captcha handling, and message review
+ * while leaving domain-specific display details injectable.
+ */
 export function AdminEmailPanel({
   historyTitle = "Email History",
   composeTitle = "Send Email",
@@ -70,6 +78,10 @@ export function AdminEmailPanel({
   const [selectedEmail, setSelectedEmail] = useState<EmailRecord | null>(null);
   const captcha = useCaptcha();
 
+  /**
+   * Runs the guarded send flow and translates captcha-specific failures back
+   * into field-level feedback instead of generic toast noise.
+   */
   async function handleSend() {
     if (!captcha.validateAnswer()) {
       return;
@@ -87,6 +99,8 @@ export function AdminEmailPanel({
       return;
     }
 
+    // NOTE: Non-captcha failures still invalidate the challenge so retries use
+    // a fresh answer rather than resubmitting a potentially consumed token.
     void captcha.regenerate();
   }
 
@@ -118,6 +132,9 @@ export function AdminEmailPanel({
                   key={email.id}
                   type="button"
                   className={["admin-email-history-item", historyItemClassName].filter(Boolean).join(" ")}
+                  // RATIONALE: The row acts as a disclosure trigger instead of a
+                  // nested button/link combination to keep the history list
+                  // keyboard-friendly inside dense admin dialogs.
                   onClick={() => setSelectedEmail(email)}
                 >
                   {renderHistoryHeader(email)}

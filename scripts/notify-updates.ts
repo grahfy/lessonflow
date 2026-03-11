@@ -24,6 +24,10 @@ type PrismaClientLike = {
 
 let prismaClient: PrismaClientLike | null = null;
 
+/**
+ * Loads runtime env from the shared deploy directory first, then falls back to
+ * a local project `.env` when run outside production.
+ */
 function loadRuntimeEnv(): void {
   const candidatePaths = [
     process.env.SHARED_DIR ? path.join(process.env.SHARED_DIR, ".env") : null,
@@ -47,6 +51,7 @@ function loadRuntimeEnv(): void {
   }
 }
 
+/** Parses the JSON deploy metadata written by the update runner. */
 function parseUpdateData(raw: string): UpdateData {
   const parsed: unknown = JSON.parse(raw);
 
@@ -132,6 +137,8 @@ async function main() {
   }
 
   // Create a public announcement file that the student portal can fetch.
+  // RATIONALE: The portal should be able to surface human-readable release
+  // notes without needing direct database access to the deploy metadata.
   const announcementPath = path.join(process.cwd(), "public", "latest-announcement.json");
   const announcement = {
     appliedAt: updateData.appliedAt,
@@ -157,6 +164,8 @@ main()
   })
   .finally(async () => {
     if (prismaClient) {
+      // NOTE: This script is often run as a one-shot deploy hook, so it must
+      // release the Prisma connection explicitly before exiting.
       await prismaClient.$disconnect();
     }
   });

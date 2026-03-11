@@ -45,6 +45,8 @@ describe("build-info", () => {
 
     const buildInfo = await getAdminBuildInfo();
 
+    // NOTE: Tagged releases should surface both the human release label and the
+    // short commit so admins can communicate versions unambiguously.
     expect(buildInfo.versionText).toBe("v1.0 · d338e15");
     expect(buildInfo.releaseLabel).toBe("v1.0");
     expect(buildInfo.shortCommit).toBe("d338e15");
@@ -102,6 +104,8 @@ describe("build-info", () => {
 
     const buildInfo = await getAdminBuildInfo();
 
+    // RATIONALE: Production hosts may not have full git history, so deploy
+    // metadata becomes the authoritative fallback for build provenance.
     expect(buildInfo.versionText).toBe("20260312094500 · d338e15");
     expect(buildInfo.releaseLabel).toBe("20260312094500");
     expect(buildInfo.shortCommit).toBe("d338e15");

@@ -15,6 +15,7 @@ type AdminManualClientProps = {
   content: AdminManualIndex;
 };
 
+/** Presentation order and copy for the manual landing-page section groups. */
 const SECTION_GROUPS: Array<{ key: ManualSectionGroup; title: string; description: string }> = [
   {
     key: "foundation",
@@ -60,11 +61,18 @@ const START_HERE_LINKS = [
   "invoicing-payments"
 ] as const;
 
+/** Filters the section index down to one audience/workflow group. */
 function sectionsForGroup(sections: AdminManualSectionIndex[], group: ManualSectionGroup) {
   return sections.filter((section) => section.group === group);
 }
 
+/**
+ * Manual landing page that turns the manifest/index payload into an operator-
+ * friendly handbook homepage.
+ */
 export function AdminManualClient({ content }: AdminManualClientProps) {
+  // RATIONALE: "Start Here" is curated rather than group-derived so new admins
+  // get a safe onboarding sequence instead of the full documentation taxonomy.
   const startHereSections = START_HERE_LINKS
     .map((id) => content.sections.find((section) => section.id === id))
     .filter((section): section is AdminManualSectionIndex => Boolean(section));

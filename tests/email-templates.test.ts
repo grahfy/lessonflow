@@ -26,6 +26,8 @@ describe("email-templates", () => {
       recurrenceEndAt: null
     });
     expect(template.subject).toContain("New booking request");
+    // NOTE: Basic smoke assertion that the applicant identity makes it into the
+    // owner-facing notification rather than only appearing in structured data.
     expect(template.html).toContain("Alex");
   });
 
@@ -80,6 +82,8 @@ describe("email-templates", () => {
 
     expect(template.html).toContain("student/login");
     expect(template.html).toContain("TempPass123!");
+    // RATIONALE: First-time approvals need explicit portal onboarding content;
+    // later approvals should omit this secret-bearing block.
     expect(template.html).toContain("Student portal access");
   });
 
@@ -119,6 +123,8 @@ describe("email-templates", () => {
     });
 
     expect(reminder.subject).toContain("overdue");
+    // NOTE: Overdue wording drives the escalation tone, so we assert the day
+    // count and invoice reference both make it into the reminder body.
     expect(reminder.html).toContain("14 day");
     expect(reminder.html).toContain("MGS-2026-0002");
   });
