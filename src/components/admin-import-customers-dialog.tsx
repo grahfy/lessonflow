@@ -1,8 +1,10 @@
-import * as React from 'react';
-import { useState } from 'react';
-import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { X } from 'lucide-react';
-import Papa from 'papaparse';
+import * as React from "react";
+import { useState } from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { X } from "lucide-react";
+import Papa from "papaparse";
+
+import { useSafeFetch } from "@/lib/admin/use-safe-fetch";
 
 interface ImportCustomersDialogProps {
   open: boolean;
@@ -13,6 +15,9 @@ interface ImportCustomersDialogProps {
 export function ImportCustomersDialog({ open, onOpenChange, onSuccess }: ImportCustomersDialogProps) {
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { safeFetch, handleApiError } = useSafeFetch({
+    onError: (message) => setError(message)
+  });
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -26,20 +31,20 @@ export function ImportCustomersDialog({ open, onOpenChange, onSuccess }: ImportC
       skipEmptyLines: true,
       complete: async (results) => {
         try {
-          const response = await fetch('/api/admin/customers/import', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+          const response = await safeFetch("/api/admin/customers/import", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ customers: results.data }),
           });
 
-          const data = await response.json();
-
           if (!response.ok) {
-            throw new Error(data.error || 'Import failed');
+            await handleApiError(response, "Import failed");
+            return;
           }
 
+          const data = await response.json();
           if (data.errors?.length > 0) {
-            console.warn('Import completed with some errors:', data.errors);
+            console.warn("Import completed with some errors:", data.errors);
             alert(`Imported ${data.importedCount} customers. ${data.errors.length} failed. Check console for details.`);
           } else {
             alert(`Successfully imported ${data.importedCount} customers.`);
@@ -47,12 +52,12 @@ export function ImportCustomersDialog({ open, onOpenChange, onSuccess }: ImportC
 
           onSuccess();
           onOpenChange(false);
-        } catch (err: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
-          setError(err.message || 'An error occurred during import.');
+        } catch (err: unknown) {
+          setError(err instanceof Error ? err.message : "An error occurred during import.");
         } finally {
           setIsImporting(false);
           // reset input
-          e.target.value = '';
+          e.target.value = "";
         }
       },
       error: (err) => {

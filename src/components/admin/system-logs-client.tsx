@@ -8,6 +8,8 @@ import { AdminNotice } from "@/components/admin/ui/admin-notice";
 import { AlertCircle, CheckCircle, RefreshCw, Bug, Search, Terminal, ChevronRight, ChevronDown, ImagePlus, X } from "lucide-react";
 import { Pagination } from "@/components/pagination";
 import { Tooltip } from "@/components/admin/ui/tooltip";
+import { useSafeFetch } from "@/lib/admin/use-safe-fetch";
+import { readApiErrorFromResponse } from "@/lib/admin/utils";
 
 type SystemLog = {
   id: string;
@@ -78,6 +80,7 @@ export function SystemLogsClient() {
   const [reportResult, setReportResult] = useState<{ success?: boolean; error?: string } | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const { safeFetch, handleApiError } = useSafeFetch({ onError: setError });
 
   /**
    * Reads a selected image file and converts it to a base64 data URL.
@@ -107,7 +110,11 @@ export function SystemLogsClient() {
         level: levelFilter,
         event: eventSearch,
       });
-      const response = await fetch(`/api/admin/system-logs?${params}`);
+      const response = await safeFetch(`/api/admin/system-logs?${params}`);
+      if (!response.ok) {
+        await handleApiError(response, "Failed to load logs. Please refresh the page.");
+        return;
+      }
       const data = await response.json();
       if (data.logs) {
         setLogs(data.logs);
@@ -120,7 +127,7 @@ export function SystemLogsClient() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, levelFilter, eventSearch]);
+  }, [page, pageSize, levelFilter, eventSearch, safeFetch, handleApiError]);
 
   useEffect(() => {
     fetchLogs();
@@ -141,7 +148,7 @@ export function SystemLogsClient() {
     setSubmittingBug(true);
     setReportResult(null);
     try {
-      const response = await fetch("/api/admin/system-logs/report", {
+      const response = await safeFetch("/api/admin/system-logs/report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -152,6 +159,17 @@ export function SystemLogsClient() {
           includeRecentLogs: true,
         }),
       });
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          await handleApiError(response, "Failed to submit report.");
+          return;
+        }
+
+        const message = await readApiErrorFromResponse(response, "Failed to submit report");
+        setReportResult({ error: message });
+        return;
+      }
+
       const data = await response.json();
       if (data.ok) {
         setReportResult({ success: true });

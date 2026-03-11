@@ -26,12 +26,11 @@ export interface BookingEvent {
 type BookingUpdatePayload = Record<string, unknown>;
 
 export interface UseBookingsResult {
-    events: BookingEvent[];
-    loading: boolean;
-    load: (view: string, date: string) => Promise<void>;
-    update: (id: string, entityType: "booking" | "booking_request", action: string, payload: BookingUpdatePayload) => Promise<boolean>;
-    remove: (id: string, entityType: "booking" | "booking_request") => Promise<boolean>;
-    notify: (id: string, action: string, message?: string) => Promise<boolean>;
+  events: BookingEvent[];
+  loading: boolean;
+  load: (view: string, date: string) => Promise<void>;
+  update: (id: string, entityType: "booking" | "booking_request", action: string, payload: BookingUpdatePayload) => Promise<boolean>;
+  remove: (id: string, entityType: "booking" | "booking_request") => Promise<boolean>;
 }
 
 /**
@@ -114,31 +113,11 @@ export function useBookings(options: { onAuthError?: () => void; onError?: (msg:
         }
     }, [safeFetch, handleApiError]);
 
-    const notify = useCallback(async (id: string, action: string, message?: string): Promise<boolean> => {
-        try {
-            const response = await safeFetch(`/api/admin/bookings/${id}/notify`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action, message })
-            });
-
-            if (!response.ok) {
-                await handleApiError(response, "Notification failed.");
-                return false;
-            }
-
-            return true;
-        } catch {
-            return false;
-        }
-    }, [safeFetch, handleApiError]);
-
     return {
         events,
         loading,
         load,
         update,
-        remove,
-        notify
+        remove
     };
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { AdminEditorPanel, AdminEditorSection } from "@/components/admin/ui/admin-editor-section";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
+import { useSafeFetch } from "@/lib/admin/use-safe-fetch";
 
 type InvoiceTemplateState = {
   logoUrl: string;
@@ -25,13 +26,14 @@ export function AdminInvoiceTemplateEditor() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const { safeFetch, handleApiError } = useSafeFetch({ onError: setError });
 
   useEffect(() => {
     async function load() {
       try {
-        const response = await fetch("/api/admin/invoice-template");
+        const response = await safeFetch("/api/admin/invoice-template");
         if (!response.ok) {
-          setError("Failed to load invoice templates.");
+          await handleApiError(response, "Failed to load invoice templates.");
           return;
         }
         const data = (await response.json()) as {
@@ -51,14 +53,14 @@ export function AdminInvoiceTemplateEditor() {
       }
     }
     void load();
-  }, []);
+  }, [safeFetch, handleApiError]);
 
   async function saveAll() {
     setSaving(true);
     setError("");
     setNotice("");
     try {
-      const response = await fetch("/api/admin/invoice-template", {
+      const response = await safeFetch("/api/admin/invoice-template", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(template)
@@ -66,7 +68,7 @@ export function AdminInvoiceTemplateEditor() {
       if (response.ok) {
         setNotice("Invoice templates saved successfully.");
       } else {
-        setError("Failed to save templates.");
+        await handleApiError(response, "Failed to save templates.");
       }
     } catch {
       setError("An error occurred while saving.");

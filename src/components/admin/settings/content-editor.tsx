@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { AdminEditorPanel, AdminEditorSection } from "@/components/admin/ui/admin-editor-section";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
+import { useSafeFetch } from "@/lib/admin/use-safe-fetch";
 
 type ContentSection = {
   key: string;
@@ -20,32 +21,34 @@ export function AdminContentEditor() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const { safeFetch, handleApiError } = useSafeFetch({ onError: setError });
 
   useEffect(() => {
     async function load() {
       try {
-        const response = await fetch("/api/admin/content");
-        if (response.ok) {
-          const data = (await response.json()) as {
-            content?: Array<{ pagePath?: string; sectionKey?: string; content?: unknown }>;
-          };
-          const nextSections = Array.isArray(data.content)
-            ? data.content
-                .filter(
-                  (section): section is { pagePath: string; sectionKey: string; content: unknown } =>
-                    typeof section?.pagePath === "string" && typeof section?.sectionKey === "string"
-                )
-                .map((section) => ({
-                  key: `${section.pagePath}::${section.sectionKey}`,
-                  pagePath: section.pagePath,
-                  sectionKey: section.sectionKey,
-                  contentText: JSON.stringify(section.content ?? {}, null, 2)
-                }))
-            : [];
-          setSections(nextSections);
-        } else {
-          setError("Failed to load content.");
+        const response = await safeFetch("/api/admin/content");
+        if (!response.ok) {
+          await handleApiError(response, "Failed to load content.");
+          return;
         }
+
+        const data = (await response.json()) as {
+          content?: Array<{ pagePath?: string; sectionKey?: string; content?: unknown }>;
+        };
+        const nextSections = Array.isArray(data.content)
+          ? data.content
+              .filter(
+                (section): section is { pagePath: string; sectionKey: string; content: unknown } =>
+                  typeof section?.pagePath === "string" && typeof section?.sectionKey === "string"
+              )
+              .map((section) => ({
+                key: `${section.pagePath}::${section.sectionKey}`,
+                pagePath: section.pagePath,
+                sectionKey: section.sectionKey,
+                contentText: JSON.stringify(section.content ?? {}, null, 2)
+              }))
+          : [];
+        setSections(nextSections);
       } catch {
         setError("Failed to load content.");
       } finally {
@@ -53,7 +56,7 @@ export function AdminContentEditor() {
       }
     }
     void load();
-  }, []);
+  }, [safeFetch, handleApiError]);
 
   async function saveAll() {
     setSaving(true);
@@ -79,14 +82,14 @@ export function AdminContentEditor() {
         }
       }
 
-      const response = await fetch("/api/admin/content", {
+      const response = await safeFetch("/api/admin/content", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ entries: parsedSections })
       });
 
       if (!response.ok) {
-        setError("Failed to save content.");
+        await handleApiError(response, "Failed to save content.");
         return;
       }
 

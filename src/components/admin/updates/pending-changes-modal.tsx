@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import { useSafeFetch } from "@/lib/admin/use-safe-fetch";
 import type { CommitMetadata } from "@/lib/services/updates-service";
 
 interface PendingChangesModalProps {
@@ -22,24 +23,25 @@ export function PendingChangesModal({
   const [confirming, setConfirming] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { safeFetch, handleApiError } = useSafeFetch({ onError: setError });
 
   async function handleUpdate() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/admin/updates/execute", { 
+      const response = await safeFetch("/api/admin/updates/execute", {
         method: "POST"
       });
-      const data = await res.json();
-      
-      if (res.ok) {
-        router.push("/admin/updates/progress");
-      } else {
-        setError(data.error || "Failed to trigger update.");
-        setLoading(false);
+
+      if (!response.ok) {
+        await handleApiError(response, "Failed to trigger update.");
+        return;
       }
+
+      router.push("/admin/updates/progress");
     } catch {
       setError("A network error occurred.");
+    } finally {
       setLoading(false);
     }
   }

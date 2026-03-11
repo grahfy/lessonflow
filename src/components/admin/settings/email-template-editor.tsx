@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { AdminEditorPanel, AdminEditorSection } from "@/components/admin/ui/admin-editor-section";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
+import { useSafeFetch } from "@/lib/admin/use-safe-fetch";
 
 type EmailTemplate = {
   key: string;
@@ -19,33 +20,35 @@ export function AdminEmailTemplateEditor() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const { safeFetch, handleApiError } = useSafeFetch({ onError: setError });
 
   useEffect(() => {
     async function load() {
       try {
-        const response = await fetch("/api/admin/email-templates");
-        if (response.ok) {
-          const data = (await response.json()) as {
-            templates?: Array<{ templateKey?: string; subject?: string; htmlBody?: string }>;
-          };
-          const nextTemplates = Array.isArray(data.templates)
-            ? data.templates
-                .filter(
-                  (template): template is { templateKey: string; subject: string; htmlBody: string } =>
-                    typeof template?.templateKey === "string" &&
-                    typeof template?.subject === "string" &&
-                    typeof template?.htmlBody === "string"
-                )
-                .map((template) => ({
-                  key: template.templateKey,
-                  subject: template.subject,
-                  body: template.htmlBody
-                }))
-            : [];
-          setTemplates(nextTemplates);
-        } else {
-          setError("Failed to load templates.");
+        const response = await safeFetch("/api/admin/email-templates");
+        if (!response.ok) {
+          await handleApiError(response, "Failed to load templates.");
+          return;
         }
+
+        const data = (await response.json()) as {
+          templates?: Array<{ templateKey?: string; subject?: string; htmlBody?: string }>;
+        };
+        const nextTemplates = Array.isArray(data.templates)
+          ? data.templates
+              .filter(
+                (template): template is { templateKey: string; subject: string; htmlBody: string } =>
+                  typeof template?.templateKey === "string" &&
+                  typeof template?.subject === "string" &&
+                  typeof template?.htmlBody === "string"
+              )
+              .map((template) => ({
+                key: template.templateKey,
+                subject: template.subject,
+                body: template.htmlBody
+              }))
+          : [];
+        setTemplates(nextTemplates);
       } catch {
         setError("Failed to load templates.");
       } finally {
@@ -53,7 +56,7 @@ export function AdminEmailTemplateEditor() {
       }
     }
     void load();
-  }, []);
+  }, [safeFetch, handleApiError]);
 
   async function saveAll() {
     setSaving(true);
@@ -65,7 +68,7 @@ export function AdminEmailTemplateEditor() {
         return;
       }
 
-      const response = await fetch("/api/admin/email-templates", {
+      const response = await safeFetch("/api/admin/email-templates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -78,7 +81,7 @@ export function AdminEmailTemplateEditor() {
       });
 
       if (!response.ok) {
-        setError("Failed to save templates.");
+        await handleApiError(response, "Failed to save templates.");
         return;
       }
 
@@ -91,7 +94,9 @@ export function AdminEmailTemplateEditor() {
   }
 
   function updateTemplate(key: string, patch: Partial<EmailTemplate>) {
-    setTemplates(templates.map(t => t.key === key ? { ...t, ...patch } : t));
+    setTemplates((current) => current.map((template) => (
+      template.key === key ? { ...template, ...patch } : template
+    )));
   }
 
   if (loading) return <p className="helper-text">Loading templates...</p>;

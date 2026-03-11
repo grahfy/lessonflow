@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AdminNotice } from "@/components/admin/ui/admin-notice";
 import { PendingChangesModal } from "./pending-changes-modal";
+import { useSafeFetch } from "@/lib/admin/use-safe-fetch";
 import type { CommitMetadata } from "@/lib/services/updates-service";
 
 interface UpdateStatusResponse {
@@ -15,22 +17,31 @@ interface UpdateStatusResponse {
 export function UpdateNotificationBanner() {
   const [status, setStatus] = useState<UpdateStatusResponse | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [error, setError] = useState("");
+  const { safeFetch, handleApiError } = useSafeFetch({ onError: setError });
 
   useEffect(() => {
     async function checkUpdates() {
       try {
-        const res = await fetch("/api/admin/updates/status");
-        if (res.ok) {
-          const data = await res.json();
-          setStatus(data);
+        const response = await safeFetch("/api/admin/updates/status");
+        if (!response.ok) {
+          await handleApiError(response, "Failed to check for updates.");
+          return;
         }
+
+        const data = await response.json();
+        setStatus(data);
       } catch (err) {
         console.error("Failed to check for updates:", err);
       }
     }
 
-    checkUpdates();
-  }, []);
+    void checkUpdates();
+  }, [safeFetch, handleApiError]);
+
+  if (error) {
+    return <AdminNotice tone="error">{error}</AdminNotice>;
+  }
 
   if (!status?.updateAvailable) return null;
 

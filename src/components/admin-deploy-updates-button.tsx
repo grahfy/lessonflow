@@ -18,11 +18,11 @@
  */
 
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
 
 import { Tooltip } from "@/components/admin/ui/tooltip";
+import { useSafeFetch } from "@/lib/admin/use-safe-fetch";
 import { APP_TIMEZONE } from "@/lib/time";
 
 /** 
@@ -85,7 +85,6 @@ function formatDateTime(value: string): string {
  * Primary component for the Admin Header that alerts users to new code changes.
  */
 export function AdminDeployUpdatesButton() {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
@@ -94,6 +93,7 @@ export function AdminDeployUpdatesButton() {
   const [activeTab, setActiveTab] = useState<"latest" | "history">("latest");
   const [history, setHistory] = useState<LatestDeployUpdate[]>([]);
   const [expandedHistoryCommit, setExpandedHistoryCommit] = useState<string | null>(null);
+  const { safeFetch, handleApiError } = useSafeFetch({ onError: setError });
 
   /**
    * Fetches latest deployment status and handles auto-opening logic.
@@ -101,19 +101,12 @@ export function AdminDeployUpdatesButton() {
    * @param options.forceOpen - Always open the dialog regardless of "seen" status
    * @param options.autoPrompt - Check localStorage and open if it's a new commit
    */
-  async function loadAndMaybeOpen(options?: { forceOpen?: boolean; autoPrompt?: boolean }) {
+  const loadAndMaybeOpen = useCallback(async (options?: { forceOpen?: boolean; autoPrompt?: boolean }) => {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/admin/deploy-updates/latest", { cache: "no-store" });
+      const response = await safeFetch("/api/admin/deploy-updates/latest", { cache: "no-store" });
       const body = await readJsonSafe<ApiResponse>(response);
-
-      // Handle session expiration
-      if (response.status === 401) {
-        router.push("/admin/login");
-        router.refresh();
-        return;
-      }
 
       if (response.status === 404) {
         setUpdate(null);
@@ -125,7 +118,7 @@ export function AdminDeployUpdatesButton() {
       }
 
       if (!response.ok || !body?.commit) {
-        setError(body?.error || "Unable to load latest updates.");
+        await handleApiError(response, body?.error || "Unable to load latest updates.");
         if (options?.forceOpen) {
           setOpen(true);
         }
@@ -164,17 +157,22 @@ export function AdminDeployUpdatesButton() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [autoPromptedCommit, safeFetch, handleApiError]);
 
   /**
    * Loads full deployment history from the API.
    */
-  async function loadHistory() {
+  const loadHistory = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/admin/deploy-updates/history", { cache: "no-store" });
+      const response = await safeFetch("/api/admin/deploy-updates/history", { cache: "no-store" });
       const body = await readJsonSafe<HistoryResponse>(response);
-      if (response.ok && body?.updates) {
+      if (!response.ok) {
+        await handleApiError(response, "Unable to load deployment history.");
+        return;
+      }
+
+      if (body?.updates) {
         setHistory(body.updates);
       }
     } catch {
@@ -182,20 +180,19 @@ export function AdminDeployUpdatesButton() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [safeFetch, handleApiError]);
 
   // Initial load on mount
   useEffect(() => {
     void loadAndMaybeOpen({ autoPrompt: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadAndMaybeOpen]);
 
   // Contextual history loading when tab changes
   useEffect(() => {
     if (open && activeTab === "history") {
       void loadHistory();
     }
-  }, [open, activeTab]);
+  }, [open, activeTab, loadHistory]);
 
   const commitCountLabel = (commits?: DeployCommitEntry[]) => {
     const count = commits?.length || 0;
