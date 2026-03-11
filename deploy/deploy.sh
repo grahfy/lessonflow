@@ -1534,9 +1534,9 @@ update_prisma() {
         fi
 
         if [[ "${needs_update}" == false && -n "${diff_range}" ]]; then
-            # Check if prisma/ directory or prisma version in package.json changed
-            if ! git -C "${DEPLOY_GIT_REPO_ROOT}" diff --quiet "${diff_range}" -- prisma/ package.json; then
-                log_info "Changes detected in prisma/ or package.json; update required."
+            # Check if Prisma schema artifacts or package metadata changed.
+            if ! git -C "${DEPLOY_GIT_REPO_ROOT}" diff --quiet "${diff_range}" -- prisma/ package.json package-lock.json; then
+                log_info "Changes detected in prisma/, package.json, or package-lock.json; update required."
                 needs_update=true
             fi
         fi

@@ -20,6 +20,19 @@ function aboutMetaRow(label: string, value: ReactElement | string) {
  * Static admin-facing product and release metadata.
  */
 export function AdminAboutPageContent({ buildInfo }: AdminAboutPageContentProps): ReactElement {
+  const releaseLabelTitle =
+    buildInfo.source === "git"
+      ? "Release tag"
+      : buildInfo.source === "deploy"
+        ? "Release"
+        : "Fallback version";
+  const sourceLabel =
+    buildInfo.source === "git"
+      ? "Git metadata"
+      : buildInfo.source === "deploy"
+        ? "Deploy metadata"
+        : "package.json fallback";
+
   return (
     <div className="admin-about-layout">
       <AdminCard className="admin-about-hero">
@@ -39,10 +52,10 @@ export function AdminAboutPageContent({ buildInfo }: AdminAboutPageContentProps)
         <h3>Build metadata</h3>
         <dl className="admin-about-meta-list">
           {aboutMetaRow("Version", <code>{buildInfo.versionText}</code>)}
-          {aboutMetaRow(buildInfo.source === "git" ? "Release tag" : "Fallback version", <code>{buildInfo.releaseLabel}</code>)}
+          {aboutMetaRow(releaseLabelTitle, <code>{buildInfo.releaseLabel}</code>)}
           {aboutMetaRow("Commit", <code>{buildInfo.shortCommit}</code>)}
           {aboutMetaRow("Package version", <code>{buildInfo.packageVersion}</code>)}
-          {aboutMetaRow("Source", buildInfo.source === "git" ? "Git metadata" : "package.json fallback")}
+          {aboutMetaRow("Source", sourceLabel)}
         </dl>
       </AdminCard>
 

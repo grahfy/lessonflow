@@ -33,7 +33,7 @@ describe("admin-build-info-api", () => {
       versionText: "v1.0 · d338e15",
       releaseLabel: "v1.0",
       shortCommit: "d338e15",
-      packageVersion: "0.1.0",
+      packageVersion: "1.0.0",
       source: "git",
       developedYear: "2026",
       createdBy: "Dean Thomson",

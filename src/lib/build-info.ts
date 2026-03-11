@@ -4,6 +4,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import type { AdminBuildInfo } from "@/lib/build-info-types";
+import { readLatestDeployUpdate } from "@/lib/deploy-updates";
 
 const execAsync = promisify(exec);
 
@@ -45,15 +46,42 @@ async function loadAdminBuildInfo(): Promise<AdminBuildInfo> {
   const shortCommit = await runGitCommand("git rev-parse --short HEAD");
   const gitFallback = await runGitCommand("git describe --tags --always");
 
-  const commitLabel = shortCommit || gitFallback || packageVersion;
-  const versionText = releaseLabel ? `${releaseLabel} · ${commitLabel}` : commitLabel;
+  if (releaseLabel || shortCommit || gitFallback) {
+    const commitLabel = shortCommit || gitFallback || packageVersion;
+    const versionText = releaseLabel ? `${releaseLabel} · ${commitLabel}` : commitLabel;
+
+    return {
+      versionText,
+      releaseLabel: releaseLabel || packageVersion,
+      shortCommit: shortCommit || (!releaseLabel && gitFallback ? gitFallback : "unavailable"),
+      packageVersion,
+      source: "git",
+      ...STATIC_BUILD_INFO
+    };
+  }
+
+  const latestDeployUpdate = await readLatestDeployUpdate();
+  if (latestDeployUpdate?.shortCommit) {
+    const deployRelease = latestDeployUpdate.release?.trim() || packageVersion;
+    const deployCommit = latestDeployUpdate.shortCommit.trim();
+    const versionText = deployRelease ? `${deployRelease} · ${deployCommit}` : deployCommit;
+
+    return {
+      versionText,
+      releaseLabel: deployRelease,
+      shortCommit: deployCommit,
+      packageVersion,
+      source: "deploy",
+      ...STATIC_BUILD_INFO
+    };
+  }
 
   return {
-    versionText,
-    releaseLabel: releaseLabel || packageVersion,
-    shortCommit: shortCommit || (!releaseLabel && gitFallback ? gitFallback : "unavailable"),
+    versionText: packageVersion,
+    releaseLabel: packageVersion,
+    shortCommit: "unavailable",
     packageVersion,
-    source: releaseLabel || shortCommit || gitFallback ? "git" : "package",
+    source: "package",
     ...STATIC_BUILD_INFO
   };
 }

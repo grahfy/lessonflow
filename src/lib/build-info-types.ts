@@ -3,7 +3,7 @@ export interface AdminBuildInfo {
   releaseLabel: string;
   shortCommit: string;
   packageVersion: string;
-  source: "git" | "package";
+  source: "git" | "deploy" | "package";
   developedYear: string;
   createdBy: string;
   repositoryUrl: string;
