@@ -24,10 +24,20 @@ run_mode_probe() {
   DEPLOY_DIR="${deploy_dir}" bash ./deploy/deploy.sh --print-deploy-mode
 }
 
+run_mode_probe_in_dir() {
+  local source_dir="$1"
+  local deploy_dir="$2"
+  (
+    cd "${source_dir}"
+    DEPLOY_DIR="${deploy_dir}" bash ./deploy/deploy.sh --print-deploy-mode
+  )
+}
+
 release_dir="${TEST_ROOT}/release-layout"
 mkdir -p "${release_dir}/releases/20260312010101"
 ln -sfn "${release_dir}/releases/20260312010101" "${release_dir}/current"
 release_output="$(run_mode_probe "${release_dir}")"
+assert_contains "${release_output}" "Source mode: git checkout"
 assert_contains "${release_output}" "Deploy mode: release-directory"
 assert_contains "${release_output}" "Runtime path: ${release_dir}/releases/20260312010101"
 
@@ -49,5 +59,14 @@ bootstrap_dir="${TEST_ROOT}/bootstrap-layout"
 bootstrap_output="$(run_mode_probe "${bootstrap_dir}")"
 assert_contains "${bootstrap_output}" "Deploy mode: release-directory (bootstrap)"
 assert_contains "${bootstrap_output}" "Detail: Fresh bootstrap; deploy.sh will create timestamped releases"
+
+archive_source="${TEST_ROOT}/archive-source"
+mkdir -p "${archive_source}"
+tar --exclude='.git' -cf - . | (cd "${archive_source}" && tar -xf -)
+archive_deploy_dir="${TEST_ROOT}/archive-deploy"
+archive_output="$(run_mode_probe_in_dir "${archive_source}" "${archive_deploy_dir}")"
+assert_contains "${archive_output}" "Source mode: archive/copy"
+assert_contains "${archive_output}" "Source path: ${archive_source}"
+assert_contains "${archive_output}" "Deploy mode: release-directory (bootstrap)"
 
 echo "Deploy mode detection checks passed."

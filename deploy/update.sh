@@ -2,9 +2,10 @@
 # =============================================================================
 # LessonFlow - Update + Deploy Script
 # =============================================================================
-# Pulls the latest git changes for a branch and then runs the deployment script.
-# Designed for server-side updates from a persistent git clone (for example
-# ~/lessonflow) and intentionally mirrors the interactive deploy UI.
+# Pulls the latest git changes for a branch or deploys the current archive
+# source tree, then runs the deployment script. Designed for server-side source
+# directories such as a persistent git clone (for example ~/lessonflow) or an
+# extracted release archive managed outside /var/www/lessonflow.
 # [TEST COMMIT: 2026-03-11 v3 - additional fake commit]
 #
 # Usage: ./deploy/update.sh [options]
@@ -43,10 +44,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOY_SCRIPT="${SCRIPT_DIR}/deploy.sh"
 REPO_ROOT=""
+DETECTED_SOURCE_PATH=""
+SOURCE_MODE="unknown"
+SOURCE_MODE_DETAIL=""
 ORIGINAL_ARGS=( "$@" )
 
 # Runtime configuration defaults. Branch defaults to the current checked-out
-# branch later so server operators can simply run ./deploy/update.sh.
+# branch later for git-backed installs; archive installs simply deploy the
+# current source tree.
 APP_NAME="lessonflow"
 DEPLOY_DIR="${DEPLOY_DIR:-/var/www/${APP_NAME}}"
 SHARED_DIR="${DEPLOY_DIR}/shared"
@@ -119,6 +124,10 @@ LessonFlow - Update + Deploy Script
 
 Usage: ./deploy/update.sh [options]
 
+Behavior:
+  - In a git checkout, this script can fetch/pull and then deploy.
+  - In an extracted archive source tree, this script skips git actions and deploys the current files on disk.
+
 Options:
   --branch BRANCH      Git branch to pull and deploy (default: current branch)
   --remote REMOTE      Git remote to pull from (default: origin)
@@ -145,6 +154,78 @@ Options:
   --no-color           Disable colored output
   --help, -h           Show usage
 EOF
+}
+
+detect_source_mode_for_path() {
+  local candidate_dir="$1"
+  local resolved_dir=""
+
+  if [[ -z "${candidate_dir}" ]]; then
+    DETECTED_SOURCE_PATH=""
+    SOURCE_MODE="invalid"
+    SOURCE_MODE_DETAIL="No source directory was provided."
+    return 1
+  fi
+
+  if [[ -d "${candidate_dir}" ]]; then
+    resolved_dir="$(cd "${candidate_dir}" 2>/dev/null && pwd || true)"
+  fi
+  if [[ -z "${resolved_dir}" ]]; then
+    resolved_dir="${candidate_dir}"
+  fi
+
+  if [[ -d "${resolved_dir}/.git" ]]; then
+    DETECTED_SOURCE_PATH="${resolved_dir}"
+    SOURCE_MODE="git"
+    SOURCE_MODE_DETAIL="Persistent git checkout"
+    return 0
+  fi
+
+  if [[ -f "${resolved_dir}/package.json" && -f "${resolved_dir}/package-lock.json" && -d "${resolved_dir}/deploy" ]]; then
+    DETECTED_SOURCE_PATH="${resolved_dir}"
+    SOURCE_MODE="archive"
+    SOURCE_MODE_DETAIL="Extracted release archive or copied source tree"
+    return 0
+  fi
+
+  DETECTED_SOURCE_PATH="${resolved_dir}"
+  SOURCE_MODE="invalid"
+  SOURCE_MODE_DETAIL="Expected package.json, package-lock.json, and deploy/ in the source tree."
+  return 1
+}
+
+source_mode_label() {
+  case "${SOURCE_MODE}" in
+    git)
+      echo "git checkout"
+      ;;
+    archive)
+      echo "archive/copy"
+      ;;
+    invalid)
+      echo "invalid"
+      ;;
+    *)
+      echo "unknown"
+      ;;
+  esac
+}
+
+resolve_source_root_for_update() {
+  local resolved=""
+
+  if git -C "${PWD}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    resolved="$(git -C "${PWD}" rev-parse --show-toplevel)"
+  elif [[ -f "${PWD}/package.json" && -d "${PWD}/deploy" ]]; then
+    resolved="$(cd "${PWD}" 2>/dev/null && pwd || printf '%s' "${PWD}")"
+  elif [[ -f "${SCRIPT_DIR}/../package.json" && -d "${SCRIPT_DIR}/../deploy" ]]; then
+    resolved="$(cd "${SCRIPT_DIR}/.." 2>/dev/null && pwd || printf '%s' "${SCRIPT_DIR}/..")"
+  else
+    resolved="${PWD}"
+  fi
+
+  detect_source_mode_for_path "${resolved}" || true
+  REPO_ROOT="${DETECTED_SOURCE_PATH:-${resolved}}"
 }
 
 # Detect terminal capabilities so the script degrades cleanly in CI/non-TTY runs.
@@ -1654,6 +1735,7 @@ refresh_tui_remote_update_cache() {
   local git_root=""
 
   [[ "${IS_TTY}" == true ]] || return 0
+  [[ "${SOURCE_MODE}" == "git" ]] || return 0
   [[ -n "${BRANCH}" && -n "${REMOTE_NAME}" ]] || return 0
 
   # Resolve the git root once and use it for all git operations to ensure
@@ -1763,50 +1845,92 @@ print_tui_remote_update_alert() {
 print_update_tui_menu() {
   tui_clear_screen
   print_box_banner "LessonFlow Update v1.0"
-  echo -e "${DIM}btop-style menu: configure git update + deploy handoff, then run.${NC}"
-  echo ""
-  echo -e "  $(status_chip "Branch" "$(tui_truncate_text "${BRANCH}" 16)")  $(status_chip "Remote" "$(tui_truncate_text "${REMOTE_NAME}" 12)")  $(status_chip "Pull" "$(bool_word "$(toggle_bool "${SKIP_PULL}")")")  $(status_chip "Deploy" "$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")")"
-  if [[ "${SKIP_DEPLOY}" == false ]]; then
-    echo -e "  $(status_chip "Dirty" "$(bool_word "${ALLOW_DIRTY}")")  $(status_chip "Sudo" "$(update_sudo_mode_label)")  $(status_chip "Spin" "$(spinner_ui_word)")  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "Cron" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")")  $(status_chip "DB" "$(update_migration_mode_label)")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")"
-  else
-    echo -e "  $(status_chip "Dirty" "$(bool_word "${ALLOW_DIRTY}")")  $(status_chip "Sudo" "$(update_sudo_mode_label)")  $(status_chip "Spin" "$(spinner_ui_word)")"
-  fi
-  echo ""
-  print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
-  print_tui_remote_update_alert
-  if [[ "${TUI_REMOTE_UPDATE_STATUS}" == "update-available" ]]; then
-    print_tui_action_pair "R" "Grab update + reload script"
+  if [[ "${SOURCE_MODE}" == "archive" ]]; then
+    echo -e "${DIM}btop-style menu: deploy the current archive source tree after replacing files in place.${NC}"
     echo ""
+    echo -e "  $(status_chip "Source" "$(source_mode_label)")  $(status_chip "Deploy" "$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")")  $(status_chip "Sudo" "$(update_sudo_mode_label)")  $(status_chip "Spin" "$(spinner_ui_word)")"
+    if [[ "${SKIP_DEPLOY}" == false ]]; then
+      echo -e "  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "Cron" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")")  $(status_chip "DB" "$(update_migration_mode_label)")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")"
+    fi
+    echo ""
+    print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
+    echo -e "  ${YELLOW}▲ Archive source:${NC} replace files in ${DIM}${REPO_ROOT}${NC} first, then deploy this source tree."
+    if archive_source_requires_permission_fix; then
+      echo -e "  ${YELLOW}▲ Permissions:${NC} ownership/permissions may need repair before replacing or deploying files."
+    fi
+    echo ""
+    echo -e "${BOLD}${BLUE}  Archive Deploy Options${NC}"
+    print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
+    print_tui_option_pair "1" "Run deploy" "$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")" "ON deploys the current source tree; OFF only runs helper actions." \
+      "2" "Sudo deploy mode" "$(update_sudo_mode_label)" "Cycle deploy invocation: auto / force sudo / no-sudo."
+    print_tui_option_pair "3" "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")" "ON runs npm install in deploy.sh. OFF passes --skip-deps." \
+      "4" "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")" "ON lets deploy.sh sync managed cron jobs."
+    print_tui_option_pair "5" "Spinner UI" "$(spinner_ui_word)" "Animated progress spinner for deploy steps." \
+      "6" "Edit shared .env" "Open editor" "Create shared .env if missing, then edit."
+  else
+    echo -e "${DIM}btop-style menu: configure git update + deploy handoff, then run.${NC}"
+    echo ""
+    echo -e "  $(status_chip "Branch" "$(tui_truncate_text "${BRANCH}" 16)")  $(status_chip "Remote" "$(tui_truncate_text "${REMOTE_NAME}" 12)")  $(status_chip "Pull" "$(bool_word "$(toggle_bool "${SKIP_PULL}")")")  $(status_chip "Deploy" "$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")")"
+    if [[ "${SKIP_DEPLOY}" == false ]]; then
+      echo -e "  $(status_chip "Dirty" "$(bool_word "${ALLOW_DIRTY}")")  $(status_chip "Sudo" "$(update_sudo_mode_label)")  $(status_chip "Spin" "$(spinner_ui_word)")  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "Cron" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")")  $(status_chip "DB" "$(update_migration_mode_label)")  $(status_chip "SSL" "$(bool_word "${SSL_SETUP}")")"
+    else
+      echo -e "  $(status_chip "Dirty" "$(bool_word "${ALLOW_DIRTY}")")  $(status_chip "Sudo" "$(update_sudo_mode_label)")  $(status_chip "Spin" "$(spinner_ui_word)")"
+    fi
+    echo ""
+    print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
+    print_tui_remote_update_alert
+    if [[ "${TUI_REMOTE_UPDATE_STATUS}" == "update-available" ]]; then
+      print_tui_action_pair "R" "Grab update + reload script"
+      echo ""
+    fi
+    echo -e "${BOLD}${BLUE}  Update Workflow Options${NC}"
+    print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
+    print_tui_option_pair "1" "Branch" "${BRANCH}" "Branch to fetch/pull and pass to deploy.sh." \
+      "2" "Remote" "${REMOTE_NAME}" "Git remote for fetch/pull (usually origin)."
+    print_tui_option_pair "3" "Pull latest changes" "$(bool_word "$(toggle_bool "${SKIP_PULL}")")" "ON runs git fetch + ff-only pull before deploy." \
+      "4" "Run deploy after pull" "$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")" "ON runs deploy.sh after update; OFF only updates repo."
+    print_tui_option_pair "5" "Allow dirty worktree" "$(bool_word "${ALLOW_DIRTY}")" "ON allows update/deploy with local tracked changes." \
+      "6" "Sudo deploy mode" "$(update_sudo_mode_label)" "Cycle deploy invocation: auto / force sudo / no-sudo."
+    print_tui_option_pair "7" "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")" "ON runs npm install in deploy.sh. OFF passes --skip-deps." \
+      "8" "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")" "ON lets deploy.sh sync managed cron jobs."
+    print_tui_option_pair "9" "Spinner UI" "$(spinner_ui_word)" "Animated progress spinner for update/deploy steps." \
+      "10" "Edit shared .env" "Open editor" "Create shared .env if missing, then edit."
   fi
-  echo -e "${BOLD}${BLUE}  Update Workflow Options${NC}"
-  print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
-  print_tui_option_pair "1" "Branch" "${BRANCH}" "Branch to fetch/pull and pass to deploy.sh." \
-    "2" "Remote" "${REMOTE_NAME}" "Git remote for fetch/pull (usually origin)."
-  print_tui_option_pair "3" "Pull latest changes" "$(bool_word "$(toggle_bool "${SKIP_PULL}")")" "ON runs git fetch + ff-only pull before deploy." \
-    "4" "Run deploy after pull" "$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")" "ON runs deploy.sh after update; OFF only updates repo."
-  print_tui_option_pair "5" "Allow dirty worktree" "$(bool_word "${ALLOW_DIRTY}")" "ON allows update/deploy with local tracked changes." \
-    "6" "Sudo deploy mode" "$(update_sudo_mode_label)" "Cycle deploy invocation: auto / force sudo / no-sudo."
-  print_tui_option_pair "7" "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")" "ON runs npm install in deploy.sh. OFF passes --skip-deps." \
-    "8" "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")" "ON lets deploy.sh sync managed cron jobs."
-  print_tui_option_pair "9" "Spinner UI" "$(spinner_ui_word)" "Animated progress spinner for update/deploy steps." \
-    "10" "Edit shared .env" "Open editor" "Create shared .env if missing, then edit."
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
   echo -e "${BOLD}${GREEN}  Bootstrap Workflow Helpers${NC}"
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
-  print_tui_option_pair "11" "Install cron/crond [DEPRECATED]" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")" "Deprecated: systemd timers now used instead." \
-    "12" "Install app service" "$(bool_word "${INSTALL_APP_SERVICE_IF_NEEDED}")" "ON: Start installs/updates app systemd unit before flow."
-  print_tui_option_pair "13" "Install systemd timers" "$(bool_word "${INSTALL_CRON_JOBS_IF_NEEDED}")" "ON: Start installs/updates systemd timer units first." \
-    "14" "Install Nginx" "$(bool_word "${INSTALL_NGINX_IF_NEEDED}")" "ON: Start installs Nginx (if missing) before flow."
-  print_tui_option_pair "15" "Install PHP-FPM" "$(bool_word "${INSTALL_PHP_FPM_IF_NEEDED}")" "ON: Start installs PHP-FPM only if nginx config needs it."
+  if [[ "${SOURCE_MODE}" == "archive" ]]; then
+    print_tui_option_pair "7" "Install cron/crond [DEPRECATED]" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")" "Deprecated: systemd timers now used instead." \
+      "8" "Install app service" "$(bool_word "${INSTALL_APP_SERVICE_IF_NEEDED}")" "ON: installs/updates app systemd unit before flow."
+    print_tui_option_pair "9" "Install systemd timers" "$(bool_word "${INSTALL_CRON_JOBS_IF_NEEDED}")" "ON: installs/updates systemd timer units first." \
+      "10" "Install Nginx" "$(bool_word "${INSTALL_NGINX_IF_NEEDED}")" "ON: installs Nginx (if missing) before flow."
+    print_tui_option_pair "11" "Install PHP-FPM" "$(bool_word "${INSTALL_PHP_FPM_IF_NEEDED}")" "ON: installs PHP-FPM only if nginx config needs it."
+  else
+    print_tui_option_pair "11" "Install cron/crond [DEPRECATED]" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")" "Deprecated: systemd timers now used instead." \
+      "12" "Install app service" "$(bool_word "${INSTALL_APP_SERVICE_IF_NEEDED}")" "ON: Start installs/updates app systemd unit before flow."
+    print_tui_option_pair "13" "Install systemd timers" "$(bool_word "${INSTALL_CRON_JOBS_IF_NEEDED}")" "ON: Start installs/updates systemd timer units first." \
+      "14" "Install Nginx" "$(bool_word "${INSTALL_NGINX_IF_NEEDED}")" "ON: Start installs Nginx (if missing) before flow."
+    print_tui_option_pair "15" "Install PHP-FPM" "$(bool_word "${INSTALL_PHP_FPM_IF_NEEDED}")" "ON: Start installs PHP-FPM only if nginx config needs it."
+  fi
   if [[ "${SKIP_DEPLOY}" == false ]]; then
     print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
     echo -e "${BOLD}${MAGENTA}  Deploy Pass-through Options${NC}"
     print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
-    print_tui_option_pair "16" "Database mode" "$(update_migration_mode_label)" "Cycle deploy DB mode: migrate / skip / db push." \
-      "17" "SSL setup" "$(bool_word "${SSL_SETUP}")" "Pass SSL flags to deploy.sh (certbot + nginx config)."
+    if [[ "${SOURCE_MODE}" == "archive" ]]; then
+      print_tui_option_pair "12" "Database mode" "$(update_migration_mode_label)" "Cycle deploy DB mode: migrate / skip / db push." \
+        "13" "SSL setup" "$(bool_word "${SSL_SETUP}")" "Pass SSL flags to deploy.sh (certbot + nginx config)."
+    else
+      print_tui_option_pair "16" "Database mode" "$(update_migration_mode_label)" "Cycle deploy DB mode: migrate / skip / db push." \
+        "17" "SSL setup" "$(bool_word "${SSL_SETUP}")" "Pass SSL flags to deploy.sh (certbot + nginx config)."
+    fi
     if [[ "${SSL_SETUP}" == true ]]; then
-      print_tui_option_pair "18" "SSL domain" "${SSL_DOMAIN:-auto-detect}" "Domain for cert request and nginx server_name." \
-        "19" "Certbot email" "${SSL_EMAIL:-required for new certs}" "Email for Let's Encrypt registration and renewals."
+      if [[ "${SOURCE_MODE}" == "archive" ]]; then
+        print_tui_option_pair "14" "SSL domain" "${SSL_DOMAIN:-auto-detect}" "Domain for cert request and nginx server_name." \
+          "15" "Certbot email" "${SSL_EMAIL:-required for new certs}" "Email for Let's Encrypt registration and renewals."
+      else
+        print_tui_option_pair "18" "SSL domain" "${SSL_DOMAIN:-auto-detect}" "Domain for cert request and nginx server_name." \
+          "19" "Certbot email" "${SSL_EMAIL:-required for new certs}" "Email for Let's Encrypt registration and renewals."
+      fi
     fi
   fi
   echo ""
@@ -1817,8 +1941,13 @@ print_update_tui_menu() {
   print_tui_action_pair "P" "Install PHP-FPM (if needed)" "U" "Install/update app service"
   print_tui_action_pair "D" "Update Prisma (gen/mig)"
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
-  print_tui_action_pair "S" "Start update + deploy" "Q" "Cancel"
-  print_tui_hint_line "Tip: deploy.sh runs migrations/nginx/restarts; this menu sets wrapper + pass-through flags."
+  if [[ "${SOURCE_MODE}" == "archive" ]]; then
+    print_tui_action_pair "S" "Start deploy from current source" "Q" "Cancel"
+    print_tui_hint_line "Tip: replace files in the archive source first; this menu only deploys what is already present."
+  else
+    print_tui_action_pair "S" "Start update + deploy" "Q" "Cancel"
+    print_tui_hint_line "Tip: deploy.sh runs migrations/nginx/restarts; this menu sets wrapper + pass-through flags."
+  fi
 }
 
 # Pulls the selected branch immediately from the TUI and reloads update.sh
@@ -1826,6 +1955,11 @@ print_update_tui_menu() {
 # script version and the operator wants the new script/menu first.
 run_tui_script_update_and_reload() {
   section "Script Update"
+
+  if [[ "${SOURCE_MODE}" != "git" ]]; then
+    log_warn "Archive source detected. Replace files in ${REPO_ROOT} and restart this menu instead of using git update actions."
+    return 0
+  fi
 
   if [[ "${SKIP_PULL}" == true ]]; then
     log_warn "Enable Pull latest changes first to grab and reload the script."
@@ -2051,12 +2185,69 @@ cleanup_local_install_and_build_caches() {
 
 # Returns 0 if the git working tree has tracked or staged changes.
 git_worktree_dirty() {
-  ! git diff --quiet || ! git diff --cached --quiet
+  [[ "${SOURCE_MODE}" == "git" ]] || return 1
+  ! git -C "${REPO_ROOT}" diff --quiet || ! git -C "${REPO_ROOT}" diff --cached --quiet
 }
 
 # Returns the current git branch name or empty string if HEAD is detached.
 current_branch_name() {
-  git branch --show-current 2>/dev/null || true
+  [[ "${SOURCE_MODE}" == "git" ]] || return 0
+  git -C "${REPO_ROOT}" branch --show-current 2>/dev/null || true
+}
+
+archive_source_requires_permission_fix() {
+  [[ "${SOURCE_MODE}" == "archive" ]] || return 1
+
+  if [[ ! -r "${REPO_ROOT}/package.json" || ! -r "${REPO_ROOT}/package-lock.json" || ! -r "${REPO_ROOT}/deploy/deploy.sh" ]]; then
+    return 0
+  fi
+
+  if [[ ! -w "${REPO_ROOT}" ]]; then
+    return 0
+  fi
+
+  return 1
+}
+
+print_archive_source_permission_notes() {
+  [[ "${SOURCE_MODE}" == "archive" ]] || return 0
+
+  if [[ ! -r "${REPO_ROOT}/package.json" || ! -r "${REPO_ROOT}/package-lock.json" || ! -r "${REPO_ROOT}/deploy/deploy.sh" ]]; then
+    log_warn "Archive source permissions look restrictive. Ensure the operator can read ${REPO_ROOT} before deploying."
+  fi
+
+  if [[ ! -w "${REPO_ROOT}" ]]; then
+    log_warn "Archive source is not writable by the current user. Replacing files in ${REPO_ROOT} may require sudo/chown first."
+  fi
+}
+
+verify_archive_source_access_for_deploy() {
+  [[ "${SOURCE_MODE}" == "archive" ]] || return 0
+
+  local required_path=""
+  local required_paths=(
+    "${REPO_ROOT}"
+    "${REPO_ROOT}/package.json"
+    "${REPO_ROOT}/package-lock.json"
+    "${REPO_ROOT}/deploy/deploy.sh"
+  )
+
+  for required_path in "${required_paths[@]}"; do
+    if ! test -r "${required_path}"; then
+      log_error "Archive source path is not readable: ${required_path}"
+      log_error "Fix ownership/permissions in ${REPO_ROOT} before deploying the extracted archive."
+      exit 1
+    fi
+  done
+
+  if should_use_sudo_for_deploy; then
+    ensure_sudo_for_deploy_ready
+    if ! run_deploy_path_cmd test -r "${REPO_ROOT}/package.json"; then
+      log_error "Deploy user cannot read ${REPO_ROOT}/package.json via sudo."
+      log_error "Fix source ownership/permissions before deploying this archive source."
+      exit 1
+    fi
+  fi
 }
 
 # Resolves whether deploy.sh should be invoked via sudo based on flags/user.
@@ -2119,140 +2310,260 @@ run_interactive_setup() {
 
   while true; do
     print_update_tui_menu
-    read -r -p "Select option [1-19, j, n, p, r, u, s, q]: " choice
+    if [[ "${SOURCE_MODE}" == "archive" ]]; then
+      read -r -p "Select option [1-15, j, n, p, u, s, q]: " choice
 
-    case "${choice,,}" in
-      1)
-        BRANCH="$(prompt_value "Git branch to update/deploy" "${BRANCH}")"
-        ;;
-      2)
-        REMOTE_NAME="$(prompt_value "Git remote" "${REMOTE_NAME}")"
-        ;;
-      3)
-        SKIP_PULL="$(toggle_bool "${SKIP_PULL}")"
-        ;;
-      4)
-        SKIP_DEPLOY="$(toggle_bool "${SKIP_DEPLOY}")"
-        if [[ "${SKIP_DEPLOY}" == true ]]; then
-          SSL_SETUP=false
-        fi
-        ;;
-      5)
-        ALLOW_DIRTY="$(toggle_bool "${ALLOW_DIRTY}")"
-        ;;
-      6)
-        cycle_update_sudo_mode
-        ;;
-      7)
-        if [[ "${SKIP_DEPLOY}" == false ]]; then
-          SKIP_DEPS="$(toggle_bool "${SKIP_DEPS}")"
-        else
-          log_warn "Enable deploy first to change deploy pass-through options."
-        fi
-        ;;
-      8)
-        if [[ "${SKIP_DEPLOY}" == false ]]; then
-          SKIP_CRON_SETUP="$(toggle_bool "${SKIP_CRON_SETUP}")"
-        else
-          log_warn "Enable deploy first to change deploy pass-through options."
-        fi
-        ;;
-      9)
-        NO_SPINNER="$(toggle_bool "${NO_SPINNER}")"
-        ;;
-      10)
-        section "Environment File (.env)"
-        ensure_shared_env_file "${REPO_ROOT}/.env.example" || true
-        edit_shared_env_now || true
-        ;;
-      11)
-        INSTALL_CRON_IF_NEEDED="$(toggle_bool "${INSTALL_CRON_IF_NEEDED}")"
-        ;;
-      12)
-        INSTALL_APP_SERVICE_IF_NEEDED="$(toggle_bool "${INSTALL_APP_SERVICE_IF_NEEDED}")"
-        ;;
-      13)
-        INSTALL_CRON_JOBS_IF_NEEDED="$(toggle_bool "${INSTALL_CRON_JOBS_IF_NEEDED}")"
-        ;;
-      14)
-        INSTALL_NGINX_IF_NEEDED="$(toggle_bool "${INSTALL_NGINX_IF_NEEDED}")"
-        ;;
-      15)
-        INSTALL_PHP_FPM_IF_NEEDED="$(toggle_bool "${INSTALL_PHP_FPM_IF_NEEDED}")"
-        ;;
-      16)
-        if [[ "${SKIP_DEPLOY}" == false ]]; then
-          cycle_update_migration_mode
-        else
-          log_warn "Enable deploy first to change deploy pass-through options."
-        fi
-        ;;
-      17)
-        if [[ "${SKIP_DEPLOY}" == false ]]; then
-          SSL_SETUP="$(toggle_bool "${SSL_SETUP}")"
-          if [[ "${SSL_SETUP}" == true ]]; then
-            if [[ -z "${SSL_DOMAIN}" || -z "${SSL_EMAIL}" ]]; then
+      case "${choice,,}" in
+        1)
+          SKIP_DEPLOY="$(toggle_bool "${SKIP_DEPLOY}")"
+          if [[ "${SKIP_DEPLOY}" == true ]]; then
+            SSL_SETUP=false
+          fi
+          ;;
+        2)
+          cycle_update_sudo_mode
+          ;;
+        3)
+          if [[ "${SKIP_DEPLOY}" == false ]]; then
+            SKIP_DEPS="$(toggle_bool "${SKIP_DEPS}")"
+          else
+            log_warn "Enable deploy first to change deploy pass-through options."
+          fi
+          ;;
+        4)
+          if [[ "${SKIP_DEPLOY}" == false ]]; then
+            SKIP_CRON_SETUP="$(toggle_bool "${SKIP_CRON_SETUP}")"
+          else
+            log_warn "Enable deploy first to change deploy pass-through options."
+          fi
+          ;;
+        5)
+          NO_SPINNER="$(toggle_bool "${NO_SPINNER}")"
+          ;;
+        6)
+          section "Environment File (.env)"
+          ensure_shared_env_file "${REPO_ROOT}/.env.example" || true
+          edit_shared_env_now || true
+          ;;
+        7)
+          INSTALL_CRON_IF_NEEDED="$(toggle_bool "${INSTALL_CRON_IF_NEEDED}")"
+          ;;
+        8)
+          INSTALL_APP_SERVICE_IF_NEEDED="$(toggle_bool "${INSTALL_APP_SERVICE_IF_NEEDED}")"
+          ;;
+        9)
+          INSTALL_CRON_JOBS_IF_NEEDED="$(toggle_bool "${INSTALL_CRON_JOBS_IF_NEEDED}")"
+          ;;
+        10)
+          INSTALL_NGINX_IF_NEEDED="$(toggle_bool "${INSTALL_NGINX_IF_NEEDED}")"
+          ;;
+        11)
+          INSTALL_PHP_FPM_IF_NEEDED="$(toggle_bool "${INSTALL_PHP_FPM_IF_NEEDED}")"
+          ;;
+        12)
+          if [[ "${SKIP_DEPLOY}" == false ]]; then
+            cycle_update_migration_mode
+          else
+            log_warn "Enable deploy first to change deploy pass-through options."
+          fi
+          ;;
+        13)
+          if [[ "${SKIP_DEPLOY}" == false ]]; then
+            SSL_SETUP="$(toggle_bool "${SSL_SETUP}")"
+            if [[ "${SSL_SETUP}" == true && ( -z "${SSL_DOMAIN}" || -z "${SSL_EMAIL}" ) ]]; then
               log_warn "SSL setup will use detected live values when available. Set domain/email explicitly if this host has no existing certbot config."
             fi
+          else
+            log_warn "Enable deploy first to configure SSL options."
           fi
-        else
-          log_warn "Enable deploy first to configure SSL options."
-        fi
-        ;;
-      18)
-        if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true ]]; then
-          SSL_DOMAIN="$(prompt_value "SSL domain" "${SSL_DOMAIN:-}")"
-        else
-          log_warn "Enable deploy + SSL setup first to edit SSL domain."
-        fi
-        ;;
-      19)
-        if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true ]]; then
-          SSL_EMAIL="$(prompt_value "Certbot email" "${SSL_EMAIL:-}")"
-        else
-          log_warn "Enable deploy + SSL setup first to edit Certbot email."
-        fi
-        ;;
-      j)
-        ensure_managed_cron_jobs_installed_from_update || true
-        ;;
-      d)
-        update_prisma_from_update || true
-        ;;
-      n)
-        ensure_nginx_installed_from_update || true
-        ;;
-      p)
-        ensure_php_fpm_installed_if_needed_from_update || true
-        ;;
-      r)
-        run_tui_script_update_and_reload
-        ;;
-      u)
-        install_app_systemd_service_from_update || true
-        ;;
-      s)
-        if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true ]]; then
-          if [[ -z "${SSL_DOMAIN}" ]]; then
-            log_warn "SSL setup still needs a detected or explicit domain before deploy can start."
-            continue
+          ;;
+        14)
+          if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true ]]; then
+            SSL_DOMAIN="$(prompt_value "SSL domain" "${SSL_DOMAIN:-}")"
+          else
+            log_warn "Enable deploy + SSL setup first to edit SSL domain."
           fi
+          ;;
+        15)
+          if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true ]]; then
+            SSL_EMAIL="$(prompt_value "Certbot email" "${SSL_EMAIL:-}")"
+          else
+            log_warn "Enable deploy + SSL setup first to edit Certbot email."
+          fi
+          ;;
+        j)
+          ensure_managed_cron_jobs_installed_from_update || true
+          ;;
+        d)
+          update_prisma_from_update || true
+          ;;
+        n)
+          ensure_nginx_installed_from_update || true
+          ;;
+        p)
+          ensure_php_fpm_installed_if_needed_from_update || true
+          ;;
+        u)
+          install_app_systemd_service_from_update || true
+          ;;
+        s)
+          if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true ]]; then
+            if [[ -z "${SSL_DOMAIN}" ]]; then
+              log_warn "SSL setup still needs a detected or explicit domain before deploy can start."
+              continue
+            fi
 
-          if [[ -z "${SSL_EMAIL}" ]] && ssl_email_required_for_domain "${SSL_DOMAIN}"; then
-            log_warn "SSL setup still needs a certbot email before deploy can start because no existing live certificate was found for ${SSL_DOMAIN}."
-            continue
+            if [[ -z "${SSL_EMAIL}" ]] && ssl_email_required_for_domain "${SSL_DOMAIN}"; then
+              log_warn "SSL setup still needs a certbot email before deploy can start because no existing live certificate was found for ${SSL_DOMAIN}."
+              continue
+            fi
           fi
-        fi
-        break
-        ;;
-      q)
-        log_warn "Update cancelled."
-        exit 0
-        ;;
-      *)
-        log_warn "Unknown selection. Choose a menu number, J/N/P/R/U, S, or Q."
-        ;;
-    esac
+          break
+          ;;
+        q)
+          log_warn "Update cancelled."
+          exit 0
+          ;;
+        *)
+          log_warn "Unknown selection. Choose a menu number, J/N/P/U, S, or Q."
+          ;;
+      esac
+    else
+      read -r -p "Select option [1-19, j, n, p, r, u, s, q]: " choice
+
+      case "${choice,,}" in
+        1)
+          BRANCH="$(prompt_value "Git branch to update/deploy" "${BRANCH}")"
+          ;;
+        2)
+          REMOTE_NAME="$(prompt_value "Git remote" "${REMOTE_NAME}")"
+          ;;
+        3)
+          SKIP_PULL="$(toggle_bool "${SKIP_PULL}")"
+          ;;
+        4)
+          SKIP_DEPLOY="$(toggle_bool "${SKIP_DEPLOY}")"
+          if [[ "${SKIP_DEPLOY}" == true ]]; then
+            SSL_SETUP=false
+          fi
+          ;;
+        5)
+          ALLOW_DIRTY="$(toggle_bool "${ALLOW_DIRTY}")"
+          ;;
+        6)
+          cycle_update_sudo_mode
+          ;;
+        7)
+          if [[ "${SKIP_DEPLOY}" == false ]]; then
+            SKIP_DEPS="$(toggle_bool "${SKIP_DEPS}")"
+          else
+            log_warn "Enable deploy first to change deploy pass-through options."
+          fi
+          ;;
+        8)
+          if [[ "${SKIP_DEPLOY}" == false ]]; then
+            SKIP_CRON_SETUP="$(toggle_bool "${SKIP_CRON_SETUP}")"
+          else
+            log_warn "Enable deploy first to change deploy pass-through options."
+          fi
+          ;;
+        9)
+          NO_SPINNER="$(toggle_bool "${NO_SPINNER}")"
+          ;;
+        10)
+          section "Environment File (.env)"
+          ensure_shared_env_file "${REPO_ROOT}/.env.example" || true
+          edit_shared_env_now || true
+          ;;
+        11)
+          INSTALL_CRON_IF_NEEDED="$(toggle_bool "${INSTALL_CRON_IF_NEEDED}")"
+          ;;
+        12)
+          INSTALL_APP_SERVICE_IF_NEEDED="$(toggle_bool "${INSTALL_APP_SERVICE_IF_NEEDED}")"
+          ;;
+        13)
+          INSTALL_CRON_JOBS_IF_NEEDED="$(toggle_bool "${INSTALL_CRON_JOBS_IF_NEEDED}")"
+          ;;
+        14)
+          INSTALL_NGINX_IF_NEEDED="$(toggle_bool "${INSTALL_NGINX_IF_NEEDED}")"
+          ;;
+        15)
+          INSTALL_PHP_FPM_IF_NEEDED="$(toggle_bool "${INSTALL_PHP_FPM_IF_NEEDED}")"
+          ;;
+        16)
+          if [[ "${SKIP_DEPLOY}" == false ]]; then
+            cycle_update_migration_mode
+          else
+            log_warn "Enable deploy first to change deploy pass-through options."
+          fi
+          ;;
+        17)
+          if [[ "${SKIP_DEPLOY}" == false ]]; then
+            SSL_SETUP="$(toggle_bool "${SSL_SETUP}")"
+            if [[ "${SSL_SETUP}" == true ]]; then
+              if [[ -z "${SSL_DOMAIN}" || -z "${SSL_EMAIL}" ]]; then
+                log_warn "SSL setup will use detected live values when available. Set domain/email explicitly if this host has no existing certbot config."
+              fi
+            fi
+          else
+            log_warn "Enable deploy first to configure SSL options."
+          fi
+          ;;
+        18)
+          if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true ]]; then
+            SSL_DOMAIN="$(prompt_value "SSL domain" "${SSL_DOMAIN:-}")"
+          else
+            log_warn "Enable deploy + SSL setup first to edit SSL domain."
+          fi
+          ;;
+        19)
+          if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true ]]; then
+            SSL_EMAIL="$(prompt_value "Certbot email" "${SSL_EMAIL:-}")"
+          else
+            log_warn "Enable deploy + SSL setup first to edit Certbot email."
+          fi
+          ;;
+        j)
+          ensure_managed_cron_jobs_installed_from_update || true
+          ;;
+        d)
+          update_prisma_from_update || true
+          ;;
+        n)
+          ensure_nginx_installed_from_update || true
+          ;;
+        p)
+          ensure_php_fpm_installed_if_needed_from_update || true
+          ;;
+        r)
+          run_tui_script_update_and_reload
+          ;;
+        u)
+          install_app_systemd_service_from_update || true
+          ;;
+        s)
+          if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true ]]; then
+            if [[ -z "${SSL_DOMAIN}" ]]; then
+              log_warn "SSL setup still needs a detected or explicit domain before deploy can start."
+              continue
+            fi
+
+            if [[ -z "${SSL_EMAIL}" ]] && ssl_email_required_for_domain "${SSL_DOMAIN}"; then
+              log_warn "SSL setup still needs a certbot email before deploy can start because no existing live certificate was found for ${SSL_DOMAIN}."
+              continue
+            fi
+          fi
+          break
+          ;;
+        q)
+          log_warn "Update cancelled."
+          exit 0
+          ;;
+        *)
+          log_warn "Unknown selection. Choose a menu number, J/N/P/R/U, S, or Q."
+          ;;
+      esac
+    fi
   done
 }
 
@@ -2270,16 +2581,26 @@ print_summary() {
   if [[ "${SKIP_DEPLOY}" == true ]]; then
     will_deploy="false"
   fi
+  if [[ "${SOURCE_MODE}" != "git" ]]; then
+    will_pull="n/a"
+  fi
 
   section "Update Summary"
   echo -e "  ${BOLD}Workflow${NC}"
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
-  print_summary_row "Repo" "$(pwd)"
-  print_summary_row "Remote" "${REMOTE_NAME}"
-  print_summary_row "Branch" "${BRANCH}"
+  print_summary_row "Source" "${REPO_ROOT}"
+  print_summary_row "Source mode" "$(source_mode_label)"
+  if [[ "${SOURCE_MODE}" == "git" ]]; then
+    print_summary_row "Remote" "${REMOTE_NAME}"
+    print_summary_row "Branch" "${BRANCH}"
+  else
+    print_summary_row "Source detail" "${SOURCE_MODE_DETAIL}"
+  fi
   print_summary_row "Git pull" "${will_pull}"
   print_summary_row "Run deploy" "${will_deploy}"
-  print_summary_row "Allow dirty" "$(bool_word "${ALLOW_DIRTY}")"
+  if [[ "${SOURCE_MODE}" == "git" ]]; then
+    print_summary_row "Allow dirty" "$(bool_word "${ALLOW_DIRTY}")"
+  fi
   print_summary_row "Auto bootstrap" "$(bool_word "${AUTO_BOOTSTRAP}")"
   print_summary_row "Sudo mode" "$(update_sudo_mode_label)"
   print_summary_row "Install cron [DEPRECATED]" "$(bool_word "${INSTALL_CRON_IF_NEEDED}")"
@@ -2302,6 +2623,15 @@ print_summary() {
       print_summary_row "Certbot email" "${SSL_EMAIL:-required for new certs}"
     fi
   fi
+  if [[ "${SOURCE_MODE}" == "archive" ]]; then
+    print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
+    echo -e "  ${BOLD}${YELLOW}Archive source notes${NC}"
+    print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
+    print_summary_row "Update path" "Replace source files in place, then deploy current source"
+    if archive_source_requires_permission_fix; then
+      print_summary_row "Permissions" "Review ownership/permissions before replacing or deploying files"
+    fi
+  fi
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
 }
 
@@ -2313,6 +2643,8 @@ run_deploy() {
     log_error "deploy.sh not found or not executable at ${DEPLOY_SCRIPT}"
     exit 1
   fi
+
+  verify_archive_source_access_for_deploy
 
   local deploy_args=()
   local effective_ssl_domain="${SSL_DOMAIN}"
@@ -2508,19 +2840,22 @@ done
 
 detect_tty_capabilities
 
-# Validate repository context early because this script is intended for a git clone
-# and REPO_ROOT is needed for TUI remote update checks.
-if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  log_error "This script must be run from inside the application git repository."
+# Validate source context early so the wrapper can run against either a git
+# checkout or an extracted archive source tree.
+resolve_source_root_for_update
+if [[ "${SOURCE_MODE}" == "invalid" ]]; then
+  log_error "This script must be run from a deployable source tree."
+  log_error "${SOURCE_MODE_DETAIL}"
   exit 1
 fi
 
-# Normalize to the repository root so git commands and the deploy script run from
-# a stable source directory even when the operator starts this script in ./deploy.
-# This is set early so the TUI remote update check can use it.
-REPO_ROOT="$(git rev-parse --show-toplevel)"
+# Normalize to the detected source root so deploy/update behavior remains stable
+# even when the operator starts this script from ./deploy.
 cd "${REPO_ROOT}"
-log_info "Repository root: ${REPO_ROOT}"
+log_info "Source root: ${REPO_ROOT}"
+log_info "Source mode: $(source_mode_label)"
+log_info "Source detail: ${SOURCE_MODE_DETAIL}"
+print_archive_source_permission_notes
 
 if [[ "${MGS_RETURN_TO_MENU_AFTER_SELF_UPDATE:-}" == "1" && "${IS_TTY}" == true ]]; then
   INTERACTIVE=true
@@ -2541,12 +2876,14 @@ fi
 
 print_banner
 
-if [[ -z "${BRANCH}" ]]; then
+if [[ "${SOURCE_MODE}" == "git" && -z "${BRANCH}" ]]; then
   BRANCH="$(current_branch_name)"
 fi
 if [[ -z "${BRANCH}" ]]; then
   BRANCH="main"
-  log_warn "Could not determine current branch (detached HEAD). Defaulting to ${BRANCH}."
+  if [[ "${SOURCE_MODE}" == "git" ]]; then
+    log_warn "Could not determine current branch (detached HEAD). Defaulting to ${BRANCH}."
+  fi
 fi
 
 detect_previous_deploy_defaults_from_host
@@ -2611,32 +2948,38 @@ if [[ "${SKIP_DEPLOY}" == true ]]; then
   fi
 fi
 
-section "Git Update"
-log_info "Repository branch: $(current_branch_name)"
+if [[ "${SOURCE_MODE}" == "git" ]]; then
+  section "Git Update"
+  log_info "Repository branch: $(current_branch_name)"
 
-if [[ "${ALLOW_DIRTY}" != true ]] && git_worktree_dirty; then
-  log_error "Working tree is dirty. Commit/stash changes or rerun with --allow-dirty."
-  git status --short
-  exit 1
-fi
-
-if [[ "${SKIP_PULL}" == false ]]; then
-  local_before_pull_commit="$(git rev-parse --short=12 HEAD 2>/dev/null || true)"
-  # Fetch/pull stays in the persistent repo clone; deploy.sh then rsyncs a clean
-  # release directory so runtime symlink switches remain atomic.
-  run_step "Fetching ${REMOTE_NAME}/${BRANCH}" run_deploy_path_cmd git fetch "${REMOTE_NAME}" "${BRANCH}"
-
-  if [[ "$(current_branch_name)" != "${BRANCH}" ]]; then
-    run_step "Checking out ${BRANCH}" run_deploy_path_cmd git checkout "${BRANCH}"
+  if [[ "${ALLOW_DIRTY}" != true ]] && git_worktree_dirty; then
+    log_error "Working tree is dirty. Commit/stash changes or rerun with --allow-dirty."
+    git -C "${REPO_ROOT}" status --short
+    exit 1
   fi
 
-  # Use ff-only to avoid accidental merge commits on production clones.
-  run_step "Merging latest ${REMOTE_NAME}/${BRANCH}" run_deploy_path_cmd git merge --ff-only "${REMOTE_NAME}/${BRANCH}"
-  local_after_pull_commit="$(git rev-parse --short=12 HEAD 2>/dev/null || true)"
-  log_info "Updated to commit $(git rev-parse --short HEAD)"
-  maybe_restart_after_self_update "${local_before_pull_commit}" "${local_after_pull_commit}"
+  if [[ "${SKIP_PULL}" == false ]]; then
+    local_before_pull_commit="$(git -C "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || true)"
+    # Fetch/pull stays in the persistent repo clone; deploy.sh then rsyncs a clean
+    # release directory so runtime symlink switches remain atomic.
+    run_step "Fetching ${REMOTE_NAME}/${BRANCH}" run_deploy_path_cmd git -C "${REPO_ROOT}" fetch "${REMOTE_NAME}" "${BRANCH}"
+
+    if [[ "$(current_branch_name)" != "${BRANCH}" ]]; then
+      run_step "Checking out ${BRANCH}" run_deploy_path_cmd git -C "${REPO_ROOT}" checkout "${BRANCH}"
+    fi
+
+    # Use ff-only to avoid accidental merge commits on production clones.
+    run_step "Merging latest ${REMOTE_NAME}/${BRANCH}" run_deploy_path_cmd git -C "${REPO_ROOT}" merge --ff-only "${REMOTE_NAME}/${BRANCH}"
+    local_after_pull_commit="$(git -C "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || true)"
+    log_info "Updated to commit $(git -C "${REPO_ROOT}" rev-parse --short HEAD)"
+    maybe_restart_after_self_update "${local_before_pull_commit}" "${local_after_pull_commit}"
+  else
+    log_info "Skipping git pull"
+  fi
 else
-  log_info "Skipping git pull"
+  section "Archive Source"
+  log_info "Archive source mode detected. Git pull/update actions are unavailable."
+  log_info "Replace files in ${REPO_ROOT}, then re-run this wrapper to deploy the updated source tree."
 fi
 
 if [[ "${SKIP_DEPLOY}" == false ]]; then

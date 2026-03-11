@@ -103,6 +103,9 @@ TEMP_BUILD_SWAP_CREATED_FILE=false
 DEPLOY_GIT_REPO_ROOT=""
 DEPLOY_PREVIOUS_COMMIT_HASH=""
 DEPLOY_TARGET_COMMIT_HASH=""
+DETECTED_SOURCE_PATH=""
+SOURCE_MODE="unknown"
+SOURCE_MODE_DETAIL=""
 DEPLOY_MODE="release-directory"
 DEPLOY_MODE_DETAIL=""
 DEPLOY_MODE_RUNTIME_PATH=""
@@ -126,6 +129,10 @@ show_usage() {
 LessonFlow - Deployment Script
 
 Usage: ./deploy/deploy.sh [options]
+
+Behavior:
+  - In a git checkout, deploy.sh can self-update and archive the selected branch.
+  - In an extracted archive source tree, deploy.sh skips git-only features and deploys the current files on disk.
 
 Options:
   --skip-migrate    Skip database migrations
@@ -151,6 +158,92 @@ Options:
   --no-color        Disable colored output
   --help, -h        Show usage
 EOF
+}
+
+detect_source_mode_for_path() {
+    local candidate_dir="$1"
+    local resolved_dir=""
+
+    if [[ -z "${candidate_dir}" ]]; then
+        DETECTED_SOURCE_PATH=""
+        SOURCE_MODE="invalid"
+        SOURCE_MODE_DETAIL="No source directory was provided."
+        return 1
+    fi
+
+    if [[ -d "${candidate_dir}" ]]; then
+        resolved_dir="$(cd "${candidate_dir}" 2>/dev/null && pwd || true)"
+    fi
+    if [[ -z "${resolved_dir}" ]]; then
+        resolved_dir="${candidate_dir}"
+    fi
+
+    if [[ -d "${resolved_dir}/.git" ]]; then
+        DETECTED_SOURCE_PATH="${resolved_dir}"
+        SOURCE_MODE="git"
+        SOURCE_MODE_DETAIL="Persistent git checkout"
+        return 0
+    fi
+
+    if [[ -f "${resolved_dir}/package.json" && -f "${resolved_dir}/package-lock.json" && -d "${resolved_dir}/deploy" ]]; then
+        DETECTED_SOURCE_PATH="${resolved_dir}"
+        SOURCE_MODE="archive"
+        SOURCE_MODE_DETAIL="Extracted release archive or copied source tree"
+        return 0
+    fi
+
+    DETECTED_SOURCE_PATH="${resolved_dir}"
+    SOURCE_MODE="invalid"
+    SOURCE_MODE_DETAIL="Expected package.json, package-lock.json, and deploy/ in the source tree."
+    return 1
+}
+
+source_mode_label() {
+    case "${SOURCE_MODE}" in
+        git)
+            echo "git checkout"
+            ;;
+        archive)
+            echo "archive/copy"
+            ;;
+        invalid)
+            echo "invalid"
+            ;;
+        *)
+            echo "unknown"
+            ;;
+    esac
+}
+
+resolve_source_dir_for_deploy() {
+    local resolved=""
+
+    if git -C "${SOURCE_DIR}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        resolved="$(git -C "${SOURCE_DIR}" rev-parse --show-toplevel)"
+    elif git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        resolved="$(git rev-parse --show-toplevel)"
+    elif [[ -f "${SOURCE_DIR}/package.json" && -d "${SOURCE_DIR}/deploy" ]]; then
+        resolved="$(cd "${SOURCE_DIR}" 2>/dev/null && pwd || printf '%s' "${SOURCE_DIR}")"
+    elif [[ -f "${SCRIPT_DIR}/../package.json" && -d "${SCRIPT_DIR}/../deploy" ]]; then
+        resolved="$(cd "${SCRIPT_DIR}/.." 2>/dev/null && pwd || printf '%s' "${SCRIPT_DIR}/..")"
+    else
+        resolved="${SOURCE_DIR}"
+    fi
+
+    detect_source_mode_for_path "${resolved}" || true
+    SOURCE_DIR="${DETECTED_SOURCE_PATH:-${resolved}}"
+}
+
+warn_if_archive_source_needs_permission_fix() {
+    [[ "${SOURCE_MODE}" == "archive" ]] || return 0
+
+    if [[ ! -r "${SOURCE_DIR}/package.json" || ! -r "${SOURCE_DIR}/package-lock.json" || ! -r "${SOURCE_DIR}/deploy/deploy.sh" ]]; then
+        log_warn "Archive source permissions look restrictive. Ensure the deploy operator can read ${SOURCE_DIR} before running deploy."
+    fi
+
+    if [[ ! -w "${SOURCE_DIR}" ]]; then
+        log_warn "Archive source is not writable by the current user. Replace source files with matching ownership/permissions before the next deploy."
+    fi
 }
 
 # Detect whether we can safely render an interactive UI (spinner/prompts).
@@ -2302,7 +2395,11 @@ detect_deploy_mode() {
 }
 
 print_deploy_mode_report() {
+    resolve_source_dir_for_deploy
     detect_deploy_mode
+    printf 'Source mode: %s\n' "$(source_mode_label)"
+    printf 'Source detail: %s\n' "${SOURCE_MODE_DETAIL}"
+    printf 'Source path: %s\n' "${SOURCE_DIR}"
     printf 'Deploy mode: %s\n' "$(deploy_mode_label)"
     printf 'Detail: %s\n' "${DEPLOY_MODE_DETAIL}"
     printf 'Runtime path: %s\n' "${DEPLOY_MODE_RUNTIME_PATH}"
@@ -2479,12 +2576,15 @@ run_interactive_setup() {
 
 # Print a compact summary before executing so deploy choices are explicit.
 print_deploy_summary() {
+    resolve_source_dir_for_deploy
     detect_deploy_mode
     section "Deploy Summary"
     echo -e "  ${BOLD}Overview${NC}"
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     print_summary_row "App" "${APP_NAME}"
     print_summary_row "Branch" "${BRANCH}"
+    print_summary_row "Source mode" "$(source_mode_label)"
+    print_summary_row "Source path" "${SOURCE_DIR}"
     print_summary_row "Deploy mode" "$(deploy_mode_label)"
     print_summary_row "Runtime path" "${DEPLOY_MODE_RUNTIME_PATH}"
     print_summary_row "Database mode" "$(deploy_migration_mode_label)"
@@ -2502,6 +2602,13 @@ print_deploy_summary() {
         echo -e "  ${BOLD}${YELLOW}Deploy mode warning${NC}"
         print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
         print_summary_row "Warning" "${DEPLOY_MODE_WARNING}"
+    fi
+    if [[ "${SOURCE_MODE}" == "archive" ]]; then
+        print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
+        echo -e "  ${BOLD}${YELLOW}Archive source notes${NC}"
+        print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
+        print_summary_row "Detail" "${SOURCE_MODE_DETAIL}"
+        print_summary_row "Metadata" "Git self-update and commit metadata are skipped in archive mode"
     fi
     if [[ "${SSL_SETUP}" == true ]]; then
         print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
@@ -3858,25 +3965,30 @@ fi
 # Resolve the application source directory independently from the caller's cwd.
 # This allows operators to run ./deploy/update.sh from inside ./deploy without
 # accidentally deploying only the deploy scripts directory.
-if git -C "${SOURCE_DIR}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    SOURCE_DIR="$(git -C "${SOURCE_DIR}" rev-parse --show-toplevel)"
-elif git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    SOURCE_DIR="$(git rev-parse --show-toplevel)"
-elif [[ -f "${SCRIPT_DIR}/../package.json" ]]; then
-    SOURCE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+resolve_source_dir_for_deploy
+
+if [[ "${SOURCE_MODE}" == "invalid" ]]; then
+    log_error "Source directory is not deployable: ${SOURCE_DIR}"
+    log_error "${SOURCE_MODE_DETAIL}"
+    exit 1
 fi
 
 log_info "Source directory: ${SOURCE_DIR}"
+log_info "Source mode: $(source_mode_label)"
+log_info "Source detail: ${SOURCE_MODE_DETAIL}"
+warn_if_archive_source_needs_permission_fix
 
 # Track deployed git commit metadata so the admin UI can show "latest updates"
 # after a successful deploy. This is best-effort and skipped for non-git source
 # deployments.
-if [[ -d "${SOURCE_DIR}/.git" ]]; then
+if [[ "${SOURCE_MODE}" == "git" ]]; then
     DEPLOY_GIT_REPO_ROOT="${SOURCE_DIR}"
     DEPLOY_TARGET_COMMIT_HASH="$(git -C "${SOURCE_DIR}" rev-parse "${BRANCH}" 2>/dev/null || true)"
     if [[ -L "${CURRENT_LINK}" && -f "${CURRENT_LINK}/.deploy-version" ]]; then
         DEPLOY_PREVIOUS_COMMIT_HASH="$(tr -d '[:space:]' < "${CURRENT_LINK}/.deploy-version" 2>/dev/null || true)"
     fi
+else
+    log_info "Archive source detected; skipping git commit metadata capture for this deploy."
 fi
 
 # Create directories if they don't exist
@@ -3932,7 +4044,7 @@ mkdir -p "${NEW_RELEASE_DIR}"
 log_info "Created release directory: ${NEW_RELEASE_DIR}"
 
 # Clone/copy repository from the resolved source dir (not the caller's cwd).
-if [[ -d "${SOURCE_DIR}/.git" ]]; then
+if [[ "${SOURCE_MODE}" == "git" ]]; then
     # Running from git repository
     git -C "${SOURCE_DIR}" archive --format=tar "${BRANCH}" | tar -x -C "${NEW_RELEASE_DIR}"
 else

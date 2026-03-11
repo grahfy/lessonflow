@@ -89,6 +89,11 @@ Deploy model:
 - `deploy.sh` then builds a fresh timestamped release under `/var/www/lessonflow/releases/` and repoints `/var/www/lessonflow/current`.
 - Check the current host layout any time with `sudo ./deploy/deploy.sh --print-deploy-mode`.
 
+Archive-source variant:
+- If the source tree was installed from a `.tar.gz` or `.zip` instead of `git clone`, replace the extracted files in that source directory first.
+- Then run `./deploy/update.sh` from the extracted source tree. The wrapper switches to archive mode, skips git pull actions, and deploys the files already present on disk.
+- Archive mode expects the operator to preserve readable ownership/permissions on the extracted source tree before starting the deploy.
+
 Recommended defaults:
 - `Dependencies`: ON for normal releases (turn OFF only when you know lockfiles/deps did not change)
 - `Cron jobs sync`: ON so the managed cron block stays aligned with supported jobs
@@ -97,6 +102,7 @@ Notes:
 - `update.sh` / `deploy.sh` now show pulled commit details and pause for a keypress if a `git pull` updates the deploy script itself, then they return to the TUI main menu.
 - The one-time migration helper now hands off to `deploy/update.sh` with automatic `git fetch/pull` (no `--skip-pull`) so the latest deploy logic is used.
 - Admins can confirm deployed commits in the app using the `Latest Updates` popup after login.
+- When the source tree has no `.git` directory, `update.sh` shows a reduced archive-source menu and `deploy.sh --print-deploy-mode` reports `Source mode: archive/copy`.
 
 ### Legacy Runtime Migration (One-Time)
 
@@ -336,7 +342,7 @@ Notes:
 - The deploy script auto-applies `NODE_OPTIONS=--max-old-space-size=3072` only on ~1GB RAM hosts (unless you already set a heap limit).
 - The deploy script prunes old Node/npm temp files in `/tmp`, `/var/tmp`, and npm cache temp before builds to reduce ENOSPC failures.
 - Use `--no-spinner --no-color` for CI/log-only environments.
-- `deploy/update.sh` wraps `git fetch/pull` + `deploy.sh` with the same interactive/spinner UI.
+- `deploy/update.sh` wraps `git fetch/pull` + `deploy.sh` for git checkouts, or runs a reduced deploy-only archive mode when the source tree has no `.git` directory.
 - `deploy/deploy.sh --print-deploy-mode` reports whether the host is already using the supported release-directory layout or still looks legacy/in-place.
 - Both scripts now expose `Dependencies` and `Cron jobs sync` as first-class TUI main-menu options.
 - `deploy.sh` / `update.sh` self-update at startup via `git pull` (when applicable), show detailed commit changes, wait for a keypress in TTY mode, and restart back to the main menu if the script code changed.
