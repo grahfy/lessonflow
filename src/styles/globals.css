@@ -1784,6 +1784,12 @@ h1 {
   background: rgba(37, 99, 235, 0.08) !important;
 }
 
+.admin-list-row-button:focus-visible {
+  outline: 2px solid rgba(96, 165, 250, 0.9);
+  outline-offset: -2px;
+  background: rgba(37, 99, 235, 0.12) !important;
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;
@@ -3270,6 +3276,67 @@ h1 {
   flex-wrap: wrap;
 }
 
+.admin-card-ghost {
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+.email-viewer-dialog-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden !important;
+}
+
+#email-viewer-dialog {
+  height: 80vh;
+}
+
+.admin-email-viewer {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.admin-email-viewer-header {
+  flex-shrink: 0;
+  display: grid;
+  gap: 4px;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-email-viewer-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.admin-email-viewer-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.admin-email-viewer-frame {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #fff;
+}
+
 .dialog-tabs {
   margin-bottom: 16px;
 }
@@ -4022,6 +4089,10 @@ h1 {
   margin-left: auto;
 }
 
+.syslog-toolbar-note {
+  margin: 6px 0 0;
+}
+
 .syslog-table-wrap {
   display: flex;
   flex-direction: column;
@@ -4111,6 +4182,12 @@ h1 {
 
 .syslog-table tbody tr.syslog-row-expandable {
   cursor: pointer;
+}
+
+.syslog-table tbody tr.syslog-row-expandable:focus-visible {
+  outline: 2px solid rgba(56, 189, 248, 0.75);
+  outline-offset: -2px;
+  background: rgba(56, 189, 248, 0.08);
 }
 
 .syslog-table tbody td {
@@ -6850,6 +6927,125 @@ h1 {
   max-width: 100%;
 }
 
+.invoice-dialog-section {
+  margin-bottom: 16px;
+}
+
+.invoice-dialog-footer {
+  align-items: flex-start;
+}
+
+.invoice-dialog-button-row {
+  margin-top: 12px;
+}
+
+.invoice-dialog-notes {
+  min-height: 80px;
+}
+
+.invoice-dialog-line-items {
+  display: grid;
+  gap: 12px;
+}
+
+.invoice-dialog-line-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 60px 100px auto;
+  gap: 8px;
+  align-items: start;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.invoice-dialog-line-item:last-child {
+  border-bottom: 0;
+}
+
+.invoice-dialog-line-item-main,
+.invoice-dialog-line-item-main .field,
+.invoice-dialog-line-item-qty,
+.invoice-dialog-line-item-qty .field,
+.invoice-dialog-line-item-price,
+.invoice-dialog-line-item-price .field {
+  min-width: 0;
+}
+
+.invoice-dialog-remove-item {
+  margin-top: 24px;
+  padding: 8px;
+  min-width: 40px;
+}
+
+.invoice-dialog-line-actions {
+  margin-top: 8px;
+  align-items: center;
+}
+
+.invoice-dialog-preset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.invoice-dialog-preset-select {
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.invoice-dialog-status-card {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.invoice-dialog-status-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.invoice-dialog-status-row-alert {
+  color: var(--red);
+  font-weight: 600;
+}
+
+.invoice-dialog-help-copy {
+  margin-bottom: 12px;
+}
+
+.invoice-dialog-stacked-actions {
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.invoice-dialog-full-width,
+.invoice-dialog-customer-select {
+  width: 100%;
+}
+
+.invoice-dialog-preset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.invoice-dialog-preset-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
 @media (max-width: 1180px) {
   .reports-period-grid {
     grid-template-columns: 1fr;
@@ -6865,6 +7061,10 @@ h1 {
 
   .report-date-range-actions {
     grid-template-columns: 1fr;
+  }
+
+  .invoice-dialog-line-item {
+    grid-template-columns: minmax(0, 1fr) minmax(72px, 96px) minmax(110px, 140px) auto;
   }
 }
 
@@ -6887,6 +7087,38 @@ h1 {
   .report-comparison-value {
     justify-items: start;
     text-align: left;
+  }
+
+  .invoice-dialog-footer {
+    align-items: stretch;
+  }
+
+  .invoice-dialog-footer .dialog-footer-left,
+  .invoice-dialog-footer .dialog-footer-right {
+    width: 100%;
+  }
+
+  .invoice-dialog-footer .btn,
+  .invoice-dialog-line-actions .btn {
+    flex: 1 1 auto;
+  }
+
+  .invoice-dialog-preset-row {
+    width: 100%;
+  }
+
+  .invoice-dialog-preset-select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .invoice-dialog-line-item {
+    grid-template-columns: 1fr;
+  }
+
+  .invoice-dialog-remove-item {
+    margin-top: 0;
+    justify-self: start;
   }
 }
 

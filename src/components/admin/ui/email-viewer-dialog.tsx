@@ -17,60 +17,48 @@ export function EmailViewerDialog({ isOpen, onClose, email }: EmailViewerDialogP
   if (!email) return null;
 
   return (
-    <>
-      <style>{`
-        #email-viewer-dialog {
-          height: 80vh;
-        }
-        #email-viewer-dialog .dialog-body-scroll {
-          display: flex;
-          flex-direction: column;
-          min-height: 0;
-          overflow: hidden !important;
-        }
-      `}</style>
-      <AdminDialog
-        isOpen={isOpen}
-        onClose={onClose}
-        title="View Email"
-        rootRef={rootRef}
-        wide
-        id="email-viewer-dialog"
-        lockBodyScrollArea
-        footer={
-          <div className="dialog-footer-row" style={{ justifyContent: "flex-end", width: "100%" }}>
-            <button className="btn btn-secondary" onClick={onClose}>Close</button>
+    <AdminDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      title="View Email"
+      rootRef={rootRef}
+      wide
+      id="email-viewer-dialog"
+      bodyClassName="email-viewer-dialog-body"
+      lockBodyScrollArea
+      footer={
+        <div className="dialog-footer-row dialog-footer-row-end">
+          <button className="btn btn-secondary" onClick={onClose}>Close</button>
+        </div>
+      }
+    >
+      <div className="admin-email-viewer">
+        <div className="admin-email-viewer-header">
+          <div className="admin-email-viewer-meta-row">
+            <strong>Subject:</strong> {email.subject}
           </div>
-        }
-      >
-        <div className="admin-email-viewer" style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, height: "100%" }}>
-          <div className="admin-email-viewer-header" style={{ flexShrink: 0, marginBottom: "1rem", paddingBottom: "1rem", borderBottom: "1px solid var(--border-color, #e2e8f0)" }}>
-            <div style={{ marginBottom: "0.25rem" }}>
-              <strong>Subject:</strong> {email.subject}
-            </div>
-            <div style={{ marginBottom: "0.25rem" }}>
-              <strong>To:</strong> {email.toEmail}
-            </div>
-            <div style={{ marginBottom: "0.25rem" }}>
-              <strong>From:</strong> System
-            </div>
-            <div style={{ marginBottom: "0.25rem" }}>
-              <strong>Date:</strong> {format(new Date(email.createdAt), "dd MMM yyyy, HH:mm")}
-            </div>
-            <div>
-              <strong>Status:</strong> <span className={`status-badge status-${email.status.toLowerCase()}`}>{email.status}</span>
-            </div>
+          <div className="admin-email-viewer-meta-row">
+            <strong>To:</strong> {email.toEmail}
           </div>
-          <div className="admin-email-viewer-body" style={{ flex: 1, minHeight: 0, width: "100%", border: "1px solid var(--border-color, #e2e8f0)", borderRadius: "var(--radius-md, 0.5rem)", overflow: "hidden", display: "flex", flexDirection: "column", height: "100%" }}>
-            <iframe
-              srcDoc={email.htmlBody}
-              style={{ flex: 1, height: "100%", width: "100%", border: "none", backgroundColor: "white" }}
-              title="Email Content"
-              sandbox="allow-same-origin"
-            />
+          <div className="admin-email-viewer-meta-row">
+            <strong>From:</strong> System
+          </div>
+          <div className="admin-email-viewer-meta-row">
+            <strong>Date:</strong> {format(new Date(email.createdAt), "dd MMM yyyy, HH:mm")}
+          </div>
+          <div className="admin-email-viewer-meta-row">
+            <strong>Status:</strong> <span className={`status-badge status-${email.status.toLowerCase()}`}>{email.status}</span>
           </div>
         </div>
-      </AdminDialog>
-    </>
+        <div className="admin-email-viewer-body">
+          <iframe
+            className="admin-email-viewer-frame"
+            srcDoc={email.htmlBody}
+            title="Email Content"
+            sandbox="allow-same-origin"
+          />
+        </div>
+      </div>
+    </AdminDialog>
   );
 }

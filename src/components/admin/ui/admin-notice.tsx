@@ -24,7 +24,13 @@ export function AdminNotice({ tone, className, children, ...props }: AdminNotice
   const classes = ["notice", tone, "admin-notice", className].filter(Boolean).join(" ");
 
   return (
-    <div className={classes} role={tone === "error" ? "alert" : "status"} {...props}>
+    <div
+      className={classes}
+      role={tone === "error" ? "alert" : "status"}
+      aria-live={tone === "error" ? "assertive" : "polite"}
+      aria-atomic="true"
+      {...props}
+    >
       {children}
     </div>
   );

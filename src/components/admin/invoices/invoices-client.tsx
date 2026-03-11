@@ -518,8 +518,17 @@ export function AdminInvoicesClient() {
           {invoices.map((inv) => (
             <div 
               key={inv.id} 
-              className="invoice-row-item invoice-item invoice-table-row"
+              className="invoice-row-item invoice-item invoice-table-row admin-list-row-button"
               onClick={() => openDetail(inv)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  openDetail(inv);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              aria-label={`Open invoice ${inv.invoiceNumber}`}
             >
               <div className="admin-list-cell admin-list-col-number">
                 <span className="admin-mobile-label">Number</span>
@@ -600,9 +609,10 @@ export function AdminInvoicesClient() {
         onClose={closeDetail}
         title={`Invoice ${selectedInvoice?.invoiceNumber}`}
         wide
+        id="invoice-detail-dialog"
         footer={
-          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-            <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="dialog-footer-row invoice-dialog-footer">
+            <div className="dialog-footer-left">
               <Tooltip content="Close invoice details and return to the invoice list.">
                 <button className="btn btn-secondary" onClick={closeDetail}>CLOSE</button>
               </Tooltip>
@@ -638,7 +648,7 @@ export function AdminInvoicesClient() {
                 }}>DELETE</button>
               </Tooltip>
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div className="dialog-footer-right">
               <Tooltip content="Save edits to recipient details, due date, notes, and line items.">
                 <button className="btn btn-secondary" disabled={!!busyAction} onClick={saveInvoiceEdits}>
                   {busyAction === 'save' ? 'SAVING...' : 'SAVE EDITS'}
@@ -667,7 +677,7 @@ export function AdminInvoicesClient() {
             <div className="dialog-layout">
               <div className="dialog-col">
                 <h3 className="manual-section-title">Invoice Details</h3>
-                <AdminCard ghost style={{ marginBottom: '16px' }}>
+                <AdminCard ghost className="invoice-dialog-section">
                   <AdminForm className="dialog-form-grid">
                     <AdminField label="First Name" tooltip="Customer's first name.">
                       <input value={editingCustomerFirstName} onChange={e => setEditingCustomerFirstName(e.target.value)} />
@@ -682,10 +692,15 @@ export function AdminInvoicesClient() {
                       <input type="datetime-local" value={editingDueAt} onChange={(e) => setEditingDueAt(e.target.value)} />
                     </AdminField>
                     <AdminField label="Notes" tooltip="Visible to the customer on the public invoice." fullWidth>
-                      <textarea value={editingNotes} onChange={(e) => setEditingNotes(e.target.value)} placeholder="Customer-facing notes..." style={{ minHeight: '80px' }} />
+                      <textarea
+                        className="invoice-dialog-notes"
+                        value={editingNotes}
+                        onChange={(e) => setEditingNotes(e.target.value)}
+                        placeholder="Customer-facing notes..."
+                      />
                     </AdminField>
                   </AdminForm>
-                  <div className="button-row" style={{ marginTop: '12px' }}>
+                  <div className="button-row invoice-dialog-button-row">
                     <Tooltip content="Save edits to recipient details, due date, notes, and line items.">
                       <button className="btn btn-secondary" disabled={!!busyAction} onClick={saveInvoiceEdits}>
                         {busyAction === 'save' ? 'SAVING...' : 'SAVE BASIC DETAILS'}
@@ -699,35 +714,39 @@ export function AdminInvoicesClient() {
 
                 <h3 className="manual-section-title">Line Items</h3>
                 <AdminCard ghost>
-                  <div style={{ display: 'grid', gap: '12px' }}>
+                  <div className="invoice-dialog-line-items">
                     {editingLineItems.map((li) => (
-                      <div key={li.key} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', borderBottom: '1px solid var(--line)', paddingBottom: '12px' }}>
-                        <div style={{ flex: 1 }}>
+                      <div key={li.key} className="invoice-dialog-line-item">
+                        <div className="invoice-dialog-line-item-main">
                           <AdminField label="Description" tooltip="Line item name or service provided.">
                             <input value={li.description} onChange={(e) => updateLineItem(li.key, { description: e.target.value })} />
                           </AdminField>
                         </div>
-                        <div style={{ width: '60px' }}>
+                        <div className="invoice-dialog-line-item-qty">
                           <AdminField label="Qty" tooltip="Quantity.">
                             <input type="number" value={li.quantity} onChange={(e) => updateLineItem(li.key, { quantity: e.target.value })} />
                           </AdminField>
                         </div>
-                        <div style={{ width: '100px' }}>
+                        <div className="invoice-dialog-line-item-price">
                           <AdminField label="Price" tooltip="Unit price in AUD.">
                             <input value={li.unitPriceAud} onChange={(e) => updateLineItem(li.key, { unitPriceAud: e.target.value })} />
                           </AdminField>
                         </div>
                         <Tooltip content="Remove this line item from the invoice.">
-                          <button className="btn btn-danger" style={{ marginTop: '24px', padding: '8px' }} onClick={() => removeLineItem(li.key)}>×</button>
+                          <button className="btn btn-danger invoice-dialog-remove-item" onClick={() => removeLineItem(li.key)}>×</button>
                         </Tooltip>
                       </div>
                     ))}
-                    <div className="button-row" style={{ marginTop: '8px' }}>
+                    <div className="button-row invoice-dialog-button-row invoice-dialog-line-actions">
                       <Tooltip content="Add a blank line item that you can customize manually.">
                         <button className="btn btn-secondary" onClick={addLineItem}>+ ADD CUSTOM ITEM</button>
                       </Tooltip>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <select value={editingProductPresetId} onChange={(e) => addPresetToInvoice(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--line)', borderRadius: '8px', color: 'var(--ink-0)', padding: '8px' }}>
+                      <div className="invoice-dialog-preset-row">
+                        <select
+                          className="invoice-product-preset-select invoice-dialog-preset-select"
+                          value={editingProductPresetId}
+                          onChange={(e) => addPresetToInvoice(e.target.value)}
+                        >
                           <option value="">+ ADD FROM PRESET...</option>
                           {presets.map(p => <option key={p.id} value={p.id}>{p.label} ({toCurrency(p.unitPriceCents, DEFAULT_CURRENCY)})</option>)}
                         </select>
@@ -742,15 +761,15 @@ export function AdminInvoicesClient() {
                 <AdminCard ghost>
                   <p className="helper-text">Manage the lifecycle of this invoice.</p>
                   
-                  <div style={{ margin: '16px 0', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--line)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <div className="invoice-dialog-status-card">
+                    <div className="invoice-dialog-status-row">
                       <span>Status:</span>
                       <span className={`status-badge status-${selectedInvoiceDisplayStatus ?? selectedInvoice.status}`}>
                         {selectedInvoiceDisplayStatus ?? selectedInvoice.status}
                       </span>
                     </div>
                     {selectedInvoice.status !== 'paid' && selectedInvoice.status !== 'void' && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--red)', fontWeight: 600 }}>
+                      <div className="invoice-dialog-status-row invoice-dialog-status-row-alert">
                         <span>Outstanding:</span>
                         <span>{selectedInvoice.overdueDays ?? 0} days</span>
                       </div>
@@ -758,14 +777,14 @@ export function AdminInvoicesClient() {
                   </div>
 
                   {selectedInvoice.status === 'draft' && (
-                    <p className="helper-text" style={{ marginBottom: '12px' }}>
+                    <p className="helper-text invoice-dialog-help-copy">
                       Mark as Paid becomes available after sending the invoice.
                     </p>
                   )}
 
-                  <div className="button-row" style={{ flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
+                  <div className="button-row invoice-dialog-stacked-actions">
                     <Tooltip content="Open the printable invoice PDF in a new browser tab.">
-                      <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => window.open(`/api/admin/invoices/${selectedInvoice.id}/pdf`, '_blank')}>VIEW PDF</button>
+                      <button className="btn btn-secondary invoice-dialog-full-width" onClick={() => window.open(`/api/admin/invoices/${selectedInvoice.id}/pdf`, '_blank')}>VIEW PDF</button>
                     </Tooltip>
                   </div>
                 </AdminCard>
@@ -780,8 +799,9 @@ export function AdminInvoicesClient() {
         onClose={() => setCreateOpen(false)}
         title="Create New Invoice"
         wide
+        id="invoice-create-dialog"
         footer={
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
+          <div className="dialog-footer-row dialog-footer-row-end">
             <Tooltip content="Close the create invoice dialog without saving.">
               <button className="btn btn-secondary" disabled={!!busyAction} onClick={() => setCreateOpen(false)}>CANCEL</button>
             </Tooltip>
@@ -802,10 +822,10 @@ export function AdminInvoicesClient() {
           <div className="dialog-layout">
           <div className="dialog-col">
             <h3 className="manual-section-title">Recipient & Basis</h3>
-            <AdminCard ghost style={{ marginBottom: '16px' }}>
+            <AdminCard ghost className="invoice-dialog-section">
               <AdminForm className="dialog-form-grid">
                 <AdminField label="Select Customer" tooltip="Choose which student to bill." fullWidth required>
-                  <select value={createSelectedCustomerId} onChange={(e) => setCreateSelectedCustomerId(e.target.value)} style={{ width: '100%' }}>
+                  <select className="invoice-dialog-customer-select" value={createSelectedCustomerId} onChange={(e) => setCreateSelectedCustomerId(e.target.value)}>
                     <option value="">-- Choose student --</option>
                     {customerOptions.map(c => <option key={c.id} value={c.id}>{c.lastName ? `${c.lastName}, ${c.firstName}` : c.fullName}</option>)}
                   </select>
@@ -837,9 +857,9 @@ export function AdminInvoicesClient() {
                 )}
                 {createInvoiceBasis === 'presets' && (
                   <AdminField label="Select Presets" tooltip="Choose one or more configured products." fullWidth>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--line)' }}>
+                    <div className="invoice-dialog-preset-list">
                       {presets.map(p => (
-                        <label key={`create-preset-${p.id}`} className="admin-inline-checkbox" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                        <label key={`create-preset-${p.id}`} className="admin-inline-checkbox invoice-dialog-preset-option">
                           <input 
                             type="checkbox" 
                             checked={createSelectedPresetIds.includes(p.id)}

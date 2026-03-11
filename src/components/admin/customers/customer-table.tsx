@@ -63,8 +63,17 @@ export function CustomerTable({
             {customers.map((customer) => (
                 <div
                     key={customer.id}
-                    className="customer-item invoice-row-item customer-table-row"
+                    className="customer-item invoice-row-item customer-table-row admin-list-row-button"
                     onClick={() => onOpenCustomerDialog(customer, false)}
+                    onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            onOpenCustomerDialog(customer, false);
+                        }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Open customer ${customer.lastName ? `${customer.lastName}, ${customer.firstName}` : customer.fullName}`}
                 >
                     <div className="customer-col-identity admin-list-cell admin-list-col-identity">
                         <span className="admin-mobile-label">Customer</span>

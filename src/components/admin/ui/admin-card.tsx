@@ -13,16 +13,13 @@ interface AdminCardProps extends PropsWithChildren<HTMLAttributes<HTMLDivElement
 export const AdminCard = forwardRef<HTMLDivElement, AdminCardProps>(
   ({ children, noPadding, ghost, className, style, ...props }, ref) => {
     const classes = [
-      ghost ? "" : "admin-card",
+      ghost ? "admin-card-ghost" : "admin-card",
       noPadding ? "no-padding" : "",
       className
     ].filter(Boolean).join(" ");
 
-    // If ghost, we strip styles. Otherwise, we rely on CSS classes for opacity.
-    const finalStyle = ghost ? { ...style, background: 'none', border: 'none', boxShadow: 'none', padding: 0 } : style;
-
     return (
-      <div ref={ref} className={classes} style={finalStyle} {...props}>
+      <div ref={ref} className={classes} style={style} {...props}>
         {children}
       </div>
     );

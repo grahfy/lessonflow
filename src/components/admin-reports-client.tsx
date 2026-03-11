@@ -528,7 +528,12 @@ export function AdminReportsClient() {
         return;
       }
 
-      setDashboard({ generatedAt: body.generatedAt, periods: body.periods, trends: body.trends });
+      setDashboard({
+        generatedAt: body.generatedAt,
+        periods: body.periods,
+        trends: body.trends,
+        ...(body.customRange ? { customRange: body.customRange } : {})
+      });
     } catch {
       setError("Unable to load reports.");
     } finally {

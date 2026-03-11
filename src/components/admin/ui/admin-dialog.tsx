@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useId } from "react";
 import { type PropsWithChildren, type ReactNode, type RefObject } from "react";
 
 interface AdminDialogProps extends PropsWithChildren {
@@ -67,6 +67,11 @@ export function AdminDialog({
   lockBodyScrollArea,
   children 
 }: AdminDialogProps) {
+  const generatedTitleId = useId();
+  const generatedDescriptionId = useId();
+  const titleId = id ? `${id}-title` : generatedTitleId;
+  const descriptionId = description ? (id ? `${id}-description` : generatedDescriptionId) : undefined;
+
   useEffect(() => {
     if (!isOpen) return;
     lockBodyScroll();
@@ -104,15 +109,17 @@ export function AdminDialog({
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
       >
         <div className="dialog-head">
-          <h3>{title}</h3>
+          <h3 id={titleId}>{title}</h3>
           <button className="btn btn-secondary" type="button" onClick={onClose}>
             Close
           </button>
         </div>
         
-        {description && <div className="dialog-status helper-text">{description}</div>}
+        {description && <div id={descriptionId} className="dialog-status helper-text">{description}</div>}
 
         <div
           className={[

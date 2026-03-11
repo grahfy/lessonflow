@@ -5,7 +5,7 @@ import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { AdminNotice } from "@/components/admin/ui/admin-notice";
-import { AlertCircle, CheckCircle, RefreshCw, Bug, Search, Terminal, ChevronRight, ChevronDown, Filter, ImagePlus, X } from "lucide-react";
+import { AlertCircle, CheckCircle, RefreshCw, Bug, Search, Terminal, ChevronRight, ChevronDown, ImagePlus, X } from "lucide-react";
 import { Pagination } from "@/components/pagination";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 
@@ -243,16 +243,6 @@ export function SystemLogsClient() {
             </div>
 
             <div className="syslog-toolbar-actions">
-              <Tooltip content="Apply the current search and level filters to the logs.">
-                <button
-                  className="btn btn-primary"
-                  onClick={fetchLogs}
-                  disabled={loading}
-                >
-                  <Filter size={14} />
-                  FILTER
-                </button>
-              </Tooltip>
               <Tooltip content="Reload the system logs from the server.">
                 <button
                   className="btn btn-secondary"
@@ -274,6 +264,7 @@ export function SystemLogsClient() {
               </Tooltip>
             </div>
           </div>
+          <p className="helper-text syslog-toolbar-note">Search and level filters apply automatically.</p>
         </AdminCard>
 
         {/* ── Table container ── */}
@@ -298,7 +289,7 @@ export function SystemLogsClient() {
               <thead>
                 <tr>
                   <th className="syslog-col-expand"></th>
-                  <th>Timestamp ↑</th>
+                  <th>Timestamp</th>
                   <th>Level</th>
                   <th>Source</th>
                   <th>Event ID</th>
@@ -321,6 +312,15 @@ export function SystemLogsClient() {
                         <tr
                           className={hasMeta ? "syslog-row-expandable" : ""}
                           onClick={() => hasMeta && toggleExpand(log.id)}
+                          onKeyDown={(event) => {
+                            if (!hasMeta) return;
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              toggleExpand(log.id);
+                            }
+                          }}
+                          tabIndex={hasMeta ? 0 : undefined}
+                          aria-expanded={hasMeta ? isExpanded : undefined}
                         >
                           <td className="syslog-col-expand">
                             {hasMeta ? (
