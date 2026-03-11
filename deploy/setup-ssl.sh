@@ -7,7 +7,7 @@
 # Usage: sudo ./deploy/setup-ssl.sh [options]
 #
 # Options:
-#   --domain DOMAIN    Primary domain (default: melbourneguitarschool.com.au)
+#   --domain DOMAIN    Primary domain (auto-detected from live nginx/shared env when omitted)
 #   --email EMAIL      Email for Let's Encrypt notifications
 #   --staging          Use Let's Encrypt staging server (for testing)
 #   --force            Force certificate renewal even if not expired
@@ -27,11 +27,11 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 # Default configuration
-DOMAIN="melbourneguitarschool.com.au"
+DOMAIN=""
 EMAIL=""
 STAGING=false
 FORCE=false
-WWW_DOMAIN="www.${DOMAIN}"
+WWW_DOMAIN=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -64,10 +64,145 @@ log_info()  { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
+read_nginx_server_name_domains() {
+    local nginx_conf="$1"
+
+    [[ -r "${nginx_conf}" ]] || return 1
+
+    awk '
+        /^[[:space:]]*server_name[[:space:]]+/ {
+            for (i = 2; i <= NF; i++) {
+                gsub(/;$/, "", $i)
+                if ($i != "_" && $i != "") {
+                    print $i
+                }
+            }
+        }
+    ' "${nginx_conf}" 2>/dev/null
+}
+
+read_domain_from_site_url() {
+    local site_url="$1"
+
+    [[ -n "${site_url}" ]] || return 1
+    printf '%s\n' "${site_url}" | sed -E 's#^[A-Za-z]+://##; s#/.*$##; s#:[0-9]+$##'
+}
+
+detect_domain_from_nginx_config() {
+    local candidate=""
+    local domain=""
+    local other=""
+    local -a domains=()
+    local nginx_candidates=(
+        "/etc/nginx/sites-available/lessonflow"
+        "/etc/nginx/sites-enabled/lessonflow"
+    )
+
+    for candidate in "${nginx_candidates[@]}"; do
+        [[ -r "${candidate}" ]] || continue
+        mapfile -t domains < <(read_nginx_server_name_domains "${candidate}" || true)
+
+        for domain in "${domains[@]}"; do
+            if [[ "${domain}" == www.* ]]; then
+                for other in "${domains[@]}"; do
+                    if [[ "${other}" == "${domain#www.}" ]]; then
+                        printf '%s\n' "${other}"
+                        return 0
+                    fi
+                done
+            fi
+        done
+
+        for domain in "${domains[@]}"; do
+            if [[ "${domain}" != www.* ]]; then
+                printf '%s\n' "${domain}"
+                return 0
+            fi
+        done
+
+        if [[ ${#domains[@]} -gt 0 ]]; then
+            printf '%s\n' "${domains[0]#www.}"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+read_site_host_from_shared_env() {
+    local shared_env="/var/www/lessonflow/shared/.env"
+    local site_url=""
+    local site_host=""
+
+    [[ -r "${shared_env}" ]] || return 1
+
+    site_url="$(awk -F'=' '
+        /^[[:space:]]*NEXT_PUBLIC_SITE_URL[[:space:]]*=/ {
+            v=substr($0, index($0, "=") + 1)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+            gsub(/^"/, "", v)
+            gsub(/"$/, "", v)
+            print v
+            exit
+        }
+    ' "${shared_env}" 2>/dev/null || true)"
+
+    site_host="$(read_domain_from_site_url "${site_url}" || true)"
+    [[ -n "${site_host}" ]] || return 1
+    printf '%s\n' "${site_host}"
+}
+
+escape_sed_replacement() {
+    printf '%s' "$1" | sed -e 's/[\/&]/\\&/g'
+}
+
+render_nginx_site_template() {
+    local template_path="$1"
+    local output_path="$2"
+    local canonical_domain="$3"
+    local www_domain="$4"
+    local escaped_canonical=""
+    local escaped_www=""
+
+    [[ -n "${canonical_domain}" ]] || return 1
+    [[ -n "${www_domain}" ]] || www_domain="www.${canonical_domain}"
+
+    escaped_canonical="$(escape_sed_replacement "${canonical_domain}")"
+    escaped_www="$(escape_sed_replacement "${www_domain}")"
+
+    sed \
+        -e "s/www\\.melbourneguitarschool\\.com\\.au/${escaped_www}/g" \
+        -e "s/melbourneguitarschool\\.com\\.au/${escaped_canonical}/g" \
+        "${template_path}" > "${output_path}"
+}
+
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
     log_error "This script must be run as root (use sudo)"
     exit 1
+fi
+
+if [[ -z "${DOMAIN}" ]]; then
+    DOMAIN="$(detect_domain_from_nginx_config || true)"
+fi
+
+if [[ -z "${DOMAIN}" ]]; then
+    DOMAIN="$(read_site_host_from_shared_env || true)"
+fi
+
+if [[ -z "${DOMAIN}" ]]; then
+    log_error "Could not detect a site domain from nginx or /var/www/lessonflow/shared/.env."
+    echo "Usage: sudo ./deploy/setup-ssl.sh --domain example.com --email your@email.com"
+    exit 1
+fi
+
+if [[ "${DOMAIN}" == www.* ]]; then
+    WWW_DOMAIN="${DOMAIN}"
+    DOMAIN="${DOMAIN#www.}"
+fi
+
+if [[ -z "${WWW_DOMAIN}" ]]; then
+    WWW_DOMAIN="www.${DOMAIN}"
 fi
 
 # Validate email
@@ -93,7 +228,10 @@ if [[ -f "${HTTP_CONF}" ]]; then
         CERT_PATH="/etc/letsencrypt/live/${DOMAIN}/fullchain.pem"
         if [[ ! -f "${CERT_PATH}" ]]; then
             log_info "Replacing nginx config with HTTP-only version before obtaining certs..."
-            cp "${HTTP_CONF}" "${NGINX_CONF}"
+            rendered_http_conf="$(mktemp)"
+            render_nginx_site_template "${HTTP_CONF}" "${rendered_http_conf}" "${DOMAIN}" "${WWW_DOMAIN}"
+            cp "${rendered_http_conf}" "${NGINX_CONF}"
+            rm -f "${rendered_http_conf}"
         fi
     fi
 fi
@@ -125,7 +263,13 @@ if [[ "${DOMAIN_IP}" != "${SERVER_IP}" ]]; then
     exit 1
 fi
 
-log_info "DNS verified: ${DOMAIN} -> ${SERVER_IP}"
+if [[ -z "${WWW_IP}" || "${WWW_IP}" != "${SERVER_IP}" ]]; then
+    log_error "Domain ${WWW_DOMAIN} resolves to ${WWW_IP:-<no DNS record>}, but this server is ${SERVER_IP}"
+    log_error "Please update DNS records for both the bare domain and www host before proceeding"
+    exit 1
+fi
+
+log_info "DNS verified: ${DOMAIN}, ${WWW_DOMAIN} -> ${SERVER_IP}"
 
 # Build certbot command dynamically so staging/force flags only apply when set.
 CERTBOT_CMD="certbot --nginx --non-interactive --agree-tos --email ${EMAIL} -d ${DOMAIN} -d ${WWW_DOMAIN}"

@@ -409,6 +409,8 @@ Visit `https://example.com/setup` to:
 sudo ./deploy/setup-ssl.sh --email your@email.com
 ```
 
+If the live host is already configured, `setup-ssl.sh` will auto-detect the canonical domain from the active Nginx site or `NEXT_PUBLIC_SITE_URL` in `/var/www/lessonflow/shared/.env`. Pass `--domain` to override detection.
+
 See [SSL Certificate](#ssl-certificate) section for full details.
 
 ---

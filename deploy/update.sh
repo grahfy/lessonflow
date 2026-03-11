@@ -19,8 +19,8 @@
 #   --skip-migrate       Pass through to deploy.sh (skip database migrations)
 #   --db-push            Pass through to deploy.sh (use prisma db push)
 #   --ssl                Pass through to deploy.sh (run SSL setup post-deploy)
-#   --domain DOMAIN      SSL domain (required with --ssl)
-#   --email EMAIL        SSL certificate email (required with --ssl)
+#   --domain DOMAIN      SSL domain (auto-detected from host config when omitted)
+#   --email EMAIL        SSL certificate email (read from certbot config when omitted)
 #   --allow-dirty        Allow git pull/deploy even if working tree is dirty
 #   --sudo-deploy        Force sudo when invoking deploy.sh
 #   --no-sudo-deploy     Do not use sudo when invoking deploy.sh
@@ -129,8 +129,8 @@ Options:
   --skip-migrate       Pass through to deploy.sh (skip database migrations)
   --db-push            Pass through to deploy.sh (use prisma db push)
   --ssl                Pass through to deploy.sh (run SSL setup post-deploy)
-  --domain DOMAIN      SSL domain (required with --ssl)
-  --email EMAIL        SSL certificate email (required with --ssl)
+  --domain DOMAIN      SSL domain (auto-detected from host config when omitted)
+  --email EMAIL        SSL certificate email (read from certbot config when omitted)
   --allow-dirty        Allow git pull/deploy even if working tree is dirty
   --sudo-deploy        Force sudo when invoking deploy.sh
   --no-sudo-deploy     Do not use sudo when invoking deploy.sh
@@ -253,6 +253,28 @@ read_first_nginx_server_name_domain() {
   ' "${nginx_conf}" 2>/dev/null
 }
 
+# Extracts all useful server_name tokens from an nginx site config so the update
+# wrapper can infer the canonical non-www host when both names are present.
+read_nginx_server_name_domains() {
+  local nginx_conf="$1"
+
+  [[ -r "${nginx_conf}" ]] || return 1
+
+  awk '
+    /^[[:space:]]*server_name[[:space:]]+/ {
+      for (i = 2; i <= NF; i++) {
+        gsub(/;/, "", $i)
+        if ($i == "" || $i == "_" || $i == "localhost" || $i ~ /^\$/) {
+          continue
+        }
+        if (!seen[$i]++) {
+          print $i
+        }
+      }
+    }
+  ' "${nginx_conf}" 2>/dev/null
+}
+
 # Reads the domain segment from a LetsEncrypt ssl_certificate path in nginx
 # config, e.g. /etc/letsencrypt/live/example.com/fullchain.pem -> example.com.
 read_letsencrypt_domain_from_nginx_config() {
@@ -268,6 +290,13 @@ read_letsencrypt_domain_from_nginx_config() {
   ' "${nginx_conf}" 2>/dev/null
 }
 
+cert_files_exist_for_domain() {
+  local domain="$1"
+
+  [[ -n "${domain}" ]] || return 1
+  [[ -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && -f "/etc/letsencrypt/live/${domain}/privkey.pem" ]]
+}
+
 # Best-effort host config discovery for update.sh defaults. It infers whether
 # SSL is already configured on the server and pre-fills domain/email where
 # readable, so operators do not need to re-toggle SSL settings every run.
@@ -279,10 +308,13 @@ detect_previous_deploy_defaults_from_host() {
   )
   local ssl_detected=false
   local detected_domain=""
+  local detected_cert_domain=""
   local detected_email=""
   local cli_ini="/etc/letsencrypt/cli.ini"
   local changed=false
   local candidate=""
+  local domain=""
+  local -a domains=()
 
   for candidate in "${nginx_candidates[@]}"; do
     if [[ -r "${candidate}" ]]; then
@@ -292,13 +324,50 @@ detect_previous_deploy_defaults_from_host() {
   done
 
   if [[ -n "${nginx_conf}" ]]; then
+    mapfile -t domains < <(read_nginx_server_name_domains "${nginx_conf}" || true)
+
     if grep -E -q '^[[:space:]]*listen[[:space:]].*443|^[[:space:]]*ssl_certificate[[:space:]]+' "${nginx_conf}" 2>/dev/null; then
       ssl_detected=true
     fi
 
-    detected_domain="$(read_first_nginx_server_name_domain "${nginx_conf}" || true)"
+    for domain in "${domains[@]}"; do
+      if [[ "${domain}" == www.* ]]; then
+        local bare_domain="${domain#www.}"
+        local other=""
+        for other in "${domains[@]}"; do
+          if [[ "${other}" == "${bare_domain}" ]]; then
+            detected_domain="${bare_domain}"
+            break 2
+          fi
+        done
+      fi
+    done
+
     if [[ -z "${detected_domain}" ]]; then
-      detected_domain="$(read_letsencrypt_domain_from_nginx_config "${nginx_conf}" || true)"
+      for domain in "${domains[@]}"; do
+        if [[ "${domain}" != www.* ]]; then
+          detected_domain="${domain}"
+          break
+        fi
+      done
+    fi
+
+    detected_cert_domain="$(read_letsencrypt_domain_from_nginx_config "${nginx_conf}" || true)"
+    if [[ -z "${detected_domain}" && -n "${detected_cert_domain}" ]]; then
+      if [[ "${detected_cert_domain}" == www.* ]]; then
+        detected_domain="${detected_cert_domain#www.}"
+      else
+        detected_domain="${detected_cert_domain}"
+      fi
+    fi
+
+    if [[ "${ssl_detected}" != true ]]; then
+      for domain in "${detected_cert_domain}" "${detected_domain}" "www.${detected_domain}"; do
+        if cert_files_exist_for_domain "${domain}"; then
+          ssl_detected=true
+          break
+        fi
+      done
     fi
   fi
 
@@ -1690,8 +1759,8 @@ print_update_tui_menu() {
     print_tui_option_pair "16" "Database mode" "$(update_migration_mode_label)" "Cycle deploy DB mode: migrate / skip / db push." \
       "17" "SSL setup" "$(bool_word "${SSL_SETUP}")" "Pass SSL flags to deploy.sh (certbot + nginx config)."
     if [[ "${SSL_SETUP}" == true ]]; then
-      print_tui_option_pair "18" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}" "Domain for cert request and nginx server_name." \
-        "19" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}" "Email for Let's Encrypt registration and renewals."
+      print_tui_option_pair "18" "SSL domain" "${SSL_DOMAIN:-auto-detect}" "Domain for cert request and nginx server_name." \
+        "19" "Certbot email" "${SSL_EMAIL:-required for new certs}" "Email for Let's Encrypt registration and renewals."
     fi
   fi
   echo ""
@@ -2076,8 +2145,9 @@ run_interactive_setup() {
         if [[ "${SKIP_DEPLOY}" == false ]]; then
           SSL_SETUP="$(toggle_bool "${SSL_SETUP}")"
           if [[ "${SSL_SETUP}" == true ]]; then
-            [[ -n "${SSL_DOMAIN}" ]] || SSL_DOMAIN="melbourneguitarschool.com.au"
-            [[ -n "${SSL_EMAIL}" ]] || SSL_EMAIL="melbourneguitarschool@gmail.com"
+            if [[ -z "${SSL_DOMAIN}" || -z "${SSL_EMAIL}" ]]; then
+              log_warn "SSL setup will use detected live values when available. Set domain/email explicitly if this host has no existing certbot config."
+            fi
           fi
         else
           log_warn "Enable deploy first to configure SSL options."
@@ -2085,14 +2155,14 @@ run_interactive_setup() {
         ;;
       18)
         if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true ]]; then
-          SSL_DOMAIN="$(prompt_value "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}")"
+          SSL_DOMAIN="$(prompt_value "SSL domain" "${SSL_DOMAIN:-}")"
         else
           log_warn "Enable deploy + SSL setup first to edit SSL domain."
         fi
         ;;
       19)
         if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true ]]; then
-          SSL_EMAIL="$(prompt_value "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}")"
+          SSL_EMAIL="$(prompt_value "Certbot email" "${SSL_EMAIL:-}")"
         else
           log_warn "Enable deploy + SSL setup first to edit Certbot email."
         fi
@@ -2116,6 +2186,10 @@ run_interactive_setup() {
         install_app_systemd_service_from_update || true
         ;;
       s)
+        if [[ "${SKIP_DEPLOY}" == false && "${SSL_SETUP}" == true && ( -z "${SSL_DOMAIN}" || -z "${SSL_EMAIL}" ) ]]; then
+          log_warn "SSL setup still needs a detected or explicit domain/email before deploy can start."
+          continue
+        fi
         break
         ;;
       q)
@@ -2171,8 +2245,8 @@ print_summary() {
     print_summary_row "Database mode" "$(update_migration_mode_label)"
     print_summary_row "SSL setup" "$(bool_word "${SSL_SETUP}")"
     if [[ "${SSL_SETUP}" == true ]]; then
-      print_summary_row "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}"
-      print_summary_row "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}"
+      print_summary_row "SSL domain" "${SSL_DOMAIN:-auto-detect}"
+      print_summary_row "Certbot email" "${SSL_EMAIL:-required for new certs}"
     fi
   fi
   print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
@@ -2192,8 +2266,10 @@ run_deploy() {
   local effective_ssl_email="${SSL_EMAIL}"
 
   if [[ "${SSL_SETUP}" == true ]]; then
-    [[ -n "${effective_ssl_domain}" ]] || effective_ssl_domain="melbourneguitarschool.com.au"
-    [[ -n "${effective_ssl_email}" ]] || effective_ssl_email="melbourneguitarschool@gmail.com"
+    if [[ -z "${effective_ssl_domain}" || -z "${effective_ssl_email}" ]]; then
+      log_error "SSL setup requires a detected or explicit domain/email. Re-run with --domain/--email or configure the live host Nginx/certbot settings first."
+      exit 1
+    fi
   fi
   deploy_args+=( "--branch" "${BRANCH}" )
   deploy_args+=( "--skip-pull" )
@@ -2419,13 +2495,8 @@ if [[ "${DB_PUSH}" == true ]]; then
   SKIP_MIGRATE=true
 fi
 
-if [[ "${SSL_SETUP}" == true ]]; then
-  [[ -n "${SSL_DOMAIN}" ]] || SSL_DOMAIN="melbourneguitarschool.com.au"
-  [[ -n "${SSL_EMAIL}" ]] || SSL_EMAIL="melbourneguitarschool@gmail.com"
-fi
-
 if [[ "${SSL_SETUP}" == true && ( -z "${SSL_DOMAIN}" || -z "${SSL_EMAIL}" ) && "${INTERACTIVE}" == false ]]; then
-  log_error "SSL setup requires --domain and --email when running non-interactively."
+  log_error "SSL setup requires a detected or explicit domain/email when running non-interactively."
   exit 1
 fi
 

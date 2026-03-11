@@ -80,6 +80,9 @@ UPDATE_PRISMA_ONLY=false
 SSL_SETUP=false
 SSL_DOMAIN=""
 SSL_EMAIL=""
+CLI_SSL_FLAG_SET=false
+CLI_SSL_DOMAIN_SET=false
+CLI_SSL_EMAIL_SET=false
 DB_PUSH=false
 TIMESTAMP=""
 NEW_RELEASE_DIR=""
@@ -269,6 +272,292 @@ render_web_update_service_template() {
         -e "s/{{APP_NAME}}/${APP_NAME}/g" \
         -e "s/{{DEPLOY_USER}}/${deploy_user}/g" \
         "${template_path}" > "${output_path}"
+}
+
+# Extracts all useful server_name tokens from an nginx site config. This is used
+# to preserve the host's current canonical/www domain pair during deploy syncs.
+read_nginx_server_name_domains() {
+    local nginx_conf="$1"
+
+    [[ -r "${nginx_conf}" ]] || return 1
+
+    awk '
+        /^[[:space:]]*server_name[[:space:]]+/ {
+            for (i = 2; i <= NF; i++) {
+                gsub(/;/, "", $i)
+                if ($i == "" || $i == "_" || $i == "localhost" || $i ~ /^\$/) {
+                    continue
+                }
+                if (!seen[$i]++) {
+                    print $i
+                }
+            }
+        }
+    ' "${nginx_conf}" 2>/dev/null
+}
+
+# Reads the LetsEncrypt live directory from an nginx ssl_certificate directive,
+# e.g. /etc/letsencrypt/live/example.com/fullchain.pem -> example.com.
+read_letsencrypt_domain_from_nginx_config() {
+    local nginx_conf="$1"
+
+    [[ -r "${nginx_conf}" ]] || return 1
+
+    awk '
+        match($0, /ssl_certificate[[:space:]]+\/etc\/letsencrypt\/live\/([^/]+)\/fullchain\.pem/, m) {
+            print m[1]
+            exit
+        }
+    ' "${nginx_conf}" 2>/dev/null
+}
+
+# Returns the first lessonflow nginx site file that currently exists on the host.
+find_existing_nginx_site_config() {
+    local candidate=""
+
+    for candidate in \
+        "/etc/nginx/sites-available/${APP_NAME}" \
+        "/etc/nginx/sites-enabled/${APP_NAME}"
+    do
+        if [[ -r "${candidate}" ]]; then
+            echo "${candidate}"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+cert_files_exist_for_domain() {
+    local domain="$1"
+
+    [[ -n "${domain}" ]] || return 1
+    [[ -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && -f "/etc/letsencrypt/live/${domain}/privkey.pem" ]]
+}
+
+# Pulls a hostname from NEXT_PUBLIC_SITE_URL in shared/.env as a fallback when
+# nginx config has not been established yet on a host.
+read_site_host_from_shared_env() {
+    local shared_env_path="${SHARED_DIR}/.env"
+    local site_url=""
+
+    [[ -f "${shared_env_path}" ]] || return 1
+
+    site_url="$(read_env_file_value "${shared_env_path}" "NEXT_PUBLIC_SITE_URL" || true)"
+    [[ -n "${site_url}" ]] || return 1
+
+    site_url="${site_url#http://}"
+    site_url="${site_url#https://}"
+    site_url="${site_url%%/*}"
+    site_url="${site_url%%:*}"
+
+    [[ -n "${site_url}" ]] || return 1
+    printf '%s\n' "${site_url}"
+}
+
+# Determines which canonical/www domains and LetsEncrypt live directory should
+# be used when rendering the nginx site config for this host.
+detect_host_nginx_domain_context() {
+    local nginx_conf="$1"
+    local cert_domain=""
+    local fallback_host=""
+    local first_domain=""
+    local domain=""
+    local -a domains=()
+
+    NGINX_RENDER_CANONICAL_DOMAIN=""
+    NGINX_RENDER_WWW_DOMAIN=""
+    NGINX_RENDER_CERT_DOMAIN=""
+    NGINX_RENDER_HAS_SSL=false
+
+    if [[ -r "${nginx_conf}" ]]; then
+        mapfile -t domains < <(read_nginx_server_name_domains "${nginx_conf}" || true)
+        cert_domain="$(read_letsencrypt_domain_from_nginx_config "${nginx_conf}" || true)"
+    fi
+
+    if [[ ${#domains[@]} -gt 0 ]]; then
+        first_domain="${domains[0]}"
+    fi
+
+    for domain in "${domains[@]}"; do
+        if [[ "${domain}" == www.* ]]; then
+            local bare_domain="${domain#www.}"
+            local candidate=""
+            for candidate in "${domains[@]}"; do
+                if [[ "${candidate}" == "${bare_domain}" ]]; then
+                    NGINX_RENDER_CANONICAL_DOMAIN="${bare_domain}"
+                    NGINX_RENDER_WWW_DOMAIN="${domain}"
+                    break 2
+                fi
+            done
+        fi
+    done
+
+    if [[ -z "${NGINX_RENDER_CANONICAL_DOMAIN}" ]]; then
+        for domain in "${domains[@]}"; do
+            if [[ "${domain}" != www.* ]]; then
+                NGINX_RENDER_CANONICAL_DOMAIN="${domain}"
+                break
+            fi
+        done
+    fi
+
+    if [[ -z "${NGINX_RENDER_CANONICAL_DOMAIN}" && -n "${SSL_DOMAIN}" ]]; then
+        if [[ "${SSL_DOMAIN}" == www.* ]]; then
+            NGINX_RENDER_CANONICAL_DOMAIN="${SSL_DOMAIN#www.}"
+            NGINX_RENDER_WWW_DOMAIN="${SSL_DOMAIN}"
+        else
+            NGINX_RENDER_CANONICAL_DOMAIN="${SSL_DOMAIN}"
+        fi
+    fi
+
+    if [[ -z "${NGINX_RENDER_CANONICAL_DOMAIN}" && -n "${cert_domain}" ]]; then
+        if [[ "${cert_domain}" == www.* ]]; then
+            NGINX_RENDER_CANONICAL_DOMAIN="${cert_domain#www.}"
+            NGINX_RENDER_WWW_DOMAIN="${cert_domain}"
+        else
+            NGINX_RENDER_CANONICAL_DOMAIN="${cert_domain}"
+        fi
+    fi
+
+    if [[ -z "${NGINX_RENDER_CANONICAL_DOMAIN}" ]]; then
+        fallback_host="$(read_site_host_from_shared_env || true)"
+        if [[ -n "${fallback_host}" ]]; then
+            if [[ "${fallback_host}" == www.* ]]; then
+                NGINX_RENDER_CANONICAL_DOMAIN="${fallback_host#www.}"
+                NGINX_RENDER_WWW_DOMAIN="${fallback_host}"
+            else
+                NGINX_RENDER_CANONICAL_DOMAIN="${fallback_host}"
+            fi
+        fi
+    fi
+
+    if [[ -z "${NGINX_RENDER_CANONICAL_DOMAIN}" && -n "${first_domain}" ]]; then
+        if [[ "${first_domain}" == www.* ]]; then
+            NGINX_RENDER_CANONICAL_DOMAIN="${first_domain#www.}"
+            NGINX_RENDER_WWW_DOMAIN="${first_domain}"
+        else
+            NGINX_RENDER_CANONICAL_DOMAIN="${first_domain}"
+        fi
+    fi
+
+    if [[ -z "${NGINX_RENDER_WWW_DOMAIN}" && -n "${NGINX_RENDER_CANONICAL_DOMAIN}" ]]; then
+        NGINX_RENDER_WWW_DOMAIN="www.${NGINX_RENDER_CANONICAL_DOMAIN}"
+    fi
+
+    if [[ -z "${cert_domain}" ]]; then
+        for domain in \
+            "${NGINX_RENDER_CANONICAL_DOMAIN}" \
+            "${NGINX_RENDER_WWW_DOMAIN}" \
+            "${SSL_DOMAIN}"
+        do
+            if cert_files_exist_for_domain "${domain}"; then
+                cert_domain="${domain}"
+                break
+            fi
+        done
+    fi
+
+    if [[ -n "${cert_domain}" ]]; then
+        NGINX_RENDER_CERT_DOMAIN="${cert_domain}"
+    else
+        NGINX_RENDER_CERT_DOMAIN="${NGINX_RENDER_CANONICAL_DOMAIN}"
+    fi
+
+    if cert_files_exist_for_domain "${NGINX_RENDER_CERT_DOMAIN}"; then
+        NGINX_RENDER_HAS_SSL=true
+    fi
+}
+
+escape_sed_replacement() {
+    printf '%s' "$1" | sed -e 's/[\/&]/\\&/g'
+}
+
+resolve_deploy_owner_user() {
+    local owner="${MGS_SUDO_USER:-${SUDO_USER:-${USER:-}}}"
+
+    if [[ -n "${owner}" && "${owner}" != "root" ]]; then
+        printf '%s\n' "${owner}"
+        return 0
+    fi
+
+    return 1
+}
+
+sync_deploy_tree_ownership() {
+    local owner=""
+
+    owner="$(resolve_deploy_owner_user || true)"
+    if [[ -n "${owner}" ]]; then
+        run_sudo_cmd chown -R "${owner}:www-data" "${DEPLOY_DIR}" 2>/dev/null || true
+    else
+        run_sudo_cmd chown -R :www-data "${DEPLOY_DIR}" 2>/dev/null || true
+    fi
+}
+
+remove_path_with_sudo_fallback() {
+    local path="$1"
+
+    [[ -e "${path}" || -L "${path}" ]] || return 0
+
+    rm -rf "${path}" 2>/dev/null && return 0
+    run_sudo_cmd rm -rf "${path}"
+}
+
+# Renders the repo nginx template with host-specific domains/cert paths instead
+# of copying the checked-in melbourneguitarschool.com.au defaults verbatim.
+render_nginx_site_template() {
+    local template_path="$1"
+    local output_path="$2"
+    local canonical_domain="$3"
+    local www_domain="$4"
+    local cert_domain="$5"
+    local escaped_canonical=""
+    local escaped_www=""
+    local escaped_cert=""
+
+    [[ -n "${canonical_domain}" ]] || return 1
+    [[ -n "${www_domain}" ]] || www_domain="www.${canonical_domain}"
+    [[ -n "${cert_domain}" ]] || cert_domain="${canonical_domain}"
+
+    escaped_canonical="$(escape_sed_replacement "${canonical_domain}")"
+    escaped_www="$(escape_sed_replacement "${www_domain}")"
+    escaped_cert="$(escape_sed_replacement "${cert_domain}")"
+
+    sed \
+        -e "s/www\\.melbourneguitarschool\\.com\\.au/${escaped_www}/g" \
+        -e "s/melbourneguitarschool\\.com\\.au/${escaped_canonical}/g" \
+        -e "s#/etc/letsencrypt/live/${escaped_canonical}/fullchain\\.pem#/etc/letsencrypt/live/${escaped_cert}/fullchain.pem#g" \
+        -e "s#/etc/letsencrypt/live/${escaped_canonical}/privkey\\.pem#/etc/letsencrypt/live/${escaped_cert}/privkey.pem#g" \
+        "${template_path}" > "${output_path}"
+}
+
+# Best-effort host SSL/domain discovery so manual deploy.sh runs reuse the live
+# nginx/certbot naming instead of falling back to a repo-specific domain.
+detect_previous_deploy_defaults_from_host() {
+    local nginx_conf=""
+
+    nginx_conf="$(find_existing_nginx_site_config || true)"
+    detect_host_nginx_domain_context "${nginx_conf}"
+
+    if [[ "${NGINX_RENDER_HAS_SSL}" == true && "${CLI_SSL_FLAG_SET}" != true && "${SSL_SETUP}" != true ]]; then
+        SSL_SETUP=true
+    fi
+
+    if [[ -n "${NGINX_RENDER_CANONICAL_DOMAIN}" && "${CLI_SSL_DOMAIN_SET}" != true && -z "${SSL_DOMAIN}" ]]; then
+        SSL_DOMAIN="${NGINX_RENDER_CANONICAL_DOMAIN}"
+    fi
+
+    if [[ -z "${SSL_EMAIL}" && -r "/etc/letsencrypt/cli.ini" ]]; then
+        SSL_EMAIL="$(awk -F'=' '
+            /^[[:space:]]*email[[:space:]]*=/ {
+                v=$2
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+                print v
+                exit
+            }
+        ' /etc/letsencrypt/cli.ini 2>/dev/null || true)"
+    fi
 }
 
 # Standardized info line for quick, readable progress output.
@@ -1770,8 +2059,8 @@ print_deploy_tui_menu() {
         print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
         echo -e "${BOLD}${MAGENTA}  SSL Options${NC}"
         print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
-        print_tui_option_pair "7" "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}" "Domain for nginx server_name and cert request." \
-            "8" "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}" "Email for Let's Encrypt registration and renewals."
+        print_tui_option_pair "7" "SSL domain" "${SSL_DOMAIN:-auto-detect}" "Domain for nginx server_name and cert request." \
+            "8" "Certbot email" "${SSL_EMAIL:-required for new certs}" "Email for Let's Encrypt registration and renewals."
     fi
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     echo -e "${BOLD}${YELLOW}  UI Options${NC}"
@@ -1824,21 +2113,17 @@ run_interactive_setup() {
                 ;;
             6)
                 SSL_SETUP="$(toggle_bool "${SSL_SETUP}")"
-                if [[ "${SSL_SETUP}" == true ]]; then
-                    [[ -n "${SSL_DOMAIN}" ]] || SSL_DOMAIN="melbourneguitarschool.com.au"
-                    [[ -n "${SSL_EMAIL}" ]] || SSL_EMAIL="melbourneguitarschool@gmail.com"
-                fi
                 ;;
             7)
                 if [[ "${SSL_SETUP}" == true ]]; then
-                    SSL_DOMAIN="$(prompt_value "SSL domain" "${SSL_DOMAIN:-melbourneguitarschool.com.au}")"
+                    SSL_DOMAIN="$(prompt_value "SSL domain" "${SSL_DOMAIN:-}")"
                 else
                     log_warn "Enable SSL setup first to configure domain/email."
                 fi
                 ;;
             8)
                 if [[ "${SSL_SETUP}" == true ]]; then
-                    SSL_EMAIL="$(prompt_value "Certbot email" "${SSL_EMAIL:-melbourneguitarschool@gmail.com}")"
+                    SSL_EMAIL="$(prompt_value "Certbot email" "${SSL_EMAIL:-}")"
                 else
                     log_warn "Enable SSL setup first to configure domain/email."
                 fi
@@ -2054,7 +2339,7 @@ cleanup_old_releases() {
             continue
         fi
 
-        rm -rf "${RELEASES_DIR:?}/${release}"
+        remove_path_with_sudo_fallback "${RELEASES_DIR:?}/${release}"
         removed=$((removed + 1))
         log_info "Removed old release: ${release}"
     done < <(ls -1t "${RELEASES_DIR}" 2>/dev/null || true)
@@ -2525,7 +2810,7 @@ cleanup_old_temp_files() {
 
         while IFS= read -r -d '' path; do
             [[ -z "${path}" ]] && continue
-            rm -rf "${path}" || {
+            remove_path_with_sudo_fallback "${path}" || {
                 log_warn "Failed to remove temp path: ${path}"
                 continue
             }
@@ -2553,7 +2838,7 @@ cleanup_old_temp_files() {
     if [[ -d "${npm_cache_tmp}" ]]; then
         while IFS= read -r -d '' path; do
             [[ -z "${path}" ]] && continue
-            rm -rf "${path}" || {
+            remove_path_with_sudo_fallback "${path}" || {
                 log_warn "Failed to remove npm cache tmp path: ${path}"
                 continue
             }
@@ -2584,7 +2869,7 @@ cleanup_install_and_build_caches() {
         "${npm_cache_root}/_logs"
     do
         [[ -e "${path}" ]] || continue
-        rm -rf "${path}" || {
+        remove_path_with_sudo_fallback "${path}" || {
             log_warn "Failed to remove cache path: ${path}"
             continue
         }
@@ -2880,7 +3165,7 @@ cleanup_incomplete_release_on_exit() {
 
         if [[ "${current_target}" != "${NEW_RELEASE_DIR}" ]]; then
             log_warn "Removing incomplete release after failure: ${NEW_RELEASE_DIR}"
-            rm -rf "${NEW_RELEASE_DIR}" || log_warn "Failed to remove incomplete release directory"
+            remove_path_with_sudo_fallback "${NEW_RELEASE_DIR}" || log_warn "Failed to remove incomplete release directory"
         fi
     fi
 
@@ -2894,9 +3179,9 @@ ARG_COUNT=$#
 while [[ $# -gt 0 ]]; do
     case $1 in
         --branch) BRANCH="$2"; shift 2 ;;
-        --ssl) SSL_SETUP=true; shift ;;
-        --domain) SSL_DOMAIN="$2"; shift 2 ;;
-        --email) SSL_EMAIL="$2"; shift 2 ;;
+        --ssl) SSL_SETUP=true; CLI_SSL_FLAG_SET=true; shift ;;
+        --domain) SSL_DOMAIN="$2"; CLI_SSL_DOMAIN_SET=true; shift 2 ;;
+        --email) SSL_EMAIL="$2"; CLI_SSL_EMAIL_SET=true; shift 2 ;;
         --interactive) INTERACTIVE=true; shift ;;
         --no-spinner) NO_SPINNER=true; shift ;;
         --no-color) NO_COLOR=true; shift ;;
@@ -3114,6 +3399,7 @@ maybe_self_update_and_restart
 
 check_legacy_migration
 repair_current_symlink_drift
+detect_previous_deploy_defaults_from_host
 auto_enable_bootstrap_defaults_deploy
 
 if [[ "${MGS_RETURN_TO_MENU_AFTER_SELF_UPDATE:-}" == "1" && "${IS_TTY}" == true && "${ROLLBACK}" == false ]]; then
@@ -3249,7 +3535,7 @@ fi
 # Create directories if they don't exist
 mkdir -p "${RELEASES_DIR}"
 mkdir -p "${SHARED_DIR}/data"
-run_sudo_cmd chown -R :www-data "${DEPLOY_DIR}" 2>/dev/null || true
+sync_deploy_tree_ownership
 run_sudo_cmd chmod -R 775 "${SHARED_DIR}/data" 2>/dev/null || true
 
 section "Environment File (.env)"
@@ -3414,7 +3700,7 @@ ln -sfn "${NEW_RELEASE_DIR}" "${CURRENT_LINK}"
 # Fix permissions for the entire deploy directory
 # Do this AFTER everything is set up to ensure all new files are owned by www-data
 log_info "Fixing permissions..."
-run_sudo_cmd chown -R :www-data "${DEPLOY_DIR}" 2>/dev/null || true
+sync_deploy_tree_ownership
 run_sudo_cmd chmod -R 755 "${NEW_RELEASE_DIR}" 2>/dev/null || true
 
 # Ensure systemd service is installed
@@ -3483,23 +3769,38 @@ fi
 # /etc/nginx/sites-available does not survive future deployments.
 NGINX_SITE_AVAILABLE="/etc/nginx/sites-available/${APP_NAME}"
 NGINX_SITE_ENABLED="/etc/nginx/sites-enabled/${APP_NAME}"
-NGINX_CERT_CHAIN="/etc/letsencrypt/live/melbourneguitarschool.com.au/fullchain.pem"
-NGINX_CERT_KEY="/etc/letsencrypt/live/melbourneguitarschool.com.au/privkey.pem"
+NGINX_EXISTING_CONF="$(find_existing_nginx_site_config || true)"
+detect_host_nginx_domain_context "${NGINX_EXISTING_CONF}"
 NGINX_TEMPLATE_SOURCE="${NEW_RELEASE_DIR}/deploy/nginx-http.conf"
-if [[ -f "${NGINX_CERT_CHAIN}" && -f "${NGINX_CERT_KEY}" ]]; then
-    # Once certs exist we promote the HTTPS template on each deploy; otherwise
-    # the HTTP-only bootstrap template keeps first-time installs reachable.
+if [[ "${NGINX_RENDER_HAS_SSL}" == true ]]; then
+    # Once live certs exist we promote the HTTPS template on each deploy;
+    # otherwise the HTTP-only bootstrap template keeps first-time installs reachable.
     NGINX_TEMPLATE_SOURCE="${NEW_RELEASE_DIR}/deploy/nginx.conf"
 fi
 
-log_info "Syncing nginx configuration from $(basename "${NGINX_TEMPLATE_SOURCE}")..."
+if [[ -z "${NGINX_RENDER_CANONICAL_DOMAIN}" ]]; then
+    log_error "Unable to determine the host domain for nginx sync."
+    log_error "Set NEXT_PUBLIC_SITE_URL in shared/.env or pass --domain for an SSL deploy before retrying."
+    exit 1
+fi
+
+NGINX_RENDER_SOURCE="$(mktemp)"
+render_nginx_site_template \
+    "${NGINX_TEMPLATE_SOURCE}" \
+    "${NGINX_RENDER_SOURCE}" \
+    "${NGINX_RENDER_CANONICAL_DOMAIN}" \
+    "${NGINX_RENDER_WWW_DOMAIN}" \
+    "${NGINX_RENDER_CERT_DOMAIN}"
+
+log_info "Syncing nginx configuration from $(basename "${NGINX_TEMPLATE_SOURCE}") for ${NGINX_RENDER_CANONICAL_DOMAIN}..."
 run_sudo_cmd mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
 if [[ -f "${NGINX_SITE_AVAILABLE}" ]]; then
     run_sudo_cmd cp "${NGINX_SITE_AVAILABLE}" "${NGINX_SITE_AVAILABLE}.bak"
 fi
-run_sudo_cmd cp "${NGINX_TEMPLATE_SOURCE}" "${NGINX_SITE_AVAILABLE}"
+run_sudo_cmd cp "${NGINX_RENDER_SOURCE}" "${NGINX_SITE_AVAILABLE}"
 run_sudo_cmd ln -sf "${NGINX_SITE_AVAILABLE}" "${NGINX_SITE_ENABLED}"
 run_sudo_cmd rm -f /etc/nginx/sites-enabled/default
+rm -f "${NGINX_RENDER_SOURCE}"
 
 if run_sudo_cmd nginx -t; then
     log_info "Nginx configuration test passed"
