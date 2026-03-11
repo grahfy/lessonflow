@@ -16,6 +16,7 @@ describe("admin-portal-credential", () => {
     await prisma.learningMaterial.deleteMany();
     await prisma.customerPortalCredentialAuditLog.deleteMany();
     await prisma.customerPortalCredential.deleteMany();
+    await prisma.outboundEmail.deleteMany();
     await prisma.booking.deleteMany();
     await prisma.bookingSeries.deleteMany();
     await prisma.bookingRequest.deleteMany();
@@ -93,8 +94,14 @@ describe("admin-portal-credential", () => {
       params: Promise.resolve({ id: customer.id })
     });
     expect(regenerateResponse.status).toBe(200);
-    const regeneratePayload = (await regenerateResponse.json()) as { password: string };
+    const regeneratePayload = (await regenerateResponse.json()) as {
+      password: string;
+      emailStatus?: "sent" | "queued_no_smtp" | "failed" | "skipped";
+      emailMessage?: string;
+    };
     expect(regeneratePayload.password).not.toBe(initialPassword);
+    expect(regeneratePayload.emailStatus).toBe("queued_no_smtp");
+    expect(regeneratePayload.emailMessage).toContain("queued");
 
     const credential = await prisma.customerPortalCredential.findUniqueOrThrow({
       where: {
@@ -123,6 +130,15 @@ describe("admin-portal-credential", () => {
     expect(auditLogs.map((log) => log.action)).toContain("generated");
     expect(auditLogs.map((log) => log.action)).toContain("revealed");
     expect(auditLogs.map((log) => log.action)).toContain("rotated");
+
+    const emailRow = await prisma.outboundEmail.findFirstOrThrow({
+      orderBy: {
+        createdAt: "desc"
+      }
+    });
+    expect(emailRow.toEmail).toBe(customer.email);
+    expect(emailRow.subject).toContain("student portal login details");
+    expect(emailRow.status).toBe("queued_no_smtp");
   });
 
   it("returns a JSON 500 when regenerate throws unexpectedly", async () => {

@@ -95,9 +95,11 @@ describe("admin-booking-approval-portal-credential", () => {
         createdAt: "desc"
       }
     });
+    expect(emailRow.toEmail).toBe("alex.student@example.com");
     expect(emailRow.subject).toContain("approved");
     expect(emailRow.htmlBody).toContain("/student/login");
     expect(emailRow.htmlBody).toContain("Temporary password");
+    expect(emailRow.status).toBe("queued_no_smtp");
   });
 
   it("does not rotate portal credentials on later approvals for same customer", async () => {
@@ -145,6 +147,8 @@ describe("admin-booking-approval-portal-credential", () => {
       }
     });
     expect(emails).toHaveLength(2);
+    expect(emails[0]?.status).toBe("queued_no_smtp");
+    expect(emails[1]?.status).toBe("queued_no_smtp");
     expect(emails[1]?.htmlBody).not.toContain("Temporary password");
   });
 

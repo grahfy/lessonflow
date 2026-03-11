@@ -105,7 +105,21 @@ describe("admin-customer-email", () => {
     const res = await POST(req, { params: Promise.resolve({ id: customer.id }) });
     
     expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = await res.json() as { ok: boolean; status?: string; message?: string };
     expect(data.ok).toBe(true);
+    expect(data.status).toBe("queued_no_smtp");
+    expect(data.message).toContain("queued");
+
+    const outbound = await prisma.outboundEmail.findFirstOrThrow({
+      where: {
+        toEmail: "success@example.com"
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    });
+    expect(outbound.subject).toBe("Test Subject");
+    expect(outbound.status).toBe("queued_no_smtp");
+    expect(outbound.htmlBody).toContain("Test Message");
   });
 });

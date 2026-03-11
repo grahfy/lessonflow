@@ -86,17 +86,26 @@ describe("admin-invoice-mutations", () => {
     const req = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}/send`, "POST", token);
     const res = await sendInvoice(req, { params: Promise.resolve({ id: invoice.id }) });
     expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean; invoice: { status: string; sentAt: string | null } };
+    expect(body.ok).toBe(true);
+    expect(body.invoice.status).toBe("sent");
+    expect(body.invoice.sentAt).toBeTruthy();
 
     const reloaded = await prisma.invoice.findUniqueOrThrow({ where: { id: invoice.id } });
     expect(reloaded.status).toBe("sent");
     expect(reloaded.sentAt).not.toBeNull();
 
-    const outbound = await prisma.outboundEmail.findFirst({
+    const outbound = await prisma.outboundEmail.findFirstOrThrow({
       where: {
         toEmail: "alex@example.com"
+      },
+      orderBy: {
+        createdAt: "desc"
       }
     });
-    expect(outbound).not.toBeNull();
+    expect(outbound.subject).toContain("MGS-2026-9999");
+    expect(outbound.status).toBe("queued_no_smtp");
+    expect(outbound.htmlBody).toContain("Alex Student");
   });
 
   it("supports pdf, protects paid delete, and creates credit notes", async () => {

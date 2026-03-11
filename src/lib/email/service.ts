@@ -180,17 +180,43 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   const ownerBcc = getCustomerAuditBccRecipient(input.to);
   const bcc = ownerBcc ? mergeBccValues(input.bcc, ownerBcc) : input.bcc;
 
-  // STEP 1: GMAIL PROVIDER PATH (Explicitly requested)
-  if (provider === "gmail" || (!tx && isGmailConfigured())) {
-    if (!isGmailConfigured()) {
-      return { status: "failed", error: "EMAIL_PROVIDER is set to gmail but GMAIL credentials are missing." };
-    }
+  const gmailConfigured = isGmailConfigured();
 
-    const gmailResult = await sendGmailEmail({ ...input, bcc });
-    if (gmailResult.status === "sent") {
-      logEvent("email.sent_via_gmail", { to: input.to, subject: input.subject });
+  // STEP 1: GMAIL PROVIDER PATH (Explicitly requested or only live provider available)
+  if (provider === "gmail" || (!tx && gmailConfigured)) {
+    if (gmailConfigured) {
+      const gmailResult = await sendGmailEmail({ ...input, bcc });
+      if (gmailResult.status === "sent") {
+        logEvent("email.sent_via_gmail", { to: input.to, subject: input.subject });
+        return gmailResult;
+      }
+
+      if (!tx) {
+        return gmailResult;
+      }
+
+      logError("email.gmail_failed_attempting_smtp", gmailResult.error || "Unknown Gmail error", {
+        to: input.to,
+        subject: input.subject
+      });
+    } else if (!tx) {
+      await prisma.outboundEmail.create({
+        data: {
+          toEmail: input.to,
+          subject: input.subject,
+          htmlBody: input.html,
+          status: "queued_no_smtp",
+          provider: "smtp",
+          source: "app",
+          error: "EMAIL_PROVIDER is set to gmail but GMAIL credentials are missing."
+        }
+      });
+      logEvent("email.queued_no_provider", { to: input.to, subject: input.subject, provider });
+      return {
+        status: "queued_no_smtp",
+        error: "EMAIL_PROVIDER is set to gmail but GMAIL credentials are missing."
+      };
     }
-    return gmailResult;
   }
 
   // STEP 2: SMTP PROVIDER PATH (FALLBACK TO QUEUED IF NO TRANSPORT)
@@ -245,9 +271,9 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
      * If SMTP fails (e.g. IP blocked, creds expired) but Gmail is configured,
      * try one last time via the API before reporting failure.
      */
-    if (isGmailConfigured()) {
+    if (gmailConfigured) {
       logError("email.smtp_failed_attempting_gmail", error, { to: input.to, subject: input.subject });
-      const gmailResult = await sendGmailEmail(input);
+      const gmailResult = await sendGmailEmail({ ...input, bcc });
       if (gmailResult.status === "sent") {
         logEvent("email.smtp_failed_gmail_fallback_sent", { to: input.to, subject: input.subject });
         return gmailResult;
