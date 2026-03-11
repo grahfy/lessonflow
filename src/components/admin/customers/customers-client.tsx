@@ -435,6 +435,7 @@ export function AdminCustomersClient() {
               setSelectedCustomer(updated);
               // Also update in the list to maintain consistency
               setCustomers((prev: CustomerRow[]) => prev.map((c: CustomerRow) => c.id === updated.id ? updated : c));
+              setNotice(result.emailMessage || "Portal password regenerated.");
             }
           }}
           

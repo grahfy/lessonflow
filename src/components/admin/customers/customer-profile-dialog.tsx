@@ -200,14 +200,12 @@ export function CustomerProfileDialog({
                 </AdminForm>
 
                 <h4 className="customer-profile-subhead">Address</h4>
-                {isEditing && (
-                    <div className="admin-address-search-row">
-                        <AddressAutocomplete 
-                            onAddressSelect={(addr) => updateForm({ ...addr, state: toAuState(addr.state) })} 
-                            disabled={savingCustomer} 
-                        />
-                    </div>
-                )}
+                <div className="admin-address-search-row">
+                    <AddressAutocomplete
+                        onAddressSelect={(addr) => updateForm({ ...addr, state: toAuState(addr.state) })}
+                        disabled={!isEditing || savingCustomer}
+                    />
+                </div>
                 <AdminForm className="dialog-form-grid">
                     <AdminField label="Unit / Apartment" tooltip="Unit or apartment number (optional).">
                         <input

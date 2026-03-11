@@ -214,6 +214,41 @@ export function customerCustomMessageTemplate(input: {
   };
 }
 
+export function customerPortalCredentialTemplate(input: {
+  name: string;
+  loginUrl: string;
+  password: string;
+}) {
+  return {
+    subject: `Your ${PUBLIC_BRAND_NAME} student portal login details`,
+    html: renderEmailLayout({
+      title: "Your student portal login details",
+      previewText: "Your student portal password has been updated.",
+      leadHtml: "Your student portal password has been updated. You can use the details below to sign in and access lesson information and assigned materials.",
+      contentHtml: `
+        <p style="margin:0 0 12px;">Hi ${escapeHtml(input.name)},</p>
+        <p style="margin:0 0 16px;">Use the student portal to view upcoming lessons, review previous appointments, and open any learning materials shared with you.</p>
+
+        <div style="margin:0 0 18px;padding:16px;border:1px solid #dfe6f2;border-radius:12px;background:#f8faff;">
+          <p style="margin:0 0 10px;"><strong>Student portal login:</strong> <a href="${escapeHtml(input.loginUrl)}" style="color:#2247d8;">${escapeHtml(input.loginUrl)}</a></p>
+          <p style="margin:0 0 10px;"><strong>Full name:</strong> Enter your full name exactly as it appears on your lesson account</p>
+          <p style="margin:0 0 10px;"><strong>Postcode:</strong> Enter your postcode</p>
+          <p style="margin:0;"><strong>Password:</strong> ${escapeHtml(input.password)}</p>
+        </div>
+
+        <p style="margin:0 0 10px;"><strong>How to log in:</strong></p>
+        <ol style="margin:0 0 16px;padding-left:20px;">
+          <li style="margin:0 0 8px;">Open the student portal link above.</li>
+          <li style="margin:0 0 8px;">Enter your full name and postcode.</li>
+          <li style="margin:0;">Enter the password shown in this email.</li>
+        </ol>
+
+        <p style="margin:0;">If you have any trouble accessing the portal, reply to this email and we can help.</p>
+      `
+    })
+  };
+}
+
 export function customerInvoiceTemplate(input: {
   invoiceNumber: string;
   customerName: string;
