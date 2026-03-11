@@ -162,6 +162,11 @@ Use Conventional Commits format:
 - `fix: preserve public shell during route transitions`
 - `refactor: extract booking validation to shared lib`
 
+Commit messages must be detailed and human-readable, not terse shorthand.
+- Write a clear subject that describes the user-visible or engineering outcome.
+- Use a multiline body that explains what changed and why it was necessary.
+- Prefer plain language over internal abbreviations unless the abbreviation is already standard in the repo.
+
 Use multiline commit messages:
 ```bash
 git commit -m "<title>" -m "<details>"
