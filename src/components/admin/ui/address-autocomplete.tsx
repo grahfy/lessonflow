@@ -85,7 +85,7 @@ export function AddressAutocomplete({ onAddressSelect, disabled }: AddressAutoco
         const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&countrycodes=au`, {
           headers: {
             "Accept-Language": "en",
-            "User-Agent": "LessonFlow/1.0"
+            "User-Agent": "LessonFlow/1.1.0"
           }
         });
         if (res.ok) {

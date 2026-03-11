@@ -29,7 +29,7 @@ describe("build-info", () => {
   it("prefers release tag plus short commit when git metadata is available", async () => {
     (exec as unknown as ReturnType<typeof vi.fn>).mockImplementation((command: string) => {
       if (command.includes("describe --tags --abbrev=0")) {
-        return Promise.resolve({ stdout: "v1.0\n" });
+        return Promise.resolve({ stdout: "v1.1.0\n" });
       }
 
       if (command.includes("rev-parse --short HEAD")) {
@@ -37,7 +37,7 @@ describe("build-info", () => {
       }
 
       if (command.includes("describe --tags --always")) {
-        return Promise.resolve({ stdout: "v1.0-1-gd338e15\n" });
+        return Promise.resolve({ stdout: "v1.1.0-1-gd338e15\n" });
       }
 
       return Promise.resolve({ stdout: "" });
@@ -47,8 +47,8 @@ describe("build-info", () => {
 
     // NOTE: Tagged releases should surface both the human release label and the
     // short commit so admins can communicate versions unambiguously.
-    expect(buildInfo.versionText).toBe("v1.0 · d338e15");
-    expect(buildInfo.releaseLabel).toBe("v1.0");
+    expect(buildInfo.versionText).toBe("v1.1.0 · d338e15");
+    expect(buildInfo.releaseLabel).toBe("v1.1.0");
     expect(buildInfo.shortCommit).toBe("d338e15");
     expect(buildInfo.source).toBe("git");
     expect(buildInfo.createdBy).toBe("Dean Thomson");
@@ -83,8 +83,8 @@ describe("build-info", () => {
 
     const buildInfo = await getAdminBuildInfo();
 
-    expect(buildInfo.versionText).toBe("1.0.0");
-    expect(buildInfo.releaseLabel).toBe("1.0.0");
+    expect(buildInfo.versionText).toBe("1.1.0");
+    expect(buildInfo.releaseLabel).toBe("1.1.0");
     expect(buildInfo.shortCommit).toBe("unavailable");
     expect(buildInfo.source).toBe("package");
   });

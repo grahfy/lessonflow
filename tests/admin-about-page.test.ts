@@ -28,10 +28,10 @@ describe("admin-about-page", () => {
     vi.clearAllMocks();
     requireAdminMock.mockResolvedValue(true);
     getAdminBuildInfoMock.mockResolvedValue({
-      versionText: "v1.0 · d338e15",
-      releaseLabel: "v1.0",
+      versionText: "v1.1.0 · d338e15",
+      releaseLabel: "v1.1.0",
       shortCommit: "d338e15",
-      packageVersion: "1.0.0",
+      packageVersion: "1.1.0",
       source: "git",
       developedYear: "2026",
       createdBy: "Dean Thomson",
@@ -50,7 +50,7 @@ describe("admin-about-page", () => {
     expect(requireAdminMock).toHaveBeenCalled();
     expect(getAdminBuildInfoMock).toHaveBeenCalled();
     expect(html).toContain("About LessonFlow");
-    expect(html).toContain("v1.0 · d338e15");
+    expect(html).toContain("v1.1.0 · d338e15");
     expect(html).toContain("Dean Thomson");
     expect(html).toContain("contact@grahfmusic.com");
     expect(html).toContain("https://gitlab.com/grahfmusic/lessonflow/-/wikis/home");

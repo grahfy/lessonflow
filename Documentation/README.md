@@ -31,6 +31,7 @@ The manual is written as a reference work for owners, administrators, and techni
 
 ## Release Material
 
+- [Version 1.1.0](release-notes-v1.1.0.md)
 - [Version 1.0](release-notes-v1.0.md)
 - [Release Maintainer Checklist](release-maintainer-checklist.md)
 

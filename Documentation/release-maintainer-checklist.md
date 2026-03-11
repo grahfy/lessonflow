@@ -5,7 +5,7 @@ Use this checklist when preparing a GitLab release for LessonFlow.
 ## Before Tagging / Publishing
 
 1. Confirm the public branch no longer tracks local-only AI, planning, or scratch material.
-2. Review [`CHANGELOG.md`](../CHANGELOG.md) and the detailed release notes in [`release-notes-v1.0.md`](release-notes-v1.0.md).
+2. Review [`CHANGELOG.md`](../CHANGELOG.md) and the detailed release notes in [`release-notes-v1.1.0.md`](release-notes-v1.1.0.md).
 3. Verify `.env.example` reflects all required production variables and any newly introduced options.
 4. Confirm Prisma migrations under `prisma/migrations/` are present and documented in release notes when relevant.
 5. Confirm `deploy/deploy.sh` and `deploy/update.sh` still reflect the supported release-directory deploy model.

@@ -318,7 +318,7 @@ print_box_banner() {
 print_banner() {
   local app_version
   app_version="$(get_app_version)"
-  print_box_banner "LessonFlow Update v1.0"
+  print_box_banner "LessonFlow Update v${app_version}"
 }
 
 # Extracts the first useful server_name token from an nginx site config so the
@@ -1855,7 +1855,7 @@ print_tui_remote_update_alert() {
 
 print_update_tui_menu() {
   tui_clear_screen
-  print_box_banner "LessonFlow Update v1.0"
+  print_box_banner "LessonFlow Update v$(get_app_version)"
   if [[ "${SOURCE_MODE}" == "archive" ]]; then
     echo -e "${DIM}btop-style menu: deploy the current archive source tree after replacing files in place.${NC}"
     echo ""

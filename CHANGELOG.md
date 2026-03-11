@@ -2,6 +2,54 @@
 
 All notable product releases for LessonFlow are documented in this file.
 
+## [1.1.0] - 2026-03-12
+
+Second public release of LessonFlow, covering user-facing and operator-facing changes since `v1.0`.
+
+Release range: `v1.0..v1.1.0`
+
+Detailed release notes: [`Documentation/release-notes-v1.1.0.md`](Documentation/release-notes-v1.1.0.md)
+
+### Highlights
+
+- Adds a dedicated admin About page plus footer release metadata so staff can confirm the live version and commit without leaving the application.
+- Expands `deploy/update.sh` and `deploy/deploy.sh` to support archive or copied source trees in addition to persistent git checkouts.
+- Improves production release provenance so archive-built hosts still show real deploy metadata instead of falling back to placeholder package information.
+- Hardens runtime handling for stale Next-Action POSTs by returning a clear 400 response on unsupported page-route requests.
+- Refreshes the operator manual and screenshots so the in-app documentation reads like a reference work rather than a task-only handbook.
+
+### Added
+
+- Admin-facing release metadata surfaces at `/admin/about`, the admin footer, and the protected build-info API.
+- Archive-source deploy detection, reduced archive-mode update menus, and deploy-mode reporting that includes source-mode detail.
+- Shell tests covering deploy-mode detection and archive-mode update behavior.
+
+### Changed
+
+- Upgraded Prisma, `@prisma/client`, and the MariaDB adapter to `7.5.0`.
+- Updated deploy/update documentation so technical owners can follow either the persistent git or extracted archive workflow safely.
+- Reframed the in-app manual and repository handbook pages around article-style operator reference material.
+
+### Fixed
+
+- Corrected production release metadata fallback behavior on hosts that deploy from archive snapshots without a `.git` directory.
+- Rejected stale or malformed Next-Action POST requests on page routes before they trigger misleading runtime errors.
+- Refreshed student portal screenshots and artwork used in operator documentation.
+
+### Upgrade Notes
+
+- No new Prisma migrations were added in this release range.
+- No new required environment keys were added in this release range.
+- Do not skip dependencies on the first `1.1.0` rollout, because Prisma packages changed in `package.json` and `package-lock.json`.
+- Git-backed hosts should continue using `sudo ./deploy/update.sh --branch main` as the normal update path.
+- Archive or copied source installs should replace the extracted source tree contents first, then run `./deploy/update.sh` from that source tree so archive mode deploys the on-disk files.
+- After deploy, verify `/admin/about` or the admin footer shows the expected release label and commit metadata.
+
+### Notes
+
+- Public notes intentionally exclude internal-only repo/process documentation commits from the same git range.
+- Archive mode skips git-only metadata capture during deploy, so source ownership and readability still need to be curated by the operator.
+
 ## [1.0] - 2026-03-12
 
 First public release of LessonFlow, covering the repo history from the initial project import through the public-ready `main` branch.

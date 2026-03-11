@@ -133,7 +133,7 @@ For full install, update, rollback, SSL, timer, and troubleshooting guidance, se
 - VPS deployment and maintenance: [`deploy/README.md`](deploy/README.md)
 - Operator handbook index: [`Documentation/README.md`](Documentation/README.md)
 - Technical owner runbook: [`Documentation/digitalocean-admin-operations.md`](Documentation/digitalocean-admin-operations.md)
-- Detailed release notes: [`Documentation/release-notes-v1.0.md`](Documentation/release-notes-v1.0.md)
+- Detailed release notes: [`Documentation/release-notes-v1.1.0.md`](Documentation/release-notes-v1.1.0.md)
 - Release maintainer checklist: [`Documentation/release-maintainer-checklist.md`](Documentation/release-maintainer-checklist.md)
 
 ## Core Commands

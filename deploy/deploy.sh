@@ -351,7 +351,7 @@ print_box_banner() {
 print_banner() {
     local app_version
     app_version="$(get_app_version)"
-    print_box_banner "LessonFlow Deploy v1.0"
+    print_box_banner "LessonFlow Deploy v${app_version}"
 }
 
 # Renders the host-side systemd unit used by the browser-triggered update flow.
@@ -2456,7 +2456,7 @@ deploy_cycle_migration_mode() {
 
 print_deploy_tui_menu() {
     tui_clear_screen
-    print_box_banner "LessonFlow Deploy v1.0"
+    print_box_banner "LessonFlow Deploy v$(get_app_version)"
     echo -e "${DIM}btop-style menu: edit values, review live status, then start.${NC}"
     echo ""
     echo -e "  $(status_chip "Branch" "$(tui_truncate_text "${BRANCH}" 18)")  $(status_chip "DB" "$(deploy_migration_mode_label)")  $(status_chip "Deps" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")")  $(status_chip "Cron" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")")"
