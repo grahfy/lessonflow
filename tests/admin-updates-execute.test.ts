@@ -69,7 +69,7 @@ describe("admin-updates-execute-api", () => {
     expect(data.ok).toBe(true);
     expect(spawnSync).toHaveBeenCalledWith(
       "sudo",
-      ["-n", "systemctl", "start", "lessonflow-web-update.service"],
+      ["-n", "systemctl", "start", "--no-block", "lessonflow-web-update.service"],
       expect.objectContaining({
         cwd: expect.any(String),
         encoding: "utf8"

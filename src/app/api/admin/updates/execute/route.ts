@@ -39,7 +39,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const startResult = spawnSync("sudo", ["-n", "systemctl", "start", runner.serviceName], {
+    // Start the host runner asynchronously so the browser can navigate to the
+    // progress page immediately instead of waiting for the full oneshot deploy.
+    const startResult = spawnSync("sudo", ["-n", "systemctl", "start", "--no-block", runner.serviceName], {
       cwd: appRoot,
       encoding: "utf8"
     });
