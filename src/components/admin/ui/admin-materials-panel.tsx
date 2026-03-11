@@ -134,15 +134,15 @@ export function AdminMaterialsPanel({
             <AdminForm className="customer-materials-upload-grid">
               {bookingField ? (
                 <AdminField
-                  label="Associate with booking"
-                  tooltip="Link this material to a specific scheduled lesson."
+                  label="Assign to lesson booking (optional)"
+                  tooltip="Link this material to a specific lesson, or leave it unassigned so it stays available across the student's materials."
                   fullWidth
                 >
                   <select
                     value={bookingField.bookingId}
                     onChange={(event) => bookingField.onChange(event.target.value)}
                   >
-                    <option value="">Overall student (all lessons)</option>
+                    <option value="">Unassigned upload (all lessons)</option>
                     {bookingField.bookings.map((booking) => (
                       <option key={booking.id} value={booking.id}>
                         {new Date(booking.startAt).toLocaleDateString("en-AU")}{" "}

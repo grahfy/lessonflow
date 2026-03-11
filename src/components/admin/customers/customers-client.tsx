@@ -148,6 +148,7 @@ export function AdminCustomersClient() {
     setIsEditing(editMode);
     setCustomerForm(customer ? customerFormFromRow(customer) : emptyCustomerForm());
     setActiveTab("profile");
+    setMaterialsBookingId("");
 
     // Eagerly load history if a customer is selected
     if (customer) {
@@ -169,6 +170,7 @@ export function AdminCustomersClient() {
     setSelectedCustomer(null);
     setIsEditing(false);
     setCustomerForm(emptyCustomerForm());
+    setMaterialsBookingId("");
     // Clear URL segments to maintain clean routing
     router.replace("/admin/customers", { scroll: false });
   }, [dialogPresence, router]);
@@ -286,6 +288,11 @@ export function AdminCustomersClient() {
     if (success) {
       setNotice("Material deleted.");
     }
+  }
+
+  function handleMaterialBookingSelect(bookingId: string) {
+    if (!selectedCustomer) return;
+    void loadMaterials(selectedCustomer.id, bookingId);
   }
 
   return (
@@ -412,7 +419,7 @@ export function AdminCustomersClient() {
           materialsUploadFormRef={materialsUploadFormRef}
           onUploadMaterial={uploadMaterial}
           onDeleteMaterial={(mId) => deleteMaterial(mId)}
-          onMaterialBookingSelect={loadMaterials}
+          onMaterialBookingSelect={handleMaterialBookingSelect}
 
           // Student Portal Identity Access
           revealedPortalPasswords={revealedPortalPasswords}
