@@ -23,14 +23,16 @@ export function BookingMaterialsDialog({
   onDelete
 }: Props) {
   return (
-    <AdminMaterialsPanel
-      materialsLoading={materialsLoading}
-      materialsList={materialsList}
-      materialsUploading={materialsUploading}
-      materialsDeletingId={materialsDeletingId}
-      uploadFormRef={uploadFormRef}
-      onUpload={onUpload}
-      onDelete={onDelete}
-    />
+    <div className="dialog-layout customer-tab-panel booking-materials-panel">
+      <AdminMaterialsPanel
+        materialsLoading={materialsLoading}
+        materialsList={materialsList}
+        materialsUploading={materialsUploading}
+        materialsDeletingId={materialsDeletingId}
+        uploadFormRef={uploadFormRef}
+        onUpload={onUpload}
+        onDelete={onDelete}
+      />
+    </div>
   );
 }

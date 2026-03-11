@@ -41,7 +41,7 @@ export function CustomerTable({
             <Separator />
             <div className="admin-list-col admin-list-col-portal">Portal Status</div>
             <Separator />
-            <div className="admin-list-col admin-list-col-actions">Actions</div>
+            <div className="admin-list-col admin-list-col-actions customer-table-actions-col">Actions</div>
         </>
     ) : null;
 
@@ -111,7 +111,7 @@ export function CustomerTable({
                                 type="button"
                                 onClick={() => onViewInvoices(customer.fullName)}
                             >
-                                Invoices
+                                Billing
                             </button>
                         </Tooltip>
                         <Tooltip content="Edit this customer's profile, contact details, and portal access.">
@@ -120,7 +120,7 @@ export function CustomerTable({
                                 type="button"
                                 onClick={() => onOpenCustomerDialog(customer, true)}
                             >
-                                Edit
+                                Open
                             </button>
                         </Tooltip>
                         <Tooltip content="Archive or remove this customer record.">

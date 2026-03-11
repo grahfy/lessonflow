@@ -48,6 +48,7 @@ export function AdminCustomersClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const searchInputId = useId();
+  const sortSelectId = useId();
   const { beginExitTransition } = useTweenOrchestrator();
   
   const [error, setError] = useState("");
@@ -297,25 +298,30 @@ export function AdminCustomersClient() {
       <div className="admin-layout-content">
         <AdminCard className="admin-toolbar-card admin-actions-card">
           <div className="admin-actions-bar">
-            <button className="btn btn-primary" onClick={() => openCustomerDialog(null, true)}>
-              CREATE NEW CUSTOMER
-            </button>
+            <div className="admin-actions-group">
+              <button className="btn btn-primary" type="button" onClick={() => openCustomerDialog(null, true)}>
+                New Customer
+              </button>
+            </div>
 
-            <div className="search-box">
-              <label htmlFor={searchInputId}>Search</label>
-              <Tooltip content="Search for students by name, email, or phone number.">
-                <input
-                  id={searchInputId}
-                  type="text"
-                  value={customerQuery}
-                  placeholder="Search by name, email, or phone..."
-                  onChange={(event) => setCustomerQuery(event.target.value)}
-                />
-              </Tooltip>
+            <div className="admin-toolbar-filters">
+              <div className="search-box admin-search-box">
+                <label htmlFor={searchInputId}>Search</label>
+                <Tooltip content="Search for students by name, email, or phone number.">
+                  <input
+                    id={searchInputId}
+                    type="text"
+                    value={customerQuery}
+                    placeholder="Name, email, or phone"
+                    onChange={(event) => setCustomerQuery(event.target.value)}
+                  />
+                </Tooltip>
+              </div>
               <div className="admin-sort-inline-row">
-                <span className="admin-inline-field">SORT BY</span>
+                <label htmlFor={sortSelectId} className="admin-inline-field">Sort</label>
                 <Tooltip content="Change the primary sorting field for the customer list.">
                   <select
+                    id={sortSelectId}
                     value={sortBy}
                     onChange={(event) => {
                       setSortBy(event.target.value as CustomersSortBy);
@@ -335,7 +341,7 @@ export function AdminCustomersClient() {
                       setPage(1);
                     }}
                   >
-                    {sortDir === "asc" ? "ASC" : "DESC"}
+                    {sortDir === "asc" ? "Asc" : "Desc"}
                   </button>
                 </Tooltip>
               </div>

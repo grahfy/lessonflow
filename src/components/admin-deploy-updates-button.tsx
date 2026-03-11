@@ -214,7 +214,7 @@ export function AdminDeployUpdatesButton() {
     <>
       <Tooltip content="Review recent code deployments and updates to the platform.">
         <button className="btn btn-secondary" type="button" disabled={loading} onClick={() => void loadAndMaybeOpen({ forceOpen: true })}>
-          {loading ? "Loading updates..." : "Latest Updates"}
+          {loading ? "Loading..." : "Updates"}
         </button>
       </Tooltip>
 

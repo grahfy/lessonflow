@@ -91,8 +91,8 @@ export function AdminEmailPanel({
   }
 
   return (
-    <div className={["dialog-layout customer-dialog-panel", panelClassName].filter(Boolean).join(" ")}>
-      <div className="dialog-col dialog-tab-section">
+    <div className={["dialog-layout customer-dialog-panel admin-email-panel", panelClassName].filter(Boolean).join(" ")}>
+      <div className="dialog-col dialog-tab-section admin-email-history-shell">
         <div className="section-header-with-action">
           <h3 className="manual-section-title">{historyTitle}</h3>
           {onSync ? (
@@ -108,11 +108,11 @@ export function AdminEmailPanel({
             </Tooltip>
           ) : null}
         </div>
-        <AdminCard ghost className={historyClassName}>
+        <AdminCard ghost className={["admin-email-history-card", historyClassName].filter(Boolean).join(" ")}>
           {loadingHistory ? (
             <p className="helper-text">Loading history...</p>
           ) : history.length > 0 ? (
-            <div className={historyListClassName}>
+            <div className={["admin-email-history-list", historyListClassName].filter(Boolean).join(" ")}>
               {history.map((email) => (
                 <button
                   key={email.id}
@@ -131,10 +131,10 @@ export function AdminEmailPanel({
         </AdminCard>
       </div>
 
-      <div className="dialog-col dialog-tab-section">
+      <div className="dialog-col dialog-tab-section admin-email-compose-shell">
         <h3 className="manual-section-title">{composeTitle}</h3>
-        <AdminCard ghost className={composerCardClassName}>
-          <div className={composerFormClassName}>
+        <AdminCard ghost className={["admin-email-composer-card", composerCardClassName].filter(Boolean).join(" ")}>
+          <div className={["admin-email-composer-form", composerFormClassName].filter(Boolean).join(" ")}>
             <div className="field full">
               <label htmlFor={`${captchaIdPrefix}-subject`}>Subject</label>
               <input
@@ -154,7 +154,7 @@ export function AdminEmailPanel({
                 onChange={(event) => setMessage(event.target.value)}
               />
             </div>
-            <div className="button-row button-row-justify customer-email-actions">
+            <div className="button-row button-row-justify admin-email-actions customer-email-actions">
               <Tooltip content="Clear message fields.">
                 <button
                   className="btn btn-secondary"
@@ -179,7 +179,9 @@ export function AdminEmailPanel({
                 </button>
               </Tooltip>
             </div>
-            <CaptchaField idPrefix={captchaIdPrefix} captcha={captcha} />
+            <div className="admin-email-captcha-field">
+              <CaptchaField idPrefix={captchaIdPrefix} captcha={captcha} />
+            </div>
           </div>
         </AdminCard>
       </div>

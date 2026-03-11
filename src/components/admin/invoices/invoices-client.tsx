@@ -63,6 +63,7 @@ export function AdminInvoicesClient() {
   const searchParams = useSearchParams();
   const searchInputId = useId();
   const sortSelectId = useId();
+  const overdueFilterId = useId();
   const { beginExitTransition } = useTweenOrchestrator();
   
   const [error, setError] = useState("");
@@ -430,18 +431,22 @@ export function AdminInvoicesClient() {
           <div className="admin-actions-bar">
             <div className="admin-actions-group">
               <Tooltip content="Create a new invoice for a selected customer.">
-                <button className="btn btn-primary" onClick={() => { setCreateOpen(true); void loadCustomers(); }}>
-                  CREATE INVOICE
+                <button className="btn btn-primary" type="button" onClick={() => { setCreateOpen(true); void loadCustomers(); }}>
+                  New Invoice
                 </button>
               </Tooltip>
               <Tooltip content="Send reminders for all eligible overdue invoices in one action.">
-                <button className="btn btn-secondary" disabled={busyAction === 'bulk-reminders'} onClick={sendBulkReminders}>
-                  {busyAction === 'bulk-reminders' ? "SENDING..." : "SEND OVERDUE REMINDERS"}
+                <button className="btn btn-secondary" type="button" disabled={busyAction === 'bulk-reminders'} onClick={sendBulkReminders}>
+                  {busyAction === 'bulk-reminders' ? "Sending..." : "Send Reminders"}
                 </button>
               </Tooltip>
+            </div>
+
+            <div className="admin-toolbar-filters">
               <Tooltip content="Show only invoices that are past their due date.">
-                <label className="admin-inline-checkbox">
+                <label className="admin-inline-checkbox" htmlFor={overdueFilterId}>
                   <input
+                    id={overdueFilterId}
                     type="checkbox"
                     checked={overdueOnly}
                     onChange={(e) => {
@@ -449,25 +454,26 @@ export function AdminInvoicesClient() {
                       setPage(1);
                     }}
                   />
-                  Overdue only
+                  Overdue
                 </label>
               </Tooltip>
-            </div>
 
-            <div className="search-box">
-              <div className="admin-search-inline-row">
+              <div className="search-box admin-search-box">
                 <label htmlFor={searchInputId}>Search</label>
                 <Tooltip content="Search for invoices by number or customer name.">
                   <input
                     id={searchInputId}
                     type="text"
                     value={query}
-                    placeholder="Search by number or customer..."
+                    placeholder="Invoice or customer"
                     onChange={(e) => { setQuery(e.target.value); setPage(1); }}
                   />
                 </Tooltip>
+              </div>
+
+              <div className="admin-sort-inline-row">
                 <label htmlFor={sortSelectId} className="admin-inline-field">
-                  Sort by
+                  Sort
                 </label>
                 <Tooltip content="Change the primary sorting field for the invoice list.">
                   <select
@@ -494,7 +500,7 @@ export function AdminInvoicesClient() {
                       setPage(1);
                     }}
                   >
-                    {sortDir === "asc" ? "ASC" : "DESC"}
+                    {sortDir === "asc" ? "Asc" : "Desc"}
                   </button>
                 </Tooltip>
               </div>
@@ -578,7 +584,7 @@ export function AdminInvoicesClient() {
                     type="button"
                     onClick={() => openDetail(inv)}
                   >
-                    Edit
+                    Open
                   </button>
                 </Tooltip>
                 <Tooltip content="Delete this invoice record permanently where allowed.">
@@ -595,7 +601,7 @@ export function AdminInvoicesClient() {
                       }
                     }}
                   >
-                    {busyAction === `delete-${inv.id}` ? "..." : "Del"}
+                    {busyAction === `delete-${inv.id}` ? "..." : "Delete"}
                   </button>
                 </Tooltip>
               </div>
@@ -614,27 +620,27 @@ export function AdminInvoicesClient() {
           <div className="dialog-footer-row invoice-dialog-footer">
             <div className="dialog-footer-left">
               <Tooltip content="Close invoice details and return to the invoice list.">
-                <button className="btn btn-secondary" onClick={closeDetail}>CLOSE</button>
+                <button className="btn btn-secondary" onClick={closeDetail}>Close</button>
               </Tooltip>
               
               {canMarkAsPaid && (
                 <Tooltip content="Record payment and move this invoice to paid status.">
                   <button className="btn btn-primary" disabled={!!busyAction} onClick={() => void performAction('mark_paid')}>
-                    {busyAction === 'mark_paid' ? 'SAVING...' : 'MARK AS PAID'}
+                    {busyAction === 'mark_paid' ? 'Saving...' : 'Mark Paid'}
                   </button>
                 </Tooltip>
               )}
               {canMarkAsUnpaid && (
                 <Tooltip content="Move this invoice back to unpaid status.">
                   <button className="btn btn-secondary" disabled={!!busyAction} onClick={() => void performAction('mark_unpaid')}>
-                    {busyAction === 'mark_unpaid' ? 'SAVING...' : 'MARK AS UNPAID'}
+                    {busyAction === 'mark_unpaid' ? 'Saving...' : 'Mark Unpaid'}
                   </button>
                 </Tooltip>
               )}
               {canVoidInvoice && (
                 <Tooltip content="Void this invoice so it is no longer collectible.">
                   <button className="btn btn-danger" disabled={!!busyAction} onClick={() => void performAction('void')}>
-                    {busyAction === 'void' ? 'VOIDING...' : 'VOID INVOICE'}
+                    {busyAction === 'void' ? 'Voiding...' : 'Void Invoice'}
                   </button>
                 </Tooltip>
               )}
@@ -651,20 +657,20 @@ export function AdminInvoicesClient() {
             <div className="dialog-footer-right">
               <Tooltip content="Save edits to recipient details, due date, notes, and line items.">
                 <button className="btn btn-secondary" disabled={!!busyAction} onClick={saveInvoiceEdits}>
-                  {busyAction === 'save' ? 'SAVING...' : 'SAVE EDITS'}
+                  {busyAction === 'save' ? 'Saving...' : 'Save'}
                 </button>
               </Tooltip>
               {selectedInvoice?.status === 'draft' && (
                 <Tooltip content="Email this invoice to the customer and mark it as sent.">
                   <button className="btn btn-primary" disabled={!!busyAction} onClick={() => void performAction('send')}>
-                    {busyAction === 'send' ? 'SENDING...' : 'SEND TO CUSTOMER'}
+                    {busyAction === 'send' ? 'Sending...' : 'Send'}
                   </button>
                 </Tooltip>
               )}
               {selectedInvoice?.status !== 'draft' && selectedInvoice?.status !== 'void' && (
                 <Tooltip content="Resend invoice notification to the customer.">
                   <button className="btn btn-secondary" disabled={!!busyAction} onClick={() => void performAction('remind')}>
-                    {busyAction === 'remind' ? 'SENDING...' : 'RESEND NOTIFICATION'}
+                    {busyAction === 'remind' ? 'Sending...' : 'Resend'}
                   </button>
                 </Tooltip>
               )}
@@ -703,11 +709,11 @@ export function AdminInvoicesClient() {
                   <div className="button-row invoice-dialog-button-row">
                     <Tooltip content="Save edits to recipient details, due date, notes, and line items.">
                       <button className="btn btn-secondary" disabled={!!busyAction} onClick={saveInvoiceEdits}>
-                        {busyAction === 'save' ? 'SAVING...' : 'SAVE BASIC DETAILS'}
+                        {busyAction === 'save' ? 'Saving...' : 'Save Details'}
                       </button>
                     </Tooltip>
                     <Tooltip content="Open this invoice's customer profile in the customers page.">
-                      <button className="btn btn-secondary" onClick={openLinkedCustomer}>VIEW CUSTOMER</button>
+                      <button className="btn btn-secondary" onClick={openLinkedCustomer}>Open Customer</button>
                     </Tooltip>
                   </div>
                 </AdminCard>
@@ -739,7 +745,7 @@ export function AdminInvoicesClient() {
                     ))}
                     <div className="button-row invoice-dialog-button-row invoice-dialog-line-actions">
                       <Tooltip content="Add a blank line item that you can customize manually.">
-                        <button className="btn btn-secondary" onClick={addLineItem}>+ ADD CUSTOM ITEM</button>
+                        <button className="btn btn-secondary" onClick={addLineItem}>Add Line Item</button>
                       </Tooltip>
                       <div className="invoice-dialog-preset-row">
                         <select
@@ -747,7 +753,7 @@ export function AdminInvoicesClient() {
                           value={editingProductPresetId}
                           onChange={(e) => addPresetToInvoice(e.target.value)}
                         >
-                          <option value="">+ ADD FROM PRESET...</option>
+                          <option value="">Add preset...</option>
                           {presets.map(p => <option key={p.id} value={p.id}>{p.label} ({toCurrency(p.unitPriceCents, DEFAULT_CURRENCY)})</option>)}
                         </select>
                       </div>

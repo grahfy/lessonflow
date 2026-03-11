@@ -29,9 +29,12 @@ export function AdminHeader({ title }: AdminHeaderProps) {
 
   return (
     <div className="admin-card booking-row admin-header-row" data-motion-item="admin-header-card">
-      <h1 className="admin-console-title" data-motion-item="admin-title">
-        {title}
-      </h1>
+      <div className="admin-header-title-group">
+        <p className="admin-console-kicker">Admin Console</p>
+        <h1 className="admin-console-title" data-motion-item="admin-title">
+          {title}
+        </h1>
+      </div>
       <div className="admin-header-controls">
         <Tooltip content="Toggle mobile navigation menu.">
           <button

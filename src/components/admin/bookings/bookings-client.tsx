@@ -567,33 +567,36 @@ export function AdminBookingsClient() {
           <div className="admin-range-primary">
             <div className="button-row admin-range-nav-buttons">
               <Tooltip content="Go to the previous date range.">
-                <button className="btn btn-secondary btn-icon" onClick={goPrev}>←</button>
+                <button className="btn btn-secondary btn-icon" type="button" onClick={goPrev} aria-label="Previous range">←</button>
               </Tooltip>
               <Tooltip content="Go to the next date range.">
-                <button className="btn btn-secondary btn-icon" onClick={goNext}>→</button>
+                <button className="btn btn-secondary btn-icon" type="button" onClick={goNext} aria-label="Next range">→</button>
               </Tooltip>
             </div>
-            <strong className="admin-range-label">{rangeLabel}</strong>
+            <div className="admin-range-copy">
+              <span className="admin-inline-field">Schedule Window</span>
+              <strong className="admin-range-label">{rangeLabel}</strong>
+            </div>
           </div>
 
           <div className="admin-range-actions">
             <div className="site-nav admin-range-view-nav">
               <Tooltip content="Switch to a single-day booking timeline.">
-                <button className={`btn ${view === "day" ? "btn-primary" : "btn-secondary"}`} onClick={() => navigate("day", dateStr)}>DAY</button>
+                <button className={`btn ${view === "day" ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => navigate("day", dateStr)}>Day</button>
               </Tooltip>
               <Tooltip content="Switch to week view for lesson planning.">
-                <button className={`btn ${view === "week" ? "btn-primary" : "btn-secondary"}`} onClick={() => navigate("week", dateStr)}>WEEK</button>
+                <button className={`btn ${view === "week" ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => navigate("week", dateStr)}>Week</button>
               </Tooltip>
               <Tooltip content="Switch to month view for broader scheduling.">
-                <button className={`btn ${view === "month" ? "btn-primary" : "btn-secondary"}`} onClick={() => navigate("month", dateStr)}>MONTH</button>
+                <button className={`btn ${view === "month" ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => navigate("month", dateStr)}>Month</button>
               </Tooltip>
               <Tooltip content="Switch to year view for long-range planning.">
-                <button className={`btn ${view === "year" ? "btn-primary" : "btn-secondary"}`} onClick={() => navigate("year", dateStr)}>YEAR</button>
+                <button className={`btn ${view === "year" ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => navigate("year", dateStr)}>Year</button>
               </Tooltip>
             </div>
             <div className="admin-range-divider" />
             <Tooltip content="Create a new booking directly from the admin calendar.">
-              <button className="btn btn-primary" onClick={openManualDialog}>ADD MANUAL BOOKING</button>
+              <button className="btn btn-primary" type="button" onClick={openManualDialog}>New Booking</button>
             </Tooltip>
           </div>
         </AdminCard>

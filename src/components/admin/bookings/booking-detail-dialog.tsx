@@ -134,6 +134,7 @@ export function BookingDetailDialog({
 
   /** Local helper for atomic form updates. */
   const updateForm = (patch: Partial<BookingDialogForm>) => setDialogForm({ ...dialogForm, ...patch });
+  const tabBodyClassName = "booking-dialog-layout";
 
   return (
     <>
@@ -220,9 +221,9 @@ export function BookingDetailDialog({
         }
       />
 
-      <div className={`dialog-layout booking-dialog-layout ${activeTab === 'emails' ? 'customer-dialog-panel' : ''}`}>
+      <div className={tabBodyClassName}>
           {activeTab === 'appointment' ? (
-            <>
+            <div className="dialog-layout customer-tab-panel booking-appointment-panel">
               {/* SECTION: CUSTOMER INFORMATION */}
               <div className="dialog-col">
                 <div className="dialog-section-heading">
@@ -364,7 +365,7 @@ export function BookingDetailDialog({
                   </Tooltip>
                 </div>
               </div>
-            </>
+            </div>
           ) : activeTab === 'emails' ? (
             <AdminEmailPanel
               emptyLabel="No emails recorded."
