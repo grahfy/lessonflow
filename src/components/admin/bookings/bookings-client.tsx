@@ -192,6 +192,7 @@ export function AdminBookingsClient() {
 
   const { customers: customerOptions, load: loadCustomers } = useCustomers({ pageSize: 250, onAuthError, onError: setError });
   const { teachers: teacherOptions } = useTeachers({ onAuthError, onError: setError });
+  const singleTeacherOptionId = teacherOptions.length === 1 ? teacherOptions[0]?.id ?? "" : "";
   const { 
     history: emailHistory, 
     loading: loadingEmailHistory, 
@@ -290,7 +291,10 @@ export function AdminBookingsClient() {
       postcode: typeof row.postcode === "string" ? row.postcode : "",
       lessonMode: typeof row.lessonMode === "string" ? row.lessonMode : "in_person",
       skillLevel: typeof row.skillLevel === "string" ? row.skillLevel : "beginner",
-      assignedTeacherId: typeof row.assignedTeacherId === "string" ? row.assignedTeacherId : "",
+      assignedTeacherId:
+        typeof row.assignedTeacherId === "string" && row.assignedTeacherId
+          ? row.assignedTeacherId
+          : singleTeacherOptionId,
       durationChoice: typeof row.lessonDuration === "string" ? row.lessonDuration : "min30",
       customDurationMinutes: row.customDurationMinutes == null ? "" : String(row.customDurationMinutes)
     });
@@ -310,7 +314,7 @@ export function AdminBookingsClient() {
 
     dialogPresence.show();
     if (dialogRootRef.current) animateIn(dialogRootRef.current);
-  }, [currentAdmin, dialogPresence, loadCustomers, loadEmailHistory, loadMaterials]);
+  }, [currentAdmin, dialogPresence, loadCustomers, loadEmailHistory, loadMaterials, singleTeacherOptionId]);
 
   const closeDialog = useCallback(async () => {
     if (dialogRootRef.current) await animateOut(dialogRootRef.current);

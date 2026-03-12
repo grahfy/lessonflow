@@ -1,4 +1,5 @@
 import { Prisma } from "@/generated/prisma/client";
+import { findSingleActiveOwnerId } from "@/lib/admin/teacher-assignment";
 
 type DbClient = Prisma.TransactionClient | typeof import("@/lib/db").prisma;
 
@@ -40,39 +41,36 @@ export function isLocalDevelopmentSiteUrl(siteUrl: string | null | undefined): b
 }
 
 /**
- * Backfills legacy appointment/customer assignment fields for local/dev-style
- * upgrades only when the dataset is still entirely unassigned.
+ * Backfills legacy appointment/customer assignment fields when the dataset is
+ * still entirely unassigned and the install is either local/dev-style or a
+ * single-owner system with no active teachers.
  */
 export async function backfillLegacyStaffAssignments(input: {
   db: DbClient;
   siteUrl?: string | null;
 }): Promise<LegacyStaffAssignmentBackfillResult> {
   const siteUrl = input.siteUrl?.trim() || "";
-
-  if (!isLocalDevelopmentSiteUrl(siteUrl)) {
+  const ownerId = await findSingleActiveOwnerId(input.db);
+  if (!ownerId) {
     return {
       status: "skipped",
-      reason: "non_local_site_url",
+      reason: "no_owner",
       siteUrl
     };
   }
 
-  const owner = await input.db.adminUser.findFirst({
+  const activeTeacherCount = await input.db.adminUser.count({
     where: {
-      role: "owner"
-    },
-    orderBy: {
-      createdAt: "asc"
-    },
-    select: {
-      id: true
+      role: "teacher",
+      isActive: true
     }
   });
+  const allowBackfill = isLocalDevelopmentSiteUrl(siteUrl) || activeTeacherCount === 0;
 
-  if (!owner) {
+  if (!allowBackfill) {
     return {
       status: "skipped",
-      reason: "no_owner",
+      reason: "non_local_site_url",
       siteUrl
     };
   }
@@ -122,7 +120,7 @@ export async function backfillLegacyStaffAssignments(input: {
         primaryTeacherId: null
       },
       data: {
-        primaryTeacherId: owner.id
+        primaryTeacherId: ownerId
       }
     }),
     input.db.bookingRequest.updateMany({
@@ -130,7 +128,7 @@ export async function backfillLegacyStaffAssignments(input: {
         assignedTeacherId: null
       },
       data: {
-        assignedTeacherId: owner.id
+        assignedTeacherId: ownerId
       }
     }),
     input.db.bookingSeries.updateMany({
@@ -138,7 +136,7 @@ export async function backfillLegacyStaffAssignments(input: {
         assignedTeacherId: null
       },
       data: {
-        assignedTeacherId: owner.id
+        assignedTeacherId: ownerId
       }
     }),
     input.db.booking.updateMany({
@@ -146,7 +144,7 @@ export async function backfillLegacyStaffAssignments(input: {
         assignedTeacherId: null
       },
       data: {
-        assignedTeacherId: owner.id
+        assignedTeacherId: ownerId
       }
     })
   ]);
@@ -155,7 +153,7 @@ export async function backfillLegacyStaffAssignments(input: {
     status: "updated",
     reason: "backfilled",
     siteUrl,
-    ownerId: owner.id,
+    ownerId,
     counts: {
       customers: customers.count,
       bookingRequests: bookingRequests.count,

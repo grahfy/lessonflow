@@ -96,6 +96,7 @@ export function AdminCustomersClient() {
   const onAuthError = useCallback(() => window.location.assign("/admin/login"), []);
   const { admin: currentAdmin } = useAdminSession({ onAuthError, onError: setError });
   const { teachers: teacherOptions } = useTeachers({ onAuthError, onError: setError });
+  const singleTeacherOptionId = teacherOptions.length === 1 ? teacherOptions[0]?.id ?? "" : "";
 
   // -- DATA HOOKS (Separated by domain logic) --
   
@@ -155,7 +156,11 @@ export function AdminCustomersClient() {
     setNotice("");
     setSelectedCustomer(customer);
     setIsEditing(editMode);
-    setCustomerForm(customer ? customerFormFromRow(customer) : emptyCustomerForm());
+    const nextForm = customer ? customerFormFromRow(customer) : emptyCustomerForm();
+    if (!nextForm.primaryTeacherId && singleTeacherOptionId) {
+      nextForm.primaryTeacherId = singleTeacherOptionId;
+    }
+    setCustomerForm(nextForm);
     setActiveTab("profile");
     setMaterialsBookingId("");
 
@@ -171,7 +176,7 @@ export function AdminCustomersClient() {
     if (dialogRootRef.current) {
       animateIn(dialogRootRef.current);
     }
-  }, [currentAdmin, dialogPresence, loadEmailHistory, loadMaterials]);
+  }, [currentAdmin, dialogPresence, loadEmailHistory, loadMaterials, singleTeacherOptionId]);
 
   const closeCustomerDialog = useCallback(async () => {
     if (dialogRootRef.current) {

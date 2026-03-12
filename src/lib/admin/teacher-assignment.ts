@@ -20,6 +20,46 @@ async function findActiveTeacherById(db: DbClient, id: string) {
   });
 }
 
+async function findActiveOwnerById(db: DbClient, id: string) {
+  return db.adminUser.findFirst({
+    where: {
+      id,
+      role: "owner",
+      isActive: true
+    },
+    select: {
+      id: true
+    }
+  });
+}
+
+async function countActiveTeachers(db: DbClient): Promise<number> {
+  return db.adminUser.count({
+    where: {
+      role: "teacher",
+      isActive: true
+    }
+  });
+}
+
+export async function findSingleActiveOwnerId(db: DbClient): Promise<string | null> {
+  const owners = await db.adminUser.findMany({
+    where: {
+      role: "owner",
+      isActive: true
+    },
+    orderBy: {
+      createdAt: "asc"
+    },
+    select: {
+      id: true
+    },
+    take: 2
+  });
+
+  return owners.length === 1 ? owners[0]?.id ?? null : null;
+}
+
 /**
  * Returns the lone active teacher when the staff roster has exactly one
  * assignable teacher. Otherwise returns null so multi-staff setups still
@@ -44,6 +84,25 @@ export async function findSingleActiveTeacherId(db: DbClient): Promise<string | 
 }
 
 /**
+ * Returns the single assignable staff member. Teachers are preferred, but
+ * when there are no active teachers the sole active owner becomes the fallback
+ * assignee so single-user installs can still attach bookings/customers.
+ */
+export async function findSingleAssignableStaffId(db: DbClient): Promise<string | null> {
+  const singleTeacherId = await findSingleActiveTeacherId(db);
+  if (singleTeacherId) {
+    return singleTeacherId;
+  }
+
+  const activeTeacherCount = await countActiveTeachers(db);
+  if (activeTeacherCount > 0) {
+    return null;
+  }
+
+  return findSingleActiveOwnerId(db);
+}
+
+/**
  * Best-effort assignment used by passive/default flows such as public booking
  * requests. A preferred teacher is preserved only when that teacher remains
  * active; otherwise the system falls back to the single-teacher default.
@@ -58,9 +117,17 @@ export async function resolveAutoAssignedTeacherId(input: {
     if (teacher) {
       return teacher.id;
     }
+
+    const activeTeacherCount = await countActiveTeachers(input.db);
+    if (activeTeacherCount === 0) {
+      const owner = await findActiveOwnerById(input.db, preferredTeacherId);
+      if (owner) {
+        return owner.id;
+      }
+    }
   }
 
-  return findSingleActiveTeacherId(input.db);
+  return findSingleAssignableStaffId(input.db);
 }
 
 export async function resolveAssignedTeacherId(input: {
@@ -75,16 +142,23 @@ export async function resolveAssignedTeacherId(input: {
 
   const candidate = input.requestedAssignedTeacherId?.trim() || input.fallbackTeacherId?.trim() || "";
   if (!candidate) {
-    return findSingleActiveTeacherId(input.db);
+    return findSingleAssignableStaffId(input.db);
   }
 
   const teacher = await findActiveTeacherById(input.db, candidate);
-
-  if (!teacher) {
-    throw new Error("Selected teacher does not exist.");
+  if (teacher) {
+    return teacher.id;
   }
 
-  return teacher.id;
+  const activeTeacherCount = await countActiveTeachers(input.db);
+  if (activeTeacherCount === 0) {
+    const owner = await findActiveOwnerById(input.db, candidate);
+    if (owner) {
+      return owner.id;
+    }
+  }
+
+  throw new Error("Selected staff member does not exist.");
 }
 
 export async function ensureCustomerPrimaryTeacher(input: {

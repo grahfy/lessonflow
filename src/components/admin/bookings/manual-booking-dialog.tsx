@@ -308,7 +308,7 @@ export function ManualBookingDialog({
               </AdminField>
               <AdminField label="Assigned Teacher" tooltip="Teacher responsible for this lesson. Teachers are auto-assigned to themselves.">
                 {canEditAssignment ? (
-                  <select name="assignedTeacherId" defaultValue="">
+                  <select name="assignedTeacherId" defaultValue={teacherOptions.length === 1 ? teacherOptions[0]?.id ?? "" : ""}>
                     <option value="">Unassigned</option>
                     {teacherOptions.map((teacher) => (
                       <option key={teacher.id} value={teacher.id}>

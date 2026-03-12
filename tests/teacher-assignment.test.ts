@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/db";
 import {
+  findSingleAssignableStaffId,
   findSingleActiveTeacherId,
   resolveAssignedTeacherId,
   resolveAutoAssignedTeacherId
@@ -52,6 +53,32 @@ describe("teacher assignment", () => {
     });
 
     expect(assignedTeacherId).toBe(teacher.id);
+  });
+
+  it("falls back to the owner account when no active teachers exist", async () => {
+    const owner = await prisma.adminUser.create({
+      data: {
+        email: "owner-fallback@example.com",
+        role: "owner",
+        firstName: "Owner",
+        lastName: "Fallback",
+        displayName: "Owner Fallback",
+        passwordHash: await bcrypt.hash("owner-password", 12),
+        isActive: true
+      }
+    });
+
+    expect(await findSingleAssignableStaffId(prisma)).toBe(owner.id);
+
+    const assignedTeacherId = await resolveAssignedTeacherId({
+      db: prisma,
+      actor: {
+        id: owner.id,
+        role: "owner"
+      }
+    });
+
+    expect(assignedTeacherId).toBe(owner.id);
   });
 
   it("prefers an active teacher default and otherwise falls back to the single-teacher default", async () => {

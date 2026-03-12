@@ -12,8 +12,9 @@ import {
 import { prisma } from "@/lib/db";
 
 /**
- * Returns the current admin profile plus the teacher list used by owner pages,
- * assignment dropdowns, and teacher self-service screens.
+ * Returns the current admin profile plus the assignable staff list used by
+ * booking/customer dropdowns. Active teachers are preferred; when none exist,
+ * the active owner becomes the fallback option for single-user installs.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -23,13 +24,22 @@ export async function GET(request: NextRequest) {
     }
 
     const teachers = await prisma.adminUser.findMany({
-      where: admin.role === "owner" ? { role: "teacher" } : { role: "teacher", isActive: true },
+      where: {
+        role: "teacher",
+        isActive: true
+      },
       orderBy: [{ isActive: "desc" }, { displayName: "asc" }]
     });
+    const assignableStaff =
+      teachers.length > 0
+        ? teachers
+        : admin.role === "owner" && admin.isActive
+          ? [admin]
+          : [];
 
     return NextResponse.json({
       currentAdmin: mapStaffProfile(admin),
-      teachers: teachers.map(mapStaffSummary)
+      teachers: assignableStaff.map(mapStaffSummary)
     });
   } catch (error) {
     return jsonUnexpectedError(error, "Unable to load staff accounts.");

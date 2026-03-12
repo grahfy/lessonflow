@@ -192,6 +192,7 @@ describe("legacy staff assignment backfill", () => {
 
   it("skips the backfill for production-style site URLs", async () => {
     await createOwner("owner.prodskip@example.com", "Prod Skip Owner");
+    await createTeacher("teacher.prodskip@example.com", "Prod Skip Teacher");
     const seeded = await seedUnassignedGraph();
 
     const result = await backfillLegacyStaffAssignments({
@@ -216,6 +217,32 @@ describe("legacy staff assignment backfill", () => {
     expect(bookingRequest.assignedTeacherId).toBeNull();
     expect(bookingSeries.assignedTeacherId).toBeNull();
     expect(booking.assignedTeacherId).toBeNull();
+  });
+
+  it("backfills owner-only production installs when there are no active teachers", async () => {
+    const owner = await createOwner("owner.prodonly@example.com", "Prod Only Owner");
+    const seeded = await seedUnassignedGraph();
+
+    const result = await backfillLegacyStaffAssignments({
+      db: prisma,
+      siteUrl: "https://melbourneguitarschool.com.au"
+    });
+
+    expect(result.status).toBe("updated");
+    if (result.status !== "updated") return;
+    expect(result.ownerId).toBe(owner.id);
+
+    const [customer, bookingRequest, bookingSeries, booking] = await Promise.all([
+      prisma.customer.findUniqueOrThrow({ where: { id: seeded.customer.id } }),
+      prisma.bookingRequest.findUniqueOrThrow({ where: { id: seeded.bookingRequest.id } }),
+      prisma.bookingSeries.findUniqueOrThrow({ where: { id: seeded.bookingSeries.id } }),
+      prisma.booking.findUniqueOrThrow({ where: { id: seeded.booking.id } })
+    ]);
+
+    expect(customer.primaryTeacherId).toBe(owner.id);
+    expect(bookingRequest.assignedTeacherId).toBe(owner.id);
+    expect(bookingSeries.assignedTeacherId).toBe(owner.id);
+    expect(booking.assignedTeacherId).toBe(owner.id);
   });
 
   it("skips the backfill when any assignment already exists anywhere in the dataset", async () => {
