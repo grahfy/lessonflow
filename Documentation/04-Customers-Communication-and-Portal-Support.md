@@ -37,10 +37,17 @@ The customer profile may include:
 - contact details
 - skill level
 - lesson mode
+- primary teacher assignment
 - address information
 - portal credential status
 
 Profile changes should be based on confirmed information, particularly where the record is already attached to active bookings or invoices.
+
+## Assigned Teacher Context
+
+The customer workflow now exposes the assigned or primary teacher as an editable dropdown rather than as passive text. This field should be treated as the default staff ownership for later bookings, support context, and follow-up.
+
+On a single-user install, the owner may appear as the only assignable teacher. This is expected behaviour when no separate active teacher account exists.
 
 ## Portal Credential Support
 
@@ -91,6 +98,7 @@ Archive or delete actions should therefore be reserved for cases in which the re
 ## Related Sections
 
 - [Daily Operations and Booking Lifecycle](03-Daily-Operations-and-Booking-Lifecycle.md)
+- [Staff Management and Teacher Assignment](03a-Staff-Management-and-Teacher-Assignment.md)
 - [Invoicing and Payments](05-Invoicing-and-Payments.md)
 - [Learning Materials and Notifications](06-Learning-Materials-and-Notifications.md)
 - [Public Intake and Student Portal](10-Public-Intake-and-Student-Portal.md)

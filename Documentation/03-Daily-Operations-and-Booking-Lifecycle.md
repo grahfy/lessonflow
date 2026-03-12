@@ -65,6 +65,26 @@ The dialog proceeds through four broad stages:
 
 Where a likely duplicate customer is detected, the operator should deliberately choose between using the existing record, updating that record, or creating a distinct new one. Duplicate creation should be treated as an exceptional choice rather than the default.
 
+## Teacher Assignment During Booking Work
+
+LessonFlow now treats teacher assignment as part of normal booking administration rather than as background metadata. Pending requests, confirmed bookings, recurring series, and the related customer record can all carry an assigned teacher.
+
+The normal interpretation is:
+
+- owners can choose or change the assigned teacher deliberately
+- teachers are scoped to records already assigned to them unless owner-level access is required
+- single-user installs treat the owner account as the valid assignable teacher when no separate teacher account exists
+
+This model is intended to keep scheduling, customer ownership, and later billing or support activity aligned around the same responsible staff account.
+
+## Timezone Interpretation
+
+<div class="manual-callout info">
+<strong>Time entry rule:</strong> LessonFlow interprets booking time inputs in the configured business timezone rather than in implicit browser or Linux local time.
+</div>
+
+This means a <code>datetime-local</code> value such as <code>12:00</code> is treated as <code>12:00</code> in the timezone configured through <code>NEXT_PUBLIC_TIMEZONE</code>. The application stores UTC internally, but administrators should reason about lesson times in the business timezone shown by the product.
+
 ## Booking Editing and Movement
 
 Confirmed bookings can be edited to update lesson details, student information, notes, and address data. Rescheduling is performed through the lesson-move flow and should only be done after the intended replacement time is confirmed.
@@ -85,6 +105,7 @@ Booking records serve as gateways into other administrative domains:
 
 | Booking-side action | Destination workflow |
 | --- | --- |
+| Manage assigned teacher / staff ownership | [Staff Management and Teacher Assignment](03a-Staff-Management-and-Teacher-Assignment.md) |
 | Open Customer | [Customers, Communication, and Portal Support](04-Customers-Communication-and-Portal-Support.md) |
 | Invoice / Billing | [Invoicing and Payments](05-Invoicing-and-Payments.md) |
 | Reminder or custom email actions | [Learning Materials and Notifications](06-Learning-Materials-and-Notifications.md) |
@@ -102,6 +123,7 @@ At the end of a normal operating period, administrators should confirm:
 ## Related Sections
 
 - [Customers, Communication, and Portal Support](04-Customers-Communication-and-Portal-Support.md)
+- [Staff Management and Teacher Assignment](03a-Staff-Management-and-Teacher-Assignment.md)
 - [Invoicing and Payments](05-Invoicing-and-Payments.md)
 - [Learning Materials and Notifications](06-Learning-Materials-and-Notifications.md)
 - [Logs and Bug Reporting](09-Logs-and-Bug-Reporting.md)

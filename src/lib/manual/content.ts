@@ -184,6 +184,14 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
     caption: "The settings area combines branding, content, invoice, product, and system configuration."
   },
   {
+    id: "teachers-workspace-page",
+    fileName: "teachers-workspace-page.png",
+    publicPath: "/documentation/screenshots/teachers-workspace-page.png",
+    documentationPath: "Documentation/assets/teachers-workspace-page.png",
+    alt: "Teachers workspace page",
+    caption: "The teachers workspace combines a staff directory with assignment-aware profile editing."
+  },
+  {
     id: "admin-reports-dashboard",
     fileName: "admin-reports-dashboard.png",
     publicPath: "/documentation/screenshots/admin-reports-dashboard.png",
@@ -251,6 +259,16 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
       "booking-detail-dialog-notes-and-actions",
       "booking-create-invoice-dialog"
     ]
+  },
+  {
+    id: "staff-management-teacher-assignment",
+    title: "Staff Management and Teacher Assignment",
+    summary: "Reference guide to the teachers workspace, admin role boundaries, assignment defaults, and single-user owner fallback.",
+    group: "operations",
+    audience: "all_admins",
+    sourcePath: "Documentation/03a-Staff-Management-and-Teacher-Assignment.md",
+    relatedRoutes: ["/admin/teachers", "/admin/bookings", "/admin/customers"],
+    screenshotIds: ["teachers-workspace-page"]
   },
   {
     id: "customers-communication-portal-support",

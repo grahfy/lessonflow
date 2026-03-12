@@ -13,7 +13,9 @@ It is designed for small teams that want one admin console for day-to-day school
 - **Public website and lead capture**: Home, lessons, teacher, vouchers, videos, terms, contact, and booking pages, with editable public content and SEO-aware page management.
 - **Protected intake forms**: Booking and contact flows protected by CAPTCHA and honeypot checks, designed to feed directly into admin follow-up workflows.
 - **Admin scheduling console**: Day, week, month, and year calendar views with approval workflows, manual bookings, reschedules, cancellations, reminders, and invoice creation from booking context.
+- **Staff management and assignment control**: Owner-managed staff workspace with teacher accounts, teaching profiles, assignment defaults, and single-user owner fallback when no separate teacher account exists.
 - **Customer operations**: Searchable customer directory, contact-detail editing, booking and invoice history, portal credential management, and safe archive/delete workflows.
+- **Timezone-safe lesson handling**: Booking, invoice, and portal datetime flows interpret `datetime-local` values in the configured business timezone instead of implicit browser or Linux local time.
 - **Billing and follow-up**: Draft or send-now invoices, invoice presets, PDF generation, resend and reminder actions, overdue filtering, payment state changes, voiding, and credit-note support.
 - **Student portal and materials**: Secure student login, appointment visibility, request and cancellation actions, and access to assigned PDFs and audio learning materials.
 - **Reports and owner visibility**: Daily, weekly, monthly, yearly, and custom-range reporting, invoice aging visibility, and summary workflows for operational follow-up.
@@ -33,6 +35,7 @@ It is designed for small teams that want one admin console for day-to-day school
 ### Admin console functions
 - Admin login, first-run setup, and protected admin routing
 - Bookings console with lesson approval, manual creation, edit, move, cancel, and reminder actions
+- Teachers workspace with owner and teacher account management, assignment-aware profile editing, and staff-scoped admin access
 - Customer directory with profile editing, communication context, billing history, and portal support
 - Invoices console with create, send, resend, remind, mark paid/unpaid, void, delete, and PDF actions
 - Reports console with operational and revenue visibility plus overdue follow-up support
@@ -147,7 +150,7 @@ For full install, update, rollback, SSL, timer, and troubleshooting guidance, se
 - VPS deployment and maintenance: [`deploy/README.md`](deploy/README.md)
 - Operator handbook index: [`Documentation/README.md`](Documentation/README.md)
 - Technical owner runbook: [`Documentation/digitalocean-admin-operations.md`](Documentation/digitalocean-admin-operations.md)
-- Detailed release notes: [`Documentation/release-notes-v1.1.0.md`](Documentation/release-notes-v1.1.0.md)
+- Detailed release notes: [`Documentation/release-notes-v1.2.0.md`](Documentation/release-notes-v1.2.0.md)
 - Release maintainer checklist: [`Documentation/release-maintainer-checklist.md`](Documentation/release-maintainer-checklist.md)
 
 ## Core Commands
@@ -188,7 +191,7 @@ npm run prisma:migrate
 ## Key Routes
 
 - Public: `/`, `/lessons`, `/teacher`, `/vouchers`, `/videos`, `/contact`, `/book`, `/terms`
-- Admin: `/admin/login`, `/admin/bookings`, `/admin/customers`, `/admin/invoices`, `/admin/reports`, `/admin/settings`, `/admin/manual`, `/admin/system-logs`, `/admin/about`
+- Admin: `/admin/login`, `/admin/bookings`, `/admin/customers`, `/admin/teachers`, `/admin/invoices`, `/admin/reports`, `/admin/settings`, `/admin/manual`, `/admin/system-logs`, `/admin/about`
 - Student: `/student/login`, `/student/portal`, `/student/materials`
 
 ## Developer Credits

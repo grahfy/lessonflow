@@ -181,6 +181,29 @@ async function seed() {
       }
     });
 
+    const teacher = await prisma.adminUser.create({
+      data: {
+        email: "tayla.teacher@example.com",
+        role: "teacher",
+        firstName: "Tayla",
+        lastName: "Rhodes",
+        displayName: "Tayla Rhodes",
+        passwordHash: await bcrypt.hash("DocsDemoTeacher!23", 12),
+        age: 31,
+        houseNumber: "22",
+        streetName: "Nicholson",
+        streetType: "Street",
+        suburb: "Brunswick East",
+        state: "VIC",
+        postcode: "3057",
+        instruments: "Guitar, Songwriting, Beginner Piano",
+        specialisations: "Beginner coaching, Acoustic rhythm, Teenage students",
+        background: "Touring songwriter and studio coach focused on practical weekly progress.",
+        musicalHistory: "Over 12 years teaching private students and small group workshops.",
+        isActive: true
+      }
+    });
+
     const customer1 = await prisma.customer.create({
       data: {
         fullName: "Alex Student",
@@ -197,7 +220,8 @@ async function seed() {
         streetType: "Street",
         suburb: "Melbourne",
         state: "VIC",
-        postcode: "3000"
+        postcode: "3000",
+        primaryTeacherId: teacher.id
       }
     });
 
@@ -217,7 +241,8 @@ async function seed() {
         streetType: "Street",
         suburb: "Carlton",
         state: "VIC",
-        postcode: "3053"
+        postcode: "3053",
+        primaryTeacherId: teacher.id
       }
     });
 
@@ -239,7 +264,8 @@ async function seed() {
         lessonDuration: "min30",
         requestedStartAt: daysFromNow(2, 16, 0),
         notes: "After-school lesson request",
-        customerId: customer1.id
+        customerId: customer1.id,
+        assignedTeacherId: teacher.id
       }
     });
 
@@ -261,7 +287,8 @@ async function seed() {
         lessonDuration: "min60",
         requestedStartAt: daysFromNow(-1, 18, 30),
         notes: "Rejected due to availability",
-        customerId: customer2.id
+        customerId: customer2.id,
+        assignedTeacherId: teacher.id
       }
     });
 
@@ -304,7 +331,8 @@ async function seed() {
         lessonDuration: "min60",
         requestedStartAt: daysFromNow(-10, 17, 0),
         approvedById: admin.id,
-        customerId: customer1.id
+        customerId: customer1.id,
+        assignedTeacherId: teacher.id
       }
     });
 
@@ -330,7 +358,8 @@ async function seed() {
         notes: "Bring practice notebook",
         customerId: customer1.id,
         modifiedById: admin.id,
-        requestId: pendingRequest.id
+        requestId: pendingRequest.id,
+        assignedTeacherId: teacher.id
       }
     });
 
@@ -356,7 +385,8 @@ async function seed() {
         notes: "Focus on chord transitions",
         customerId: customer2.id,
         modifiedById: admin.id,
-        requestId: approvedRequest.id
+        requestId: approvedRequest.id,
+        assignedTeacherId: teacher.id
       }
     });
 
@@ -381,7 +411,8 @@ async function seed() {
         timezone: "Australia/Melbourne",
         cancelledAt: daysFromNow(-2, 10, 0),
         customerId: customer1.id,
-        modifiedById: admin.id
+        modifiedById: admin.id,
+        assignedTeacherId: teacher.id
       }
     });
 
@@ -406,7 +437,8 @@ async function seed() {
         endAt: new Date(now.getFullYear(), now.getMonth() - 1, 10, 18, 0, 0, 0),
         timezone: "Australia/Melbourne",
         customerId: customer2.id,
-        modifiedById: admin.id
+        modifiedById: admin.id,
+        assignedTeacherId: teacher.id
       }
     });
 
@@ -430,7 +462,8 @@ async function seed() {
         endAt: new Date(now.getFullYear() - 1, 6, 14, 16, 0, 0, 0),
         timezone: "Australia/Melbourne",
         customerId: customer1.id,
-        modifiedById: admin.id
+        modifiedById: admin.id,
+        assignedTeacherId: teacher.id
       }
     });
 
@@ -669,7 +702,7 @@ async function seed() {
 
     fs.writeFileSync(
       checklistPath,
-      `# Screenshot Seed Checklist\n\nLast seeded: ${new Date().toISOString()}\n\n## Demo Credentials\n- Admin email: \`${adminEmail}\`\n- Admin password: \`${adminPassword}\`\n- Student login name: \`${customer1.fullName}\`\n- Student postcode: \`${customer1.postcode}\`\n- Student password: \`${studentPassword}\`\n\n## Dataset Summary\n- Customers: 2\n- Booking requests: 4 (pending/approved/rejected/cancelled)\n- Bookings: 5 (approved + cancelled, cross-period)\n- Invoices: 5 (draft/sent/paid + comparisons)\n- Learning materials: 2 (booking-linked + general)\n`,
+      `# Screenshot Seed Checklist\n\nLast seeded: ${new Date().toISOString()}\n\n## Demo Credentials\n- Admin email: \`${adminEmail}\`\n- Admin password: \`${adminPassword}\`\n- Student login name: \`${customer1.fullName}\`\n- Student postcode: \`${customer1.postcode}\`\n- Student password: \`${studentPassword}\`\n\n## Dataset Summary\n- Staff accounts: 2 (owner + teacher)\n- Customers: 2\n- Booking requests: 4 (pending/approved/rejected/cancelled)\n- Bookings: 5 (approved + cancelled, cross-period)\n- Invoices: 5 (draft/sent/paid + comparisons)\n- Learning materials: 2 (booking-linked + general)\n`,
       "utf8"
     );
 

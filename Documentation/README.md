@@ -11,9 +11,11 @@ The manual is written as a reference work for owners, administrators, and techni
 1. [Start Here and Features](01-Start-Here-and-Features.md)
 2. [First-Time Setup and Admin Access](02-First-Time-Setup-and-Admin-Access.md)
 3. [Daily Operations and Booking Lifecycle](03-Daily-Operations-and-Booking-Lifecycle.md)
+4. [Staff Management and Teacher Assignment](03a-Staff-Management-and-Teacher-Assignment.md)
 
 ## Core Reference Sections
 
+- [Staff Management and Teacher Assignment](03a-Staff-Management-and-Teacher-Assignment.md)
 - [Customers, Communication, and Portal Support](04-Customers-Communication-and-Portal-Support.md)
 - [Invoicing and Payments](05-Invoicing-and-Payments.md)
 - [Learning Materials and Notifications](06-Learning-Materials-and-Notifications.md)
@@ -31,6 +33,7 @@ The manual is written as a reference work for owners, administrators, and techni
 
 ## Release Material
 
+- [Version 1.2.0](release-notes-v1.2.0.md)
 - [Version 1.1.0](release-notes-v1.1.0.md)
 - [Version 1.0](release-notes-v1.0.md)
 - [Release Maintainer Checklist](release-maintainer-checklist.md)

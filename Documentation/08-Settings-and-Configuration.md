@@ -101,7 +101,12 @@ Presets are intended to make common invoice creation faster and more consistent 
 | --- | --- |
 | `DATABASE_URL` | Database connection target |
 | `NEXT_PUBLIC_SITE_URL` | Public site URL |
+| `NEXT_PUBLIC_TIMEZONE` | Business timezone used for booking-time parsing and display |
 | `ADMIN_EMAIL` | Admin login and notification address |
+
+<div class="manual-callout info">
+<strong>Timezone note:</strong> <code>NEXT_PUBLIC_TIMEZONE</code> is now the application source of truth for lesson-time interpretation. Operators should not rely on Linux host localtime as a substitute for this setting.
+</div>
 
 ### Email Delivery
 

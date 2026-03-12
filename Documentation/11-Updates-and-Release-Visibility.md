@@ -54,6 +54,8 @@ Release identity also appears in:
 
 These locations are useful when a support report needs version context but the full updates dialog is unnecessary.
 
+This release context matters more once workflow behavior is tied to versioned rules such as teacher assignment fallback or timezone-safe booking handling. When administrators report unexpected scheduling behavior, the current version should be confirmed before the issue is escalated as a product defect.
+
 ## Live Update Progress
 
 Where web-triggered updates are enabled, LessonFlow can display a live update progress page with streamed output and status changes such as connecting, updating, restarting, complete, or error.

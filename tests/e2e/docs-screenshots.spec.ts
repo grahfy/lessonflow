@@ -232,6 +232,7 @@ test.describe("documentation screenshots", () => {
       { path: "/admin/manual", file: "admin-manual-page.png", waitFor: "Operations Manual" },
       { path: "/admin/reports", file: "admin-reports-dashboard.png", waitFor: "Reports Console" },
       { path: "/admin/settings", file: "admin-settings-page.png", waitFor: "Admin Configuration" },
+      { path: "/admin/teachers", file: "teachers-workspace-page.png", waitFor: "Teachers" },
       { path: "/admin/system-logs", file: "system-logs-page.png", waitFor: "System Logs" },
       { path: "/admin/invoices", file: "invoice-console-list-and-filters.png", waitFor: "Invoices" },
       { path: "/admin/bookings", file: "booking-calendar-week-view.png", waitFor: "Bookings" }

@@ -2,6 +2,54 @@
 
 All notable product releases for LessonFlow are documented in this file.
 
+## [1.2.0] - 2026-03-12
+
+Third public release of LessonFlow, covering user-facing and operator-facing changes since `v1.1.0`.
+
+Release range: `v1.1.0..v1.2.0`
+
+Detailed release notes: [`Documentation/release-notes-v1.2.0.md`](Documentation/release-notes-v1.2.0.md)
+
+### Highlights
+
+- Adds a dedicated teachers workspace so owners can manage staff accounts, teaching profiles, role boundaries, and assignment defaults from inside the admin console.
+- Makes lesson scheduling timezone-safe by interpreting `datetime-local` values in the configured business timezone instead of implicit browser or Linux local time.
+- Expands assignment behavior across bookings, booking requests, booking series, and customer defaults, including a safe owner fallback on single-user installs.
+- Improves upgrade behavior for older datasets by backfilling legacy unassigned records only when the install is still fully unassigned and eligible for automatic repair.
+- Cleans up deploy/update terminal progress rendering so spinner timing labels no longer leave stray characters behind during host updates.
+
+### Added
+
+- `/admin/teachers` with a directory workspace, profile tabs, tooltip coverage, sticky save controls, and teacher photo/password support.
+- Teacher-assignment helpers and APIs for bookings, booking requests, booking series, and customer primary-teacher defaults.
+- A new app-level timezone contract based on `NEXT_PUBLIC_TIMEZONE`, shared by booking, invoice, and portal datetime flows.
+- A deploy-time legacy staff-assignment backfill for eligible installs with fully unassigned historical data.
+
+### Changed
+
+- Owner-only and teacher-scoped admin behavior now follows explicit role rules rather than assuming a single undifferentiated admin account.
+- Single-user installs now treat the owner as the valid assignable teacher when no active teacher account exists.
+- Operator docs, in-app manual content, and the GitLab handbook now describe the staff-management and timezone-aware scheduling model as part of the core product surface.
+
+### Fixed
+
+- Corrected booking-edit, manual-booking, and customer-assignment surfaces that previously showed `Unassigned` when the owner was the only valid staff account.
+- Corrected production upgrade handling so eligible single-owner installs can repair older unassigned booking data safely.
+- Cleared deploy/update spinner rows before redraw and final status output so elapsed and ETA suffixes do not leave visual artifacts.
+
+### Upgrade Notes
+
+- Apply the Prisma migrations added since `v1.1.0` before treating an existing installation as `1.2.0`.
+- `NEXT_PUBLIC_TIMEZONE` should now be set explicitly to the school’s business timezone, for example `Australia/Melbourne`.
+- The app no longer relies on Linux `localtime` as the booking-time source of truth; production hosts should keep the application timezone and host timezone aligned only for operator convenience.
+- Single-user installs should verify that the owner now appears as the assignable teacher in bookings and customer assignment flows.
+- After deployment, confirm `/admin/teachers`, `/admin/bookings`, and `/admin/about` reflect the expected `1.2.0` state.
+
+### Notes
+
+- The release narrative includes both product and deploy behavior because assignment and timezone correctness depend on code, env configuration, and upgrade handling together.
+- Legacy assignment backfill is intentionally gated so it does not rewrite installations that already contain real staff assignment data.
+
 ## [1.1.0] - 2026-03-12
 
 Second public release of LessonFlow, covering user-facing and operator-facing changes since `v1.0`.

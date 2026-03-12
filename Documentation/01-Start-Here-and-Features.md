@@ -15,6 +15,7 @@ LessonFlow is organised around connected workflows rather than isolated screens.
 | Area | Primary function | Typical outcomes |
 | --- | --- | --- |
 | Bookings | Calendar-based lesson administration | Request review, confirmation, rescheduling, cancellation, reminder actions |
+| Staff and Teacher Assignment | Role-aware admin identities and teacher allocation | Teacher account management, assignment defaults, owner fallback on single-user installs |
 | Customers | Identity and support records | Profile updates, portal support, billing lookup, communication history |
 | Invoices | Billing lifecycle management | Drafting, sending, reminding, payment-state updates, credit-note handling |
 | Reports | Operational and financial summaries | Follow-up decisions, overdue review, activity trend review |
@@ -31,11 +32,12 @@ The following sequence is recommended for new administrators and owners:
 
 1. [First-Time Setup and Admin Access](02-First-Time-Setup-and-Admin-Access.md)
 2. [Daily Operations and Booking Lifecycle](03-Daily-Operations-and-Booking-Lifecycle.md)
-3. [Customers, Communication, and Portal Support](04-Customers-Communication-and-Portal-Support.md)
-4. [Invoicing and Payments](05-Invoicing-and-Payments.md)
-5. [Reports and Follow-Up](07-Reports-and-Follow-Up.md)
-6. [Settings and Configuration](08-Settings-and-Configuration.md)
-7. [Logs and Bug Reporting](09-Logs-and-Bug-Reporting.md)
+3. [Staff Management and Teacher Assignment](03a-Staff-Management-and-Teacher-Assignment.md)
+4. [Customers, Communication, and Portal Support](04-Customers-Communication-and-Portal-Support.md)
+5. [Invoicing and Payments](05-Invoicing-and-Payments.md)
+6. [Reports and Follow-Up](07-Reports-and-Follow-Up.md)
+7. [Settings and Configuration](08-Settings-and-Configuration.md)
+8. [Logs and Bug Reporting](09-Logs-and-Bug-Reporting.md)
 
 This reading order begins with access and day-to-day workflows, then moves into support, billing, configuration, and diagnostics.
 
@@ -65,4 +67,5 @@ The in-app manual groups content into orientation, operations, support, configur
 
 - [First-Time Setup and Admin Access](02-First-Time-Setup-and-Admin-Access.md)
 - [Daily Operations and Booking Lifecycle](03-Daily-Operations-and-Booking-Lifecycle.md)
+- [Staff Management and Teacher Assignment](03a-Staff-Management-and-Teacher-Assignment.md)
 - [How LessonFlow Works](12-How-LessonFlow-Works.md)

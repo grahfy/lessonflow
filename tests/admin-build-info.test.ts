@@ -30,10 +30,10 @@ describe("admin-build-info-api", () => {
     const token = createSessionToken(admin.email);
 
     vi.spyOn(buildInfo, "getAdminBuildInfo").mockResolvedValue({
-      versionText: "v1.1.0 · d338e15",
-      releaseLabel: "v1.1.0",
+      versionText: "v1.2.0 · d338e15",
+      releaseLabel: "v1.2.0",
       shortCommit: "d338e15",
-      packageVersion: "1.1.0",
+      packageVersion: "1.2.0",
       source: "git",
       developedYear: "2026",
       createdBy: "Dean Thomson",
@@ -53,7 +53,7 @@ describe("admin-build-info-api", () => {
 
     expect(response.status).toBe(200);
     expect(data.ok).toBe(true);
-    expect(data.buildInfo.versionText).toBe("v1.1.0 · d338e15");
+    expect(data.buildInfo.versionText).toBe("v1.2.0 · d338e15");
     expect(data.buildInfo.createdBy).toBe("Dean Thomson");
   });
 });

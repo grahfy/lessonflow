@@ -5,8 +5,8 @@ Use this checklist when preparing a GitLab release for LessonFlow.
 ## Before Tagging / Publishing
 
 1. Confirm the public branch no longer tracks local-only AI, planning, or scratch material.
-2. Review [`CHANGELOG.md`](../CHANGELOG.md) and the detailed release notes in [`release-notes-v1.1.0.md`](release-notes-v1.1.0.md).
-3. Verify `.env.example` reflects all required production variables and any newly introduced options.
+2. Review [`CHANGELOG.md`](../CHANGELOG.md) and the detailed release notes in [`release-notes-v1.2.0.md`](release-notes-v1.2.0.md).
+3. Verify `.env.example` reflects all required production variables and any newly introduced options such as `NEXT_PUBLIC_TIMEZONE`.
 4. Confirm Prisma migrations under `prisma/migrations/` are present and documented in release notes when relevant.
 5. Confirm `deploy/deploy.sh` and `deploy/update.sh` still reflect the supported release-directory deploy model.
 6. Refresh operator docs if workflow, settings, deploy, or manual behavior changed.
@@ -27,9 +27,10 @@ Include:
 1. Release summary and highlights.
 2. Upgrade notes, including migrations and environment changes.
 3. Required environment keys and any new optional operational settings.
-4. Deploy/update reminder that the supported production model is timestamped releases under `/var/www/lessonflow/releases` with `/var/www/lessonflow/current` as the live symlink.
-5. Rollback reminder pointing operators to [`deploy/README.md`](../deploy/README.md).
-6. Links to the operator manual and detailed release notes.
+4. Explicit timezone guidance when business-time interpretation changed in the release.
+5. Deploy/update reminder that the supported production model is timestamped releases under `/var/www/lessonflow/releases` with `/var/www/lessonflow/current` as the live symlink.
+6. Rollback reminder pointing operators to [`deploy/README.md`](../deploy/README.md).
+7. Links to the operator manual and detailed release notes.
 
 ## After Publishing
 

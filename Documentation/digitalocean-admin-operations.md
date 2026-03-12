@@ -79,6 +79,15 @@ For an already-installed system, the standard update path is:
 
 This is the preferred routine path for ordinary code or configuration updates.
 
+### Release 1.2.0 Upgrade Checks
+
+When moving to `1.2.0`, the technical owner should explicitly confirm:
+
+1. the Prisma migrations since `v1.1.0` have been applied successfully
+2. `NEXT_PUBLIC_TIMEZONE` is set to the intended business timezone
+3. single-user installs now show the owner account as the valid assignable teacher
+4. older fully unassigned datasets have either been backfilled safely or deliberately reviewed after deploy
+
 ## Script Selection
 
 | Script or file | Intended use |
@@ -144,3 +153,4 @@ Host-side service checks and the in-app Logs page should be used together where 
 - [Settings and Configuration](08-Settings-and-Configuration.md)
 - [Updates and Release Visibility](11-Updates-and-Release-Visibility.md)
 - [Logs and Bug Reporting](09-Logs-and-Bug-Reporting.md)
+- [Staff Management and Teacher Assignment](03a-Staff-Management-and-Teacher-Assignment.md)
