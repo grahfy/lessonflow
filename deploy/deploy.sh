@@ -2677,7 +2677,7 @@ start_spinner() {
     (
         while true; do
             suffix="$(spinner_progress_suffix "${SPINNER_MSG}" "${SPINNER_LOG_FILE}")"
-            printf "\r${CYAN}%s${NC} %s ${DIM}%s${NC}" "${SPINNER_FRAMES[$i]}" "${SPINNER_MSG}" "${suffix}"
+            printf "\r\033[K${CYAN}%s${NC} %s ${DIM}%s${NC}" "${SPINNER_FRAMES[$i]}" "${SPINNER_MSG}" "${suffix}"
             i=$(( (i + 1) % frame_count ))
             sleep 0.2
         done
@@ -2706,7 +2706,7 @@ stop_spinner() {
         final_color="${RED}"
     fi
 
-    printf "\r${final_color}%s${NC} %s%*s\n" "${final_icon}" "${SPINNER_MSG}" 10 ""
+    printf "\r\033[K${final_color}%s${NC} %s\n" "${final_icon}" "${SPINNER_MSG}"
     SPINNER_PID=""
     SPINNER_MSG=""
     SPINNER_LOG_FILE=""
