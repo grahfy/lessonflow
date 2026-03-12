@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import { addDays } from "date-fns";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -11,6 +12,7 @@ describe("api-booking-requests", () => {
     await prisma.bookingSeries.deleteMany();
     await prisma.bookingRequest.deleteMany();
     await prisma.customer.deleteMany();
+    await prisma.adminUser.deleteMany();
   });
 
   it("does not expose booking request rows via public GET", async () => {
@@ -192,5 +194,50 @@ describe("api-booking-requests", () => {
     // Should preserve 60 mins and link to customer
     expect(row?.lessonDuration).toBe("min60");
     expect(row?.customerId).toBe(customer.id);
+  });
+
+  it("auto-assigns public booking requests when exactly one active teacher exists", async () => {
+    const teacher = await prisma.adminUser.create({
+      data: {
+        email: "solo-teacher@example.com",
+        role: "teacher",
+        firstName: "Solo",
+        lastName: "Teacher",
+        displayName: "Solo Teacher",
+        passwordHash: await bcrypt.hash("teacher-password", 12),
+        isActive: true
+      }
+    });
+
+    const startAt = addDays(new Date(), 7).toISOString();
+
+    const request = new Request("http://localhost/api/booking-requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        firstName: "Auto",
+        lastName: "Assigned",
+        name: "Auto Assigned",
+        email: "auto.assigned@example.com",
+        phone: "0401-222-333",
+        postcode: "3070",
+        lessonMode: "video",
+        skillLevel: "beginner",
+        lessonDuration: "min30",
+        requestedStartAt: startAt,
+        isRecurring: false,
+        captchaToken: "test-token",
+        captchaAnswer: "test-answer"
+      })
+    });
+
+    const response = await POST(request);
+    expect([200, 503]).toContain(response.status);
+    const payload = (await response.json()) as { id: string };
+
+    const row = await prisma.bookingRequest.findUniqueOrThrow({
+      where: { id: payload.id }
+    });
+    expect(row.assignedTeacherId).toBe(teacher.id);
   });
 });

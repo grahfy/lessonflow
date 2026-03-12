@@ -124,6 +124,37 @@ describe("admin role permissions", () => {
     expect(customer.primaryTeacherId).toBe(teacher.id);
   });
 
+  it("auto-assigns owner-created bookings when exactly one active teacher exists", async () => {
+    await ensureOwnerAdmin();
+    const teacher = await createTeacher("solo-owner-booking@example.com", "Solo Owner Booking");
+    const owner = await prisma.adminUser.findFirstOrThrow({
+      where: { role: "owner" }
+    });
+    const token = createSessionToken(owner.email);
+
+    const response = await createBooking(
+      new NextRequest("http://localhost/api/admin/bookings", {
+        method: "POST",
+        headers: authHeaders(token, true),
+        body: JSON.stringify(baseBookingPayload(addDays(new Date(), 9).toISOString()))
+      })
+    );
+
+    expect(response.status).toBe(200);
+
+    const booking = await prisma.booking.findFirstOrThrow({
+      where: { email: "jamie@example.com" },
+      orderBy: { createdAt: "desc" }
+    });
+    const customer = await prisma.customer.findFirstOrThrow({
+      where: { email: "jamie@example.com" },
+      orderBy: { createdAt: "desc" }
+    });
+
+    expect(booking.assignedTeacherId).toBe(teacher.id);
+    expect(customer.primaryTeacherId).toBe(teacher.id);
+  });
+
   it("prevents teachers from editing another teacher's booking", async () => {
     await ensureOwnerAdmin();
     const teacherA = await createTeacher("teacher-a@example.com", "Teacher A");

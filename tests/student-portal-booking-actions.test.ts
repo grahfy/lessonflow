@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import { addDays } from "date-fns";
 import { beforeEach, describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
@@ -24,6 +25,7 @@ describe("student-portal-booking-actions", () => {
     await prisma.bookingSeries.deleteMany();
     await prisma.bookingRequest.deleteMany();
     await prisma.customer.deleteMany();
+    await prisma.adminUser.deleteMany();
     await prisma.outboundEmail.deleteMany();
   });
 
@@ -80,6 +82,66 @@ describe("student-portal-booking-actions", () => {
     expect(created.lastName).toBe("Student");
     expect(created.lessonMode).toBe("video");
     expect(created.lessonDuration).toBe("min30");
+  });
+
+  it("auto-assigns student booking requests when the student has no teacher and only one teacher exists", async () => {
+    const teacher = await prisma.adminUser.create({
+      data: {
+        email: "student-portal-solo@example.com",
+        role: "teacher",
+        firstName: "Portal",
+        lastName: "Solo",
+        displayName: "Portal Solo",
+        passwordHash: await bcrypt.hash("teacher-password", 12),
+        isActive: true
+      }
+    });
+
+    const customer = await prisma.customer.create({
+      data: customerSnapshotFromInput({
+        firstName: "Solo",
+        lastName: "Student",
+        name: "Solo Student",
+        email: "solo.student@example.com",
+        phone: "0400777000",
+        lessonMode: "video",
+        skillLevel: "intermediate",
+        unitNumber: undefined,
+        houseNumber: "22",
+        streetName: "River",
+        streetType: "Road",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070"
+      })
+    });
+
+    const request = new NextRequest("http://localhost/api/student/bookings", {
+      method: "POST",
+      body: JSON.stringify({
+        requestedStartAt: addDays(new Date(), 2).toISOString(),
+        lessonMode: "video",
+        lessonDuration: "min60",
+        notes: "Auto-assign me."
+      }),
+      headers: {
+        "content-type": "application/json",
+        cookie: `${getStudentSessionCookieName()}=${createStudentSessionToken(customer.id)}`
+      }
+    });
+
+    const response = await createStudentBooking(request);
+    expect(response.status).toBe(201);
+
+    const created = await prisma.bookingRequest.findFirstOrThrow({
+      where: {
+        customerId: customer.id
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    });
+    expect(created.assignedTeacherId).toBe(teacher.id);
   });
 
   it("cancels an upcoming owned booking", async () => {

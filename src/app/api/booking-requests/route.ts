@@ -15,6 +15,7 @@ import { NextResponse } from "next/server";
 import { bookingRequestSchema, formatBookingAddress } from "@/lib/booking-rules";
 import { verifyCaptchaGuard } from "@/lib/captcha";
 import { prisma } from "@/lib/db";
+import { resolveAutoAssignedTeacherId } from "@/lib/admin/teacher-assignment";
 import { resolveRequestCountry } from "@/lib/geo-country";
 import { sendOwnerBookingEmail } from "@/lib/booking-events";
 import { logError, logEvent } from "@/lib/observability";
@@ -163,6 +164,11 @@ export async function POST(request: Request) {
       finalCustomDuration = null;
     }
 
+    const assignedTeacherId = await resolveAutoAssignedTeacherId({
+      db: prisma,
+      preferredTeacherId: existingCustomer?.primaryTeacherId ?? null
+    });
+
     // STEP 4: DB Persistence
     const created = await prisma.bookingRequest.create({
       data: {
@@ -187,6 +193,7 @@ export async function POST(request: Request) {
         notes: parsed.data.notes,
         isRecurring: parsed.data.isRecurring,
         recurrenceEndAt: parsed.data.recurrenceEndAt ? new Date(parsed.data.recurrenceEndAt) : null,
+        assignedTeacherId,
         // Link to existing customer if found
         customerId: existingCustomer?.id ?? null
       }

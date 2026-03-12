@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { resolveAutoAssignedTeacherId } from "@/lib/admin/teacher-assignment";
 import { formatBookingAddress } from "@/lib/booking-rules";
 import { prisma } from "@/lib/db";
 import { ownerPendingBookingTemplate } from "@/lib/email/templates";
@@ -59,6 +60,11 @@ export async function POST(request: NextRequest) {
     postcode: student.postcode
   });
 
+  const assignedTeacherId = await resolveAutoAssignedTeacherId({
+    db: prisma,
+    preferredTeacherId: student.primaryTeacherId
+  });
+
   // Student portal creates pending requests only; admin approval converts them into bookings.
   const created = await prisma.bookingRequest.create({
     data: {
@@ -79,7 +85,7 @@ export async function POST(request: NextRequest) {
       skillLevel: student.skillLevel,
       lessonDuration: parsed.data.lessonDuration,
       customDurationMinutes: parsed.data.customDurationMinutes ?? null,
-      assignedTeacherId: student.primaryTeacherId,
+      assignedTeacherId,
       requestedStartAt,
       notes: parsed.data.notes || null,
       isRecurring: false,
