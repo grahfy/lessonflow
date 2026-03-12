@@ -38,8 +38,11 @@ import { useBookings, type BookingEvent } from "@/lib/admin/use-bookings";
 import { useCustomers } from "@/lib/admin/use-customers";
 import { useEmailHistory } from "@/lib/admin/use-email-history";
 import { useLearningMaterials } from "@/lib/admin/use-learning-materials";
+import { useAdminSession } from "@/lib/admin/use-admin-session";
 import { usePresets } from "@/lib/admin/use-presets";
+import { useTeachers } from "@/lib/admin/use-teachers";
 import { buildManualBookingPayload } from "@/lib/admin/manual-booking-payload";
+import { toDateKey, toDateTimeLocalValue } from "@/lib/time";
 
 import { BookingDetailDialog } from "./booking-detail-dialog";
 import { ManualBookingDialog } from "./manual-booking-dialog";
@@ -127,7 +130,7 @@ export function AdminBookingsClient() {
   
   // PARAMS: Sync calendar view state with URL for shareable/bookmarkable states.
   const view = (searchParams.get("view") as CalendarView) || "week";
-  const dateStr = searchParams.get("date") || new Date().toISOString().split("T")[0];
+  const dateStr = searchParams.get("date") || toDateKey(new Date());
 
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -140,6 +143,7 @@ export function AdminBookingsClient() {
   }, [notice]);
 
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [teacherFilter, setTeacherFilter] = useState("all");
 
   // Dialog & Selection State
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -174,6 +178,7 @@ export function AdminBookingsClient() {
   const manualFormRef = useRef<HTMLFormElement | null>(null);
 
   const onAuthError = useCallback(() => window.location.assign("/admin/login"), []);
+  const { admin: currentAdmin } = useAdminSession({ onAuthError, onError: setError });
 
   // Data Fetching Hooks (Abstracted for reuse and clean component logic)
   const { 
@@ -186,6 +191,7 @@ export function AdminBookingsClient() {
   const events = useMemo(() => rawEvents as EventWithRow[], [rawEvents]);
 
   const { customers: customerOptions, load: loadCustomers } = useCustomers({ pageSize: 250, onAuthError, onError: setError });
+  const { teachers: teacherOptions } = useTeachers({ onAuthError, onError: setError });
   const { 
     history: emailHistory, 
     loading: loadingEmailHistory, 
@@ -199,6 +205,18 @@ export function AdminBookingsClient() {
   const { presets } = usePresets({ onAuthError, onError: setError });
 
   const selectedEvent = useMemo(() => events.find((event) => event.id === selectedKey) || null, [events, selectedKey]);
+  const filteredEvents = useMemo(() => {
+    if (teacherFilter === "all") return events;
+    if (teacherFilter === "unassigned") {
+      return events.filter((event) => !event.row.assignedTeacherId);
+    }
+    return events.filter((event) => event.row.assignedTeacherId === teacherFilter);
+  }, [events, teacherFilter]);
+  const canManageSelectedEvent = useMemo(() => {
+    if (!currentAdmin || !selectedEvent) return false;
+    return currentAdmin.role === "owner" || selectedEvent.row.assignedTeacherId === currentAdmin.id;
+  }, [currentAdmin, selectedEvent]);
+  const canApproveSelectedRequest = Boolean(currentAdmin?.role === "owner" && selectedEvent?.entityType === "booking_request");
   
   // LOGIC: Resolve customer relationships
   const linkedCustomer = useMemo(() => {
@@ -258,7 +276,7 @@ export function AdminBookingsClient() {
     const row = event.row as BookingRowData;
     setDialogForm({
       notes: typeof row.notes === "string" ? row.notes : "",
-      startAtLocal: event.startAt.slice(0, 16),
+      startAtLocal: toDateTimeLocalValue(event.startAt),
       firstName: typeof row.firstName === "string" ? row.firstName : "",
       lastName: typeof row.lastName === "string" ? row.lastName : "",
       email: typeof row.email === "string" ? row.email : "",
@@ -272,6 +290,7 @@ export function AdminBookingsClient() {
       postcode: typeof row.postcode === "string" ? row.postcode : "",
       lessonMode: typeof row.lessonMode === "string" ? row.lessonMode : "in_person",
       skillLevel: typeof row.skillLevel === "string" ? row.skillLevel : "beginner",
+      assignedTeacherId: typeof row.assignedTeacherId === "string" ? row.assignedTeacherId : "",
       durationChoice: typeof row.lessonDuration === "string" ? row.lessonDuration : "min30",
       customDurationMinutes: row.customDurationMinutes == null ? "" : String(row.customDurationMinutes)
     });
@@ -284,12 +303,14 @@ export function AdminBookingsClient() {
 
     if (typeof row.customerId === "string" && row.customerId) {
       void loadEmailHistory(row.customerId);
-      void loadMaterials(row.customerId, event.id);
+      if (currentAdmin?.role === "owner" || row.assignedTeacherId === currentAdmin?.id) {
+        void loadMaterials(row.customerId, event.id);
+      }
     }
 
     dialogPresence.show();
     if (dialogRootRef.current) animateIn(dialogRootRef.current);
-  }, [dialogPresence, loadCustomers, loadEmailHistory, loadMaterials]);
+  }, [currentAdmin, dialogPresence, loadCustomers, loadEmailHistory, loadMaterials]);
 
   const closeDialog = useCallback(async () => {
     if (dialogRootRef.current) await animateOut(dialogRootRef.current);
@@ -527,7 +548,11 @@ export function AdminBookingsClient() {
     if (!event) return;
     
     setBusyAction(action);
-    const success = await updateBookingApi(selectedKey!, event.entityType, action, {});
+    const payload =
+      action === "approve" && dialogForm
+        ? { assignedTeacherId: dialogForm.assignedTeacherId || null }
+        : {};
+    const success = await updateBookingApi(selectedKey!, event.entityType, action, payload);
     setBusyAction(null);
     
     if (success) {
@@ -594,6 +619,18 @@ export function AdminBookingsClient() {
                 <button className={`btn ${view === "year" ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => navigate("year", dateStr)}>Year</button>
               </Tooltip>
             </div>
+            <div className="field admin-inline-field booking-teacher-filter-field">
+              <label htmlFor="booking-teacher-filter">Teacher</label>
+              <select id="booking-teacher-filter" value={teacherFilter} onChange={(event) => setTeacherFilter(event.target.value)}>
+                <option value="all">All teachers</option>
+                <option value="unassigned">Unassigned</option>
+                {teacherOptions.map((teacher) => (
+                  <option key={teacher.id} value={teacher.id}>
+                    {teacher.displayName}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="admin-range-divider" />
             <Tooltip content="Create a new booking directly from the admin calendar.">
               <button className="btn btn-primary" type="button" onClick={openManualDialog}>New Booking</button>
@@ -605,7 +642,7 @@ export function AdminBookingsClient() {
           <AdminBookingCalendar
             view={view}
             date={dateStr}
-            events={events}
+            events={filteredEvents}
             selectedEventId={selectedKey}
             onSelect={openDialog}
           />
@@ -623,10 +660,15 @@ export function AdminBookingsClient() {
           busyAction={busyAction}
           onSave={saveBooking}
           onDelete={deleteBooking}
+          canManageAppointment={canManageSelectedEvent}
+          canApproveRequest={canApproveSelectedRequest}
+          canEditTeacherAssignment={currentAdmin?.role === "owner"}
+          canInvoice={currentAdmin?.role === "owner"}
+          teacherOptions={teacherOptions}
           onMove={() => {
             const event = events.find(e => e.id === selectedKey);
             if (event) {
-              setMoveNewStart(event.startAt.slice(0, 16));
+              setMoveNewStart(toDateTimeLocalValue(event.startAt));
               setIsMoveOpen(true);
             }
           }}
@@ -740,6 +782,9 @@ export function AdminBookingsClient() {
           setUpdateCustomerFromBooking={setManualUpdateCustomerFromBooking}
           isRecurring={manualIsRecurring}
           setIsRecurring={setManualIsRecurring}
+          canEditAssignment={currentAdmin?.role === "owner"}
+          teacherOptions={teacherOptions}
+          currentTeacherId={currentAdmin?.role === "teacher" ? currentAdmin.id : null}
           durationChoice={manualDurationChoice}
           setDurationChoice={setManualDurationChoice}
           manualMatch={manualMatch}

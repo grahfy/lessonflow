@@ -13,6 +13,7 @@ import { useTweenOrchestrator } from "@/components/motion/tween-orchestrator";
 import { parseAudInputToCents } from "@/lib/invoices/currency";
 import { DEFAULT_CURRENCY } from "@/lib/branding";
 import { toDateTimeLocalValue, toMoneyInput } from "@/lib/admin/formatters";
+import { dateTimeLocalToIso } from "@/lib/time";
 
 import { useInvoices, type InvoiceAction, type InvoiceRow, type InvoiceTaxMode } from "@/lib/admin/use-invoices";
 import { usePresets } from "@/lib/admin/use-presets";
@@ -281,6 +282,13 @@ export function AdminInvoicesClient() {
     setBusyAction("save");
     setError("");
 
+    const dueAt = dateTimeLocalToIso(editingDueAt);
+    if (!dueAt) {
+      setBusyAction(null);
+      setError("Please enter a valid due date and time.");
+      return;
+    }
+
     const lineItemsPayload = editingLineItems.map((li) => ({
       kind: li.kind,
       description: li.description,
@@ -291,7 +299,7 @@ export function AdminInvoicesClient() {
 
     const result = await saveInvoiceApi(selectedInvoice.id, {
       notes: editingNotes,
-      dueAt: new Date(editingDueAt).toISOString(),
+      dueAt,
       customerFirstName: editingCustomerFirstName,
       customerLastName: editingCustomerLastName,
       customerName: `${editingCustomerFirstName} ${editingCustomerLastName}`.trim(),
@@ -347,6 +355,13 @@ export function AdminInvoicesClient() {
       setError("Please select a customer.");
       return;
     }
+
+    const dueAt = createDueAt ? dateTimeLocalToIso(createDueAt) : new Date().toISOString();
+    if (!dueAt) {
+      setError("Please enter a valid due date and time.");
+      return;
+    }
+
     setBusyAction(shouldSend ? "create_send" : "create");
     setError("");
 
@@ -369,7 +384,7 @@ export function AdminInvoicesClient() {
       basis: createInvoiceBasis,
       lessonPriceCents: parseAudInputToCents(createLessonPrice).cents || 0,
       standalonePriceCents: parseAudInputToCents(createStandalonePrice).cents || 0,
-      dueAt: createDueAt ? new Date(createDueAt).toISOString() : new Date().toISOString(),
+      dueAt,
       taxMode: createTaxMode,
       lineItems: (() => {
         if (createInvoiceBasis === "standalone") {

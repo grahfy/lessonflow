@@ -1,6 +1,8 @@
 export type BookingRowData = Record<string, unknown> & {
   customerId?: string | null;
   customerName?: string | null;
+  assignedTeacherId?: string | null;
+  assignedTeacherName?: string | null;
   notes?: string | null;
   firstName?: string | null;
   lastName?: string | null;
@@ -35,6 +37,7 @@ export type BookingDialogForm = {
   postcode: string;
   lessonMode: string;
   skillLevel: string;
+  assignedTeacherId: string;
   durationChoice: string;
   customDurationMinutes: string;
 };
@@ -55,4 +58,5 @@ export type BookingMatchedCustomer = {
   postcode?: string | null;
   skillLevel?: string | null;
   lessonMode?: string | null;
+  primaryTeacherId?: string | null;
 };

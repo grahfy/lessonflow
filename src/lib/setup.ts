@@ -887,6 +887,8 @@ export async function createInitialAdmin(input: SetupInitializeInput) {
     const admin = await tx.adminUser.create({
       data: {
         email: normalizedEmail,
+        role: "owner",
+        firstName: displayName,
         displayName,
         passwordHash,
         isActive: true

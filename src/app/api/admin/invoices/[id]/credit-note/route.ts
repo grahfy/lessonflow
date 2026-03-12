@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { isOwnerAdmin } from "@/lib/admin-auth";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { prisma } from "@/lib/db";
 import { createCreditNoteSchema } from "@/lib/invoices/schema";
@@ -18,6 +19,9 @@ export async function POST(request: NextRequest, { params }: Params) {
   const admin = await requireAdminFromRequest(request);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!isOwnerAdmin(admin)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const body = await request.json().catch(() => ({}));

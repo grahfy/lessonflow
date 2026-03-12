@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import { canManagePrimaryTeacherCustomer, isOwner } from "@/lib/admin/permissions";
+import { resolveAssignedTeacherId } from "@/lib/admin/teacher-assignment";
 import { auPhoneSchema, auPostcodeSchema, auStateSchema, lessonModeSchema, skillLevelSchema } from "@/lib/booking-rules";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
@@ -29,6 +31,7 @@ const updateCustomerSchema = z.object({
   suburb: z.string().trim().max(80).optional(),
   state: auStateSchema.optional(),
   postcode: auPostcodeSchema.optional(),
+  primaryTeacherId: z.string().trim().min(1).nullable().optional(),
   isArchived: z.boolean().optional()
 });
 
@@ -46,6 +49,12 @@ export async function GET(request: NextRequest, { params }: Params) {
     const customer = await prisma.customer.findUnique({
       where: { id },
       include: {
+        primaryTeacher: {
+          select: {
+            id: true,
+            displayName: true
+          }
+        },
         portalCredential: {
           select: {
             id: true,
@@ -86,6 +95,19 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (!existing) {
       return NextResponse.json({ error: "Customer not found." }, { status: 404 });
     }
+    if (!canManagePrimaryTeacherCustomer(admin, existing.primaryTeacherId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const nextPrimaryTeacherId =
+      parsed.data.primaryTeacherId === undefined
+        ? existing.primaryTeacherId
+        : await resolveAssignedTeacherId({
+            db: prisma,
+            actor: admin,
+            requestedAssignedTeacherId: parsed.data.primaryTeacherId,
+            fallbackTeacherId: parsed.data.primaryTeacherId === null ? null : existing.primaryTeacherId
+          });
 
     // Compute the full next-state customer values server-side so partial edits preserve lookup
     // normalization fields (email/phone/name tokens) consistently.
@@ -145,7 +167,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         suburb: parsed.data.suburb ?? existing.suburb,
         state: parsed.data.state ?? existing.state,
         postcode: parsed.data.postcode ?? existing.postcode,
-        isArchived: parsed.data.isArchived ?? existing.isArchived
+        ...(isOwner(admin) ? { primaryTeacherId: nextPrimaryTeacherId } : {}),
+        isArchived: isOwner(admin) ? parsed.data.isArchived ?? existing.isArchived : existing.isArchived
       }
     });
 
@@ -160,6 +183,9 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     const admin = await requireAdminFromRequest(request);
     if (!admin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!isOwner(admin)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const { id } = await params;

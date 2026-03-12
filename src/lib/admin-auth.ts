@@ -15,7 +15,7 @@
  * even under load.
  */
 
-import { AdminUser } from "@/generated/prisma/client";
+import { AdminRole, AdminUser } from "@/generated/prisma/client";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
@@ -106,11 +106,24 @@ export async function ensureOwnerAdmin(): Promise<AdminUser> {
     where: { email }
   });
 
-  if (existing) return existing;
+  if (existing) {
+    if (existing.role !== "owner" || !existing.isActive) {
+      return prisma.adminUser.update({
+        where: { id: existing.id },
+        data: {
+          role: "owner",
+          isActive: true
+        }
+      });
+    }
+    return existing;
+  }
 
   return prisma.adminUser.create({
     data: {
       email,
+      role: "owner",
+      firstName: "Owner",
       displayName,
       passwordHash,
       isActive: true
@@ -121,9 +134,28 @@ export async function ensureOwnerAdmin(): Promise<AdminUser> {
 /** Retrieves the primary admin (usually the school owner/founder). */
 export async function getPrimaryActiveAdmin(): Promise<AdminUser | null> {
   return prisma.adminUser.findFirst({
-    where: { isActive: true },
+    where: {
+      isActive: true,
+      role: "owner"
+    },
     orderBy: { createdAt: "asc" }
   });
+}
+
+export function isOwnerRole(role: AdminRole): boolean {
+  return role === "owner";
+}
+
+export function isTeacherRole(role: AdminRole): boolean {
+  return role === "teacher";
+}
+
+export function isOwnerAdmin(admin: Pick<AdminUser, "role">): boolean {
+  return isOwnerRole(admin.role);
+}
+
+export function isTeacherAdmin(admin: Pick<AdminUser, "role">): boolean {
+  return isTeacherRole(admin.role);
 }
 
 /** Checks provided credentials against stored BCrypt hashes. */

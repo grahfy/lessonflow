@@ -100,6 +100,28 @@ Default admin credentials:
 - Email: `admin@example.com`
 - Password: `admin123`
 
+## Ephemeral Demo Preview
+
+For a sales/demo-friendly local instance that resets when the session ends:
+
+```bash
+./scripts/test-full-site-demo.sh
+```
+
+Behavior:
+1. Starts a dedicated demo MariaDB container
+2. Runs migrations and seeds a richer demo dataset
+3. Prints frontend, admin, and student preview links plus demo credentials
+4. Allows data changes during the session
+5. Removes the demo database container on exit so the next run starts clean
+
+Useful options:
+
+```bash
+./scripts/test-full-site-demo.sh --skip-install
+./scripts/test-full-site-demo.sh --no-start
+```
+
 ## Manual Setup (Step by Step)
 
 ### 1. Clone and Install Dependencies

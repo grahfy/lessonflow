@@ -106,6 +106,11 @@ enum LearningMaterialType {
   image
 }
 
+enum AdminRole {
+  owner
+  teacher
+}
+
 // Public website contact form submissions. These are stored even when email
 // delivery fails so admins can follow up later and inspect retry logs.
 model ContactSubmission {
@@ -149,12 +154,15 @@ model BookingRequest {
   updatedAt             DateTime             @updatedAt
   approvedById          String?
   approvedBy            AdminUser?           @relation("RequestApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
+  assignedTeacherId     String?
+  assignedTeacher       AdminUser?           @relation("BookingRequestAssignedTeacher", fields: [assignedTeacherId], references: [id], onDelete: SetNull)
   customerId            String?
   customer              Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
   bookings              Booking[]
 
   @@index([requestedStartAt, status])
   @@index([customerId])
+  @@index([assignedTeacherId])
 }
 
 // Recurring booking template metadata used to generate/track multiple concrete
@@ -186,11 +194,14 @@ model BookingSeries {
   isActive              Boolean        @default(true)
   createdAt             DateTime       @default(now())
   updatedAt             DateTime       @updatedAt
+  assignedTeacherId     String?
+  assignedTeacher       AdminUser?     @relation("BookingSeriesAssignedTeacher", fields: [assignedTeacherId], references: [id], onDelete: SetNull)
   customerId            String?
   customer              Customer?      @relation(fields: [customerId], references: [id], onDelete: SetNull)
   bookings              Booking[]
 
   @@index([customerId])
+  @@index([assignedTeacherId])
 }
 
 // Confirmed or cancelled lesson instances shown in admin/student calendar views.
@@ -226,6 +237,8 @@ model Booking {
   request               BookingRequest?    @relation(fields: [requestId], references: [id], onDelete: SetNull)
   seriesId              String?
   series                BookingSeries?     @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  assignedTeacherId     String?
+  assignedTeacher       AdminUser?         @relation("BookingAssignedTeacher", fields: [assignedTeacherId], references: [id], onDelete: SetNull)
   customerId            String?
   customer              Customer?          @relation(fields: [customerId], references: [id], onDelete: SetNull)
   modifiedById          String?
@@ -236,6 +249,7 @@ model Booking {
 
   @@index([startAt, status])
   @@index([customerId])
+  @@index([assignedTeacherId])
 }
 
 // Append-only audit trail for booking/request lifecycle actions performed by an
@@ -259,12 +273,33 @@ model BookingAuditLog {
 model AdminUser {
   id                        String                             @id @default(cuid())
   email                     String                             @unique
+  role                      AdminRole                          @default(owner)
+  firstName                 String                             @default("")
+  lastName                  String                             @default("")
   displayName               String
   passwordHash              String
+  age                       Int?
+  unitNumber                String?
+  houseNumber               String                             @default("")
+  streetName                String                             @default("")
+  streetType                String                             @default("")
+  suburb                    String                             @default("")
+  state                     String                             @default("")
+  postcode                  String                             @default("")
+  instruments               String?                            @db.Text
+  specialisations           String?                            @db.Text
+  background                String?                            @db.Text
+  musicalHistory            String?                            @db.Text
+  profilePhotoStorageKey    String?
+  profilePhotoMimeType      String?
   isActive                  Boolean                            @default(true)
   createdAt                 DateTime                           @default(now())
   updatedAt                 DateTime                           @updatedAt
   approvedRequests          BookingRequest[]                   @relation("RequestApprovals")
+  assignedBookingRequests   BookingRequest[]                   @relation("BookingRequestAssignedTeacher")
+  assignedBookingSeries     BookingSeries[]                    @relation("BookingSeriesAssignedTeacher")
+  assignedBookings          Booking[]                          @relation("BookingAssignedTeacher")
+  primaryTeacherCustomers   Customer[]                         @relation("CustomerPrimaryTeacher")
   editedBookings            Booking[]                          @relation("BookingEdits")
   auditLogs                 BookingAuditLog[]
   createdInvoices           Invoice[]                          @relation("InvoiceCreatedBy")
@@ -299,6 +334,8 @@ model Customer {
   isArchived                Boolean                            @default(false)
   createdAt                 DateTime                           @default(now())
   updatedAt                 DateTime                           @updatedAt
+  primaryTeacherId          String?
+  primaryTeacher            AdminUser?                         @relation("CustomerPrimaryTeacher", fields: [primaryTeacherId], references: [id], onDelete: SetNull)
   bookingRequests           BookingRequest[]
   bookingSeries             BookingSeries[]
   bookings                  Booking[]
@@ -311,6 +348,7 @@ model Customer {
   @@index([normalizedFullName, postcode, isArchived])
   @@index([normalizedEmail])
   @@index([normalizedPhone])
+  @@index([primaryTeacherId])
 }
 
 // Portal credentials are stored as both a hash (verification) and encrypted

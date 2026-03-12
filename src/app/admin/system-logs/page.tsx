@@ -1,5 +1,5 @@
 import { SystemLogsClient } from "@/components/admin/system-logs-client";
-import { requireAdmin } from "@/lib/admin/server-auth";
+import { requireOwner } from "@/lib/admin/server-auth";
 
 export const metadata = {
   title: "System Logs"
@@ -9,6 +9,6 @@ export const metadata = {
  * Protected admin system logs route.
  */
 export default async function SystemLogsPage() {
-  await requireAdmin();
+  await requireOwner();
   return <SystemLogsClient />;
 }

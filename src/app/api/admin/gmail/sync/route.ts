@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isOwnerAdmin } from "@/lib/admin-auth";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { syncGmailSentMessages } from "@/lib/gmail/sync";
@@ -12,6 +13,9 @@ export async function POST(request: NextRequest) {
     const admin = await requireAdminFromRequest(request);
     if (!admin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!isOwnerAdmin(admin)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     if (!isGmailConfigured()) {

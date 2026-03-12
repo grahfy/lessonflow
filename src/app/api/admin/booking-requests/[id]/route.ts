@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@/generated/prisma/client";
 import { z } from "zod";
 
+import { canManageAssignedTeacher, isOwner } from "@/lib/admin/permissions";
+import { ensureCustomerPrimaryTeacher, resolveAssignedTeacherId } from "@/lib/admin/teacher-assignment";
 import {
   auPhoneSchema,
   auPostcodeSchema,
@@ -43,6 +45,7 @@ const requestEditSchema = z.object({
   skillLevel: skillLevelSchema.optional(),
   lessonDuration: lessonDurationSchema.optional(),
   customDurationMinutes: z.coerce.number().int().min(15).max(300).nullable().optional(),
+  assignedTeacherId: z.string().trim().min(1).nullable().optional(),
   requestedStartAt: z.string().datetime({ offset: true }).optional(),
   notes: z.string().trim().max(1000).nullable().optional(),
   isRecurring: z.boolean().optional(),
@@ -158,9 +161,25 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
     if (action === "approve") {
+      if (!isOwner(admin)) {
+        return NextResponse.json({ error: "Only the owner can approve booking requests." }, { status: 403 });
+      }
       if (bookingRequest.status !== "pending") {
         return NextResponse.json({ error: "Only pending requests can be approved." }, { status: 400 });
       }
+
+      const requestedAssignedTeacherId = await resolveAssignedTeacherId({
+        db: prisma,
+        actor: admin,
+        requestedAssignedTeacherId:
+          body && Object.prototype.hasOwnProperty.call(body, "assignedTeacherId")
+            ? (body.assignedTeacherId as string | null)
+            : bookingRequest.assignedTeacherId,
+        fallbackTeacherId:
+          body && Object.prototype.hasOwnProperty.call(body, "assignedTeacherId") && body.assignedTeacherId === null
+            ? null
+            : bookingRequest.assignedTeacherId
+      });
 
       // Approval spans customer resolution, booking creation, request status update, and portal
       // credential ensure. Keeping this transactional prevents partially approved states.
@@ -199,6 +218,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
               startDate: bookingRequest.requestedStartAt,
               recurrenceEndAt: bookingRequest.recurrenceEndAt,
               timezone: APP_TIMEZONE,
+              assignedTeacherId: requestedAssignedTeacherId,
               customerId
             }
           });
@@ -235,6 +255,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
               timezone: APP_TIMEZONE,
               requestId: bookingRequest.id,
               seriesId: series.id,
+              assignedTeacherId: requestedAssignedTeacherId,
               customerId,
               modifiedById: admin.id
             }))
@@ -267,6 +288,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
               ),
               timezone: APP_TIMEZONE,
               requestId: bookingRequest.id,
+              assignedTeacherId: requestedAssignedTeacherId,
               customerId,
               modifiedById: admin.id
             }
@@ -278,8 +300,15 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           data: {
             status: "approved",
             approvedById: admin.id,
+            assignedTeacherId: requestedAssignedTeacherId,
             customerId
           }
+        });
+
+        await ensureCustomerPrimaryTeacher({
+          db: tx,
+          customerId,
+          assignedTeacherId: requestedAssignedTeacherId
         });
 
         // Ensure portal credentials before the approval email so first-time approved students can
@@ -327,6 +356,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
     if (action === "reject") {
+      if (!canManageAssignedTeacher(admin, bookingRequest.assignedTeacherId)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
       if (bookingRequest.status !== "pending") {
         return NextResponse.json({ error: "Only pending requests can be rejected." }, { status: 400 });
       }
@@ -357,6 +389,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
     if (action === "cancel") {
+      if (!canManageAssignedTeacher(admin, bookingRequest.assignedTeacherId)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
       if (bookingRequest.status !== "pending") {
         return NextResponse.json({ error: "Only pending requests can be cancelled." }, { status: 400 });
       }
@@ -387,6 +422,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
     if (action === "move") {
+      if (!canManageAssignedTeacher(admin, bookingRequest.assignedTeacherId)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
       if (bookingRequest.status !== "pending") {
         return NextResponse.json({ error: "Only pending requests can be moved." }, { status: 400 });
       }
@@ -413,10 +451,23 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       if (!parsed.success) {
         return NextResponse.json({ error: "Invalid edit payload.", details: parsed.error.flatten() }, { status: 400 });
       }
+      if (!canManageAssignedTeacher(admin, bookingRequest.assignedTeacherId)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
 
       if (bookingRequest.status !== "pending") {
         return NextResponse.json({ error: "Only pending requests can be edited." }, { status: 400 });
       }
+
+      const nextAssignedTeacherId =
+        parsed.data.assignedTeacherId === undefined
+          ? bookingRequest.assignedTeacherId
+          : await resolveAssignedTeacherId({
+              db: prisma,
+              actor: admin,
+              requestedAssignedTeacherId: parsed.data.assignedTeacherId,
+              fallbackTeacherId: parsed.data.assignedTeacherId === null ? null : bookingRequest.assignedTeacherId
+            });
 
       // As with booking edits, compute the full next-state payload server-side for consistency and
       // to preserve required fields during partial updates.
@@ -488,6 +539,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             parsed.data.customDurationMinutes === undefined
               ? bookingRequest.customDurationMinutes
               : parsed.data.customDurationMinutes,
+          ...(isOwner(admin) ? { assignedTeacherId: nextAssignedTeacherId } : {}),
           requestedStartAt: parsed.data.requestedStartAt ? new Date(parsed.data.requestedStartAt) : bookingRequest.requestedStartAt,
           notes:
             parsed.data.notes === undefined
@@ -532,11 +584,15 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       where: { id },
       select: {
         id: true,
-        status: true
+        status: true,
+        assignedTeacherId: true
       }
     });
     if (!existing) {
       return NextResponse.json({ error: "Request not found." }, { status: 404 });
+    }
+    if (!canManageAssignedTeacher(admin, existing.assignedTeacherId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // RATIONALE: Once approved, the request is no longer the operational source

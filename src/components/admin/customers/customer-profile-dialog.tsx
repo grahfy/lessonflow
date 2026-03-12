@@ -28,6 +28,11 @@ export type CustomerRow = {
     state: string;
     postcode: string;
     isArchived: boolean;
+    primaryTeacherId?: string | null;
+    primaryTeacher?: {
+        id: string;
+        displayName: string;
+    } | null;
     portalCredential?: {
         id: string;
         generatedAt: string;
@@ -51,6 +56,7 @@ export type CustomerForm = {
     suburb: string;
     state: AuState;
     postcode: string;
+    primaryTeacherId: string;
 };
 
 /** Empty baseline for create/reset flows before a customer is selected. */
@@ -69,7 +75,8 @@ export function emptyCustomerForm(): CustomerForm {
         streetType: "Street",
         suburb: "",
         state: "VIC",
-        postcode: ""
+        postcode: "",
+        primaryTeacherId: ""
     };
 }
 
@@ -103,7 +110,8 @@ export function customerFormFromRow(customer: CustomerRow): CustomerForm {
         streetType: customer.streetType ?? "Street",
         suburb: customer.suburb ?? "",
         state: toAuState(customer.state),
-        postcode: customer.postcode ?? ""
+        postcode: customer.postcode ?? "",
+        primaryTeacherId: customer.primaryTeacherId ?? ""
     };
 }
 
@@ -114,6 +122,12 @@ type Props = {
     setForm: React.Dispatch<React.SetStateAction<CustomerForm>>;
     savingCustomer: boolean;
     deletingCustomerId: string | null;
+    canEditProfile: boolean;
+    canEditAssignment: boolean;
+    teacherOptions: Array<{ id: string; displayName: string }>;
+    canManagePortalCredentials: boolean;
+    canViewBillingHistory: boolean;
+    canDeleteCustomer: boolean;
     revealedPortalPasswords: Record<string, string>;
     portalCredentialBusyCustomerId: string | null;
     onSave: () => void;
@@ -132,6 +146,12 @@ export function CustomerProfileDialog({
     setForm,
     savingCustomer,
     deletingCustomerId,
+    canEditProfile,
+    canEditAssignment,
+    teacherOptions,
+    canManagePortalCredentials,
+    canViewBillingHistory,
+    canDeleteCustomer,
     revealedPortalPasswords,
     portalCredentialBusyCustomerId,
     onSave,
@@ -205,6 +225,23 @@ export function CustomerProfileDialog({
                             </select>
                         ) : (
                             <input value={form.lessonMode === "in_person" ? "In-person" : "Video"} readOnly />
+                        )}
+                    </AdminField>
+                    <AdminField label="Assigned Teacher" tooltip="Default teacher assignment for this student.">
+                        {isEditing && canEditAssignment ? (
+                            <select
+                                value={form.primaryTeacherId}
+                                onChange={e => updateForm({ primaryTeacherId: e.target.value })}
+                            >
+                                <option value="">Unassigned</option>
+                                {teacherOptions.map((teacher) => (
+                                    <option key={teacher.id} value={teacher.id}>
+                                        {teacher.displayName}
+                                    </option>
+                                ))}
+                            </select>
+                        ) : (
+                            <input value={customer?.primaryTeacher?.displayName || "Unassigned"} readOnly />
                         )}
                     </AdminField>
                 </AdminForm>
@@ -313,11 +350,12 @@ export function CustomerProfileDialog({
                                         className="btn btn-secondary customer-portal-copy-btn"
                                         onClick={() => {
                                             // RATIONALE: Revealed credentials are
-                                            // short-lived in the UI, so clipboard
-                                            // copy reduces transcription mistakes.
+                                    // short-lived in the UI, so clipboard
+                                    // copy reduces transcription mistakes.
                                             void navigator.clipboard.writeText(revealedPortalPasswords[customer.id]);
                                             alert("Password copied to clipboard");
                                         }}
+                                        disabled={!canManagePortalCredentials}
                                     >
                                         Copy
                                     </button>
@@ -333,7 +371,7 @@ export function CustomerProfileDialog({
                                     // NOTE: Credential actions are disabled while
                                     // editing so the dialog cannot mix profile
                                     // saves with security-sensitive mutations.
-                                    disabled={!customer || !customer.portalCredential || portalCredentialBusyCustomerId === customer.id || isEditing}
+                                    disabled={!canManagePortalCredentials || !customer || !customer.portalCredential || portalCredentialBusyCustomerId === customer.id || isEditing}
                                     onClick={() => customer && onRevealPortalPassword()}
                                 >
                                     {customer && portalCredentialBusyCustomerId === customer.id ? "..." : "Reveal Password"}
@@ -343,7 +381,7 @@ export function CustomerProfileDialog({
                                 <button
                                     className="btn btn-secondary"
                                     type="button"
-                                    disabled={!customer || portalCredentialBusyCustomerId === customer.id || isEditing}
+                                    disabled={!canManagePortalCredentials || !customer || portalCredentialBusyCustomerId === customer.id || isEditing}
                                     // RATIONALE: Password generation is available
                                     // even when a credential does not yet exist,
                                     // which lets admins bootstrap portal access
@@ -390,13 +428,14 @@ export function CustomerProfileDialog({
                                 <button
                                     className="btn btn-primary"
                                     type="button"
+                                    disabled={!canViewBillingHistory}
                                     onClick={onViewBillingHistory}
                                 >
                                     View Billing History
                                 </button>
                             </Tooltip>
                             <Tooltip content="Modify this customer's details.">
-                                <button className="btn btn-secondary" type="button" onClick={onStartEdit}>
+                                <button className="btn btn-secondary" type="button" disabled={!canEditProfile} onClick={onStartEdit}>
                                     Edit Profile
                                 </button>
                             </Tooltip>
@@ -408,7 +447,7 @@ export function CustomerProfileDialog({
                             <button
                                 className="btn btn-danger"
                                 type="button"
-                                disabled={deletingCustomerId === customer.id || savingCustomer || isEditing}
+                                disabled={!canDeleteCustomer || deletingCustomerId === customer.id || savingCustomer || isEditing}
                                 onClick={onDelete}
                             >
                                 {deletingCustomerId === customer.id ? "Deleting..." : "Delete Customer"}

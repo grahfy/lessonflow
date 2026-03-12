@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import { canManagePrimaryTeacherCustomer } from "@/lib/admin/permissions";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { verifyCaptchaSubmission } from "@/lib/captcha";
@@ -34,11 +35,17 @@ export async function GET(request: NextRequest, { params }: Params) {
     const { id } = await params;
     const customer = await prisma.customer.findUnique({
       where: { id },
-      select: { email: true }
+      select: {
+        email: true,
+        primaryTeacherId: true
+      }
     });
 
     if (!customer) {
       return NextResponse.json({ error: "Customer not found." }, { status: 404 });
+    }
+    if (!canManagePrimaryTeacherCustomer(admin, customer.primaryTeacherId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const history = await prisma.outboundEmail.findMany({
@@ -74,6 +81,9 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     if (!customer) {
       return NextResponse.json({ error: "Customer not found." }, { status: 404 });
+    }
+    if (!canManagePrimaryTeacherCustomer(admin, customer.primaryTeacherId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const body = await request.json().catch(() => null);

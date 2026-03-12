@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import { canManageAssignedTeacher, isOwner } from "@/lib/admin/permissions";
+import { resolveAssignedTeacherId } from "@/lib/admin/teacher-assignment";
 import {
   auPhoneSchema,
   auPostcodeSchema,
@@ -39,6 +41,7 @@ const editSchema = z.object({
   skillLevel: skillLevelSchema.optional(),
   lessonDuration: lessonDurationSchema.optional(),
   customDurationMinutes: z.coerce.number().int().min(15).max(300).nullable().optional(),
+  assignedTeacherId: z.string().trim().min(1).nullable().optional(),
   notes: z.string().trim().max(1000).nullable().optional()
 });
 
@@ -64,6 +67,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     });
     if (!existing) {
       return NextResponse.json({ error: "Booking not found." }, { status: 404 });
+    }
+    if (!canManageAssignedTeacher(admin, existing.assignedTeacherId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     if (action === "cancel") {
@@ -132,6 +138,16 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       if (!parsed.success) {
         return NextResponse.json({ error: "Invalid edit payload.", details: parsed.error.flatten() }, { status: 400 });
       }
+
+      const nextAssignedTeacherId =
+        parsed.data.assignedTeacherId === undefined
+          ? existing.assignedTeacherId
+          : await resolveAssignedTeacherId({
+              db: prisma,
+              actor: admin,
+              requestedAssignedTeacherId: parsed.data.assignedTeacherId,
+              fallbackTeacherId: parsed.data.assignedTeacherId === null ? null : existing.assignedTeacherId
+            });
 
       // Derive the full next-state payload server-side so partial edits preserve required fields
       // and computed values (address string, end time) stay consistent.
@@ -208,6 +224,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           lessonDuration: nextDuration,
           customDurationMinutes: nextCustomDurationMinutes,
           endAt: getBookingEnd(existing.startAt, nextDuration, nextCustomDurationMinutes),
+          ...(isOwner(admin) ? { assignedTeacherId: nextAssignedTeacherId } : {}),
           notes: nextNotes,
           modifiedById: admin.id
         }
@@ -247,6 +264,9 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     });
     if (!existing) {
       return NextResponse.json({ error: "Booking not found." }, { status: 404 });
+    }
+    if (!canManageAssignedTeacher(admin, existing.assignedTeacherId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Delete dependent audit rows first to satisfy FK constraints before removing the booking.

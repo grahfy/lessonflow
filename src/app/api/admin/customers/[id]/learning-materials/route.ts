@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { canManageAssignedTeacher, canManagePrimaryTeacherCustomer } from "@/lib/admin/permissions";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { verifyCaptchaSubmission } from "@/lib/captcha";
@@ -38,6 +39,9 @@ export async function GET(request: NextRequest, { params }: Params) {
     if (!customer || customer.isArchived) {
       return NextResponse.json({ error: "Customer not found." }, { status: 404 });
     }
+    if (!canManagePrimaryTeacherCustomer(admin, customer.primaryTeacherId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     // Optional booking filter lets the admin modal narrow materials to one appointment while
     // preserving a "show all customer materials" view.
@@ -52,6 +56,9 @@ export async function GET(request: NextRequest, { params }: Params) {
       if (!ownsBooking) {
         return NextResponse.json({ error: "Selected appointment is not linked to this customer." }, { status: 400 });
       }
+      if (!canManageAssignedTeacher(admin, ownsBooking.assignedTeacherId)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
     }
 
     // Load bookings and materials together because the modal needs both datasets to drive the
@@ -59,7 +66,8 @@ export async function GET(request: NextRequest, { params }: Params) {
     const [bookings, materials] = await Promise.all([
       prisma.booking.findMany({
         where: {
-          customerId: customer.id
+          customerId: customer.id,
+          ...(admin.role === "teacher" ? { assignedTeacherId: admin.id } : {})
         },
         orderBy: {
           startAt: "desc"
@@ -123,6 +131,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (!customer || customer.isArchived) {
       return NextResponse.json({ error: "Customer not found." }, { status: 404 });
     }
+    if (!canManagePrimaryTeacherCustomer(admin, customer.primaryTeacherId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const form = await request.formData().catch(() => null);
     if (!form) {
@@ -165,6 +176,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       });
       if (!booking) {
         return NextResponse.json({ error: "Selected appointment is not linked to this customer." }, { status: 400 });
+      }
+      if (!canManageAssignedTeacher(admin, booking.assignedTeacherId)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
       linkedBookingId = booking.id;
     }

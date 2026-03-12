@@ -55,6 +55,11 @@ interface BookingDetailDialogProps {
   onSave: () => void;
   onDelete: () => void;
   onMove: () => void;
+  canManageAppointment: boolean;
+  canApproveRequest: boolean;
+  canEditTeacherAssignment: boolean;
+  canInvoice: boolean;
+  teacherOptions: Array<{ id: string; displayName: string }>;
 
   // Tabs Navigation
   activeTab: "appointment" | "emails" | "materials";
@@ -109,6 +114,11 @@ export function BookingDetailDialog({
   onSave,
   onDelete,
   onMove,
+  canManageAppointment,
+  canApproveRequest,
+  canEditTeacherAssignment,
+  canInvoice,
+  teacherOptions,
   activeTab,
   setActiveTab,
   matchedCustomer,
@@ -159,12 +169,12 @@ export function BookingDetailDialog({
             {activeTab === 'appointment' ? (
               <>
                 <Tooltip content="Save edits to booking details, schedule, and notes.">
-                  <button className="btn btn-primary" disabled={!!busyAction} onClick={onSave}>
+                  <button className="btn btn-primary" disabled={!!busyAction || !canManageAppointment} onClick={onSave}>
                     {busyAction === 'save' ? 'Saving...' : 'Save Changes'}
                   </button>
                 </Tooltip>
                 {/* RATIONALE: Requests can be 'Approved' to create a Booking linked to a Teacher/Room. */}
-                {event.status === 'pending' && (
+                {event.status === 'pending' && canApproveRequest && (
                   <Tooltip content="Approve this pending request and convert it into a confirmed booking.">
                     <button className="btn btn-primary" disabled={!!busyAction} onClick={() => onPerformAction('approve')}>
                       Approve Request
@@ -202,12 +212,14 @@ export function BookingDetailDialog({
           {
             key: "emails",
             label: "Communication",
-            tooltip: "View email history and send a custom message to the student."
+            tooltip: "View email history and send a custom message to the student.",
+            disabled: !canManageAppointment
           },
           {
             key: "materials",
             label: "Learning Materials",
-            tooltip: "View and manage learning materials for this booking."
+            tooltip: "View and manage learning materials for this booking.",
+            disabled: !canManageAppointment
           }
         ]}
         rightSlot={
@@ -325,6 +337,20 @@ export function BookingDetailDialog({
                       <option value="advanced">Advanced</option>
                     </select>
                   </AdminField>
+                  <AdminField label="Assigned Teacher" tooltip="Teacher responsible for this lesson.">
+                    {canEditTeacherAssignment ? (
+                      <select value={dialogForm.assignedTeacherId} onChange={e => updateForm({ assignedTeacherId: e.target.value })}>
+                        <option value="">Unassigned</option>
+                        {teacherOptions.map((teacher) => (
+                          <option key={teacher.id} value={teacher.id}>
+                            {teacher.displayName}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input value={teacherOptions.find((teacher) => teacher.id === dialogForm.assignedTeacherId)?.displayName || "Unassigned"} readOnly />
+                    )}
+                  </AdminField>
                   <AdminField label="Duration" tooltip="Length of the lesson in minutes.">
                     <select value={dialogForm.durationChoice} onChange={e => updateForm({ durationChoice: e.target.value })}>
                       <option value="min30">30 minutes</option>
@@ -348,11 +374,11 @@ export function BookingDetailDialog({
                 </AdminField>
                 <div className="button-row booking-notes-actions">
                   <Tooltip content="Reschedule the lesson to a new start time.">
-                    <button className="btn btn-secondary" onClick={onMove}>Move Lesson Time</button>
+                    <button className="btn btn-secondary" disabled={!canManageAppointment} onClick={onMove}>Move Lesson Time</button>
                   </Tooltip>
 
                   {/* RATIONALE: Invoicing is only available once a Request is converted to a Booking. */}
-                  {event.entityType === "booking" && (
+                  {event.entityType === "booking" && canInvoice && (
                     <Tooltip content="Create or open a draft invoice linked to this booking.">
                       <button className="btn btn-secondary" disabled={busyAction === "invoice"} onClick={onOpenInvoice}>
                         {busyAction === "invoice" ? "Creating Invoice..." : "Invoice / Billing"}
@@ -361,7 +387,9 @@ export function BookingDetailDialog({
                   )}
 
                   <Tooltip content="Cancel this booking. This action will notify the student.">
-                    <button className="btn btn-danger" disabled={!!busyAction} onClick={onDelete}>Cancel Booking</button>
+                    <button className="btn btn-danger" disabled={!!busyAction || !canManageAppointment} onClick={onDelete}>
+                      {event.entityType === "booking_request" ? "Delete / Reject Request" : "Cancel Booking"}
+                    </button>
                   </Tooltip>
                 </div>
               </div>

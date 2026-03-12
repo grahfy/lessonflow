@@ -107,6 +107,20 @@ Then open:
 
 For a fuller local workflow, seeded demo data, and troubleshooting, use [`LOCAL-DEVELOPMENT.md`](LOCAL-DEVELOPMENT.md).
 
+### Ephemeral Demo Preview
+
+To run a reset-on-exit local preview suitable for sales demos:
+
+```bash
+./scripts/test-full-site-demo.sh
+```
+
+The demo:
+- seeds a richer demo dataset,
+- allows add/edit/delete changes during the session,
+- prints frontend/admin preview links plus demo credentials,
+- destroys the demo database when the session ends.
+
 ## Self-Hosting on a VPS
 
 LessonFlow ships with deployment scripts for Linux VPS environments.

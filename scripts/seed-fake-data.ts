@@ -68,6 +68,64 @@ const STREET_TYPES = ['Street', 'Road', 'Avenue', 'Parade', 'Grove', 'Court'];
 
 const DOMAINS = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com'];
 
+const OWNER_EMAIL = 'admin@example.com';
+const OWNER_PASSWORD = 'admin123';
+const TEACHER_PASSWORD = 'teacher123';
+
+const TEACHER_SEEDS = [
+  {
+    email: 'teacher.mia@example.com',
+    firstName: 'Mia',
+    lastName: 'Hart',
+    displayName: 'Mia Hart',
+    age: 32,
+    houseNumber: '66',
+    streetName: 'High',
+    streetType: 'Street',
+    suburb: 'Northcote',
+    state: 'VIC',
+    postcode: '3070',
+    instruments: 'Electric Guitar, Acoustic Guitar',
+    specialisations: 'Rock, Blues, Beginner Foundations',
+    background: 'Performer and private tutor with a focus on expressive rhythm and lead playing.',
+    musicalHistory: 'Played in Melbourne rock and blues projects, with extensive one-on-one lesson experience.'
+  },
+  {
+    email: 'teacher.luca@example.com',
+    firstName: 'Luca',
+    lastName: 'Vale',
+    displayName: 'Luca Vale',
+    age: 41,
+    houseNumber: '12',
+    streetName: 'Arthur',
+    streetType: 'Road',
+    suburb: 'Brunswick',
+    state: 'VIC',
+    postcode: '3056',
+    instruments: 'Classical Guitar, Bass',
+    specialisations: 'Fingerstyle, Classical, Theory, Intermediate Technique',
+    background: 'Conservatory-trained guitarist who teaches technique, reading, and musicality.',
+    musicalHistory: 'Studied classical guitar, performed chamber arrangements, and taught across schools and studios.'
+  },
+  {
+    email: 'teacher.sarah@example.com',
+    firstName: 'Sarah',
+    lastName: 'Quinn',
+    displayName: 'Sarah Quinn',
+    age: 28,
+    houseNumber: '88',
+    streetName: 'Victoria',
+    streetType: 'Parade',
+    suburb: 'Collingwood',
+    state: 'VIC',
+    postcode: '3066',
+    instruments: 'Voice, Songwriting, Acoustic Guitar',
+    specialisations: 'Songwriting, Contemporary Pop, Performance Confidence',
+    background: 'Singer-songwriter and mentor helping newer players connect lessons to real songs.',
+    musicalHistory: 'Released independent projects, gigged locally, and coached students in songwriting and live performance.'
+  }
+] as const;
+
 function getRandomItem<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -79,26 +137,91 @@ function generateRandomPhone(): string {
   return `04${part1} ${part2} ${part3}`;
 }
 
+async function ensureOwnerAdmin() {
+  const passwordHash = await bcrypt.hash(OWNER_PASSWORD, 12);
+  return prisma.adminUser.upsert({
+    where: { email: OWNER_EMAIL },
+    update: {
+      role: 'owner',
+      firstName: 'System',
+      lastName: 'Admin',
+      displayName: 'System Admin',
+      passwordHash,
+      isActive: true
+    },
+    create: {
+      email: OWNER_EMAIL,
+      role: 'owner',
+      firstName: 'System',
+      lastName: 'Admin',
+      displayName: 'System Admin',
+      passwordHash,
+      isActive: true
+    }
+  });
+}
+
+async function ensureTeacherAccounts() {
+  const passwordHash = await bcrypt.hash(TEACHER_PASSWORD, 12);
+
+  return Promise.all(
+    TEACHER_SEEDS.map((teacher) =>
+      prisma.adminUser.upsert({
+        where: { email: teacher.email },
+        update: {
+          role: 'teacher',
+          firstName: teacher.firstName,
+          lastName: teacher.lastName,
+          displayName: teacher.displayName,
+          passwordHash,
+          age: teacher.age,
+          houseNumber: teacher.houseNumber,
+          streetName: teacher.streetName,
+          streetType: teacher.streetType,
+          suburb: teacher.suburb,
+          state: teacher.state,
+          postcode: teacher.postcode,
+          instruments: teacher.instruments,
+          specialisations: teacher.specialisations,
+          background: teacher.background,
+          musicalHistory: teacher.musicalHistory,
+          isActive: true
+        },
+        create: {
+          email: teacher.email,
+          role: 'teacher',
+          firstName: teacher.firstName,
+          lastName: teacher.lastName,
+          displayName: teacher.displayName,
+          passwordHash,
+          age: teacher.age,
+          houseNumber: teacher.houseNumber,
+          streetName: teacher.streetName,
+          streetType: teacher.streetType,
+          suburb: teacher.suburb,
+          state: teacher.state,
+          postcode: teacher.postcode,
+          instruments: teacher.instruments,
+          specialisations: teacher.specialisations,
+          background: teacher.background,
+          musicalHistory: teacher.musicalHistory,
+          isActive: true
+        }
+      })
+    )
+  );
+}
+
 async function seedFakeData() {
   const argCount = process.argv[2];
   const customerCount = argCount ? parseInt(argCount, 10) : 50;
 
   console.log(`🌱 Seeding ${customerCount} fake customers and associated data...`);
 
-  // Ensure an AdminUser exists
-  let admin = await prisma.adminUser.findFirst();
-  if (!admin) {
-    console.log("Creating default admin user...");
-    const passwordHash = await bcrypt.hash('admin123', 12);
-    admin = await prisma.adminUser.create({
-      data: {
-        email: 'admin@example.com',
-        displayName: 'System Admin',
-        passwordHash,
-        isActive: true
-      }
-    });
-  }
+  const admin = await ensureOwnerAdmin();
+  const teachers = await ensureTeacherAccounts();
+  console.log(`✅ Owner account ready (${OWNER_EMAIL} / ${OWNER_PASSWORD})`);
+  console.log(`✅ Teacher accounts ready (${teachers.length} total, password: ${TEACHER_PASSWORD})`);
 
   const now = new Date();
 
@@ -109,6 +232,7 @@ async function seedFakeData() {
     const email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}.${Math.floor(Math.random() * 1000)}@${getRandomItem(DOMAINS)}`;
     const phone = generateRandomPhone();
     const suburb = getRandomItem(SUBURBS);
+    const assignedTeacher = teachers[i % teachers.length];
     
     const customer = await prisma.customer.create({
       data: {
@@ -129,6 +253,7 @@ async function seedFakeData() {
         suburb: suburb.name,
         state: 'VIC',
         postcode: suburb.postcode,
+        primaryTeacherId: assignedTeacher.id,
         isArchived: Math.random() > 0.9
       }
     });
@@ -159,6 +284,7 @@ async function seedFakeData() {
           lessonMode: customer.lessonMode,
           skillLevel: customer.skillLevel,
           lessonDuration: duration,
+          assignedTeacherId: assignedTeacher.id,
           startAt,
           endAt,
           timezone: 'Australia/Melbourne'
@@ -234,6 +360,7 @@ async function seedFakeData() {
           lessonMode: customer.lessonMode,
           skillLevel: customer.skillLevel,
           lessonDuration: duration,
+          assignedTeacherId: assignedTeacher.id,
           startAt,
           endAt,
           timezone: 'Australia/Melbourne'
@@ -262,6 +389,7 @@ async function seedFakeData() {
           lessonMode: customer.lessonMode,
           skillLevel: customer.skillLevel,
           lessonDuration: 'min60',
+          assignedTeacherId: assignedTeacher.id,
           dayOfWeek: 1, // Monday
           startTimeLocal: '15:00',
           startDate,
@@ -293,6 +421,7 @@ async function seedFakeData() {
           lessonMode: customer.lessonMode,
           skillLevel: customer.skillLevel,
           lessonDuration: 'min30',
+          assignedTeacherId: assignedTeacher.id,
           requestedStartAt
         }
       });
@@ -502,6 +631,10 @@ async function seedFakeData() {
     }
   }
 
+  console.log('Teacher logins:');
+  for (const teacher of TEACHER_SEEDS) {
+    console.log(`  - ${teacher.displayName}: ${teacher.email} / ${TEACHER_PASSWORD}`);
+  }
   console.log('✅ Seeding complete.');
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { dateTimeLocalToIso } from "@/lib/time";
 import { useSafeFetch } from "./use-safe-fetch";
 
 export type BookingStatus = "pending" | "approved" | "cancelled" | "rejected";
@@ -20,6 +21,8 @@ export interface BookingEvent {
     seriesId: string | null;
     color: "green" | "yellow" | "red" | "slate";
     title: string;
+    assignedTeacherId?: string | null;
+    assignedTeacherName?: string | null;
     row: Record<string, unknown>;
 }
 
@@ -82,13 +85,28 @@ export function useBookings(options: { onAuthError?: () => void; onError?: (msg:
         // while bookings accept `newStartAt` for move operations.
         if (entityType === "booking_request") {
             if (action === "move" && payloadNewStartAt) {
-                body.requestedStartAt = new Date(payloadNewStartAt).toISOString();
+                const requestedStartAt = dateTimeLocalToIso(payloadNewStartAt);
+                if (!requestedStartAt) {
+                    if (onError) onError("Please enter a valid booking start date and time.");
+                    return false;
+                }
+                body.requestedStartAt = requestedStartAt;
             } else if (action === "edit" && payloadStartAtLocal) {
-                body.requestedStartAt = new Date(payloadStartAtLocal).toISOString();
+                const requestedStartAt = dateTimeLocalToIso(payloadStartAtLocal);
+                if (!requestedStartAt) {
+                    if (onError) onError("Please enter a valid booking start date and time.");
+                    return false;
+                }
+                body.requestedStartAt = requestedStartAt;
             }
         } else if (entityType === "booking") {
             if (action === "move" && payloadNewStartAt) {
-                body.newStartAt = new Date(payloadNewStartAt).toISOString();
+                const newStartAt = dateTimeLocalToIso(payloadNewStartAt);
+                if (!newStartAt) {
+                    if (onError) onError("Please enter a valid booking start date and time.");
+                    return false;
+                }
+                body.newStartAt = newStartAt;
             }
         }
 
@@ -108,7 +126,7 @@ export function useBookings(options: { onAuthError?: () => void; onError?: (msg:
         } catch {
             return false;
         }
-    }, [safeFetch, handleApiError]);
+    }, [safeFetch, handleApiError, onError]);
 
     /** Deletes either entity type through its matching admin route. */
     const remove = useCallback(async (id: string, entityType: "booking" | "booking_request"): Promise<boolean> => {

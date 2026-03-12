@@ -34,10 +34,12 @@ import { CustomerDialogWrapper } from "@/components/admin/customers/customer-dia
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { emptyCustomerForm, customerFormFromRow, type CustomerRow, type CustomerForm } from "@/components/admin/customers/customer-profile-dialog";
 
+import { useAdminSession } from "@/lib/admin/use-admin-session";
 import { useCustomers } from "@/lib/admin/use-customers";
 import { useEmailHistory } from "@/lib/admin/use-email-history";
 import { useLearningMaterials } from "@/lib/admin/use-learning-materials";
 import { usePortalCredentials } from "@/lib/admin/use-portal-credentials";
+import { useTeachers } from "@/lib/admin/use-teachers";
 import { type CustomersSortBy, type CustomersSortDirection } from "@/lib/customers/schema";
 
 /**
@@ -92,6 +94,8 @@ export function AdminCustomersClient() {
   const materialsUploadFormRef = useRef<HTMLFormElement | null>(null);
 
   const onAuthError = useCallback(() => window.location.assign("/admin/login"), []);
+  const { admin: currentAdmin } = useAdminSession({ onAuthError, onError: setError });
+  const { teachers: teacherOptions } = useTeachers({ onAuthError, onError: setError });
 
   // -- DATA HOOKS (Separated by domain logic) --
   
@@ -138,6 +142,11 @@ export function AdminCustomersClient() {
     regenerate: regeneratePortalPasswordApi
   } = usePortalCredentials({ onAuthError, onError: setError });
 
+  const canManageSelectedCustomer = Boolean(
+    currentAdmin && selectedCustomer && (currentAdmin.role === "owner" || selectedCustomer.primaryTeacherId === currentAdmin.id)
+  );
+  const canManagePortalCredentials = currentAdmin?.role === "owner";
+
   // -- DIALOG HANDLERS --
 
   /** Opens the complex tabbed detail dialog for a customer and triggers sub-data loads. */
@@ -153,14 +162,16 @@ export function AdminCustomersClient() {
     // Eagerly load history if a customer is selected
     if (customer) {
       void loadEmailHistory(customer.id);
-      void loadMaterials(customer.id);
+      if (currentAdmin?.role === "owner" || customer.primaryTeacherId === currentAdmin?.id) {
+        void loadMaterials(customer.id);
+      }
     }
 
     dialogPresence.show();
     if (dialogRootRef.current) {
       animateIn(dialogRootRef.current);
     }
-  }, [dialogPresence, loadEmailHistory, loadMaterials]);
+  }, [currentAdmin, dialogPresence, loadEmailHistory, loadMaterials]);
 
   const closeCustomerDialog = useCallback(async () => {
     if (dialogRootRef.current) {
@@ -212,7 +223,8 @@ export function AdminCustomersClient() {
 
     const payload = {
       ...customerForm,
-      fullName: `${customerForm.firstName.trim()} ${customerForm.lastName.trim()}`
+      fullName: `${customerForm.firstName.trim()} ${customerForm.lastName.trim()}`,
+      primaryTeacherId: customerForm.primaryTeacherId || null
     };
 
     const result = await saveCustomerApi(payload, selectedCustomer?.id);
@@ -306,9 +318,11 @@ export function AdminCustomersClient() {
         <AdminCard className="admin-toolbar-card admin-actions-card">
           <div className="admin-actions-bar">
             <div className="admin-actions-group">
-              <button className="btn btn-primary" type="button" onClick={() => openCustomerDialog(null, true)}>
-                New Customer
-              </button>
+              {currentAdmin?.role === "owner" ? (
+                <button className="btn btn-primary" type="button" onClick={() => openCustomerDialog(null, true)}>
+                  New Customer
+                </button>
+              ) : null}
             </div>
 
             <div className="admin-toolbar-filters">
@@ -369,6 +383,8 @@ export function AdminCustomersClient() {
             setPageSize(size);
             setPage(1);
           }}
+          canManageCustomers={currentAdmin?.role === "owner"}
+          canViewBilling={currentAdmin?.role === "owner"}
           onOpenCustomerDialog={openCustomerDialog}
           onDeleteCustomer={deleteCustomer}
           onViewInvoices={(name) => void beginExitTransition(null, 0, () => router.push(`/admin/invoices?q=${encodeURIComponent(name)}`))}
@@ -386,11 +402,13 @@ export function AdminCustomersClient() {
           selectedCustomer={selectedCustomer}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
+          canAccessCustomerActions={canManageSelectedCustomer}
           isEditing={isEditing}
           customerForm={customerForm}
           setCustomerForm={setCustomerForm}
           savingCustomer={savingCustomer}
           deletingCustomerId={deletingCustomerId}
+          canEditProfile={canManageSelectedCustomer}
           onSaveCustomer={saveCustomer}
           onClose={closeCustomerDialog}
           error={error}
@@ -420,6 +438,11 @@ export function AdminCustomersClient() {
           onUploadMaterial={uploadMaterial}
           onDeleteMaterial={(mId) => deleteMaterial(mId)}
           onMaterialBookingSelect={handleMaterialBookingSelect}
+          canEditAssignment={currentAdmin?.role === "owner"}
+          teacherOptions={teacherOptions.map((teacher) => ({ id: teacher.id, displayName: teacher.displayName }))}
+          canManagePortalCredentials={canManagePortalCredentials}
+          canViewBillingHistory={currentAdmin?.role === "owner"}
+          canDeleteCustomer={currentAdmin?.role === "owner"}
 
           // Student Portal Identity Access
           revealedPortalPasswords={revealedPortalPasswords}
@@ -448,9 +471,9 @@ export function AdminCustomersClient() {
           
           // Profile Tab Internal Actions
           onCancelEdit={() => setIsEditing(false)}
-          onStartEdit={() => setIsEditing(true)}
-          onDeleteCustomer={() => selectedCustomer && deleteCustomer(selectedCustomer)}
-          onViewBillingHistory={() => selectedCustomer && void beginExitTransition(null, 0, () => router.push(`/admin/invoices?q=${encodeURIComponent(selectedCustomer.fullName)}`))}
+          onStartEdit={() => canManageSelectedCustomer && setIsEditing(true)}
+          onDeleteCustomer={() => selectedCustomer && currentAdmin?.role === "owner" && deleteCustomer(selectedCustomer)}
+          onViewBillingHistory={() => selectedCustomer && currentAdmin?.role === "owner" && void beginExitTransition(null, 0, () => router.push(`/admin/invoices?q=${encodeURIComponent(selectedCustomer.fullName)}`))}
         />
       )}
     </AdminShell>

@@ -18,6 +18,7 @@ type Props = {
     error: string;
     notice: string;
     onClose: () => void;
+    canAccessCustomerActions: boolean;
 
     // Profile Props
     isEditing: boolean;
@@ -25,6 +26,12 @@ type Props = {
     setCustomerForm: React.Dispatch<React.SetStateAction<CustomerForm>>;
     savingCustomer: boolean;
     deletingCustomerId: string | null;
+    canEditProfile: boolean;
+    canEditAssignment: boolean;
+    teacherOptions: Array<{ id: string; displayName: string }>;
+    canManagePortalCredentials: boolean;
+    canViewBillingHistory: boolean;
+    canDeleteCustomer: boolean;
     revealedPortalPasswords: Record<string, string>;
     portalCredentialBusyCustomerId: string | null;
     onSaveCustomer: () => void;
@@ -94,8 +101,8 @@ export function CustomerDialogWrapper({
                 listClassName="customer-dialog-tabs-list"
                 items={[
                     { key: "profile", label: "Profile & Address" },
-                    { key: "emails", label: "Communication", disabled: !selectedCustomer },
-                    { key: "materials", label: "Learning Materials", disabled: !selectedCustomer }
+                    { key: "emails", label: "Communication", disabled: !selectedCustomer || !rest.canAccessCustomerActions },
+                    { key: "materials", label: "Learning Materials", disabled: !selectedCustomer || !rest.canAccessCustomerActions }
                 ]}
             />
         </div>
@@ -128,6 +135,12 @@ export function CustomerDialogWrapper({
                         setForm={rest.setCustomerForm}
                         savingCustomer={rest.savingCustomer}
                         deletingCustomerId={rest.deletingCustomerId}
+                        canEditProfile={rest.canEditProfile}
+                        canEditAssignment={rest.canEditAssignment}
+                        teacherOptions={rest.teacherOptions}
+                        canManagePortalCredentials={rest.canManagePortalCredentials}
+                        canViewBillingHistory={rest.canViewBillingHistory}
+                        canDeleteCustomer={rest.canDeleteCustomer}
                         revealedPortalPasswords={rest.revealedPortalPasswords}
                         portalCredentialBusyCustomerId={rest.portalCredentialBusyCustomerId}
                         onSave={rest.onSaveCustomer}

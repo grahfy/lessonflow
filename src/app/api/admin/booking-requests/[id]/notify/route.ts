@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { sendCustomerCustomEmail, sendCustomerReminderEmail } from "@/lib/booking-events";
+import { canManageAssignedTeacher } from "@/lib/admin/permissions";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
@@ -37,6 +38,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     });
     if (!bookingRequest) {
       return NextResponse.json({ error: "Booking request not found." }, { status: 404 });
+    }
+    if (!canManageAssignedTeacher(admin, bookingRequest.assignedTeacherId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const linkedBooking = await prisma.booking.findFirst({

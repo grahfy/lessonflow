@@ -9,6 +9,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 
+import { isOwner } from "@/lib/admin/permissions";
+import { resolveAssignedTeacherId } from "@/lib/admin/teacher-assignment";
 import { lessonModeSchema, skillLevelSchema, auPostcodeSchema, auPhoneSchema, auStateSchema } from "@/lib/booking-rules";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
@@ -34,7 +36,8 @@ const createCustomerSchema = z.object({
   streetType: z.string().trim().max(40).optional().default(""),
   suburb: z.string().trim().max(80).optional().default(""),
   state: auStateSchema.optional().default("VIC"),
-  postcode: auPostcodeSchema.optional().default("3000")
+  postcode: auPostcodeSchema.optional().default("3000"),
+  primaryTeacherId: z.string().trim().min(1).nullable().optional()
 });
 
 /**
@@ -98,6 +101,12 @@ export async function GET(request: NextRequest) {
         take: pageSize,
         skip,
         include: {
+          primaryTeacher: {
+            select: {
+              id: true,
+              displayName: true
+            }
+          },
           portalCredential: {
             select: {
               id: true,
@@ -142,6 +151,9 @@ export async function POST(request: NextRequest) {
     if (!admin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    if (!isOwner(admin)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const body = await request.json().catch(() => null);
     const parsed = createCustomerSchema.safeParse(body);
@@ -151,6 +163,11 @@ export async function POST(request: NextRequest) {
 
     const normalizedEmail = normalizeEmail(parsed.data.email);
     const normalizedPhone = normalizePhone(parsed.data.phone);
+    const primaryTeacherId = await resolveAssignedTeacherId({
+      db: prisma,
+      actor: admin,
+      requestedAssignedTeacherId: parsed.data.primaryTeacherId ?? null
+    });
 
     // STEP 1: Duplicate Check
     const existing = await prisma.customer.findFirst({
@@ -173,22 +190,25 @@ export async function POST(request: NextRequest) {
 
     // STEP 2: Record Creation
     const created = await prisma.customer.create({
-      data: customerSnapshotFromInput({
-        firstName: parsed.data.firstName,
-        lastName: parsed.data.lastName,
-        name: parsed.data.fullName,
-        email: parsed.data.email,
-        phone: parsed.data.phone,
-        skillLevel: parsed.data.skillLevel,
-        lessonMode: parsed.data.lessonMode,
-        unitNumber: parsed.data.unitNumber ?? undefined,
-        houseNumber: parsed.data.houseNumber ?? "",
-        streetName: parsed.data.streetName ?? "",
-        streetType: parsed.data.streetType ?? "",
-        suburb: parsed.data.suburb ?? "",
-        state: parsed.data.state ?? "VIC",
-        postcode: parsed.data.postcode ?? ""
-      })
+      data: {
+        ...customerSnapshotFromInput({
+          firstName: parsed.data.firstName,
+          lastName: parsed.data.lastName,
+          name: parsed.data.fullName,
+          email: parsed.data.email,
+          phone: parsed.data.phone,
+          skillLevel: parsed.data.skillLevel,
+          lessonMode: parsed.data.lessonMode,
+          unitNumber: parsed.data.unitNumber ?? undefined,
+          houseNumber: parsed.data.houseNumber ?? "",
+          streetName: parsed.data.streetName ?? "",
+          streetType: parsed.data.streetType ?? "",
+          suburb: parsed.data.suburb ?? "",
+          state: parsed.data.state ?? "VIC",
+          postcode: parsed.data.postcode ?? ""
+        }),
+        ...(primaryTeacherId ? { primaryTeacherId } : {})
+      }
     });
 
     // STEP 3: Automated Enrollment

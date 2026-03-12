@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { AdminDeployUpdatesButton } from "@/components/admin-deploy-updates-button";
 import { ADMIN_NAV_ITEMS } from "@/lib/admin/config";
 import { Tooltip } from "@/components/admin/ui/tooltip";
+import { useAdminSession } from "@/lib/admin/use-admin-session";
 
 interface AdminHeaderProps {
   title: string;
@@ -18,6 +19,9 @@ export function AdminHeader({ title }: AdminHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { admin } = useAdminSession({
+    onAuthError: () => window.location.assign("/admin/login")
+  });
 
   useEffect(() => {
     // NOTE: Close the mobile menu on route change so stale open state does not
@@ -41,6 +45,11 @@ export function AdminHeader({ title }: AdminHeaderProps) {
         <h1 className="admin-console-title" data-motion-item="admin-title">
           {title}
         </h1>
+        {admin ? (
+          <p className="helper-text admin-console-subtitle">
+            Signed in as {admin.displayName} · {admin.role === "owner" ? "Owner" : "Teacher"}
+          </p>
+        ) : null}
       </div>
       <div className="admin-header-controls">
         <Tooltip content="Toggle mobile navigation menu.">
@@ -61,7 +70,7 @@ export function AdminHeader({ title }: AdminHeaderProps) {
           aria-hidden={!menuOpen}
         >
           <nav className="admin-header-nav-primary" aria-label="Admin sections">
-            {ADMIN_NAV_ITEMS.map((item) => {
+            {ADMIN_NAV_ITEMS.filter((item) => !item.roles || (admin ? item.roles.includes(admin.role) : true)).map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <Tooltip key={item.href} content={item.tooltip}>
@@ -81,7 +90,7 @@ export function AdminHeader({ title }: AdminHeaderProps) {
           </nav>
 
           <div className="admin-header-quick-actions">
-            <AdminDeployUpdatesButton />
+            {admin?.role === "owner" ? <AdminDeployUpdatesButton /> : null}
             <Tooltip content="Sign out of the admin console.">
               <button
                 className="btn btn-secondary"

@@ -29,6 +29,9 @@ interface ManualBookingDialogProps {
   setUpdateCustomerFromBooking: (val: boolean) => void;
   isRecurring: boolean;
   setIsRecurring: (val: boolean) => void;
+  canEditAssignment: boolean;
+  teacherOptions: Array<{ id: string; displayName: string }>;
+  currentTeacherId: string | null;
   durationChoice: string;
   setDurationChoice: (val: string) => void;
   manualMatch: BookingMatchedCustomer | null;
@@ -66,6 +69,9 @@ export function ManualBookingDialog({
   setUpdateCustomerFromBooking,
   isRecurring,
   setIsRecurring,
+  canEditAssignment,
+  teacherOptions,
+  currentTeacherId,
   durationChoice,
   setDurationChoice,
   manualMatch,
@@ -299,6 +305,23 @@ export function ManualBookingDialog({
             <AdminForm className="manual-grid manual-grid-2">
               <AdminField label="Start Time" tooltip="The date and time this lesson is scheduled to begin." required>
                 <input name="requestedStartAt" type="datetime-local" required />
+              </AdminField>
+              <AdminField label="Assigned Teacher" tooltip="Teacher responsible for this lesson. Teachers are auto-assigned to themselves.">
+                {canEditAssignment ? (
+                  <select name="assignedTeacherId" defaultValue="">
+                    <option value="">Unassigned</option>
+                    {teacherOptions.map((teacher) => (
+                      <option key={teacher.id} value={teacher.id}>
+                        {teacher.displayName}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <>
+                    <input value={teacherOptions.find((teacher) => teacher.id === currentTeacherId)?.displayName || "Assigned to you"} readOnly />
+                    <input type="hidden" name="assignedTeacherId" value={currentTeacherId || ""} />
+                  </>
+                )}
               </AdminField>
               <AdminField label="Weekly Recurring" tooltip="Check if this lesson repeats weekly.">
                 <div className="manual-recurring-toggle">

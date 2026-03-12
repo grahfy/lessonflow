@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isOwnerAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
@@ -7,6 +8,9 @@ export async function GET(request: NextRequest) {
   const admin = await requireAdminFromRequest(request);
   if (!admin) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+  if (!isOwnerAdmin(admin)) {
+    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   }
 
   const template = await prisma.invoiceTemplate.findFirst({
@@ -20,6 +24,9 @@ export async function POST(request: NextRequest) {
     const admin = await requireAdminFromRequest(request);
     if (!admin) {
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    }
+    if (!isOwnerAdmin(admin)) {
+      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
     }
 
     const body = await request.json();

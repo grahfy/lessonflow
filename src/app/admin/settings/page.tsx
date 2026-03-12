@@ -1,5 +1,5 @@
 import { AdminSettingsClient } from "@/components/admin/settings/settings-client";
-import { requireAdmin } from "@/lib/admin/server-auth";
+import { requireOwner } from "@/lib/admin/server-auth";
 
 export const metadata = {
   title: "Booking Console Settings"
@@ -9,6 +9,6 @@ export const metadata = {
  * Protected admin settings route for managing environment-backed configuration.
  */
 export default async function AdminSettingsPage() {
-  await requireAdmin();
+  await requireOwner();
   return <AdminSettingsClient />;
 }

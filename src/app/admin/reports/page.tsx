@@ -1,5 +1,5 @@
 import { AdminReportsClient } from "@/components/admin-reports-client";
-import { requireAdmin } from "@/lib/admin/server-auth";
+import { requireOwner } from "@/lib/admin/server-auth";
 
 export const metadata = {
   title: "Booking Console Reports"
@@ -9,6 +9,6 @@ export const metadata = {
  * Protected admin reports dashboard route.
  */
 export default async function AdminReportsPage() {
-  await requireAdmin();
+  await requireOwner();
   return <AdminReportsClient />;
 }

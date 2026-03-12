@@ -16,6 +16,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { CaptchaField, useCaptcha } from "@/components/captcha";
+import { dateTimeLocalToIso } from "@/lib/time";
 
 /**
  * State of the form submission process.
@@ -101,8 +102,8 @@ export function BookingForm() {
       const customDurationMinutes =
         durationType === "custom" && customDurationRaw ? Number.parseInt(customDurationRaw, 10) : undefined;
 
-      const requestedStartAtDate = new Date(startRaw);
-      if (Number.isNaN(requestedStartAtDate.getTime())) {
+      const requestedStartAt = dateTimeLocalToIso(startRaw);
+      if (!requestedStartAt) {
         setState({ status: "error", message: "Please choose a valid booking start date and time." });
         setLoading(false);
         return;
@@ -125,7 +126,7 @@ export function BookingForm() {
         skillLevel: String(form.get("skillLevel") || ""),
         lessonDuration: durationType === "min30" ? "min30" : "min60",
         customDurationMinutes,
-        requestedStartAt: requestedStartAtDate.toISOString(),
+        requestedStartAt,
         notes: String(form.get("notes") || ""),
         country: "Australia",
         unitNumber: "",

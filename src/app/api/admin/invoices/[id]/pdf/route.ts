@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { isOwnerAdmin } from "@/lib/admin-auth";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
@@ -19,6 +20,9 @@ export async function GET(request: NextRequest, { params }: Params) {
     const admin = await requireAdminFromRequest(request);
     if (!admin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!isOwnerAdmin(admin)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const { id } = await params;

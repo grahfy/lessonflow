@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { canManagePrimaryTeacherCustomer } from "@/lib/admin/permissions";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
@@ -81,10 +82,20 @@ export async function GET(request: NextRequest, { params }: Params) {
     const material = await prisma.learningMaterial.findUnique({
       where: {
         id
+      },
+      include: {
+        customer: {
+          select: {
+            primaryTeacherId: true
+          }
+        }
       }
     });
     if (!material) {
       return NextResponse.json({ error: "Learning material not found." }, { status: 404 });
+    }
+    if (!canManagePrimaryTeacherCustomer(admin, material.customer.primaryTeacherId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const dispositionParam = request.nextUrl.searchParams.get("disposition");
@@ -125,10 +136,20 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     const existing = await prisma.learningMaterial.findUnique({
       where: {
         id
+      },
+      include: {
+        customer: {
+          select: {
+            primaryTeacherId: true
+          }
+        }
       }
     });
     if (!existing) {
       return NextResponse.json({ error: "Learning material not found." }, { status: 404 });
+    }
+    if (!canManagePrimaryTeacherCustomer(admin, existing.customer.primaryTeacherId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Delete DB metadata first so the admin UI reflects removal immediately even if storage cleanup

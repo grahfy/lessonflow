@@ -174,6 +174,10 @@ if [[ "$SEED_DATA" -eq 1 ]]; then
   log "  URL: http://${HOST}:${PORT}/admin/login"
   log "  Email: admin@example.com"
   log "  Password: admin123"
+  log "Seeded teacher accounts:"
+  log "  Mia Hart: teacher.mia@example.com / teacher123"
+  log "  Luca Vale: teacher.luca@example.com / teacher123"
+  log "  Sarah Quinn: teacher.sarah@example.com / teacher123"
 fi
 
 # 7. Automated Testing

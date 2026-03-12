@@ -38,6 +38,7 @@ describe("buildManualBookingPayload", () => {
     expect(result.payload.isRecurring).toBe(false);
     expect(result.payload.recurrenceEndAt).toBeUndefined();
     expect(result.payload.name).toBe("Taylor Student");
+    expect(result.payload.requestedStartAt).toBe("2026-04-10T00:00:00.000Z");
   });
 
   it("requires recurrence end when recurring is enabled", () => {
@@ -67,7 +68,7 @@ describe("buildManualBookingPayload", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.payload.isRecurring).toBe(true);
-    expect(typeof result.payload.recurrenceEndAt).toBe("string");
+    expect(result.payload.recurrenceEndAt).toBe("2026-05-10T00:00:00.000Z");
   });
 
   it("maps custom duration to API-compatible payload", () => {

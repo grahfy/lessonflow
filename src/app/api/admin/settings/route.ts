@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getSessionCookieName } from "@/lib/admin-auth";
 import { jsonUnexpectedError } from "@/lib/api-errors";
-import { requireAdminFromRequest } from "@/lib/admin-route";
+import { requireOwnerFromRequest } from "@/lib/admin-route";
 import {
   CONFIGURABLE_ENV_VARS,
   getCurrentEnvValues,
@@ -51,9 +51,9 @@ function queueSystemdServiceRestart(): { queued: boolean; warning?: string } {
  * Returns admin-editable environment settings plus the current authenticated admin profile.
  */
 export async function GET(request: NextRequest) {
-  const admin = await requireAdminFromRequest(request);
+  const admin = await requireOwnerFromRequest(request);
   if (!admin) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   }
 
   const values = getCurrentEnvValues();
@@ -82,9 +82,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const admin = await requireAdminFromRequest(request);
+    const admin = await requireOwnerFromRequest(request);
     if (!admin) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
     }
 
     const body = (await request.json().catch(() => null)) as

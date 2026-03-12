@@ -10,6 +10,8 @@ interface Props {
     pageSize: number;
     totalCount: number;
     totalPages: number;
+    canManageCustomers: boolean;
+    canViewBilling: boolean;
     onSetPage: (page: number) => void;
     onSetPageSize: (size: number) => void;
     onOpenCustomerDialog: (customer: CustomerRow, edit: boolean) => void;
@@ -32,6 +34,8 @@ export function CustomerTable({
     pageSize,
     totalCount,
     totalPages,
+    canManageCustomers,
+    canViewBilling,
     onSetPage,
     onSetPageSize,
     onOpenCustomerDialog,
@@ -45,6 +49,8 @@ export function CustomerTable({
             <div className="admin-list-col admin-list-col-phone">Phone</div>
             <Separator />
             <div className="admin-list-col admin-list-col-skill">Skill / Mode</div>
+            <Separator />
+            <div className="admin-list-col admin-list-col-portal">Assigned Teacher</div>
             <Separator />
             <div className="admin-list-col admin-list-col-portal">Portal Status</div>
             <Separator />
@@ -105,6 +111,12 @@ export function CustomerTable({
 
                     <Separator />
                     <div className="customer-col-portal admin-list-cell admin-list-col-portal">
+                        <span className="admin-mobile-label">Teacher</span>
+                        <span>{customer.primaryTeacher?.displayName || "Unassigned"}</span>
+                    </div>
+
+                    <Separator />
+                    <div className="customer-col-portal admin-list-cell admin-list-col-portal">
                         <span className="admin-mobile-label">Portal Status</span>
                         <span>
                             {customer.portalCredential ? `Active (since ${new Date(customer.portalCredential.generatedAt).toLocaleDateString("en-AU")})` : "Not generated"}
@@ -116,15 +128,17 @@ export function CustomerTable({
                         {/* RATIONALE: Stop propagation so Billing/Open/Delete do
                             not also trigger the row's generic open handler. */}
                         <span className="admin-mobile-label">Actions</span>
-                        <Tooltip content="Open this customer's invoice history and billing records.">
-                            <button
-                                className="btn btn-secondary admin-list-action-btn"
-                                type="button"
-                                onClick={() => onViewInvoices(customer.fullName)}
-                            >
-                                Billing
-                            </button>
-                        </Tooltip>
+                        {canViewBilling ? (
+                            <Tooltip content="Open this customer's invoice history and billing records.">
+                                <button
+                                    className="btn btn-secondary admin-list-action-btn"
+                                    type="button"
+                                    onClick={() => onViewInvoices(customer.fullName)}
+                                >
+                                    Billing
+                                </button>
+                            </Tooltip>
+                        ) : null}
                         <Tooltip content="Edit this customer's profile, contact details, and portal access.">
                             <button
                                 className="btn btn-secondary admin-list-action-btn"
@@ -134,16 +148,18 @@ export function CustomerTable({
                                 Open
                             </button>
                         </Tooltip>
-                        <Tooltip content="Archive or remove this customer record.">
-                            <button
-                                className="btn btn-danger admin-list-action-btn"
-                                type="button"
-                                disabled={deletingCustomerId === customer.id}
-                                onClick={() => onDeleteCustomer(customer)}
-                            >
-                                {deletingCustomerId === customer.id ? "..." : "Delete"}
-                            </button>
-                        </Tooltip>
+                        {canManageCustomers ? (
+                            <Tooltip content="Archive or remove this customer record.">
+                                <button
+                                    className="btn btn-danger admin-list-action-btn"
+                                    type="button"
+                                    disabled={deletingCustomerId === customer.id}
+                                    onClick={() => onDeleteCustomer(customer)}
+                                >
+                                    {deletingCustomerId === customer.id ? "..." : "Delete"}
+                                </button>
+                            </Tooltip>
+                        ) : null}
                     </div>
                 </div>
             ))}

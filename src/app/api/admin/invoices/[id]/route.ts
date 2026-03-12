@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { isOwnerAdmin } from "@/lib/admin-auth";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { prisma } from "@/lib/db";
 import { applyInvoiceTaxMode, calculateInvoiceTotals } from "@/lib/invoices/calculate";
@@ -20,6 +21,9 @@ export async function GET(request: NextRequest, { params }: Params) {
   const admin = await requireAdminFromRequest(request);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!isOwnerAdmin(admin)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { id } = await params;
@@ -47,6 +51,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const admin = await requireAdminFromRequest(request);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!isOwnerAdmin(admin)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const body = await request.json().catch(() => null);
@@ -287,6 +294,9 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const admin = await requireAdminFromRequest(request);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!isOwnerAdmin(admin)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { id } = await params;

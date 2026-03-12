@@ -12,7 +12,7 @@ import {
   type StudentPortalMaterial,
   type StudentPortalPayload
 } from "@/lib/student-portal/contracts";
-import { APP_TIMEZONE } from "@/lib/time";
+import { APP_TIMEZONE, dateTimeLocalToIso, toDateTimeLocalValue } from "@/lib/time";
 
 type LessonDurationChoice = "min30" | "min60";
 
@@ -596,24 +596,12 @@ function isWithin24Hours(startAtIso: string): boolean {
 function defaultStartAtLocalValue(): string {
   const date = new Date(Date.now() + 24 * 60 * 60 * 1000);
   date.setMinutes(0, 0, 0);
-  return toLocalDateTimeValue(date);
-}
-
-/**
- * Converts Date values to `datetime-local` friendly strings.
- */
-function toLocalDateTimeValue(date: Date): string {
-  const shifted = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return shifted.toISOString().slice(0, 16);
+  return toDateTimeLocalValue(date);
 }
 
 /**
  * Converts `datetime-local` input values to ISO timestamps for API requests.
  */
 function toIsoFromLocal(value: string): string | null {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-  return parsed.toISOString();
+  return dateTimeLocalToIso(value);
 }

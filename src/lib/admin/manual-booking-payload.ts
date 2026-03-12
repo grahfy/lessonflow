@@ -1,3 +1,5 @@
+import { dateTimeLocalToIso } from "@/lib/time";
+
 export type ManualMatchResolution = "use_existing" | "create_new" | "update_existing";
 
 interface BuildManualBookingPayloadOptions {
@@ -14,13 +16,7 @@ function toIsoString(value: FormDataEntryValue | null): string | null {
   if (typeof value !== "string" || !value.trim()) {
     return null;
   }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-
-  return parsed.toISOString();
+  return dateTimeLocalToIso(value);
 }
 
 /**
@@ -35,6 +31,7 @@ export function buildManualBookingPayload(
 
   payload.name = `${String(payload.firstName || "").trim()} ${String(payload.lastName || "").trim()}`.trim();
   payload.customerId = options.manualCustomerId || undefined;
+  payload.assignedTeacherId = String(payload.assignedTeacherId || "").trim() || null;
   payload.matchResolution = options.matchResolution;
   payload.updateCustomerFromBooking = options.updateCustomerFromBooking;
   payload.isRecurring = formData.get("isRecurring") === "on";

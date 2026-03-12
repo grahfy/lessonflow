@@ -3,6 +3,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { NextRequest, NextResponse } from "next/server";
 
+import { isOwnerAdmin } from "@/lib/admin-auth";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { getWebUpdateRunnerStatus } from "@/lib/updates-runner";
 
@@ -11,6 +12,9 @@ export async function POST(request: NextRequest) {
     const admin = await requireAdminFromRequest(request);
     if (!admin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!isOwnerAdmin(admin)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const appRoot = process.cwd();

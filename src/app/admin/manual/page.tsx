@@ -1,5 +1,5 @@
 import { AdminManualClient } from "@/components/admin/manual/manual-client";
-import { requireAdmin } from "@/lib/admin/server-auth";
+import { requireOwner } from "@/lib/admin/server-auth";
 import { getAdminManualIndex } from "@/lib/manual/content";
 
 export const metadata = {
@@ -10,7 +10,7 @@ export const metadata = {
  * Protected in-app manual landing page for admin operators.
  */
 export default async function AdminManualPage() {
-  await requireAdmin();
+  await requireOwner();
   const manualIndex = await getAdminManualIndex();
   return <AdminManualClient content={manualIndex} />;
 }

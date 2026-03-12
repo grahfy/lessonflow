@@ -12,7 +12,7 @@
  */
 
 import { NextRequest } from "next/server";
-import { getAdminFromToken, getSessionCookieName } from "@/lib/admin-auth";
+import { getAdminFromToken, getSessionCookieName, isOwnerAdmin } from "@/lib/admin-auth";
 
 /**
  * Validates the administrative session of an incoming Request.
@@ -23,4 +23,15 @@ import { getAdminFromToken, getSessionCookieName } from "@/lib/admin-auth";
 export async function requireAdminFromRequest(request: NextRequest) {
   const token = request.cookies.get(getSessionCookieName())?.value;
   return getAdminFromToken(token);
+}
+
+/**
+ * Restricts a route handler to the owner-level admin account.
+ */
+export async function requireOwnerFromRequest(request: NextRequest) {
+  const admin = await requireAdminFromRequest(request);
+  if (!admin || !isOwnerAdmin(admin)) {
+    return null;
+  }
+  return admin;
 }

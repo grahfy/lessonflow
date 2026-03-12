@@ -99,6 +99,14 @@ function eventMonth(event: AdminCalendarEvent, monthStart: Date): boolean {
   return isSameMonth(parseISO(event.startAt), monthStart);
 }
 
+function assignedTeacherLabel(event: AdminCalendarEvent): string | null {
+  const row = event.row as { assignedTeacherName?: unknown };
+  if (typeof row.assignedTeacherName === "string" && row.assignedTeacherName.trim()) {
+    return row.assignedTeacherName.trim();
+  }
+  return null;
+}
+
 /** Shared day cell for day/week/month views. */
 function DayCell(props: {
   day: Date;
@@ -128,6 +136,7 @@ function DayCell(props: {
           >
             <span>{eventTime(event.startAt)}</span>
             <strong>{event.title}</strong>
+            <small>{assignedTeacherLabel(event) || "Unassigned"}</small>
           </button>
         ))}
         {!props.events.length ? <p className="helper-text">No events</p> : null}
@@ -165,6 +174,7 @@ function YearMonthCell(props: {
           >
             <span>{format(parseISO(event.startAt), "d MMM")} · {eventTime(event.startAt)}</span>
             <strong>{event.title}</strong>
+            <small>{assignedTeacherLabel(event) || "Unassigned"}</small>
           </button>
         ))}
         {!props.events.length ? <p className="helper-text">No events</p> : null}

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { requireAdminFromRequest } from "@/lib/admin-route";
+import { requireOwnerFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/email/service";
@@ -26,9 +26,9 @@ const mutationSchema = z.object({
  * Returns portal credential metadata for one customer (without revealing password).
  */
 export async function GET(request: NextRequest, { params }: Params) {
-  const admin = await requireAdminFromRequest(request);
+  const admin = await requireOwnerFromRequest(request);
   if (!admin) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { id } = await params;
@@ -61,9 +61,9 @@ export async function GET(request: NextRequest, { params }: Params) {
  */
 export async function POST(request: NextRequest, { params }: Params) {
   try {
-    const admin = await requireAdminFromRequest(request);
+    const admin = await requireOwnerFromRequest(request);
     if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const body = await request.json().catch(() => null);

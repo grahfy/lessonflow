@@ -5,11 +5,13 @@
  * This route is the backbone of the Admin Calendar UI.
  */
 
-import { APP_TIMEZONE } from "@/lib/time";
+import { APP_TIMEZONE, toTimeKey } from "@/lib/time";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { bookingColor, bookingRequestColor, getRecencyCutoff } from "@/lib/admin-calendar-events";
+import { canManagePrimaryTeacherCustomer } from "@/lib/admin/permissions";
+import { ensureCustomerPrimaryTeacher, resolveAssignedTeacherId } from "@/lib/admin/teacher-assignment";
 import { bookingRequestSchema, formatBookingAddress, generateRecurringStartDates, getBookingEnd } from "@/lib/booking-rules";
 import { customerSnapshotFromInput, normalizeEmail, normalizePhone } from "@/lib/customer-match";
 import { getCalendarRange } from "@/lib/calendar-range";
@@ -25,6 +27,7 @@ import { ensurePortalCredentialForCustomer } from "@/lib/student-portal/credenti
 const manualBookingSchema = bookingRequestSchema.and(
   z.object({
     customerId: z.string().trim().min(1).optional(),
+    assignedTeacherId: z.string().trim().min(1).nullable().optional(),
     matchResolution: z.enum(["use_existing", "create_new", "update_existing"]).optional(),
     updateCustomerFromBooking: z.boolean().optional()
   })
@@ -35,24 +38,27 @@ type ManualBookingInput = z.infer<typeof manualBookingSchema>;
 /**
  * Internal helper to create a new customer record from booking data.
  */
-async function createCustomerFromBooking(input: ManualBookingInput) {
+async function createCustomerFromBooking(input: ManualBookingInput, primaryTeacherId?: string | null) {
   return prisma.customer.create({
-    data: customerSnapshotFromInput({
-      firstName: input.firstName,
-      lastName: input.lastName,
-      name: input.name,
-      email: input.email,
-      phone: input.phone,
-      skillLevel: input.skillLevel,
-      lessonMode: input.lessonMode,
-      unitNumber: input.unitNumber ?? undefined,
-      houseNumber: input.houseNumber,
-      streetName: input.streetName,
-      streetType: input.streetType,
-      suburb: input.suburb,
-      state: input.state,
-      postcode: input.postcode
-    })
+    data: {
+      ...customerSnapshotFromInput({
+        firstName: input.firstName,
+        lastName: input.lastName,
+        name: input.name,
+        email: input.email,
+        phone: input.phone,
+        skillLevel: input.skillLevel,
+        lessonMode: input.lessonMode,
+        unitNumber: input.unitNumber ?? undefined,
+        houseNumber: input.houseNumber,
+        streetName: input.streetName,
+        streetType: input.streetType,
+        suburb: input.suburb,
+        state: input.state,
+        postcode: input.postcode
+      }),
+      ...(primaryTeacherId ? { primaryTeacherId } : {})
+    }
   });
 }
 
@@ -126,6 +132,14 @@ export async function GET(request: NextRequest) {
           }
         ]
       },
+      include: {
+        assignedTeacher: {
+          select: {
+            id: true,
+            displayName: true
+          }
+        }
+      },
       orderBy: { startAt: "asc" }
     });
 
@@ -138,6 +152,14 @@ export async function GET(request: NextRequest) {
           { status: "rejected", updatedAt: { gte: recencyCutoff } },
           { status: "cancelled", updatedAt: { gte: recencyCutoff } }
         ]
+      },
+      include: {
+        assignedTeacher: {
+          select: {
+            id: true,
+            displayName: true
+          }
+        }
       },
       orderBy: { requestedStartAt: "asc" }
     });
@@ -152,7 +174,10 @@ export async function GET(request: NextRequest) {
         status: booking.status,
         color: bookingColor(booking.status),
         title: booking.lastName ? `${booking.lastName}, ${booking.firstName}` : booking.name,
-        row: booking
+        row: {
+          ...booking,
+          assignedTeacherName: booking.assignedTeacher?.displayName ?? null
+        }
       })),
       ...requestRows.map((requestRow) => ({
         entityType: "booking_request" as const,
@@ -162,7 +187,10 @@ export async function GET(request: NextRequest) {
         status: requestRow.status,
         color: bookingRequestColor(requestRow.status),
         title: requestRow.lastName ? `${requestRow.lastName}, ${requestRow.firstName}` : requestRow.name,
-        row: requestRow
+        row: {
+          ...requestRow,
+          assignedTeacherName: requestRow.assignedTeacher?.displayName ?? null
+        }
       }))
     ].sort((a, b) => a.startAt.localeCompare(b.startAt));
 
@@ -213,6 +241,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid booking payload.", details: parsed.error.flatten() }, { status: 400 });
     }
 
+    const requestedAssignedTeacherId = await resolveAssignedTeacherId({
+      db: prisma,
+      actor: admin,
+      requestedAssignedTeacherId: parsed.data.assignedTeacherId ?? null
+    });
+
     // --- STEP 1: CUSTOMER RESOLUTION ---
     let customerId: string | null = null;
     if (parsed.data.customerId) {
@@ -222,6 +256,9 @@ export async function POST(request: NextRequest) {
       });
       if (!selected || selected.isArchived) {
         return NextResponse.json({ error: "Selected customer does not exist." }, { status: 400 });
+      }
+      if (admin.role === "teacher" && !canManagePrimaryTeacherCustomer(admin, selected.primaryTeacherId)) {
+        return NextResponse.json({ error: "Teachers can only book students assigned to themselves." }, { status: 403 });
       }
       customerId = selected.id;
       if (parsed.data.updateCustomerFromBooking) {
@@ -240,6 +277,10 @@ export async function POST(request: NextRequest) {
         orderBy: { createdAt: "desc" }
       });
 
+      if (existing && admin.role === "teacher" && !canManagePrimaryTeacherCustomer(admin, existing.primaryTeacherId)) {
+        return NextResponse.json({ error: "Teachers can only book students assigned to themselves." }, { status: 403 });
+      }
+
       // CONFLICT HANDLING: Notify admin of probable duplicate before proceeding
       if (existing && !parsed.data.matchResolution) {
         return NextResponse.json(
@@ -255,7 +296,7 @@ export async function POST(request: NextRequest) {
       // Resolution Application
       if (existing) {
         if (parsed.data.matchResolution === "create_new") {
-          const created = await createCustomerFromBooking(parsed.data);
+          const created = await createCustomerFromBooking(parsed.data, requestedAssignedTeacherId);
           customerId = created.id;
         } else {
           customerId = existing.id;
@@ -264,7 +305,7 @@ export async function POST(request: NextRequest) {
           }
         }
       } else {
-        const created = await createCustomerFromBooking(parsed.data);
+        const created = await createCustomerFromBooking(parsed.data, requestedAssignedTeacherId);
         customerId = created.id;
       }
     }
@@ -280,6 +321,11 @@ export async function POST(request: NextRequest) {
       customerId,
       actorId: admin.id,
       details: "Portal credential ensured during manual booking create."
+    });
+    await ensureCustomerPrimaryTeacher({
+      db: prisma,
+      customerId,
+      assignedTeacherId: requestedAssignedTeacherId
     });
 
     const startAt = new Date(parsed.data.requestedStartAt);
@@ -318,10 +364,11 @@ export async function POST(request: NextRequest) {
           lessonDuration: parsed.data.lessonDuration,
           customDurationMinutes: parsed.data.customDurationMinutes ?? null,
           dayOfWeek: startAt.getDay(),
-          startTimeLocal: startAt.toISOString().slice(11, 16),
+          startTimeLocal: toTimeKey(startAt),
           startDate: startAt,
           recurrenceEndAt: endAt,
           timezone: APP_TIMEZONE,
+          assignedTeacherId: requestedAssignedTeacherId,
           customerId
         }
       });
@@ -353,6 +400,7 @@ export async function POST(request: NextRequest) {
               timezone: APP_TIMEZONE,
               notes: parsed.data.notes,
               seriesId: series.id,
+              assignedTeacherId: requestedAssignedTeacherId,
               customerId,
               modifiedById: admin.id
             }
@@ -384,6 +432,7 @@ export async function POST(request: NextRequest) {
           endAt: getBookingEnd(startAt, parsed.data.lessonDuration, parsed.data.customDurationMinutes),
           timezone: APP_TIMEZONE,
           notes: parsed.data.notes,
+          assignedTeacherId: requestedAssignedTeacherId,
           customerId,
           modifiedById: admin.id
         }

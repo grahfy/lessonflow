@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isOwnerAdmin } from "@/lib/admin-auth";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { getGmailUserProfile, isGmailConfigured } from "@/lib/email/gmail-service";
@@ -11,6 +12,9 @@ export async function GET(request: NextRequest) {
     const admin = await requireAdminFromRequest(request);
     if (!admin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!isOwnerAdmin(admin)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const configured = isGmailConfigured();

@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { isOwnerAdmin } from "@/lib/admin-auth";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import path from "node:path";
 import fs from "node:fs";
@@ -7,6 +8,9 @@ export async function GET(request: NextRequest) {
   const admin = await requireAdminFromRequest(request);
   if (!admin) {
     return new Response("Unauthorized", { status: 401 });
+  }
+  if (!isOwnerAdmin(admin)) {
+    return new Response("Forbidden", { status: 403 });
   }
 
   const repoRoot = process.cwd();

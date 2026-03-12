@@ -1,5 +1,5 @@
 import { AdminInvoicesClient } from "@/components/admin/invoices/invoices-client";
-import { requireAdmin } from "@/lib/admin/server-auth";
+import { requireOwner } from "@/lib/admin/server-auth";
 
 export const metadata = {
   title: "Booking Console Invoices"
@@ -9,6 +9,6 @@ export const metadata = {
  * Protected admin invoices route.
  */
 export default async function AdminInvoicesPage() {
-  await requireAdmin();
+  await requireOwner();
   return <AdminInvoicesClient />;
 }

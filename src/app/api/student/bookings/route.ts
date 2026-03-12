@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
       skillLevel: student.skillLevel,
       lessonDuration: parsed.data.lessonDuration,
       customDurationMinutes: parsed.data.customDurationMinutes ?? null,
+      assignedTeacherId: student.primaryTeacherId,
       requestedStartAt,
       notes: parsed.data.notes || null,
       isRecurring: false,
