@@ -873,6 +873,31 @@
   min-height: 320px;
 }
 
+.field textarea.admin-email-signature-textarea {
+  min-height: 180px;
+}
+
+.admin-email-signature-logo-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-email-signature-logo-preview {
+  display: block;
+  max-width: 220px;
+  max-height: 120px;
+  width: auto;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  padding: 10px;
+}
+
+.admin-email-signature-logo-actions {
+  justify-content: flex-start;
+}
+
 .admin-shell.admin-shell-reports {
   height: auto;
   max-height: none;

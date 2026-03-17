@@ -6,6 +6,9 @@ import {
 } from "@/lib/branding";
 import { getPublicSiteUrl, getOwnerEmail } from "@/lib/env";
 
+export const EMAIL_SIGNATURE_START_MARKER = "<!-- EMAIL_SIGNATURE_START -->";
+export const EMAIL_SIGNATURE_END_MARKER = "<!-- EMAIL_SIGNATURE_END -->";
+
 /**
  * Escapes user-provided values before inserting into HTML email strings.
  */
@@ -28,7 +31,7 @@ export function nl2br(value: string): string {
 /**
  * Resolves branding/signature values with env overrides for deployment-specific contact details.
  */
-export function getEmailBranding() {
+export function buildEmailBranding() {
   const siteUrl = getPublicSiteUrl().replace(/\/+$/, "");
   return {
     brandName: PUBLIC_BRAND_NAME,
@@ -41,28 +44,48 @@ export function getEmailBranding() {
 }
 
 /**
+ * Backward-compatible helper retained for existing imports.
+ */
+export function getEmailBranding() {
+  return buildEmailBranding();
+}
+
+/**
  * Shared signature block appended to all branded emails.
  */
-export function renderSignatureHtml() {
-  const branding = getEmailBranding();
+export function renderSignatureHtml(input: {
+  brandName: string;
+  logoUrl: string;
+  bodyHtml: string;
+}) {
   return `
     <div style="margin-top:28px;padding-top:18px;border-top:1px solid #e3e8f3;">
       <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;">
         <tr>
           <td style="vertical-align:top;padding:0 0 12px;">
-            <img src="${escapeHtml(branding.logoUrl)}" alt="${escapeHtml(branding.brandName)}" width="164" style="display:block;width:164px;max-width:100%;height:auto;border:0;" />
+            <img src="${escapeHtml(input.logoUrl)}" alt="${escapeHtml(input.brandName)}" width="164" style="display:block;width:164px;max-width:100%;height:auto;border:0;" />
           </td>
         </tr>
       </table>
-      <p style="margin:0 0 8px;font-size:14px;line-height:1.5;color:#16233d;"><strong>${escapeHtml(branding.brandName)}</strong></p>
+      <p style="margin:0 0 8px;font-size:14px;line-height:1.5;color:#16233d;"><strong>${escapeHtml(input.brandName)}</strong></p>
+      ${input.bodyHtml}
+    </div>
+  `;
+}
+
+export function renderDefaultSignatureHtml(branding = buildEmailBranding()) {
+  return renderSignatureHtml({
+    brandName: branding.brandName,
+    logoUrl: branding.logoUrl,
+    bodyHtml: `
       <p style="margin:0;font-size:13px;line-height:1.6;color:#41506f;">
         Call or text: <a href="tel:${escapeHtml(branding.phone.replace(/\s+/g, ""))}" style="color:#2247d8;text-decoration:none;">${escapeHtml(branding.phone)}</a><br/>
         Email: <a href="mailto:${escapeHtml(branding.email)}" style="color:#2247d8;text-decoration:none;">${escapeHtml(branding.email)}</a><br/>
         Website: <a href="${escapeHtml(branding.siteUrl)}" style="color:#2247d8;text-decoration:none;">${escapeHtml(branding.siteUrl.replace(/^https?:\/\//, ""))}</a><br/>
         Studio: ${escapeHtml(branding.address)}
       </p>
-    </div>
-  `;
+    `
+  });
 }
 
 /**
@@ -77,7 +100,7 @@ export function renderEmailLayout(input: {
   leadHtml?: string;
   contentHtml: string;
 }) {
-  const branding = getEmailBranding();
+  const branding = buildEmailBranding();
   const previewText = input.previewText || input.title;
 
   return `
@@ -108,7 +131,7 @@ export function renderEmailLayout(input: {
                     <div style="font-size:14px;line-height:1.65;color:#16233d;">
                       ${input.contentHtml}
                     </div>
-                    ${renderSignatureHtml()}
+                    ${EMAIL_SIGNATURE_START_MARKER}${renderDefaultSignatureHtml(branding)}${EMAIL_SIGNATURE_END_MARKER}
                   </td>
                 </tr>
               </table>

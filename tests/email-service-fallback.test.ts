@@ -7,6 +7,7 @@ const mockCreateTransport = vi.fn(() => ({
 const mockIsGmailConfigured = vi.fn();
 const mockSendGmailEmail = vi.fn();
 const mockOutboundEmailCreate = vi.fn();
+const mockEmailSignatureSettingsFindUnique = vi.fn();
 const mockSystemLogCreate = vi.fn(() => Promise.resolve());
 
 vi.mock("nodemailer", () => ({
@@ -25,6 +26,9 @@ vi.mock("@/lib/db", () => ({
     outboundEmail: {
       create: mockOutboundEmailCreate
     },
+    emailSignatureSettings: {
+      findUnique: mockEmailSignatureSettingsFindUnique
+    },
     systemLog: {
       create: mockSystemLogCreate
     }
@@ -41,6 +45,7 @@ describe("email-service-fallback", () => {
     vi.stubEnv("SMTP_PASS", "smtp-pass");
     vi.stubEnv("SMTP_FROM", "Melbourne Guitar School <no-reply@example.com>");
     vi.stubEnv("ADMIN_EMAIL", "owner@example.com");
+    mockEmailSignatureSettingsFindUnique.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -68,9 +73,11 @@ describe("email-service-fallback", () => {
       expect.objectContaining({
         to: "student@example.com",
         bcc: ["owner@example.com"],
-        subject: "Portal password updated"
+        subject: "Portal password updated",
+        html: expect.stringContaining("<p>Hello</p>")
       })
     );
+    expect(mockSendMail.mock.calls[0]?.[0]?.html).toContain("Call or text:");
     expect(mockOutboundEmailCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         toEmail: "student@example.com",
@@ -99,8 +106,33 @@ describe("email-service-fallback", () => {
     expect(mockSendGmailEmail).toHaveBeenCalledWith({
       to: "student@example.com",
       subject: "Portal password updated",
-      html: "<p>Hello</p>",
+      html: expect.stringContaining("<p>Hello</p>"),
       bcc: ["owner@example.com"]
     });
+  });
+
+  it("replaces the default signature with custom signature settings", async () => {
+    vi.stubEnv("EMAIL_PROVIDER", "smtp");
+    mockIsGmailConfigured.mockReturnValue(false);
+    mockSendMail.mockResolvedValue({ messageId: "smtp-message-id" });
+    mockEmailSignatureSettingsFindUnique.mockResolvedValue({
+      id: "default-email-signature",
+      bodyText: "Kind regards\nCustom Teacher\ncustom@example.com",
+      logoStorageKey: null,
+      logoMimeType: null,
+      createdAt: new Date("2026-03-18T00:00:00.000Z"),
+      updatedAt: new Date("2026-03-18T00:00:00.000Z")
+    });
+
+    const { sendEmail } = await import("@/lib/email/service");
+    const result = await sendEmail({
+      to: "student@example.com",
+      subject: "Portal password updated",
+      html: "<p>Hello</p>"
+    });
+
+    expect(result).toEqual({ status: "sent" });
+    expect(mockSendMail.mock.calls[0]?.[0]?.html).toContain("custom@example.com");
+    expect(mockSendMail.mock.calls[0]?.[0]?.html).not.toContain("Call or text:");
   });
 });

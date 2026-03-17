@@ -21,6 +21,12 @@ import nodemailer from "nodemailer";
 
 import { prisma } from "@/lib/db";
 import { isGmailConfigured, sendGmailEmail } from "@/lib/email/gmail-service";
+import {
+  EMAIL_SIGNATURE_END_MARKER,
+  EMAIL_SIGNATURE_START_MARKER,
+  renderEmailLayout
+} from "@/lib/email/layout";
+import { renderResolvedSignatureHtml } from "@/lib/email/signature";
 import { getOwnerEmail } from "@/lib/env";
 import { logError, logEvent } from "@/lib/observability";
 import { renderTemplate } from "@/lib/email/render";
@@ -54,6 +60,35 @@ export type SendEmailResult = {
 
 /** Reused transporter instance to minimize connection overhead. */
 let transporter: nodemailer.Transporter | null = null;
+
+function isFullHtmlDocument(value: string): boolean {
+  return /<html[\s>]/i.test(value) || /<!doctype html/i.test(value);
+}
+
+async function injectEmailSignature(html: string, subject: string): Promise<string> {
+  const baseHtml = isFullHtmlDocument(html)
+    ? html
+    : renderEmailLayout({
+        title: subject,
+        contentHtml: html
+      });
+
+  const signatureHtml = await renderResolvedSignatureHtml();
+  const signatureBlock = `${EMAIL_SIGNATURE_START_MARKER}${signatureHtml}${EMAIL_SIGNATURE_END_MARKER}`;
+
+  if (baseHtml.includes(EMAIL_SIGNATURE_START_MARKER) && baseHtml.includes(EMAIL_SIGNATURE_END_MARKER)) {
+    return baseHtml.replace(
+      new RegExp(`${EMAIL_SIGNATURE_START_MARKER}[\\s\\S]*?${EMAIL_SIGNATURE_END_MARKER}`),
+      signatureBlock
+    );
+  }
+
+  if (/<\/body>/i.test(baseHtml)) {
+    return baseHtml.replace(/<\/body>/i, `${signatureBlock}</body>`);
+  }
+
+  return `${baseHtml}${signatureBlock}`;
+}
 
 /** 
  * Cleanly extracts the raw email portion from "Name <email@address.com>" 
@@ -179,13 +214,14 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   const tx = getTransporter();
   const ownerBcc = getCustomerAuditBccRecipient(input.to);
   const bcc = ownerBcc ? mergeBccValues(input.bcc, ownerBcc) : input.bcc;
+  const html = await injectEmailSignature(input.html, input.subject);
 
   const gmailConfigured = isGmailConfigured();
 
   // STEP 1: GMAIL PROVIDER PATH (Explicitly requested or only live provider available)
   if (provider === "gmail" || (!tx && gmailConfigured)) {
     if (gmailConfigured) {
-      const gmailResult = await sendGmailEmail({ ...input, bcc });
+      const gmailResult = await sendGmailEmail({ ...input, html, bcc });
       if (gmailResult.status === "sent") {
         logEvent("email.sent_via_gmail", { to: input.to, subject: input.subject });
         return gmailResult;
@@ -204,7 +240,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         data: {
           toEmail: input.to,
           subject: input.subject,
-          htmlBody: input.html,
+          htmlBody: html,
           status: "queued_no_smtp",
           provider: "smtp",
           source: "app",
@@ -226,7 +262,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       data: {
         toEmail: input.to,
         subject: input.subject,
-        htmlBody: input.html,
+        htmlBody: html,
         status: "queued_no_smtp",
         provider: "smtp",
         source: "app"
@@ -242,7 +278,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       to: input.to,
       bcc,
       subject: input.subject,
-      html: input.html,
+      html,
       attachments: input.attachments?.map((attachment) => ({
         filename: attachment.filename,
         content: attachment.content,
@@ -254,7 +290,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       data: {
         toEmail: input.to,
         subject: input.subject,
-        htmlBody: input.html,
+        htmlBody: html,
         status: "sent",
         provider: "smtp",
         externalId: info.messageId,
@@ -273,7 +309,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
      */
     if (gmailConfigured) {
       logError("email.smtp_failed_attempting_gmail", error, { to: input.to, subject: input.subject });
-      const gmailResult = await sendGmailEmail({ ...input, bcc });
+      const gmailResult = await sendGmailEmail({ ...input, html, bcc });
       if (gmailResult.status === "sent") {
         logEvent("email.smtp_failed_gmail_fallback_sent", { to: input.to, subject: input.subject });
         return gmailResult;
@@ -286,7 +322,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       data: {
         toEmail: input.to,
         subject: input.subject,
-        htmlBody: input.html,
+        htmlBody: html,
         status: "failed",
         provider: "smtp",
         source: "app",

@@ -581,6 +581,16 @@ model EmailTemplate {
   updatedAt   DateTime @updatedAt
 }
 
+// Singleton config for the shared outbound email signature and optional email-only logo.
+model EmailSignatureSettings {
+  id             String   @id
+  bodyText       String?  @db.Text
+  logoStorageKey String?
+  logoMimeType   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
 // Layout and style customization for generated invoices.
 model InvoiceTemplate {
   id          String   @id @default(cuid())
