@@ -765,6 +765,25 @@ extract_env_assignment_key() {
   printf '%s\n' "${line}" | sed -nE 's/^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=.*$/\2/p'
 }
 
+shared_env_has_key_from_update() {
+  local env_file="$1"
+  local key="$2"
+
+  run_shared_env_cmd env SHARED_ENV_PATH="${env_file}" SHARED_ENV_KEY="${key}" sh -c '
+    pattern="^[[:space:]]*(export[[:space:]]+)?${SHARED_ENV_KEY}[[:space:]]*="
+    grep -Eq "$pattern" "$SHARED_ENV_PATH" >/dev/null 2>&1
+  '
+}
+
+append_blank_env_key_from_update() {
+  local env_file="$1"
+  local key="$2"
+
+  run_shared_env_cmd env SHARED_ENV_PATH="${env_file}" SHARED_ENV_KEY="${key}" sh -c '
+    printf "%s\n" "${SHARED_ENV_KEY}=\"\"" >> "$SHARED_ENV_PATH"
+  '
+}
+
 ensure_shared_env_file() {
   local env_template_path="$1"
   local shared_env_path="${SHARED_DIR}/.env"
@@ -798,9 +817,9 @@ ensure_shared_env_file() {
       key="$(extract_env_assignment_key "${template_line}")"
       [[ -n "${key}" ]] || continue
 
-      if ! grep -Eq "^[[:space:]]*(export[[:space:]]+)?${key}[[:space:]]*=" "${shared_env_path}"; then
+      if ! shared_env_has_key_from_update "${shared_env_path}" "${key}"; then
         log_info "Adding missing config key to shared .env: ${key}"
-        if ! printf '%s\n' "${key}=\"\"" | run_shared_env_cmd tee -a "${shared_env_path}" >/dev/null; then
+        if ! append_blank_env_key_from_update "${shared_env_path}" "${key}"; then
           log_warn "Unable to append ${key} to ${shared_env_path}."
           log_warn "deploy.sh will retry shared .env setup during deployment."
           return 1
