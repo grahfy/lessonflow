@@ -114,6 +114,10 @@ export async function syncGmailSentMessages(maxResults: number = 50, options?: {
       } catch (error: unknown) {
         const err = error as { code?: number; status?: number; message?: string };
         if (err.code === 403 || err.status === 403 || err.message?.includes("Metadata scope")) {
+          // NOTE: metadata format omits body content (parts/body.data not populated).
+          // extractBestStoredBody will fall back to details.snippet (~100 chars).
+          // If this 403 persists (e.g., OAuth scope never upgraded), this message
+          // will be stored with snippet-only content and cannot be auto-repaired.
           details = await getMessageDetails(msg.id, "metadata");
         } else {
           throw error;
@@ -141,12 +145,13 @@ export async function syncGmailSentMessages(maxResults: number = 50, options?: {
 
       if (existing) {
         skippedCount++;
-        if (existing.toEmail !== storedRecipientValue || shouldRepairStoredBody(existing.htmlBody, body)) {
+        const repairBody = shouldRepairStoredBody(existing.htmlBody, body);
+        if (existing.toEmail !== storedRecipientValue || repairBody) {
           await prisma.outboundEmail.update({
             where: { externalId: msg.id },
             data: {
               toEmail: storedRecipientValue,
-              ...(shouldRepairStoredBody(existing.htmlBody, body) ? { htmlBody: body } : {})
+              ...(repairBody ? { htmlBody: body } : {})
             }
           });
         }

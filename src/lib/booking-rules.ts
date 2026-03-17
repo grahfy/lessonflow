@@ -99,6 +99,8 @@ function createBookingRequestSchema(options?: { allowHistoricalSingleBookings?: 
     const startAt = new Date(data.requestedStartAt);
     const now = new Date();
     const currentYear = getCurrentCalendarYear();
+    // NOTE: No lower-bound date limit is enforced — admins may backfill single bookings for any past date.
+    // Recurring entries still require the standard current-year and future-only rules.
     const allowHistoricalSingleBookings =
       options?.allowHistoricalSingleBookings === true && !data.isRecurring && isBefore(startAt, now);
 
@@ -188,6 +190,9 @@ export const bookingRequestSchema = createBookingRequestSchema();
  *
  * RATIONALE: Admins may backfill one-off historical bookings for record keeping,
  * but recurring entries still follow the normal current-year and future-only rules.
+ * 
+ * NOTE: This bypass only applies to past dates (isBefore check). Future single bookings
+ * that fall outside the current calendar year are still rejected by the normal year guard.
  */
 export const adminManualBookingSchema = createBookingRequestSchema({
   allowHistoricalSingleBookings: true

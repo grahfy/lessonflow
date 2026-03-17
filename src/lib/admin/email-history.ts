@@ -20,7 +20,7 @@ export type EmailViewerContent =
   | { kind: "text"; value: string }
   | { kind: "empty"; value: "" };
 
-const HTML_EMAIL_BODY_PATTERN = /<(?:!doctype|html|head|body|div|p|br|span|table|tbody|thead|tr|td|th|img|a|ul|ol|li|strong|em|style|blockquote|pre|h[1-6])(?:\s|>)/i;
+const HTML_EMAIL_BODY_PATTERN = /<(?:!doctype|html|head|body|div|p|br|span|table|tbody|thead|tr|td|th|img|a|ul|ol|li|strong|em|style|blockquote|pre|h[1-6])(?:\s|>|\/)/i;
 
 function normalizeEmailBodyValue(value?: string | null): string {
   return value?.trim() || "";
