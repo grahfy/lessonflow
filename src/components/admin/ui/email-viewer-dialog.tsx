@@ -13,6 +13,7 @@ interface EmailViewerDialogProps {
 
 export function EmailViewerDialog({ isOpen, onClose, email }: EmailViewerDialogProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const renderedTextBody = email?.textBody?.trim() || "";
 
   if (!email) return null;
 
@@ -41,22 +42,39 @@ export function EmailViewerDialog({ isOpen, onClose, email }: EmailViewerDialogP
             <strong>To:</strong> {email.toEmail}
           </div>
           <div className="admin-email-viewer-meta-row">
-            <strong>From:</strong> System
+            <strong>From:</strong> {email.fromEmail || "Unknown"}
           </div>
           <div className="admin-email-viewer-meta-row">
             <strong>Date:</strong> {format(new Date(email.createdAt), "dd MMM yyyy, HH:mm")}
           </div>
           <div className="admin-email-viewer-meta-row">
+            <strong>Direction:</strong> {email.direction === "inbound" ? "Inbound" : "Outbound"}
+          </div>
+          {email.provider ? (
+            <div className="admin-email-viewer-meta-row">
+              <strong>Provider:</strong> {email.provider.toUpperCase()}
+            </div>
+          ) : null}
+          {email.source ? (
+            <div className="admin-email-viewer-meta-row">
+              <strong>Source:</strong> {email.source}
+            </div>
+          ) : null}
+          <div className="admin-email-viewer-meta-row">
             <strong>Status:</strong> <span className={`status-badge status-${email.status.toLowerCase()}`}>{email.status}</span>
           </div>
         </div>
         <div className="admin-email-viewer-body">
-          <iframe
-            className="admin-email-viewer-frame"
-            srcDoc={email.htmlBody}
-            title="Email Content"
-            sandbox="allow-same-origin"
-          />
+          {email.htmlBody ? (
+            <iframe
+              className="admin-email-viewer-frame"
+              srcDoc={email.htmlBody}
+              title="Email Content"
+              sandbox="allow-same-origin"
+            />
+          ) : (
+            <pre className="admin-email-viewer-plain">{renderedTextBody || "No message body available."}</pre>
+          )}
         </div>
       </div>
     </AdminDialog>

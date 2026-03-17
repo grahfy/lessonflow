@@ -6,6 +6,7 @@ import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { verifyCaptchaSubmission } from "@/lib/captcha";
 import { prisma } from "@/lib/db";
+import { getCustomerEmailHistory } from "@/lib/email/history";
 import { sendEmail } from "@/lib/email/service";
 import { customerCustomMessageTemplate } from "@/lib/email/templates";
 
@@ -37,6 +38,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       where: { id },
       select: {
         email: true,
+        normalizedEmail: true,
         primaryTeacherId: true
       }
     });
@@ -48,14 +50,10 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const history = await prisma.outboundEmail.findMany({
-      where: {
-        toEmail: customer.email
-      },
-      orderBy: {
-        createdAt: "desc"
-      },
-      take: 50
+    const history = await getCustomerEmailHistory({
+      id,
+      email: customer.email,
+      normalizedEmail: customer.normalizedEmail
     });
 
     return NextResponse.json({ history });

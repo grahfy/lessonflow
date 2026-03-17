@@ -12,8 +12,8 @@
  * 2. Heuristic Matching logic: If a booking comes in from a guest email that 
  *    partially matches an existing customer, the UI provides a "Match Found" 
  *    guard to prevent duplicate profile creation.
- * 3. Bidirectional Communication: Integrates an Email History viewer (fetched 
- *    from `OutboundEmail` logs and optionally Gmail API) alongside a 
+ * 3. Bidirectional Communication: Integrates an Email History viewer (fetched
+ *    from persisted outbound logs plus provider-backed inbound snapshots) alongside a
  *    custom composer.
  * 4. Modular Actions: Provides entry points to adjacent domains:
  *    - Invoicing (Financial)
@@ -32,6 +32,7 @@ import { AdminField, AdminForm } from "@/components/admin/ui/admin-form";
 import { AdminTabBar } from "@/components/admin/ui/admin-tab-bar";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { STREET_TYPES } from "@/lib/admin/constants";
+import { getEmailSourceLabel } from "@/lib/admin/email-history";
 import { formatDateTime } from "@/lib/admin/formatters";
 import { type BookingEvent } from "@/lib/admin/use-bookings";
 import { type EmailRecord, type SendEmailResult } from "@/lib/admin/use-email-history";
@@ -425,9 +426,10 @@ export function BookingDetailDialog({
               renderHistoryMeta={(email) => (
                 <div className="email-history-meta booking-email-history-meta">
                   {formatDateTime(email.createdAt)}
+                  <span className="email-direction-tag"> · {email.direction === "inbound" ? "Inbound" : "Outbound"}</span>
                   {email.provider ? <span className="email-provider-tag"> · {email.provider.toUpperCase()}</span> : null}
-                  {email.source ? (
-                    <span className="email-source-tag"> · {email.source === "app" ? "via App" : "via Gmail"}</span>
+                  {getEmailSourceLabel(email.source) ? (
+                    <span className="email-source-tag"> · {getEmailSourceLabel(email.source)}</span>
                   ) : null}
                   {email.error ? <span className="booking-email-history-error">· {email.error}</span> : null}
                 </div>

@@ -3,14 +3,30 @@ import { listSentMessages, getMessageDetails } from "./service";
 import type { gmail_v1 } from "googleapis";
 import { logError, logEvent } from "@/lib/observability";
 
+const HEADER_EMAIL_PATTERN = /([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi;
+
+function extractEmailAddresses(headerValue: string): string[] {
+  return Array.from(headerValue.matchAll(HEADER_EMAIL_PATTERN), (match) => match[1].trim().toLowerCase());
+}
+
+function getStoredRecipientValue(toHeader: string, normalizedRecipients: string[]): string {
+  if (normalizedRecipients.length > 0) {
+    return normalizedRecipients.join(", ");
+  }
+
+  return toHeader.trim().toLowerCase() || "unknown";
+}
+
 /**
  * Syncs the latest sent messages from Gmail into the local OutboundEmail table.
  * Deduplicates based on the Gmail message ID (externalId).
  */
-export async function syncGmailSentMessages(maxResults: number = 50) {
+export async function syncGmailSentMessages(maxResults: number = 50, options?: { targetToEmail?: string }) {
   try {
-    logEvent("gmail.sync_started", { maxResults });
-    const { messages } = await listSentMessages(maxResults);
+    const targetToEmail = options?.targetToEmail?.trim().toLowerCase() || undefined;
+    logEvent("gmail.sync_started", { maxResults, targetToEmail });
+    const query = targetToEmail ? `to:${targetToEmail}` : undefined;
+    const { messages } = await listSentMessages(maxResults, undefined, query);
     
     let importedCount = 0;
     let skippedCount = 0;
@@ -18,17 +34,7 @@ export async function syncGmailSentMessages(maxResults: number = 50) {
     for (const msg of messages) {
       if (!msg.id) continue;
 
-      // 1. Check if we already have this message
-      const existing = await prisma.outboundEmail.findUnique({
-        where: { externalId: msg.id },
-      });
-
-      if (existing) {
-        skippedCount++;
-        continue;
-      }
-
-      // 2. Fetch details. Try for full content, fallback to metadata if permissions are restricted.
+      // 1. Fetch details. Try for full content, fallback to metadata if permissions are restricted.
       let details: gmail_v1.Schema$Message | undefined;
       try {
         details = await getMessageDetails(msg.id, "full");
@@ -45,8 +51,20 @@ export async function syncGmailSentMessages(maxResults: number = 50) {
       const headers = details.payload?.headers || [];
       const toHeader = headers.find(h => h.name?.toLowerCase() === "to")?.value || "unknown";
       const subjectHeader = headers.find(h => h.name?.toLowerCase() === "subject")?.value || "(no subject)";
+      const normalizedRecipients = extractEmailAddresses(toHeader);
+      const storedRecipientValue = getStoredRecipientValue(toHeader, normalizedRecipients);
+
+      if (targetToEmail && !normalizedRecipients.includes(targetToEmail)) {
+        skippedCount++;
+        continue;
+      }
+
+      // 2. Check if we already have this message and heal recipient storage if needed.
+      const existing = await prisma.outboundEmail.findUnique({
+        where: { externalId: msg.id },
+      });
       
-      // 4. Try to get HTML body, fallback to text, then snippet
+      // 3. Try to get HTML body, fallback to text, then snippet
       let body = details.snippet || "";
       
       // Gmail messages can be deeply nested. This is a simplified extractor.
@@ -60,10 +78,23 @@ export async function syncGmailSentMessages(maxResults: number = 50) {
         body = Buffer.from(textPart.body.data, "base64").toString("utf-8");
       }
 
-      // 5. Create local record
+      if (existing) {
+        skippedCount++;
+        if (existing.toEmail !== storedRecipientValue) {
+          await prisma.outboundEmail.update({
+            where: { externalId: msg.id },
+            data: {
+              toEmail: storedRecipientValue
+            }
+          });
+        }
+        continue;
+      }
+
+      // 4. Create local record
       await prisma.outboundEmail.create({
         data: {
-          toEmail: toHeader,
+          toEmail: storedRecipientValue,
           subject: subjectHeader,
           htmlBody: body,
           status: "sent",

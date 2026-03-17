@@ -1,3 +1,4 @@
+import { getEmailSourceLabel } from "@/lib/admin/email-history";
 import { formatDateTime } from "@/lib/admin/utils";
 import { type EmailRecord, type SendEmailResult } from "@/lib/admin/use-email-history";
 import { AdminEmailPanel } from "@/components/admin/ui/admin-email-panel";
@@ -60,10 +61,9 @@ export function CustomerEmailDialog({
       renderHistoryMeta={(email) => (
         <div className="customer-email-history-meta">
           <span className={`status-badge status-${email.status.toLowerCase()}`}>{email.status}</span>
+          <span className="email-direction-tag">· {email.direction === "inbound" ? "Inbound" : "Outbound"}</span>
           {email.provider ? <span className="email-provider-tag">· {email.provider.toUpperCase()}</span> : null}
-          {email.source ? (
-            <span className="email-source-tag">· {email.source === "app" ? "via App" : "via Gmail"}</span>
-          ) : null}
+          {getEmailSourceLabel(email.source) ? <span className="email-source-tag">· {getEmailSourceLabel(email.source)}</span> : null}
           {email.error ? <span className="customer-email-history-error">· {email.error}</span> : null}
         </div>
       )}

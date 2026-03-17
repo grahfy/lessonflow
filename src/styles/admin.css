@@ -438,7 +438,7 @@
   border: 1px solid rgba(76, 204, 135, 0.3);
 }
 
-.status-sent, .status-pending {
+.status-sent, .status-pending, .status-received {
   background: rgba(244, 183, 108, 0.15);
   color: #ffe9ce;
   border: 1px solid rgba(244, 183, 108, 0.3);
@@ -1398,6 +1398,13 @@
 
 .customer-email-history-error {
   color: #ff9ea9;
+  font-size: 0.75rem;
+}
+
+.email-direction-tag,
+.email-provider-tag,
+.email-source-tag {
+  color: var(--ink-1);
   font-size: 0.75rem;
 }
 
@@ -3005,6 +3012,17 @@
   height: 100%;
   border: none;
   background: #fff;
+}
+
+.admin-email-viewer-plain {
+  margin: 0;
+  padding: 16px;
+  width: 100%;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ink-0);
+  font: inherit;
 }
 
 .dialog-tabs {

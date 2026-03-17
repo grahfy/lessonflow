@@ -1,19 +1,12 @@
 "use client";
 
 import { useCallback, useState } from "react";
+
+import type { EmailRecord, EmailRefreshResult } from "@/lib/admin/email-history";
+
 import { useSafeFetch } from "./use-safe-fetch";
 
-export interface EmailRecord {
-    id: string;
-    toEmail: string;
-    subject: string;
-    htmlBody: string;
-    status: string;
-    provider?: string;
-    source?: string;
-    error?: string;
-    createdAt: string;
-}
+export type { EmailRecord } from "@/lib/admin/email-history";
 
 export interface UseEmailHistoryOptions {
     /** Called on auth error */
@@ -100,16 +93,17 @@ export function useEmailHistory(options: UseEmailHistoryOptions = {}): UseEmailH
   const sync = useCallback(async (customerId: string): Promise<boolean> => {
     setSyncing(true);
     try {
-      const response = await safeFetch(`/api/admin/gmail/sync`, {
+      const response = await safeFetch(`/api/admin/customers/${customerId}/email/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
 
       if (!response.ok) {
-        await handleApiError(response, "Unable to sync Gmail.");
+        await handleApiError(response, "Unable to refresh email history.");
         return false;
       }
 
+      await response.json().catch(() => null as EmailRefreshResult | null);
       void load(customerId);
       return true;
     } catch {

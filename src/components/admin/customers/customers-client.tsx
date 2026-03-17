@@ -7,7 +7,7 @@
  * CORE RESPONSIBILITIES:
  * 1. Customer Discovery: Paginated list with debounced search (Name, Email, Phone).
  * 2. Profile Management: Creating and editing detailed student records.
- * 3. Communication Audit: Viewing outbound email history and syncing from Gmail.
+ * 3. Communication Audit: Viewing provider-backed email history and refreshing customer email timelines.
  * 4. Resource Allocation: Attaching audio/PDF materials to customers or specific lessons.
  * 5. Access Control: Managing and rotating student portal credentials.
  * 

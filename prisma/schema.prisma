@@ -348,12 +348,35 @@ model Customer {
   portalCredential          CustomerPortalCredential?
   portalCredentialAuditLogs CustomerPortalCredentialAuditLog[]
   learningMaterials         LearningMaterial[]
+  inboundEmails             CustomerInboundEmail[]
 
   @@index([isArchived, fullName])
   @@index([normalizedFullName, postcode, isArchived])
   @@index([normalizedEmail])
   @@index([normalizedPhone])
   @@index([primaryTeacherId])
+}
+
+// Persisted inbound customer email snapshots imported from mailbox providers so
+// admin history views can show inbound context without live mailbox reads.
+model CustomerInboundEmail {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  provider   String   @default("imap")
+  source     String   @default("imap")
+  externalId String
+  fromEmail  String
+  toEmail    String?
+  subject    String
+  snippet    String   @db.Text
+  bodyText   String?  @db.Text
+  status     String   @default("received")
+  receivedAt DateTime
+  syncedAt   DateTime @default(now())
+
+  @@unique([provider, externalId])
+  @@index([customerId, receivedAt])
 }
 
 // Portal credentials are stored as both a hash (verification) and encrypted

@@ -4,13 +4,14 @@ import { getGmailClient } from "./client";
  * Lists messages from the "Sent" label in Gmail.
  * Supports basic pagination via maxResults.
  */
-export async function listSentMessages(maxResults: number = 50, pageToken?: string) {
+export async function listSentMessages(maxResults: number = 50, pageToken?: string, query?: string) {
   const gmail = getGmailClient();
   const response = await gmail.users.messages.list({
     userId: "me",
     labelIds: ["SENT"],
     maxResults,
     pageToken,
+    q: query,
   });
 
   return {
