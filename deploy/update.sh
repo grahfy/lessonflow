@@ -759,6 +759,12 @@ read_env_file_value_from_update() {
 
 # Ensures /var/www/.../shared/.env exists, copying the repo .env.example on
 # first-run servers so operators have a file to review before deployment.
+extract_env_assignment_key() {
+  local line="$1"
+
+  printf '%s\n' "${line}" | sed -nE 's/^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=.*$/\2/p'
+}
+
 ensure_shared_env_file() {
   local env_template_path="$1"
   local shared_env_path="${SHARED_DIR}/.env"
@@ -783,6 +789,25 @@ ensure_shared_env_file() {
   else
     log_warn "No shared .env file found and no template available at ${env_template_path}"
     return 1
+  fi
+
+  if [[ -f "${shared_env_path}" && -f "${env_template_path}" ]]; then
+    local template_line=""
+    local key=""
+    while IFS= read -r template_line || [[ -n "${template_line}" ]]; do
+      key="$(extract_env_assignment_key "${template_line}")"
+      [[ -n "${key}" ]] || continue
+
+      if ! grep -Eq "^[[:space:]]*(export[[:space:]]+)?${key}[[:space:]]*=" "${shared_env_path}"; then
+        log_info "Adding missing config key to shared .env: ${key}"
+        if ! printf '%s\n' "${key}=\"\"" | run_shared_env_cmd tee -a "${shared_env_path}" >/dev/null; then
+          log_warn "Unable to append ${key} to ${shared_env_path}."
+          log_warn "deploy.sh will retry shared .env setup during deployment."
+          return 1
+        fi
+      fi
+    done < "${env_template_path}"
+    log_info "Shared .env keys synchronized with template."
   fi
 
   # Re-apply runtime ownership in case a previous manual edit left the file as

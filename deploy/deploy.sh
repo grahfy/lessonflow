@@ -922,6 +922,12 @@ pick_env_editor() {
 # Ensures the shared production .env file exists, bootstrapping it from the
 # repository .env.example when missing. If it exists, it merges any missing
 # keys from the template to ensure updates include new config variables.
+extract_env_assignment_key() {
+    local line="$1"
+
+    printf '%s\n' "${line}" | sed -nE 's/^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=.*$/\2/p'
+}
+
 ensure_shared_env_file() {
     local env_template_path="$1"
     local shared_env_path="${SHARED_DIR}/.env"
@@ -942,29 +948,19 @@ ensure_shared_env_file() {
         # Merge missing keys from template into existing shared env
         # RATIONALE: Existing values are preserved because production hosts may
         # already contain secrets or host-specific overrides not present in git.
-        # NOTE: This merge is append-only by design. Deploys should surface new
-        # config knobs without clobbering previously curated production values.
-        local temp_env
-        temp_env="$(mktemp)"
-        cp "${shared_env_path}" "${temp_env}"
-        
+        # NOTE: Upgrade merges intentionally append blank placeholders instead
+        # of template defaults so new settings require explicit operator review.
+        local template_line=""
         local key=""
-        local value=""
-        while IFS='=' read -r key value || [[ -n "$key" ]]; do
-            # Skip comments and empty lines
-            [[ "$key" =~ ^[[:space:]]*# ]] && continue
-            [[ -z "${key//[[:space:]]/}" ]] && continue
-            
-            # Remove whitespace and potential export prefix
-            key="${key#export }"
-            key="${key//[[:space:]]/}"
-            
-            if ! grep -q "^[[:space:]]*${key}=" "${shared_env_path}"; then
+        while IFS= read -r template_line || [[ -n "${template_line}" ]]; do
+            key="$(extract_env_assignment_key "${template_line}")"
+            [[ -n "${key}" ]] || continue
+
+            if ! grep -Eq "^[[:space:]]*(export[[:space:]]+)?${key}[[:space:]]*=" "${shared_env_path}"; then
                 log_info "Adding missing config key to shared .env: ${key}"
-                echo "${key}=${value}" >> "${shared_env_path}"
+                echo "${key}=\"\"" >> "${shared_env_path}"
             fi
         done < "${env_template_path}"
-        rm -f "${temp_env}"
         log_info "Shared .env keys synchronized with template."
     fi
 

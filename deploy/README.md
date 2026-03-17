@@ -732,6 +732,10 @@ cd ~/lessonflow
 # Update git clone + deploy (interactive)
 sudo ./deploy/update.sh
 
+# Existing shared env files keep current values. Any newly introduced keys from
+# the repo .env.example are appended as blank placeholders such as KEY="" so
+# you can review and populate them after the upgrade.
+
 # Skip managed cron sync for this run (rare/manual maintenance case)
 sudo ./deploy/update.sh --skip-cron
 
