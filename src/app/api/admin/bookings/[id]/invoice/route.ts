@@ -45,9 +45,14 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const taxMode = parsed.data.taxMode ?? getDefaultInvoiceTaxMode();
     const lineItems: InvoiceLineItemDraft[] = parsed.data.lineItems.map((item, index) => ({
-      ...item,
+      description: item.description,
+      quantity: item.quantity,
+      unitPriceCents: item.unitPriceCents,
       taxMode: item.taxMode || taxMode,
-      sortOrder: item.sortOrder ?? index
+      kind: item.kind,
+      sortOrder: item.sortOrder ?? index,
+      discountKind: item.discountKind ?? null,
+      discountValue: item.discountValue ?? null
     }));
 
     const issuedAt = new Date();
@@ -60,6 +65,10 @@ export async function POST(request: NextRequest, { params }: Params) {
         customerId: booking.customerId,
         bookingId: booking.id,
         customerSnapshot: customerSnapshotFromBooking(booking),
+        invoiceDiscount: {
+          discountKind: parsed.data.discountKind ?? null,
+          discountValue: parsed.data.discountValue ?? null
+        },
         lineItems,
         notes: parsed.data.notes,
         issuedAt,

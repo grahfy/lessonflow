@@ -14,6 +14,13 @@ type Params = {
   }>;
 };
 
+function lineDiscountChanged(
+  incoming: Pick<InvoiceLineItemDraft, "discountKind" | "discountValue">,
+  existing: { discountKind: string | null; discountValue: number | null }
+): boolean {
+  return (incoming.discountKind ?? null) !== (existing.discountKind ?? null) || (incoming.discountValue ?? null) !== (existing.discountValue ?? null);
+}
+
 /**
  * Returns one invoice record with line items for detail views.
  */
@@ -224,11 +231,49 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     unitPriceCents: lineItem.unitPriceCents,
     taxMode: lineItem.taxMode,
     kind: lineItem.kind as InvoiceLineItemDraft["kind"],
-    sortOrder: lineItem.sortOrder ?? index
+    sortOrder: lineItem.sortOrder ?? index,
+    discountKind: lineItem.discountKind ?? null,
+    discountValue: lineItem.discountValue ?? null
   }));
 
+  const invoiceDiscountChanged =
+    (parsed.data.discountKind !== undefined && (parsed.data.discountKind ?? null) !== (existing.discountKind ?? null)) ||
+    (parsed.data.discountValue !== undefined && (parsed.data.discountValue ?? null) !== (existing.discountValue ?? null));
+  const existingLineItemsById = new Map(
+    existing.lineItems.map((lineItem) => [
+      lineItem.id,
+      {
+        discountKind: lineItem.discountKind ?? null,
+        discountValue: lineItem.discountValue ?? null
+      }
+    ])
+  );
+  const lineDiscountsChanged =
+    lineItemsProvided &&
+    parsed.data.lineItems!.some((lineItem) => {
+      if (lineItem.id) {
+        const matchedExistingLine = existingLineItemsById.get(lineItem.id);
+        if (!matchedExistingLine) {
+          return (lineItem.discountKind ?? null) !== null || (lineItem.discountValue ?? null) !== null;
+        }
+        return lineDiscountChanged(lineItem, matchedExistingLine);
+      }
+
+      return (lineItem.discountKind ?? null) !== null || (lineItem.discountValue ?? null) !== null;
+    });
+
+  if (existing.status !== "draft" && (invoiceDiscountChanged || lineDiscountsChanged)) {
+    return NextResponse.json(
+      { error: "Discounts can only be changed while the invoice is still a draft." },
+      { status: 400 }
+    );
+  }
+
   const normalizedLines = parsed.data.taxMode ? applyInvoiceTaxMode(baseLineDrafts, parsed.data.taxMode) : baseLineDrafts;
-  const calculation = calculateInvoiceTotals(normalizedLines);
+  const calculation = calculateInvoiceTotals(normalizedLines, {
+    discountKind: parsed.data.discountKind === undefined ? existing.discountKind : parsed.data.discountKind,
+    discountValue: parsed.data.discountValue === undefined ? existing.discountValue : parsed.data.discountValue
+  });
 
   const updated = await prisma.$transaction(async (tx) => {
     if (lineItemsProvided || parsed.data.taxMode) {
@@ -244,6 +289,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           quantity: lineItem.quantity,
           unitPriceCents: lineItem.unitPriceCents,
           taxMode: lineItem.taxMode,
+          discountKind: lineItem.discountKind ?? null,
+          discountValue: lineItem.discountValue ?? null,
+          lineDiscountCents: lineItem.lineDiscountCents,
           lineSubtotalCents: lineItem.lineSubtotalCents,
           lineGstCents: lineItem.lineGstCents,
           lineTotalCents: lineItem.lineTotalCents,
@@ -260,6 +308,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         customerPhone: parsed.data.customerPhone ?? existing.customerPhone,
         customerAddress: parsed.data.customerAddress ?? existing.customerAddress,
         taxMode: parsed.data.taxMode ?? existing.taxMode,
+        discountKind: parsed.data.discountKind === undefined ? existing.discountKind : parsed.data.discountKind,
+        discountValue: parsed.data.discountValue === undefined ? existing.discountValue : parsed.data.discountValue,
+        discountCents: calculation.totals.discountCents,
         notes: parsed.data.notes === null ? null : parsed.data.notes ?? existing.notes,
         dueAt: parsed.data.dueAt ? new Date(parsed.data.dueAt) : existing.dueAt,
         subtotalCents: calculation.totals.subtotalCents,

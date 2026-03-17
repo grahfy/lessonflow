@@ -232,7 +232,9 @@ describe.sequential("admin settings save contracts", () => {
         body: {
           label: "No Description Preset",
           description: "",
-          unitPriceCents: 4500
+          unitPriceCents: 4500,
+          discountKind: "percent",
+          discountValue: 1000
         }
       })
     );
@@ -244,10 +246,14 @@ describe.sequential("admin settings save contracts", () => {
         label: string;
         description: string;
         unitPriceCents: number;
+        discountKind: string | null;
+        discountValue: number | null;
       };
     };
 
     expect(createBody.preset.description).toBe("");
+    expect(createBody.preset.discountKind).toBe("percent");
+    expect(createBody.preset.discountValue).toBe(1000);
 
     const patchResponse = await updatePreset(
       adminRequest(`http://localhost/api/admin/presets/${createBody.preset.id}`, token, {
@@ -256,6 +262,8 @@ describe.sequential("admin settings save contracts", () => {
           label: "Updated Preset",
           description: "Updated description",
           unitPriceCents: 5200,
+          discountKind: "amount",
+          discountValue: 700,
           sortOrder: 3,
           isActive: true
         }
@@ -269,7 +277,7 @@ describe.sequential("admin settings save contracts", () => {
     expect(listResponse.status).toBe(200);
 
     const listBody = (await listResponse.json()) as {
-      presets: Array<{ id: string; label: string; description: string; unitPriceCents: number }>;
+      presets: Array<{ id: string; label: string; description: string; unitPriceCents: number; discountKind: string | null; discountValue: number | null }>;
     };
 
     expect(listBody.presets).toEqual([
@@ -277,7 +285,9 @@ describe.sequential("admin settings save contracts", () => {
         id: createBody.preset.id,
         label: "Updated Preset",
         description: "Updated description",
-        unitPriceCents: 5200
+        unitPriceCents: 5200,
+        discountKind: "amount",
+        discountValue: 700
       })
     ]);
 

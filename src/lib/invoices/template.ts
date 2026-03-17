@@ -40,6 +40,30 @@ function formatCurrency(cents: number, currency: string = DEFAULT_CURRENCY): str
   }).format(cents / 100);
 }
 
+function formatPercentValue(basisPoints: number | null): string {
+  if (basisPoints === null) {
+    return "";
+  }
+  return `${(basisPoints / 100).toFixed(2).replace(/\.00$/, "").replace(/(\.\d*[1-9])0$/, "$1")}%`;
+}
+
+function renderDiscountSummary(
+  discountKind: "amount" | "percent" | null,
+  discountValue: number | null,
+  discountCents: number,
+  currency: string
+): string {
+  if (!discountKind || discountCents === 0) {
+    return "";
+  }
+
+  const detail = discountKind === "amount"
+    ? formatCurrency(discountValue ?? 0, currency)
+    : formatPercentValue(discountValue);
+
+  return `<div style="font-size:0.82rem; color:#475569;">Discount: ${escapeHtml(detail)} (${escapeHtml(formatCurrency(discountCents, currency))})</div>`;
+}
+
 export type InvoiceTemplateRecord = Invoice & {
   lineItems: InvoiceLineItem[];
 };
@@ -61,7 +85,10 @@ export function renderInvoiceHtml(invoice: InvoiceTemplateRecord, templateConfig
     .map(
       (lineItem) => `
         <tr>
-          <td style="padding:8px; border-bottom:1px solid #edf2f7;">${escapeHtml(lineItem.description)}</td>
+          <td style="padding:8px; border-bottom:1px solid #edf2f7;">
+            <div>${escapeHtml(lineItem.description)}</div>
+            ${renderDiscountSummary(lineItem.discountKind, lineItem.discountValue, lineItem.lineDiscountCents, currency)}
+          </td>
           <td style="padding:8px; border-bottom:1px solid #edf2f7;">${lineItem.quantity}</td>
           <td style="padding:8px; border-bottom:1px solid #edf2f7;">${formatCurrency(lineItem.unitPriceCents, currency)}</td>
           <td style="padding:8px; border-bottom:1px solid #edf2f7;">${lineItem.taxMode === "taxable" ? "GST" : "GST-free"}</td>
@@ -126,6 +153,7 @@ export function renderInvoiceHtml(invoice: InvoiceTemplateRecord, templateConfig
 
       <section style="margin-top:16px; text-align:right;">
         <p style="margin:2px 0;">Subtotal: ${formatCurrency(invoice.subtotalCents, currency)}</p>
+        ${invoice.discountCents !== 0 ? `<p style="margin:2px 0;">Invoice Discount: ${formatCurrency(-invoice.discountCents, currency)}</p>` : ""}
         <p style="margin:2px 0;">GST: ${formatCurrency(invoice.gstCents, currency)}</p>
         <p style="margin:2px 0; font-weight:700; color:${accentColor}; font-size:1.1rem;">Total: ${formatCurrency(invoice.totalCents, currency)}</p>
       </section>

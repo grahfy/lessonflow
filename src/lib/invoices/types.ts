@@ -1,9 +1,20 @@
-import { InvoiceTaxMode } from "@/generated/prisma/client";
+import { InvoiceDiscountKind, InvoiceTaxMode } from "@/generated/prisma/client";
+
+/**
+ * Shared discount fields used by presets, invoice lines, and invoice totals.
+ *
+ * `amount` values are stored in cents. `percent` values are stored in basis
+ * points, where `10000` equals `100.00%`.
+ */
+export type InvoiceDiscountDraft = {
+  discountKind?: InvoiceDiscountKind | null;
+  discountValue?: number | null;
+};
 
 /**
  * Represents a single line item entered by admin before any GST calculations are applied.
  */
-export type InvoiceLineItemDraft = {
+export type InvoiceLineItemDraft = InvoiceDiscountDraft & {
   description: string;
   quantity: number;
   unitPriceCents: number;
@@ -16,6 +27,7 @@ export type InvoiceLineItemDraft = {
  * Represents a line item after all monetary fields are normalized and calculated.
  */
 export type CalculatedInvoiceLineItem = InvoiceLineItemDraft & {
+  lineDiscountCents: number;
   lineSubtotalCents: number;
   lineGstCents: number;
   lineTotalCents: number;
@@ -26,6 +38,7 @@ export type CalculatedInvoiceLineItem = InvoiceLineItemDraft & {
  */
 export type CalculatedInvoiceTotals = {
   subtotalCents: number;
+  discountCents: number;
   gstCents: number;
   totalCents: number;
 };

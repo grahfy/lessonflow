@@ -7,6 +7,7 @@ import { type InvoiceLifecycleAction } from "@/lib/invoices/transitions";
 
 export type InvoiceStatus = "draft" | "sent" | "paid" | "void";
 export type InvoiceTaxMode = "taxable" | "gst_free";
+export type InvoiceDiscountKind = "amount" | "percent";
 
 export interface InvoiceLineItem {
     id: string;
@@ -14,8 +15,12 @@ export interface InvoiceLineItem {
     description: string;
     quantity: number;
     unitPriceCents: number;
-    totalCents: number;
-    taxCents: number;
+    discountKind: InvoiceDiscountKind | null;
+    discountValue: number | null;
+    lineDiscountCents: number;
+    lineSubtotalCents: number;
+    lineTotalCents: number;
+    lineGstCents: number;
     taxMode: InvoiceTaxMode;
 }
 
@@ -27,6 +32,9 @@ export interface InvoiceRow {
     issuedAt: string;
     dueAt: string;
     overdueDays: number | null;
+    discountKind: InvoiceDiscountKind | null;
+    discountValue: number | null;
+    discountCents: number;
     totalCents: number;
     currency: string;
     customerName: string;

@@ -167,6 +167,153 @@ describe("admin-invoices", () => {
     expect(body.invoice.lineItems.length).toBe(4);
   });
 
+  it("creates discounted invoices and blocks discount edits after send", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const createReq = adminRequest("http://localhost/api/admin/invoices", "POST", token, {
+      customerFirstName: "Discount",
+      customerLastName: "Student",
+      customerName: "Discount Student",
+      customerEmail: "discount@example.com",
+      customerPhone: "0400123000",
+      customerAddress: "10 Main Street, Northcote VIC 3070",
+      taxMode: "taxable",
+      dueAt: "2026-08-01T10:00:00.000Z",
+      discountKind: "percent",
+      discountValue: 1000,
+      lineItems: [
+        {
+          kind: "lesson_fee",
+          description: "Lesson fee",
+          quantity: 1,
+          unitPriceCents: 10000,
+          taxMode: "taxable",
+          sortOrder: 0,
+          discountKind: "amount",
+          discountValue: 500
+        },
+        {
+          kind: "custom",
+          description: "Books",
+          quantity: 1,
+          unitPriceCents: 3000,
+          taxMode: "taxable",
+          sortOrder: 1
+        }
+      ]
+    });
+    const createRes = await POST(createReq);
+    expect(createRes.status).toBe(201);
+    const createBody = (await createRes.json()) as {
+      invoice: {
+        id: string;
+        subtotalCents: number;
+        discountCents: number;
+        gstCents: number;
+        totalCents: number;
+        lineItems: Array<{ id: string; description: string; lineDiscountCents: number }>;
+      };
+    };
+
+    expect(createBody.invoice.lineItems[0].lineDiscountCents).toBe(500);
+    expect(createBody.invoice.subtotalCents).toBe(12500);
+    expect(createBody.invoice.discountCents).toBe(1250);
+    expect(createBody.invoice.gstCents).toBe(1125);
+    expect(createBody.invoice.totalCents).toBe(12375);
+
+    const updateDraftReq = adminRequest(`http://localhost/api/admin/invoices/${createBody.invoice.id}`, "PATCH", token, {
+      action: "edit",
+      discountKind: "amount",
+      discountValue: 1000,
+      lineItems: [
+        {
+          id: createBody.invoice.lineItems[0].id,
+          kind: "lesson_fee",
+          description: "Lesson fee",
+          quantity: 1,
+          unitPriceCents: 10000,
+          taxMode: "taxable",
+          sortOrder: 0,
+          discountKind: "percent",
+          discountValue: 2000
+        },
+        {
+          id: createBody.invoice.lineItems[1].id,
+          kind: "custom",
+          description: "Books",
+          quantity: 1,
+          unitPriceCents: 3000,
+          taxMode: "taxable",
+          sortOrder: 1
+        }
+      ]
+    });
+    const updateDraftRes = await patchInvoice(updateDraftReq, { params: Promise.resolve({ id: createBody.invoice.id }) });
+    expect(updateDraftRes.status).toBe(200);
+    const updateDraftBody = (await updateDraftRes.json()) as {
+      invoice: {
+        lineItems: Array<{ id: string }>;
+      };
+    };
+
+    const sendReq = adminRequest(`http://localhost/api/admin/invoices/${createBody.invoice.id}/send`, "POST", token);
+    const sendRes = await sendInvoice(sendReq, { params: Promise.resolve({ id: createBody.invoice.id }) });
+    expect(sendRes.status).toBe(200);
+
+    const reorderSentReq = adminRequest(`http://localhost/api/admin/invoices/${createBody.invoice.id}`, "PATCH", token, {
+      action: "edit",
+      notes: "Sent invoice note update",
+      lineItems: [
+        {
+          id: updateDraftBody.invoice.lineItems[1].id,
+          kind: "custom",
+          description: "Books updated",
+          quantity: 1,
+          unitPriceCents: 3000,
+          taxMode: "taxable",
+          sortOrder: 0
+        },
+        {
+          id: updateDraftBody.invoice.lineItems[0].id,
+          kind: "lesson_fee",
+          description: "Lesson fee",
+          quantity: 1,
+          unitPriceCents: 10000,
+          taxMode: "taxable",
+          sortOrder: 1,
+          discountKind: "percent",
+          discountValue: 2000
+        }
+      ]
+    });
+    const reorderSentRes = await patchInvoice(reorderSentReq, { params: Promise.resolve({ id: createBody.invoice.id }) });
+    expect(reorderSentRes.status).toBe(200);
+
+    const updateSentReq = adminRequest(`http://localhost/api/admin/invoices/${createBody.invoice.id}`, "PATCH", token, {
+      action: "edit",
+      discountKind: "amount",
+      discountValue: 1500,
+      lineItems: [
+        {
+          id: updateDraftBody.invoice.lineItems[0].id,
+          kind: "lesson_fee",
+          description: "Lesson fee",
+          quantity: 1,
+          unitPriceCents: 10000,
+          taxMode: "taxable",
+          sortOrder: 0,
+          discountKind: "percent",
+          discountValue: 2500
+        }
+      ]
+    });
+    const updateSentRes = await patchInvoice(updateSentReq, { params: Promise.resolve({ id: createBody.invoice.id }) });
+    expect(updateSentRes.status).toBe(400);
+    const updateSentBody = (await updateSentRes.json()) as { error: string };
+    expect(updateSentBody.error).toBe("Discounts can only be changed while the invoice is still a draft.");
+  });
+
   it("filters invoice list by aging bucket", async () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);

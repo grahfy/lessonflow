@@ -219,7 +219,9 @@ export async function POST(request: NextRequest) {
       unitPriceCents: lineItem.unitPriceCents,
       taxMode: lineItem.taxMode,
       kind: lineItem.kind,
-      sortOrder: lineItem.sortOrder
+      sortOrder: lineItem.sortOrder,
+      discountKind: lineItem.discountKind ?? null,
+      discountValue: lineItem.discountValue ?? null
     }));
 
     const issuedAt = parsed.data.issuedAt ? new Date(parsed.data.issuedAt) : new Date();
@@ -240,6 +242,10 @@ export async function POST(request: NextRequest) {
           customerEmail: parsed.data.customerEmail,
           customerPhone: parsed.data.customerPhone,
           customerAddress: parsed.data.customerAddress
+        },
+        invoiceDiscount: {
+          discountKind: parsed.data.discountKind ?? null,
+          discountValue: parsed.data.discountValue ?? null
         },
         lineItems,
         notes: parsed.data.notes,

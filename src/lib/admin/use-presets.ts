@@ -8,6 +8,8 @@ export interface Preset {
     label: string;
     description: string;
     unitPriceCents: number;
+    discountKind?: "amount" | "percent" | null;
+    discountValue?: number | null;
 }
 
 export interface UsePresetsOptions {

@@ -43,6 +43,51 @@ describe("invoice-domain", () => {
     expect(result.totals.totalCents).toBe(16000);
   });
 
+  it("applies line and invoice discounts before GST", () => {
+    const result = calculateInvoiceTotals(
+      [
+        {
+          kind: "lesson_fee",
+          description: "Lesson",
+          quantity: 1,
+          unitPriceCents: 10000,
+          taxMode: "taxable",
+          sortOrder: 0,
+          discountKind: "percent",
+          discountValue: 1000
+        },
+        {
+          kind: "custom",
+          description: "Books",
+          quantity: 1,
+          unitPriceCents: 5000,
+          taxMode: "gst_free",
+          sortOrder: 1,
+          discountKind: "amount",
+          discountValue: 500
+        }
+      ],
+      {
+        discountKind: "percent",
+        discountValue: 1000
+      }
+    );
+
+    expect(result.lineItems[0].lineDiscountCents).toBe(1000);
+    expect(result.lineItems[1].lineDiscountCents).toBe(500);
+    expect(result.totals.subtotalCents).toBe(13500);
+    expect(result.totals.discountCents).toBe(1350);
+    expect(result.totals.gstCents).toBe(810);
+    expect(result.totals.totalCents).toBe(12960);
+    expect(result.lineItems[0].lineSubtotalCents).toBe(8100);
+    expect(result.lineItems[0].lineGstCents).toBe(810);
+    expect(result.lineItems[0].lineTotalCents).toBe(8910);
+    expect(result.lineItems[1].lineSubtotalCents).toBe(4050);
+    expect(result.lineItems[1].lineGstCents).toBe(0);
+    expect(result.lineItems[1].lineTotalCents).toBe(4050);
+    expect(result.lineItems.reduce((sum, lineItem) => sum + lineItem.lineTotalCents, 0)).toBe(result.totals.totalCents);
+  });
+
   it("reads default tax mode from env", () => {
     expect(getDefaultInvoiceTaxMode()).toBe("taxable");
     process.env.INVOICE_DEFAULT_TAX_MODE = "gst_free";

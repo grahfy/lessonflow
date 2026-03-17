@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { AdminEditorPanel, AdminEditorSection } from "@/components/admin/ui/admin-editor-section";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
-import { parseAudInputToCents } from "@/lib/invoices/currency";
+import { basisPointsToPercentageInput, parseAudInputToCents, parsePercentageInputToBasisPoints } from "@/lib/invoices/currency";
 import { toMoneyInput } from "@/lib/admin/formatters";
 import { usePresets, type Preset } from "@/lib/admin/use-presets";
 
@@ -21,7 +21,9 @@ export function AdminPresetsEditor() {
   const [newPreset, setNewPreset] = useState<Partial<Preset>>({
     label: "",
     unitPriceCents: 0,
-    description: ""
+    description: "",
+    discountKind: null,
+    discountValue: null
   });
 
   const { 
@@ -53,7 +55,7 @@ export function AdminPresetsEditor() {
     const result = await savePresetApi(newPreset);
     if (result) {
       setNotice("Preset added.");
-      setNewPreset({ label: "", unitPriceCents: 0, description: "" });
+      setNewPreset({ label: "", unitPriceCents: 0, description: "", discountKind: null, discountValue: null });
       void reloadPresets();
     }
   }
@@ -132,6 +134,60 @@ export function AdminPresetsEditor() {
                 }
               />
             </AdminField>
+            <AdminField label="Discount Type" tooltip="Optional default discount applied when this preset is added to an invoice.">
+              <select
+                value={preset.discountKind ?? ""}
+                onChange={(event) =>
+                  setDraftPresets((current) =>
+                    current.map((item) =>
+                      item.id === preset.id
+                        ? {
+                            ...item,
+                            discountKind: event.target.value ? (event.target.value as Preset["discountKind"]) : null,
+                            discountValue: event.target.value ? item.discountValue ?? 0 : null
+                          }
+                        : item
+                    )
+                  )
+                }
+              >
+                <option value="">No discount</option>
+                <option value="amount">Fixed amount</option>
+                <option value="percent">Percentage</option>
+              </select>
+            </AdminField>
+            <AdminField label="Discount Value" tooltip="Amount discounts use AUD. Percentage discounts use %." fullWidth>
+              <input
+                placeholder={preset.discountKind === "percent" ? "10%" : "0.00"}
+                value={
+                  preset.discountKind === "percent"
+                    ? basisPointsToPercentageInput(preset.discountValue ?? 0)
+                    : toMoneyInput(preset.discountValue ?? 0)
+                }
+                disabled={!preset.discountKind}
+                onChange={(event) =>
+                  setDraftPresets((current) =>
+                    current.map((item) => {
+                      if (item.id !== preset.id) {
+                        return item;
+                      }
+
+                      if (item.discountKind === "percent") {
+                        return {
+                          ...item,
+                          discountValue: parsePercentageInputToBasisPoints(event.target.value).basisPoints ?? 0
+                        };
+                      }
+
+                      return {
+                        ...item,
+                        discountValue: parseAudInputToCents(event.target.value).cents ?? 0
+                      };
+                    })
+                  )
+                }
+              />
+            </AdminField>
             <div className="field full">
               <div className="button-row">
                 <button className="btn btn-secondary" type="button" onClick={() => void updatePreset(preset.id, {})}>
@@ -173,6 +229,42 @@ export function AdminPresetsEditor() {
               placeholder="Line item text..."
               value={newPreset.description}
               onChange={(event) => setNewPreset((prev) => ({ ...prev, description: event.target.value }))}
+            />
+          </AdminField>
+          <AdminField label="Discount Type" tooltip="Optional default discount applied when this preset is used.">
+            <select
+              value={newPreset.discountKind ?? ""}
+              onChange={(event) =>
+                setNewPreset((prev) => ({
+                  ...prev,
+                  discountKind: event.target.value ? (event.target.value as Preset["discountKind"]) : null,
+                  discountValue: event.target.value ? prev.discountValue ?? 0 : null
+                }))
+              }
+            >
+              <option value="">No discount</option>
+              <option value="amount">Fixed amount</option>
+              <option value="percent">Percentage</option>
+            </select>
+          </AdminField>
+          <AdminField label="Discount Value" tooltip="Amount discounts use AUD. Percentage discounts use %." fullWidth>
+            <input
+              placeholder={newPreset.discountKind === "percent" ? "10%" : "0.00"}
+              value={
+                newPreset.discountKind === "percent"
+                  ? basisPointsToPercentageInput(newPreset.discountValue ?? 0)
+                  : toMoneyInput(newPreset.discountValue ?? 0)
+              }
+              disabled={!newPreset.discountKind}
+              onChange={(event) =>
+                setNewPreset((prev) => ({
+                  ...prev,
+                  discountValue:
+                    prev.discountKind === "percent"
+                      ? parsePercentageInputToBasisPoints(event.target.value).basisPoints ?? 0
+                      : parseAudInputToCents(event.target.value).cents ?? 0
+                }))
+              }
             />
           </AdminField>
           <div className="field full">

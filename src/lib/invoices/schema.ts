@@ -4,6 +4,7 @@ import { z } from "zod";
  * Supported tax modes for invoice lines and invoice-level defaults.
  */
 export const invoiceTaxModeSchema = z.enum(["taxable", "gst_free"]);
+export const invoiceDiscountKindSchema = z.enum(["amount", "percent"]);
 
 /**
  * Supported lifecycle states for invoices.
@@ -32,45 +33,100 @@ export const invoiceLineItemKindSchema = z.enum([
 /**
  * Single invoice line-item payload schema.
  */
-export const invoiceLineItemInputSchema = z.object({
-  description: z.string().trim().min(1).max(200),
-  quantity: z.number().int().min(1).max(999),
-  unitPriceCents: z.number().int().min(-50_000_000).max(50_000_000),
-  taxMode: invoiceTaxModeSchema.default("taxable"),
-  kind: invoiceLineItemKindSchema.default("custom"),
-  sortOrder: z.number().int().min(0).max(9_999).default(0)
-});
+const optionalDiscountFieldShape = {
+  discountKind: invoiceDiscountKindSchema.optional().nullable(),
+  discountValue: z.number().int().optional().nullable()
+} as const;
+
+function validateOptionalDiscountFields(
+  data: {
+    discountKind?: "amount" | "percent" | null;
+    discountValue?: number | null;
+  },
+  ctx: z.RefinementCtx
+) {
+  const hasKind = data.discountKind !== undefined && data.discountKind !== null;
+  const hasValue = data.discountValue !== undefined && data.discountValue !== null;
+
+  if (hasKind !== hasValue) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["discountKind"],
+      message: "Discount kind and value must be provided together."
+    });
+    return;
+  }
+
+  if (!hasKind || !hasValue) {
+    return;
+  }
+
+  if (data.discountKind === "amount" && (data.discountValue as number) > 50_000_000) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["discountValue"],
+      message: "Amount discounts must be 50,000,000 cents or less."
+    });
+  }
+
+  if (data.discountKind === "percent" && ((data.discountValue as number) < 1 || (data.discountValue as number) > 10_000)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["discountValue"],
+      message: "Percent discounts must be between 0.01% and 100.00%."
+    });
+  }
+}
+
+export const invoiceLineItemInputSchema = z
+  .object({
+    id: z.string().trim().min(1).optional(),
+    description: z.string().trim().min(1).max(200),
+    quantity: z.number().int().min(1).max(999),
+    unitPriceCents: z.number().int().min(-50_000_000).max(50_000_000),
+    taxMode: invoiceTaxModeSchema.default("taxable"),
+    kind: invoiceLineItemKindSchema.default("custom"),
+    sortOrder: z.number().int().min(0).max(9_999).default(0)
+  })
+  .extend(optionalDiscountFieldShape)
+  .superRefine(validateOptionalDiscountFields);
 
 /**
  * Invoice create payload that supports direct create from UI and booking-linked defaults.
  */
-export const createInvoiceSchema = z.object({
-  bookingId: z.string().trim().min(1).optional(),
-  customerId: z.string().trim().min(1).optional(),
-  customerFirstName: z.string().trim().min(1).max(60),
-  customerLastName: z.string().trim().min(1).max(60),
-  customerName: z.string().trim().min(2).max(140),
-  customerEmail: z.string().trim().email().max(200),
-  customerPhone: z.string().trim().min(6).max(40),
-  customerAddress: z.string().trim().min(3).max(260),
-  taxMode: invoiceTaxModeSchema.default("taxable"),
-  notes: z.string().trim().max(2_000).optional(),
-  issuedAt: z.string().datetime({ offset: true }).optional(),
-  dueAt: z.string().datetime({ offset: true }),
-  lineItems: z.array(invoiceLineItemInputSchema).min(1).max(100)
-});
+export const createInvoiceSchema = z
+  .object({
+    bookingId: z.string().trim().min(1).optional(),
+    customerId: z.string().trim().min(1).optional(),
+    customerFirstName: z.string().trim().min(1).max(60),
+    customerLastName: z.string().trim().min(1).max(60),
+    customerName: z.string().trim().min(2).max(140),
+    customerEmail: z.string().trim().email().max(200),
+    customerPhone: z.string().trim().min(6).max(40),
+    customerAddress: z.string().trim().min(3).max(260),
+    taxMode: invoiceTaxModeSchema.default("taxable"),
+    notes: z.string().trim().max(2_000).optional(),
+    issuedAt: z.string().datetime({ offset: true }).optional(),
+    dueAt: z.string().datetime({ offset: true }),
+    lineItems: z.array(invoiceLineItemInputSchema).min(1).max(100)
+  })
+  .extend(optionalDiscountFieldShape)
+  .superRefine(validateOptionalDiscountFields);
 
 /**
  * Customer-scoped invoice create payload used by `/customers/:id/invoices`.
  * Supports optional booking linkage while deriving customer snapshot server-side.
  */
-export const createCustomerInvoiceSchema = z.object({
-  bookingId: z.string().trim().min(1).optional(),
-  lineItems: z.array(invoiceLineItemInputSchema).min(1).max(100),
-  dueAt: z.string().datetime({ offset: true }).optional(),
-  notes: z.string().trim().max(2_000).optional(),
-  taxMode: invoiceTaxModeSchema.optional()
-});
+export const createCustomerInvoiceSchema = z
+  .object({
+    bookingId: z.string().trim().min(1).optional(),
+    lineItems: z.array(invoiceLineItemInputSchema).min(1).max(100),
+    dueAt: z.string().datetime({ offset: true }).optional(),
+    notes: z.string().trim().max(2_000).optional(),
+    taxMode: invoiceTaxModeSchema.optional()
+  })
+  .extend(optionalDiscountFieldShape)
+  .superRefine(validateOptionalDiscountFields);
 
 /**
  * Invoice update payload for editing draft/sent invoices and toggling payment state.
@@ -87,8 +143,22 @@ export const updateInvoiceSchema = z
     dueAt: z.string().datetime({ offset: true }).optional(),
     lineItems: z.array(invoiceLineItemInputSchema).min(1).max(100).optional()
   })
+  .extend(optionalDiscountFieldShape)
+  .superRefine(validateOptionalDiscountFields)
   .superRefine((data, ctx) => {
-    if (data.action === "edit" && !data.lineItems && !data.customerName && !data.customerEmail && !data.customerPhone && !data.customerAddress && !data.taxMode && data.notes === undefined && !data.dueAt) {
+    if (
+      data.action === "edit" &&
+      !data.lineItems &&
+      !data.customerName &&
+      !data.customerEmail &&
+      !data.customerPhone &&
+      !data.customerAddress &&
+      !data.taxMode &&
+      data.notes === undefined &&
+      !data.dueAt &&
+      data.discountKind === undefined &&
+      data.discountValue === undefined
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["action"],
@@ -115,12 +185,15 @@ export const listInvoicesQuerySchema = z.object({
 /**
  * Booking-linked invoice creation schema used by the booking dialog action.
  */
-export const createBookingInvoiceSchema = z.object({
-  lineItems: z.array(invoiceLineItemInputSchema).min(1).max(100),
-  dueAt: z.string().datetime({ offset: true }).optional(),
-  notes: z.string().trim().max(2_000).optional(),
-  taxMode: invoiceTaxModeSchema.optional()
-});
+export const createBookingInvoiceSchema = z
+  .object({
+    lineItems: z.array(invoiceLineItemInputSchema).min(1).max(100),
+    dueAt: z.string().datetime({ offset: true }).optional(),
+    notes: z.string().trim().max(2_000).optional(),
+    taxMode: invoiceTaxModeSchema.optional()
+  })
+  .extend(optionalDiscountFieldShape)
+  .superRefine(validateOptionalDiscountFields);
 
 /**
  * Credit-note creation payload for reversing a sent/paid invoice.

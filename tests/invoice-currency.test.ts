@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseAudInputToCents } from "@/lib/invoices/currency";
+import { basisPointsToPercentageInput, parseAudInputToCents, parsePercentageInputToBasisPoints } from "@/lib/invoices/currency";
 
 describe("invoice-currency", () => {
   it("accepts flexible AUD formats", () => {
@@ -17,5 +17,12 @@ describe("invoice-currency", () => {
     expect(parseAudInputToCents("$").error).toBeTruthy();
     expect(parseAudInputToCents("abc").error).toBeTruthy();
     expect(parseAudInputToCents("12.345").error).toBeTruthy();
+  });
+
+  it("accepts flexible percentage formats", () => {
+    expect(parsePercentageInputToBasisPoints("10").basisPoints).toBe(1000);
+    expect(parsePercentageInputToBasisPoints("10.5").basisPoints).toBe(1050);
+    expect(parsePercentageInputToBasisPoints("10.25%").basisPoints).toBe(1025);
+    expect(basisPointsToPercentageInput(1250)).toBe("12.5");
   });
 });

@@ -55,6 +55,14 @@ function formatCurrency(cents: number, currency: string = DEFAULT_CURRENCY): str
   }).format(cents / 100);
 }
 
+function formatPercentValue(basisPoints: number | null): string {
+  if (basisPoints === null) {
+    return "";
+  }
+
+  return `${(basisPoints / 100).toFixed(2).replace(/\.00$/, "").replace(/(\.\d*[1-9])0$/, "$1")}%`;
+}
+
 /**
  * Formats a Date object into a long-form Australian date string.
  * Uses Melbourne timezone as the standard for school records.
@@ -261,6 +269,19 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord, templateC
     page.drawText(lineItem.quantity.toString(), { x: 315, y, size: 10, font });
     page.drawText(formatCurrency(lineItem.unitPriceCents, currency), { x: 420, y, size: 10, font });
     page.drawText(formatCurrency(lineItem.lineTotalCents, currency), { x: 500, y, size: 10, font });
+    if (lineItem.discountKind && lineItem.lineDiscountCents !== 0) {
+      const detail = lineItem.discountKind === "amount"
+        ? formatCurrency(lineItem.discountValue ?? 0, currency)
+        : formatPercentValue(lineItem.discountValue);
+      y -= 12;
+      page.drawText(`Discount: ${detail} (${formatCurrency(lineItem.lineDiscountCents, currency)})`, {
+        x: 60,
+        y,
+        size: 8,
+        font,
+        color: rgb(0.35, 0.35, 0.35)
+      });
+    }
     y -= 25;
     
     // NOTE: In a production system, we would check if y < margin and add a new page.
@@ -276,6 +297,10 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord, templateC
     page.drawText(value, { x: rightMargin - 10 - valWidth, y: currentY, size: 10, font: f });
   };
 
+  if (invoice.discountCents !== 0) {
+    drawTotal("Invoice Discount:", formatCurrency(-invoice.discountCents, currency), y);
+    y -= 15;
+  }
   drawTotal("GST:", formatCurrency(invoice.gstCents, currency), y);
   y -= 15;
   drawTotal("Total:", formatCurrency(invoice.totalCents, currency), y);

@@ -696,7 +696,9 @@ export function AdminBookingsClient() {
                     description: lessonPreset?.description || lessonPreset?.label || "Standard Lesson Fee",
                     quantity: 1,
                     unitPriceCents: lessonPreset?.unitPriceCents ?? 6000,
-                    kind: "lesson_fee"
+                    kind: "lesson_fee",
+                    discountKind: lessonPreset?.discountKind ?? null,
+                    discountValue: lessonPreset?.discountValue ?? null
                   }]
                 })
               });

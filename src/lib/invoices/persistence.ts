@@ -18,7 +18,7 @@ import { calculateInvoiceTotals } from "@/lib/invoices/calculate";
 import { getDefaultInvoiceTaxMode } from "@/lib/invoices/gst-policy";
 import { generateNextInvoiceNumber } from "@/lib/invoices/numbering";
 import { sellerSnapshotFromEnv } from "@/lib/invoices/snapshots";
-import { InvoiceCustomerSnapshot, InvoiceLineItemDraft } from "@/lib/invoices/types";
+import { InvoiceCustomerSnapshot, InvoiceDiscountDraft, InvoiceLineItemDraft } from "@/lib/invoices/types";
 
 /**
  * Retrieves the standard payment term (in days) from environment variables.
@@ -60,6 +60,7 @@ type CreateInvoiceRecordInput = {
   originalInvoiceId?: string | null;
   customerSnapshot: InvoiceCustomerSnapshot;
   lineItems: InvoiceLineItemDraft[];
+  invoiceDiscount?: InvoiceDiscountDraft;
   notes?: string | null;
   issuedAt: Date;
   dueAt: Date;
@@ -86,10 +87,15 @@ export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
   const normalizedLineItems = input.lineItems.map((lineItem, index) => ({
     ...lineItem,
     taxMode: lineItem.taxMode ?? taxMode,
-    sortOrder: lineItem.sortOrder ?? index
+    sortOrder: lineItem.sortOrder ?? index,
+    discountKind: lineItem.discountKind ?? null,
+    discountValue: lineItem.discountValue ?? null
   }));
 
-  const calculation = calculateInvoiceTotals(normalizedLineItems);
+  const calculation = calculateInvoiceTotals(normalizedLineItems, {
+    discountKind: input.invoiceDiscount?.discountKind ?? null,
+    discountValue: input.invoiceDiscount?.discountValue ?? null
+  });
   const sellerSnapshot = sellerSnapshotFromEnv();
   
   // NOTE: Number generation is transaction-scoped to maintain consistency under concurrency.
@@ -101,6 +107,9 @@ export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
       status: input.status ?? "draft",
       documentType: input.documentType ?? "invoice",
       taxMode,
+      discountKind: input.invoiceDiscount?.discountKind ?? null,
+      discountValue: input.invoiceDiscount?.discountValue ?? null,
+      discountCents: calculation.totals.discountCents,
       customerId: input.customerId ?? null,
       bookingId: input.bookingId ?? null,
       originalInvoiceId: input.originalInvoiceId ?? null,
@@ -141,6 +150,9 @@ export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
           quantity: lineItem.quantity,
           unitPriceCents: lineItem.unitPriceCents,
           taxMode: lineItem.taxMode,
+          discountKind: lineItem.discountKind ?? null,
+          discountValue: lineItem.discountValue ?? null,
+          lineDiscountCents: lineItem.lineDiscountCents,
           lineSubtotalCents: lineItem.lineSubtotalCents,
           lineGstCents: lineItem.lineGstCents,
           lineTotalCents: lineItem.lineTotalCents,

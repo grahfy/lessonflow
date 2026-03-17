@@ -81,6 +81,11 @@ enum InvoiceTaxMode {
   gst_free
 }
 
+enum InvoiceDiscountKind {
+  amount
+  percent
+}
+
 enum InvoiceAuditAction {
   created
   edited
@@ -435,6 +440,9 @@ model Invoice {
   status             InvoiceStatus       @default(draft)
   documentType       InvoiceDocumentType @default(invoice)
   taxMode            InvoiceTaxMode      @default(taxable)
+  discountKind       InvoiceDiscountKind?
+  discountValue      Int?
+  discountCents      Int                 @default(0)
   currency           String              @default("AUD")
   customerId         String?
   customer           Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
@@ -496,6 +504,9 @@ model InvoiceLineItem {
   quantity          Int            @default(1)
   unitPriceCents    Int
   taxMode           InvoiceTaxMode @default(taxable)
+  discountKind      InvoiceDiscountKind?
+  discountValue     Int?
+  lineDiscountCents Int            @default(0)
   lineSubtotalCents Int
   lineGstCents      Int
   lineTotalCents    Int
@@ -513,6 +524,8 @@ model InvoiceProductPreset {
   label          String
   description    String
   unitPriceCents Int
+  discountKind   InvoiceDiscountKind?
+  discountValue  Int?
   isActive       Boolean  @default(true)
   sortOrder      Int      @default(0)
   createdAt      DateTime @default(now())

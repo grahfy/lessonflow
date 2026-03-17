@@ -10,25 +10,35 @@ import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { useTweenOrchestrator } from "@/components/motion/tween-orchestrator";
-import { parseAudInputToCents } from "@/lib/invoices/currency";
+import { basisPointsToPercentageInput, parseAudInputToCents, parsePercentageInputToBasisPoints } from "@/lib/invoices/currency";
 import { DEFAULT_CURRENCY } from "@/lib/branding";
 import { toDateTimeLocalValue, toMoneyInput } from "@/lib/admin/formatters";
 import { dateTimeLocalToIso } from "@/lib/time";
 
-import { useInvoices, type InvoiceAction, type InvoiceRow, type InvoiceTaxMode } from "@/lib/admin/use-invoices";
+import {
+  useInvoices,
+  type InvoiceAction,
+  type InvoiceDiscountKind,
+  type InvoiceRow,
+  type InvoiceTaxMode
+} from "@/lib/admin/use-invoices";
 import { usePresets } from "@/lib/admin/use-presets";
 import { useCustomers } from "@/lib/admin/use-customers";
+import { calculateInvoiceTotals } from "@/lib/invoices/calculate";
 import { type InvoiceSortBy, type InvoiceSortDirection } from "@/lib/invoices/schema";
 import { canApplyInvoiceAction } from "@/lib/invoices/transitions";
+import { type InvoiceLineItemDraft } from "@/lib/invoices/types";
 
 type EditableLineItem = {
   key: string;
   id?: string;
-  kind: string;
+  kind: InvoiceLineItemDraft["kind"];
   description: string;
   quantity: string;
   unitPriceAud: string;
   taxMode: InvoiceTaxMode;
+  discountKind: InvoiceDiscountKind | null;
+  discountValueInput: string;
   isPreset?: boolean;
 };
 
@@ -58,6 +68,32 @@ function toCurrency(cents: number, currency: string) {
     style: "currency",
     currency: currency
   }).format(cents / 100);
+}
+
+function toDiscountValueInput(kind: InvoiceDiscountKind | null, value: number | null): string {
+  if (!kind || value === null) {
+    return "";
+  }
+
+  return kind === "percent" ? basisPointsToPercentageInput(value) : toMoneyInput(value);
+}
+
+function parseDiscountValue(kind: InvoiceDiscountKind | null, rawInput: string): number | null {
+  if (!kind) {
+    return null;
+  }
+
+  return kind === "percent"
+    ? parsePercentageInputToBasisPoints(rawInput).basisPoints
+    : parseAudInputToCents(rawInput).cents;
+}
+
+function describeDiscount(kind: InvoiceDiscountKind | null, value: number | null, currency: string): string {
+  if (!kind || value === null) {
+    return "No discount";
+  }
+
+  return kind === "percent" ? `${basisPointsToPercentageInput(value)}%` : toCurrency(value, currency);
 }
 
 /**
@@ -101,6 +137,8 @@ export function AdminInvoicesClient() {
   const [editingNotes, setEditingNotes] = useState("");
   const [editingDueAt, setEditingDueAt] = useState("");
   const [editingLineItems, setEditingLineItems] = useState<EditableLineItem[]>([]);
+  const [editingDiscountKind, setEditingDiscountKind] = useState<InvoiceDiscountKind | null>(null);
+  const [editingDiscountValueInput, setEditingDiscountValueInput] = useState("");
   const [editingProductPresetId, setEditingProductPresetId] = useState("");
   const [editingCustomerFirstName, setEditingCustomerFirstName] = useState("");
   const [editingCustomerLastName, setEditingCustomerLastName] = useState("");
@@ -113,6 +151,8 @@ export function AdminInvoicesClient() {
   const [createSelectedPresetIds, setCreateSelectedPresetIds] = useState<string[]>([]);
   const [createDueAt, setCreateDueAt] = useState("");
   const [createTaxMode, setCreateTaxMode] = useState<InvoiceTaxMode>("taxable");
+  const [createDiscountKind, setCreateDiscountKind] = useState<InvoiceDiscountKind | null>(null);
+  const [createDiscountValueInput, setCreateDiscountValueInput] = useState("");
 
   // NOTE: Auth failures are handled here instead of each button click so all
   // invoice hooks share the same redirect behavior.
@@ -152,17 +192,21 @@ export function AdminInvoicesClient() {
     setSelectedInvoice(invoice);
     setEditingNotes(invoice.notes || "");
     setEditingDueAt(toDateTimeLocalValue(invoice.dueAt));
+    setEditingDiscountKind(invoice.discountKind ?? null);
+    setEditingDiscountValueInput(toDiscountValueInput(invoice.discountKind ?? null, invoice.discountValue ?? null));
     setEditingCustomerFirstName(invoice.customerFirstName || invoice.customerName.split(' ')[0]);
     setEditingCustomerLastName(invoice.customerLastName || invoice.customerName.split(' ').slice(1).join(' '));
     setEditingLineItems(
       invoice.lineItems.map((li) => ({
         key: li.id,
         id: li.id,
-        kind: li.kind,
+        kind: li.kind as InvoiceLineItemDraft["kind"],
         description: li.description,
         quantity: String(li.quantity),
         unitPriceAud: toMoneyInput(li.unitPriceCents),
-        taxMode: li.taxMode
+        taxMode: li.taxMode,
+        discountKind: li.discountKind ?? null,
+        discountValueInput: toDiscountValueInput(li.discountKind ?? null, li.discountValue ?? null)
       }))
     );
     setNotice("");
@@ -234,6 +278,18 @@ export function AdminInvoicesClient() {
 
   const closeDetail = () => setSelectedInvoice(null);
 
+  const resetCreateDialog = () => {
+    setCreateSelectedCustomerId("");
+    setCreateInvoiceBasis("lesson_based");
+    setCreateLessonPrice("60.00");
+    setCreateStandalonePrice("0.00");
+    setCreateSelectedPresetIds([]);
+    setCreateDueAt("");
+    setCreateTaxMode("taxable");
+    setCreateDiscountKind(null);
+    setCreateDiscountValueInput("");
+  };
+
   const addLineItem = () => {
     setEditingLineItems((prev) => [
       ...prev,
@@ -243,7 +299,9 @@ export function AdminInvoicesClient() {
         description: "",
         quantity: "1",
         unitPriceAud: "0.00",
-        taxMode: "taxable"
+        taxMode: "taxable",
+        discountKind: null,
+        discountValueInput: ""
       }
     ]);
   };
@@ -260,6 +318,8 @@ export function AdminInvoicesClient() {
         quantity: "1",
         unitPriceAud: toMoneyInput(preset.unitPriceCents),
         taxMode: "taxable",
+        discountKind: preset.discountKind ?? null,
+        discountValueInput: toDiscountValueInput(preset.discountKind ?? null, preset.discountValue ?? null),
         isPreset: true
       }
     ]);
@@ -273,6 +333,63 @@ export function AdminInvoicesClient() {
   const updateLineItem = (key: string, patch: Partial<EditableLineItem>) => {
     setEditingLineItems((prev) => prev.map((li) => (li.key === key ? { ...li, ...patch } : li)));
   };
+
+  const editingCalculation = calculateInvoiceTotals(
+    editingLineItems.map((li, index) => ({
+      kind: li.kind,
+      description: li.description,
+      quantity: Number.parseFloat(li.quantity) || 0,
+      unitPriceCents: parseAudInputToCents(li.unitPriceAud).cents || 0,
+      taxMode: li.taxMode,
+      sortOrder: index,
+      discountKind: li.discountKind,
+      discountValue: parseDiscountValue(li.discountKind, li.discountValueInput)
+    })),
+    {
+      discountKind: editingDiscountKind,
+      discountValue: parseDiscountValue(editingDiscountKind, editingDiscountValueInput)
+    }
+  );
+
+  const createCalculation = calculateInvoiceTotals(
+    (() => {
+      if (createInvoiceBasis === "presets") {
+        return presets
+          .filter((preset) => createSelectedPresetIds.includes(preset.id))
+          .map((preset, index) => ({
+            description: preset.description || preset.label,
+            quantity: 1,
+            unitPriceCents: preset.unitPriceCents,
+            taxMode: createTaxMode,
+            kind: "custom" as const,
+            sortOrder: index,
+            discountKind: preset.discountKind ?? null,
+            discountValue: preset.discountValue ?? null
+          }));
+      }
+
+      const amount = createInvoiceBasis === "standalone"
+        ? parseAudInputToCents(createStandalonePrice).cents || 0
+        : parseAudInputToCents(createLessonPrice).cents || 0;
+
+      return [
+        {
+          description: "Standard Lesson Fee",
+          quantity: 1,
+          unitPriceCents: amount,
+          taxMode: createTaxMode,
+          kind: "lesson_fee" as const,
+          sortOrder: 0,
+          discountKind: null,
+          discountValue: null
+        }
+      ];
+    })(),
+    {
+      discountKind: createDiscountKind,
+      discountValue: parseDiscountValue(createDiscountKind, createDiscountValueInput)
+    }
+  );
 
   /**
    * Persists the editable detail dialog fields back to the invoice route.
@@ -290,11 +407,14 @@ export function AdminInvoicesClient() {
     }
 
     const lineItemsPayload = editingLineItems.map((li) => ({
+      id: li.id,
       kind: li.kind,
       description: li.description,
       quantity: Number.parseFloat(li.quantity) || 0,
       unitPriceCents: parseAudInputToCents(li.unitPriceAud).cents || 0,
-      taxMode: li.taxMode
+      taxMode: li.taxMode,
+      discountKind: li.discountKind,
+      discountValue: parseDiscountValue(li.discountKind, li.discountValueInput)
     }));
 
     const result = await saveInvoiceApi(selectedInvoice.id, {
@@ -303,6 +423,8 @@ export function AdminInvoicesClient() {
       customerFirstName: editingCustomerFirstName,
       customerLastName: editingCustomerLastName,
       customerName: `${editingCustomerFirstName} ${editingCustomerLastName}`.trim(),
+      discountKind: editingDiscountKind,
+      discountValue: parseDiscountValue(editingDiscountKind, editingDiscountValueInput),
       lineItems: lineItemsPayload
     });
 
@@ -386,14 +508,21 @@ export function AdminInvoicesClient() {
       standalonePriceCents: parseAudInputToCents(createStandalonePrice).cents || 0,
       dueAt,
       taxMode: createTaxMode,
+      discountKind: createDiscountKind,
+      discountValue: parseDiscountValue(createDiscountKind, createDiscountValueInput),
       lineItems: (() => {
-        if (createInvoiceBasis === "standalone") {
+        if (createInvoiceBasis === "standalone" || createInvoiceBasis === "lesson_based") {
           return [{
             description: "Standard Lesson Fee",
             quantity: 1,
-            unitPriceCents: parseAudInputToCents(createStandalonePrice).cents || 0,
+            unitPriceCents:
+              createInvoiceBasis === "standalone"
+                ? parseAudInputToCents(createStandalonePrice).cents || 0
+                : parseAudInputToCents(createLessonPrice).cents || 0,
             kind: "lesson_fee",
-            taxMode: createTaxMode
+            taxMode: createTaxMode,
+            discountKind: null,
+            discountValue: null
           }];
         }
         if (createInvoiceBasis === "presets") {
@@ -401,11 +530,13 @@ export function AdminInvoicesClient() {
           // an explicit immutable line-item payload rather than preset IDs.
           const selectedPresets = presets.filter(p => createSelectedPresetIds.includes(p.id));
           return selectedPresets.map(preset => ({
-            description: preset.description,
+            description: preset.description || preset.label,
             quantity: 1,
             unitPriceCents: preset.unitPriceCents,
             kind: "custom",
-            taxMode: createTaxMode
+            taxMode: createTaxMode,
+            discountKind: preset.discountKind ?? null,
+            discountValue: preset.discountValue ?? null
           }));
         }
         return undefined;
@@ -418,11 +549,13 @@ export function AdminInvoicesClient() {
       const sentResult = await performActionApi(result.id, "send");
       setBusyAction(null);
       if (sentResult) {
+        resetCreateDialog();
         setCreateOpen(false);
         setNotice("Invoice created and sent to customer.");
         openDetail(sentResult);
         void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
       } else {
+        resetCreateDialog();
         setCreateOpen(false);
         // RATIONALE: When email delivery fails, we still surface the draft so an
         // admin can inspect or resend it rather than losing the newly created document.
@@ -433,6 +566,7 @@ export function AdminInvoicesClient() {
     } else {
       setBusyAction(null);
       if (result) {
+        resetCreateDialog();
         setCreateOpen(false);
         setNotice("Invoice created.");
         openDetail(result);
@@ -772,6 +906,31 @@ export function AdminInvoicesClient() {
                     <AdminField label="Due Date" tooltip="When the invoice payment is required.">
                       <input type="datetime-local" value={editingDueAt} onChange={(e) => setEditingDueAt(e.target.value)} />
                     </AdminField>
+                    <AdminField label="Invoice Discount Type" tooltip="Optional discount applied to the full invoice subtotal before GST.">
+                      <select
+                        value={editingDiscountKind ?? ""}
+                        disabled={selectedInvoice.status !== "draft"}
+                        onChange={(e) => {
+                          const nextKind = e.target.value ? (e.target.value as InvoiceDiscountKind) : null;
+                          setEditingDiscountKind(nextKind);
+                          if (!nextKind) {
+                            setEditingDiscountValueInput("");
+                          }
+                        }}
+                      >
+                        <option value="">No discount</option>
+                        <option value="amount">Fixed amount</option>
+                        <option value="percent">Percentage</option>
+                      </select>
+                    </AdminField>
+                    <AdminField label="Invoice Discount Value" tooltip="Amount discounts use AUD. Percentage discounts use %." fullWidth>
+                      <input
+                        value={editingDiscountValueInput}
+                        disabled={!editingDiscountKind || selectedInvoice.status !== "draft"}
+                        placeholder={editingDiscountKind === "percent" ? "10%" : "0.00"}
+                        onChange={(e) => setEditingDiscountValueInput(e.target.value)}
+                      />
+                    </AdminField>
                     <AdminField label="Notes" tooltip="Visible to the customer on the public invoice." fullWidth>
                       <textarea
                         className="invoice-dialog-notes"
@@ -813,6 +972,35 @@ export function AdminInvoicesClient() {
                             <input value={li.unitPriceAud} onChange={(e) => updateLineItem(li.key, { unitPriceAud: e.target.value })} />
                           </AdminField>
                         </div>
+                        <div className="invoice-dialog-line-item-qty">
+                          <AdminField label="Discount Type" tooltip="Optional line-level discount for this item.">
+                            <select
+                              value={li.discountKind ?? ""}
+                              disabled={selectedInvoice.status !== "draft"}
+                              onChange={(e) => {
+                                const nextKind = e.target.value ? (e.target.value as InvoiceDiscountKind) : null;
+                                updateLineItem(li.key, {
+                                  discountKind: nextKind,
+                                  discountValueInput: nextKind ? li.discountValueInput : ""
+                                });
+                              }}
+                            >
+                              <option value="">No discount</option>
+                              <option value="amount">Fixed amount</option>
+                              <option value="percent">Percentage</option>
+                            </select>
+                          </AdminField>
+                        </div>
+                        <div className="invoice-dialog-line-item-price">
+                          <AdminField label="Discount Value" tooltip="Amount discounts use AUD. Percentage discounts use %.">
+                            <input
+                              value={li.discountValueInput}
+                              disabled={!li.discountKind || selectedInvoice.status !== "draft"}
+                              placeholder={li.discountKind === "percent" ? "10%" : "0.00"}
+                              onChange={(e) => updateLineItem(li.key, { discountValueInput: e.target.value })}
+                            />
+                          </AdminField>
+                        </div>
                         <Tooltip content="Remove this line item from the invoice.">
                           <button className="btn btn-danger invoice-dialog-remove-item" onClick={() => removeLineItem(li.key)}>×</button>
                         </Tooltip>
@@ -820,16 +1008,17 @@ export function AdminInvoicesClient() {
                     ))}
                     <div className="button-row invoice-dialog-button-row invoice-dialog-line-actions">
                       <Tooltip content="Add a blank line item that you can customize manually.">
-                        <button className="btn btn-secondary" onClick={addLineItem}>Add Line Item</button>
+                        <button className="btn btn-secondary" disabled={selectedInvoice.status !== "draft"} onClick={addLineItem}>Add Line Item</button>
                       </Tooltip>
                       <div className="invoice-dialog-preset-row">
                         <select
                           className="invoice-product-preset-select invoice-dialog-preset-select"
                           value={editingProductPresetId}
+                          disabled={selectedInvoice.status !== "draft"}
                           onChange={(e) => addPresetToInvoice(e.target.value)}
                         >
                           <option value="">Add preset...</option>
-                          {presets.map(p => <option key={p.id} value={p.id}>{p.label} ({toCurrency(p.unitPriceCents, DEFAULT_CURRENCY)})</option>)}
+                          {presets.map(p => <option key={p.id} value={p.id}>{p.label} ({toCurrency(p.unitPriceCents, DEFAULT_CURRENCY)}{p.discountKind ? `, ${describeDiscount(p.discountKind, p.discountValue ?? null, DEFAULT_CURRENCY)} off` : ""})</option>)}
                         </select>
                       </div>
                     </div>
@@ -843,6 +1032,24 @@ export function AdminInvoicesClient() {
                   <p className="helper-text">Manage the lifecycle of this invoice.</p>
                   
                   <div className="invoice-dialog-status-card">
+                    <div className="invoice-dialog-status-row">
+                      <span>Subtotal:</span>
+                      <span>{toCurrency(editingCalculation.totals.subtotalCents, selectedInvoice.currency)}</span>
+                    </div>
+                    {editingCalculation.totals.discountCents !== 0 && (
+                      <div className="invoice-dialog-status-row">
+                        <span>Discount:</span>
+                        <span>{toCurrency(-editingCalculation.totals.discountCents, selectedInvoice.currency)}</span>
+                      </div>
+                    )}
+                    <div className="invoice-dialog-status-row">
+                      <span>GST:</span>
+                      <span>{toCurrency(editingCalculation.totals.gstCents, selectedInvoice.currency)}</span>
+                    </div>
+                    <div className="invoice-dialog-status-row">
+                      <span>Total:</span>
+                      <span>{toCurrency(editingCalculation.totals.totalCents, selectedInvoice.currency)}</span>
+                    </div>
                     <div className="invoice-dialog-status-row">
                       <span>Status:</span>
                       <span className={`status-badge status-${selectedInvoiceDisplayStatus ?? selectedInvoice.status}`}>
@@ -877,14 +1084,26 @@ export function AdminInvoicesClient() {
 
       <AdminDialog
         isOpen={createOpen}
-        onClose={() => setCreateOpen(false)}
+        onClose={() => {
+          resetCreateDialog();
+          setCreateOpen(false);
+        }}
         title="Create New Invoice"
         wide
         id="invoice-create-dialog"
         footer={
           <div className="dialog-footer-row dialog-footer-row-end">
             <Tooltip content="Close the create invoice dialog without saving.">
-              <button className="btn btn-secondary" disabled={!!busyAction} onClick={() => setCreateOpen(false)}>CANCEL</button>
+              <button
+                className="btn btn-secondary"
+                disabled={!!busyAction}
+                onClick={() => {
+                  resetCreateDialog();
+                  setCreateOpen(false);
+                }}
+              >
+                CANCEL
+              </button>
             </Tooltip>
             <Tooltip content="Create a new draft invoice only.">
               <button className="btn btn-secondary" disabled={!!busyAction || !createSelectedCustomerId} onClick={() => void createInvoice(false)}>
@@ -951,7 +1170,7 @@ export function AdminInvoicesClient() {
                               else setCreateSelectedPresetIds(prev => prev.filter(id => id !== p.id));
                             }}
                           />
-                          {p.label} ({toCurrency(p.unitPriceCents, DEFAULT_CURRENCY)})
+                          {p.label} ({toCurrency(p.unitPriceCents, DEFAULT_CURRENCY)}{p.discountKind ? `, ${describeDiscount(p.discountKind, p.discountValue ?? null, DEFAULT_CURRENCY)} off` : ""})
                         </label>
                       ))}
                     </div>
@@ -959,6 +1178,30 @@ export function AdminInvoicesClient() {
                 )}
                 <AdminField label="Due Date (Optional)" tooltip="When the invoice must be paid.">
                   <input type="datetime-local" value={createDueAt} onChange={(e) => setCreateDueAt(e.target.value)} />
+                </AdminField>
+                <AdminField label="Invoice Discount Type" tooltip="Optional discount applied to the full invoice subtotal before GST.">
+                  <select
+                    value={createDiscountKind ?? ""}
+                    onChange={(e) => {
+                      const nextKind = e.target.value ? (e.target.value as InvoiceDiscountKind) : null;
+                      setCreateDiscountKind(nextKind);
+                      if (!nextKind) {
+                        setCreateDiscountValueInput("");
+                      }
+                    }}
+                  >
+                    <option value="">No discount</option>
+                    <option value="amount">Fixed amount</option>
+                    <option value="percent">Percentage</option>
+                  </select>
+                </AdminField>
+                <AdminField label="Invoice Discount Value" tooltip="Amount discounts use AUD. Percentage discounts use %." fullWidth>
+                  <input
+                    value={createDiscountValueInput}
+                    disabled={!createDiscountKind}
+                    placeholder={createDiscountKind === "percent" ? "10%" : "0.00"}
+                    onChange={(e) => setCreateDiscountValueInput(e.target.value)}
+                  />
                 </AdminField>
               </AdminForm>
             </AdminCard>
@@ -973,6 +1216,26 @@ export function AdminInvoicesClient() {
                   ? "This will create a blank invoice with one line item at the specified price. You can add more items after creation."
                   : "This will create a blank invoice pre-filled with the selected preset items."}
               </p>
+              <div className="invoice-dialog-status-card">
+                <div className="invoice-dialog-status-row">
+                  <span>Subtotal:</span>
+                  <span>{toCurrency(createCalculation.totals.subtotalCents, DEFAULT_CURRENCY)}</span>
+                </div>
+                {createCalculation.totals.discountCents !== 0 && (
+                  <div className="invoice-dialog-status-row">
+                    <span>Discount:</span>
+                    <span>{toCurrency(-createCalculation.totals.discountCents, DEFAULT_CURRENCY)}</span>
+                  </div>
+                )}
+                <div className="invoice-dialog-status-row">
+                  <span>GST:</span>
+                  <span>{toCurrency(createCalculation.totals.gstCents, DEFAULT_CURRENCY)}</span>
+                </div>
+                <div className="invoice-dialog-status-row">
+                  <span>Total:</span>
+                  <span>{toCurrency(createCalculation.totals.totalCents, DEFAULT_CURRENCY)}</span>
+                </div>
+              </div>
             </AdminCard>
           </div>
         </div>
