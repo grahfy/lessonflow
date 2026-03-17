@@ -2244,6 +2244,33 @@ git_worktree_dirty() {
   ! git -C "${REPO_ROOT}" diff --quiet || ! git -C "${REPO_ROOT}" diff --cached --quiet
 }
 
+git_source_has_unwritable_tracked_paths() {
+  [[ "${SOURCE_MODE}" == "git" ]] || return 1
+
+  local tracked_path=""
+  while IFS= read -r -d '' tracked_path; do
+    if [[ -e "${REPO_ROOT}/${tracked_path}" && ! -w "${REPO_ROOT}/${tracked_path}" ]]; then
+      printf '%s\n' "${tracked_path}"
+      return 0
+    fi
+  done < <(git -C "${REPO_ROOT}" ls-files -z)
+
+  return 1
+}
+
+verify_git_source_access_for_update() {
+  [[ "${SOURCE_MODE}" == "git" ]] || return 0
+
+  local first_unwritable_path=""
+  if first_unwritable_path="$(git_source_has_unwritable_tracked_paths)"; then
+    log_error "Git source checkout contains tracked files that are not writable by $(id -un)."
+    log_error "First unwritable path: ${REPO_ROOT}/${first_unwritable_path}"
+    log_error "Repair checkout ownership before pulling, for example:"
+    log_error "  sudo chown -R $(id -un):$(id -gn) ${REPO_ROOT}"
+    exit 1
+  fi
+}
+
 # Returns the current git branch name or empty string if HEAD is detached.
 current_branch_name() {
   [[ "${SOURCE_MODE}" == "git" ]] || return 0
@@ -3006,6 +3033,7 @@ fi
 if [[ "${SOURCE_MODE}" == "git" ]]; then
   section "Git Update"
   log_info "Repository branch: $(current_branch_name)"
+  verify_git_source_access_for_update
 
   if [[ "${ALLOW_DIRTY}" != true ]] && git_worktree_dirty; then
     log_error "Working tree is dirty. Commit/stash changes or rerun with --allow-dirty."
