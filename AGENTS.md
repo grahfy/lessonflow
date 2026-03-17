@@ -48,6 +48,11 @@ npm run test:prepare && node ./scripts/run-vitest-with-test-db.cjs run -- [test-
 ```
 Example: `npm run test:prepare && node ./scripts/run-vitest-with-test-db.cjs run -- booking`
 
+### Test Database Notes
+- `TEST_DATABASE_URL` is already wired into [`scripts/test-full-site-local.sh`](/home/grahf/jon/melbourne-guitar-school/scripts/test-full-site-local.sh).
+- That script first reads `TEST_DATABASE_URL` from `.env.test.local` when present.
+- If `.env.test.local` is missing, it derives the test DB URL from the main DB URL by switching `mgs_dev` → `mgs_test` and port `3306` → `3307`, then exports `TEST_DATABASE_URL` before running Prisma/test commands.
+
 ## Coding Style & Naming Conventions
 
 ### General

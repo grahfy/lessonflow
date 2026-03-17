@@ -375,7 +375,8 @@ model CustomerInboundEmail {
   receivedAt DateTime
   syncedAt   DateTime @default(now())
 
-  @@unique([provider, externalId])
+  @@unique([customerId, provider, externalId])
+  @@index([provider, externalId])
   @@index([customerId, receivedAt])
 }
 

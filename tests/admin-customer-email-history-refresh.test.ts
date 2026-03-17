@@ -2,9 +2,9 @@ import bcrypt from "bcryptjs";
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockSyncGmailSentMessages, mockListRecentImapMessages } = vi.hoisted(() => ({
+const { mockSyncGmailSentMessages, mockListRecentImapMessagesBySender } = vi.hoisted(() => ({
   mockSyncGmailSentMessages: vi.fn(),
-  mockListRecentImapMessages: vi.fn()
+  mockListRecentImapMessagesBySender: vi.fn()
 }));
 
 vi.mock("@/lib/gmail/sync", () => ({
@@ -12,7 +12,7 @@ vi.mock("@/lib/gmail/sync", () => ({
 }));
 
 vi.mock("@/lib/imap/service", () => ({
-  listRecentImapMessages: mockListRecentImapMessages
+  listRecentImapMessagesBySender: mockListRecentImapMessagesBySender
 }));
 
 import { POST } from "@/app/api/admin/customers/[id]/email/refresh/route";
@@ -83,7 +83,7 @@ describe("admin-customer-email-history-refresh", () => {
       importedCount: 2,
       skippedCount: 1
     });
-    mockListRecentImapMessages.mockResolvedValue([
+    mockListRecentImapMessagesBySender.mockResolvedValue([
       {
         messageId: "imap-1",
         senderEmail: "alex@example.com",
@@ -92,15 +92,6 @@ describe("admin-customer-email-history-refresh", () => {
         snippet: "Can we reschedule?",
         bodyText: "Can we reschedule next week?",
         receivedAt: "2026-03-18T11:00:00.000Z"
-      },
-      {
-        messageId: "imap-2",
-        senderEmail: "other@example.com",
-        toEmail: "owner@example.com",
-        subject: "Ignore me",
-        snippet: "Ignore me",
-        bodyText: "Ignore me",
-        receivedAt: "2026-03-18T10:00:00.000Z"
       }
     ]);
 
@@ -118,8 +109,9 @@ describe("admin-customer-email-history-refresh", () => {
 
     expect(body.ok).toBe(true);
     expect(body.gmail).toEqual({ importedCount: 2, skippedCount: 1 });
-    expect(body.imap).toEqual({ importedCount: 1, skippedCount: 1 });
+    expect(body.imap).toEqual({ importedCount: 1, skippedCount: 0 });
     expect(mockSyncGmailSentMessages).toHaveBeenCalledWith(20, { targetToEmail: "alex@example.com" });
+    expect(mockListRecentImapMessagesBySender).toHaveBeenCalledWith("alex@example.com", 20);
 
     const inboundRows = await prisma.customerInboundEmail.findMany({
       orderBy: {
@@ -154,7 +146,7 @@ describe("admin-customer-email-history-refresh", () => {
     });
 
     mockSyncGmailSentMessages.mockRejectedValue(new Error("gmail token expired"));
-    mockListRecentImapMessages.mockResolvedValue([
+    mockListRecentImapMessagesBySender.mockResolvedValue([
       {
         messageId: "imap-history-1",
         senderEmail: "alex@example.com",
@@ -185,6 +177,78 @@ describe("admin-customer-email-history-refresh", () => {
     const inboundRows = await prisma.customerInboundEmail.findMany();
     expect(inboundRows).toHaveLength(1);
     expect(inboundRows[0]?.externalId).toBe("imap-history-1");
+  });
+
+  it("persists the same inbound IMAP message for multiple customers who share an email account", async () => {
+    const owner = await ensureOwnerAdmin();
+    const token = createSessionToken(owner.email);
+
+    const [customerA, customerB] = await Promise.all([
+      prisma.customer.create({
+        data: {
+          fullName: "Taylor Sibling",
+          normalizedFullName: "taylor sibling",
+          email: "family@example.com",
+          phone: "0400000101",
+          normalizedEmail: "family@example.com",
+          normalizedPhone: "0400000101",
+          skillLevel: "beginner",
+          lessonMode: "in_person"
+        }
+      }),
+      prisma.customer.create({
+        data: {
+          fullName: "Jordan Sibling",
+          normalizedFullName: "jordan sibling",
+          email: "family@example.com",
+          phone: "0400000102",
+          normalizedEmail: "family@example.com",
+          normalizedPhone: "0400000102",
+          skillLevel: "beginner",
+          lessonMode: "in_person"
+        }
+      })
+    ]);
+
+    mockSyncGmailSentMessages.mockResolvedValue({
+      importedCount: 0,
+      skippedCount: 0
+    });
+    mockListRecentImapMessagesBySender.mockResolvedValue([
+      {
+        messageId: "imap-family-1",
+        senderEmail: "family@example.com",
+        toEmail: "owner@example.com",
+        subject: "Shared inbox reply",
+        snippet: "One family inbox",
+        bodyText: "One family inbox",
+        receivedAt: "2026-03-18T09:00:00.000Z"
+      }
+    ]);
+
+    const responseA = await POST(
+      authRequest(`http://localhost/api/admin/customers/${customerA.id}/email/refresh`, token),
+      { params: Promise.resolve({ id: customerA.id }) }
+    );
+    const responseB = await POST(
+      authRequest(`http://localhost/api/admin/customers/${customerB.id}/email/refresh`, token),
+      { params: Promise.resolve({ id: customerB.id }) }
+    );
+
+    expect(responseA.status).toBe(200);
+    expect(responseB.status).toBe(200);
+
+    const inboundRows = await prisma.customerInboundEmail.findMany({
+      where: {
+        externalId: "imap-family-1"
+      },
+      orderBy: {
+        customerId: "asc"
+      }
+    });
+
+    expect(inboundRows).toHaveLength(2);
+    expect(inboundRows.map((row) => row.customerId)).toEqual([customerA.id, customerB.id].sort());
   });
 
   it("forbids a teacher from refreshing another teacher's customer history", async () => {
@@ -234,6 +298,6 @@ describe("admin-customer-email-history-refresh", () => {
 
     expect(response.status).toBe(403);
     expect(mockSyncGmailSentMessages).not.toHaveBeenCalled();
-    expect(mockListRecentImapMessages).not.toHaveBeenCalled();
+    expect(mockListRecentImapMessagesBySender).not.toHaveBeenCalled();
   });
 });

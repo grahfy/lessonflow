@@ -1,3 +1,5 @@
+import type { SearchObject } from "imapflow";
+
 import { createImapClient } from "@/lib/imap/client";
 import { getImapConfig } from "@/lib/env";
 
@@ -76,10 +78,7 @@ export async function getImapConnectionStatus(): Promise<ImapConnectionStatus> {
  * Returns recent messages from the configured IMAP mailbox.
  */
 async function listImapMessages(
-  query: {
-    all?: boolean;
-    seen?: boolean;
-  },
+  query: SearchObject,
   maxResults: number = 20
 ): Promise<ImapUnreadMessage[]> {
   return withImapMailbox(async (client) => {
@@ -142,4 +141,17 @@ export async function listUnreadImapMessages(maxResults: number = 20): Promise<I
  */
 export async function listRecentImapMessages(maxResults: number = 20): Promise<ImapUnreadMessage[]> {
   return listImapMessages({ all: true }, maxResults);
+}
+
+/**
+ * Returns recent messages for a specific sender from the configured IMAP mailbox.
+ */
+export async function listRecentImapMessagesBySender(senderEmail: string, maxResults: number = 20): Promise<ImapUnreadMessage[]> {
+  return listImapMessages(
+    {
+      all: true,
+      from: senderEmail.trim().toLowerCase()
+    },
+    maxResults
+  );
 }

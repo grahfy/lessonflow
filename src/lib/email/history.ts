@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/db";
+import { Prisma } from "@/generated/prisma/client";
 import { getOwnerEmail, isImapConfigured } from "@/lib/env";
 import { isGmailConfigured } from "@/lib/email/gmail-service";
 import { syncGmailSentMessages } from "@/lib/gmail/sync";
-import { listRecentImapMessages } from "@/lib/imap/service";
+import { listRecentImapMessagesBySender } from "@/lib/imap/service";
 import { logError } from "@/lib/observability";
 import { type EmailRecord, type EmailRefreshResult } from "@/lib/admin/email-history";
 
@@ -15,18 +16,57 @@ type CustomerEmailTarget = {
 type OutboundEmailRow = Awaited<ReturnType<typeof prisma.outboundEmail.findMany>>[number];
 type InboundEmailRow = Awaited<ReturnType<typeof prisma.customerInboundEmail.findMany>>[number];
 
+const STORED_EMAIL_ADDRESS_PATTERN = /([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi;
+
 function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function matchesEmailAddress(emailValue: string) {
-  const normalizedEmail = normalizeEmail(emailValue);
-  return {
-    OR: [
-      { toEmail: normalizedEmail },
-      { toEmail: { contains: normalizedEmail } }
-    ]
-  };
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractStoredEmailAddresses(value: string): string[] {
+  return Array.from(
+    value.matchAll(STORED_EMAIL_ADDRESS_PATTERN),
+    (match) => normalizeEmail(match[1] || "")
+  ).filter(Boolean);
+}
+
+function matchesStoredRecipient(toEmail: string, emailValue: string): boolean {
+  return extractStoredEmailAddresses(toEmail).includes(normalizeEmail(emailValue));
+}
+
+function buildRecipientMatchPattern(emailValue: string): string {
+  const escapedEmail = escapeRegExp(normalizeEmail(emailValue));
+  return `(^|,\\s*)([^,<>]*<)?${escapedEmail}(>)?(,\\s*|$)`;
+}
+
+async function listOutboundEmailsForCustomer(customer: CustomerEmailTarget): Promise<OutboundEmailRow[]> {
+  const matchingRowIds = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+    SELECT id
+    FROM \`OutboundEmail\`
+    WHERE LOWER(\`toEmail\`) REGEXP ${buildRecipientMatchPattern(customer.normalizedEmail)}
+    ORDER BY \`createdAt\` DESC
+    LIMIT 50
+  `);
+
+  if (matchingRowIds.length === 0) {
+    return [];
+  }
+
+  const outboundRows = await prisma.outboundEmail.findMany({
+    where: {
+      id: {
+        in: matchingRowIds.map((row) => row.id)
+      }
+    }
+  });
+  const orderById = new Map(matchingRowIds.map((row, index) => [row.id, index]));
+
+  return outboundRows
+    .filter((row) => matchesStoredRecipient(row.toEmail, customer.normalizedEmail))
+    .sort((left, right) => (orderById.get(left.id) || 0) - (orderById.get(right.id) || 0));
 }
 
 function getOutboundFromAddress(provider?: string, source?: string): string {
@@ -73,13 +113,7 @@ function toEmailRecordFromInbound(row: InboundEmailRow): EmailRecord {
  */
 export async function getCustomerEmailHistory(customer: CustomerEmailTarget): Promise<EmailRecord[]> {
   const [outboundRows, inboundRows] = await Promise.all([
-    prisma.outboundEmail.findMany({
-      where: matchesEmailAddress(customer.email),
-      orderBy: {
-        createdAt: "desc"
-      },
-      take: 50
-    }),
+    listOutboundEmailsForCustomer(customer),
     prisma.customerInboundEmail.findMany({
       where: {
         customerId: customer.id
@@ -97,7 +131,7 @@ export async function getCustomerEmailHistory(customer: CustomerEmailTarget): Pr
 }
 
 async function syncCustomerImapMessages(customer: CustomerEmailTarget, maxResults: number): Promise<{ importedCount: number; skippedCount: number }> {
-  const messages = await listRecentImapMessages(maxResults);
+  const messages = await listRecentImapMessagesBySender(customer.normalizedEmail, maxResults);
   const matchedMessages = messages.filter((message) => normalizeEmail(message.senderEmail) === customer.normalizedEmail);
 
   let importedCount = 0;
@@ -106,7 +140,8 @@ async function syncCustomerImapMessages(customer: CustomerEmailTarget, maxResult
   for (const message of matchedMessages) {
     const existing = await prisma.customerInboundEmail.findUnique({
       where: {
-        provider_externalId: {
+        customerId_provider_externalId: {
+          customerId: customer.id,
           provider: "imap",
           externalId: message.messageId
         }
@@ -117,7 +152,8 @@ async function syncCustomerImapMessages(customer: CustomerEmailTarget, maxResult
       skippedCount += 1;
       await prisma.customerInboundEmail.update({
         where: {
-          provider_externalId: {
+          customerId_provider_externalId: {
+            customerId: customer.id,
             provider: "imap",
             externalId: message.messageId
           }

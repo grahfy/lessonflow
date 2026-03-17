@@ -164,4 +164,57 @@ describe("admin-customer-email-history", () => {
       toEmail: "alex@example.com, sam@example.com"
     });
   });
+
+  it("does not leak outbound history when another recipient only contains the customer's address as a substring", async () => {
+    const owner = await ensureOwnerAdmin();
+    const token = createSessionToken(owner.email);
+
+    const customer = await prisma.customer.create({
+      data: {
+        fullName: "Ann Student",
+        normalizedFullName: "ann student",
+        email: "ann@example.com",
+        phone: "0400000004",
+        normalizedEmail: "ann@example.com",
+        normalizedPhone: "0400000004",
+        skillLevel: "beginner",
+        lessonMode: "in_person"
+      }
+    });
+
+    await prisma.outboundEmail.createMany({
+      data: [
+        {
+          toEmail: "joann@example.com",
+          subject: "Wrong customer",
+          htmlBody: "<p>Should not appear</p>",
+          status: "sent",
+          provider: "smtp",
+          source: "app",
+          createdAt: new Date("2026-03-18T12:00:00.000Z")
+        },
+        {
+          toEmail: "Ann Student <ann@example.com>",
+          subject: "Correct customer",
+          htmlBody: "<p>Should appear</p>",
+          status: "sent",
+          provider: "smtp",
+          source: "app",
+          createdAt: new Date("2026-03-18T11:00:00.000Z")
+        }
+      ]
+    });
+
+    const response = await GET(
+      authRequest(`http://localhost/api/admin/customers/${customer.id}/email`, token),
+      { params: Promise.resolve({ id: customer.id }) }
+    );
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      history: Array<{ subject: string }>;
+    };
+
+    expect(body.history.map((email) => email.subject)).toEqual(["Correct customer"]);
+  });
 });
