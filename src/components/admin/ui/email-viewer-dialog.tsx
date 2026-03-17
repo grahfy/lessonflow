@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { format } from "date-fns";
 import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { getEmailViewerContent } from "@/lib/admin/email-history";
 import { type EmailRecord } from "@/lib/admin/use-email-history";
 
 interface EmailViewerDialogProps {
@@ -13,9 +14,10 @@ interface EmailViewerDialogProps {
 
 export function EmailViewerDialog({ isOpen, onClose, email }: EmailViewerDialogProps) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const renderedTextBody = email?.textBody?.trim() || "";
 
   if (!email) return null;
+
+  const viewerContent = getEmailViewerContent(email);
 
   return (
     <AdminDialog
@@ -65,15 +67,17 @@ export function EmailViewerDialog({ isOpen, onClose, email }: EmailViewerDialogP
           </div>
         </div>
         <div className="admin-email-viewer-body">
-          {email.htmlBody ? (
+          {viewerContent.kind === "html" ? (
             <iframe
               className="admin-email-viewer-frame"
-              srcDoc={email.htmlBody}
+              srcDoc={viewerContent.value}
               title="Email Content"
               sandbox="allow-same-origin"
             />
           ) : (
-            <pre className="admin-email-viewer-plain">{renderedTextBody || "No message body available."}</pre>
+            <pre className="admin-email-viewer-plain">
+              {viewerContent.kind === "text" ? viewerContent.value : "No message body available."}
+            </pre>
           )}
         </div>
       </div>

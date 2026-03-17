@@ -5,7 +5,7 @@ import { isGmailConfigured } from "@/lib/email/gmail-service";
 import { syncGmailSentMessages } from "@/lib/gmail/sync";
 import { listRecentImapMessagesBySender } from "@/lib/imap/service";
 import { logError } from "@/lib/observability";
-import { type EmailRecord, type EmailRefreshResult } from "@/lib/admin/email-history";
+import { getEmailRecordBodyFields, type EmailRecord, type EmailRefreshResult } from "@/lib/admin/email-history";
 
 type CustomerEmailTarget = {
   id: string;
@@ -83,7 +83,7 @@ function toEmailRecordFromOutbound(row: OutboundEmailRow): EmailRecord {
     fromEmail: getOutboundFromAddress(row.provider, row.source),
     toEmail: row.toEmail,
     subject: row.subject,
-    htmlBody: row.htmlBody,
+    ...getEmailRecordBodyFields(row.htmlBody),
     status: row.status,
     provider: row.provider,
     source: row.source,

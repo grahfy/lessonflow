@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { listSentMessages, getMessageDetails } from "./service";
 import type { gmail_v1 } from "googleapis";
 import { logError, logEvent } from "@/lib/observability";
+import { getEmailRecordBodyFields } from "@/lib/admin/email-history";
 
 const HEADER_EMAIL_PATTERN = /([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi;
 
@@ -15,6 +16,78 @@ function getStoredRecipientValue(toHeader: string, normalizedRecipients: string[
   }
 
   return toHeader.trim().toLowerCase() || "unknown";
+}
+
+function decodeGmailBodyData(data: string): string {
+  return Buffer.from(data.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf-8").trim();
+}
+
+function findBodyByMimeType(part: gmail_v1.Schema$MessagePart | undefined, mimeType: string): string {
+  if (!part) {
+    return "";
+  }
+
+  if (part.mimeType === mimeType && part.body?.data) {
+    return decodeGmailBodyData(part.body.data);
+  }
+
+  for (const childPart of part.parts || []) {
+    const childBody = findBodyByMimeType(childPart, mimeType);
+    if (childBody) {
+      return childBody;
+    }
+  }
+
+  return "";
+}
+
+function extractBestStoredBody(details: gmail_v1.Schema$Message): string {
+  const htmlBody = findBodyByMimeType(details.payload, "text/html");
+  if (htmlBody) {
+    return htmlBody;
+  }
+
+  const textBody = findBodyByMimeType(details.payload, "text/plain");
+  if (textBody) {
+    return textBody;
+  }
+
+  if (details.payload?.body?.data) {
+    const payloadBody = decodeGmailBodyData(details.payload.body.data);
+    if (payloadBody) {
+      return payloadBody;
+    }
+  }
+
+  return details.snippet?.trim() || "";
+}
+
+function getStoredBodyQuality(value?: string | null): number {
+  const bodyFields = getEmailRecordBodyFields(value);
+  if (bodyFields.htmlBody) {
+    return 3;
+  }
+
+  if (bodyFields.textBody) {
+    return 2;
+  }
+
+  return 0;
+}
+
+function shouldRepairStoredBody(existingBody: string | null, recoveredBody: string): boolean {
+  const normalizedRecoveredBody = recoveredBody.trim();
+  if (!normalizedRecoveredBody) {
+    return false;
+  }
+
+  const existingQuality = getStoredBodyQuality(existingBody);
+  const recoveredQuality = getStoredBodyQuality(normalizedRecoveredBody);
+  if (recoveredQuality > existingQuality) {
+    return true;
+  }
+
+  return recoveredQuality === existingQuality && normalizedRecoveredBody.length > (existingBody?.trim().length || 0);
 }
 
 /**
@@ -64,27 +137,16 @@ export async function syncGmailSentMessages(maxResults: number = 50, options?: {
         where: { externalId: msg.id },
       });
       
-      // 3. Try to get HTML body, fallback to text, then snippet
-      let body = details.snippet || "";
-      
-      // Gmail messages can be deeply nested. This is a simplified extractor.
-      const parts = details.payload?.parts || [];
-      const htmlPart = parts.find(p => p.mimeType === "text/html");
-      const textPart = parts.find(p => p.mimeType === "text/plain");
-      
-      if (htmlPart?.body?.data) {
-        body = Buffer.from(htmlPart.body.data, "base64").toString("utf-8");
-      } else if (textPart?.body?.data) {
-        body = Buffer.from(textPart.body.data, "base64").toString("utf-8");
-      }
+      const body = extractBestStoredBody(details);
 
       if (existing) {
         skippedCount++;
-        if (existing.toEmail !== storedRecipientValue) {
+        if (existing.toEmail !== storedRecipientValue || shouldRepairStoredBody(existing.htmlBody, body)) {
           await prisma.outboundEmail.update({
             where: { externalId: msg.id },
             data: {
-              toEmail: storedRecipientValue
+              toEmail: storedRecipientValue,
+              ...(shouldRepairStoredBody(existing.htmlBody, body) ? { htmlBody: body } : {})
             }
           });
         }
