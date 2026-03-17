@@ -6,6 +6,15 @@ import { getEmailRecordBodyFields } from "@/lib/admin/email-history";
 
 const HEADER_EMAIL_PATTERN = /([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi;
 
+type GmailSyncResult = {
+  importedCount: number;
+  skippedCount: number;
+};
+
+type SyncedSentMessageResult = GmailSyncResult & {
+  matchedTarget: boolean;
+};
+
 function extractEmailAddresses(headerValue: string): string[] {
   return Array.from(headerValue.matchAll(HEADER_EMAIL_PATTERN), (match) => match[1].trim().toLowerCase());
 }
@@ -90,6 +99,163 @@ function shouldRepairStoredBody(existingBody: string | null, recoveredBody: stri
   return recoveredQuality === existingQuality && normalizedRecoveredBody.length > (existingBody?.trim().length || 0);
 }
 
+function isMetadataReadRestriction(error: unknown): boolean {
+  const err = error as { code?: number; status?: number; message?: string };
+  return err.code === 403 || err.status === 403 || err.message?.includes("Metadata scope") === true;
+}
+
+function isMetadataQueryRestriction(error: unknown): boolean {
+  const err = error as { message?: string };
+  return err.message?.includes("Metadata scope") === true && err.message?.includes("'q' parameter") === true;
+}
+
+async function getMessageDetailsWithFallback(messageId: string): Promise<gmail_v1.Schema$Message> {
+  try {
+    return await getMessageDetails(messageId, "full");
+  } catch (error: unknown) {
+    if (!isMetadataReadRestriction(error)) {
+      throw error;
+    }
+
+    // NOTE: metadata format omits body content (parts/body.data not populated).
+    // extractBestStoredBody will fall back to details.snippet (~100 chars).
+    // If this 403 persists (e.g., OAuth scope never upgraded), this message
+    // will be stored with snippet-only content and cannot be auto-repaired.
+    return getMessageDetails(messageId, "metadata");
+  }
+}
+
+async function syncSentMessage(messageId: string, targetToEmail?: string): Promise<SyncedSentMessageResult> {
+  const details = await getMessageDetailsWithFallback(messageId);
+  const headers = details.payload?.headers || [];
+  const toHeader = headers.find((header) => header.name?.toLowerCase() === "to")?.value || "unknown";
+  const subjectHeader = headers.find((header) => header.name?.toLowerCase() === "subject")?.value || "(no subject)";
+  const normalizedRecipients = extractEmailAddresses(toHeader);
+  const storedRecipientValue = getStoredRecipientValue(toHeader, normalizedRecipients);
+
+  if (targetToEmail && !normalizedRecipients.includes(targetToEmail)) {
+    return {
+      matchedTarget: false,
+      importedCount: 0,
+      skippedCount: 0
+    };
+  }
+
+  const existing = await prisma.outboundEmail.findUnique({
+    where: { externalId: messageId },
+  });
+
+  const body = extractBestStoredBody(details);
+
+  if (existing) {
+    const repairBody = shouldRepairStoredBody(existing.htmlBody, body);
+    if (existing.toEmail !== storedRecipientValue || repairBody) {
+      await prisma.outboundEmail.update({
+        where: { externalId: messageId },
+        data: {
+          toEmail: storedRecipientValue,
+          ...(repairBody ? { htmlBody: body } : {})
+        }
+      });
+    }
+
+    return {
+      matchedTarget: true,
+      importedCount: 0,
+      skippedCount: 1
+    };
+  }
+
+  await prisma.outboundEmail.create({
+    data: {
+      toEmail: storedRecipientValue,
+      subject: subjectHeader,
+      htmlBody: body,
+      status: "sent",
+      provider: "gmail",
+      externalId: messageId,
+      source: "gmail", // Mark as originated from Gmail interface
+      createdAt: new Date(parseInt(details.internalDate || Date.now().toString(), 10)),
+    },
+  });
+
+  return {
+    matchedTarget: true,
+    importedCount: 1,
+    skippedCount: 0
+  };
+}
+
+async function syncSentMessagesBatch(
+  messages: gmail_v1.Schema$Message[],
+  options?: { targetToEmail?: string; maxMatchedMessages?: number }
+): Promise<GmailSyncResult & { matchedCount: number }> {
+  const targetToEmail = options?.targetToEmail;
+  const maxMatchedMessages = options?.maxMatchedMessages ?? Number.POSITIVE_INFINITY;
+  let importedCount = 0;
+  let skippedCount = 0;
+  let matchedCount = 0;
+
+  for (const message of messages) {
+    if (matchedCount >= maxMatchedMessages) {
+      break;
+    }
+
+    if (!message.id) {
+      continue;
+    }
+
+    const result = await syncSentMessage(message.id, targetToEmail);
+    if (!result.matchedTarget) {
+      continue;
+    }
+
+    matchedCount += 1;
+    importedCount += result.importedCount;
+    skippedCount += result.skippedCount;
+  }
+
+  return { importedCount, skippedCount, matchedCount };
+}
+
+async function syncTargetedSentMessages(maxResults: number, targetToEmail: string): Promise<GmailSyncResult> {
+  try {
+    const { messages } = await listSentMessages(maxResults, undefined, `to:${targetToEmail}`);
+    const result = await syncSentMessagesBatch(messages, { targetToEmail, maxMatchedMessages: maxResults });
+    return {
+      importedCount: result.importedCount,
+      skippedCount: result.skippedCount
+    };
+  } catch (error) {
+    if (!isMetadataQueryRestriction(error)) {
+      throw error;
+    }
+
+    logEvent("gmail.sync_target_query_fallback", { maxResults, targetToEmail });
+
+    const pageSize = Math.min(Math.max(maxResults, 20), 100);
+    let importedCount = 0;
+    let skippedCount = 0;
+    let matchedCount = 0;
+    let nextPageToken: string | undefined;
+
+    do {
+      const response = await listSentMessages(pageSize, nextPageToken);
+      const result = await syncSentMessagesBatch(response.messages, {
+        targetToEmail,
+        maxMatchedMessages: maxResults - matchedCount
+      });
+
+      importedCount += result.importedCount;
+      skippedCount += result.skippedCount;
+      matchedCount += result.matchedCount;
+      nextPageToken = response.nextPageToken || undefined;
+    } while (nextPageToken && matchedCount < maxResults);
+
+    return { importedCount, skippedCount };
+  }
+}
+
 /**
  * Syncs the latest sent messages from Gmail into the local OutboundEmail table.
  * Deduplicates based on the Gmail message ID (externalId).
@@ -98,83 +264,20 @@ export async function syncGmailSentMessages(maxResults: number = 50, options?: {
   try {
     const targetToEmail = options?.targetToEmail?.trim().toLowerCase() || undefined;
     logEvent("gmail.sync_started", { maxResults, targetToEmail });
-    const query = targetToEmail ? `to:${targetToEmail}` : undefined;
-    const { messages } = await listSentMessages(maxResults, undefined, query);
-    
-    let importedCount = 0;
-    let skippedCount = 0;
+    let result: GmailSyncResult;
 
-    for (const msg of messages) {
-      if (!msg.id) continue;
-
-      // 1. Fetch details. Try for full content, fallback to metadata if permissions are restricted.
-      let details: gmail_v1.Schema$Message | undefined;
-      try {
-        details = await getMessageDetails(msg.id, "full");
-      } catch (error: unknown) {
-        const err = error as { code?: number; status?: number; message?: string };
-        if (err.code === 403 || err.status === 403 || err.message?.includes("Metadata scope")) {
-          // NOTE: metadata format omits body content (parts/body.data not populated).
-          // extractBestStoredBody will fall back to details.snippet (~100 chars).
-          // If this 403 persists (e.g., OAuth scope never upgraded), this message
-          // will be stored with snippet-only content and cannot be auto-repaired.
-          details = await getMessageDetails(msg.id, "metadata");
-        } else {
-          throw error;
-        }
-      }
-      
-      // 3. Extract metadata from headers
-      const headers = details.payload?.headers || [];
-      const toHeader = headers.find(h => h.name?.toLowerCase() === "to")?.value || "unknown";
-      const subjectHeader = headers.find(h => h.name?.toLowerCase() === "subject")?.value || "(no subject)";
-      const normalizedRecipients = extractEmailAddresses(toHeader);
-      const storedRecipientValue = getStoredRecipientValue(toHeader, normalizedRecipients);
-
-      if (targetToEmail && !normalizedRecipients.includes(targetToEmail)) {
-        skippedCount++;
-        continue;
-      }
-
-      // 2. Check if we already have this message and heal recipient storage if needed.
-      const existing = await prisma.outboundEmail.findUnique({
-        where: { externalId: msg.id },
-      });
-      
-      const body = extractBestStoredBody(details);
-
-      if (existing) {
-        skippedCount++;
-        const repairBody = shouldRepairStoredBody(existing.htmlBody, body);
-        if (existing.toEmail !== storedRecipientValue || repairBody) {
-          await prisma.outboundEmail.update({
-            where: { externalId: msg.id },
-            data: {
-              toEmail: storedRecipientValue,
-              ...(repairBody ? { htmlBody: body } : {})
-            }
-          });
-        }
-        continue;
-      }
-
-      // 4. Create local record
-      await prisma.outboundEmail.create({
-        data: {
-          toEmail: storedRecipientValue,
-          subject: subjectHeader,
-          htmlBody: body,
-          status: "sent",
-          provider: "gmail",
-          externalId: msg.id,
-          source: "gmail", // Mark as originated from Gmail interface
-          createdAt: new Date(parseInt(details.internalDate || Date.now().toString())),
-        },
-      });
-
-      importedCount++;
+    if (targetToEmail) {
+      result = await syncTargetedSentMessages(maxResults, targetToEmail);
+    } else {
+      const { messages } = await listSentMessages(maxResults);
+      const batchResult = await syncSentMessagesBatch(messages);
+      result = {
+        importedCount: batchResult.importedCount,
+        skippedCount: batchResult.skippedCount
+      };
     }
 
+    const { importedCount, skippedCount } = result;
     logEvent("gmail.sync_completed", { importedCount, skippedCount });
     return { importedCount, skippedCount };
   } catch (error) {
