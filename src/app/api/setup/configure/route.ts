@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getSetupAccessDeniedMessage, isSetupAccessAllowed } from "@/lib/setup-access";
 import { isSetupComplete, saveEnvConfig } from "@/lib/setup";
 
 /**
@@ -7,6 +8,17 @@ import { isSetupComplete, saveEnvConfig } from "@/lib/setup";
  */
 export async function POST(request: Request) {
   try {
+    if (!isSetupAccessAllowed(request)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: getSetupAccessDeniedMessage(),
+          code: "SETUP_ACCESS_DENIED"
+        },
+        { status: 403 }
+      );
+    }
+
     if (await isSetupComplete()) {
       return NextResponse.json(
         {

@@ -14,6 +14,8 @@ type MutableEnv = Record<string, string | undefined>;
 const env = process.env as MutableEnv;
 const originalAdminEmail = env.ADMIN_EMAIL;
 const originalStorageDriver = env.LEARNING_MATERIALS_STORAGE_DRIVER;
+const originalNodeEnv = env.NODE_ENV;
+const originalSetupAccessToken = env.SETUP_ACCESS_TOKEN;
 
 /**
  * Clears mutable business data for isolated setup tests.
@@ -38,11 +40,14 @@ describe("setup-wizard", () => {
     await clearData();
     env.ADMIN_EMAIL = "owner@melbourneguitar.school";
     env.LEARNING_MATERIALS_STORAGE_DRIVER = "local";
+    env.SETUP_ACCESS_TOKEN = undefined;
   });
 
   afterEach(() => {
     env.ADMIN_EMAIL = originalAdminEmail;
     env.LEARNING_MATERIALS_STORAGE_DRIVER = originalStorageDriver;
+    env.NODE_ENV = originalNodeEnv;
+    env.SETUP_ACCESS_TOKEN = originalSetupAccessToken;
   });
 
   it("reports setup as incomplete before first admin is created", async () => {
@@ -126,6 +131,105 @@ describe("setup-wizard", () => {
     expect(response.status).toBe(400);
     const body = (await response.json()) as { error?: string };
     expect(body.error).toBe("Invalid configuration payload.");
+  });
+
+  it("blocks setup access from public addresses in production before initialization", async () => {
+    env.NODE_ENV = "production";
+
+    const statusResponse = await getSetupStatus(
+      new Request("https://lessonflow.example.com/api/setup/status", {
+        headers: {
+          "x-real-ip": "203.0.113.10"
+        }
+      })
+    );
+    expect(statusResponse.status).toBe(403);
+
+    const envResponse = await getSetupEnv(
+      new Request("https://lessonflow.example.com/api/setup/env", {
+        headers: {
+          "x-real-ip": "203.0.113.10"
+        }
+      })
+    );
+    expect(envResponse.status).toBe(403);
+
+    const configureResponse = await configureSetupEnv(
+      new Request("https://lessonflow.example.com/api/setup/configure", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-real-ip": "203.0.113.10"
+        },
+        body: JSON.stringify({})
+      })
+    );
+    expect(configureResponse.status).toBe(403);
+
+    const initializeResponse = await initializeSetup(
+      new Request("https://lessonflow.example.com/api/setup/initialize", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-real-ip": "203.0.113.10"
+        },
+        body: JSON.stringify({
+          displayName: "Owner",
+          email: "owner@melbourneguitar.school",
+          password: "StrongPass!234",
+          confirmPassword: "StrongPass!234"
+        })
+      })
+    );
+    expect(initializeResponse.status).toBe(403);
+  });
+
+  it("ignores spoofed private proxy headers when the production host is public", async () => {
+    env.NODE_ENV = "production";
+
+    const response = await getSetupStatus(
+      new Request("https://lessonflow.example.com/api/setup/status", {
+        headers: {
+          "x-real-ip": "127.0.0.1",
+          "x-forwarded-for": "10.0.0.5"
+        }
+      })
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("blocks localhost setup access in production when the bootstrap token is missing", async () => {
+    env.NODE_ENV = "production";
+
+    const response = await getSetupStatus(
+      new Request("http://127.0.0.1/api/setup/status")
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("allows production setup access when the bootstrap token is provided", async () => {
+    env.NODE_ENV = "production";
+    env.SETUP_ACCESS_TOKEN = "bootstrap-secret";
+
+    const statusResponse = await getSetupStatus(
+      new Request("https://lessonflow.example.com/api/setup/status", {
+        headers: {
+          "x-setup-access-token": "bootstrap-secret"
+        }
+      })
+    );
+    expect(statusResponse.status).toBe(200);
+
+    const envResponse = await getSetupEnv(
+      new Request("https://lessonflow.example.com/api/setup/env", {
+        headers: {
+          "x-setup-access-token": "bootstrap-secret"
+        }
+      })
+    );
+    expect(envResponse.status).toBe(200);
   });
 
   it("blocks admin login before setup is initialized", async () => {

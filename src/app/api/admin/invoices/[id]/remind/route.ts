@@ -6,7 +6,8 @@ import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
 import { sendCustomerInvoiceReminderEmail } from "@/lib/invoice-events";
 import { getInvoiceOverdueDays } from "@/lib/invoices/aging";
-import { getInvoiceReminderEligibility, sendInvoiceReminder } from "@/lib/invoices/reminders";
+import { buildInvoiceReminderPersistence, getInvoiceReminderEligibility } from "@/lib/invoices/reminders";
+import { logError } from "@/lib/observability";
 
 type Params = {
   params: Promise<{
@@ -73,32 +74,25 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     const manualStage = eligibility.stage;
+    const reminderState = manualStage
+      ? buildInvoiceReminderPersistence(overdueDays, manualStage)
+      : {
+          lastReminderSentAt: new Date(),
+          lastReminderStage: invoice.lastReminderStage,
+          details: `Manual overdue reminder sent (${overdueDays} days overdue)`
+        };
 
-    // Manual reminders should work for any overdue sent invoice. We still preserve the automated
-    // 7/14/30 stage helper when a stage applies so reminder metadata remains consistent with cron.
-    const reminder = manualStage
-      ? await sendInvoiceReminder(invoice, overdueDays, manualStage)
-      : (() => {
-          const sendPromise = sendCustomerInvoiceReminderEmail(invoice, overdueDays);
-          return sendPromise.then(() => ({
-            lastReminderSentAt: new Date(),
-            lastReminderStage: invoice.lastReminderStage,
-            details: `Manual overdue reminder sent (${overdueDays} days overdue)`
-          }));
-        })();
-
-    const resolvedReminder = await reminder;
     const updated = await prisma.invoice.update({
       where: { id },
       data: {
-        lastReminderSentAt: resolvedReminder.lastReminderSentAt,
-        lastReminderStage: resolvedReminder.lastReminderStage,
+        lastReminderSentAt: reminderState.lastReminderSentAt,
+        lastReminderStage: reminderState.lastReminderStage,
         updatedById: admin.id,
         auditLogs: {
           create: {
             action: "reminder_sent",
             actorId: admin.id,
-            details: resolvedReminder.details
+            details: reminderState.details
           }
         }
       },
@@ -111,7 +105,57 @@ export async function POST(request: NextRequest, { params }: Params) {
       }
     });
 
-    return NextResponse.json({ invoice: updated, overdueDays, stage: manualStage });
+    try {
+      const deliveryResult = await sendCustomerInvoiceReminderEmail(invoice, overdueDays);
+      if (deliveryResult.status === "failed") {
+        return NextResponse.json(
+          {
+            invoice: updated,
+            overdueDays,
+            stage: manualStage,
+            partial: true,
+            warning: "Reminder metadata was saved, but the customer email could not be delivered.",
+            deliveryStatus: deliveryResult.status
+          },
+          { status: 202 }
+        );
+      }
+
+      if (deliveryResult.status === "queued_no_smtp") {
+        return NextResponse.json(
+          {
+            invoice: updated,
+            overdueDays,
+            stage: manualStage,
+            partial: true,
+            warning: "Reminder metadata was saved, but no live email provider is configured for customer delivery.",
+            deliveryStatus: deliveryResult.status
+          },
+          { status: 202 }
+        );
+      }
+
+      return NextResponse.json({
+        invoice: updated,
+        overdueDays,
+        stage: manualStage,
+        message: "Reminder sent.",
+        deliveryStatus: deliveryResult.status
+      });
+    } catch (error) {
+      logError("invoice.reminder_notification_failed", error, { invoiceId: invoice.id, actorId: admin.id });
+      return NextResponse.json(
+        {
+          invoice: updated,
+          overdueDays,
+          stage: manualStage,
+          partial: true,
+          warning: "Reminder metadata was saved, but the customer email could not be delivered.",
+          deliveryStatus: "failed"
+        },
+        { status: 202 }
+      );
+    }
   } catch (error) {
     return jsonUnexpectedError(error, "Unable to send invoice reminder.");
   }

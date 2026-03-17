@@ -152,6 +152,14 @@ export async function sendGmailEmail(input: SendEmailInput): Promise<SendEmailRe
         externalId: response.data.id,
         source: "app"
       },
+    }).catch((persistError) => {
+      // Gmail already accepted the message, so we log audit persistence failures instead of
+      // surfacing a false-negative delivery result to callers.
+      logError("email.audit_persist_failed_after_gmail_send", persistError, {
+        to: input.to,
+        subject: input.subject,
+        messageId: response.data.id
+      });
     });
 
     logEvent("email.sent_gmail", { 

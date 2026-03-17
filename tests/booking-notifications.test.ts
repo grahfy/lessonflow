@@ -54,8 +54,8 @@ describe("booking-notifications", () => {
     });
 
     const response = await POST(request);
-    // 200 if email sent, 503 if queued/failed (still recorded in DB)
-    expect([200, 503]).toContain(response.status);
+    // Public booking requests persist first, so degraded owner notification is a partial-success 202.
+    expect([200, 202]).toContain(response.status);
 
     const outboundEmails = await prisma.outboundEmail.findMany();
     expect(outboundEmails.length).toBeGreaterThan(0);
@@ -190,7 +190,7 @@ describe("booking-notifications", () => {
     });
 
     const response = await notifyBooking(request, { params: Promise.resolve({ id: booking.id }) });
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(503);
 
     const outboundEmails = await prisma.outboundEmail.findMany({
       where: { toEmail: "remind@example.com" }
@@ -232,7 +232,7 @@ describe("booking-notifications", () => {
     });
 
     const response = await notifyBooking(request, { params: Promise.resolve({ id: booking.id }) });
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(503);
 
     const outboundEmails = await prisma.outboundEmail.findMany({
       where: { toEmail: "custom@example.com" }

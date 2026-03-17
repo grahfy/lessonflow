@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireAdminFromRequest } from "@/lib/admin-route";
+import { requireOwnerFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 
 function isValidPresetDiscount(body: Record<string, unknown>): boolean {
@@ -27,9 +27,9 @@ function isValidPresetDiscount(body: Record<string, unknown>): boolean {
  */
 export async function GET(request: NextRequest) {
   try {
-    const admin = await requireAdminFromRequest(request);
+    const admin = await requireOwnerFromRequest(request);
     if (!admin) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
     }
 
     const presets = await prisma.invoiceProductPreset.findMany({
@@ -48,9 +48,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const admin = await requireAdminFromRequest(request);
+    const admin = await requireOwnerFromRequest(request);
     if (!admin) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
     }
 
     const body = await request.json().catch(() => null);

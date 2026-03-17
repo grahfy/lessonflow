@@ -66,7 +66,10 @@ export const studentPortalBookingRequestResponseSchema = z.object({
     id: z.string(),
     status: z.literal("pending"),
     requestedStartAt: z.string().datetime({ offset: true })
-  })
+  }),
+  partial: z.boolean().optional(),
+  warning: z.string().optional(),
+  deliveryStatus: z.string().optional()
 });
 
 export const studentPortalCancelBookingResponseSchema = z.object({

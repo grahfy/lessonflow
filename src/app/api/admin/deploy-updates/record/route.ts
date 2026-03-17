@@ -23,45 +23,48 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields: commit and branch" }, { status: 400 });
     }
 
-    // Upsert the deployment record
-    const deployUpdate = await prisma.deployUpdate.upsert({
-      where: { commit },
-      update: {
-        branch,
-        release: release || "",
-        appliedAt: appliedAt ? new Date(appliedAt) : new Date(),
-        shortCommit,
-        previousCommit: previousCommit || null,
-      },
-      create: {
-        branch,
-        release: release || "",
-        appliedAt: appliedAt ? new Date(appliedAt) : new Date(),
-        commit,
-        shortCommit,
-        previousCommit: previousCommit || null,
-      },
-    });
-
-    // Replace commits for this deployment if it's an update, or create them for a new record.
-    // We delete and recreate to ensure the commit list matches what was sent.
-    await prisma.deployCommit.deleteMany({
-      where: { deployUpdateId: deployUpdate.id },
-    });
-
-    if (Array.isArray(commits) && commits.length > 0) {
-      await prisma.deployCommit.createMany({
-        data: commits.map((c: { hash: string; shortHash: string; authorName: string; authoredAt: string | Date; subject: string; body?: string | null }) => ({
-          deployUpdateId: deployUpdate.id,
-          hash: c.hash,
-          shortHash: c.shortHash,
-          authorName: c.authorName,
-          authoredAt: new Date(c.authoredAt),
-          subject: c.subject,
-          body: c.body || null,
-        })),
+    // Keep the deploy record and commit-list replacement atomic so malformed
+    // commit payloads cannot wipe an existing deployment history entry.
+    const deployUpdate = await prisma.$transaction(async (tx) => {
+      const savedDeployUpdate = await tx.deployUpdate.upsert({
+        where: { commit },
+        update: {
+          branch,
+          release: release || "",
+          appliedAt: appliedAt ? new Date(appliedAt) : new Date(),
+          shortCommit,
+          previousCommit: previousCommit || null,
+        },
+        create: {
+          branch,
+          release: release || "",
+          appliedAt: appliedAt ? new Date(appliedAt) : new Date(),
+          commit,
+          shortCommit,
+          previousCommit: previousCommit || null,
+        },
       });
-    }
+
+      await tx.deployCommit.deleteMany({
+        where: { deployUpdateId: savedDeployUpdate.id },
+      });
+
+      if (Array.isArray(commits) && commits.length > 0) {
+        await tx.deployCommit.createMany({
+          data: commits.map((c: { hash: string; shortHash: string; authorName: string; authoredAt: string | Date; subject: string; body?: string | null }) => ({
+            deployUpdateId: savedDeployUpdate.id,
+            hash: c.hash,
+            shortHash: c.shortHash,
+            authorName: c.authorName,
+            authoredAt: new Date(c.authoredAt),
+            subject: c.subject,
+            body: c.body || null,
+          })),
+        });
+      }
+
+      return savedDeployUpdate;
+    });
 
     return NextResponse.json({ success: true, id: deployUpdate.id });
   } catch (error) {

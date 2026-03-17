@@ -18,7 +18,8 @@ export async function GET(request: NextRequest) {
   try {
     const rows = await prisma.bookingRequest.findMany({
       where: {
-        status: "pending"
+        status: "pending",
+        ...(admin.role === "teacher" ? { assignedTeacherId: admin.id } : {})
       },
       orderBy: {
         requestedStartAt: "asc"

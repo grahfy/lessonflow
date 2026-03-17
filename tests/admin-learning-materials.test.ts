@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import { beforeEach, describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
+import bcrypt from "bcryptjs";
 
 import { GET, POST } from "@/app/api/admin/customers/[id]/learning-materials/route";
 import { DELETE } from "@/app/api/admin/learning-materials/[id]/route";
@@ -13,6 +14,7 @@ describe("admin-learning-materials", () => {
     await prisma.learningMaterial.deleteMany();
     await prisma.customerPortalCredentialAuditLog.deleteMany();
     await prisma.customerPortalCredential.deleteMany();
+    await prisma.adminUser.deleteMany();
     await prisma.booking.deleteMany();
     await prisma.bookingSeries.deleteMany();
     await prisma.bookingRequest.deleteMany();
@@ -42,7 +44,21 @@ describe("admin-learning-materials", () => {
     });
   }
 
-  async function createBooking(customerId: string, email: string, phone: string) {
+  async function createTeacher(email: string, displayName: string) {
+    return prisma.adminUser.create({
+      data: {
+        email,
+        role: "teacher",
+        firstName: displayName,
+        lastName: "Teacher",
+        displayName,
+        passwordHash: await bcrypt.hash("teacher-password", 12),
+        isActive: true
+      }
+    });
+  }
+
+  async function createBooking(customerId: string, email: string, phone: string, assignedTeacherId?: string | null) {
     return prisma.booking.create({
       data: {
         name: "Lesson Student",
@@ -61,7 +77,8 @@ describe("admin-learning-materials", () => {
         startAt: new Date("2026-07-01T09:00:00.000Z"),
         endAt: new Date("2026-07-01T10:00:00.000Z"),
         timezone: "Australia/Melbourne",
-        customerId
+        customerId,
+        assignedTeacherId: assignedTeacherId ?? null
       }
     });
   }
@@ -189,12 +206,87 @@ describe("admin-learning-materials", () => {
     });
     expect(uploadResponse.status).toBe(201);
 
-    const { material } = (await uploadResponse.json()) as { material: any };
+    const { material } = (await uploadResponse.json()) as {
+      material: {
+        id: string;
+        materialType: string;
+        mimeType: string;
+      };
+    };
     expect(material.materialType).toBe("image");
     expect(material.mimeType).toBe("image/jpeg");
 
     // Verify retrieval
     const dbMaterial = await prisma.learningMaterial.findUnique({ where: { id: material.id } });
     expect(dbMaterial?.materialType).toBe("image");
+  });
+
+  it("does not expose another teacher's booking-linked materials to the customer's primary teacher", async () => {
+    const teacherA = await createTeacher("materials-primary@example.com", "Materials Primary");
+    const teacherB = await createTeacher("materials-booking@example.com", "Materials Booking");
+    const token = createSessionToken(teacherA.email);
+    const cookie = `${getSessionCookieName()}=${token}`;
+
+    const customer = await prisma.customer.create({
+      data: {
+        ...customerSnapshotFromInput({
+          name: "Split Access Student",
+          email: "split.access@example.com",
+          phone: "0400123123",
+          lessonMode: "in_person",
+          skillLevel: "beginner",
+          unitNumber: undefined,
+          houseNumber: "12",
+          streetName: "Smith",
+          streetType: "Street",
+          suburb: "Northcote",
+          state: "VIC",
+          postcode: "3070"
+        }),
+        primaryTeacherId: teacherA.id
+      }
+    });
+    const booking = await createBooking(customer.id, customer.email, customer.phone, teacherB.id);
+    const material = await prisma.learningMaterial.create({
+      data: {
+        customerId: customer.id,
+        bookingId: booking.id,
+        uploadedById: teacherB.id,
+        title: "Other teacher notes",
+        description: "Only the assigned teacher should manage this.",
+        materialType: "pdf",
+        storageKey: "tests/other-teacher-notes.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 128
+      }
+    });
+
+    const listRequest = new NextRequest(
+      `http://localhost/api/admin/customers/${customer.id}/learning-materials`,
+      {
+        headers: {
+          cookie
+        }
+      }
+    );
+    const listResponse = await GET(listRequest, {
+      params: Promise.resolve({ id: customer.id })
+    });
+    expect(listResponse.status).toBe(200);
+    const listPayload = (await listResponse.json()) as {
+      materials: Array<{ id: string }>;
+    };
+    expect(listPayload.materials.map((entry) => entry.id)).not.toContain(material.id);
+
+    const deleteRequest = new NextRequest(`http://localhost/api/admin/learning-materials/${material.id}`, {
+      method: "DELETE",
+      headers: {
+        cookie
+      }
+    });
+    const deleteResponse = await DELETE(deleteRequest, {
+      params: Promise.resolve({ id: material.id })
+    });
+    expect(deleteResponse.status).toBe(403);
   });
 });

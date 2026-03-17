@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 import { POST as sendSingleReminder } from "@/app/api/admin/invoices/[id]/remind/route";
 import { POST as sendBulkReminders } from "@/app/api/admin/invoices/reminders/route";
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
+import * as invoiceEvents from "@/lib/invoice-events";
 
 function adminRequest(url: string, method: "POST", token: string, body?: Record<string, unknown>) {
   return new NextRequest(url, {
@@ -99,8 +100,8 @@ describe("admin-invoice-reminders", () => {
 
     const body = (await res.json()) as { sentCount: number; eligibleCount: number; failedCount: number };
     expect(body.eligibleCount).toBe(1);
-    expect(body.sentCount).toBe(1);
-    expect(body.failedCount).toBe(0);
+    expect(body.sentCount).toBe(0);
+    expect(body.failedCount).toBe(1);
 
     const reminded = await prisma.invoice.findUniqueOrThrow({ where: { invoiceNumber: "MGS-2026-9901" } });
     expect(reminded.lastReminderStage).toBe(7);
@@ -137,9 +138,69 @@ describe("admin-invoice-reminders", () => {
 
     const okReq = adminRequest(`http://localhost/api/admin/invoices/${eligible.id}/remind`, "POST", token);
     const okRes = await sendSingleReminder(okReq, { params: Promise.resolve({ id: eligible.id }) });
-    expect(okRes.status).toBe(200);
+    expect(okRes.status).toBe(202);
 
     const reloaded = await prisma.invoice.findUniqueOrThrow({ where: { id: eligible.id } });
     expect(reloaded.lastReminderStage).toBe(14);
+  });
+
+  it("returns partial success when reminder metadata persists but no live provider is configured", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const invoice = await seedSentInvoice({
+      adminId: admin.id,
+      invoiceNumber: "MGS-2026-9904A",
+      dueAt: new Date(Date.now() - 16 * 24 * 60 * 60 * 1000),
+      lastReminderStage: 7
+    });
+
+    const req = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}/remind`, "POST", token);
+    const res = await sendSingleReminder(req, { params: Promise.resolve({ id: invoice.id }) });
+
+    expect(res.status).toBe(202);
+    const body = (await res.json()) as {
+      partial?: boolean;
+      warning?: string;
+      deliveryStatus?: string;
+      invoice?: { lastReminderStage: number | null };
+    };
+    expect(body.partial).toBe(true);
+    expect(body.warning).toContain("no live email provider");
+    expect(body.deliveryStatus).toBe("queued_no_smtp");
+    expect(body.invoice?.lastReminderStage).toBe(14);
+  });
+
+  it("returns partial success when reminder metadata persists but delivery fails", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const invoice = await seedSentInvoice({
+      adminId: admin.id,
+      invoiceNumber: "MGS-2026-9905",
+      dueAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000)
+    });
+
+    vi.spyOn(invoiceEvents, "sendCustomerInvoiceReminderEmail").mockResolvedValueOnce({
+      status: "failed",
+      error: "smtp offline"
+    });
+
+    const req = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}/remind`, "POST", token);
+    const res = await sendSingleReminder(req, { params: Promise.resolve({ id: invoice.id }) });
+
+    expect(res.status).toBe(202);
+    const body = (await res.json()) as {
+      partial?: boolean;
+      warning?: string;
+      invoice?: { lastReminderStage: number | null };
+    };
+    expect(body.partial).toBe(true);
+    expect(body.warning).toContain("could not be delivered");
+    expect(body.invoice?.lastReminderStage).toBe(7);
+
+    const reloaded = await prisma.invoice.findUniqueOrThrow({ where: { id: invoice.id } });
+    expect(reloaded.lastReminderStage).toBe(7);
+    expect(reloaded.lastReminderSentAt).not.toBeNull();
   });
 });

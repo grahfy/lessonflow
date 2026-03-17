@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -77,5 +78,45 @@ describe("admin-customers-import", () => {
     expect(customer.streetType).toBe("");
     expect(customer.suburb).toBe("");
     expect(customer.state).toBe("VIC");
+  });
+
+  it("ensures portal access and assigns imported customers to the importing teacher", async () => {
+    await ensureOwnerAdmin();
+    const teacher = await prisma.adminUser.create({
+      data: {
+        email: "import-teacher@example.com",
+        role: "teacher",
+        firstName: "Import",
+        displayName: "Import Teacher",
+        passwordHash: await bcrypt.hash("teacher-password", 12),
+        isActive: true
+      }
+    });
+    const token = createSessionToken(teacher.email);
+
+    const response = await importCustomers(
+      authRequest(
+        {
+          customers: [{ first_name: "Taylor", last_name: "Import", email: "taylor.import@example.com" }]
+        },
+        token
+      )
+    );
+
+    expect(response.status).toBe(200);
+
+    const customer = await prisma.customer.findFirstOrThrow({
+      where: {
+        normalizedEmail: "taylor.import@example.com"
+      }
+    });
+    expect(customer.primaryTeacherId).toBe(teacher.id);
+
+    const credential = await prisma.customerPortalCredential.findUnique({
+      where: {
+        customerId: customer.id
+      }
+    });
+    expect(credential).not.toBeNull();
   });
 });

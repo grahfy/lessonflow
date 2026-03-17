@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import bcrypt from "bcryptjs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GET as getBuildInfoRoute } from "@/app/api/admin/build-info/route";
@@ -55,5 +56,46 @@ describe("admin-build-info-api", () => {
     expect(data.ok).toBe(true);
     expect(data.buildInfo.versionText).toBe("v1.2.0 · d338e15");
     expect(data.buildInfo.createdBy).toBe("Dean Thomson");
+  });
+
+  it("returns build metadata for authenticated teachers as well", async () => {
+    const teacher = await prisma.adminUser.create({
+      data: {
+        email: "teacher.build-info@example.com",
+        role: "teacher",
+        firstName: "Build",
+        lastName: "Teacher",
+        displayName: "Build Teacher",
+        passwordHash: await bcrypt.hash("teacher-password", 12),
+        isActive: true
+      }
+    });
+    const token = createSessionToken(teacher.email);
+
+    vi.spyOn(buildInfo, "getAdminBuildInfo").mockResolvedValue({
+      versionText: "v1.2.0 · d338e15",
+      releaseLabel: "v1.2.0",
+      shortCommit: "d338e15",
+      packageVersion: "1.2.0",
+      source: "git",
+      developedYear: "2026",
+      createdBy: "Dean Thomson",
+      repositoryUrl: "https://gitlab.com/grahfmusic/lessonflow.git",
+      wikiUrl: "https://gitlab.com/grahfmusic/lessonflow/-/wikis/home",
+      contactEmail: "contact@grahfmusic.com"
+    });
+
+    const request = new NextRequest("http://localhost/api/admin/build-info", {
+      headers: {
+        cookie: `${getSessionCookieName()}=${token}`
+      }
+    });
+
+    const response = await getBuildInfoRoute(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.ok).toBe(true);
+    expect(data.buildInfo.versionText).toBe("v1.2.0 · d338e15");
   });
 });

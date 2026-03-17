@@ -1,12 +1,23 @@
 import { NextResponse } from "next/server";
 
 import { createSessionToken, getSessionCookieName } from "@/lib/admin-auth";
+import { getSetupAccessDeniedMessage, isSetupAccessAllowed } from "@/lib/setup-access";
 import { createInitialAdmin, getSetupReadiness, setupInitializeSchema } from "@/lib/setup";
 
 /**
  * Creates the first admin account after requirement checks pass.
  */
 export async function POST(request: Request) {
+  if (!isSetupAccessAllowed(request)) {
+    return NextResponse.json(
+      {
+        error: getSetupAccessDeniedMessage(),
+        code: "SETUP_ACCESS_DENIED"
+      },
+      { status: 403 }
+    );
+  }
+
   const readiness = await getSetupReadiness();
   if (readiness.completed) {
     return NextResponse.json({ error: "Setup is already complete." }, { status: 409 });

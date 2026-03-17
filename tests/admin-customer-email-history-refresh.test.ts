@@ -179,6 +179,83 @@ describe("admin-customer-email-history-refresh", () => {
     expect(inboundRows[0]?.externalId).toBe("imap-history-1");
   });
 
+  it("updates existing IMAP rows without creating duplicates", async () => {
+    const owner = await ensureOwnerAdmin();
+    const token = createSessionToken(owner.email);
+
+    const customer = await prisma.customer.create({
+      data: {
+        fullName: "Existing Thread",
+        normalizedFullName: "existing thread",
+        email: "existing.thread@example.com",
+        phone: "0400000011",
+        normalizedEmail: "existing.thread@example.com",
+        normalizedPhone: "0400000011",
+        skillLevel: "beginner",
+        lessonMode: "in_person"
+      }
+    });
+
+    await prisma.customerInboundEmail.create({
+      data: {
+        customerId: customer.id,
+        provider: "imap",
+        source: "imap",
+        externalId: "imap-existing-1",
+        fromEmail: "existing.thread@example.com",
+        toEmail: "owner@example.com",
+        subject: "Old subject",
+        snippet: "Old snippet",
+        bodyText: "Old body",
+        status: "received",
+        receivedAt: new Date("2026-03-18T08:00:00.000Z")
+      }
+    });
+
+    mockSyncGmailSentMessages.mockResolvedValue({
+      importedCount: 0,
+      skippedCount: 0
+    });
+    mockListRecentImapMessagesBySender.mockResolvedValue([
+      {
+        messageId: "imap-existing-1",
+        senderEmail: "existing.thread@example.com",
+        toEmail: "owner@example.com",
+        subject: "Updated subject",
+        snippet: "Updated snippet",
+        bodyText: "Updated body",
+        receivedAt: "2026-03-18T13:30:00.000Z"
+      }
+    ]);
+
+    const response = await POST(
+      authRequest(`http://localhost/api/admin/customers/${customer.id}/email/refresh`, token),
+      { params: Promise.resolve({ id: customer.id }) }
+    );
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      ok: boolean;
+      imap?: { importedCount: number; skippedCount: number };
+    };
+    expect(body.ok).toBe(true);
+    expect(body.imap).toEqual({ importedCount: 0, skippedCount: 1 });
+
+    const inboundRows = await prisma.customerInboundEmail.findMany({
+      where: {
+        customerId: customer.id,
+        externalId: "imap-existing-1"
+      }
+    });
+    expect(inboundRows).toHaveLength(1);
+    expect(inboundRows[0]).toMatchObject({
+      subject: "Updated subject",
+      snippet: "Updated snippet",
+      bodyText: "Updated body"
+    });
+    expect(inboundRows[0]?.receivedAt.toISOString()).toBe("2026-03-18T13:30:00.000Z");
+  });
+
   it("persists the same inbound IMAP message for multiple customers who share an email account", async () => {
     const owner = await ensureOwnerAdmin();
     const token = createSessionToken(owner.email);

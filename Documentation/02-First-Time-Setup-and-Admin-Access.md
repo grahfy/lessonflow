@@ -21,6 +21,8 @@ This distinction prevents routine staff from operating a system that has not yet
 
 When setup is incomplete, the Setup Wizard becomes the authoritative path for initialisation. Its purpose is to confirm runtime readiness, persist environment-backed configuration, and create the first administrative account.
 
+In production, the setup flow is intentionally locked behind the server-side <code>SETUP_ACCESS_TOKEN</code> secret. The operator should open <code>/setup?setupToken=...</code> with that value during first boot so the wizard can talk to the protected setup APIs.
+
 ### Readiness Checks
 
 The readiness interface reports results as <code>pass</code>, <code>warn</code>, or <code>fail</code>. These checks are intended to confirm that the environment is viable before initialisation proceeds.

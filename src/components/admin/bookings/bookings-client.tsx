@@ -432,10 +432,10 @@ export function AdminBookingsClient() {
     const event = events.find(e => e.id === selectedKey);
     if (!selectedKey || !dialogForm || !event) return;
     setBusyAction("save");
-    const success = await updateBookingApi(selectedKey, event.entityType, "edit", dialogForm);
+    const result = await updateBookingApi(selectedKey, event.entityType, "edit", dialogForm);
     setBusyAction(null);
-    if (success) {
-      setNotice("Booking updated.");
+    if (result.ok) {
+      setNotice(result.notice || "Booking updated.");
       void loadBookings(view, dateStr);
     }
   }
@@ -444,10 +444,10 @@ export function AdminBookingsClient() {
     const event = events.find(e => e.id === selectedKey);
     if (!selectedKey || !event || !window.confirm("Are you sure you want to cancel this booking?")) return;
     setBusyAction("delete");
-    const success = await removeBookingApi(selectedKey, event.entityType);
+    const result = await removeBookingApi(selectedKey, event.entityType);
     setBusyAction(null);
-    if (success) {
-      setNotice("Booking cancelled.");
+    if (result.ok) {
+      setNotice(result.notice || "Booking cancelled.");
       void closeDialog();
       void loadBookings(view, dateStr);
     }
@@ -457,10 +457,10 @@ export function AdminBookingsClient() {
     const event = events.find(e => e.id === selectedKey);
     if (!selectedKey || !event || !moveNewStart) return;
     setBusyAction("move");
-    const success = await updateBookingApi(selectedKey, event.entityType, "move", { newStartAt: moveNewStart });
+    const result = await updateBookingApi(selectedKey, event.entityType, "move", { newStartAt: moveNewStart });
     setBusyAction(null);
-    if (success) {
-      setNotice("Booking moved.");
+    if (result.ok) {
+      setNotice(result.notice || "Booking moved.");
       setIsMoveOpen(false);
       void loadBookings(view, dateStr);
     }
@@ -556,11 +556,11 @@ export function AdminBookingsClient() {
       action === "approve" && dialogForm
         ? { assignedTeacherId: dialogForm.assignedTeacherId || null }
         : {};
-    const success = await updateBookingApi(selectedKey!, event.entityType, action, payload);
+    const result = await updateBookingApi(selectedKey!, event.entityType, action, payload);
     setBusyAction(null);
     
-    if (success) {
-      setNotice(`Booking ${action}ed.`);
+    if (result.ok) {
+      setNotice(result.notice || `Booking ${action}ed.`);
       if (action === "approve" || action === "reject") {
         void closeDialog();
       }

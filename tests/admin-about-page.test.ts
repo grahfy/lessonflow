@@ -2,11 +2,11 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const requireAdminMock = vi.fn();
+const requireOwnerMock = vi.fn();
 const getAdminBuildInfoMock = vi.fn();
 
 vi.mock("@/lib/admin/server-auth", () => ({
-  requireAdmin: requireAdminMock
+  requireOwner: requireOwnerMock
 }));
 
 vi.mock("@/lib/build-info", () => ({
@@ -26,7 +26,7 @@ vi.mock("@/components/admin/ui/admin-card", () => ({
 describe("admin-about-page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    requireAdminMock.mockResolvedValue(true);
+    requireOwnerMock.mockResolvedValue(true);
     getAdminBuildInfoMock.mockResolvedValue({
       versionText: "v1.2.0 · d338e15",
       releaseLabel: "v1.2.0",
@@ -47,7 +47,7 @@ describe("admin-about-page", () => {
     const element = await AdminAboutPage();
     const html = renderToStaticMarkup(element);
 
-    expect(requireAdminMock).toHaveBeenCalled();
+    expect(requireOwnerMock).toHaveBeenCalled();
     expect(getAdminBuildInfoMock).toHaveBeenCalled();
     expect(html).toContain("About LessonFlow");
     expect(html).toContain("v1.2.0 · d338e15");

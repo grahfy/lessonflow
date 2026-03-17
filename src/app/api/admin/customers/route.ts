@@ -86,8 +86,13 @@ export async function GET(request: NextRequest) {
         )
       : [];
 
-    const where = {
+    const where: Prisma.CustomerWhereInput = {
       isArchived: isArchived === "true",
+      ...(admin.role === "teacher"
+        ? {
+            primaryTeacherId: admin.id
+          }
+        : {}),
       ...(customerIdList.length > 0
         ? {
             id: {
@@ -206,34 +211,40 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // STEP 2: Record Creation
-    const created = await prisma.customer.create({
-      data: {
-        ...customerSnapshotFromInput({
-          firstName: parsed.data.firstName,
-          lastName: parsed.data.lastName,
-          name: parsed.data.fullName,
-          email: parsed.data.email,
-          phone: parsed.data.phone,
-          skillLevel: parsed.data.skillLevel,
-          lessonMode: parsed.data.lessonMode,
-          unitNumber: parsed.data.unitNumber ?? undefined,
-          houseNumber: parsed.data.houseNumber ?? "",
-          streetName: parsed.data.streetName ?? "",
-          streetType: parsed.data.streetType ?? "",
-          suburb: parsed.data.suburb ?? "",
-          state: parsed.data.state ?? "VIC",
-          postcode: parsed.data.postcode ?? ""
-        }),
-        ...(primaryTeacherId ? { primaryTeacherId } : {})
-      }
-    });
+    // Keep customer creation and portal enrollment atomic so a credential
+    // failure cannot leave behind a "ghost" customer that the UI treats as a
+    // failed create and later retries into a duplicate conflict.
+    const created = await prisma.$transaction(async (tx) => {
+      const customer = await tx.customer.create({
+        data: {
+          ...customerSnapshotFromInput({
+            firstName: parsed.data.firstName,
+            lastName: parsed.data.lastName,
+            name: parsed.data.fullName,
+            email: parsed.data.email,
+            phone: parsed.data.phone,
+            skillLevel: parsed.data.skillLevel,
+            lessonMode: parsed.data.lessonMode,
+            unitNumber: parsed.data.unitNumber ?? undefined,
+            houseNumber: parsed.data.houseNumber ?? "",
+            streetName: parsed.data.streetName ?? "",
+            streetType: parsed.data.streetType ?? "",
+            suburb: parsed.data.suburb ?? "",
+            state: parsed.data.state ?? "VIC",
+            postcode: parsed.data.postcode ?? ""
+          }),
+          ...(primaryTeacherId ? { primaryTeacherId } : {})
+        }
+      });
 
-    // STEP 3: Automated Enrollment
-    await ensurePortalCredentialForCustomer({
-      customerId: created.id,
-      actorId: admin.id,
-      details: "Portal credential generated during admin customer create."
+      await ensurePortalCredentialForCustomer({
+        customerId: customer.id,
+        actorId: admin.id,
+        tx,
+        details: "Portal credential generated during admin customer create."
+      });
+
+      return customer;
     });
 
     return NextResponse.json({ customer: created }, { status: 201 });

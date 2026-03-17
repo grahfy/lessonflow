@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
-import { requireAdminFromRequest } from "@/lib/admin-route";
+import { requireOwnerFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 
 type ContentEntryInput = {
@@ -28,9 +28,9 @@ function isContentEntry(value: unknown): value is ContentEntryInput {
 
 /** Returns either one content block or the full public-content collection. */
 export async function GET(request: NextRequest) {
-  const admin = await requireAdminFromRequest(request);
+  const admin = await requireOwnerFromRequest(request);
   if (!admin) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   }
 
   const { searchParams } = new URL(request.url);
@@ -61,9 +61,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const admin = await requireAdminFromRequest(request);
+    const admin = await requireOwnerFromRequest(request);
     if (!admin) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
     }
 
     const body = await request.json();

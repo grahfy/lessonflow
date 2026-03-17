@@ -76,7 +76,19 @@ export async function GET(request: NextRequest, { params }: Params) {
       prisma.learningMaterial.findMany({
         where: {
           customerId: customer.id,
-          ...(bookingId ? { bookingId } : {})
+          ...(bookingId ? { bookingId } : {}),
+          ...(admin.role === "teacher"
+            ? {
+                OR: [
+                  { bookingId: null },
+                  {
+                    booking: {
+                      assignedTeacherId: admin.id
+                    }
+                  }
+                ]
+              }
+            : {})
         },
         orderBy: {
           createdAt: "desc"

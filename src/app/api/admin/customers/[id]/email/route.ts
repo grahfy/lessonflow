@@ -114,10 +114,26 @@ export async function POST(request: NextRequest, { params }: Params) {
       html: template.html
     });
 
+    if (result.status === "failed") {
+      return NextResponse.json(
+        { error: result.error || "Unable to send email." },
+        { status: 502 }
+      );
+    }
+
+    if (result.status === "queued_no_smtp") {
+      return NextResponse.json(
+        {
+          error: "Email delivery is not configured on this host. Configure a live email provider before sending customer emails."
+        },
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json({ 
       ok: true, 
       status: result.status,
-      message: result.status === "sent" ? "Email sent successfully." : "Email queued for later delivery."
+      message: "Email sent successfully."
     });
   } catch (error) {
     return jsonUnexpectedError(error, "Unable to send email.");

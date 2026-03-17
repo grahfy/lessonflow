@@ -6,6 +6,7 @@ import { AdminHeader } from "@/components/admin-header";
 import { AdminBuildInfoFooter } from "@/components/admin/layout/admin-build-info-footer";
 import { AdminNoticeStack } from "@/components/admin/ui/admin-notice";
 import { UpdateNotificationBanner } from "@/components/admin/updates/update-notification-banner";
+import { AdminSessionProvider, useAdminSession } from "@/lib/admin/use-admin-session";
 
 interface AdminShellProps extends PropsWithChildren {
   title: string;
@@ -21,22 +22,28 @@ interface AdminShellProps extends PropsWithChildren {
  * Centralizes layout, header, and common UI elements like errors and notices.
  */
 export function AdminShell({ title, error, notice, loading, style, className, children }: AdminShellProps) {
+  const session = useAdminSession({
+    onAuthError: () => window.location.assign("/admin/login")
+  });
+
   return (
-    <div 
-      className={className ? `admin-shell ${className}` : "admin-shell"} 
-      data-motion-root="admin" 
-      data-motion-primary="true"
-      style={style}
-    >
-      <AdminHeader title={title} />
+    <AdminSessionProvider value={session}>
+      <div
+        className={className ? `admin-shell ${className}` : "admin-shell"}
+        data-motion-root="admin"
+        data-motion-primary="true"
+        style={style}
+      >
+        <AdminHeader title={title} admin={session.admin} adminLoading={session.loading} />
 
-      <div className="admin-shell-messages">
-        <UpdateNotificationBanner />
-        <AdminNoticeStack error={error} notice={notice} loading={loading} />
+        <div className="admin-shell-messages">
+          <UpdateNotificationBanner admin={session.admin} />
+          <AdminNoticeStack error={error} notice={notice} loading={loading} />
+        </div>
+
+        <div className="admin-shell-content">{children}</div>
+        <AdminBuildInfoFooter admin={session.admin} />
       </div>
-
-      <div className="admin-shell-content">{children}</div>
-      <AdminBuildInfoFooter />
-    </div>
+    </AdminSessionProvider>
   );
 }

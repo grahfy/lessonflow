@@ -5,6 +5,7 @@ import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
 import { sendCustomerInvoiceEmail } from "@/lib/invoice-events";
+import { logError } from "@/lib/observability";
 
 type Params = {
   params: Promise<{
@@ -41,8 +42,6 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
     }
 
-    await sendCustomerInvoiceEmail(invoice);
-
     const now = new Date();
     const updated = await prisma.invoice.update({
       where: { id },
@@ -57,10 +56,63 @@ export async function POST(request: NextRequest, { params }: Params) {
             details: "Invoice email dispatched"
           }
         }
+      },
+      include: {
+        lineItems: {
+          orderBy: {
+            sortOrder: "asc"
+          }
+        }
       }
     });
 
-    return NextResponse.json({ ok: true, invoice: updated });
+    try {
+      const deliveryResult = await sendCustomerInvoiceEmail(invoice);
+      if (deliveryResult.status === "failed") {
+        return NextResponse.json(
+          {
+            ok: true,
+            partial: true,
+            warning: "Invoice was marked as sent, but the customer email could not be delivered.",
+            deliveryStatus: deliveryResult.status,
+            invoice: updated
+          },
+          { status: 202 }
+        );
+      }
+
+      if (deliveryResult.status === "queued_no_smtp") {
+        return NextResponse.json(
+          {
+            ok: true,
+            partial: true,
+            warning: "Invoice was marked as sent, but no live email provider is configured for customer delivery.",
+            deliveryStatus: deliveryResult.status,
+            invoice: updated
+          },
+          { status: 202 }
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        message: "Invoice sent.",
+        deliveryStatus: deliveryResult.status,
+        invoice: updated
+      });
+    } catch (error) {
+      logError("invoice.send_notification_failed", error, { invoiceId: invoice.id, actorId: admin.id });
+      return NextResponse.json(
+        {
+          ok: true,
+          partial: true,
+          warning: "Invoice was marked as sent, but the customer email could not be delivered.",
+          deliveryStatus: "failed",
+          invoice: updated
+        },
+        { status: 202 }
+      );
+    }
   } catch (error) {
     return jsonUnexpectedError(error, "Unable to send invoice.");
   }

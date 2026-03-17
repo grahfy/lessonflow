@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 
 import { useNoticeTween } from "@/components/motion/use-notice-tween";
 import type { SetupCheck, SetupReadiness } from "@/lib/setup";
+import { SETUP_ACCESS_TOKEN_HEADER } from "@/lib/setup-access";
 
 type SetupWizardProps = {
   initialReadiness: SetupReadiness;
+  setupAccessToken?: string | null;
 };
 
 type SetupStatusResponse = {
@@ -64,7 +66,7 @@ function SetupCheckRow({ check }: { check: SetupCheck }) {
  * The browser handles UX state while the server remains the source of truth for readiness checks
  * (DB connectivity, filesystem access, env validation) and initialization.
  */
-export function SetupWizard({ initialReadiness }: SetupWizardProps) {
+export function SetupWizard({ initialReadiness, setupAccessToken = null }: SetupWizardProps) {
   const router = useRouter();
   const [readiness, setReadiness] = useState<SetupReadiness>(initialReadiness);
   const [isRefreshingChecks, setIsRefreshingChecks] = useState(false);
@@ -85,6 +87,17 @@ export function SetupWizard({ initialReadiness }: SetupWizardProps) {
     return `${readiness.passCount} passed, ${readiness.warnCount} warnings, ${readiness.failCount} failures`;
   }, [readiness.failCount, readiness.passCount, readiness.warnCount]);
 
+  const buildSetupHeaders = useCallback((contentType?: string): HeadersInit => {
+    const headers: Record<string, string> = {};
+    if (contentType) {
+      headers["content-type"] = contentType;
+    }
+    if (setupAccessToken) {
+      headers[SETUP_ACCESS_TOKEN_HEADER] = setupAccessToken;
+    }
+    return headers;
+  }, [setupAccessToken]);
+
   /** Refreshes server-derived readiness checks without resetting the whole page. */
   async function refreshChecks() {
     setIsRefreshingChecks(true);
@@ -93,7 +106,8 @@ export function SetupWizard({ initialReadiness }: SetupWizardProps) {
     try {
       // Status is server-derived because many checks cannot be safely/accurately evaluated client-side.
       const response = await fetch("/api/setup/status", {
-        method: "GET"
+        method: "GET",
+        headers: buildSetupHeaders()
       });
       const body = (await response.json()) as SetupStatusResponse;
 
@@ -119,7 +133,8 @@ export function SetupWizard({ initialReadiness }: SetupWizardProps) {
       // Load env metadata lazily when the config section is expanded to keep initial setup render
       // focused on readiness results.
       const response = await fetch("/api/setup/env", {
-        method: "GET"
+        method: "GET",
+        headers: buildSetupHeaders()
       });
       const body = (await response.json()) as EnvConfigResponse;
 
@@ -134,7 +149,7 @@ export function SetupWizard({ initialReadiness }: SetupWizardProps) {
     } finally {
       setIsLoadingEnvVars(false);
     }
-  }, []);
+  }, [buildSetupHeaders]);
 
   /**
    * Persists the editable environment variable values shown in the setup panel.
@@ -163,9 +178,7 @@ export function SetupWizard({ initialReadiness }: SetupWizardProps) {
     try {
       const response = await fetch("/api/setup/configure", {
         method: "POST",
-        headers: {
-          "content-type": "application/json"
-        },
+        headers: buildSetupHeaders("application/json"),
         body: JSON.stringify(payload)
       });
 
@@ -214,9 +227,7 @@ export function SetupWizard({ initialReadiness }: SetupWizardProps) {
       // Server initialization re-checks readiness and password policy before creating the first admin.
       const response = await fetch("/api/setup/initialize", {
         method: "POST",
-        headers: {
-          "content-type": "application/json"
-        },
+        headers: buildSetupHeaders("application/json"),
         body: JSON.stringify(payload)
       });
 

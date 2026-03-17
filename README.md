@@ -135,7 +135,8 @@ sudo ./deploy/setup-packages.sh
 sudo ./deploy/deploy.sh --branch main --ssl --domain yourdomain.com
 ```
 
-After deployment, finish setup in the browser at `https://yourdomain.com/setup`.
+After deployment, set `SETUP_ACCESS_TOKEN` on the server, then finish setup in the browser at
+`https://yourdomain.com/setup?setupToken=your-bootstrap-token`.
 
 Deploy model:
 - `deploy/update.sh` advances the persistent source checkout with `git fetch/pull`.

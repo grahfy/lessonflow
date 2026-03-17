@@ -48,6 +48,15 @@ export async function POST(request: NextRequest) {
       html: template.html
     });
 
+    if (sendResult.status === "queued_no_smtp") {
+      return NextResponse.json(
+        {
+          error: "Report email delivery is not configured on this host. Configure a live email provider before sending reports."
+        },
+        { status: 503 }
+      );
+    }
+
     if (sendResult.status === "failed") {
       return NextResponse.json({ error: sendResult.error || "Unable to send report email." }, { status: 502 });
     }

@@ -85,7 +85,7 @@ export async function sendCustomerBookingStatusEmail(input: {
     html: template.html
   });
 
-  if (result.status === "sent" || result.status === "queued_no_smtp") {
+  if (result.status === "sent") {
     await recordAudit(input.audit);
   }
 
@@ -111,7 +111,7 @@ export async function sendCustomerBookingMovedEmail(input: {
     html: template.html
   });
 
-  if (result.status === "sent" || result.status === "queued_no_smtp") {
+  if (result.status === "sent") {
     await recordAudit(input.audit);
   }
 
@@ -135,7 +135,7 @@ export async function sendCustomerReminderEmail(input: {
     html: template.html
   });
 
-  if (result.status === "sent" || result.status === "queued_no_smtp") {
+  if (result.status === "sent") {
     await recordAudit(input.audit);
   }
 
@@ -162,7 +162,7 @@ export async function sendCustomerCustomEmail(input: {
     html: template.html
   });
 
-  if (result.status === "sent" || result.status === "queued_no_smtp") {
+  if (result.status === "sent") {
     await recordAudit(input.audit);
   }
 

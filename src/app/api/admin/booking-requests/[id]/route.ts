@@ -22,6 +22,7 @@ import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
 import { getStudentPortalLoginUrl } from "@/lib/env";
+import { logError } from "@/lib/observability";
 import { ensurePortalCredentialForCustomer } from "@/lib/student-portal/credentials";
 
 type Params = {
@@ -331,28 +332,52 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       // RATIONALE: The credential helper returns a plaintext password only when a
       // credential is created/rotated during this approval. Existing customers
       // keep their current portal access and therefore receive no new password.
-      await sendCustomerBookingStatusEmail({
-        email: approvalResult.updated.email,
-        name: approvalResult.updated.name,
-        status: approvalResult.updated.status,
-        when: approvalResult.updated.requestedStartAt,
-        portalAccess: approvalResult.generatedPassword
-          ? {
-              loginUrl: getStudentPortalLoginUrl(),
-              generatedPassword: approvalResult.generatedPassword
-            }
-          : null,
-        audit: {
-          // Approvals create bookings; link audit to the first/primary booking created.
-          // For recurring approvals, several are created but one audit log entry covers the event.
-          // Traceability back to the request ID is preserved via details.
-          actorId: admin.id,
-          action: "approved",
-          details: `requestId=${id}`
-        }
-      });
+      try {
+        const deliveryResult = await sendCustomerBookingStatusEmail({
+          email: approvalResult.updated.email,
+          name: approvalResult.updated.name,
+          status: approvalResult.updated.status,
+          when: approvalResult.updated.requestedStartAt,
+          portalAccess: approvalResult.generatedPassword
+            ? {
+                loginUrl: getStudentPortalLoginUrl(),
+                generatedPassword: approvalResult.generatedPassword
+              }
+            : null,
+          audit: {
+            // Approvals create bookings; link audit to the first/primary booking created.
+            // For recurring approvals, several are created but one audit log entry covers the event.
+            // Traceability back to the request ID is preserved via details.
+            actorId: admin.id,
+            action: "approved",
+            details: `requestId=${id}`
+          }
+        });
 
-      return NextResponse.json({ ok: true });
+        if (deliveryResult.status !== "sent") {
+          return NextResponse.json(
+            {
+              ok: true,
+              partial: true,
+              warning: deliveryResult.error || "Booking approved, but the customer notification email could not be sent.",
+              deliveryStatus: deliveryResult.status
+            },
+            { status: 202 }
+          );
+        }
+      } catch (error) {
+        logError("booking_request.approval_notification_failed", error, { id, actorId: admin.id });
+        return NextResponse.json(
+          {
+            ok: true,
+            partial: true,
+            warning: "Booking approved, but the customer notification email could not be sent."
+          },
+          { status: 202 }
+        );
+      }
+
+      return NextResponse.json({ ok: true, message: "Booking approved." });
     }
 
     if (action === "reject") {
@@ -371,21 +396,45 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         }
       });
 
-      await sendCustomerBookingStatusEmail({
-        email: updated.email,
-        name: updated.name,
-        // NOTE: The shared booking-status email templates use the cancelled copy
-        // path for both admin rejection and student-side cancellation outcomes.
-        status: "cancelled",
-        when: updated.requestedStartAt,
-        audit: {
-          actorId: admin.id,
-          action: "rejected",
-          details: `requestId=${id}`
-        }
-      });
+      try {
+        const deliveryResult = await sendCustomerBookingStatusEmail({
+          email: updated.email,
+          name: updated.name,
+          // NOTE: The shared booking-status email templates use the cancelled copy
+          // path for both admin rejection and student-side cancellation outcomes.
+          status: "cancelled",
+          when: updated.requestedStartAt,
+          audit: {
+            actorId: admin.id,
+            action: "rejected",
+            details: `requestId=${id}`
+          }
+        });
 
-      return NextResponse.json({ ok: true });
+        if (deliveryResult.status !== "sent") {
+          return NextResponse.json(
+            {
+              ok: true,
+              partial: true,
+              warning: deliveryResult.error || "Booking rejected, but the customer notification email could not be sent.",
+              deliveryStatus: deliveryResult.status
+            },
+            { status: 202 }
+          );
+        }
+      } catch (error) {
+        logError("booking_request.rejection_notification_failed", error, { id, actorId: admin.id });
+        return NextResponse.json(
+          {
+            ok: true,
+            partial: true,
+            warning: "Booking rejected, but the customer notification email could not be sent."
+          },
+          { status: 202 }
+        );
+      }
+
+      return NextResponse.json({ ok: true, message: "Booking rejected." });
     }
 
     if (action === "cancel") {
@@ -404,21 +453,45 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         }
       });
 
-      await sendCustomerBookingStatusEmail({
-        email: updated.email,
-        name: updated.name,
-        // RATIONALE: Admin-driven cancellation uses the same outward-facing
-        // customer messaging as rejection because the lesson will not proceed.
-        status: "cancelled",
-        when: updated.requestedStartAt,
-        audit: {
-          actorId: admin.id,
-          action: "cancelled",
-          details: `requestId=${id}`
-        }
-      });
+      try {
+        const deliveryResult = await sendCustomerBookingStatusEmail({
+          email: updated.email,
+          name: updated.name,
+          // RATIONALE: Admin-driven cancellation uses the same outward-facing
+          // customer messaging as rejection because the lesson will not proceed.
+          status: "cancelled",
+          when: updated.requestedStartAt,
+          audit: {
+            actorId: admin.id,
+            action: "cancelled",
+            details: `requestId=${id}`
+          }
+        });
 
-      return NextResponse.json({ ok: true });
+        if (deliveryResult.status !== "sent") {
+          return NextResponse.json(
+            {
+              ok: true,
+              partial: true,
+              warning: deliveryResult.error || "Booking cancelled, but the customer notification email could not be sent.",
+              deliveryStatus: deliveryResult.status
+            },
+            { status: 202 }
+          );
+        }
+      } catch (error) {
+        logError("booking_request.cancellation_notification_failed", error, { id, actorId: admin.id });
+        return NextResponse.json(
+          {
+            ok: true,
+            partial: true,
+            warning: "Booking cancelled, but the customer notification email could not be sent."
+          },
+          { status: 202 }
+        );
+      }
+
+      return NextResponse.json({ ok: true, message: "Booking cancelled." });
     }
 
     if (action === "move") {

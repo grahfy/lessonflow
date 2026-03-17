@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { ownerPendingBookingTemplate } from "@/lib/email/templates";
 import { sendEmail } from "@/lib/email/service";
 import { getOwnerEmail } from "@/lib/env";
-import { logEvent } from "@/lib/observability";
+import { logError, logEvent } from "@/lib/observability";
 import {
   studentPortalBookingRequestInputSchema,
   studentPortalBookingRequestResponseSchema
@@ -100,25 +100,6 @@ export async function POST(request: NextRequest) {
     requestedStartAt: created.requestedStartAt.toISOString()
   });
 
-  const template = ownerPendingBookingTemplate({
-    name: created.name,
-    email: created.email,
-    phone: created.phone,
-    address: created.address,
-    lessonMode: created.lessonMode,
-    skillLevel: created.skillLevel,
-    lessonDuration: created.lessonDuration,
-    customDurationMinutes: created.customDurationMinutes,
-    requestedStartAt: created.requestedStartAt,
-    isRecurring: created.isRecurring,
-    recurrenceEndAt: created.recurrenceEndAt
-  });
-  await sendEmail({
-    to: getOwnerEmail(),
-    subject: template.subject,
-    html: template.html
-  });
-
   const responsePayload = studentPortalBookingRequestResponseSchema.parse({
     request: {
       id: created.id,
@@ -126,6 +107,53 @@ export async function POST(request: NextRequest) {
       requestedStartAt: created.requestedStartAt.toISOString()
     }
   });
+
+  try {
+    const template = ownerPendingBookingTemplate({
+      name: created.name,
+      email: created.email,
+      phone: created.phone,
+      address: created.address,
+      lessonMode: created.lessonMode,
+      skillLevel: created.skillLevel,
+      lessonDuration: created.lessonDuration,
+      customDurationMinutes: created.customDurationMinutes,
+      requestedStartAt: created.requestedStartAt,
+      isRecurring: created.isRecurring,
+      recurrenceEndAt: created.recurrenceEndAt
+    });
+    const sendResult = await sendEmail({
+      to: getOwnerEmail(),
+      subject: template.subject,
+      html: template.html
+    });
+
+    if (sendResult.status !== "sent") {
+      return NextResponse.json(
+        studentPortalBookingRequestResponseSchema.parse({
+          ...responsePayload,
+          partial: true,
+          warning: "Lesson request submitted, but we could not deliver the owner notification email right now.",
+          deliveryStatus: sendResult.status
+        }),
+        { status: 201 }
+      );
+    }
+  } catch (error) {
+    logError("student_portal.booking_request.owner_notification_failed", error, {
+      bookingRequestId: created.id,
+      customerId: student.id
+    });
+    return NextResponse.json(
+      studentPortalBookingRequestResponseSchema.parse({
+        ...responsePayload,
+        partial: true,
+        warning: "Lesson request submitted, but we could not deliver the owner notification email right now.",
+        deliveryStatus: "failed"
+      }),
+      { status: 201 }
+    );
+  }
 
   return NextResponse.json(responsePayload, { status: 201 });
 }

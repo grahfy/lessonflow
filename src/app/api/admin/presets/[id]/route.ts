@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireAdminFromRequest } from "@/lib/admin-route";
+import { requireOwnerFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 
 type Context = {
@@ -31,9 +31,9 @@ function isValidPresetDiscount(body: Record<string, unknown>): boolean {
  */
 export async function PATCH(request: NextRequest, { params }: Context) {
   try {
-    const admin = await requireAdminFromRequest(request);
+    const admin = await requireOwnerFromRequest(request);
     if (!admin) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
     }
 
     const { id } = await params;
@@ -66,9 +66,9 @@ export async function PATCH(request: NextRequest, { params }: Context) {
  */
 export async function DELETE(request: NextRequest, { params }: Context) {
   try {
-    const admin = await requireAdminFromRequest(request);
+    const admin = await requireOwnerFromRequest(request);
     if (!admin) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
     }
 
     const { id } = await params;

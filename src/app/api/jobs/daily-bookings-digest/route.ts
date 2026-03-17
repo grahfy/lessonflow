@@ -46,6 +46,9 @@ export async function POST(request: NextRequest) {
   const now = new Date();
   const rows = await prisma.booking.findMany({
     where: {
+      status: {
+        not: "cancelled"
+      },
       startAt: {
         gte: startOfDay(now),
         lte: endOfDay(now)
@@ -70,14 +73,29 @@ export async function POST(request: NextRequest) {
   });
 
   // STEP 3: Dispatch Email
-  await sendEmail({
+  const sendResult = await sendEmail({
     to: getOwnerEmail(),
     subject: template.subject,
     html: template.html
   });
 
+  if (sendResult.status === "queued_no_smtp") {
+    return NextResponse.json(
+      { error: "Unable to send daily bookings digest because no email provider is configured." },
+      { status: 503 }
+    );
+  }
+
+  if (sendResult.status === "failed") {
+    return NextResponse.json(
+      { error: sendResult.error || "Unable to send daily bookings digest." },
+      { status: 502 }
+    );
+  }
+
   return NextResponse.json({
     ok: true,
-    count: rows.length
+    count: rows.length,
+    deliveryStatus: sendResult.status
   });
 }

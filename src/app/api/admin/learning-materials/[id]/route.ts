@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { canManagePrimaryTeacherCustomer } from "@/lib/admin/permissions";
+import { canManageAssignedTeacher, canManagePrimaryTeacherCustomer } from "@/lib/admin/permissions";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
@@ -88,6 +88,11 @@ export async function GET(request: NextRequest, { params }: Params) {
           select: {
             primaryTeacherId: true
           }
+        },
+        booking: {
+          select: {
+            assignedTeacherId: true
+          }
         }
       }
     });
@@ -95,6 +100,9 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Learning material not found." }, { status: 404 });
     }
     if (!canManagePrimaryTeacherCustomer(admin, material.customer.primaryTeacherId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (material.bookingId && !canManageAssignedTeacher(admin, material.booking?.assignedTeacherId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -142,6 +150,11 @@ export async function DELETE(request: NextRequest, { params }: Params) {
           select: {
             primaryTeacherId: true
           }
+        },
+        booking: {
+          select: {
+            assignedTeacherId: true
+          }
         }
       }
     });
@@ -149,6 +162,9 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Learning material not found." }, { status: 404 });
     }
     if (!canManagePrimaryTeacherCustomer(admin, existing.customer.primaryTeacherId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (existing.bookingId && !canManageAssignedTeacher(admin, existing.booking?.assignedTeacherId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

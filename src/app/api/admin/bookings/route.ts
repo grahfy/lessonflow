@@ -8,6 +8,7 @@
 import { APP_TIMEZONE, toTimeKey } from "@/lib/time";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@/generated/prisma/client";
 
 import { bookingColor, bookingRequestColor, getRecencyCutoff } from "@/lib/admin-calendar-events";
 import { canManagePrimaryTeacherCustomer } from "@/lib/admin/permissions";
@@ -38,8 +39,10 @@ type ManualBookingInput = z.infer<typeof manualBookingSchema>;
 /**
  * Internal helper to create a new customer record from booking data.
  */
-async function createCustomerFromBooking(input: ManualBookingInput, primaryTeacherId?: string | null) {
-  return prisma.customer.create({
+type DbClient = Prisma.TransactionClient | typeof prisma;
+
+async function createCustomerFromBooking(db: DbClient, input: ManualBookingInput, primaryTeacherId?: string | null) {
+  return db.customer.create({
     data: {
       ...customerSnapshotFromInput({
         firstName: input.firstName,
@@ -66,8 +69,8 @@ async function createCustomerFromBooking(input: ManualBookingInput, primaryTeach
  * Internal helper to update an existing customer from booking data.
  * Used when an admin explicitly chooses to sync new details to the master profile.
  */
-async function updateCustomerFromBooking(id: string, input: ManualBookingInput) {
-  return prisma.customer.update({
+async function updateCustomerFromBooking(db: DbClient, id: string, input: ManualBookingInput) {
+  return db.customer.update({
     where: { id },
     data: customerSnapshotFromInput({
       firstName: input.firstName,
@@ -123,12 +126,14 @@ export async function GET(request: NextRequest) {
         OR: [
           {
             status: "approved",
-            startAt: { gte: range.start, lte: range.end }
+            startAt: { gte: range.start, lte: range.end },
+            ...(admin.role === "teacher" ? { assignedTeacherId: admin.id } : {})
           },
           {
             status: "cancelled",
             startAt: { gte: range.start, lte: range.end },
-            updatedAt: { gte: recencyCutoff } // RATIONALE: Keep recently deleted items visible for UX feedback
+            updatedAt: { gte: recencyCutoff }, // RATIONALE: Keep recently deleted items visible for UX feedback
+            ...(admin.role === "teacher" ? { assignedTeacherId: admin.id } : {})
           }
         ]
       },
@@ -147,6 +152,7 @@ export async function GET(request: NextRequest) {
     const requestRows = await prisma.bookingRequest.findMany({
       where: {
         requestedStartAt: { gte: range.start, lte: range.end },
+        ...(admin.role === "teacher" ? { assignedTeacherId: admin.id } : {}),
         OR: [
           { status: "pending" },
           { status: "rejected", updatedAt: { gte: recencyCutoff } },
@@ -248,7 +254,9 @@ export async function POST(request: NextRequest) {
     });
 
     // --- STEP 1: CUSTOMER RESOLUTION ---
-    let customerId: string | null = null;
+    let resolvedExistingCustomerId: string | null = null;
+    let shouldCreateCustomer = false;
+    let shouldUpdateResolvedCustomer = false;
     if (parsed.data.customerId) {
       // Direct binding to an existing customer record
       const selected = await prisma.customer.findUnique({
@@ -260,10 +268,8 @@ export async function POST(request: NextRequest) {
       if (admin.role === "teacher" && !canManagePrimaryTeacherCustomer(admin, selected.primaryTeacherId)) {
         return NextResponse.json({ error: "Teachers can only book students assigned to themselves." }, { status: 403 });
       }
-      customerId = selected.id;
-      if (parsed.data.updateCustomerFromBooking) {
-        await updateCustomerFromBooking(selected.id, parsed.data);
-      }
+      resolvedExistingCustomerId = selected.id;
+      shouldUpdateResolvedCustomer = Boolean(parsed.data.updateCustomerFromBooking);
     } else {
       // Probabilistic match based on contact details
       const existing = await prisma.customer.findFirst({
@@ -296,153 +302,167 @@ export async function POST(request: NextRequest) {
       // Resolution Application
       if (existing) {
         if (parsed.data.matchResolution === "create_new") {
-          const created = await createCustomerFromBooking(parsed.data, requestedAssignedTeacherId);
-          customerId = created.id;
+          shouldCreateCustomer = true;
         } else {
-          customerId = existing.id;
-          if (parsed.data.matchResolution === "update_existing" || parsed.data.updateCustomerFromBooking) {
-            await updateCustomerFromBooking(existing.id, parsed.data);
-          }
+          resolvedExistingCustomerId = existing.id;
+          shouldUpdateResolvedCustomer =
+            parsed.data.matchResolution === "update_existing" || Boolean(parsed.data.updateCustomerFromBooking);
         }
       } else {
-        const created = await createCustomerFromBooking(parsed.data, requestedAssignedTeacherId);
-        customerId = created.id;
+        shouldCreateCustomer = true;
       }
     }
-
-    if (!customerId) {
-      return NextResponse.json({ error: "Unable to resolve customer for manual booking." }, { status: 500 });
-    }
-
-    // --- STEP 2: ACCESS CONTROL ---
-    // RATIONALE: We ensure every customer booked into the system has portal
-    // access so they can receive automated materials and schedule updates.
-    await ensurePortalCredentialForCustomer({
-      customerId,
-      actorId: admin.id,
-      details: "Portal credential ensured during manual booking create."
-    });
-    await ensureCustomerPrimaryTeacher({
-      db: prisma,
-      customerId,
-      assignedTeacherId: requestedAssignedTeacherId
-    });
 
     const startAt = new Date(parsed.data.requestedStartAt);
 
-    // --- STEP 3: PERSISTENCE (Single or Recurring) ---
-    if (parsed.data.isRecurring && parsed.data.recurrenceEndAt) {
-      const endAt = new Date(parsed.data.recurrenceEndAt);
-      let starts: Date[] = [];
-      try {
-        starts = generateRecurringStartDates({ startAt, recurrenceEndAt: endAt });
-      } catch (error) {
-        return NextResponse.json(
-          { error: error instanceof Error ? error.message : "Invalid recurrence range." },
-          { status: 400 }
-        );
+    await prisma.$transaction(async (tx) => {
+      let customerId = resolvedExistingCustomerId;
+
+      if (customerId) {
+        const selected = await tx.customer.findUnique({
+          where: { id: customerId }
+        });
+        if (!selected || selected.isArchived) {
+          throw new Error("Selected customer does not exist.");
+        }
+        if (admin.role === "teacher" && !canManagePrimaryTeacherCustomer(admin, selected.primaryTeacherId)) {
+          throw new Error("Teachers can only book students assigned to themselves.");
+        }
+        if (shouldUpdateResolvedCustomer) {
+          await updateCustomerFromBooking(tx, selected.id, parsed.data);
+        }
+      } else if (shouldCreateCustomer) {
+        const created = await createCustomerFromBooking(tx, parsed.data, requestedAssignedTeacherId);
+        customerId = created.id;
       }
 
-      // 3a. Create the high-level Series record
-      const series = await prisma.bookingSeries.create({
-        data: {
-          firstName: parsed.data.firstName,
-          lastName: parsed.data.lastName,
-          name: parsed.data.name,
-          email: parsed.data.email,
-          phone: parsed.data.phone,
-          address: formatBookingAddress(parsed.data),
-          unitNumber: parsed.data.unitNumber,
-          houseNumber: parsed.data.houseNumber,
-          streetName: parsed.data.streetName,
-          streetType: parsed.data.streetType,
-          suburb: parsed.data.suburb,
-          state: parsed.data.state,
-          postcode: parsed.data.postcode,
-          lessonMode: parsed.data.lessonMode,
-          skillLevel: parsed.data.skillLevel,
-          lessonDuration: parsed.data.lessonDuration,
-          customDurationMinutes: parsed.data.customDurationMinutes ?? null,
-          dayOfWeek: startAt.getDay(),
-          startTimeLocal: toTimeKey(startAt),
-          startDate: startAt,
-          recurrenceEndAt: endAt,
-          timezone: APP_TIMEZONE,
-          assignedTeacherId: requestedAssignedTeacherId,
-          customerId
-        }
+      if (!customerId) {
+        throw new Error("Unable to resolve customer for manual booking.");
+      }
+
+      // RATIONALE: We ensure every customer booked into the system has portal
+      // access so they can receive automated materials and schedule updates.
+      await ensurePortalCredentialForCustomer({
+        customerId,
+        actorId: admin.id,
+        tx,
+        details: "Portal credential ensured during manual booking create."
+      });
+      await ensureCustomerPrimaryTeacher({
+        db: tx,
+        customerId,
+        assignedTeacherId: requestedAssignedTeacherId
       });
 
-      // 3b. Create individual booking instances in a transaction to ensure all or nothing
-      await prisma.$transaction(
-        starts.map((start) =>
-          prisma.booking.create({
-            data: {
-              firstName: parsed.data.firstName,
-              lastName: parsed.data.lastName,
-              name: parsed.data.name,
-              email: parsed.data.email,
-              phone: parsed.data.phone,
-              address: formatBookingAddress(parsed.data),
-              unitNumber: parsed.data.unitNumber,
-              houseNumber: parsed.data.houseNumber,
-              streetName: parsed.data.streetName,
-              streetType: parsed.data.streetType,
-              suburb: parsed.data.suburb,
-              state: parsed.data.state,
-              postcode: parsed.data.postcode,
-              lessonMode: parsed.data.lessonMode,
-              skillLevel: parsed.data.skillLevel,
-              lessonDuration: parsed.data.lessonDuration,
-              customDurationMinutes: parsed.data.customDurationMinutes ?? null,
-              startAt: start,
-              endAt: getBookingEnd(start, parsed.data.lessonDuration, parsed.data.customDurationMinutes),
-              timezone: APP_TIMEZONE,
-              notes: parsed.data.notes,
-              seriesId: series.id,
-              assignedTeacherId: requestedAssignedTeacherId,
-              customerId,
-              modifiedById: admin.id
-            }
-          })
-        )
-      );
-    } else {
-      // Single booking creation
-      await prisma.booking.create({
-        data: {
-          firstName: parsed.data.firstName,
-          lastName: parsed.data.lastName,
-          name: parsed.data.name,
-          email: parsed.data.email,
-          phone: parsed.data.phone,
-          address: formatBookingAddress(parsed.data),
-          unitNumber: parsed.data.unitNumber,
-          houseNumber: parsed.data.houseNumber,
-          streetName: parsed.data.streetName,
-          streetType: parsed.data.streetType,
-          suburb: parsed.data.suburb,
-          state: parsed.data.state,
-          postcode: parsed.data.postcode,
-          lessonMode: parsed.data.lessonMode,
-          skillLevel: parsed.data.skillLevel,
-          lessonDuration: parsed.data.lessonDuration,
-          customDurationMinutes: parsed.data.customDurationMinutes ?? null,
-          startAt,
-          endAt: getBookingEnd(startAt, parsed.data.lessonDuration, parsed.data.customDurationMinutes),
-          timezone: APP_TIMEZONE,
-          notes: parsed.data.notes,
-          assignedTeacherId: requestedAssignedTeacherId,
-          customerId,
-          modifiedById: admin.id
+      // --- STEP 3: PERSISTENCE (Single or Recurring) ---
+      if (parsed.data.isRecurring && parsed.data.recurrenceEndAt) {
+        const endAt = new Date(parsed.data.recurrenceEndAt);
+        let starts: Date[] = [];
+        try {
+          starts = generateRecurringStartDates({ startAt, recurrenceEndAt: endAt });
+        } catch (error) {
+          throw new Error(error instanceof Error ? error.message : "Invalid recurrence range.");
         }
-      });
-    }
+
+        const series = await tx.bookingSeries.create({
+          data: {
+            firstName: parsed.data.firstName,
+            lastName: parsed.data.lastName,
+            name: parsed.data.name,
+            email: parsed.data.email,
+            phone: parsed.data.phone,
+            address: formatBookingAddress(parsed.data),
+            unitNumber: parsed.data.unitNumber,
+            houseNumber: parsed.data.houseNumber,
+            streetName: parsed.data.streetName,
+            streetType: parsed.data.streetType,
+            suburb: parsed.data.suburb,
+            state: parsed.data.state,
+            postcode: parsed.data.postcode,
+            lessonMode: parsed.data.lessonMode,
+            skillLevel: parsed.data.skillLevel,
+            lessonDuration: parsed.data.lessonDuration,
+            customDurationMinutes: parsed.data.customDurationMinutes ?? null,
+            dayOfWeek: startAt.getDay(),
+            startTimeLocal: toTimeKey(startAt),
+            startDate: startAt,
+            recurrenceEndAt: endAt,
+            timezone: APP_TIMEZONE,
+            assignedTeacherId: requestedAssignedTeacherId,
+            customerId
+          }
+        });
+
+        await tx.booking.createMany({
+          data: starts.map((start) => ({
+            firstName: parsed.data.firstName,
+            lastName: parsed.data.lastName,
+            name: parsed.data.name,
+            email: parsed.data.email,
+            phone: parsed.data.phone,
+            address: formatBookingAddress(parsed.data),
+            unitNumber: parsed.data.unitNumber,
+            houseNumber: parsed.data.houseNumber,
+            streetName: parsed.data.streetName,
+            streetType: parsed.data.streetType,
+            suburb: parsed.data.suburb,
+            state: parsed.data.state,
+            postcode: parsed.data.postcode,
+            lessonMode: parsed.data.lessonMode,
+            skillLevel: parsed.data.skillLevel,
+            lessonDuration: parsed.data.lessonDuration,
+            customDurationMinutes: parsed.data.customDurationMinutes ?? null,
+            startAt: start,
+            endAt: getBookingEnd(start, parsed.data.lessonDuration, parsed.data.customDurationMinutes),
+            timezone: APP_TIMEZONE,
+            notes: parsed.data.notes,
+            seriesId: series.id,
+            assignedTeacherId: requestedAssignedTeacherId,
+            customerId,
+            modifiedById: admin.id
+          }))
+        });
+      } else {
+        // Single booking creation
+        await tx.booking.create({
+          data: {
+            firstName: parsed.data.firstName,
+            lastName: parsed.data.lastName,
+            name: parsed.data.name,
+            email: parsed.data.email,
+            phone: parsed.data.phone,
+            address: formatBookingAddress(parsed.data),
+            unitNumber: parsed.data.unitNumber,
+            houseNumber: parsed.data.houseNumber,
+            streetName: parsed.data.streetName,
+            streetType: parsed.data.streetType,
+            suburb: parsed.data.suburb,
+            state: parsed.data.state,
+            postcode: parsed.data.postcode,
+            lessonMode: parsed.data.lessonMode,
+            skillLevel: parsed.data.skillLevel,
+            lessonDuration: parsed.data.lessonDuration,
+            customDurationMinutes: parsed.data.customDurationMinutes ?? null,
+            startAt,
+            endAt: getBookingEnd(startAt, parsed.data.lessonDuration, parsed.data.customDurationMinutes),
+            timezone: APP_TIMEZONE,
+            notes: parsed.data.notes,
+            assignedTeacherId: requestedAssignedTeacherId,
+            customerId,
+            modifiedById: admin.id
+          }
+        });
+      }
+    });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to create booking." },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : "Unable to create booking.";
+    const status =
+      message === "Teachers can only book students assigned to themselves." || message === "Selected staff member does not exist."
+        ? 403
+        : message === "Selected customer does not exist." || message === "Invalid recurrence range."
+          ? 400
+          : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 
   return NextResponse.json({ ok: true });

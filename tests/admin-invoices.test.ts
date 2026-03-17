@@ -76,7 +76,7 @@ describe("admin-invoices", () => {
 
     const sendReq = adminRequest(`http://localhost/api/admin/invoices/${createdBody.invoice.id}/send`, "POST", token);
     const sendRes = await sendInvoice(sendReq, { params: Promise.resolve({ id: createdBody.invoice.id }) });
-    expect(sendRes.status).toBe(200);
+    expect(sendRes.status).toBe(202);
 
     const markPaidReq = adminRequest(`http://localhost/api/admin/invoices/${createdBody.invoice.id}`, "PATCH", token, {
       action: "mark_paid"
@@ -259,7 +259,7 @@ describe("admin-invoices", () => {
 
     const sendReq = adminRequest(`http://localhost/api/admin/invoices/${createBody.invoice.id}/send`, "POST", token);
     const sendRes = await sendInvoice(sendReq, { params: Promise.resolve({ id: createBody.invoice.id }) });
-    expect(sendRes.status).toBe(200);
+    expect(sendRes.status).toBe(202);
 
     const reorderSentReq = adminRequest(`http://localhost/api/admin/invoices/${createBody.invoice.id}`, "PATCH", token, {
       action: "edit",

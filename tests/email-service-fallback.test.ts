@@ -45,6 +45,7 @@ describe("email-service-fallback", () => {
     vi.stubEnv("SMTP_PASS", "smtp-pass");
     vi.stubEnv("SMTP_FROM", "Melbourne Guitar School <no-reply@example.com>");
     vi.stubEnv("ADMIN_EMAIL", "owner@example.com");
+    mockOutboundEmailCreate.mockResolvedValue(undefined);
     mockEmailSignatureSettingsFindUnique.mockResolvedValue(null);
   });
 
@@ -134,5 +135,23 @@ describe("email-service-fallback", () => {
     expect(result).toEqual({ status: "sent" });
     expect(mockSendMail.mock.calls[0]?.[0]?.html).toContain("custom@example.com");
     expect(mockSendMail.mock.calls[0]?.[0]?.html).not.toContain("Call or text:");
+  });
+
+  it("still returns sent when smtp delivery succeeds but audit persistence fails", async () => {
+    vi.stubEnv("EMAIL_PROVIDER", "smtp");
+    mockIsGmailConfigured.mockReturnValue(false);
+    mockSendMail.mockResolvedValue({ messageId: "smtp-message-id" });
+    mockOutboundEmailCreate.mockRejectedValueOnce(new Error("audit insert failed"));
+
+    const { sendEmail } = await import("@/lib/email/service");
+    const result = await sendEmail({
+      to: "student@example.com",
+      subject: "Lesson reminder",
+      html: "<p>Hello</p>"
+    });
+
+    expect(result).toEqual({ status: "sent" });
+    expect(mockSendMail).toHaveBeenCalledTimes(1);
+    expect(mockOutboundEmailCreate).toHaveBeenCalledTimes(1);
   });
 });

@@ -451,9 +451,14 @@ export function AdminInvoicesClient() {
     const result = await performActionApi(selectedInvoice.id, action);
     setBusyAction(null);
 
-    if (result) {
-      setSelectedInvoice(result);
-      if (action === "send" || action === "remind") {
+    if (result.invoice) {
+      setSelectedInvoice(result.invoice);
+      if (result.notice) {
+        setNotice(result.notice);
+        if ((action === "send" || action === "remind") && !result.partial) {
+          alert("Invoice has been sent to the customer.");
+        }
+      } else if (action === "send" || action === "remind") {
         setNotice("Invoice notification sent.");
         alert("Invoice has been sent to the customer.");
       } else {
@@ -548,11 +553,11 @@ export function AdminInvoicesClient() {
     if (result && shouldSend) {
       const sentResult = await performActionApi(result.id, "send");
       setBusyAction(null);
-      if (sentResult) {
+      if (sentResult.invoice) {
         resetCreateDialog();
         setCreateOpen(false);
-        setNotice("Invoice created and sent to customer.");
-        openDetail(sentResult);
+        setNotice(sentResult.notice || "Invoice created and sent to customer.");
+        openDetail(sentResult.invoice);
         void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
       } else {
         resetCreateDialog();

@@ -95,8 +95,8 @@ describe("jobs-invoice-reminders", () => {
     const body = (await res.json()) as { ok: boolean; sentCount: number; eligibleCount: number; failedCount: number };
     expect(body.ok).toBe(true);
     expect(body.eligibleCount).toBe(1);
-    expect(body.sentCount).toBe(1);
-    expect(body.failedCount).toBe(0);
+    expect(body.sentCount).toBe(0);
+    expect(body.failedCount).toBe(1);
 
     const updatedInvoice = await prisma.invoice.findUniqueOrThrow({ where: { invoiceNumber: "MGS-2026-9701" } });
     expect(updatedInvoice.lastReminderStage).toBe(7);

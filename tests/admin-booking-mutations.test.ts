@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
+import * as bookingEvents from "@/lib/booking-events";
 import { prisma } from "@/lib/db";
 import { PATCH as patchBooking } from "@/app/api/admin/bookings/[id]/route";
 import { PATCH as patchBookingRequest } from "@/app/api/admin/booking-requests/[id]/route";
@@ -84,6 +85,109 @@ describe("admin-booking-mutations", () => {
     expect(updated.endAt.toISOString()).toBe("2026-06-01T11:30:00.000Z");
   });
 
+  it("returns partial success when a booking move persists but notification delivery fails", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const booking = await prisma.booking.create({
+      data: {
+        name: "Delivery Failure",
+        email: "delivery.failure@example.com",
+        phone: "0400-000-010",
+        address: "66 Street",
+        houseNumber: "66",
+        streetName: "Street",
+        streetType: "Rd",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070",
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min60",
+        startAt: new Date("2026-06-01T09:00:00.000Z"),
+        endAt: new Date("2026-06-01T10:00:00.000Z"),
+        timezone: "Australia/Melbourne",
+        modifiedById: admin.id
+      }
+    });
+
+    vi.spyOn(bookingEvents, "sendCustomerBookingMovedEmail").mockResolvedValueOnce({
+      status: "failed",
+      error: "smtp offline"
+    });
+
+    const moveReq = adminRequest("http://localhost/api/admin/bookings/id_1", {
+      action: "move",
+      newStartAt: "2026-06-01T11:00:00.000Z"
+    }, token);
+    const moveRes = await patchBooking(moveReq, { params: Promise.resolve({ id: booking.id }) });
+    expect(moveRes.status).toBe(200);
+
+    const payload = (await moveRes.json()) as {
+      ok?: boolean;
+      partial?: boolean;
+      warning?: string;
+      deliveryStatus?: string;
+    };
+    expect(payload.ok).toBe(true);
+    expect(payload.partial).toBe(true);
+    expect(payload.warning).toContain("smtp offline");
+    expect(payload.deliveryStatus).toBe("failed");
+
+    const updated = await prisma.booking.findUniqueOrThrow({
+      where: { id: booking.id }
+    });
+    expect(updated.startAt.toISOString()).toBe("2026-06-01T11:00:00.000Z");
+    expect(updated.endAt.toISOString()).toBe("2026-06-01T12:00:00.000Z");
+  });
+
+  it("returns partial success when a booking move persists but no live mail provider is configured", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const booking = await prisma.booking.create({
+      data: {
+        name: "Queued Move",
+        email: "queued.move@example.com",
+        phone: "0400-000-011",
+        address: "66 Street",
+        houseNumber: "66",
+        streetName: "Street",
+        streetType: "Rd",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070",
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min60",
+        startAt: new Date("2026-06-01T09:00:00.000Z"),
+        endAt: new Date("2026-06-01T10:00:00.000Z"),
+        timezone: "Australia/Melbourne",
+        modifiedById: admin.id
+      }
+    });
+
+    vi.spyOn(bookingEvents, "sendCustomerBookingMovedEmail").mockResolvedValueOnce({
+      status: "queued_no_smtp"
+    });
+
+    const moveReq = adminRequest("http://localhost/api/admin/bookings/id_1", {
+      action: "move",
+      newStartAt: "2026-06-01T11:00:00.000Z"
+    }, token);
+    const moveRes = await patchBooking(moveReq, { params: Promise.resolve({ id: booking.id }) });
+    expect(moveRes.status).toBe(200);
+
+    const payload = (await moveRes.json()) as {
+      ok?: boolean;
+      partial?: boolean;
+      deliveryStatus?: string;
+    };
+    expect(payload.ok).toBe(true);
+    expect(payload.partial).toBe(true);
+    expect(payload.deliveryStatus).toBe("queued_no_smtp");
+  });
+
   it("edits and cancels pending requests via cancel action", async () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);
@@ -120,13 +224,73 @@ describe("admin-booking-mutations", () => {
       action: "cancel"
     }, token);
     const cancelRes = await patchBookingRequest(cancelReq, { params: Promise.resolve({ id: requestRow.id }) });
-    expect(cancelRes.status).toBe(200);
+    expect(cancelRes.status).toBe(202);
+    const payload = (await cancelRes.json()) as {
+      ok?: boolean;
+      partial?: boolean;
+      deliveryStatus?: string;
+    };
+    expect(payload.ok).toBe(true);
+    expect(payload.partial).toBe(true);
+    expect(payload.deliveryStatus).toBe("queued_no_smtp");
 
     const updated = await prisma.bookingRequest.findUniqueOrThrow({
       where: { id: requestRow.id }
     });
     expect(updated.phone).toBe("0411-111-111");
     expect(updated.requestedStartAt.toISOString()).toBe("2026-06-04T12:00:00.000Z");
+    expect(updated.status).toBe("cancelled");
+  });
+
+  it("returns partial success when request cancellation persists but notification delivery fails", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const requestRow = await prisma.bookingRequest.create({
+      data: {
+        name: "Cancel Failure",
+        email: "cancel.failure@example.com",
+        phone: "0400-000-021",
+        address: "11 Street",
+        houseNumber: "11",
+        streetName: "Street",
+        streetType: "Ave",
+        suburb: "Brunswick",
+        state: "VIC",
+        postcode: "3056",
+        lessonMode: "video",
+        skillLevel: "intermediate",
+        lessonDuration: "min60",
+        requestedStartAt: new Date("2026-06-04T09:00:00.000Z"),
+        status: "pending"
+      }
+    });
+
+    vi.spyOn(bookingEvents, "sendCustomerBookingStatusEmail").mockResolvedValueOnce({
+      status: "failed",
+      error: "smtp offline"
+    });
+
+    const cancelReq = adminRequest("http://localhost/api/admin/booking-requests/id_1", {
+      action: "cancel"
+    }, token);
+    const cancelRes = await patchBookingRequest(cancelReq, { params: Promise.resolve({ id: requestRow.id }) });
+    expect(cancelRes.status).toBe(202);
+
+    const payload = (await cancelRes.json()) as {
+      ok?: boolean;
+      partial?: boolean;
+      warning?: string;
+      deliveryStatus?: string;
+    };
+    expect(payload.ok).toBe(true);
+    expect(payload.partial).toBe(true);
+    expect(payload.warning).toContain("smtp offline");
+    expect(payload.deliveryStatus).toBe("failed");
+
+    const updated = await prisma.bookingRequest.findUniqueOrThrow({
+      where: { id: requestRow.id }
+    });
     expect(updated.status).toBe("cancelled");
   });
 

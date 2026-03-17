@@ -1,8 +1,10 @@
 "use client";
 
+import React from "react";
 import { useEffect, useState } from "react";
 import { AdminNotice } from "@/components/admin/ui/admin-notice";
 import { PendingChangesModal } from "./pending-changes-modal";
+import type { AdminSessionSummary } from "@/lib/admin/use-admin-session";
 import { useSafeFetch } from "@/lib/admin/use-safe-fetch";
 import type { CommitMetadata } from "@/lib/services/updates-service";
 
@@ -14,13 +16,17 @@ interface UpdateStatusResponse {
   webTriggerMessage?: string | null;
 }
 
-export function UpdateNotificationBanner() {
+export function UpdateNotificationBanner({ admin }: { admin: AdminSessionSummary | null }) {
   const [status, setStatus] = useState<UpdateStatusResponse | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState("");
   const { safeFetch, handleApiError } = useSafeFetch({ onError: setError });
 
   useEffect(() => {
+    if (admin?.role !== "owner") {
+      return;
+    }
+
     async function checkUpdates() {
       try {
         const response = await safeFetch("/api/admin/updates/status");
@@ -37,7 +43,11 @@ export function UpdateNotificationBanner() {
     }
 
     void checkUpdates();
-  }, [safeFetch, handleApiError]);
+  }, [admin?.role, safeFetch, handleApiError]);
+
+  if (admin?.role !== "owner") {
+    return null;
+  }
 
   if (error) {
     return <AdminNotice tone="error">{error}</AdminNotice>;

@@ -28,12 +28,22 @@ export interface BookingEvent {
 
 type BookingUpdatePayload = Record<string, unknown>;
 
+export interface BookingMutationResult {
+  ok: boolean;
+  notice?: string;
+}
+
 export interface UseBookingsResult {
   events: BookingEvent[];
   loading: boolean;
   load: (view: string, date: string) => Promise<void>;
-  update: (id: string, entityType: "booking" | "booking_request", action: string, payload: BookingUpdatePayload) => Promise<boolean>;
-  remove: (id: string, entityType: "booking" | "booking_request") => Promise<boolean>;
+  update: (
+    id: string,
+    entityType: "booking" | "booking_request",
+    action: string,
+    payload: BookingUpdatePayload
+  ) => Promise<BookingMutationResult>;
+  remove: (id: string, entityType: "booking" | "booking_request") => Promise<BookingMutationResult>;
 }
 
 /**
@@ -72,7 +82,12 @@ export function useBookings(options: { onAuthError?: () => void; onError?: (msg:
      * Updates either a booking or a booking request using the correct admin route
      * and payload shape for that entity type.
      */
-    const update = useCallback(async (id: string, entityType: "booking" | "booking_request", action: string, payload: BookingUpdatePayload): Promise<boolean> => {
+    const update = useCallback(async (
+        id: string,
+        entityType: "booking" | "booking_request",
+        action: string,
+        payload: BookingUpdatePayload
+    ): Promise<BookingMutationResult> => {
         const base = entityType === "booking" ? "bookings" : "booking-requests";
         const endpoint = `/api/admin/${base}/${id}`;
         
@@ -88,14 +103,14 @@ export function useBookings(options: { onAuthError?: () => void; onError?: (msg:
                 const requestedStartAt = dateTimeLocalToIso(payloadNewStartAt);
                 if (!requestedStartAt) {
                     if (onError) onError("Please enter a valid booking start date and time.");
-                    return false;
+                    return { ok: false };
                 }
                 body.requestedStartAt = requestedStartAt;
             } else if (action === "edit" && payloadStartAtLocal) {
                 const requestedStartAt = dateTimeLocalToIso(payloadStartAtLocal);
                 if (!requestedStartAt) {
                     if (onError) onError("Please enter a valid booking start date and time.");
-                    return false;
+                    return { ok: false };
                 }
                 body.requestedStartAt = requestedStartAt;
             }
@@ -104,7 +119,7 @@ export function useBookings(options: { onAuthError?: () => void; onError?: (msg:
                 const newStartAt = dateTimeLocalToIso(payloadNewStartAt);
                 if (!newStartAt) {
                     if (onError) onError("Please enter a valid booking start date and time.");
-                    return false;
+                    return { ok: false };
                 }
                 body.newStartAt = newStartAt;
             }
@@ -119,27 +134,42 @@ export function useBookings(options: { onAuthError?: () => void; onError?: (msg:
 
             if (!response.ok) {
                 await handleApiError(response, "Action failed.");
-                return false;
+                return { ok: false };
             }
 
-            return true;
+            const data = await response.json().catch(() => null);
+            const notice =
+                data && typeof data === "object"
+                    ? typeof (data as { warning?: unknown }).warning === "string"
+                        ? (data as { warning: string }).warning
+                        : typeof (data as { message?: unknown }).message === "string"
+                            ? (data as { message: string }).message
+                            : undefined
+                    : undefined;
+
+            return { ok: true, notice };
         } catch {
-            return false;
+            return { ok: false };
         }
     }, [safeFetch, handleApiError, onError]);
 
     /** Deletes either entity type through its matching admin route. */
-    const remove = useCallback(async (id: string, entityType: "booking" | "booking_request"): Promise<boolean> => {
+    const remove = useCallback(async (id: string, entityType: "booking" | "booking_request"): Promise<BookingMutationResult> => {
         const base = entityType === "booking" ? "bookings" : "booking-requests";
         try {
             const response = await safeFetch(`/api/admin/${base}/${id}`, { method: "DELETE" });
             if (!response.ok) {
                 await handleApiError(response, "Unable to delete.");
-                return false;
+                return { ok: false };
             }
-            return true;
+            const data = await response.json().catch(() => null);
+            const notice =
+                data && typeof data === "object" && typeof (data as { message?: unknown }).message === "string"
+                    ? (data as { message: string }).message
+                    : undefined;
+            return { ok: true, notice };
         } catch {
-            return false;
+            return { ok: false };
         }
     }, [safeFetch, handleApiError]);
 

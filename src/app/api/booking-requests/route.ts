@@ -6,8 +6,8 @@
  * DESIGN PHILOSOPHY:
  * 1. Accessibility: GET is disabled to prevent data leakage of private requests.
  * 2. Geo-Fencing: Server-side validation ensures only AU residents can submit.
- * 3. Atomic Grace: The request is persisted to DB before owner notification 
- *    (fallback to 503 if email fails but record is saved).
+ * 3. Atomic Grace: The request is persisted to DB before owner notification
+ *    and returns partial success if email delivery is degraded.
  */
 
 import { NextResponse } from "next/server";
@@ -211,12 +211,13 @@ export async function POST(request: Request) {
     if (emailResult.status !== "sent") {
       return NextResponse.json(
         {
-          ok: false,
+          ok: true,
           id: created.id,
-          error: "Your booking request was saved, but we could not deliver the owner notification email right now.",
+          partial: true,
+          warning: "Your booking request was saved, but we could not deliver the owner notification email right now.",
           deliveryStatus: emailResult.status
         },
-        { status: 503 }
+        { status: 202 }
       );
     }
 
@@ -229,11 +230,13 @@ export async function POST(request: Request) {
     if (createdId) {
       return NextResponse.json(
         {
-          ok: false,
+          ok: true,
           id: createdId,
-          error: "Your booking request was saved, but we could not finish the owner notification right now."
+          partial: true,
+          warning: "Your booking request was saved, but we could not finish the owner notification right now.",
+          deliveryStatus: "failed"
         },
-        { status: 503 }
+        { status: 202 }
       );
     }
 

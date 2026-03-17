@@ -20,7 +20,9 @@
  */
 
 import { prisma } from "@/lib/db";
-import { getInvoiceReminderEligibility, sendInvoiceReminder } from "@/lib/invoices/reminders";
+import { logError } from "@/lib/observability";
+import { sendCustomerInvoiceReminderEmail } from "@/lib/invoice-events";
+import { buildInvoiceReminderPersistence, getInvoiceReminderEligibility } from "@/lib/invoices/reminders";
 
 type RunInvoiceReminderBatchInput = {
   /** The Admin (or SYSTEM_USER) ID triggering the batch. */
@@ -112,10 +114,10 @@ export async function runInvoiceReminderBatch(input: RunInvoiceReminderBatchInpu
     if (!eligibility.stage) continue;
 
     try {
-      // Dispatch email via SMTP/Gmail
-      const reminder = await sendInvoiceReminder(invoice, eligibility.overdueDays, eligibility.stage);
-      
-      // Update metadata to prevent duplicate sends until the next escalation stage
+      const reminder = buildInvoiceReminderPersistence(eligibility.overdueDays, eligibility.stage);
+
+      // Persist reminder state before the customer-side side effect so retries do not
+      // fan out duplicate overdue notices if the process dies after delivery.
       await prisma.invoice.update({
         where: { id: invoice.id },
         data: {
@@ -131,7 +133,26 @@ export async function runInvoiceReminderBatch(input: RunInvoiceReminderBatchInpu
           }
         }
       });
-      
+
+      const deliveryResult = await sendCustomerInvoiceReminderEmail(invoice, eligibility.overdueDays);
+      if (deliveryResult.status === "failed") {
+        failed.push({
+          id: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          error: deliveryResult.error || "Reminder email could not be delivered."
+        });
+        continue;
+      }
+
+      if (deliveryResult.status === "queued_no_smtp") {
+        failed.push({
+          id: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          error: "Reminder metadata was saved, but no live email provider is configured for customer delivery."
+        });
+        continue;
+      }
+
       sent.push({
         id: invoice.id,
         invoiceNumber: invoice.invoiceNumber,
@@ -139,6 +160,10 @@ export async function runInvoiceReminderBatch(input: RunInvoiceReminderBatchInpu
         stage: eligibility.stage
       });
     } catch (error) {
+      logError("invoice.reminder_batch_item_failed", error, {
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber
+      });
       // RATIONALE: Keep going to process other invoices even if one fails.
       failed.push({
         id: invoice.id,

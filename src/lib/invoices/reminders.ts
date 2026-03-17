@@ -35,6 +35,14 @@ export function getInvoiceReminderEligibility(invoice: InvoiceWithLines, now: Da
   };
 }
 
+export function buildInvoiceReminderPersistence(overdueDays: number, stage: 7 | 14 | 30) {
+  return {
+    lastReminderSentAt: new Date(),
+    lastReminderStage: stage,
+    details: `Overdue reminder sent at ${stage}-day stage (${overdueDays} days overdue)`
+  };
+}
+
 /**
  * Sends a reminder email and returns persistence fields for reminder tracking.
  *
@@ -42,11 +50,10 @@ export function getInvoiceReminderEligibility(invoice: InvoiceWithLines, now: Da
  * transaction/audit-log update without this helper owning database writes.
  */
 export async function sendInvoiceReminder(invoice: InvoiceWithLines, overdueDays: number, stage: 7 | 14 | 30) {
-  await sendCustomerInvoiceReminderEmail(invoice, overdueDays);
+  const deliveryResult = await sendCustomerInvoiceReminderEmail(invoice, overdueDays);
 
   return {
-    lastReminderSentAt: new Date(),
-    lastReminderStage: stage,
-    details: `Overdue reminder sent at ${stage}-day stage (${overdueDays} days overdue)`
+    deliveryResult,
+    ...buildInvoiceReminderPersistence(overdueDays, stage)
   };
 }

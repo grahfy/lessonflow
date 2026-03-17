@@ -1,11 +1,12 @@
 import { addDays } from "date-fns";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 import { DELETE, PATCH } from "@/app/api/admin/customers/[id]/route";
 import { GET, POST } from "@/app/api/admin/customers/route";
+import * as portalCredentials from "@/lib/student-portal/credentials";
 
 function adminRequest(url: string, method: "GET" | "POST" | "PATCH" | "DELETE", token: string, body?: Record<string, unknown>) {
   return new NextRequest(url, {
@@ -75,6 +76,33 @@ describe("admin-customers", () => {
       }
     });
     expect(credential).not.toBeNull();
+  });
+
+  it("rolls back customer creation when portal credential provisioning fails", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    vi.spyOn(portalCredentials, "ensurePortalCredentialForCustomer").mockRejectedValueOnce(
+      new Error("credential provisioning failed")
+    );
+
+    const createReq = adminRequest("http://localhost/api/admin/customers", "POST", token, {
+      firstName: "Rollback",
+      lastName: "Student",
+      fullName: "Rollback Student",
+      email: "rollback@example.com",
+      phone: "0400555444",
+      skillLevel: "intermediate"
+    });
+    const createRes = await POST(createReq);
+    expect(createRes.status).toBe(500);
+
+    const persisted = await prisma.customer.findFirst({
+      where: {
+        email: "rollback@example.com"
+      }
+    });
+    expect(persisted).toBeNull();
   });
 
   it("archives customer deletes when linked booking records exist", async () => {

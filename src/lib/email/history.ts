@@ -133,24 +133,34 @@ export async function getCustomerEmailHistory(customer: CustomerEmailTarget): Pr
 async function syncCustomerImapMessages(customer: CustomerEmailTarget, maxResults: number): Promise<{ importedCount: number; skippedCount: number }> {
   const messages = await listRecentImapMessagesBySender(customer.normalizedEmail, maxResults);
   const matchedMessages = messages.filter((message) => normalizeEmail(message.senderEmail) === customer.normalizedEmail);
+  const matchedExternalIds = matchedMessages.map((message) => message.messageId);
+  const existingRows =
+    matchedExternalIds.length > 0
+      ? await prisma.customerInboundEmail.findMany({
+          where: {
+            customerId: customer.id,
+            provider: "imap",
+            externalId: {
+              in: matchedExternalIds
+            }
+          },
+          select: {
+            externalId: true
+          }
+        })
+      : [];
+  const existingExternalIds = new Set(existingRows.map((row) => row.externalId));
 
   let importedCount = 0;
   let skippedCount = 0;
+  const updates = [];
+  const creates = [];
 
   for (const message of matchedMessages) {
-    const existing = await prisma.customerInboundEmail.findUnique({
-      where: {
-        customerId_provider_externalId: {
-          customerId: customer.id,
-          provider: "imap",
-          externalId: message.messageId
-        }
-      }
-    });
-
-    if (existing) {
+    if (existingExternalIds.has(message.messageId)) {
       skippedCount += 1;
-      await prisma.customerInboundEmail.update({
+      updates.push(
+        prisma.customerInboundEmail.update({
         where: {
           customerId_provider_externalId: {
             customerId: customer.id,
@@ -168,26 +178,32 @@ async function syncCustomerImapMessages(customer: CustomerEmailTarget, maxResult
           receivedAt: new Date(message.receivedAt),
           syncedAt: new Date()
         }
-      });
+      })
+      );
       continue;
     }
 
-    await prisma.customerInboundEmail.create({
-      data: {
-        customerId: customer.id,
-        provider: "imap",
-        source: "imap",
-        externalId: message.messageId,
-        fromEmail: message.senderEmail,
-        toEmail: message.toEmail || null,
-        subject: message.subject,
-        snippet: message.snippet,
-        bodyText: message.bodyText,
-        status: "received",
-        receivedAt: new Date(message.receivedAt)
-      }
+    creates.push({
+      customerId: customer.id,
+      provider: "imap" as const,
+      source: "imap" as const,
+      externalId: message.messageId,
+      fromEmail: message.senderEmail,
+      toEmail: message.toEmail || null,
+      subject: message.subject,
+      snippet: message.snippet,
+      bodyText: message.bodyText,
+      status: "received" as const,
+      receivedAt: new Date(message.receivedAt)
     });
     importedCount += 1;
+  }
+
+  if (updates.length > 0 || creates.length > 0) {
+    await prisma.$transaction([
+      ...updates,
+      ...(creates.length > 0 ? [prisma.customerInboundEmail.createMany({ data: creates })] : [])
+    ]);
   }
 
   skippedCount += messages.length - matchedMessages.length;

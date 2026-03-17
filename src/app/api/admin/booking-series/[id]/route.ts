@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { canManageAssignedTeacher } from "@/lib/admin/permissions";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
@@ -24,35 +25,51 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
     const { id } = await params;
     const now = new Date();
-
-    // Series removal is modeled as status cancellation on future bookings rather than hard delete.
-    await prisma.booking.updateMany({
-      where: {
-        seriesId: id,
-        startAt: {
-          gte: now
-        }
-      },
-      data: {
-        status: "cancelled",
-        cancelledAt: now,
-        modifiedById: admin.id
-      }
-    });
-
-    await prisma.bookingSeries.update({
+    const series = await prisma.bookingSeries.findUnique({
       where: { id },
-      data: {
-        isActive: false
+      select: {
+        id: true,
+        assignedTeacherId: true
       }
     });
+    if (!series) {
+      return NextResponse.json({ error: "Booking series not found." }, { status: 404 });
+    }
+    if (!canManageAssignedTeacher(admin, series.assignedTeacherId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
-    await prisma.bookingAuditLog.create({
-      data: {
-        actorId: admin.id,
-        action: "series_removed",
-        details: `Series ${id} removed from ${now.toISOString()}`
-      }
+    // Keep future-booking cancellation, series deactivation, and audit logging
+    // atomic so the UI never sees a partial series removal.
+    await prisma.$transaction(async (tx) => {
+      await tx.booking.updateMany({
+        where: {
+          seriesId: id,
+          startAt: {
+            gte: now
+          }
+        },
+        data: {
+          status: "cancelled",
+          cancelledAt: now,
+          modifiedById: admin.id
+        }
+      });
+
+      await tx.bookingSeries.update({
+        where: { id },
+        data: {
+          isActive: false
+        }
+      });
+
+      await tx.bookingAuditLog.create({
+        data: {
+          actorId: admin.id,
+          action: "series_removed",
+          details: `Series ${id} removed from ${now.toISOString()}`
+        }
+      });
     });
 
     return NextResponse.json({ ok: true });

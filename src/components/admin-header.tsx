@@ -7,23 +7,22 @@ import { invalidateCustomerEmailAlertsSessionCache } from "@/lib/admin/customer-
 import { ADMIN_NAV_ITEMS } from "@/lib/admin/config";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { useCustomerEmailAlerts } from "@/lib/admin/use-customer-email-alerts";
-import { useAdminSession } from "@/lib/admin/use-admin-session";
+import type { AdminSessionSummary } from "@/lib/admin/use-admin-session";
 
 interface AdminHeaderProps {
   title: string;
+  admin: AdminSessionSummary | null;
+  adminLoading?: boolean;
 }
 
 /**
  * Shared admin shell header with section navigation, deploy visibility, and
  * mobile-friendly menu behavior.
  */
-export function AdminHeader({ title }: AdminHeaderProps) {
+export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-  const { admin } = useAdminSession({
-    onAuthError: () => window.location.assign("/admin/login")
-  });
   const { summary: customerEmailAlerts } = useCustomerEmailAlerts({
     adminId: admin?.id,
     enabled: admin?.role === "owner"
@@ -79,7 +78,15 @@ export function AdminHeader({ title }: AdminHeaderProps) {
           aria-hidden={!menuOpen}
         >
           <nav className="admin-header-nav-primary" aria-label="Admin sections">
-            {ADMIN_NAV_ITEMS.filter((item) => !item.roles || (admin ? item.roles.includes(admin.role) : true)).map((item) => {
+            {ADMIN_NAV_ITEMS.filter((item) => {
+              if (!item.roles) {
+                return true;
+              }
+              if (adminLoading || !admin) {
+                return false;
+              }
+              return item.roles.includes(admin.role);
+            }).map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <Tooltip key={item.href} content={item.tooltip}>

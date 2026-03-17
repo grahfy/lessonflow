@@ -1,10 +1,12 @@
 "use client";
 
+import React from "react";
 import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import type { AdminBuildInfo } from "@/lib/build-info-types";
+import type { AdminSessionSummary } from "@/lib/admin/use-admin-session";
 
 type BuildInfoResponse = {
   ok: boolean;
@@ -14,7 +16,7 @@ type BuildInfoResponse = {
 /**
  * Compact footer that keeps the current admin build identifier visible.
  */
-export function AdminBuildInfoFooter(): ReactElement {
+export function AdminBuildInfoFooter({ admin }: { admin: AdminSessionSummary | null }): ReactElement {
   const [buildInfo, setBuildInfo] = useState<AdminBuildInfo | null>(null);
 
   useEffect(() => {
@@ -50,9 +52,11 @@ export function AdminBuildInfoFooter(): ReactElement {
       </p>
       <div className="admin-build-info-footer-links">
         <span className="helper-text">Created by {buildInfo?.createdBy || "Dean Thomson"}</span>
-        <Link href="/admin/about" className="helper-text">
-          About
-        </Link>
+        {admin?.role === "owner" ? (
+          <Link href="/admin/about" className="helper-text">
+            About
+          </Link>
+        ) : null}
       </div>
     </footer>
   );

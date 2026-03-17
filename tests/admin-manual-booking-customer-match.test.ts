@@ -1,10 +1,11 @@
 import { addDays } from "date-fns";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 import { POST } from "@/app/api/admin/bookings/route";
+import * as portalCredentials from "@/lib/student-portal/credentials";
 
 function adminPost(body: Record<string, unknown>, token: string): NextRequest {
   return new NextRequest("http://localhost/api/admin/bookings", {
@@ -51,6 +52,8 @@ describe("admin-manual-booking-customer-match", () => {
   beforeEach(async () => {
     // NOTE: Manual booking can create both direct bookings and recurring series,
     // so cleanup must remove both paths before each deterministic scenario.
+    await prisma.customerPortalCredentialAuditLog.deleteMany();
+    await prisma.customerPortalCredential.deleteMany();
     await prisma.bookingAuditLog.deleteMany();
     await prisma.booking.deleteMany();
     await prisma.bookingSeries.deleteMany();
@@ -222,11 +225,16 @@ describe("admin-manual-booking-customer-match", () => {
       orderBy: { startAt: "asc" }
     });
     expect(bookings.length).toBeGreaterThan(1);
+    const series = await prisma.bookingSeries.findFirstOrThrow({
+      where: { email: "taylor@example.com" }
+    });
+    expect(series.isActive).toBe(true);
     // RATIONALE: Recurring manual bookings expand into multiple rows, so each
     // generated booking must keep the structured name fields for later edits.
     for (const booking of bookings) {
       expect(booking.firstName).toBe("Taylor");
       expect(booking.lastName).toBe("Student");
+      expect(booking.seriesId).toBe(series.id);
     }
   });
 
@@ -252,5 +260,32 @@ describe("admin-manual-booking-customer-match", () => {
       where: { email: "taylor@example.com" }
     });
     expect(bookings).toHaveLength(0);
+  });
+
+  it("rolls back manual booking customer creation when portal provisioning fails", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+    const startAt = addDays(new Date(), 10).toISOString();
+
+    vi.spyOn(portalCredentials, "ensurePortalCredentialForCustomer").mockRejectedValueOnce(
+      new Error("portal provisioning failed")
+    );
+
+    const response = await POST(adminPost(basePayload(startAt), token));
+    expect(response.status).toBe(500);
+
+    const customer = await prisma.customer.findFirst({
+      where: {
+        email: "taylor@example.com"
+      }
+    });
+    expect(customer).toBeNull();
+
+    const booking = await prisma.booking.findFirst({
+      where: {
+        email: "taylor@example.com"
+      }
+    });
+    expect(booking).toBeNull();
   });
 });

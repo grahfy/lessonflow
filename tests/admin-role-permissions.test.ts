@@ -4,11 +4,17 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { POST as bookingNotify } from "@/app/api/admin/bookings/[id]/notify/route";
+import { GET as listBookingRequests } from "@/app/api/admin/booking-requests/route";
+import { DELETE as removeBookingSeries } from "@/app/api/admin/booking-series/[id]/route";
 import { POST as createBooking } from "@/app/api/admin/bookings/route";
+import { GET as listBookings } from "@/app/api/admin/bookings/route";
 import { PATCH as updateBooking } from "@/app/api/admin/bookings/[id]/route";
+import { POST as saveContent } from "@/app/api/admin/content/route";
+import { GET as getCustomer, PATCH as updateCustomer } from "@/app/api/admin/customers/[id]/route";
+import { GET as listCustomers } from "@/app/api/admin/customers/route";
 import { POST as sendCustomerEmail } from "@/app/api/admin/customers/[id]/email/route";
-import { PATCH as updateCustomer } from "@/app/api/admin/customers/[id]/route";
 import { GET as listInvoices } from "@/app/api/admin/invoices/route";
+import { POST as createPreset } from "@/app/api/admin/presets/route";
 import { GET as getSettings } from "@/app/api/admin/settings/route";
 import { PATCH as updateStaff } from "@/app/api/admin/staff/[id]/route";
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
@@ -96,6 +102,38 @@ describe("admin role permissions", () => {
     );
 
     expect(response.status).toBe(403);
+  });
+
+  it("blocks teachers from owner-only content and preset mutations", async () => {
+    await ensureOwnerAdmin();
+    const teacher = await createTeacher("teacher-content@example.com", "Teacher Content");
+    const token = createSessionToken(teacher.email);
+
+    const contentResponse = await saveContent(
+      new NextRequest("http://localhost/api/admin/content", {
+        method: "POST",
+        headers: authHeaders(token, true),
+        body: JSON.stringify({
+          pagePath: "/",
+          sectionKey: "hero",
+          content: { title: "Teacher edit" }
+        })
+      })
+    );
+    expect(contentResponse.status).toBe(403);
+
+    const presetResponse = await createPreset(
+      new NextRequest("http://localhost/api/admin/presets", {
+        method: "POST",
+        headers: authHeaders(token, true),
+        body: JSON.stringify({
+          label: "Teacher Preset",
+          description: "",
+          unitPriceCents: 5000
+        })
+      })
+    );
+    expect(presetResponse.status).toBe(403);
   });
 
   it("auto-assigns teacher-created bookings to the signed-in teacher and sets the customer default teacher", async () => {
@@ -225,6 +263,159 @@ describe("admin role permissions", () => {
     expect(response.status).toBe(403);
   });
 
+  it("prevents teachers from cancelling another teacher's booking series", async () => {
+    await ensureOwnerAdmin();
+    const teacherA = await createTeacher("series-owner@example.com", "Series Owner");
+    const teacherB = await createTeacher("series-other@example.com", "Series Other");
+    const token = createSessionToken(teacherB.email);
+
+    const series = await prisma.bookingSeries.create({
+      data: {
+        name: "Protected Series",
+        email: "series@example.com",
+        phone: "0400001000",
+        address: "20 Smith Street, Northcote VIC 3070",
+        houseNumber: "20",
+        streetName: "Smith",
+        streetType: "Street",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070",
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min60",
+        dayOfWeek: 2,
+        startTimeLocal: "09:00",
+        startDate: addDays(new Date(), 7),
+        recurrenceEndAt: addDays(new Date(), 35),
+        timezone: "Australia/Melbourne",
+        assignedTeacherId: teacherA.id
+      }
+    });
+
+    const response = await removeBookingSeries(
+      new NextRequest(`http://localhost/api/admin/booking-series/${series.id}`, {
+        method: "DELETE",
+        headers: authHeaders(token)
+      }),
+      { params: Promise.resolve({ id: series.id }) }
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("cancels only future bookings when removing a booking series", async () => {
+    const owner = await ensureOwnerAdmin();
+    const token = createSessionToken(owner.email);
+    const now = new Date();
+
+    const series = await prisma.bookingSeries.create({
+      data: {
+        name: "Managed Series",
+        email: "managed-series@example.com",
+        phone: "0400002000",
+        address: "20 Smith Street, Northcote VIC 3070",
+        houseNumber: "20",
+        streetName: "Smith",
+        streetType: "Street",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070",
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min60",
+        dayOfWeek: 2,
+        startTimeLocal: "09:00",
+        startDate: addDays(now, 7),
+        recurrenceEndAt: addDays(now, 35),
+        timezone: "Australia/Melbourne",
+        assignedTeacherId: owner.id
+      }
+    });
+
+    const pastBooking = await prisma.booking.create({
+      data: {
+        name: "Past Series Lesson",
+        email: "managed-series@example.com",
+        phone: "0400002000",
+        address: "20 Smith Street, Northcote VIC 3070",
+        houseNumber: "20",
+        streetName: "Smith",
+        streetType: "Street",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070",
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min60",
+        startAt: addDays(now, -7),
+        endAt: addDays(now, -7),
+        timezone: "Australia/Melbourne",
+        seriesId: series.id,
+        assignedTeacherId: owner.id
+      }
+    });
+
+    const futureBooking = await prisma.booking.create({
+      data: {
+        name: "Future Series Lesson",
+        email: "managed-series@example.com",
+        phone: "0400002000",
+        address: "20 Smith Street, Northcote VIC 3070",
+        houseNumber: "20",
+        streetName: "Smith",
+        streetType: "Street",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070",
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min60",
+        startAt: addDays(now, 7),
+        endAt: addDays(now, 7),
+        timezone: "Australia/Melbourne",
+        seriesId: series.id,
+        assignedTeacherId: owner.id
+      }
+    });
+
+    const response = await removeBookingSeries(
+      new NextRequest(`http://localhost/api/admin/booking-series/${series.id}`, {
+        method: "DELETE",
+        headers: authHeaders(token)
+      }),
+      { params: Promise.resolve({ id: series.id }) }
+    );
+
+    expect(response.status).toBe(200);
+
+    const updatedSeries = await prisma.bookingSeries.findUniqueOrThrow({
+      where: { id: series.id }
+    });
+    expect(updatedSeries.isActive).toBe(false);
+
+    const persistedPastBooking = await prisma.booking.findUniqueOrThrow({
+      where: { id: pastBooking.id }
+    });
+    expect(persistedPastBooking.status).not.toBe("cancelled");
+
+    const persistedFutureBooking = await prisma.booking.findUniqueOrThrow({
+      where: { id: futureBooking.id }
+    });
+    expect(persistedFutureBooking.status).toBe("cancelled");
+
+    const auditRow = await prisma.bookingAuditLog.findFirst({
+      where: {
+        actorId: owner.id,
+        action: "series_removed"
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    });
+    expect(auditRow?.details).toContain(series.id);
+  });
+
   it("allows teachers to update assigned students but not other customers", async () => {
     await ensureOwnerAdmin();
     const teacher = await createTeacher("teacher-customer@example.com", "Teacher Customer");
@@ -294,6 +485,200 @@ describe("admin role permissions", () => {
       { params: Promise.resolve({ id: otherCustomer.id }) }
     );
     expect(forbidden.status).toBe(403);
+  });
+
+  it("scopes teacher customer reads to assigned students only", async () => {
+    await ensureOwnerAdmin();
+    const teacher = await createTeacher("teacher-read-customer@example.com", "Teacher Read Customer");
+    const otherTeacher = await createTeacher("teacher-read-other@example.com", "Teacher Read Other");
+    const token = createSessionToken(teacher.email);
+
+    const assignedCustomer = await prisma.customer.create({
+      data: {
+        ...customerSnapshotFromInput({
+          name: "Assigned Reader",
+          email: "assigned-reader@example.com",
+          phone: "0400123000",
+          lessonMode: "in_person",
+          skillLevel: "beginner",
+          unitNumber: undefined,
+          houseNumber: "1",
+          streetName: "Main",
+          streetType: "Street",
+          suburb: "Northcote",
+          state: "VIC",
+          postcode: "3070"
+        }),
+        primaryTeacherId: teacher.id
+      }
+    });
+
+    const otherCustomer = await prisma.customer.create({
+      data: {
+        ...customerSnapshotFromInput({
+          name: "Other Reader",
+          email: "other-reader@example.com",
+          phone: "0400456000",
+          lessonMode: "video",
+          skillLevel: "intermediate",
+          unitNumber: undefined,
+          houseNumber: "2",
+          streetName: "High",
+          streetType: "Street",
+          suburb: "Northcote",
+          state: "VIC",
+          postcode: "3070"
+        }),
+        primaryTeacherId: otherTeacher.id
+      }
+    });
+
+    const listResponse = await listCustomers(
+      new NextRequest("http://localhost/api/admin/customers", {
+        headers: authHeaders(token)
+      })
+    );
+    expect(listResponse.status).toBe(200);
+    const listBody = (await listResponse.json()) as { customers: Array<{ id: string }> };
+    expect(listBody.customers.map((customer) => customer.id)).toEqual([assignedCustomer.id]);
+
+    const allowedDetail = await getCustomer(
+      new NextRequest(`http://localhost/api/admin/customers/${assignedCustomer.id}`, {
+        headers: authHeaders(token)
+      }),
+      { params: Promise.resolve({ id: assignedCustomer.id }) }
+    );
+    expect(allowedDetail.status).toBe(200);
+
+    const forbiddenDetail = await getCustomer(
+      new NextRequest(`http://localhost/api/admin/customers/${otherCustomer.id}`, {
+        headers: authHeaders(token)
+      }),
+      { params: Promise.resolve({ id: otherCustomer.id }) }
+    );
+    expect(forbiddenDetail.status).toBe(403);
+  });
+
+  it("scopes teacher booking and booking-request reads to assigned rows only", async () => {
+    await ensureOwnerAdmin();
+    const teacher = await createTeacher("teacher-read-booking@example.com", "Teacher Read Booking");
+    const otherTeacher = await createTeacher("teacher-read-booking-other@example.com", "Teacher Read Booking Other");
+    const token = createSessionToken(teacher.email);
+    const teacherBookingStartAt = new Date("2026-04-14T09:00:00.000Z");
+    const otherBookingStartAt = new Date("2026-04-15T09:00:00.000Z");
+    const teacherRequestedStartAt = new Date("2026-04-16T09:00:00.000Z");
+    const otherRequestedStartAt = new Date("2026-04-17T09:00:00.000Z");
+
+    await prisma.booking.createMany({
+      data: [
+        {
+          name: "Teacher Booking",
+          email: "teacher-booking@example.com",
+          phone: "0400000001",
+          address: "1 Main Street, Northcote VIC 3070",
+          houseNumber: "1",
+          streetName: "Main",
+          streetType: "Street",
+          suburb: "Northcote",
+          state: "VIC",
+          postcode: "3070",
+          lessonMode: "in_person",
+          skillLevel: "beginner",
+          lessonDuration: "min60",
+          startAt: teacherBookingStartAt,
+          endAt: addDays(teacherBookingStartAt, 0),
+          timezone: "Australia/Melbourne",
+          assignedTeacherId: teacher.id
+        },
+        {
+          name: "Other Booking",
+          email: "other-booking@example.com",
+          phone: "0400000002",
+          address: "2 Main Street, Northcote VIC 3070",
+          houseNumber: "2",
+          streetName: "Main",
+          streetType: "Street",
+          suburb: "Northcote",
+          state: "VIC",
+          postcode: "3070",
+          lessonMode: "video",
+          skillLevel: "intermediate",
+          lessonDuration: "min30",
+          startAt: otherBookingStartAt,
+          endAt: addDays(otherBookingStartAt, 0),
+          timezone: "Australia/Melbourne",
+          assignedTeacherId: otherTeacher.id
+        }
+      ]
+    });
+
+    await prisma.bookingRequest.createMany({
+      data: [
+        {
+          name: "Teacher Request",
+          email: "teacher-request@example.com",
+          phone: "0400000003",
+          address: "3 Main Street, Northcote VIC 3070",
+          houseNumber: "3",
+          streetName: "Main",
+          streetType: "Street",
+          suburb: "Northcote",
+          state: "VIC",
+          postcode: "3070",
+          lessonMode: "in_person",
+          skillLevel: "beginner",
+          lessonDuration: "min30",
+          requestedStartAt: teacherRequestedStartAt,
+          status: "pending",
+          assignedTeacherId: teacher.id
+        },
+        {
+          name: "Other Request",
+          email: "other-request@example.com",
+          phone: "0400000004",
+          address: "4 Main Street, Northcote VIC 3070",
+          houseNumber: "4",
+          streetName: "Main",
+          streetType: "Street",
+          suburb: "Northcote",
+          state: "VIC",
+          postcode: "3070",
+          lessonMode: "video",
+          skillLevel: "advanced",
+          lessonDuration: "min60",
+          requestedStartAt: otherRequestedStartAt,
+          status: "pending",
+          assignedTeacherId: otherTeacher.id
+        }
+      ]
+    });
+
+    const bookingsResponse = await listBookings(
+      new NextRequest("http://localhost/api/admin/bookings?view=week&date=2026-04-14", {
+        headers: authHeaders(token)
+      })
+    );
+    expect(bookingsResponse.status).toBe(200);
+    const bookingsBody = (await bookingsResponse.json()) as {
+      rows: Array<{ assignedTeacherId: string | null }>;
+      requestRows: Array<{ assignedTeacherId: string | null }>;
+    };
+    expect(bookingsBody.rows).toHaveLength(1);
+    expect(bookingsBody.rows[0]?.assignedTeacherId).toBe(teacher.id);
+    expect(bookingsBody.requestRows).toHaveLength(1);
+    expect(bookingsBody.requestRows[0]?.assignedTeacherId).toBe(teacher.id);
+
+    const requestListResponse = await listBookingRequests(
+      new NextRequest("http://localhost/api/admin/booking-requests", {
+        headers: authHeaders(token)
+      })
+    );
+    expect(requestListResponse.status).toBe(200);
+    const requestListBody = (await requestListResponse.json()) as {
+      rows: Array<{ assignedTeacherId: string | null }>;
+    };
+    expect(requestListBody.rows).toHaveLength(1);
+    expect(requestListBody.rows[0]?.assignedTeacherId).toBe(teacher.id);
   });
 
   it("limits teacher email access to assigned students only", async () => {

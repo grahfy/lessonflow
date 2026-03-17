@@ -1,12 +1,13 @@
 import bcrypt from "bcryptjs";
 import { addDays } from "date-fns";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 import { PATCH as cancelStudentBooking } from "@/app/api/student/bookings/[id]/route";
 import { POST as createStudentBooking } from "@/app/api/student/bookings/route";
 import { customerSnapshotFromInput } from "@/lib/customer-match";
 import { prisma } from "@/lib/db";
+import * as emailService from "@/lib/email/service";
 import {
   studentPortalBookingRequestResponseSchema,
   studentPortalCancelBookingResponseSchema
@@ -144,6 +145,115 @@ describe("student-portal-booking-actions", () => {
     expect(created.assignedTeacherId).toBe(teacher.id);
   });
 
+  it("returns success when the request is saved but owner notification delivery fails", async () => {
+    const customer = await prisma.customer.create({
+      data: customerSnapshotFromInput({
+        firstName: "Partial",
+        lastName: "Portal",
+        name: "Partial Portal",
+        email: "partial.portal@example.com",
+        phone: "0400999000",
+        lessonMode: "video",
+        skillLevel: "beginner",
+        unitNumber: undefined,
+        houseNumber: "12",
+        streetName: "Main",
+        streetType: "Street",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070"
+      })
+    });
+
+    vi.spyOn(emailService, "sendEmail").mockResolvedValueOnce({
+      status: "failed",
+      error: "smtp offline"
+    });
+
+    const request = new NextRequest("http://localhost/api/student/bookings", {
+      method: "POST",
+      body: JSON.stringify({
+        requestedStartAt: addDays(new Date(), 2).toISOString(),
+        lessonMode: "video",
+        lessonDuration: "min30"
+      }),
+      headers: {
+        "content-type": "application/json",
+        cookie: `${getStudentSessionCookieName()}=${createStudentSessionToken(customer.id)}`
+      }
+    });
+
+    const response = await createStudentBooking(request);
+    expect(response.status).toBe(201);
+    const payload = studentPortalBookingRequestResponseSchema.parse(await response.json());
+    expect(payload.partial).toBe(true);
+    expect(payload.warning).toContain("submitted");
+
+    const created = await prisma.bookingRequest.findFirstOrThrow({
+      where: {
+        customerId: customer.id
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    });
+    expect(created.status).toBe("pending");
+  });
+
+  it("returns partial success when the request is saved but no owner mail provider is configured", async () => {
+    const customer = await prisma.customer.create({
+      data: customerSnapshotFromInput({
+        firstName: "Queued",
+        lastName: "Portal",
+        name: "Queued Portal",
+        email: "queued.portal@example.com",
+        phone: "0400888000",
+        lessonMode: "video",
+        skillLevel: "beginner",
+        unitNumber: undefined,
+        houseNumber: "8",
+        streetName: "High",
+        streetType: "Street",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070"
+      })
+    });
+
+    vi.spyOn(emailService, "sendEmail").mockResolvedValueOnce({
+      status: "queued_no_smtp"
+    });
+
+    const request = new NextRequest("http://localhost/api/student/bookings", {
+      method: "POST",
+      body: JSON.stringify({
+        requestedStartAt: addDays(new Date(), 2).toISOString(),
+        lessonMode: "video",
+        lessonDuration: "min30"
+      }),
+      headers: {
+        "content-type": "application/json",
+        cookie: `${getStudentSessionCookieName()}=${createStudentSessionToken(customer.id)}`
+      }
+    });
+
+    const response = await createStudentBooking(request);
+    expect(response.status).toBe(201);
+    const payload = studentPortalBookingRequestResponseSchema.parse(await response.json());
+    expect(payload.partial).toBe(true);
+    expect(payload.deliveryStatus).toBe("queued_no_smtp");
+
+    const created = await prisma.bookingRequest.findFirstOrThrow({
+      where: {
+        customerId: customer.id
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    });
+    expect(created.status).toBe("pending");
+  });
+
   it("cancels an upcoming owned booking", async () => {
     const customer = await prisma.customer.create({
       data: customerSnapshotFromInput({
@@ -212,4 +322,5 @@ describe("student-portal-booking-actions", () => {
     // affect attendance, reminder flows, and possible billing follow-up.
     expect(log).not.toBeNull();
   });
+
 });

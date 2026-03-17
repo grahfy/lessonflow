@@ -1,6 +1,6 @@
 import { Invoice, InvoiceLineItem } from "@/generated/prisma/client";
 
-import { sendEmail } from "@/lib/email/service";
+import { sendEmail, type SendEmailResult } from "@/lib/email/service";
 import { customerInvoiceReminderTemplate, customerInvoiceTemplate } from "@/lib/email/templates";
 import { renderInvoicePdf } from "@/lib/invoices/pdf";
 
@@ -11,7 +11,7 @@ export type InvoiceWithLines = Invoice & {
 /**
  * Sends an invoice email with PDF attachment to the customer.
  */
-export async function sendCustomerInvoiceEmail(invoice: InvoiceWithLines): Promise<void> {
+export async function sendCustomerInvoiceEmail(invoice: InvoiceWithLines): Promise<SendEmailResult> {
   const template = customerInvoiceTemplate({
     invoiceNumber: invoice.invoiceNumber,
     customerName: invoice.customerName,
@@ -21,7 +21,7 @@ export async function sendCustomerInvoiceEmail(invoice: InvoiceWithLines): Promi
   });
 
   const pdfBuffer = await renderInvoicePdf(invoice);
-  await sendEmail({
+  return sendEmail({
     to: invoice.customerEmail,
     subject: template.subject,
     html: template.html,
@@ -38,7 +38,10 @@ export async function sendCustomerInvoiceEmail(invoice: InvoiceWithLines): Promi
 /**
  * Sends an overdue reminder email with the current invoice PDF attached.
  */
-export async function sendCustomerInvoiceReminderEmail(invoice: InvoiceWithLines, overdueDays: number): Promise<void> {
+export async function sendCustomerInvoiceReminderEmail(
+  invoice: InvoiceWithLines,
+  overdueDays: number
+): Promise<SendEmailResult> {
   const template = customerInvoiceReminderTemplate({
     invoiceNumber: invoice.invoiceNumber,
     customerName: invoice.customerName,
@@ -49,7 +52,7 @@ export async function sendCustomerInvoiceReminderEmail(invoice: InvoiceWithLines
   });
 
   const pdfBuffer = await renderInvoicePdf(invoice);
-  await sendEmail({
+  return sendEmail({
     to: invoice.customerEmail,
     subject: template.subject,
     html: template.html,

@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import { resolveAssignedTeacherId } from "@/lib/admin/teacher-assignment";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { customerSnapshotFromInput } from "@/lib/customer-match";
 import { prisma } from "@/lib/db";
 import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
+import { ensurePortalCredentialForCustomer } from "@/lib/student-portal/credentials";
 
 const MAX_IMPORT_ROWS = 1000;
 const MAX_IMPORT_BYTES = 1024 * 1024;
@@ -107,6 +109,11 @@ export async function POST(request: NextRequest) {
     const errors: string[] = [];
     const seenNormalizedEmails = new Set<string>();
     const seenNormalizedPhones = new Set<string>();
+    const defaultPrimaryTeacherId = await resolveAssignedTeacherId({
+      db: prisma,
+      actor: admin,
+      requestedAssignedTeacherId: null
+    });
 
     for (const [index, row] of parsed.data.customers.entries()) {
       const rowNumber = index + 1;
@@ -185,14 +192,26 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const created = await prisma.customer.create({
-        data: {
-          ...customerData,
-          isArchived: false
-        },
-        select: {
-          id: true
-        }
+      const created = await prisma.$transaction(async (tx) => {
+        const customer = await tx.customer.create({
+          data: {
+            ...customerData,
+            isArchived: false,
+            ...(defaultPrimaryTeacherId ? { primaryTeacherId: defaultPrimaryTeacherId } : {})
+          },
+          select: {
+            id: true
+          }
+        });
+
+        await ensurePortalCredentialForCustomer({
+          customerId: customer.id,
+          actorId: admin.id,
+          tx,
+          details: "Portal credential ensured during customer import."
+        });
+
+        return customer;
       });
 
       createdCustomerIds.push(created.id);

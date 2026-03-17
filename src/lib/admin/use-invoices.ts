@@ -67,13 +67,19 @@ export interface UseInvoicesResult {
         sortDir?: InvoiceSortDirection
     ) => Promise<void>;
     save: (id: string, payload: Record<string, unknown>) => Promise<InvoiceRow | null>;
-    performAction: (id: string, action: InvoiceAction) => Promise<InvoiceRow | null>;
+    performAction: (id: string, action: InvoiceAction) => Promise<InvoiceActionResult>;
     create: (payload: Record<string, unknown>) => Promise<InvoiceRow | null>;
     sendBulkReminders: () => Promise<number | null>;
     remove: (id: string) => Promise<boolean>;
 }
 
 export type InvoiceAction = "send" | "remind" | "restore" | InvoiceLifecycleAction;
+
+export interface InvoiceActionResult {
+    invoice: InvoiceRow | null;
+    notice?: string;
+    partial?: boolean;
+}
 
 /**
  * Centralizes the admin invoices screen's fetch/mutation behavior.
@@ -162,7 +168,7 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
         }
     }, [safeFetch, handleApiError]);
 
-    const performAction = useCallback(async (id: string, action: InvoiceAction): Promise<InvoiceRow | null> => {
+    const performAction = useCallback(async (id: string, action: InvoiceAction): Promise<InvoiceActionResult> => {
         let endpoint = `/api/admin/invoices/${id}`;
         let method = "POST";
 
@@ -185,13 +191,23 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
 
             if (!response.ok) {
                 await handleApiError(response, `Unable to perform ${action}.`);
-                return null;
+                return { invoice: null };
             }
 
             const data = await response.json();
-            return (data.invoice || data) as InvoiceRow;
+            const notice =
+                typeof data?.warning === "string"
+                    ? data.warning
+                    : typeof data?.message === "string"
+                        ? data.message
+                        : undefined;
+            return {
+                invoice: (data.invoice || data) as InvoiceRow,
+                notice,
+                partial: data?.partial === true
+            };
         } catch {
-            return null;
+            return { invoice: null };
         }
     }, [safeFetch, handleApiError]);
 

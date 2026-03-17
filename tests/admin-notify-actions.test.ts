@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 import { POST as bookingNotifyPost } from "@/app/api/admin/bookings/[id]/notify/route";
 import { POST as requestNotifyPost } from "@/app/api/admin/booking-requests/[id]/notify/route";
+import * as bookingEvents from "@/lib/booking-events";
 
 function adminPost(url: string, body: Record<string, unknown>, token: string): NextRequest {
   return new NextRequest(url, {
@@ -27,7 +28,7 @@ describe("admin-notify-actions", () => {
     await prisma.customer.deleteMany();
   });
 
-  it("sends booking reminders and writes audit + outbound records", async () => {
+  it("returns a configuration error for booking reminders when no live provider is configured", async () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);
 
@@ -55,7 +56,7 @@ describe("admin-notify-actions", () => {
 
     const req = adminPost("http://localhost/api/admin/bookings/booking_1/notify", { action: "reminder" }, token);
     const res = await bookingNotifyPost(req, { params: Promise.resolve({ id: booking.id }) });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(503);
 
     const emailRow = await prisma.outboundEmail.findFirst({
       where: {
@@ -63,16 +64,17 @@ describe("admin-notify-actions", () => {
       }
     });
     expect(emailRow?.subject).toContain("reminder");
+    expect(emailRow?.status).toBe("queued_no_smtp");
 
     const auditRow = await prisma.bookingAuditLog.findFirst({
       where: {
         bookingId: booking.id
       }
     });
-    expect(auditRow?.action).toBe("reminder_sent");
+    expect(auditRow).toBeNull();
   });
 
-  it("sends custom request emails and stores request context in audit details", async () => {
+  it("returns a configuration error for booking-request custom emails when no live provider is configured", async () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);
 
@@ -116,7 +118,7 @@ describe("admin-notify-actions", () => {
         { params: Promise.resolve({ id: requestRow.id }) }
       );
     }
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(503);
 
     const emailRow = await prisma.outboundEmail.findFirst({
       where: {
@@ -125,6 +127,7 @@ describe("admin-notify-actions", () => {
       }
     });
     expect(emailRow?.subject).toBe("Custom note");
+    expect(emailRow?.status).toBe("queued_no_smtp");
 
     const auditRow = await prisma.bookingAuditLog.findFirst({
       where: {
@@ -134,7 +137,82 @@ describe("admin-notify-actions", () => {
         createdAt: "desc"
       }
     });
-    expect(auditRow?.action).toBe("custom_email_sent");
-    expect(auditRow?.details).toContain(`requestId=${requestRow.id}`);
+    expect(auditRow).toBeNull();
+  });
+
+  it("returns an error when booking reminder delivery fails", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const booking = await prisma.booking.create({
+      data: {
+        name: "Reminder Failure",
+        email: "reminder.failure@example.com",
+        phone: "0400-000-002",
+        address: "66 Street",
+        houseNumber: "66",
+        streetName: "Street",
+        streetType: "Rd",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070",
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min60",
+        startAt: new Date("2026-06-02T09:00:00.000Z"),
+        endAt: new Date("2026-06-02T10:00:00.000Z"),
+        timezone: "Australia/Melbourne",
+        modifiedById: admin.id
+      }
+    });
+
+    vi.spyOn(bookingEvents, "sendCustomerReminderEmail").mockResolvedValueOnce({
+      status: "failed",
+      error: "smtp offline"
+    });
+
+    const req = adminPost("http://localhost/api/admin/bookings/booking_1/notify", { action: "reminder" }, token);
+    const res = await bookingNotifyPost(req, { params: Promise.resolve({ id: booking.id }) });
+    expect(res.status).toBe(502);
+  });
+
+  it("returns an error when booking-request custom delivery fails", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const requestRow = await prisma.bookingRequest.create({
+      data: {
+        name: "Request Failure",
+        email: "request.failure@example.com",
+        phone: "0400-000-003",
+        address: "11 Street",
+        houseNumber: "11",
+        streetName: "Street",
+        streetType: "Ave",
+        suburb: "Brunswick",
+        state: "VIC",
+        postcode: "3056",
+        lessonMode: "video",
+        skillLevel: "intermediate",
+        lessonDuration: "min60",
+        requestedStartAt: new Date("2026-06-05T09:00:00.000Z"),
+        status: "pending"
+      }
+    });
+
+    vi.spyOn(bookingEvents, "sendCustomerCustomEmail").mockResolvedValueOnce({
+      status: "failed",
+      error: "smtp offline"
+    });
+
+    const res = await requestNotifyPost(
+      adminPost(
+        "http://localhost/api/admin/booking-requests/request_1/notify",
+        { action: "custom", subject: "Custom note", message: "Please reply." },
+        token
+      ),
+      { params: Promise.resolve({ id: requestRow.id }) }
+    );
+    expect(res.status).toBe(502);
   });
 });

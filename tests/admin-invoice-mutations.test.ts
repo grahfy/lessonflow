@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 import { POST as createCreditNote } from "@/app/api/admin/invoices/[id]/credit-note/route";
@@ -7,6 +7,7 @@ import { GET as getInvoicePdf } from "@/app/api/admin/invoices/[id]/pdf/route";
 import { POST as sendInvoice } from "@/app/api/admin/invoices/[id]/send/route";
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
+import * as invoiceEvents from "@/lib/invoice-events";
 
 function adminRequest(url: string, method: "POST" | "PATCH" | "DELETE" | "GET", token: string, body?: Record<string, unknown>) {
   return new NextRequest(url, {
@@ -85,9 +86,18 @@ describe("admin-invoice-mutations", () => {
 
     const req = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}/send`, "POST", token);
     const res = await sendInvoice(req, { params: Promise.resolve({ id: invoice.id }) });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { ok: boolean; invoice: { status: string; sentAt: string | null } };
+    expect(res.status).toBe(202);
+    const body = (await res.json()) as {
+      ok: boolean;
+      partial?: boolean;
+      warning?: string;
+      deliveryStatus?: string;
+      invoice: { status: string; sentAt: string | null };
+    };
     expect(body.ok).toBe(true);
+    expect(body.partial).toBe(true);
+    expect(body.warning).toContain("no live email provider");
+    expect(body.deliveryStatus).toBe("queued_no_smtp");
     expect(body.invoice.status).toBe("sent");
     expect(body.invoice.sentAt).toBeTruthy();
 
@@ -106,6 +116,37 @@ describe("admin-invoice-mutations", () => {
     expect(outbound.subject).toContain("MGS-2026-9999");
     expect(outbound.status).toBe("queued_no_smtp");
     expect(outbound.htmlBody).toContain("Alex Student");
+  });
+
+  it("returns partial success when invoice state persists but delivery fails", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+    const invoice = await seedInvoice(admin.id, "MGS-2026-9912");
+
+    vi.spyOn(invoiceEvents, "sendCustomerInvoiceEmail").mockResolvedValueOnce({
+      status: "failed",
+      error: "smtp offline"
+    });
+
+    const req = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}/send`, "POST", token);
+    const res = await sendInvoice(req, { params: Promise.resolve({ id: invoice.id }) });
+
+    expect(res.status).toBe(202);
+    const body = (await res.json()) as {
+      ok?: boolean;
+      partial?: boolean;
+      warning?: string;
+      invoice?: { status: string; sentAt: string | null };
+    };
+    expect(body.ok).toBe(true);
+    expect(body.partial).toBe(true);
+    expect(body.warning).toContain("could not be delivered");
+    expect(body.invoice?.status).toBe("sent");
+    expect(body.invoice?.sentAt).toBeTruthy();
+
+    const reloaded = await prisma.invoice.findUniqueOrThrow({ where: { id: invoice.id } });
+    expect(reloaded.status).toBe("sent");
+    expect(reloaded.sentAt).not.toBeNull();
   });
 
   it("supports pdf, protects paid delete, and creates credit notes", async () => {
@@ -128,7 +169,7 @@ describe("admin-invoice-mutations", () => {
 
     const sendReq = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}/send`, "POST", token);
     const sendRes = await sendInvoice(sendReq, { params: Promise.resolve({ id: invoice.id }) });
-    expect(sendRes.status).toBe(200);
+    expect(sendRes.status).toBe(202);
 
     const markPaidReq = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}`, "PATCH", token, {
       action: "mark_paid"
@@ -173,7 +214,7 @@ describe("admin-invoice-mutations", () => {
 
     const sendReq = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}/send`, "POST", token);
     const sendRes = await sendInvoice(sendReq, { params: Promise.resolve({ id: invoice.id }) });
-    expect(sendRes.status).toBe(200);
+    expect(sendRes.status).toBe(202);
 
     const markUnpaidFromSentReq = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}`, "PATCH", token, {
       action: "mark_unpaid"

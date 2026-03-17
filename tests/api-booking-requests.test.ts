@@ -54,13 +54,19 @@ describe("api-booking-requests", () => {
     });
 
     const response = await POST(request);
-    expect([200, 503]).toContain(response.status);
-    const payload = (await response.json()) as { id?: string; ok?: boolean; deliveryStatus?: string };
+    expect(response.status).toBe(202);
+    const payload = (await response.json()) as {
+      id?: string;
+      ok?: boolean;
+      partial?: boolean;
+      warning?: string;
+      deliveryStatus?: string;
+    };
     expect(typeof payload.id).toBe("string");
-    if (response.status === 503) {
-      expect(payload.ok).toBe(false);
-      expect(payload.deliveryStatus).toBe("queued_no_smtp");
-    }
+    expect(payload.ok).toBe(true);
+    expect(payload.partial).toBe(true);
+    expect(payload.warning).toContain("saved");
+    expect(payload.deliveryStatus).toBe("queued_no_smtp");
 
     const row = await prisma.bookingRequest.findUnique({
       where: {
@@ -133,7 +139,7 @@ describe("api-booking-requests", () => {
     });
 
     const response = await POST(request);
-    expect([200, 503]).toContain(response.status);
+    expect([200, 202]).toContain(response.status);
     const payload = (await response.json()) as { id: string };
     
     const row = await prisma.bookingRequest.findUnique({
@@ -184,7 +190,7 @@ describe("api-booking-requests", () => {
     });
 
     const response = await POST(request);
-    expect([200, 503]).toContain(response.status);
+    expect([200, 202]).toContain(response.status);
     const payload = (await response.json()) as { id: string };
     
     const row = await prisma.bookingRequest.findUnique({
@@ -232,7 +238,7 @@ describe("api-booking-requests", () => {
     });
 
     const response = await POST(request);
-    expect([200, 503]).toContain(response.status);
+    expect([200, 202]).toContain(response.status);
     const payload = (await response.json()) as { id: string };
 
     const row = await prisma.bookingRequest.findUniqueOrThrow({

@@ -68,6 +68,9 @@ export async function GET(request: NextRequest, { params }: Params) {
     if (!customer) {
       return NextResponse.json({ error: "Customer not found." }, { status: 404 });
     }
+    if (!canManagePrimaryTeacherCustomer(admin, customer.primaryTeacherId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     return NextResponse.json({ customer });
   } catch (error) {

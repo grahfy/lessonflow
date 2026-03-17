@@ -90,8 +90,17 @@ ${logContext || "No logs included."}
       html: htmlBody,
     });
 
+    if (result.status === "queued_no_smtp") {
+      return NextResponse.json(
+        {
+          error: "Bug report email is not configured on this host. Configure a live email provider before submitting issue reports."
+        },
+        { status: 503 }
+      );
+    }
+
     if (result.status === "failed") {
-      return NextResponse.json({ error: "Failed to send email report.", details: result.error }, { status: 500 });
+      return NextResponse.json({ error: "Failed to send email report.", details: result.error }, { status: 502 });
     }
 
     return NextResponse.json({ 

@@ -84,7 +84,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
       // Reuse the customer-facing booking status template for cancellation notices.
       // Audit log entry is handled by the event wrapper.
-      await sendCustomerBookingStatusEmail({
+      const deliveryResult = await sendCustomerBookingStatusEmail({
         email: booking.email,
         name: booking.name,
         status: "cancelled",
@@ -95,6 +95,18 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           action: "cancelled"
         }
       });
+
+      if (deliveryResult.status !== "sent") {
+        return NextResponse.json(
+          {
+            ok: true,
+            partial: true,
+            warning: deliveryResult.error || "Booking was cancelled, but the notification email could not be delivered.",
+            deliveryStatus: deliveryResult.status
+          },
+          { status: 200 }
+        );
+      }
 
       return NextResponse.json({ ok: true });
     }
@@ -117,7 +129,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
       // Send after the DB write succeeds so the customer email reflects persisted booking times.
       // Audit log entry is handled by the event wrapper.
-      await sendCustomerBookingMovedEmail({
+      const deliveryResult = await sendCustomerBookingMovedEmail({
         email: existing.email,
         name: existing.name,
         oldWhen,
@@ -129,6 +141,18 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           details: `Moved to ${newStart.toISOString()}`
         }
       });
+
+      if (deliveryResult.status !== "sent") {
+        return NextResponse.json(
+          {
+            ok: true,
+            partial: true,
+            warning: deliveryResult.error || "Booking was moved, but the notification email could not be delivered.",
+            deliveryStatus: deliveryResult.status
+          },
+          { status: 200 }
+        );
+      }
 
       return NextResponse.json({ ok: true });
     }
@@ -203,38 +227,40 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         );
       }
 
-      await prisma.booking.update({
-        where: { id },
-        data: {
-          firstName: nextFirstName,
-          lastName: nextLastName,
-          name: nextName,
-          email: nextEmail,
-          phone: nextPhone,
-          address: nextAddress,
-          unitNumber: nextUnitNumber,
-          houseNumber: nextHouseNumber,
-          streetName: nextStreetName,
-          streetType: nextStreetType,
-          suburb: nextSuburb,
-          state: nextState,
-          postcode: nextPostcode,
-          lessonMode: parsed.data.lessonMode ?? existing.lessonMode,
-          skillLevel: parsed.data.skillLevel ?? existing.skillLevel,
-          lessonDuration: nextDuration,
-          customDurationMinutes: nextCustomDurationMinutes,
-          endAt: getBookingEnd(existing.startAt, nextDuration, nextCustomDurationMinutes),
-          ...(isOwner(admin) ? { assignedTeacherId: nextAssignedTeacherId } : {}),
-          notes: nextNotes,
-          modifiedById: admin.id
-        }
-      });
-      await prisma.bookingAuditLog.create({
-        data: {
-          bookingId: id,
-          actorId: admin.id,
-          action: "edited"
-        }
+      await prisma.$transaction(async (tx) => {
+        await tx.booking.update({
+          where: { id },
+          data: {
+            firstName: nextFirstName,
+            lastName: nextLastName,
+            name: nextName,
+            email: nextEmail,
+            phone: nextPhone,
+            address: nextAddress,
+            unitNumber: nextUnitNumber,
+            houseNumber: nextHouseNumber,
+            streetName: nextStreetName,
+            streetType: nextStreetType,
+            suburb: nextSuburb,
+            state: nextState,
+            postcode: nextPostcode,
+            lessonMode: parsed.data.lessonMode ?? existing.lessonMode,
+            skillLevel: parsed.data.skillLevel ?? existing.skillLevel,
+            lessonDuration: nextDuration,
+            customDurationMinutes: nextCustomDurationMinutes,
+            endAt: getBookingEnd(existing.startAt, nextDuration, nextCustomDurationMinutes),
+            ...(isOwner(admin) ? { assignedTeacherId: nextAssignedTeacherId } : {}),
+            notes: nextNotes,
+            modifiedById: admin.id
+          }
+        });
+        await tx.bookingAuditLog.create({
+          data: {
+            bookingId: id,
+            actorId: admin.id,
+            action: "edited"
+          }
+        });
       });
       return NextResponse.json({ ok: true });
     }
@@ -270,12 +296,14 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     }
 
     // Delete dependent audit rows first to satisfy FK constraints before removing the booking.
-    await prisma.bookingAuditLog.deleteMany({
-      where: { bookingId: id }
-    });
+    await prisma.$transaction(async (tx) => {
+      await tx.bookingAuditLog.deleteMany({
+        where: { bookingId: id }
+      });
 
-    await prisma.booking.delete({
-      where: { id }
+      await tx.booking.delete({
+        where: { id }
+      });
     });
 
     return NextResponse.json({ ok: true });

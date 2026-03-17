@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { POST } from "@/app/api/admin/customers/[id]/email/route";
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
+import * as emailService from "@/lib/email/service";
 
 const MOCK_VALID_TOKEN = "valid-token";
 const MOCK_VALID_ANSWER = "123456";
@@ -70,7 +71,7 @@ describe("admin-customer-email", () => {
     expect(data.error).toContain("CAPTCHA");
   });
 
-  it("accepts a valid captcha token and answer in production (simulated)", async () => {
+  it("returns a configuration error when no live email provider is available in production", async () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);
     const cookieName = getSessionCookieName();
@@ -106,13 +107,9 @@ describe("admin-customer-email", () => {
 
     const res = await POST(req, { params: Promise.resolve({ id: customer.id }) });
     
-    // RATIONALE: A valid captcha should preserve the normal queued-no-smtp
-    // behavior rather than introducing a separate success contract.
-    expect(res.status).toBe(200);
-    const data = await res.json() as { ok: boolean; status?: string; message?: string };
-    expect(data.ok).toBe(true);
-    expect(data.status).toBe("queued_no_smtp");
-    expect(data.message).toContain("queued");
+    expect(res.status).toBe(503);
+    const data = await res.json() as { error?: string };
+    expect(data.error).toContain("not configured");
 
     const outbound = await prisma.outboundEmail.findFirstOrThrow({
       where: {
@@ -125,5 +122,48 @@ describe("admin-customer-email", () => {
     expect(outbound.subject).toBe("Test Subject");
     expect(outbound.status).toBe("queued_no_smtp");
     expect(outbound.htmlBody).toContain("Test Message");
+  });
+
+  it("returns a delivery error when the email transport reports failure", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+    const cookieName = getSessionCookieName();
+
+    const customer = await prisma.customer.create({
+      data: {
+        firstName: "Failure",
+        lastName: "Student",
+        fullName: "Failure Student",
+        normalizedFullName: "failure student",
+        email: "failure@example.com",
+        normalizedEmail: "failure@example.com",
+        phone: "1234567890",
+        normalizedPhone: "1234567890"
+      }
+    });
+
+    vi.spyOn(emailService, "sendEmail").mockResolvedValueOnce({
+      status: "failed",
+      error: "smtp offline"
+    });
+
+    const req = new NextRequest(`http://localhost/api/admin/customers/${customer.id}/email`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        cookie: `${cookieName}=${token}`
+      },
+      body: JSON.stringify({
+        subject: "Test Subject",
+        message: "Test Message",
+        captchaToken: MOCK_VALID_TOKEN,
+        captchaAnswer: MOCK_VALID_ANSWER
+      })
+    });
+
+    const res = await POST(req, { params: Promise.resolve({ id: customer.id }) });
+    expect(res.status).toBe(502);
+    const data = await res.json() as { error?: string };
+    expect(data.error).toContain("smtp offline");
   });
 });

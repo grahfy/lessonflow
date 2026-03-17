@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 import { PATCH } from "@/app/api/admin/booking-requests/[id]/route";
+import * as bookingEvents from "@/lib/booking-events";
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 
@@ -72,7 +73,15 @@ describe("admin-booking-approval-portal-credential", () => {
       }),
       { params: Promise.resolve({ id: requestRow.id }) }
     );
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(202);
+    const payload = (await response.json()) as {
+      ok?: boolean;
+      partial?: boolean;
+      deliveryStatus?: string;
+    };
+    expect(payload.ok).toBe(true);
+    expect(payload.partial).toBe(true);
+    expect(payload.deliveryStatus).toBe("queued_no_smtp");
 
     const approvedRequest = await prisma.bookingRequest.findUniqueOrThrow({
       where: {
@@ -181,7 +190,15 @@ describe("admin-booking-approval-portal-credential", () => {
       }),
       { params: Promise.resolve({ id: requestRow.id }) }
     );
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(202);
+    const payload = (await response.json()) as {
+      ok?: boolean;
+      partial?: boolean;
+      deliveryStatus?: string;
+    };
+    expect(payload.ok).toBe(true);
+    expect(payload.partial).toBe(true);
+    expect(payload.deliveryStatus).toBe("queued_no_smtp");
 
     const createdBookings = await prisma.booking.findMany({
       where: { requestId: requestRow.id },
@@ -200,5 +217,120 @@ describe("admin-booking-approval-portal-credential", () => {
     });
     expect(series?.firstName).toBe("Alex");
     expect(series?.lastName).toBe("Student");
+  });
+
+  it("returns partial success when approval persists but notification delivery fails", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const requestRow = await prisma.bookingRequest.create({
+      data: baseRequestData({
+        email: "partial-approval@example.com"
+      })
+    });
+
+    vi.spyOn(bookingEvents, "sendCustomerBookingStatusEmail").mockRejectedValueOnce(new Error("smtp offline"));
+
+    const response = await PATCH(
+      adminPatch(requestRow.id, token, {
+        action: "approve"
+      }),
+      { params: Promise.resolve({ id: requestRow.id }) }
+    );
+
+    expect(response.status).toBe(202);
+    const body = (await response.json()) as { ok?: boolean; partial?: boolean; warning?: string };
+    expect(body.ok).toBe(true);
+    expect(body.partial).toBe(true);
+    expect(body.warning).toContain("notification email");
+
+    const approvedRequest = await prisma.bookingRequest.findUniqueOrThrow({
+      where: { id: requestRow.id }
+    });
+    expect(approvedRequest.status).toBe("approved");
+
+    const booking = await prisma.booking.findFirst({
+      where: { requestId: requestRow.id }
+    });
+    expect(booking).not.toBeNull();
+  });
+
+  it("returns partial success when approval persists but delivery reports failed without throwing", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const requestRow = await prisma.bookingRequest.create({
+      data: baseRequestData({
+        email: "failed-status-approval@example.com"
+      })
+    });
+
+    vi.spyOn(bookingEvents, "sendCustomerBookingStatusEmail").mockResolvedValueOnce({
+      status: "failed",
+      error: "smtp offline"
+    });
+
+    const response = await PATCH(
+      adminPatch(requestRow.id, token, {
+        action: "approve"
+      }),
+      { params: Promise.resolve({ id: requestRow.id }) }
+    );
+
+    expect(response.status).toBe(202);
+    const body = (await response.json()) as {
+      ok?: boolean;
+      partial?: boolean;
+      warning?: string;
+      deliveryStatus?: string;
+    };
+    expect(body.ok).toBe(true);
+    expect(body.partial).toBe(true);
+    expect(body.warning).toContain("smtp offline");
+    expect(body.deliveryStatus).toBe("failed");
+
+    const approvedRequest = await prisma.bookingRequest.findUniqueOrThrow({
+      where: { id: requestRow.id }
+    });
+    expect(approvedRequest.status).toBe("approved");
+  });
+
+  it("returns partial success when approval persists but no live mail provider is configured", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const requestRow = await prisma.bookingRequest.create({
+      data: baseRequestData({
+        email: "queued-status-approval@example.com"
+      })
+    });
+
+    vi.spyOn(bookingEvents, "sendCustomerBookingStatusEmail").mockResolvedValueOnce({
+      status: "queued_no_smtp"
+    });
+
+    const response = await PATCH(
+      adminPatch(requestRow.id, token, {
+        action: "approve"
+      }),
+      { params: Promise.resolve({ id: requestRow.id }) }
+    );
+
+    expect(response.status).toBe(202);
+    const body = (await response.json()) as {
+      ok?: boolean;
+      partial?: boolean;
+      warning?: string;
+      deliveryStatus?: string;
+    };
+    expect(body.ok).toBe(true);
+    expect(body.partial).toBe(true);
+    expect(body.warning).toContain("notification email");
+    expect(body.deliveryStatus).toBe("queued_no_smtp");
+
+    const approvedRequest = await prisma.bookingRequest.findUniqueOrThrow({
+      where: { id: requestRow.id }
+    });
+    expect(approvedRequest.status).toBe("approved");
   });
 });

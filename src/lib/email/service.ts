@@ -296,6 +296,14 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         externalId: info.messageId,
         source: "app"
       }
+    }).catch((persistError) => {
+      // The provider already accepted the message, so audit-log persistence must not
+      // turn delivery into an apparent failure that encourages duplicate retries.
+      logError("email.audit_persist_failed_after_smtp_send", persistError, {
+        to: input.to,
+        subject: input.subject,
+        messageId: info.messageId
+      });
     });
     logEvent("email.sent_smtp", { to: input.to, subject: input.subject });
     return { status: "sent" };

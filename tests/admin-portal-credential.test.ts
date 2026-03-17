@@ -5,6 +5,7 @@ import { GET, POST } from "@/app/api/admin/customers/[id]/portal-credential/rout
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
 import { customerSnapshotFromInput } from "@/lib/customer-match";
 import { prisma } from "@/lib/db";
+import * as emailService from "@/lib/email/service";
 import {
   ensurePortalCredentialForCustomer,
   verifyPortalPassword
@@ -188,5 +189,81 @@ describe("admin-portal-credential", () => {
     expect(payload.error).toBe("Simulated rotate failure");
 
     rotateSpy.mockRestore();
+  });
+
+  it("returns partial success when credential regeneration succeeds but email delivery throws", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+    const cookie = `${getSessionCookieName()}=${token}`;
+
+    const customer = await prisma.customer.create({
+      data: customerSnapshotFromInput({
+        name: "Exploding Mail",
+        email: "exploding.mail@example.com",
+        phone: "0400222333",
+        lessonMode: "video",
+        skillLevel: "beginner",
+        unitNumber: undefined,
+        houseNumber: "12",
+        streetName: "Explode",
+        streetType: "Street",
+        suburb: "Coburg",
+        state: "VIC",
+        postcode: "3058"
+      })
+    });
+    const initial = await ensurePortalCredentialForCustomer({
+      customerId: customer.id,
+      actorId: admin.id
+    });
+    const initialPassword = initial.generatedPassword || "";
+
+    const sendSpy = vi.spyOn(emailService, "sendEmail").mockRejectedValueOnce(new Error("SMTP transport exploded"));
+
+    const regenerateRequest = new NextRequest(`http://localhost/api/admin/customers/${customer.id}/portal-credential`, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "regenerate"
+      }),
+      headers: {
+        "content-type": "application/json",
+        cookie
+      }
+    });
+
+    const regenerateResponse = await POST(regenerateRequest, {
+      params: Promise.resolve({ id: customer.id })
+    });
+    const regeneratePayload = (await regenerateResponse.json()) as {
+      password: string;
+      partial?: boolean;
+      emailStatus?: "sent" | "queued_no_smtp" | "failed" | "skipped";
+      emailMessage?: string;
+    };
+
+    expect(regenerateResponse.status).toBe(200);
+    expect(regeneratePayload.partial).toBe(true);
+    expect(regeneratePayload.emailStatus).toBe("failed");
+    expect(regeneratePayload.emailMessage).toContain("SMTP transport exploded");
+    expect(regeneratePayload.password).not.toBe(initialPassword);
+
+    const credential = await prisma.customerPortalCredential.findUniqueOrThrow({
+      where: {
+        customerId: customer.id
+      }
+    });
+    const oldValid = await verifyPortalPassword({
+      plaintext: initialPassword,
+      passwordHash: credential.passwordHash
+    });
+    const newValid = await verifyPortalPassword({
+      plaintext: regeneratePayload.password,
+      passwordHash: credential.passwordHash
+    });
+
+    expect(oldValid).toBe(false);
+    expect(newValid).toBe(true);
+
+    sendSpy.mockRestore();
   });
 });
