@@ -12,7 +12,7 @@ import { z } from "zod";
 import { bookingColor, bookingRequestColor, getRecencyCutoff } from "@/lib/admin-calendar-events";
 import { canManagePrimaryTeacherCustomer } from "@/lib/admin/permissions";
 import { ensureCustomerPrimaryTeacher, resolveAssignedTeacherId } from "@/lib/admin/teacher-assignment";
-import { bookingRequestSchema, formatBookingAddress, generateRecurringStartDates, getBookingEnd } from "@/lib/booking-rules";
+import { adminManualBookingSchema, formatBookingAddress, generateRecurringStartDates, getBookingEnd } from "@/lib/booking-rules";
 import { customerSnapshotFromInput, normalizeEmail, normalizePhone } from "@/lib/customer-match";
 import { getCalendarRange } from "@/lib/calendar-range";
 import { requireAdminFromRequest } from "@/lib/admin-route";
@@ -24,7 +24,7 @@ import { ensurePortalCredentialForCustomer } from "@/lib/student-portal/credenti
  * Includes additional fields for binding to existing customers or choosing
  * resolution strategies when a possible duplicate is detected.
  */
-const manualBookingSchema = bookingRequestSchema.and(
+const manualBookingSchema = adminManualBookingSchema.and(
   z.object({
     customerId: z.string().trim().min(1).optional(),
     assignedTeacherId: z.string().trim().min(1).nullable().optional(),

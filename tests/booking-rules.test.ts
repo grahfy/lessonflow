@@ -1,7 +1,7 @@
 import { addDays } from "date-fns";
 import { describe, expect, it } from "vitest";
 
-import { bookingRequestSchema, generateRecurringStartDates, getBookingEnd } from "@/lib/booking-rules";
+import { adminManualBookingSchema, bookingRequestSchema, generateRecurringStartDates, getBookingEnd } from "@/lib/booking-rules";
 
 function toIso(year: number, month: number, day: number, hour = 10): string {
   const value = new Date(Date.UTC(year, month - 1, day, hour, 0, 0));
@@ -47,6 +47,84 @@ describe("booking-rules", () => {
     const start = toIso(year, 1, 10, 3);
 
     const parsed = bookingRequestSchema.safeParse({
+      firstName: "Alex",
+      lastName: "Student",
+      name: "Alex Student",
+      email: "alex@example.com",
+      phone: "0400-123-456",
+      houseNumber: "1",
+      streetName: "Smith",
+      streetType: "St",
+      suburb: "Northcote",
+      state: "VIC",
+      postcode: "3070",
+      lessonMode: "video",
+      skillLevel: "intermediate",
+      lessonDuration: "min30",
+      requestedStartAt: start,
+      isRecurring: false
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects public booking dates in the past", () => {
+    const startDate = addDays(new Date(), -2);
+    const start = startDate.toISOString().replace("Z", "+00:00");
+
+    const parsed = bookingRequestSchema.safeParse({
+      firstName: "Alex",
+      lastName: "Student",
+      name: "Alex Student",
+      email: "alex@example.com",
+      phone: "0400-123-456",
+      houseNumber: "1",
+      streetName: "Smith",
+      streetType: "St",
+      suburb: "Northcote",
+      state: "VIC",
+      postcode: "3070",
+      lessonMode: "video",
+      skillLevel: "intermediate",
+      lessonDuration: "min30",
+      requestedStartAt: start,
+      isRecurring: false
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  it("allows admin manual single bookings in the past, including prior years", () => {
+    const previousYear = new Date().getUTCFullYear() - 1;
+    const start = toIso(previousYear, 6, 10, 3);
+
+    const parsed = adminManualBookingSchema.safeParse({
+      firstName: "Alex",
+      lastName: "Student",
+      name: "Alex Student",
+      email: "alex@example.com",
+      phone: "0400-123-456",
+      houseNumber: "1",
+      streetName: "Smith",
+      streetType: "St",
+      suburb: "Northcote",
+      state: "VIC",
+      postcode: "3070",
+      lessonMode: "video",
+      skillLevel: "intermediate",
+      lessonDuration: "min30",
+      requestedStartAt: start,
+      isRecurring: false
+    });
+
+    expect(parsed.success).toBe(true);
+  });
+
+  it("still rejects admin manual single bookings scheduled beyond the current year", () => {
+    const nextYear = new Date().getUTCFullYear() + 1;
+    const start = toIso(nextYear, 1, 10, 3);
+
+    const parsed = adminManualBookingSchema.safeParse({
       firstName: "Alex",
       lastName: "Student",
       name: "Alex Student",

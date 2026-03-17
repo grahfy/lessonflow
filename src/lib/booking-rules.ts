@@ -12,9 +12,10 @@
  *    discrete temporal intervals for DB storage.
  * 4. Recurring Logic: Algorithmic generation of weekly booking series.
  * 
- * RATIONALE: By centralizing these rules in a single library, we ensure that 
- * the Public Booking Form, Admin Manual Booking, and Background Workers 
- * all adhere to identical constraints, preventing system drift.
+ * RATIONALE: By centralizing these rules in a single library, we keep the
+ * Public Booking Form, Admin Manual Booking, and Background Workers aligned on
+ * shared validation while still making explicit, auditable exceptions where
+ * business policy differs.
  */
 
 import { addMinutes, addWeeks, isAfter, isBefore } from "date-fns";
@@ -64,64 +65,61 @@ export const contactSubmissionSchema = z.object({
 // BOOKING REQUEST VALIDATION - Complex schema with cross-field validation
 // =============================================================================
 
-/**
- * Complete booking request schema with simplified address validation.
- * 
- * LOGIC: Validates core identification fields (Name, Email, Phone, Postcode).
- * RATIONALE: Address fields (street, house number, etc.) have been moved out of the 
- * public UI to reduce friction. They are kept in the schema as optional/empty strings 
- * to maintain backward compatibility with existing database rows and admin views.
- */
-export const bookingRequestSchema = z
-  .object({
-    // Split name for better customer matching logic
-    firstName: z.string().trim().min(1, "First name is required").max(60),
-    lastName: z.string().trim().min(1, "Last name is required").max(60),
-    // name is kept for backward compatibility with the database schema
-    name: z.string().trim().min(2).max(120),
-    email: z.string().trim().email().max(200),
-    phone: auPhoneSchema,
-    // Country is defaulted to Australia but allowed to be empty
-    country: z.string().trim().optional().default("Australia"),
-    // Address fields are now optional to support simplified booking flow
-    unitNumber: z.string().trim().optional().nullable(),
-    houseNumber: z.string().trim().optional().default(""),
-    streetName: z.string().trim().optional().default(""),
-    streetType: z.string().trim().optional().default(""),
-    suburb: z.string().trim().optional().default(""),
-    state: z.string().trim().optional().default("VIC"),
-    // Postcode remains mandatory for matching and service eligibility
-    postcode: auPostcodeSchema,
-    lessonMode: lessonModeSchema,
-    skillLevel: skillLevelSchema,
-    lessonDuration: lessonDurationSchema,
-    customDurationMinutes: z.coerce.number().int().min(15).max(300).optional(),
-    requestedStartAt: isoDateParser,
-    notes: z.string().trim().max(1000).optional(),
-    isRecurring: z.boolean().default(false),
-    recurrenceEndAt: isoDateParser.optional()
-  })
-  .superRefine((data, ctx) => {
+const bookingRequestFields = z.object({
+  // Split name for better customer matching logic
+  firstName: z.string().trim().min(1, "First name is required").max(60),
+  lastName: z.string().trim().min(1, "Last name is required").max(60),
+  // name is kept for backward compatibility with the database schema
+  name: z.string().trim().min(2).max(120),
+  email: z.string().trim().email().max(200),
+  phone: auPhoneSchema,
+  // Country is defaulted to Australia but allowed to be empty
+  country: z.string().trim().optional().default("Australia"),
+  // Address fields are now optional to support simplified booking flow
+  unitNumber: z.string().trim().optional().nullable(),
+  houseNumber: z.string().trim().optional().default(""),
+  streetName: z.string().trim().optional().default(""),
+  streetType: z.string().trim().optional().default(""),
+  suburb: z.string().trim().optional().default(""),
+  state: z.string().trim().optional().default("VIC"),
+  // Postcode remains mandatory for matching and service eligibility
+  postcode: auPostcodeSchema,
+  lessonMode: lessonModeSchema,
+  skillLevel: skillLevelSchema,
+  lessonDuration: lessonDurationSchema,
+  customDurationMinutes: z.coerce.number().int().min(15).max(300).optional(),
+  requestedStartAt: isoDateParser,
+  notes: z.string().trim().max(1000).optional(),
+  isRecurring: z.boolean().default(false),
+  recurrenceEndAt: isoDateParser.optional()
+});
+
+function createBookingRequestSchema(options?: { allowHistoricalSingleBookings?: boolean }) {
+  return bookingRequestFields.superRefine((data, ctx) => {
     const startAt = new Date(data.requestedStartAt);
     const now = new Date();
     const currentYear = getCurrentCalendarYear();
+    const allowHistoricalSingleBookings =
+      options?.allowHistoricalSingleBookings === true && !data.isRecurring && isBefore(startAt, now);
 
-    // SECURITY: Prevent booking dates in the past or far future outside the business cycle.
-    if (!isDateInCalendarYear(startAt, currentYear)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `Bookings must be in the current calendar year (${currentYear}).`,
-        path: ["requestedStartAt"]
-      });
-    }
+    if (!allowHistoricalSingleBookings) {
+      // SECURITY: Prevent booking dates in the past or far future outside the business cycle.
+      if (!isDateInCalendarYear(startAt, currentYear)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Bookings must be in the current calendar year (${currentYear}).`,
+          path: ["requestedStartAt"]
+        });
+      }
 
-    // LOGIC: Ensure booking is in the future
-    if (isBefore(startAt, now)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Requested start must be in the future.",
-        path: ["requestedStartAt"]
-      });
+      // LOGIC: Ensure booking is in the future
+      if (isBefore(startAt, now)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Requested start must be in the future.",
+          path: ["requestedStartAt"]
+        });
+      }
     }
 
     // VALIDATION: Custom duration must be whole number
@@ -173,6 +171,27 @@ export const bookingRequestSchema = z
       });
     }
   });
+}
+
+/**
+ * Complete public booking request schema with simplified address validation.
+ *
+ * LOGIC: Validates core identification fields (Name, Email, Phone, Postcode).
+ * RATIONALE: Address fields (street, house number, etc.) have been moved out of the
+ * public UI to reduce friction. They are kept in the schema as optional/empty strings
+ * to maintain backward compatibility with existing database rows and admin views.
+ */
+export const bookingRequestSchema = createBookingRequestSchema();
+
+/**
+ * Admin-only manual booking schema.
+ *
+ * RATIONALE: Admins may backfill one-off historical bookings for record keeping,
+ * but recurring entries still follow the normal current-year and future-only rules.
+ */
+export const adminManualBookingSchema = createBookingRequestSchema({
+  allowHistoricalSingleBookings: true
+});
 
 export type BookingRequestInput = z.infer<typeof bookingRequestSchema>;
 

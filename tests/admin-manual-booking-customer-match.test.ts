@@ -43,6 +43,10 @@ function basePayload(startAt: string) {
   };
 }
 
+function historicalIso(yearOffset = -1, month = 6, day = 10, hour = 10): string {
+  return new Date(Date.UTC(new Date().getUTCFullYear() + yearOffset, month - 1, day, hour, 0, 0)).toISOString();
+}
+
 describe("admin-manual-booking-customer-match", () => {
   beforeEach(async () => {
     // NOTE: Manual booking can create both direct bookings and recurring series,
@@ -79,6 +83,29 @@ describe("admin-manual-booking-customer-match", () => {
       }
     });
     expect(credential).not.toBeNull();
+  });
+
+  it("creates and links a customer automatically for historical manual bookings", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+    const startAt = historicalIso();
+
+    const res = await POST(adminPost(basePayload(startAt), token));
+    expect(res.status).toBe(200);
+
+    const booking = await prisma.booking.findFirstOrThrow({
+      where: {
+        startAt: new Date(startAt)
+      }
+    });
+    expect(booking.customerId).toBeTruthy();
+
+    const customer = await prisma.customer.findUniqueOrThrow({
+      where: {
+        id: booking.customerId!
+      }
+    });
+    expect(customer.normalizedEmail).toBe("taylor@example.com");
   });
 
   it("returns conflict for existing deterministic customer match and allows using existing", async () => {
@@ -201,5 +228,29 @@ describe("admin-manual-booking-customer-match", () => {
       expect(booking.firstName).toBe("Taylor");
       expect(booking.lastName).toBe("Student");
     }
+  });
+
+  it("rejects recurring manual bookings that start in the past", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+    const startAt = historicalIso();
+    const recurrenceEndAt = historicalIso(-1, 6, 24, 10);
+
+    const response = await POST(
+      adminPost(
+        {
+          ...basePayload(startAt),
+          isRecurring: true,
+          recurrenceEndAt
+        },
+        token
+      )
+    );
+
+    expect(response.status).toBe(400);
+    const bookings = await prisma.booking.findMany({
+      where: { email: "taylor@example.com" }
+    });
+    expect(bookings).toHaveLength(0);
   });
 });
