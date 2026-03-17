@@ -5,9 +5,10 @@ This folder stores screenshot assets used by:
 - the in-app admin manual (`/admin/manual`) via `public/documentation/screenshots/` sync.
 
 `Documentation/assets/` is the authored source of truth.
+`src/lib/manual/content.ts` is the canonical screenshot registry and section/gallery contract.
 `public/documentation/screenshots/` is the synced runtime/public copy used by the app and repo-facing screenshots.
 
-The current manual structure expects screenshots for the core admin, student, public, and diagnostic workflows. Existing baseline coverage includes bookings, customers, invoices, reports, settings, manual, and student/public pages. As the manual grows, add captures for any new section that benefits from a real UI example rather than descriptive prose alone.
+The manual now expects a chapter-complete screenshot set for the core admin, student, public, diagnostic, and release-visibility workflows. Add new screenshots only by registering them first, then capturing, syncing, and validating the full set.
 
 ## Capture Workflow
 1. Seed deterministic demo data:
@@ -16,6 +17,13 @@ The current manual structure expects screenshots for the core admin, student, pu
    - `npm run docs:screenshots`
 3. Sync assets to public manual path:
    - `npm run docs:screenshots:sync`
+4. Validate registry, markdown, and asset parity:
+   - `npm run docs:screenshots:validate`
+
+## Markdown Contract
+- Use `assets/<file>.png` in `Documentation/*.md`
+- Legacy `Documentation/assets/<file>.png` links still render in-app, but new edits should normalize to `assets/...`
+- Every manual screenshot must exist in `MANUAL_SCREENSHOTS` and be assigned to at least one section gallery
 
 ## Required Environment for Authenticated Captures
 - `DOCS_SCREENSHOTS_ADMIN_EMAIL`

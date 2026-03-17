@@ -18,7 +18,8 @@
     "docs:screenshots:seed": "npx tsx ./scripts/seed-docs-screenshots.ts",
     "docs:screenshots": "playwright test tests/e2e/docs-screenshots.spec.ts",
     "docs:screenshots:sync": "node ./scripts/sync-manual-screenshots.cjs",
-    "docs:screenshots:update": "npm run docs:screenshots && npm run docs:screenshots:sync",
+    "docs:screenshots:validate": "npx tsx ./scripts/validate-manual-screenshots.ts",
+    "docs:screenshots:update": "npm run docs:screenshots && npm run docs:screenshots:sync && npm run docs:screenshots:validate",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio"

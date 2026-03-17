@@ -50,171 +50,232 @@ export type AdminManualIndex = {
   screenshots: ManualScreenshot[];
 };
 
+function createManualScreenshot(
+  id: string,
+  alt: string,
+  caption: string
+): ManualScreenshot {
+  const fileName = `${id}.png`;
+  return {
+    id,
+    fileName,
+    publicPath: `/documentation/screenshots/${fileName}`,
+    documentationPath: `Documentation/assets/${fileName}`,
+    alt,
+    caption
+  };
+}
+
 /**
  * Stable screenshot registry used by both the manual UI and the Playwright
  * docs-capture workflow.
  */
 export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
-  {
-    id: "admin-login-page",
-    fileName: "admin-login-page.png",
-    publicPath: "/documentation/screenshots/admin-login-page.png",
-    documentationPath: "Documentation/assets/admin-login-page.png",
-    alt: "Admin login page",
-    caption: "Owner and staff use the admin login page to access the console."
-  },
-  {
-    id: "booking-calendar-week-view",
-    fileName: "booking-calendar-week-view.png",
-    publicPath: "/documentation/screenshots/booking-calendar-week-view.png",
-    documentationPath: "Documentation/assets/booking-calendar-week-view.png",
-    alt: "Booking calendar week view",
-    caption: "The weekly calendar combines confirmed lessons and pending requests."
-  },
-  {
-    id: "manual-booking-dialog-customer-step",
-    fileName: "manual-booking-dialog-customer-step.png",
-    publicPath: "/documentation/screenshots/manual-booking-dialog-customer-step.png",
-    documentationPath: "Documentation/assets/manual-booking-dialog-customer-step.png",
-    alt: "Manual booking dialog customer step",
-    caption: "Manual bookings can attach to an existing customer or create a new record."
-  },
-  {
-    id: "booking-detail-dialog-notes-and-actions",
-    fileName: "booking-detail-dialog-notes-and-actions.png",
-    publicPath: "/documentation/screenshots/booking-detail-dialog-notes-and-actions.png",
-    documentationPath: "Documentation/assets/booking-detail-dialog-notes-and-actions.png",
-    alt: "Booking detail dialog actions",
-    caption: "Booking detail shows edit, move, notify, materials, and billing actions."
-  },
-  {
-    id: "booking-create-invoice-dialog",
-    fileName: "booking-create-invoice-dialog.png",
-    publicPath: "/documentation/screenshots/booking-create-invoice-dialog.png",
-    documentationPath: "Documentation/assets/booking-create-invoice-dialog.png",
-    alt: "Create invoice from booking dialog",
-    caption: "A confirmed booking can open the billing flow without leaving the lesson context."
-  },
-  {
-    id: "customer-directory-list",
-    fileName: "customer-directory-list.png",
-    publicPath: "/documentation/screenshots/customer-directory-list.png",
-    documentationPath: "Documentation/assets/customer-directory-list.png",
-    alt: "Customer directory list",
-    caption: "The customer directory is the support hub for profile, portal, and billing access."
-  },
-  {
-    id: "customer-editor-create",
-    fileName: "customer-editor-create.png",
-    publicPath: "/documentation/screenshots/customer-editor-create.png",
-    documentationPath: "Documentation/assets/customer-editor-create.png",
-    alt: "Customer create dialog",
-    caption: "Customer records can be created or edited directly inside the admin console."
-  },
-  {
-    id: "invoice-console-list-and-filters",
-    fileName: "invoice-console-list-and-filters.png",
-    publicPath: "/documentation/screenshots/invoice-console-list-and-filters.png",
-    documentationPath: "Documentation/assets/invoice-console-list-and-filters.png",
-    alt: "Invoice console list and filters",
-    caption: "The invoices list highlights status, overdue balances, and follow-up candidates."
-  },
-  {
-    id: "invoice-create-dialog",
-    fileName: "invoice-create-dialog.png",
-    publicPath: "/documentation/screenshots/invoice-create-dialog.png",
-    documentationPath: "Documentation/assets/invoice-create-dialog.png",
-    alt: "Invoice create dialog",
-    caption: "Standalone and lesson-based invoice creation both begin from the invoice create dialog."
-  },
-  {
-    id: "invoice-detail-send-and-download-pdf",
-    fileName: "invoice-detail-send-and-download-pdf.png",
-    publicPath: "/documentation/screenshots/invoice-detail-send-and-download-pdf.png",
-    documentationPath: "Documentation/assets/invoice-detail-send-and-download-pdf.png",
-    alt: "Invoice detail actions",
-    caption: "Invoice detail provides send, remind, payment, and PDF actions according to status."
-  },
-  {
-    id: "invoice-filters-outstanding-aging",
-    fileName: "invoice-filters-outstanding-aging.png",
-    publicPath: "/documentation/screenshots/invoice-filters-outstanding-aging.png",
-    documentationPath: "Documentation/assets/invoice-filters-outstanding-aging.png",
-    alt: "Invoice outstanding aging filters",
-    caption: "Outstanding-only and aging filters help owners focus on overdue billing."
-  },
-  {
-    id: "public-book-page",
-    fileName: "public-book-page.png",
-    publicPath: "/documentation/screenshots/public-book-page.png",
-    documentationPath: "Documentation/assets/public-book-page.png",
-    alt: "Public booking request page",
-    caption: "New students use the public booking form to request lessons."
-  },
-  {
-    id: "public-contact-page",
-    fileName: "public-contact-page.png",
-    publicPath: "/documentation/screenshots/public-contact-page.png",
-    documentationPath: "Documentation/assets/public-contact-page.png",
-    alt: "Public contact page",
-    caption: "General enquiries arrive through the public contact form."
-  },
-  {
-    id: "student-login-page",
-    fileName: "student-login-page.png",
-    publicPath: "/documentation/screenshots/student-login-page.png",
-    documentationPath: "Documentation/assets/student-login-page.png",
-    alt: "Student portal login page",
-    caption: "Students sign in with name, postcode, and a generated portal password."
-  },
-  {
-    id: "student-portal-page",
-    fileName: "student-portal-page.png",
-    publicPath: "/documentation/screenshots/student-portal-page.png",
-    documentationPath: "Documentation/assets/student-portal-page.png",
-    alt: "Student portal dashboard page",
-    caption: "The student portal shows appointments, requests, and learning materials."
-  },
-  {
-    id: "admin-settings-page",
-    fileName: "admin-settings-page.png",
-    publicPath: "/documentation/screenshots/admin-settings-page.png",
-    documentationPath: "Documentation/assets/admin-settings-page.png",
-    alt: "Admin settings page",
-    caption: "The settings area combines branding, content, invoice, product, and system configuration."
-  },
-  {
-    id: "teachers-workspace-page",
-    fileName: "teachers-workspace-page.png",
-    publicPath: "/documentation/screenshots/teachers-workspace-page.png",
-    documentationPath: "Documentation/assets/teachers-workspace-page.png",
-    alt: "Teachers workspace page",
-    caption: "The teachers workspace combines a staff directory with assignment-aware profile editing."
-  },
-  {
-    id: "admin-reports-dashboard",
-    fileName: "admin-reports-dashboard.png",
-    publicPath: "/documentation/screenshots/admin-reports-dashboard.png",
-    documentationPath: "Documentation/assets/admin-reports-dashboard.png",
-    alt: "Admin reports dashboard",
-    caption: "Reports help owners review activity, overdue balances, and earnings trends."
-  },
-  {
-    id: "system-logs-page",
-    fileName: "system-logs-page.png",
-    publicPath: "/documentation/screenshots/system-logs-page.png",
-    documentationPath: "Documentation/assets/system-logs-page.png",
-    alt: "System logs page",
-    caption: "The logs page helps staff confirm recent system events and collect evidence before escalation."
-  },
-  {
-    id: "admin-manual-page",
-    fileName: "admin-manual-page.png",
-    publicPath: "/documentation/screenshots/admin-manual-page.png",
-    documentationPath: "Documentation/assets/admin-manual-page.png",
-    alt: "Admin manual page",
-    caption: "The in-app manual turns the repository docs into a navigable operator reference."
-  }
+  createManualScreenshot(
+    "admin-manual-page",
+    "Admin manual page",
+    "The in-app manual turns the repository docs into a navigable operator reference."
+  ),
+  createManualScreenshot(
+    "admin-login-page",
+    "Admin login page",
+    "Owner and staff use the admin login page to access the console."
+  ),
+  createManualScreenshot(
+    "booking-calendar-week-view",
+    "Booking calendar week view",
+    "The weekly calendar combines confirmed lessons and pending requests."
+  ),
+  createManualScreenshot(
+    "manual-booking-dialog-customer-step",
+    "Manual booking dialog customer step",
+    "Manual bookings can attach to an existing customer or create a new record."
+  ),
+  createManualScreenshot(
+    "booking-detail-dialog-notes-and-actions",
+    "Booking detail dialog actions",
+    "Booking detail shows edit, move, notify, materials, and billing actions."
+  ),
+  createManualScreenshot(
+    "booking-create-invoice-dialog",
+    "Create invoice from booking dialog",
+    "A confirmed booking can open the billing flow without leaving the lesson context."
+  ),
+  createManualScreenshot(
+    "booking-assigned-teacher-dialog",
+    "Booking dialog assigned teacher control",
+    "Booking editing exposes the assigned teacher field alongside lesson timing and status controls."
+  ),
+  createManualScreenshot(
+    "booking-email-panel",
+    "Booking email panel",
+    "Booking communication history and manual email drafting stay inside the lesson detail workflow."
+  ),
+  createManualScreenshot(
+    "teachers-workspace-page",
+    "Teachers workspace page",
+    "The teachers workspace combines a staff directory with assignment-aware profile editing."
+  ),
+  createManualScreenshot(
+    "teachers-directory-list",
+    "Teachers directory list",
+    "The teacher directory rail makes it easy to move between owner and teacher accounts."
+  ),
+  createManualScreenshot(
+    "teacher-profile-editor-basics",
+    "Teacher profile editor basics tab",
+    "The Basics tab keeps identity, sign-in, and active status controls together."
+  ),
+  createManualScreenshot(
+    "customer-directory-list",
+    "Customer directory list",
+    "The customer directory is the support hub for profile, portal, and billing access."
+  ),
+  createManualScreenshot(
+    "customer-editor-create",
+    "Customer create dialog",
+    "Customer records can be created or edited directly inside the admin console."
+  ),
+  createManualScreenshot(
+    "customer-profile-assigned-teacher",
+    "Customer profile assigned teacher field",
+    "Customer profiles expose the primary teacher assignment used for follow-up and future defaults."
+  ),
+  createManualScreenshot(
+    "customer-portal-credential-panel",
+    "Customer portal credential panel",
+    "Portal credential support stays inside the customer profile so admins can reveal or regenerate access quickly."
+  ),
+  createManualScreenshot(
+    "customer-email-history-panel",
+    "Customer email history panel",
+    "Customer communication history shows message status, provider source, and manual send controls."
+  ),
+  createManualScreenshot(
+    "customer-materials-list-upload-panel",
+    "Customer materials upload panel",
+    "The customer materials tab combines booking selection, uploads, and file deletion in one panel."
+  ),
+  createManualScreenshot(
+    "invoice-console-list-and-filters",
+    "Invoice console list and filters",
+    "The invoices list highlights status, overdue balances, and follow-up candidates."
+  ),
+  createManualScreenshot(
+    "invoice-create-dialog",
+    "Invoice create dialog",
+    "Standalone and lesson-based invoice creation both begin from the invoice create dialog."
+  ),
+  createManualScreenshot(
+    "invoice-detail-send-and-download-pdf",
+    "Invoice detail actions",
+    "Invoice detail provides send, remind, payment, and PDF actions according to status."
+  ),
+  createManualScreenshot(
+    "invoice-filters-outstanding-aging",
+    "Invoice outstanding aging filters",
+    "Outstanding-only and aging filters help owners focus on overdue billing."
+  ),
+  createManualScreenshot(
+    "admin-reports-dashboard",
+    "Admin reports dashboard",
+    "Reports help owners review activity, overdue balances, and earnings trends."
+  ),
+  createManualScreenshot(
+    "reports-custom-range-controls",
+    "Reports custom range controls",
+    "Custom date-range controls let owners inspect non-standard reporting windows without leaving the dashboard."
+  ),
+  createManualScreenshot(
+    "admin-settings-page",
+    "Admin settings page",
+    "The settings area combines branding, content, invoice, product, and system configuration."
+  ),
+  createManualScreenshot(
+    "settings-pages-tab",
+    "Settings pages tab",
+    "The Pages tab edits structured content blocks for legal and student-facing pages."
+  ),
+  createManualScreenshot(
+    "settings-emails-tab",
+    "Settings emails tab",
+    "The Emails tab groups signature and template editing for automated communication."
+  ),
+  createManualScreenshot(
+    "settings-invoices-tab",
+    "Settings invoices tab",
+    "The Invoices tab combines billing defaults with invoice template controls."
+  ),
+  createManualScreenshot(
+    "settings-products-tab",
+    "Settings products tab",
+    "The Products tab manages reusable billing presets such as lesson packages and textbooks."
+  ),
+  createManualScreenshot(
+    "settings-system-tab",
+    "Settings system tab",
+    "The System tab exposes infrastructure, delivery, and security settings that require deliberate handling."
+  ),
+  createManualScreenshot(
+    "system-logs-page",
+    "System logs page",
+    "The logs page helps staff confirm recent system events and collect evidence before escalation."
+  ),
+  createManualScreenshot(
+    "system-log-report-dialog",
+    "System log report dialog",
+    "The issue-report dialog captures a subject, reply address, description, screenshot, and recent logs."
+  ),
+  createManualScreenshot(
+    "public-book-page",
+    "Public booking request page",
+    "New students use the public booking form to request lessons."
+  ),
+  createManualScreenshot(
+    "public-contact-page",
+    "Public contact page",
+    "General enquiries arrive through the public contact form."
+  ),
+  createManualScreenshot(
+    "student-login-page",
+    "Student portal login page",
+    "Students sign in with name, postcode, and a generated portal password."
+  ),
+  createManualScreenshot(
+    "student-portal-page",
+    "Student portal dashboard page",
+    "The student portal dashboard shows appointments, requests, and quick access to learning materials."
+  ),
+  createManualScreenshot(
+    "student-portal-materials-view",
+    "Student portal materials library page",
+    "The dedicated materials library shows lesson-linked files alongside general resources."
+  ),
+  createManualScreenshot(
+    "pending-changes-modal",
+    "Pending repository updates modal",
+    "The pending-changes modal shows which commits are available before an owner triggers a web update."
+  ),
+  createManualScreenshot(
+    "deployment-updates-latest-tab",
+    "Deployment updates dialog latest tab",
+    "The Latest tab confirms the currently deployed commit, release label, and included changes."
+  ),
+  createManualScreenshot(
+    "deployment-updates-history-tab",
+    "Deployment updates dialog history tab",
+    "The History tab helps correlate current behaviour with earlier deployments."
+  ),
+  createManualScreenshot(
+    "admin-about-page",
+    "Admin about page",
+    "The About page provides stable build metadata and escalation contact details."
+  ),
+  createManualScreenshot(
+    "update-progress-page",
+    "Update progress page",
+    "The live update progress page shows streamed output and restart status while a web-triggered deployment runs."
+  )
 ];
 
 /**
@@ -268,7 +329,12 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
     audience: "all_admins",
     sourcePath: "Documentation/03a-Staff-Management-and-Teacher-Assignment.md",
     relatedRoutes: ["/admin/teachers", "/admin/bookings", "/admin/customers"],
-    screenshotIds: ["teachers-workspace-page"]
+    screenshotIds: [
+      "teachers-workspace-page",
+      "teachers-directory-list",
+      "teacher-profile-editor-basics",
+      "booking-assigned-teacher-dialog"
+    ]
   },
   {
     id: "customers-communication-portal-support",
@@ -278,7 +344,13 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
     audience: "all_admins",
     sourcePath: "Documentation/04-Customers-Communication-and-Portal-Support.md",
     relatedRoutes: ["/admin/customers", "/admin/bookings", "/admin/invoices"],
-    screenshotIds: ["customer-directory-list", "customer-editor-create"]
+    screenshotIds: [
+      "customer-directory-list",
+      "customer-editor-create",
+      "customer-profile-assigned-teacher",
+      "customer-portal-credential-panel",
+      "customer-email-history-panel"
+    ]
   },
   {
     id: "learning-materials-notifications",
@@ -287,8 +359,12 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
     group: "support",
     audience: "all_admins",
     sourcePath: "Documentation/06-Learning-Materials-and-Notifications.md",
-    relatedRoutes: ["/admin/bookings", "/admin/customers", "/student/portal"],
-    screenshotIds: ["student-portal-page"]
+    relatedRoutes: ["/admin/bookings", "/admin/customers", "/student/portal", "/student/materials"],
+    screenshotIds: [
+      "booking-email-panel",
+      "customer-materials-list-upload-panel",
+      "student-portal-materials-view"
+    ]
   },
   {
     id: "invoicing-payments",
@@ -313,7 +389,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
     audience: "all_admins",
     sourcePath: "Documentation/07-Reports-and-Follow-Up.md",
     relatedRoutes: ["/admin/reports", "/admin/invoices"],
-    screenshotIds: ["admin-reports-dashboard", "invoice-filters-outstanding-aging"]
+    screenshotIds: ["admin-reports-dashboard", "reports-custom-range-controls"]
   },
   {
     id: "settings-configuration",
@@ -323,7 +399,14 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
     audience: "all_admins",
     sourcePath: "Documentation/08-Settings-and-Configuration.md",
     relatedRoutes: ["/admin/settings"],
-    screenshotIds: ["admin-settings-page"]
+    screenshotIds: [
+      "admin-settings-page",
+      "settings-pages-tab",
+      "settings-emails-tab",
+      "settings-invoices-tab",
+      "settings-products-tab",
+      "settings-system-tab"
+    ]
   },
   {
     id: "logs-bug-reporting",
@@ -333,7 +416,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
     audience: "all_admins",
     sourcePath: "Documentation/09-Logs-and-Bug-Reporting.md",
     relatedRoutes: ["/admin/system-logs"],
-    screenshotIds: ["system-logs-page"]
+    screenshotIds: ["system-logs-page", "system-log-report-dialog"]
   },
   {
     id: "public-intake-student-portal",
@@ -353,7 +436,13 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
     audience: "all_admins",
     sourcePath: "Documentation/11-Updates-and-Release-Visibility.md",
     relatedRoutes: ["/admin/about", "/admin/updates/progress", "/admin/bookings"],
-    screenshotIds: []
+    screenshotIds: [
+      "pending-changes-modal",
+      "deployment-updates-latest-tab",
+      "deployment-updates-history-tab",
+      "admin-about-page",
+      "update-progress-page"
+    ]
   },
   {
     id: "how-lessonflow-works",
@@ -399,7 +488,10 @@ const DOC_BASENAME_TO_SECTION_ID = new Map(
  * the app shell and cross-link to manual routes instead of raw files.
  */
 function rewriteDocAssetImagePaths(markdown: string): string {
-  const withImages = markdown.replace(/\((?:\.\/)?assets\/([^)]+)\)/g, "(/documentation/screenshots/$1)");
+  const withImages = markdown.replace(
+    /\((?:\.\/)?(?:(?:Documentation\/)?assets\/([^)]+))\)/g,
+    "(/documentation/screenshots/$1)"
+  );
 
   return withImages.replace(/\(((?:Documentation\/)?[^)]+\.md)\)/g, (fullMatch, target) => {
     const fileName = path.basename(String(target));

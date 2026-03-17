@@ -17,6 +17,8 @@ The page supports:
 - submission of issue reports
 - optional screenshot attachment
 
+![System logs page](assets/system-logs-page.png)
+
 ## Toolbar Elements
 
 | Control | Function |
@@ -57,6 +59,8 @@ Good issue reports identify the attempted action, the observed result, whether i
 <div class="manual-callout warning">
 <strong>Privacy note:</strong> Secrets, passwords, and unrelated personal information should not be pasted into the report. Only the minimum evidence necessary to explain the failure should be included.
 </div>
+
+![System log report dialog](assets/system-log-report-dialog.png)
 
 ## Escalation Conditions
 

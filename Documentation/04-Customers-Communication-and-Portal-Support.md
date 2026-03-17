@@ -20,6 +20,8 @@ The customer directory supports the following activities:
 
 These functions make the directory the preferred starting point for support questions tied to a known student or family.
 
+![Customer directory list](assets/customer-directory-list.png)
+
 ## Record Creation and Duplicate Avoidance
 
 Before a new customer record is created, the directory should be searched by:
@@ -29,6 +31,8 @@ Before a new customer record is created, the directory should be searched by:
 - phone number
 
 Duplicate records complicate portal access, invoice history, and lesson continuity. Preventing duplication is therefore preferable to repairing it later through manual reconciliation.
+
+![Customer create dialog](assets/customer-editor-create.png)
 
 ## Profile Maintenance
 
@@ -49,6 +53,8 @@ The customer workflow now exposes the assigned or primary teacher as an editable
 
 On a single-user install, the owner may appear as the only assignable teacher. This is expected behaviour when no separate active teacher account exists.
 
+![Customer profile assigned teacher](assets/customer-profile-assigned-teacher.png)
+
 ## Portal Credential Support
 
 LessonFlow exposes student-portal credential support from the customer workflow so administrators can resolve access issues without leaving the record.
@@ -62,6 +68,8 @@ LessonFlow exposes student-portal credential support from the customer workflow 
 <div class="manual-callout warning">
 <strong>Immediate effect:</strong> Portal credential changes affect the student as soon as they are saved. Password regeneration should therefore be treated as a deliberate support action rather than a diagnostic shortcut.
 </div>
+
+![Customer portal credential panel](assets/customer-portal-credential-panel.png)
 
 ## Billing History
 
@@ -79,6 +87,8 @@ It may be used to determine:
 - whether an error was recorded
 
 Manual email composition remains available for messages that do not fit the automated workflow.
+
+![Customer email history panel](assets/customer-email-history-panel.png)
 
 ### Manual Email Practice
 

@@ -29,11 +29,15 @@ The reports console includes controls for refresh, report-email dispatch, chart 
 | Chart and date controls | Adjust presentation for review |
 | Custom-range inputs | Investigate a non-standard period |
 
+![Admin reports dashboard](assets/admin-reports-dashboard.png)
+
 ## Custom Range
 
 Custom range reporting is intended for questions not answered by the default time windows, such as school-holiday periods, short promotional windows, or a specific overdue follow-up interval.
 
 Both dates are required, and the start date must not be later than the end date.
+
+![Reports custom range controls](assets/reports-custom-range-controls.png)
 
 ## High-Value Metrics
 

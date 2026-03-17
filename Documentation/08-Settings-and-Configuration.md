@@ -49,11 +49,15 @@ Each block includes:
 
 The editor should be used only when the operator is comfortable editing structured content, because invalid JSON prevents a successful save.
 
+![Settings pages tab](assets/settings-pages-tab.png)
+
 ## Emails Tab
 
 The Emails tab controls the wording of automated email templates. Each template includes a subject field and an HTML body field.
 
 Placeholder tokens required for dynamic content should be preserved unless the technical meaning of the template is fully understood.
+
+![Settings emails tab](assets/settings-emails-tab.png)
 
 ## Invoices Tab
 
@@ -79,6 +83,8 @@ The Invoices tab defines both billing defaults and invoice presentation content.
 
 The invoice content editor includes branding, header information, and footer terms. It is used when invoice appearance, payment instructions, or policy wording changes.
 
+![Settings invoices tab](assets/settings-invoices-tab.png)
+
 ## Products Tab
 
 The Products tab stores reusable billing presets. Each preset typically contains:
@@ -89,11 +95,15 @@ The Products tab stores reusable billing presets. Each preset typically contains
 
 Presets are intended to make common invoice creation faster and more consistent across repeated products or lesson packages.
 
+![Settings products tab](assets/settings-products-tab.png)
+
 ## System Tab
 
 <div class="manual-callout warning">
 <strong>Technical-owner zone:</strong> The System tab contains configuration for infrastructure, delivery, session security, and administrative identity. Changes here should be limited to operators who understand the downstream effect.
 </div>
+
+![Settings system tab](assets/settings-system-tab.png)
 
 ### Core System
 

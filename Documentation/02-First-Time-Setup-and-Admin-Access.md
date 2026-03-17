@@ -1,6 +1,6 @@
 # First-Time Setup and Admin Access
 
-First-time setup and admin access define the two principal entry states of LessonFlow: an uninitialised installation that requires setup, and an operational installation that routes administrators through the sign-in flow. This chapter describes the setup wizard, the normal login pathway, and the session behaviours that administrators are expected to encounter.
+When you first install LessonFlow, you'll encounter one of two entry states: an uninitialized system that requires setup, or an operational system that routes you through the sign-in flow. This chapter guides you through the setup wizard, the standard login pathway, and the session behaviors you'll encounter as an administrator.
 
 <div class="manual-callout warning">
 <strong>Audience note:</strong> The setup wizard is ordinarily completed once by an owner or technical owner. Most staff begin their work at <code>/admin/login</code> after the system has already been commissioned.
@@ -8,84 +8,87 @@ First-time setup and admin access define the two principal entry states of Lesso
 
 ## Entry States
 
-LessonFlow distinguishes between the following entry conditions:
+LessonFlow distinguishes between these two entry conditions:
 
-| State | Typical route behaviour | Intended operator |
+| State | Typical route behavior | Intended operator |
 | --- | --- | --- |
-| Uninitialised system | <code>/admin</code> redirects to <code>/setup</code> | Owner or technical owner |
+| Uninitialized system | <code>/admin</code> redirects to <code>/setup</code> | Owner or technical owner |
 | Operational system | <code>/admin/login</code> provides the sign-in form | Administrators and owners |
 
-This distinction prevents routine staff from operating a system that has not yet completed its baseline configuration.
+This distinction ensures that staff don't attempt to use a system before you've completed its baseline configuration.
 
 ## Setup Wizard
 
-When setup is incomplete, the Setup Wizard becomes the authoritative path for initialisation. Its purpose is to confirm runtime readiness, persist environment-backed configuration, and create the first administrative account.
+If your setup is incomplete, the Setup Wizard serves as your authoritative path for initialization. You'll use it to confirm your system is ready, save your environment configuration, and create your first administrative account.
 
-In production, the setup flow is intentionally locked behind the server-side <code>SETUP_ACCESS_TOKEN</code> secret. The operator should open <code>/setup?setupToken=...</code> with that value during first boot so the wizard can talk to the protected setup APIs.
+In production, you'll find the setup flow is locked behind the <code>SETUP_ACCESS_TOKEN</code> secret. Open <code>/setup?setupToken=...</code> using that value during your first boot so the wizard can communicate with the protected setup APIs.
 
 ### Readiness Checks
 
-The readiness interface reports results as <code>pass</code>, <code>warn</code>, or <code>fail</code>. These checks are intended to confirm that the environment is viable before initialisation proceeds.
+The readiness interface reports your results as <code>pass</code>, <code>warn</code>, or <code>fail</code>. Use these checks to confirm your environment is viable before you proceed with initialization.
 
-Operators should use the checks to confirm:
+Run these checks to confirm:
 
 - database connectivity
 - site URL validity
 - presence of required secrets
 - general server readiness
 
-The checks should be re-run after configuration changes so the wizard reflects the latest environment state.
+Re-run these checks after you make any configuration changes so the wizard reflects your latest environment state.
 
 ### Environment Configuration
 
-The environment configuration panel is used when readiness checks indicate missing or invalid values. It is designed for controlled correction of installation settings prior to first use.
+Use the environment configuration panel if your readiness checks indicate missing or invalid values. This panel allows you to correct your installation settings before you start using the system.
 
-The expected sequence is:
+Follow this sequence:
 
-1. review the failing or warning check
-2. update the relevant configuration value
-3. save the configuration
-4. re-run checks
-5. continue only once the installation is in a usable state
+1. Review the failing or warning check.
+2. Update the relevant configuration value.
+3. Save your configuration.
+4. Re-run your checks.
+5. Continue only once your installation is in a usable state.
 
 ### First Admin Creation
 
-Initialisation concludes with creation of the first admin account. The wizard requires:
+You'll conclude initialization by creating your first admin account. The wizard requires you to enter:
 
 - display name
 - email address
 - password
 - password confirmation
 
-On success, LessonFlow redirects to the admin console and the setup state is treated as complete.
+Once you succeed, LessonFlow redirects you to the admin console and marks your setup state as complete.
 
 ## Admin Login
 
-The normal administrative entry point is <code>/admin/login</code>. The login form expects the current admin email address and password associated with the installation.
+Navigate to <code>/admin/login</code> for your normal administrative entry point. Enter the admin email address and password associated with your installation into the login form.
 
-Administrative sessions are tied to the current credential state. If those credentials change in Settings, a fresh login should be expected.
+Your administrative sessions are tied to your current credentials. If you change these credentials in Settings, expect to sign in again.
 
-## Session and Sign-Out Behaviour
+![Admin login page](assets/admin-login-page.png)
+*You'll use the admin login page to access your console.*
 
-Session termination may occur under several normal conditions:
+## Session and Sign-Out Behavior
+
+You may experience session termination under several normal conditions:
 
 | Cause | Description |
 | --- | --- |
-| Manual sign-out | The user chose to end the session from the admin header |
-| Credential rotation | The password or related authentication material changed |
-| Admin identity change | The configured admin email changed |
-| Expiry or restart | The session ended because of runtime lifecycle behaviour |
+| Manual sign-out | You chose to end your session from the admin header |
+| Credential rotation | Your password or related authentication material changed |
+| Admin identity change | Your configured admin email changed |
+| Expiry or restart | Your session ended because of runtime lifecycle behavior |
 
-Unexpected return to <code>/admin/login</code> is therefore not always evidence of failure. Administrators should first sign in again and then escalate only if the behaviour repeats without a clear cause.
+If you find yourself back at <code>/admin/login</code> unexpectedly, don't assume the system has failed. Sign in again first, and only escalate the issue if the behavior repeats without a clear cause.
 
 ## Initial Verification
 
-The first day of use should include a basic verification pass across the principal admin areas:
+On your first day of use, perform a basic verification pass across the principal admin areas:
 
-1. sign in successfully
-2. open Bookings, Customers, Invoices, Reports, Logs, Manual, and Settings
-3. confirm headings, navigation, and page shells render normally
-4. read the opening chapters of the manual before making live changes
+1. Sign in successfully.
+2. Open Bookings, Customers, Invoices, Reports, Logs, Manual, and Settings.
+3. Confirm your headings, navigation, and page shells render normally.
+4. Read the opening chapters of this manual before you make live changes.
 
 ```text
 Typical first-day path:

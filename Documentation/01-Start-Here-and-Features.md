@@ -1,34 +1,34 @@
 # Start Here and Features
 
-LessonFlow is a lesson-management platform that combines public intake, administrative scheduling, customer records, billing, reporting, and student self-service within a single operating environment. This chapter serves as the general orientation article for the manual and outlines the major system areas, the recommended reading sequence, and the operational principles that govern safe use.
+Welcome to LessonFlow. You've found the central hub for managing your music school's operations, from public enquiries to student billing. This chapter gives you a quick map of the whole system so you know where to go when you need to get something done.
 
 <div class="manual-callout info">
-<strong>Reference note:</strong> The in-app manual at <code>/admin/manual</code> renders this documentation for live use inside the admin console. The Markdown files in <code>Documentation/</code> remain the authored source of truth.
+<strong>Reference note:</strong> Your in-app manual at <code>/admin/manual</code> renders this documentation for live use inside your admin console. Your Markdown files in <code>Documentation/</code> remain the authored source of truth.
 </div>
 
 ## Overview
 
-LessonFlow is organised around connected workflows rather than isolated screens. A booking request may lead to customer creation, lesson confirmation, portal access, reminder traffic, invoice issuance, and later payment follow-up. The manual is therefore arranged by operational domain, but each chapter also identifies where one workflow passes into another.
+You'll find that LessonFlow focuses on connected workflows rather than isolated screens. When you receive a booking request, it often triggers a chain of events: you'll create a customer record, confirm the lesson, grant portal access, and eventually issue an invoice. This manual follows those operational domains, showing you exactly how one task flows into the next.
 
 ## Major System Areas
 
-| Area | Primary function | Typical outcomes |
+| Area | What you can do | What happens next |
 | --- | --- | --- |
-| Bookings | Calendar-based lesson administration | Request review, confirmation, rescheduling, cancellation, reminder actions |
-| Staff and Teacher Assignment | Role-aware admin identities and teacher allocation | Teacher account management, assignment defaults, owner fallback on single-user installs |
-| Customers | Identity and support records | Profile updates, portal support, billing lookup, communication history |
-| Invoices | Billing lifecycle management | Drafting, sending, reminding, payment-state updates, credit-note handling |
-| Reports | Operational and financial summaries | Follow-up decisions, overdue review, activity trend review |
-| Learning Materials | Student-facing resource distribution | Lesson-linked uploads, general practice materials, file removal |
-| Public Intake | Website enquiry capture | Booking requests and contact submissions for later admin review |
-| Student Portal | Student self-service | Portal login, lesson requests, cancellations, materials access |
-| Settings | Business and system configuration | Branding, content, templates, invoice defaults, technical configuration |
-| Logs and Issue Reporting | Evidence gathering and escalation | Event review, filtering, bug reports, screenshot-supported escalation |
-| Technical Owner Tooling | Deployment and host maintenance | Installation, updates, timers, services, recovery tasks |
+| Bookings | Manage your lesson calendar | You'll review requests, confirm appointments, and handle reschedules or cancellations. |
+| Staff and Teacher Assignment | Manage your team | You'll set up teacher accounts, assign them to lessons, and manage your own admin identity. |
+| Customers | Maintain student and parent records | You'll update profiles, support portal users, and track communication history. |
+| Invoices | Handle your billing lifecycle | You'll draft and send invoices, track payments, and issue credit notes when needed. |
+| Reports | Review your business health | You'll use financial summaries to make follow-up decisions and track growth trends. |
+| Learning Materials | Share resources with students | You'll upload practice materials and link them directly to specific lessons. |
+| Public Intake | Capture new enquiries | You'll receive booking requests and contact forms directly from your website. |
+| Student Portal | Provide self-service for students | Your students will log in to view their lessons, request changes, and download materials. |
+| Settings | Configure your business | You'll set up your branding, email templates, and default invoice settings. |
+| Logs and Issue Reporting | Troubleshoot and report bugs | You'll review system events and escalate technical issues with supporting evidence. |
+| Technical Owner Tooling | Maintain your installation | You'll handle updates, backups, and server maintenance tasks. |
 
 ## Recommended Reading Sequence
 
-The following sequence is recommended for new administrators and owners:
+If you're new to LessonFlow, we recommend following this sequence to get up to speed:
 
 1. [First-Time Setup and Admin Access](02-First-Time-Setup-and-Admin-Access.md)
 2. [Daily Operations and Booking Lifecycle](03-Daily-Operations-and-Booking-Lifecycle.md)
@@ -39,17 +39,17 @@ The following sequence is recommended for new administrators and owners:
 7. [Settings and Configuration](08-Settings-and-Configuration.md)
 8. [Logs and Bug Reporting](09-Logs-and-Bug-Reporting.md)
 
-This reading order begins with access and day-to-day workflows, then moves into support, billing, configuration, and diagnostics.
+You'll start with basic access and daily tasks before moving into more advanced areas like billing, configuration, and system diagnostics.
 
 ## Operational Principles
 
-The manual assumes the following principles throughout:
+To get the most out of LessonFlow, keep these practical tips in mind as you work:
 
-1. Records should be confirmed before they are altered.
-2. Editing and archiving are generally safer than deletion when history matters.
-3. Communication activity is part of normal administration rather than a separate optional task.
-4. High-impact actions should be verified immediately after they are saved or triggered.
-5. Unexplained behaviour should be escalated through logs or technical-owner workflows rather than addressed by guesswork.
+1. Confirm records before you change them.
+2. Archive or edit records instead of deleting them whenever you need to preserve history.
+3. Treat communication as a core part of your daily administration.
+4. Verify high-impact actions immediately after you save or trigger them.
+5. Escalate unexplained behavior through logs instead of relying on guesswork.
 
 ## High-Risk Actions
 
@@ -57,11 +57,13 @@ The manual assumes the following principles throughout:
 <strong>High-risk actions include:</strong> customer deletion, invoice deletion, credential rotation, system-setting edits, and production deployment commands.
 </div>
 
-These actions remain part of the documented product surface, but they should be approached as controlled interventions rather than routine clicks. When the effect of a destructive action is unclear, the related chapter should be reviewed before the action is taken.
+While you have full control over these actions, treat them as deliberate interventions rather than routine tasks. If you're ever unsure about the impact of a destructive change, check the relevant chapter before you click.
 
 ## Manual Structure
 
-The in-app manual groups content into orientation, operations, support, configuration, diagnostics, system awareness, and technical ownership. This structure is intended to help readers move from general product understanding to specific workflows without losing the relationship between screens.
+You can find the in-app manual (shown in the screenshot below) grouped into logical areas like operations, support, and configuration. This structure helps you move from a general understanding of the product to specific workflows while keeping the big picture in view.
+
+![Admin manual page](assets/admin-manual-page.png)
 
 ## Related Sections
 
