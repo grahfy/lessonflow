@@ -286,6 +286,56 @@ run_sudo_cmd() {
     fi
 }
 
+resolve_source_git_user() {
+    local repo_root="$1"
+    local repo_owner=""
+    local candidate=""
+
+    if [[ -n "${MGS_SOURCE_GIT_USER:-}" ]]; then
+        printf '%s\n' "${MGS_SOURCE_GIT_USER}"
+        return 0
+    fi
+
+    if [[ ${EUID} -ne 0 ]]; then
+        return 1
+    fi
+
+    repo_owner="$(stat -c '%U' "${repo_root}" 2>/dev/null || true)"
+
+    for candidate in "${MGS_SUDO_USER:-}" "${SUDO_USER:-}" "${repo_owner}"; do
+        if [[ -n "${candidate}" && "${candidate}" != "root" && "${candidate}" != "UNKNOWN" ]]; then
+            printf '%s\n' "${candidate}"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+run_source_git_cmd() {
+    local repo_root="$1"
+    shift
+
+    local source_git_user=""
+    local current_user=""
+    source_git_user="$(resolve_source_git_user "${repo_root}" || true)"
+    current_user="$(id -un 2>/dev/null || true)"
+
+    if [[ -n "${source_git_user}" && "${source_git_user}" != "${current_user}" ]]; then
+        if command -v runuser >/dev/null 2>&1; then
+            runuser -u "${source_git_user}" -- git -C "${repo_root}" "$@"
+            return
+        fi
+        if command -v sudo >/dev/null 2>&1; then
+            sudo -u "${source_git_user}" git -C "${repo_root}" "$@"
+            return
+        fi
+        log_warn "Could not switch git self-update to ${source_git_user}; continuing as ${current_user:-current user}."
+    fi
+
+    git -C "${repo_root}" "$@"
+}
+
 auto_size_tui_panel_width() {
     local cols=""
     local target_width=""
@@ -3243,10 +3293,10 @@ maybe_self_update_and_restart() {
 
     section "Git Update"
     log_info "Deploy self-update check in ${repo_root}"
-    run_step "Fetching origin/${BRANCH}" run_sudo_cmd git -C "${repo_root}" fetch origin "${BRANCH}"
+    run_step "Fetching origin/${BRANCH}" run_source_git_cmd "${repo_root}" fetch origin "${BRANCH}"
 
     if [[ -n "${current_branch}" && "${current_branch}" != "${BRANCH}" ]]; then
-        run_step "Checking out ${BRANCH}" run_sudo_cmd git -C "${repo_root}" checkout "${BRANCH}"
+        run_step "Checking out ${BRANCH}" run_source_git_cmd "${repo_root}" checkout "${BRANCH}"
     fi
 
     if [[ -z "$(git -C "${repo_root}" symbolic-ref --short HEAD 2>/dev/null || true)" ]]; then
@@ -3254,7 +3304,7 @@ maybe_self_update_and_restart() {
         return 0
     fi
 
-    run_step "Merging latest origin/${BRANCH}" run_sudo_cmd git -C "${repo_root}" merge --ff-only "origin/${BRANCH}"
+    run_step "Merging latest origin/${BRANCH}" run_source_git_cmd "${repo_root}" merge --ff-only "origin/${BRANCH}"
     after_commit="$(git -C "${repo_root}" rev-parse --short=12 HEAD 2>/dev/null || true)"
     log_info "Repository commit: $(git -C "${repo_root}" rev-parse --short HEAD)"
 
