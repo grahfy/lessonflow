@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
 
     const parsed = listCustomersQuerySchema.safeParse({
       q: request.nextUrl.searchParams.get("q") ?? undefined,
+      customerIds: request.nextUrl.searchParams.get("customerIds") ?? undefined,
       sortBy: request.nextUrl.searchParams.get("sortBy") ?? undefined,
       sortDir: request.nextUrl.searchParams.get("sortDir") ?? undefined,
       page: request.nextUrl.searchParams.get("page") ?? undefined,
@@ -72,11 +73,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid query parameters.", details: parsed.error.flatten() }, { status: 400 });
     }
 
-    const { q, sortBy, sortDir, page, pageSize, isArchived } = parsed.data;
+    const { q, customerIds, sortBy, sortDir, page, pageSize, isArchived } = parsed.data;
     const skip = (page - 1) * pageSize;
+    const customerIdList = customerIds
+      ? Array.from(
+          new Set(
+            customerIds
+              .split(",")
+              .map((value) => value.trim())
+              .filter(Boolean)
+          )
+        )
+      : [];
 
     const where = {
       isArchived: isArchived === "true",
+      ...(customerIdList.length > 0
+        ? {
+            id: {
+              in: customerIdList
+            }
+          }
+        : {}),
       ...(q
         ? {
             OR: [

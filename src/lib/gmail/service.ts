@@ -20,14 +20,37 @@ export async function listSentMessages(maxResults: number = 50, pageToken?: stri
 }
 
 /**
+ * Lists unread inbox messages from Gmail for lightweight owner alert checks.
+ */
+export async function listUnreadInboxMessages(maxResults: number = 20, pageToken?: string) {
+  const gmail = getGmailClient();
+  const response = await gmail.users.messages.list({
+    userId: "me",
+    labelIds: ["INBOX", "UNREAD"],
+    maxResults,
+    pageToken,
+  });
+
+  return {
+    messages: response.data.messages || [],
+    nextPageToken: response.data.nextPageToken || undefined,
+  };
+}
+
+/**
  * Fetches full details for a specific Gmail message.
  */
-export async function getMessageDetails(messageId: string, format: "full" | "metadata" | "minimal" = "full") {
+export async function getMessageDetails(
+  messageId: string,
+  format: "full" | "metadata" | "minimal" = "full",
+  options?: { metadataHeaders?: string[] }
+) {
   const gmail = getGmailClient();
   const response = await gmail.users.messages.get({
     userId: "me",
     id: messageId,
     format,
+    metadataHeaders: options?.metadataHeaders,
   });
 
   return response.data;

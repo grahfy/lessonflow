@@ -22,7 +22,13 @@ export interface UseCustomersResult {
     loading: boolean;
     total: number;
     totalPages: number;
-    load: (query?: string, page?: number, sortBy?: CustomersSortBy, sortDir?: CustomersSortDirection) => Promise<void>;
+    load: (
+        query?: string,
+        page?: number,
+        sortBy?: CustomersSortBy,
+        sortDir?: CustomersSortDirection,
+        filters?: { customerIds?: string[] }
+    ) => Promise<void>;
     save: (customer: Partial<CustomerRow>, id?: string) => Promise<CustomerRow | null>;
     remove: (id: string) => Promise<{ archived: boolean } | null>;
 }
@@ -44,12 +50,24 @@ export function useCustomers(options: UseCustomersOptions = {}): UseCustomersRes
             query?: string,
             page = 1,
             sortBy: CustomersSortBy = "customer",
-            sortDir: CustomersSortDirection = "asc"
+            sortDir: CustomersSortDirection = "asc",
+            filters?: { customerIds?: string[] }
         ) => {
         setLoading(true);
         const search = (query ?? "").trim();
+        const customerIds = filters?.customerIds ?? undefined;
+
+        if (customerIds && customerIds.length === 0) {
+            setCustomers([]);
+            setTotal(0);
+            setTotalPages(1);
+            setLoading(false);
+            return;
+        }
+
         const params = new URLSearchParams();
         if (search) params.set("q", search);
+        if (customerIds && customerIds.length > 0) params.set("customerIds", customerIds.join(","));
         params.set("sortBy", sortBy);
         params.set("sortDir", sortDir);
         params.set("page", String(page));

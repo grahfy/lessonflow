@@ -8,6 +8,7 @@ export const customersSortDirectionSchema = z.enum(["asc", "desc"]);
  */
 export const listCustomersQuerySchema = z.object({
   q: z.string().trim().max(200).optional(),
+  customerIds: z.string().trim().max(4000).optional(),
   sortBy: customersSortBySchema.default("customer"),
   sortDir: customersSortDirectionSchema.default("asc"),
   page: z.coerce.number().int().min(1).default(1),

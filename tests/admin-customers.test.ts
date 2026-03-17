@@ -223,4 +223,60 @@ describe("admin-customers", () => {
       "Bob Student"
     ]);
   });
+
+  it("filters customer lists to a supplied set of customer ids", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const [alex, beth, chris] = await Promise.all([
+      prisma.customer.create({
+        data: {
+          fullName: "Alex Student",
+          normalizedFullName: "alex student",
+          email: "alex@example.com",
+          phone: "0400000101",
+          normalizedEmail: "alex@example.com",
+          normalizedPhone: "0400000101",
+          skillLevel: "beginner",
+          lessonMode: "in_person"
+        }
+      }),
+      prisma.customer.create({
+        data: {
+          fullName: "Beth Student",
+          normalizedFullName: "beth student",
+          email: "beth@example.com",
+          phone: "0400000102",
+          normalizedEmail: "beth@example.com",
+          normalizedPhone: "0400000102",
+          skillLevel: "intermediate",
+          lessonMode: "video"
+        }
+      }),
+      prisma.customer.create({
+        data: {
+          fullName: "Chris Student",
+          normalizedFullName: "chris student",
+          email: "chris@example.com",
+          phone: "0400000103",
+          normalizedEmail: "chris@example.com",
+          normalizedPhone: "0400000103",
+          skillLevel: "advanced",
+          lessonMode: "video"
+        }
+      })
+    ]);
+
+    const req = adminRequest(
+      `http://localhost/api/admin/customers?customerIds=${alex.id},${chris.id}`,
+      "GET",
+      token
+    );
+    const res = await GET(req);
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { customers: Array<{ id: string }> };
+    expect(body.customers.map((customer) => customer.id)).toEqual([alex.id, chris.id]);
+    expect(body.customers.map((customer) => customer.id)).not.toContain(beth.id);
+  });
 });

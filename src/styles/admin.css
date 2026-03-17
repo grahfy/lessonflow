@@ -1712,6 +1712,105 @@
   min-height: 34px;
 }
 
+.admin-header-alert-button {
+  white-space: nowrap;
+}
+
+.customer-email-alert-summary-card {
+  display: grid;
+  gap: 12px;
+}
+
+.customer-email-alert-summary-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.customer-email-alert-summary-head .helper-text {
+  margin-bottom: 0;
+}
+
+.customer-email-alert-list {
+  display: grid;
+  gap: 10px;
+}
+
+.customer-email-alert-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.customer-email-alert-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.customer-email-alert-copy p {
+  margin: 0;
+}
+
+.gmail-status-card {
+  display: grid;
+  gap: 10px;
+}
+
+.gmail-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.gmail-status-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gmail-status-details {
+  display: grid;
+  gap: 4px;
+}
+
+.gmail-status-details .helper-text {
+  margin: 0;
+}
+
+.customer-email-provider-status-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.customer-email-provider-status-item {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.customer-email-provider-status-item .helper-text {
+  margin: 0;
+}
+
+@media (max-width: 860px) {
+  .customer-email-provider-status-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .admin-about-layout {
   display: grid;
   gap: 12px;

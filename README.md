@@ -22,7 +22,7 @@ It is designed for small teams that want one admin console for day-to-day school
 - **Admin settings and whitelabel controls**: Branding, invoice, content, email, product, and system configuration from the admin console.
 - **System operations and diagnostics**: Admin system logs, bug-report workflows, in-app update visibility, and synchronized operator documentation in `/admin/manual`.
 - **Deployment and maintenance tooling**: VPS install, release, rollback, timer, and maintenance scripts built for `systemd + nginx + MariaDB` environments.
-- **Supporting integrations and utilities**: Gmail-based email workflows, geo detection, public voucher support, in-app manual screenshots, and white-label content management.
+- **Supporting integrations and utilities**: Gmail and IMAP-backed email workflows, owner login alerts for unread customer emails, geo detection, public voucher support, in-app manual screenshots, and white-label content management.
 
 ## Feature Inventory
 

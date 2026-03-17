@@ -10,6 +10,8 @@ export type EnvVarField = {
     placeholder: string;
     isRequired: boolean;
     isSecret: boolean;
+    inputType?: "text" | "boolean" | "select";
+    options?: Array<{ label: string; value: string }>;
     currentValue: string;
 };
 

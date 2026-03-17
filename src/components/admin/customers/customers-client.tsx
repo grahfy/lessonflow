@@ -22,7 +22,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
@@ -40,6 +40,7 @@ import { useEmailHistory } from "@/lib/admin/use-email-history";
 import { useLearningMaterials } from "@/lib/admin/use-learning-materials";
 import { usePortalCredentials } from "@/lib/admin/use-portal-credentials";
 import { useTeachers } from "@/lib/admin/use-teachers";
+import type { CustomerEmailAlertsSummary } from "@/lib/admin/customer-email-alerts";
 import { type CustomersSortBy, type CustomersSortDirection } from "@/lib/customers/schema";
 
 /**
@@ -52,9 +53,12 @@ export function AdminCustomersClient() {
   const searchInputId = useId();
   const sortSelectId = useId();
   const { beginExitTransition } = useTweenOrchestrator();
+  const emailAlertMode = searchParams.get("emailAlert") === "customer-email";
   
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [emailAlertSummary, setEmailAlertSummary] = useState<CustomerEmailAlertsSummary | null>(null);
+  const [loadingEmailAlertSummary, setLoadingEmailAlertSummary] = useState(false);
 
   // Transient feedback timer (Auto-clear notices)
   useEffect(() => {
@@ -92,6 +96,10 @@ export function AdminCustomersClient() {
   const dialogPresence = usePresenceExit();
   const dialogRootRef = useRef<HTMLDivElement | null>(null);
   const materialsUploadFormRef = useRef<HTMLFormElement | null>(null);
+  const alertCustomerIds = useMemo(
+    () => emailAlertSummary?.matchedCustomers.map((customer) => customer.id) ?? [],
+    [emailAlertSummary]
+  );
 
   const onAuthError = useCallback(() => window.location.assign("/admin/login"), []);
   const { admin: currentAdmin } = useAdminSession({ onAuthError, onError: setError });
@@ -147,6 +155,7 @@ export function AdminCustomersClient() {
     currentAdmin && selectedCustomer && (currentAdmin.role === "owner" || selectedCustomer.primaryTeacherId === currentAdmin.id)
   );
   const canManagePortalCredentials = currentAdmin?.role === "owner";
+  const customersBasePath = emailAlertMode ? "/admin/customers?emailAlert=customer-email" : "/admin/customers";
 
   // -- DIALOG HANDLERS --
 
@@ -188,15 +197,57 @@ export function AdminCustomersClient() {
     setCustomerForm(emptyCustomerForm());
     setMaterialsBookingId("");
     // Clear URL segments to maintain clean routing
-    router.replace("/admin/customers", { scroll: false });
-  }, [dialogPresence, router]);
+    router.replace(customersBasePath, { scroll: false });
+  }, [customersBasePath, dialogPresence, router]);
 
   // -- EFFECTS --
 
   // React to search/sort changes
   useEffect(() => {
-    void loadCustomers(debouncedCustomerQuery, page, sortBy, sortDir);
-  }, [debouncedCustomerQuery, page, sortBy, sortDir, loadCustomers]);
+    void loadCustomers(
+      debouncedCustomerQuery,
+      page,
+      sortBy,
+      sortDir,
+      emailAlertMode ? { customerIds: alertCustomerIds } : undefined
+    );
+  }, [alertCustomerIds, debouncedCustomerQuery, emailAlertMode, page, sortBy, sortDir, loadCustomers]);
+
+  useEffect(() => {
+    if (!emailAlertMode) {
+      setEmailAlertSummary(null);
+      setLoadingEmailAlertSummary(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingEmailAlertSummary(true);
+
+    void fetch("/api/admin/customer-email-alerts", {
+      cache: "no-store"
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          return null;
+        }
+
+        return (await response.json()) as CustomerEmailAlertsSummary;
+      })
+      .then((summary) => {
+        if (!cancelled) {
+          setEmailAlertSummary(summary);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingEmailAlertSummary(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [emailAlertMode]);
 
   // Deep linking to customer details via URL (e.g. from invoices page)
   useEffect(() => {
@@ -208,9 +259,9 @@ export function AdminCustomersClient() {
       if (customer) {
         void openCustomerDialog(customer, false);
       }
-      router.replace("/admin/customers", { scroll: false });
+      router.replace(customersBasePath, { scroll: false });
     }
-  }, [searchParams, customers, selectedCustomer, openCustomerDialog, router]);
+  }, [customers, customersBasePath, openCustomerDialog, router, searchParams, selectedCustomer]);
 
   // Handle Input Debouncing
   useEffect(() => {
@@ -237,7 +288,13 @@ export function AdminCustomersClient() {
 
     if (result) {
       setNotice(selectedCustomer ? "Customer updated." : "Customer created.");
-      void loadCustomers(debouncedCustomerQuery, page, sortBy, sortDir);
+      void loadCustomers(
+        debouncedCustomerQuery,
+        page,
+        sortBy,
+        sortDir,
+        emailAlertMode ? { customerIds: alertCustomerIds } : undefined
+      );
       
       if (selectedCustomer) {
         setSelectedCustomer(result);
@@ -270,7 +327,13 @@ export function AdminCustomersClient() {
       if (selectedCustomer?.id === customer.id) {
         void closeCustomerDialog();
       }
-      void loadCustomers(debouncedCustomerQuery, page, sortBy, sortDir);
+      void loadCustomers(
+        debouncedCustomerQuery,
+        page,
+        sortBy,
+        sortDir,
+        emailAlertMode ? { customerIds: alertCustomerIds } : undefined
+      );
     }
   }
 
@@ -320,6 +383,65 @@ export function AdminCustomersClient() {
       className="admin-shell-customers"
     >
       <div className="admin-layout-content">
+        {emailAlertMode ? (
+          <AdminCard className="customer-email-alert-summary-card">
+            <div className="customer-email-alert-summary-head">
+              <div>
+                <h2 className="admin-settings-section-title">Unread Customer Email Alerts</h2>
+                <p className="helper-text">
+                  {loadingEmailAlertSummary
+                    ? "Checking the configured inbox for unread customer emails..."
+                    : emailAlertSummary?.state === "disabled"
+                      ? "Customer email alerts are currently disabled in Settings."
+                      : emailAlertSummary?.state === "not_configured"
+                        ? "No inbox provider is configured for unread customer email alerts."
+                    : emailAlertSummary?.unreadCount
+                      ? `${emailAlertSummary.unreadCount} unread email${emailAlertSummary.unreadCount === 1 ? "" : "s"} across ${emailAlertSummary.matchedCustomers.length} customer${emailAlertSummary.matchedCustomers.length === 1 ? "" : "s"} via ${emailAlertSummary.provider?.toUpperCase() || "inbox"}.`
+                      : "No unread customer emails match current customer records."}
+                </p>
+              </div>
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={() => router.replace("/admin/customers", { scroll: false })}
+              >
+                Exit Alert Mode
+              </button>
+            </div>
+
+            {emailAlertSummary?.messages.length ? (
+              <div className="customer-email-alert-list">
+                {emailAlertSummary.messages.map((message) => {
+                  const customer = customers.find((row) => row.id === message.customerId) || null;
+                  return (
+                    <div key={message.messageId} className="customer-email-alert-item">
+                      <div className="customer-email-alert-copy">
+                        <strong>{message.subject}</strong>
+                        <p className="helper-text">
+                          {message.customerName} · {message.senderEmail} · {new Date(message.receivedAt).toLocaleString()}
+                        </p>
+                        <p>{message.snippet || "No preview available."}</p>
+                      </div>
+                      <button
+                        className="btn btn-secondary"
+                        type="button"
+                        onClick={() => {
+                          if (customer) {
+                            void openCustomerDialog(customer, false);
+                          }
+                        }}
+                        disabled={!customer}
+                      >
+                        Open Customer
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+          </AdminCard>
+        ) : null}
+
         <AdminCard className="admin-toolbar-card admin-actions-card">
           <div className="admin-actions-bar">
             <div className="admin-actions-group">

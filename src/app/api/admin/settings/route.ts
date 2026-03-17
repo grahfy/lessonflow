@@ -72,6 +72,8 @@ export async function GET(request: NextRequest) {
       placeholder: def.placeholder,
       isRequired: def.isRequired,
       isSecret: def.isSecret,
+      inputType: def.inputType || "text",
+      options: def.options || [],
       currentValue: values[def.key] || ""
     }))
   });

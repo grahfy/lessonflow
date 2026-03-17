@@ -29,7 +29,7 @@ import { z } from "zod";
 
 import { prisma } from "@/lib/db";
 import { isGmailConfigured } from "@/lib/email/gmail-service";
-import { getOwnerEmail } from "@/lib/env";
+import { getAdminCustomerEmailAlertsProvider, getOwnerEmail, isAdminCustomerEmailAlertsEnabled, isImapConfigured } from "@/lib/env";
 import { getMaterialStorageDriverName } from "@/lib/student-portal/material-storage";
 
 /**
@@ -63,7 +63,26 @@ export type SetupReadiness = {
  * Environment variable definitions for setup configuration.
  * Each entry defines the key, display info, validation, and whether it's sensitive.
  */
-export const CONFIGURABLE_ENV_VARS = [
+type ConfigurableEnvVarInputType = "text" | "boolean" | "select";
+
+type ConfigurableEnvVarOption = {
+  label: string;
+  value: string;
+};
+
+type ConfigurableEnvVarDefinition = {
+  key: string;
+  title: string;
+  description: string;
+  placeholder: string;
+  isRequired: boolean;
+  isSecret: boolean;
+  inputType?: ConfigurableEnvVarInputType;
+  options?: ConfigurableEnvVarOption[];
+  validation: (value: string) => string | null;
+};
+
+export const CONFIGURABLE_ENV_VARS: ConfigurableEnvVarDefinition[] = [
   {
     key: "DATABASE_URL",
     title: "Database URL",
@@ -148,6 +167,103 @@ export const CONFIGURABLE_ENV_VARS = [
       const result = z.string().email().safeParse(v);
       return result.success ? null : "Must be a valid email";
     }
+  },
+  {
+    key: "ADMIN_CUSTOMER_EMAIL_ALERTS_PROVIDER",
+    title: "Customer Email Alert Inbox Provider",
+    description: "Which inbox provider should power owner login customer email alerts. Auto prefers Gmail, then falls back to IMAP.",
+    placeholder: "auto",
+    isRequired: false,
+    isSecret: false,
+    inputType: "select",
+    options: [
+      { label: "Auto", value: "auto" },
+      { label: "Gmail API", value: "gmail" },
+      { label: "IMAP", value: "imap" }
+    ],
+    validation: (v: string) => {
+      const normalized = v.trim().toLowerCase();
+      if (!normalized) return null;
+      return ["auto", "gmail", "imap"].includes(normalized) ? null : "Must be auto, gmail, or imap";
+    }
+  },
+  {
+    key: "ADMIN_CUSTOMER_EMAIL_ALERTS_ENABLED",
+    title: "Owner Customer Email Alerts",
+    description: "When enabled, owners check the configured inbox provider for unread emails from known customers on admin login and see a header alert.",
+    placeholder: "false",
+    isRequired: false,
+    isSecret: false,
+    inputType: "boolean",
+    validation: (v: string) => {
+      const normalized = v.trim().toLowerCase();
+      if (!normalized) return null;
+      return normalized === "true" || normalized === "false" ? null : "Must be true or false";
+    }
+  },
+  {
+    key: "IMAP_HOST",
+    title: "IMAP Host",
+    description: "Inbox server hostname for standard mail accounts used for unread customer email alerts.",
+    placeholder: "imap.example.com",
+    isRequired: false,
+    isSecret: false,
+    validation: () => null
+  },
+  {
+    key: "IMAP_PORT",
+    title: "IMAP Port",
+    description: "Inbox server port for IMAP access.",
+    placeholder: "993",
+    isRequired: false,
+    isSecret: false,
+    validation: (v: string) => {
+      if (!v.trim()) return null;
+      const port = parseInt(v, 10);
+      if (isNaN(port) || port < 1 || port > 65535) return "Must be a valid port number";
+      return null;
+    }
+  },
+  {
+    key: "IMAP_USER",
+    title: "IMAP Username",
+    description: "Username for IMAP authentication.",
+    placeholder: "owner@example.com",
+    isRequired: false,
+    isSecret: false,
+    validation: () => null
+  },
+  {
+    key: "IMAP_PASS",
+    title: "IMAP Password",
+    description: "Password or app password for IMAP authentication.",
+    placeholder: "your-imap-password",
+    isRequired: false,
+    isSecret: true,
+    validation: () => null
+  },
+  {
+    key: "IMAP_TLS",
+    title: "IMAP TLS",
+    description: "Whether to use TLS for IMAP connections.",
+    placeholder: "true",
+    isRequired: false,
+    isSecret: false,
+    inputType: "boolean",
+    validation: (v: string) => {
+      const normalized = v.trim().toLowerCase();
+      if (!normalized) return null;
+      return normalized === "true" || normalized === "false" ? null : "Must be true or false";
+    }
+  },
+  {
+    key: "IMAP_MAILBOX",
+    title: "IMAP Mailbox",
+    description: "Mailbox folder to check for unread customer emails.",
+    placeholder: "INBOX",
+    isRequired: false,
+    isSecret: false,
+    validation: () => null
   },
   {
     key: "SMTP_HOST",
@@ -730,6 +846,9 @@ export async function evaluateSetupChecks(): Promise<SetupCheck[]> {
   const gmailConfigured = isGmailConfigured();
   const gmailSender = (process.env.GMAIL_USER_EMAIL || "").trim();
   const gmailSenderValid = gmailSender ? z.string().email().safeParse(gmailSender).success : false;
+  const imapConfigured = isImapConfigured();
+  const alertProviderPreference = getAdminCustomerEmailAlertsProvider();
+  const alertsEnabled = isAdminCustomerEmailAlertsEnabled();
   const smtpConfigured =
     Boolean((process.env.SMTP_HOST || "").trim()) &&
     Boolean((process.env.SMTP_USER || "").trim()) &&
@@ -741,6 +860,11 @@ export async function evaluateSetupChecks(): Promise<SetupCheck[]> {
     Boolean((process.env.GMAIL_CLIENT_SECRET || "").trim()) ||
     Boolean((process.env.GMAIL_REFRESH_TOKEN || "").trim()) ||
     Boolean(gmailSender);
+  const hasAnyImapField =
+    Boolean((process.env.IMAP_HOST || "").trim()) ||
+    Boolean((process.env.IMAP_USER || "").trim()) ||
+    Boolean((process.env.IMAP_PASS || "").trim()) ||
+    Boolean((process.env.IMAP_MAILBOX || "").trim());
 
   checks.push({
     id: "email-delivery",
@@ -755,6 +879,34 @@ export async function evaluateSetupChecks(): Promise<SetupCheck[]> {
         : hasAnyGmailField
           ? "Gmail delivery is partially configured. Complete GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, and GMAIL_USER_EMAIL (or configure SMTP)."
           : "Email delivery is not configured. Add Gmail API credentials (recommended) or SMTP credentials for outbound email delivery."
+  });
+
+  const inboundAlertsConfigured =
+    alertProviderPreference === "gmail"
+      ? gmailConfigured
+      : alertProviderPreference === "imap"
+        ? imapConfigured
+        : gmailConfigured || imapConfigured;
+
+  checks.push({
+    id: "customer-email-alerts-inbox",
+    title: "Customer email alert inbox",
+    status: !alertsEnabled ? "pass" : inboundAlertsConfigured ? "pass" : "warn",
+    detail: !alertsEnabled
+      ? "Owner customer email alerts are disabled."
+      : inboundAlertsConfigured
+        ? alertProviderPreference === "gmail"
+          ? "Customer email alerts are configured to use Gmail inbox access."
+          : alertProviderPreference === "imap"
+            ? "Customer email alerts are configured to use IMAP inbox access."
+            : gmailConfigured
+              ? "Customer email alerts are configured and will use Gmail inbox access."
+              : "Customer email alerts are configured and will use IMAP inbox access."
+        : hasAnyImapField
+          ? "IMAP inbox access is partially configured. Complete IMAP_HOST, IMAP_USER, IMAP_PASS, and optional IMAP_PORT/IMAP_TLS/IMAP_MAILBOX."
+          : hasAnyGmailField
+            ? "Gmail inbox access is partially configured. Complete GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, and GMAIL_USER_EMAIL."
+            : "Customer email alerts are enabled but no inbox provider is configured. Add Gmail API credentials or IMAP mailbox settings."
   });
 
   const storageDriver = getMaterialStorageDriverName();

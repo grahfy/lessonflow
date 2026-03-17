@@ -31,9 +31,10 @@ import { AdminPresetsEditor } from "@/components/admin/settings/presets-editor";
 import { AdminContentEditor } from "@/components/admin/settings/content-editor";
 import { AdminEmailTemplateEditor } from "@/components/admin/settings/email-template-editor";
 import { AdminInvoiceTemplateEditor } from "@/components/admin/invoices/invoice-template-editor";
-import { GmailStatus } from "@/components/admin/settings/gmail-status";
+import { CustomerEmailAlertStatus } from "@/components/admin/settings/customer-email-alert-status";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 
+import { invalidateCustomerEmailAlertsSessionCache } from "@/lib/admin/customer-email-alerts";
 import { useSettings, type EnvVarField } from "@/lib/admin/use-settings";
 
 type TabKey = "branding" | "pages" | "emails" | "invoices" | "products" | "system";
@@ -131,6 +132,14 @@ export function AdminSettingsClient() {
           "GMAIL_CLIENT_SECRET",
           "GMAIL_REFRESH_TOKEN",
           "GMAIL_USER_EMAIL",
+          "ADMIN_CUSTOMER_EMAIL_ALERTS_PROVIDER",
+          "ADMIN_CUSTOMER_EMAIL_ALERTS_ENABLED",
+          "IMAP_HOST",
+          "IMAP_PORT",
+          "IMAP_USER",
+          "IMAP_PASS",
+          "IMAP_TLS",
+          "IMAP_MAILBOX",
           "SMTP_HOST",
           "SMTP_PORT",
           "SMTP_USER",
@@ -236,6 +245,7 @@ export function AdminSettingsClient() {
         router.refresh();
       }, 1200);
     } else {
+      invalidateCustomerEmailAlertsSessionCache();
       void loadSettings();
     }
   }
@@ -251,13 +261,20 @@ export function AdminSettingsClient() {
           <div key={group.title} className="field full">
             <div className="admin-settings-section">
               <h2 className="admin-settings-section-title">{group.title}</h2>
-              {/* Specialized status row for Gmail oauth flow */}
-              {group.title === "Email Delivery" && <GmailStatus />}
+              {/* Specialized status row for inbox-backed customer email alerts */}
+              {group.title === "Email Delivery" && <CustomerEmailAlertStatus />}
               
               <AdminForm>
                 {group.items.map((envVar) => {
                   const fieldError = fieldErrors[envVar.key];
                   const isSecret = envVar.isSecret;
+                  const isBoolean = envVar.inputType === "boolean";
+                  const isSelect = envVar.inputType === "select";
+                  const defaultValue =
+                    isBoolean || isSelect
+                      ? envVar.placeholder || (isBoolean ? "false" : envVar.options?.[0]?.value || "")
+                      : "";
+                  const resolvedValue = values[envVar.key] || envVar.currentValue || defaultValue;
                   const placeholder =
                     isSecret && envVar.currentValue === "***SET***"
                       ? `${envVar.placeholder || ""} (leave blank to keep current value)`
@@ -272,21 +289,58 @@ export function AdminSettingsClient() {
                       error={fieldError}
                       htmlFor={`admin-setting-${envVar.key}`}
                     >
-                      <input
-                        id={`admin-setting-${envVar.key}`}
-                        name={envVar.key}
-                        type={envVar.isSecret ? "password" : "text"}
-                        placeholder={placeholder}
-                        value={values[envVar.key] ?? ""}
-                        onChange={(event) =>
-                          setValues((prev) => ({
-                            ...prev,
-                            [envVar.key]: event.target.value
-                          }))
-                        }
-                        className={fieldError ? "input-error" : ""}
-                        autoComplete="off"
-                      />
+                      {isBoolean ? (
+                        <label className="admin-inline-checkbox" htmlFor={`admin-setting-${envVar.key}`}>
+                          <input
+                            id={`admin-setting-${envVar.key}`}
+                            name={envVar.key}
+                            type="checkbox"
+                            checked={resolvedValue === "true"}
+                            onChange={(event) =>
+                              setValues((prev) => ({
+                                ...prev,
+                                [envVar.key]: event.target.checked ? "true" : "false"
+                              }))
+                            }
+                          />
+                          Enabled
+                        </label>
+                      ) : isSelect ? (
+                        <select
+                          id={`admin-setting-${envVar.key}`}
+                          name={envVar.key}
+                          value={resolvedValue}
+                          onChange={(event) =>
+                            setValues((prev) => ({
+                              ...prev,
+                              [envVar.key]: event.target.value
+                            }))
+                          }
+                          className={fieldError ? "input-error" : ""}
+                        >
+                          {(envVar.options || []).map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          id={`admin-setting-${envVar.key}`}
+                          name={envVar.key}
+                          type={envVar.isSecret ? "password" : "text"}
+                          placeholder={placeholder}
+                          value={values[envVar.key] ?? ""}
+                          onChange={(event) =>
+                            setValues((prev) => ({
+                              ...prev,
+                              [envVar.key]: event.target.value
+                            }))
+                          }
+                          className={fieldError ? "input-error" : ""}
+                          autoComplete="off"
+                        />
+                      )}
                     </AdminField>
                   );
                 })}

@@ -23,6 +23,73 @@ export function getOwnerEmail(): string {
 }
 
 /**
+ * Returns whether owner login should surface unread customer-email alerts.
+ */
+export function isAdminCustomerEmailAlertsEnabled(): boolean {
+  return (process.env.ADMIN_CUSTOMER_EMAIL_ALERTS_ENABLED || "false").trim().toLowerCase() === "true";
+}
+
+export type CustomerEmailAlertsProvider = "auto" | "gmail" | "imap";
+
+/**
+ * Returns the configured inbound provider preference for customer email alerts.
+ */
+export function getAdminCustomerEmailAlertsProvider(): CustomerEmailAlertsProvider {
+  const value = (process.env.ADMIN_CUSTOMER_EMAIL_ALERTS_PROVIDER || "auto").trim().toLowerCase();
+  if (value === "gmail" || value === "imap") {
+    return value;
+  }
+
+  return "auto";
+}
+
+/**
+ * Returns whether IMAP inbox access is configured for inbound email checks.
+ */
+export function isImapConfigured(): boolean {
+  return Boolean(
+    (process.env.IMAP_HOST || "").trim() &&
+      (process.env.IMAP_USER || "").trim() &&
+      (process.env.IMAP_PASS || "").trim()
+  );
+}
+
+export type ImapConfig = {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  pass: string;
+  mailbox: string;
+};
+
+/**
+ * Returns normalized IMAP configuration for inbox polling.
+ */
+export function getImapConfig(): ImapConfig {
+  const host = (process.env.IMAP_HOST || "").trim();
+  const user = (process.env.IMAP_USER || "").trim();
+  const pass = process.env.IMAP_PASS || "";
+
+  if (!host || !user || !pass) {
+    throw new Error("Missing IMAP inbox configuration in environment variables.");
+  }
+
+  const port = Number(process.env.IMAP_PORT || 993);
+  const secure = (process.env.IMAP_TLS || "true").trim().toLowerCase() !== "false";
+  const mailbox = (process.env.IMAP_MAILBOX || "INBOX").trim() || "INBOX";
+
+  return {
+    host,
+    port: Number.isFinite(port) ? port : 993,
+    secure,
+    user,
+    pass,
+    mailbox
+  };
+}
+
+/**
  * Retrieves the cryptographic secret required to trigger background routines.
  * 
  * SECURITY RATIONALE: Vercel/VPS Cron jobs hit public `/api/jobs/*` endpoints. 

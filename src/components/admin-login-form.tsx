@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 
 import { CaptchaField, useCaptcha } from "@/components/captcha";
 import { useNoticeTween } from "@/components/motion/use-notice-tween";
+import { invalidateCustomerEmailAlertsSessionCache } from "@/lib/admin/customer-email-alerts";
 
 /**
  * Admin login form with a lightweight anti-bot captcha.
@@ -84,6 +85,7 @@ export function AdminLoginForm() {
 
     // Use a full navigation so the first admin page/data requests always include the newly set
     // httpOnly session cookie.
+    invalidateCustomerEmailAlertsSessionCache();
     window.location.assign("/admin/bookings");
   }
 
