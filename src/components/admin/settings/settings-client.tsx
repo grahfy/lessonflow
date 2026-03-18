@@ -51,6 +51,11 @@ const SETTINGS_TABS: Array<{ key: TabKey; label: string; tooltip: string }> = [
   { key: "system", label: "System", tooltip: "Advanced configuration for databases, security, and email delivery routes." }
 ];
 
+const HIDDEN_GMAIL_ALERT_ENV_KEYS = new Set([
+  "ADMIN_CUSTOMER_EMAIL_ALERTS_PROVIDER",
+  "ADMIN_CUSTOMER_EMAIL_ALERTS_ENABLED"
+]);
+
 /**
  * Main Client Component for the Admin Settings route.
  */
@@ -135,8 +140,6 @@ export function AdminSettingsClient() {
           "GMAIL_CLIENT_SECRET",
           "GMAIL_REFRESH_TOKEN",
           "GMAIL_USER_EMAIL",
-          "ADMIN_CUSTOMER_EMAIL_ALERTS_PROVIDER",
-          "ADMIN_CUSTOMER_EMAIL_ALERTS_ENABLED",
           "IMAP_HOST",
           "IMAP_PORT",
           "IMAP_USER",
@@ -200,7 +203,7 @@ export function AdminSettingsClient() {
     }
 
     // Capture any dynamically added variables that weren't manually categorized.
-    const uncategorized = settings.envVars.filter((item) => !seen.has(item.key));
+    const uncategorized = settings.envVars.filter((item) => !seen.has(item.key) && !HIDDEN_GMAIL_ALERT_ENV_KEYS.has(item.key));
     if (uncategorized.length > 0) {
       ordered.push({ title: "Additional Config", tab: "system", items: uncategorized });
     }

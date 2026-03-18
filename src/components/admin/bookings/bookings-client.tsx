@@ -36,7 +36,7 @@ import { Tooltip } from "@/components/admin/ui/tooltip";
 
 import { useBookings, type BookingEvent } from "@/lib/admin/use-bookings";
 import { useCustomers } from "@/lib/admin/use-customers";
-import { useEmailHistory } from "@/lib/admin/use-email-history";
+import { useEmailHistory, type EmailHistoryTarget } from "@/lib/admin/use-email-history";
 import { useLearningMaterials } from "@/lib/admin/use-learning-materials";
 import { useAdminSession } from "@/lib/admin/use-admin-session";
 import { usePresets } from "@/lib/admin/use-presets";
@@ -102,6 +102,20 @@ function findHeuristicCustomerMatch(customers: BookingMatchedCustomer[], email: 
       );
     }) || null
   );
+}
+
+function getEmailHistoryTargetForEvent(event: EventWithRow | null): EmailHistoryTarget | null {
+  if (!event) {
+    return null;
+  }
+
+  if (typeof event.row.customerId === "string" && event.row.customerId) {
+    return { customerId: event.row.customerId };
+  }
+
+  return event.entityType === "booking_request"
+    ? { bookingRequestId: event.id }
+    : { bookingId: event.id };
 }
 
 /** Extracts first validation error message from API response details. */
@@ -305,10 +319,13 @@ export function AdminBookingsClient() {
 
     void loadCustomers();
 
-    if (typeof row.customerId === "string" && row.customerId) {
-      void loadEmailHistory(row.customerId);
+    const emailTarget = getEmailHistoryTargetForEvent(event as EventWithRow);
+    if (emailTarget) {
+      void loadEmailHistory(emailTarget);
       if (currentAdmin?.role === "owner" || row.assignedTeacherId === currentAdmin?.id) {
-        void loadMaterials(row.customerId, event.id);
+        if (typeof row.customerId === "string" && row.customerId) {
+          void loadMaterials(row.customerId, event.id);
+        }
       }
     }
 
@@ -468,11 +485,11 @@ export function AdminBookingsClient() {
 
   async function sendCustomEmail(subject: string, message: string, captcha?: { captchaToken: string; captchaAnswer: string }) {
     const event = events.find(e => e.id === selectedKey);
-    const customerId = event?.row.customerId;
-    if (!customerId || !subject || !message) return { success: false };
+    const emailTarget = getEmailHistoryTargetForEvent((event as EventWithRow | undefined) || null);
+    if (!emailTarget || !subject || !message) return { success: false };
     
     setError("");
-    const result = await sendEmailApi(customerId, subject, message, captcha);
+    const result = await sendEmailApi(emailTarget, subject, message, captcha);
     if (result.success) {
       setNotice("Email sent.");
       setEmailComposerSubject("");
@@ -729,8 +746,9 @@ export function AdminBookingsClient() {
           onSendEmail={sendCustomEmail}
           onSyncEmail={() => {
             const event = events.find(e => e.id === selectedKey);
-            if (event?.row.customerId) {
-              void syncEmailApi(event.row.customerId);
+            const emailTarget = getEmailHistoryTargetForEvent((event as EventWithRow | undefined) || null);
+            if (emailTarget) {
+              void syncEmailApi(emailTarget);
             }
           }}
           onPerformAction={performAction}

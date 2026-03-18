@@ -86,6 +86,7 @@ ${logContext || "No logs included."}
 
     const result = await sendEmail({
       to: "contact@grahfmusic.com",
+      cc: "deant@ccasoftware.com.au",
       subject: `[LessonFlow Bug] ${subject} — from ${admin.displayName}`,
       html: htmlBody,
       notification: {

@@ -26,21 +26,16 @@ export function getOwnerEmail(): string {
  * Returns whether owner login should surface unread customer-email alerts.
  */
 export function isAdminCustomerEmailAlertsEnabled(): boolean {
-  return (process.env.ADMIN_CUSTOMER_EMAIL_ALERTS_ENABLED || "false").trim().toLowerCase() === "true";
+  return true;
 }
 
-export type CustomerEmailAlertsProvider = "auto" | "gmail" | "imap";
+export type CustomerEmailAlertsProvider = "gmail";
 
 /**
  * Returns the configured inbound provider preference for customer email alerts.
  */
 export function getAdminCustomerEmailAlertsProvider(): CustomerEmailAlertsProvider {
-  const value = (process.env.ADMIN_CUSTOMER_EMAIL_ALERTS_PROVIDER || "auto").trim().toLowerCase();
-  if (value === "gmail" || value === "imap") {
-    return value;
-  }
-
-  return "auto";
+  return "gmail";
 }
 
 /**

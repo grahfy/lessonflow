@@ -33,6 +33,7 @@ function renderStatusLabel(status: InboxProviderStatus["status"]) {
 
 export function CustomerEmailAlertStatus() {
   const { status, check } = useCustomerEmailAlertStatus();
+  const loading = status.gmail.status === "loading" || status.imap.status === "loading";
 
   return (
     <AdminCard ghost className="gmail-status-card">
@@ -47,17 +48,17 @@ export function CustomerEmailAlertStatus() {
           type="button"
           className="btn btn-secondary btn-small"
           onClick={check}
-          disabled={status.gmail.status === "loading" || status.imap.status === "loading"}
+          disabled={loading}
         >
           <RefreshCw
             size={14}
-            className={status.gmail.status === "loading" || status.imap.status === "loading" ? "icon-spin" : ""}
+            className={loading ? "icon-spin" : ""}
           />
         </button>
       </div>
 
       <div className="gmail-status-details">
-        <p className="helper-text">Provider preference: <code>{status.providerPreference}</code></p>
+        <p className="helper-text">Inbox alerts are locked to <code>{status.providerPreference}</code>.</p>
       </div>
 
       <div className="customer-email-provider-status-grid">

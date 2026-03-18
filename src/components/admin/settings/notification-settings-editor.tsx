@@ -170,28 +170,6 @@ export function AdminNotificationSettingsEditor() {
         </AdminForm>
       </AdminEditorPanel>
 
-      <AdminEditorPanel title="Automated Categories" subdued>
-        <AdminForm>
-          {NOTIFICATION_CATEGORY_DEFINITIONS.map((category) => (
-            <AdminField
-              key={category.key}
-              label={category.label}
-              description={category.description}
-              fullWidth
-            >
-              <label className="admin-inline-checkbox">
-                <input
-                  type="checkbox"
-                  checked={settings.categoryPreferences[category.key]}
-                  onChange={(event) => updateCategory(category.key, event.target.checked)}
-                />
-                Enabled
-              </label>
-            </AdminField>
-          ))}
-        </AdminForm>
-      </AdminEditorPanel>
-
       <AdminEditorPanel title="Automatic Invoice Reminders" subdued>
         <AdminForm>
           <AdminField
@@ -251,6 +229,28 @@ export function AdminNotificationSettingsEditor() {
               }
             />
           </AdminField>
+        </AdminForm>
+      </AdminEditorPanel>
+
+      <AdminEditorPanel title="Automated Categories" subdued>
+        <AdminForm>
+          {NOTIFICATION_CATEGORY_DEFINITIONS.map((category) => (
+            <AdminField
+              key={category.key}
+              label={category.label}
+              description={category.description}
+              fullWidth
+            >
+              <label className="admin-inline-checkbox">
+                <input
+                  type="checkbox"
+                  checked={settings.categoryPreferences[category.key]}
+                  onChange={(event) => updateCategory(category.key, event.target.checked)}
+                />
+                Enabled
+              </label>
+            </AdminField>
+          ))}
         </AdminForm>
       </AdminEditorPanel>
     </AdminEditorSection>

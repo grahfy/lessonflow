@@ -8,6 +8,7 @@ import { PATCH as patchBookingRequest } from "@/app/api/admin/booking-requests/[
 import { PATCH as patchBooking } from "@/app/api/admin/bookings/[id]/route";
 import { POST as notifyBooking } from "@/app/api/admin/bookings/[id]/notify/route";
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
+import { DEFAULT_GEOBLOCKING_SETTINGS_ID } from "@/lib/geoblocking-settings";
 
 function adminRequest(url: string, body: Record<string, unknown>, token: string): NextRequest {
   return new NextRequest(url, {
@@ -24,10 +25,19 @@ describe("booking-notifications", () => {
   beforeEach(async () => {
     process.env.ADMIN_EMAIL = "admin@example.com";
     await prisma.outboundEmail.deleteMany();
+    await prisma.geoblockingSettings.deleteMany();
     await prisma.booking.deleteMany();
     await prisma.bookingSeries.deleteMany();
     await prisma.bookingRequest.deleteMany();
     await prisma.customer.deleteMany();
+
+    await prisma.geoblockingSettings.create({
+      data: {
+        id: DEFAULT_GEOBLOCKING_SETTINGS_ID,
+        allowedCountries: ["AU", "NZ"],
+        unknownCountryMode: "allow"
+      }
+    });
   });
 
   it("records an outbound email for the owner when a booking request is submitted", async () => {

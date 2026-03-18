@@ -10,6 +10,7 @@ import { Pagination } from "@/components/pagination";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { useSafeFetch } from "@/lib/admin/use-safe-fetch";
 import { readApiErrorFromResponse } from "@/lib/admin/utils";
+import { APP_TIMEZONE } from "@/lib/time";
 
 type SystemLog = {
   id: string;
@@ -78,6 +79,10 @@ export function SystemLogsClient() {
   const [bugScreenshot, setBugScreenshot] = useState<string | null>(null);
   const [submittingBug, setSubmittingBug] = useState(false);
   const [reportResult, setReportResult] = useState<{ success?: boolean; error?: string } | null>(null);
+  const [isClearBeforeOpen, setIsClearBeforeOpen] = useState(false);
+  const [clearCutoffLocal, setClearCutoffLocal] = useState("");
+  const [clearingMode, setClearingMode] = useState<"before" | "all" | null>(null);
+  const [downloadingLogs, setDownloadingLogs] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const { safeFetch, handleApiError } = useSafeFetch({ onError: setError });
@@ -101,12 +106,14 @@ export function SystemLogsClient() {
     reader.readAsDataURL(file);
   };
 
-  const fetchLogs = useCallback(async () => {
+  const fetchLogs = useCallback(async (options?: { page?: number; pageSize?: number }) => {
+    const requestedPage = options?.page ?? page;
+    const requestedPageSize = options?.pageSize ?? pageSize;
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        page: page.toString(),
-        pageSize: pageSize.toString(),
+        page: requestedPage.toString(),
+        pageSize: requestedPageSize.toString(),
         level: levelFilter,
         event: eventSearch,
       });
@@ -194,6 +201,92 @@ export function SystemLogsClient() {
     }
   };
 
+  const buildLogQuery = useCallback((extra: Record<string, string> = {}) => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      pageSize: pageSize.toString(),
+      ...(levelFilter ? { level: levelFilter } : {}),
+      ...(eventSearch ? { event: eventSearch } : {}),
+      ...extra
+    });
+    return params.toString();
+  }, [eventSearch, levelFilter, page, pageSize]);
+
+  const handleDownloadLogs = useCallback(() => {
+    setDownloadingLogs(true);
+    try {
+      window.location.assign(`/api/admin/system-logs?${buildLogQuery({ download: "true" })}`);
+      setNotice("Log download started.");
+    } finally {
+      window.setTimeout(() => setDownloadingLogs(false), 800);
+    }
+  }, [buildLogQuery]);
+
+  const handleClearAllLogs = useCallback(async () => {
+    if (!window.confirm("Delete every system log entry? This cannot be undone.")) {
+      return;
+    }
+
+    setClearingMode("all");
+    setError("");
+    try {
+      const response = await safeFetch("/api/admin/system-logs", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "all" })
+      });
+
+      if (!response.ok) {
+        await handleApiError(response, "Unable to clear logs.");
+        return;
+      }
+
+      const data = await response.json() as { deletedCount?: number };
+      setExpandedLogs(new Set());
+      setPage(1);
+      setNotice(`Cleared ${data.deletedCount ?? 0} log${data.deletedCount === 1 ? "" : "s"}.`);
+      await fetchLogs({ page: 1 });
+    } catch {
+      setError("Unable to clear logs.");
+    } finally {
+      setClearingMode(null);
+    }
+  }, [fetchLogs, handleApiError, safeFetch]);
+
+  const handleClearBefore = useCallback(async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!clearCutoffLocal) {
+      setError(`Choose a cutoff date and time in ${APP_TIMEZONE}.`);
+      return;
+    }
+
+    setClearingMode("before");
+    setError("");
+    try {
+      const response = await safeFetch("/api/admin/system-logs", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "before", cutoffLocal: clearCutoffLocal })
+      });
+
+      if (!response.ok) {
+        await handleApiError(response, "Unable to clear logs up to that date.");
+        return;
+      }
+
+      const data = await response.json() as { deletedCount?: number };
+      setExpandedLogs(new Set());
+      setPage(1);
+      setIsClearBeforeOpen(false);
+      setNotice(`Cleared ${data.deletedCount ?? 0} log${data.deletedCount === 1 ? "" : "s"} up to the selected time.`);
+      await fetchLogs({ page: 1 });
+    } catch {
+      setError("Unable to clear logs up to that date.");
+    } finally {
+      setClearingMode(null);
+    }
+  }, [clearCutoffLocal, fetchLogs, handleApiError, safeFetch]);
+
   /**
    * Returns the CSS class suffix for a log level badge.
    */
@@ -264,11 +357,41 @@ export function SystemLogsClient() {
               <Tooltip content="Reload the system logs from the server.">
                 <button
                   className="btn btn-secondary"
-                  onClick={fetchLogs}
+                  onClick={() => void fetchLogs()}
                   disabled={loading}
                 >
                   <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
                   REFRESH
+                </button>
+              </Tooltip>
+              <Tooltip content="Download every log row matching the current filters.">
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  onClick={handleDownloadLogs}
+                  disabled={downloadingLogs}
+                >
+                  {downloadingLogs ? "DOWNLOADING..." : "DOWNLOAD LOGS"}
+                </button>
+              </Tooltip>
+              <Tooltip content={`Delete logs up to a chosen ${APP_TIMEZONE} date and time.`}>
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  onClick={() => setIsClearBeforeOpen(true)}
+                  disabled={clearingMode !== null}
+                >
+                  CLEAR UP TO...
+                </button>
+              </Tooltip>
+              <Tooltip content="Delete all stored system logs permanently.">
+                <button
+                  className="btn btn-danger"
+                  type="button"
+                  onClick={() => void handleClearAllLogs()}
+                  disabled={clearingMode !== null}
+                >
+                  {clearingMode === "all" ? "CLEARING..." : "CLEAR ALL"}
                 </button>
               </Tooltip>
               <Tooltip content="Open a form to submit a technical issue report to the developer.">
@@ -535,6 +658,48 @@ export function SystemLogsClient() {
               {reportResult.success ? " Report sent successfully! Thank you." : ` ${reportResult.error}`}
             </AdminNotice>
           )}
+        </form>
+      </AdminDialog>
+
+      <AdminDialog
+        isOpen={isClearBeforeOpen}
+        onClose={() => setIsClearBeforeOpen(false)}
+        title="Clear Logs Up To"
+        description={`Delete every log entry at or before the selected ${APP_TIMEZONE} timestamp.`}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setIsClearBeforeOpen(false)}
+              className="btn btn-secondary"
+              disabled={clearingMode === "before"}
+            >
+              CANCEL
+            </button>
+            <button
+              type="submit"
+              form="clear-logs-before-form"
+              disabled={clearingMode === "before" || !clearCutoffLocal}
+              className="btn btn-danger"
+            >
+              {clearingMode === "before" ? "CLEARING..." : "CLEAR LOGS"}
+            </button>
+          </>
+        }
+      >
+        <form id="clear-logs-before-form" onSubmit={(event) => void handleClearBefore(event)}>
+          <div className="field">
+            <label htmlFor="clear-logs-cutoff" className="admin-inline-field">
+              Cutoff Date/Time
+            </label>
+            <input
+              id="clear-logs-cutoff"
+              type="datetime-local"
+              value={clearCutoffLocal}
+              onChange={(event) => setClearCutoffLocal(event.target.value)}
+            />
+          </div>
+          <p className="helper-text">Timezone: {APP_TIMEZONE}</p>
         </form>
       </AdminDialog>
     </AdminShell>

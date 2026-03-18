@@ -1274,10 +1274,15 @@ export async function saveAdminSettingsConfig(
   input: AdminSettingsSaveInput,
   options: { currentAdminId: string }
 ): Promise<AdminSettingsSaveResult> {
+  const normalizedInput: Record<string, string | undefined> = {
+    ...input,
+    ADMIN_CUSTOMER_EMAIL_ALERTS_PROVIDER: "gmail",
+    ADMIN_CUSTOMER_EMAIL_ALERTS_ENABLED: "true"
+  };
   const validationInput: Record<string, string> = {};
   const currentValues = getStoredEnvValues();
   for (const envVar of CONFIGURABLE_ENV_VARS) {
-    const rawValue = input[envVar.key] || "";
+    const rawValue = normalizedInput[envVar.key] || "";
     if (envVar.isSecret && !rawValue.trim()) {
       // In the admin settings screen, blank secret inputs mean "keep current value" when a secret
       // is already configured. Validate against the currently loaded env value so required secrets
@@ -1339,7 +1344,7 @@ export async function saveAdminSettingsConfig(
   managedKeys.add("ADMIN_PASSWORD");
 
   for (const envVar of CONFIGURABLE_ENV_VARS) {
-    const value = input[envVar.key] || "";
+    const value = normalizedInput[envVar.key] || "";
     if (value && value !== "***SET***") {
       vars.set(envVar.key, value);
       // Update in-memory process.env so the current process sees the change immediately

@@ -175,7 +175,7 @@ export function AdminCustomersClient() {
 
     // Eagerly load history if a customer is selected
     if (customer) {
-      void loadEmailHistory(customer.id);
+      void loadEmailHistory({ customerId: customer.id });
       if (currentAdmin?.role === "owner" || customer.primaryTeacherId === currentAdmin?.id) {
         void loadMaterials(customer.id);
       }
@@ -341,7 +341,7 @@ export function AdminCustomersClient() {
   async function sendCustomerEmail(subject: string, message: string, captcha?: { captchaToken: string; captchaAnswer: string }) {
     if (!selectedCustomer) return { success: false };
     setError("");
-    const result = await sendEmailApi(selectedCustomer.id, subject, message, captcha);
+    const result = await sendEmailApi({ customerId: selectedCustomer.id }, subject, message, captcha);
     if (result.success) {
       setNotice("Email sent successfully.");
       setEmailComposerSubject("");
@@ -568,7 +568,7 @@ export function AdminCustomersClient() {
           sendingEmail={sendingEmail}
           syncingEmail={syncingEmail}
           onSendEmail={sendCustomerEmail}
-          onSyncEmail={() => selectedCustomer && syncEmailApi(selectedCustomer.id)}
+          onSyncEmail={() => selectedCustomer && syncEmailApi({ customerId: selectedCustomer.id })}
 
           // Learning Materials Asset Management
           materialsList={materialsList}

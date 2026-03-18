@@ -64,7 +64,7 @@ describe("setup-wizard", () => {
   });
 
   it("reports setup as incomplete before first admin is created", async () => {
-    const response = await getSetupStatus();
+    const response = await getSetupStatus(new Request("http://localhost/api/setup/status"));
     expect(response.status).toBe(200);
 
     const body = (await response.json()) as {
@@ -79,7 +79,7 @@ describe("setup-wizard", () => {
   });
 
   it("allows setup env endpoints before setup completes and blocks them after initialization", async () => {
-    const preEnvResponse = await getSetupEnv();
+    const preEnvResponse = await getSetupEnv(new Request("http://localhost/api/setup/env"));
     expect(preEnvResponse.status).toBe(200);
     const preEnvBody = (await preEnvResponse.json()) as { ok?: boolean; envVars?: Array<{ key: string }> };
     expect(preEnvBody.ok).toBe(true);
@@ -106,7 +106,7 @@ describe("setup-wizard", () => {
     const initializeResponse = await initializeSetup(initializeRequest);
     expect(initializeResponse.status).toBe(201);
 
-    const postEnvResponse = await getSetupEnv();
+    const postEnvResponse = await getSetupEnv(new Request("http://localhost/api/setup/env"));
     expect(postEnvResponse.status).toBe(409);
     const postEnvBody = (await postEnvResponse.json()) as { code?: string };
     expect(postEnvBody.code).toBe("SETUP_COMPLETE");
@@ -139,6 +139,45 @@ describe("setup-wizard", () => {
     expect(response.status).toBe(400);
     const body = (await response.json()) as { error?: string };
     expect(body.error).toBe("Invalid configuration payload.");
+  });
+
+  it("round-trips the persisted inbox alert settings through the setup env APIs", async () => {
+    const initialEnvResponse = await getSetupEnv(new Request("http://localhost/api/setup/env"));
+    expect(initialEnvResponse.status).toBe(200);
+    const initialEnvBody = (await initialEnvResponse.json()) as {
+      envVars: Array<{ key: string; currentValue: string }>;
+    };
+
+    const envPayload = Object.fromEntries(
+      initialEnvBody.envVars.map((envVar) => [envVar.key, envVar.currentValue === "***SET***" ? "" : envVar.currentValue])
+    );
+    envPayload.ADMIN_CUSTOMER_EMAIL_ALERTS_PROVIDER = "imap";
+    envPayload.ADMIN_CUSTOMER_EMAIL_ALERTS_ENABLED = "false";
+    envPayload.IMAP_HOST = "imap.example.com";
+    envPayload.IMAP_USER = "setup-owner@example.com";
+
+    const configureResponse = await configureSetupEnv(
+      new Request("http://localhost/api/setup/configure", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify(envPayload)
+      })
+    );
+    expect(configureResponse.status).toBe(200);
+
+    const refreshedEnvResponse = await getSetupEnv(new Request("http://localhost/api/setup/env"));
+    expect(refreshedEnvResponse.status).toBe(200);
+    const refreshedEnvBody = (await refreshedEnvResponse.json()) as {
+      envVars: Array<{ key: string; currentValue: string }>;
+    };
+    const valuesByKey = Object.fromEntries(refreshedEnvBody.envVars.map((envVar) => [envVar.key, envVar.currentValue]));
+
+    expect(valuesByKey.ADMIN_CUSTOMER_EMAIL_ALERTS_PROVIDER).toBe("imap");
+    expect(valuesByKey.ADMIN_CUSTOMER_EMAIL_ALERTS_ENABLED).toBe("false");
+    expect(valuesByKey.IMAP_HOST).toBe("imap.example.com");
+    expect(valuesByKey.IMAP_USER).toBe("setup-owner@example.com");
   });
 
   it("blocks setup access from public addresses in production before initialization", async () => {
@@ -282,7 +321,7 @@ describe("setup-wizard", () => {
     expect(geoblocking?.allowedCountries).toEqual(["AU", "NZ"]);
     expect(geoblocking?.unknownCountryMode).toBe("allow");
 
-    const statusResponse = await getSetupStatus();
+    const statusResponse = await getSetupStatus(new Request("http://localhost/api/setup/status"));
     expect(statusResponse.status).toBe(409);
     const statusBody = (await statusResponse.json()) as { code?: string; completed?: boolean };
     expect(statusBody.code).toBe("SETUP_COMPLETE");

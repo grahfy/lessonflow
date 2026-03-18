@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { requireOwnerFromRequest } from "@/lib/admin-route";
 import { getCustomerEmailAlertsStatusSummary } from "@/lib/email/customer-email-alerts";
-import { isAdminCustomerEmailAlertsEnabled } from "@/lib/env";
 
 /**
  * Returns owner-only readiness and provider status for inbox-backed customer email alerts.
@@ -16,7 +15,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(
-      await getCustomerEmailAlertsStatusSummary(isAdminCustomerEmailAlertsEnabled())
+      await getCustomerEmailAlertsStatusSummary(true)
     );
   } catch (error) {
     return jsonUnexpectedError(error, "Unable to load customer email alert status.");

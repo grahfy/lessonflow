@@ -14,8 +14,8 @@ export type InboxProviderStatus = {
 
 export type CustomerEmailAlertStatusSummary = {
   alertsEnabled: boolean;
-  providerPreference: "auto" | "gmail" | "imap";
-  activeProvider: "gmail" | "imap" | null;
+  providerPreference: "gmail";
+  activeProvider: "gmail" | null;
   gmail: InboxProviderStatus;
   imap: InboxProviderStatus;
 };
@@ -27,8 +27,8 @@ const loadingStatus: InboxProviderStatus = {
 
 export function useCustomerEmailAlertStatus(options: { onAuthError?: () => void } = {}) {
   const [status, setStatus] = useState<CustomerEmailAlertStatusSummary>({
-    alertsEnabled: false,
-    providerPreference: "auto",
+    alertsEnabled: true,
+    providerPreference: "gmail",
     activeProvider: null,
     gmail: loadingStatus,
     imap: loadingStatus

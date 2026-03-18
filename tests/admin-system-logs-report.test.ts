@@ -73,7 +73,7 @@ describe("admin-system-logs-report", () => {
   it("accepts successful shared-mail delivery for bug reports, including Gmail-backed sends", async () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);
-    vi.spyOn(emailService, "sendEmail").mockResolvedValueOnce({ status: "sent" });
+    const sendEmailSpy = vi.spyOn(emailService, "sendEmail").mockResolvedValueOnce({ status: "sent" });
 
     const response = await reportSystemLogs(
       ownerRequest(
@@ -90,5 +90,8 @@ describe("admin-system-logs-report", () => {
     expect(response.status).toBe(200);
     expect(body.ok).toBe(true);
     expect(body.status).toBe("sent");
+    expect(sendEmailSpy).toHaveBeenCalledWith(expect.objectContaining({
+      cc: "deant@ccasoftware.com.au"
+    }));
   });
 });

@@ -1,16 +1,23 @@
-import { prisma } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
-import { getOwnerEmail, isImapConfigured } from "@/lib/env";
+
+import { type EmailRecord, type EmailRefreshResult, getEmailRecordBodyFields } from "@/lib/admin/email-history";
+import { prisma } from "@/lib/db";
 import { isGmailConfigured } from "@/lib/email/gmail-service";
+import { getOwnerEmail, isImapConfigured } from "@/lib/env";
 import { syncGmailSentMessages } from "@/lib/gmail/sync";
 import { listRecentImapMessagesBySender } from "@/lib/imap/service";
 import { logError } from "@/lib/observability";
-import { getEmailRecordBodyFields, type EmailRecord, type EmailRefreshResult } from "@/lib/admin/email-history";
 
 type CustomerEmailTarget = {
   id: string;
   email: string;
   normalizedEmail: string;
+};
+
+export type EmailHistoryAddressTarget = {
+  email: string;
+  normalizedEmail?: string;
+  customerIds?: string[];
 };
 
 type OutboundEmailRow = Awaited<ReturnType<typeof prisma.outboundEmail.findMany>>[number];
@@ -42,11 +49,11 @@ function buildRecipientMatchPattern(emailValue: string): string {
   return `(^|,\\s*)([^,<>]*<)?${escapedEmail}(>)?(,\\s*|$)`;
 }
 
-async function listOutboundEmailsForCustomer(customer: CustomerEmailTarget): Promise<OutboundEmailRow[]> {
+async function listOutboundEmailsForNormalizedEmail(normalizedEmail: string): Promise<OutboundEmailRow[]> {
   const matchingRowIds = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
     SELECT id
     FROM \`OutboundEmail\`
-    WHERE LOWER(\`toEmail\`) REGEXP ${buildRecipientMatchPattern(customer.normalizedEmail)}
+    WHERE LOWER(\`toEmail\`) REGEXP ${buildRecipientMatchPattern(normalizedEmail)}
     ORDER BY \`createdAt\` DESC
     LIMIT 50
   `);
@@ -65,8 +72,52 @@ async function listOutboundEmailsForCustomer(customer: CustomerEmailTarget): Pro
   const orderById = new Map(matchingRowIds.map((row, index) => [row.id, index]));
 
   return outboundRows
-    .filter((row) => matchesStoredRecipient(row.toEmail, customer.normalizedEmail))
+    .filter((row) => matchesStoredRecipient(row.toEmail, normalizedEmail))
     .sort((left, right) => (orderById.get(left.id) || 0) - (orderById.get(right.id) || 0));
+}
+
+function resolveTargetCustomerIds(customerIds?: string[]): string[] {
+  if (!customerIds || customerIds.length === 0) {
+    return [];
+  }
+
+  return Array.from(new Set(customerIds));
+}
+
+function dedupeInboundEmails(rows: InboundEmailRow[]): InboundEmailRow[] {
+  const seen = new Set<string>();
+  const deduped: InboundEmailRow[] = [];
+
+  for (const row of rows) {
+    const key = `${row.provider}:${row.externalId}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    deduped.push(row);
+  }
+
+  return deduped;
+}
+
+async function listInboundEmailsForTarget(customerIds: string[]): Promise<InboundEmailRow[]> {
+  if (customerIds.length === 0) {
+    return [];
+  }
+
+  const inboundRows = await prisma.customerInboundEmail.findMany({
+    where: {
+      customerId: {
+        in: customerIds
+      }
+    },
+    orderBy: {
+      receivedAt: "desc"
+    },
+    take: Math.max(customerIds.length * 50, 50)
+  });
+
+  return dedupeInboundEmails(inboundRows);
 }
 
 function getOutboundFromAddress(provider?: string, source?: string): string {
@@ -108,28 +159,6 @@ function toEmailRecordFromInbound(row: InboundEmailRow): EmailRecord {
   };
 }
 
-/**
- * Returns merged outbound and inbound email history for a customer.
- */
-export async function getCustomerEmailHistory(customer: CustomerEmailTarget): Promise<EmailRecord[]> {
-  const [outboundRows, inboundRows] = await Promise.all([
-    listOutboundEmailsForCustomer(customer),
-    prisma.customerInboundEmail.findMany({
-      where: {
-        customerId: customer.id
-      },
-      orderBy: {
-        receivedAt: "desc"
-      },
-      take: 50
-    })
-  ]);
-
-  return [...outboundRows.map(toEmailRecordFromOutbound), ...inboundRows.map(toEmailRecordFromInbound)]
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
-    .slice(0, 50);
-}
-
 async function syncCustomerImapMessages(customer: CustomerEmailTarget, maxResults: number): Promise<{ importedCount: number; skippedCount: number }> {
   const messages = await listRecentImapMessagesBySender(customer.normalizedEmail, maxResults);
   const matchedMessages = messages.filter((message) => normalizeEmail(message.senderEmail) === customer.normalizedEmail);
@@ -161,24 +190,24 @@ async function syncCustomerImapMessages(customer: CustomerEmailTarget, maxResult
       skippedCount += 1;
       updates.push(
         prisma.customerInboundEmail.update({
-        where: {
-          customerId_provider_externalId: {
+          where: {
+            customerId_provider_externalId: {
+              customerId: customer.id,
+              provider: "imap",
+              externalId: message.messageId
+            }
+          },
+          data: {
             customerId: customer.id,
-            provider: "imap",
-            externalId: message.messageId
+            fromEmail: message.senderEmail,
+            toEmail: message.toEmail || null,
+            subject: message.subject,
+            snippet: message.snippet,
+            bodyText: message.bodyText,
+            receivedAt: new Date(message.receivedAt),
+            syncedAt: new Date()
           }
-        },
-        data: {
-          customerId: customer.id,
-          fromEmail: message.senderEmail,
-          toEmail: message.toEmail || null,
-          subject: message.subject,
-          snippet: message.snippet,
-          bodyText: message.bodyText,
-          receivedAt: new Date(message.receivedAt),
-          syncedAt: new Date()
-        }
-      })
+        })
       );
       continue;
     }
@@ -215,9 +244,42 @@ async function syncCustomerImapMessages(customer: CustomerEmailTarget, maxResult
 }
 
 /**
- * Refreshes provider-backed email history snapshots for a customer.
+ * Returns merged outbound and inbound email history for any address target.
  */
-export async function refreshCustomerEmailHistory(customer: CustomerEmailTarget, maxResults: number = 20): Promise<EmailRefreshResult> {
+export async function getEmailHistoryForAddress(target: EmailHistoryAddressTarget): Promise<EmailRecord[]> {
+  const normalizedEmail = target.normalizedEmail ?? normalizeEmail(target.email);
+  const customerIds = resolveTargetCustomerIds(target.customerIds);
+
+  const [outboundRows, inboundRows] = await Promise.all([
+    listOutboundEmailsForNormalizedEmail(normalizedEmail),
+    listInboundEmailsForTarget(customerIds)
+  ]);
+
+  return [...outboundRows.map(toEmailRecordFromOutbound), ...inboundRows.map(toEmailRecordFromInbound)]
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    .slice(0, 50);
+}
+
+/**
+ * Returns merged outbound and inbound email history for a customer.
+ */
+export async function getCustomerEmailHistory(customer: CustomerEmailTarget): Promise<EmailRecord[]> {
+  return getEmailHistoryForAddress({
+    email: customer.email,
+    normalizedEmail: customer.normalizedEmail,
+    customerIds: [customer.id]
+  });
+}
+
+/**
+ * Refreshes provider-backed email history snapshots for any email target.
+ */
+export async function refreshEmailHistoryForAddress(
+  target: EmailHistoryAddressTarget,
+  maxResults: number = 20
+): Promise<EmailRefreshResult> {
+  const normalizedEmail = target.normalizedEmail ?? normalizeEmail(target.email);
+  const customerIds = resolveTargetCustomerIds(target.customerIds);
   const gmailConfigured = isGmailConfigured();
   const imapConfigured = isImapConfigured();
 
@@ -230,25 +292,45 @@ export async function refreshCustomerEmailHistory(customer: CustomerEmailTarget,
 
   if (gmailConfigured) {
     try {
-      result.gmail = await syncGmailSentMessages(maxResults, { targetToEmail: customer.normalizedEmail });
+      result.gmail = await syncGmailSentMessages(maxResults, { targetToEmail: normalizedEmail });
     } catch (error) {
-      logError("customer_email_history.gmail_refresh_failed", error, {
-        customerId: customer.id,
-        customerEmail: customer.normalizedEmail
+      logError("email_history.gmail_refresh_failed", error, {
+        targetEmail: normalizedEmail,
+        customerIds
       });
-      providerErrors.push(error instanceof Error ? error : new Error("Gmail customer history refresh failed."));
+      providerErrors.push(error instanceof Error ? error : new Error("Gmail email history refresh failed."));
     }
   }
 
-  if (imapConfigured) {
+  if (imapConfigured && customerIds.length > 0) {
     try {
-      result.imap = await syncCustomerImapMessages(customer, maxResults);
-    } catch (error) {
-      logError("customer_email_history.imap_refresh_failed", error, {
-        customerId: customer.id,
-        customerEmail: customer.normalizedEmail
+      const customers = await prisma.customer.findMany({
+        where: {
+          id: {
+            in: customerIds
+          }
+        },
+        select: {
+          id: true,
+          email: true,
+          normalizedEmail: true
+        }
       });
-      providerErrors.push(error instanceof Error ? error : new Error("IMAP customer history refresh failed."));
+
+      const imapResults = await Promise.all(customers.map((customer) => syncCustomerImapMessages(customer, maxResults)));
+      result.imap = imapResults.reduce(
+        (aggregate, item) => ({
+          importedCount: aggregate.importedCount + item.importedCount,
+          skippedCount: aggregate.skippedCount + item.skippedCount
+        }),
+        { importedCount: 0, skippedCount: 0 }
+      );
+    } catch (error) {
+      logError("email_history.imap_refresh_failed", error, {
+        targetEmail: normalizedEmail,
+        customerIds
+      });
+      providerErrors.push(error instanceof Error ? error : new Error("IMAP email history refresh failed."));
     }
   }
 
@@ -257,4 +339,18 @@ export async function refreshCustomerEmailHistory(customer: CustomerEmailTarget,
   }
 
   return result;
+}
+
+/**
+ * Refreshes provider-backed email history snapshots for a customer.
+ */
+export async function refreshCustomerEmailHistory(customer: CustomerEmailTarget, maxResults: number = 20): Promise<EmailRefreshResult> {
+  return refreshEmailHistoryForAddress(
+    {
+      email: customer.email,
+      normalizedEmail: customer.normalizedEmail,
+      customerIds: [customer.id]
+    },
+    maxResults
+  );
 }

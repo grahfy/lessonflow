@@ -8,30 +8,44 @@ import { useSafeFetch } from "./use-safe-fetch";
 
 export type { EmailRecord } from "@/lib/admin/email-history";
 
+export type EmailHistoryTarget =
+  | { customerId: string }
+  | { bookingId: string }
+  | { bookingRequestId: string };
+
 export interface UseEmailHistoryOptions {
-    /** Called on auth error */
-    onAuthError?: () => void;
-    /** Called on other errors */
-    onError?: (message: string) => void;
+  /** Called on auth error */
+  onAuthError?: () => void;
+  /** Called on other errors */
+  onError?: (message: string) => void;
 }
 
 export type SendEmailResult = {
-    success: boolean;
-    errorCode?: string;
+  success: boolean;
+  errorCode?: string;
 };
 
 export interface UseEmailHistoryResult {
-    history: ReadonlyArray<EmailRecord>;
-    loading: boolean;
-    sending: boolean;
-    syncing: boolean;
-    load: (customerId: string) => Promise<void>;
-    send: (customerId: string, subject: string, message: string, captcha?: { captchaToken: string; captchaAnswer: string }) => Promise<SendEmailResult>;
-    sync: (customerId: string) => Promise<boolean>;
+  history: ReadonlyArray<EmailRecord>;
+  loading: boolean;
+  sending: boolean;
+  syncing: boolean;
+  load: (target: EmailHistoryTarget) => Promise<void>;
+  send: (
+    target: EmailHistoryTarget,
+    subject: string,
+    message: string,
+    captcha?: { captchaToken: string; captchaAnswer: string }
+  ) => Promise<SendEmailResult>;
+  sync: (target: EmailHistoryTarget) => Promise<boolean>;
+}
+
+function toQueryString(target: EmailHistoryTarget): string {
+  return new URLSearchParams(target).toString();
 }
 
 /**
- * Hook to manage email communication history and sending for customers.
+ * Hook to manage email communication history and sending for admin targets.
  */
 export function useEmailHistory(options: UseEmailHistoryOptions = {}): UseEmailHistoryResult {
   const { onAuthError, onError } = options;
@@ -42,10 +56,10 @@ export function useEmailHistory(options: UseEmailHistoryOptions = {}): UseEmailH
 
   const { safeFetch, handleApiError } = useSafeFetch({ onAuthError, onError });
 
-  const load = useCallback(async (customerId: string) => {
+  const load = useCallback(async (target: EmailHistoryTarget) => {
     setLoading(true);
     try {
-      const response = await safeFetch(`/api/admin/customers/${customerId}/email`, { cache: "no-store" });
+      const response = await safeFetch(`/api/admin/email-history?${toQueryString(target)}`, { cache: "no-store" });
       if (!response.ok) {
         await handleApiError(response, "Unable to load email history.");
         return;
@@ -58,15 +72,20 @@ export function useEmailHistory(options: UseEmailHistoryOptions = {}): UseEmailH
     } finally {
       setLoading(false);
     }
-  }, [safeFetch, handleApiError, onError]);
+  }, [handleApiError, onError, safeFetch]);
 
-  const send = useCallback(async (customerId: string, subject: string, message: string, captcha?: { captchaToken: string; captchaAnswer: string }): Promise<SendEmailResult> => {
+  const send = useCallback(async (
+    target: EmailHistoryTarget,
+    subject: string,
+    message: string,
+    captcha?: { captchaToken: string; captchaAnswer: string }
+  ): Promise<SendEmailResult> => {
     setSending(true);
     try {
-      const response = await safeFetch(`/api/admin/customers/${customerId}/email`, {
+      const response = await safeFetch("/api/admin/email-history", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject, message, ...captcha })
+        body: JSON.stringify({ ...target, subject, message, ...captcha })
       });
 
       if (!response.ok) {
@@ -81,21 +100,22 @@ export function useEmailHistory(options: UseEmailHistoryOptions = {}): UseEmailH
         return { success: false, errorCode: errorData.code };
       }
 
-      void load(customerId);
+      void load(target);
       return { success: true };
     } catch {
       return { success: false };
     } finally {
       setSending(false);
     }
-  }, [safeFetch, handleApiError, load, onError]);
+  }, [handleApiError, load, onError, safeFetch]);
 
-  const sync = useCallback(async (customerId: string): Promise<boolean> => {
+  const sync = useCallback(async (target: EmailHistoryTarget): Promise<boolean> => {
     setSyncing(true);
     try {
-      const response = await safeFetch(`/api/admin/customers/${customerId}/email/refresh`, {
+      const response = await safeFetch("/api/admin/email-history/refresh", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(target)
       });
 
       if (!response.ok) {
@@ -104,14 +124,14 @@ export function useEmailHistory(options: UseEmailHistoryOptions = {}): UseEmailH
       }
 
       await response.json().catch(() => null as EmailRefreshResult | null);
-      void load(customerId);
+      void load(target);
       return true;
     } catch {
       return false;
     } finally {
       setSyncing(false);
     }
-  }, [safeFetch, handleApiError, load]);
+  }, [handleApiError, load, safeFetch]);
 
   return {
     history,

@@ -26,6 +26,7 @@ type SendEmailInput = {
   to: string;
   subject: string;
   html: string;
+  cc?: string | string[];
   bcc?: string | string[];
   attachments?: Array<{
     filename: string;
@@ -60,6 +61,7 @@ export function isGmailConfigured(): boolean {
 function encodeEmailMessage(
   from: string,
   to: string,
+  cc: string | string[] | undefined,
   bcc: string | string[] | undefined,
   subject: string,
   html: string,
@@ -76,6 +78,13 @@ function encodeEmailMessage(
   let email = [
     `From: ${from}`,
     `To: ${to}`,
+    ...(Array.isArray(cc)
+      ? cc.length > 0
+        ? [`Cc: ${cc.join(", ")}`]
+        : []
+      : typeof cc === "string" && cc.trim()
+        ? [`Cc: ${cc}`]
+        : []),
     ...(Array.isArray(bcc)
       ? bcc.length > 0
         ? [`Bcc: ${bcc.join(", ")}`]
@@ -129,7 +138,7 @@ export async function sendGmailEmail(input: SendEmailInput): Promise<SendEmailRe
   }
 
   const from = process.env.GMAIL_USER_EMAIL!;
-  const rawMessage = encodeEmailMessage(from, input.to, input.bcc, input.subject, input.html, input.attachments);
+  const rawMessage = encodeEmailMessage(from, input.to, input.cc, input.bcc, input.subject, input.html, input.attachments);
 
   const gmail = getGmailClient();
 

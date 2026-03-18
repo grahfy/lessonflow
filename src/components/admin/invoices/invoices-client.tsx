@@ -209,6 +209,7 @@ export function AdminInvoicesClient() {
         discountValueInput: toDiscountValueInput(li.discountKind ?? null, li.discountValue ?? null)
       }))
     );
+    setEditingProductPresetId("");
     setNotice("");
     setError("");
   }, []);
@@ -430,7 +431,7 @@ export function AdminInvoicesClient() {
 
     setBusyAction(null);
     if (result) {
-      setSelectedInvoice(result);
+      openDetail(result);
       setNotice("Invoice saved successfully.");
       // RATIONALE: Refresh the backing list after saving so badges, totals, and
       // pagination rows stay aligned with whatever the server recalculated.
@@ -452,7 +453,7 @@ export function AdminInvoicesClient() {
     setBusyAction(null);
 
     if (result.invoice) {
-      setSelectedInvoice(result.invoice);
+      openDetail(result.invoice);
       if (result.notice) {
         setNotice(result.notice);
         if ((action === "send" || action === "remind") && !result.partial) {
@@ -601,6 +602,9 @@ export function AdminInvoicesClient() {
     : false;
   const canVoidInvoice = selectedInvoice
     ? canApplyInvoiceAction(selectedInvoice.status, "void")
+    : false;
+  const canEditSelectedInvoice = selectedInvoice
+    ? selectedInvoice.status === "draft" || selectedInvoice.status === "sent"
     : false;
   const selectedInvoiceDisplayStatus = selectedInvoice ? getDisplayStatus(selectedInvoice, overdueOnly) : null;
 
@@ -830,6 +834,8 @@ export function AdminInvoicesClient() {
         title={`Invoice ${selectedInvoice?.invoiceNumber}`}
         wide
         id="invoice-detail-dialog"
+        bodyClassName="invoice-dialog-body-lock"
+        lockBodyScrollArea
         footer={
           <div className="dialog-footer-row invoice-dialog-footer">
             <div className="dialog-footer-left">
@@ -870,7 +876,7 @@ export function AdminInvoicesClient() {
             </div>
             <div className="dialog-footer-right">
               <Tooltip content="Save edits to recipient details, due date, notes, and line items.">
-                <button className="btn btn-secondary" disabled={!!busyAction} onClick={saveInvoiceEdits}>
+                <button className="btn btn-secondary" disabled={!!busyAction || !canEditSelectedInvoice} onClick={saveInvoiceEdits}>
                   {busyAction === 'save' ? 'Saving...' : 'Save'}
                 </button>
               </Tooltip>
@@ -893,28 +899,41 @@ export function AdminInvoicesClient() {
         }
       >
         {selectedInvoice && (
-          <div className="booking-dialog-scroll">
-            <div className="dialog-layout">
-              <div className="dialog-col">
+          <div className="invoice-dialog-body">
+            <div className="dialog-layout invoice-dialog-layout">
+              <div className="dialog-col invoice-dialog-main-col">
                 <h3 className="manual-section-title">Invoice Details</h3>
                 <AdminCard ghost className="invoice-dialog-section">
                   <AdminForm className="dialog-form-grid">
                     <AdminField label="First Name" tooltip="Customer's first name.">
-                      <input value={editingCustomerFirstName} onChange={e => setEditingCustomerFirstName(e.target.value)} />
+                      <input
+                        value={editingCustomerFirstName}
+                        disabled={!canEditSelectedInvoice}
+                        onChange={e => setEditingCustomerFirstName(e.target.value)}
+                      />
                     </AdminField>
                     <AdminField label="Last Name" tooltip="Customer's last name.">
-                      <input value={editingCustomerLastName} onChange={e => setEditingCustomerLastName(e.target.value)} />
+                      <input
+                        value={editingCustomerLastName}
+                        disabled={!canEditSelectedInvoice}
+                        onChange={e => setEditingCustomerLastName(e.target.value)}
+                      />
                     </AdminField>
                     <AdminField label="Email" tooltip="Primary email for sending the invoice." fullWidth>
                       <input value={selectedInvoice.customerEmail} readOnly />
                     </AdminField>
                     <AdminField label="Due Date" tooltip="When the invoice payment is required.">
-                      <input type="datetime-local" value={editingDueAt} onChange={(e) => setEditingDueAt(e.target.value)} />
+                      <input
+                        type="datetime-local"
+                        value={editingDueAt}
+                        disabled={!canEditSelectedInvoice}
+                        onChange={(e) => setEditingDueAt(e.target.value)}
+                      />
                     </AdminField>
                     <AdminField label="Invoice Discount Type" tooltip="Optional discount applied to the full invoice subtotal before GST.">
                       <select
                         value={editingDiscountKind ?? ""}
-                        disabled={selectedInvoice.status !== "draft"}
+                        disabled={!canEditSelectedInvoice}
                         onChange={(e) => {
                           const nextKind = e.target.value ? (e.target.value as InvoiceDiscountKind) : null;
                           setEditingDiscountKind(nextKind);
@@ -931,7 +950,7 @@ export function AdminInvoicesClient() {
                     <AdminField label="Invoice Discount Value" tooltip="Amount discounts use AUD. Percentage discounts use %." fullWidth>
                       <input
                         value={editingDiscountValueInput}
-                        disabled={!editingDiscountKind || selectedInvoice.status !== "draft"}
+                        disabled={!editingDiscountKind || !canEditSelectedInvoice}
                         placeholder={editingDiscountKind === "percent" ? "10%" : "0.00"}
                         onChange={(e) => setEditingDiscountValueInput(e.target.value)}
                       />
@@ -940,6 +959,7 @@ export function AdminInvoicesClient() {
                       <textarea
                         className="invoice-dialog-notes"
                         value={editingNotes}
+                        disabled={!canEditSelectedInvoice}
                         onChange={(e) => setEditingNotes(e.target.value)}
                         placeholder="Customer-facing notes..."
                       />
@@ -947,7 +967,7 @@ export function AdminInvoicesClient() {
                   </AdminForm>
                   <div className="button-row invoice-dialog-button-row">
                     <Tooltip content="Save edits to recipient details, due date, notes, and line items.">
-                      <button className="btn btn-secondary" disabled={!!busyAction} onClick={saveInvoiceEdits}>
+                      <button className="btn btn-secondary" disabled={!!busyAction || !canEditSelectedInvoice} onClick={saveInvoiceEdits}>
                         {busyAction === 'save' ? 'Saving...' : 'Save Details'}
                       </button>
                     </Tooltip>
@@ -958,68 +978,90 @@ export function AdminInvoicesClient() {
                 </AdminCard>
 
                 <h3 className="manual-section-title">Line Items</h3>
-                <AdminCard ghost>
-                  <div className="invoice-dialog-line-items">
-                    {editingLineItems.map((li) => (
-                      <div key={li.key} className="invoice-dialog-line-item">
-                        <div className="invoice-dialog-line-item-main">
-                          <AdminField label="Description" tooltip="Line item name or service provided.">
-                            <input value={li.description} onChange={(e) => updateLineItem(li.key, { description: e.target.value })} />
-                          </AdminField>
-                        </div>
-                        <div className="invoice-dialog-line-item-qty">
-                          <AdminField label="Qty" tooltip="Quantity.">
-                            <input type="number" value={li.quantity} onChange={(e) => updateLineItem(li.key, { quantity: e.target.value })} />
-                          </AdminField>
-                        </div>
-                        <div className="invoice-dialog-line-item-price">
-                          <AdminField label="Price" tooltip="Unit price in AUD.">
-                            <input value={li.unitPriceAud} onChange={(e) => updateLineItem(li.key, { unitPriceAud: e.target.value })} />
-                          </AdminField>
-                        </div>
-                        <div className="invoice-dialog-line-item-qty">
-                          <AdminField label="Discount Type" tooltip="Optional line-level discount for this item.">
-                            <select
-                              value={li.discountKind ?? ""}
-                              disabled={selectedInvoice.status !== "draft"}
-                              onChange={(e) => {
-                                const nextKind = e.target.value ? (e.target.value as InvoiceDiscountKind) : null;
-                                updateLineItem(li.key, {
-                                  discountKind: nextKind,
-                                  discountValueInput: nextKind ? li.discountValueInput : ""
-                                });
-                              }}
+                <AdminCard ghost className="invoice-dialog-line-items-card">
+                  <div className="invoice-dialog-line-items-shell">
+                    <div className="invoice-dialog-line-items">
+                      {editingLineItems.map((li) => (
+                        <div key={li.key} className="invoice-dialog-line-item">
+                          <div className="invoice-dialog-line-item-main">
+                            <AdminField label="Description" tooltip="Line item name or service provided.">
+                              <input
+                                value={li.description}
+                                disabled={!canEditSelectedInvoice}
+                                onChange={(e) => updateLineItem(li.key, { description: e.target.value })}
+                              />
+                            </AdminField>
+                          </div>
+                          <div className="invoice-dialog-line-item-qty">
+                            <AdminField label="Qty" tooltip="Quantity.">
+                              <input
+                                type="number"
+                                value={li.quantity}
+                                disabled={!canEditSelectedInvoice}
+                                onChange={(e) => updateLineItem(li.key, { quantity: e.target.value })}
+                              />
+                            </AdminField>
+                          </div>
+                          <div className="invoice-dialog-line-item-price">
+                            <AdminField label="Price" tooltip="Unit price in AUD.">
+                              <input
+                                value={li.unitPriceAud}
+                                disabled={!canEditSelectedInvoice}
+                                onChange={(e) => updateLineItem(li.key, { unitPriceAud: e.target.value })}
+                              />
+                            </AdminField>
+                          </div>
+                          <div className="invoice-dialog-line-item-qty">
+                            <AdminField label="Discount Type" tooltip="Optional line-level discount for this item.">
+                              <select
+                                value={li.discountKind ?? ""}
+                                disabled={!canEditSelectedInvoice}
+                                onChange={(e) => {
+                                  const nextKind = e.target.value ? (e.target.value as InvoiceDiscountKind) : null;
+                                  updateLineItem(li.key, {
+                                    discountKind: nextKind,
+                                    discountValueInput: nextKind ? li.discountValueInput : ""
+                                  });
+                                }}
+                              >
+                                <option value="">No discount</option>
+                                <option value="amount">Fixed amount</option>
+                                <option value="percent">Percentage</option>
+                              </select>
+                            </AdminField>
+                          </div>
+                          <div className="invoice-dialog-line-item-price">
+                            <AdminField label="Discount Value" tooltip="Amount discounts use AUD. Percentage discounts use %.">
+                              <input
+                                value={li.discountValueInput}
+                                disabled={!li.discountKind || !canEditSelectedInvoice}
+                                placeholder={li.discountKind === "percent" ? "10%" : "0.00"}
+                                onChange={(e) => updateLineItem(li.key, { discountValueInput: e.target.value })}
+                              />
+                            </AdminField>
+                          </div>
+                          <Tooltip content="Remove this line item from the invoice.">
+                            <button
+                              className="btn btn-danger invoice-dialog-remove-item"
+                              type="button"
+                              disabled={!canEditSelectedInvoice}
+                              onClick={() => removeLineItem(li.key)}
                             >
-                              <option value="">No discount</option>
-                              <option value="amount">Fixed amount</option>
-                              <option value="percent">Percentage</option>
-                            </select>
-                          </AdminField>
+                              ×
+                            </button>
+                          </Tooltip>
                         </div>
-                        <div className="invoice-dialog-line-item-price">
-                          <AdminField label="Discount Value" tooltip="Amount discounts use AUD. Percentage discounts use %.">
-                            <input
-                              value={li.discountValueInput}
-                              disabled={!li.discountKind || selectedInvoice.status !== "draft"}
-                              placeholder={li.discountKind === "percent" ? "10%" : "0.00"}
-                              onChange={(e) => updateLineItem(li.key, { discountValueInput: e.target.value })}
-                            />
-                          </AdminField>
-                        </div>
-                        <Tooltip content="Remove this line item from the invoice.">
-                          <button className="btn btn-danger invoice-dialog-remove-item" onClick={() => removeLineItem(li.key)}>×</button>
-                        </Tooltip>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                     <div className="button-row invoice-dialog-button-row invoice-dialog-line-actions">
                       <Tooltip content="Add a blank line item that you can customize manually.">
-                        <button className="btn btn-secondary" disabled={selectedInvoice.status !== "draft"} onClick={addLineItem}>Add Line Item</button>
+                        <button className="btn btn-secondary" type="button" disabled={!canEditSelectedInvoice} onClick={addLineItem}>Add Line Item</button>
                       </Tooltip>
                       <div className="invoice-dialog-preset-row">
                         <select
                           className="invoice-product-preset-select invoice-dialog-preset-select"
                           value={editingProductPresetId}
-                          disabled={selectedInvoice.status !== "draft"}
+                          disabled={!canEditSelectedInvoice}
                           onChange={(e) => addPresetToInvoice(e.target.value)}
                         >
                           <option value="">Add preset...</option>
@@ -1031,7 +1073,7 @@ export function AdminInvoicesClient() {
                 </AdminCard>
               </div>
 
-              <div className="dialog-col is-notes">
+              <div className="dialog-col is-notes invoice-dialog-side-col">
                 <h3 className="manual-section-title">Actions & History</h3>
                 <AdminCard ghost>
                   <p className="helper-text">Manage the lifecycle of this invoice.</p>
@@ -1072,6 +1114,16 @@ export function AdminInvoicesClient() {
                   {selectedInvoice.status === 'draft' && (
                     <p className="helper-text invoice-dialog-help-copy">
                       Mark as Paid becomes available after sending the invoice.
+                    </p>
+                  )}
+                  {selectedInvoice.status === 'sent' && (
+                    <p className="helper-text invoice-dialog-help-copy">
+                      This sent invoice can still be edited until it is paid or voided.
+                    </p>
+                  )}
+                  {(selectedInvoice.status === 'paid' || selectedInvoice.status === 'void') && (
+                    <p className="helper-text invoice-dialog-help-copy">
+                      Financial edits are locked once an invoice is {selectedInvoice.status}.
                     </p>
                   )}
 

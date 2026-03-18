@@ -42,6 +42,8 @@ export type SendEmailInput = {
   to: string;
   subject: string;
   html: string;
+  /** Optional carbon copy recipients. */
+  cc?: string | string[];
   /** Optional blind carbon copy recipients. */
   bcc?: string | string[];
   /** Optional file attachments (e.g. Invoices). */
@@ -179,6 +181,7 @@ type SendTemplateEmailInput = {
   context: PlaceholderContext;
   /** fallback function if no template row is found in DB. */
   fallbackRenderer: (ctx: PlaceholderContext) => { subject: string; html: string };
+  cc?: string | string[];
   bcc?: string | string[];
   attachments?: Array<{
     filename: string;
@@ -248,6 +251,7 @@ export async function sendTemplateEmail(input: SendTemplateEmailInput): Promise<
     to: input.to,
     subject: rendered.subject,
     html: rendered.html,
+    cc: input.cc,
     bcc: input.bcc,
     attachments: input.attachments,
     notification: input.notification,
@@ -282,6 +286,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     to: input.to,
     subject: input.subject,
     html: input.html,
+    cc: input.cc,
     bcc: input.bcc,
     attachments: input.attachments
   };
@@ -346,6 +351,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     const info = await tx.sendMail({
       from,
       to: input.to,
+      cc: input.cc,
       bcc,
       subject: input.subject,
       html,

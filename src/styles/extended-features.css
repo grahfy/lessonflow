@@ -1728,8 +1728,47 @@
   max-width: 100%;
 }
 
+.invoice-dialog-body-lock {
+  overflow: hidden !important;
+}
+
+.invoice-dialog-body {
+  min-height: 0;
+  height: min(72vh, 780px);
+  overflow: hidden;
+}
+
+.invoice-dialog-layout {
+  height: 100%;
+  grid-template-columns: minmax(0, 1.28fr) minmax(320px, 0.82fr);
+  align-items: stretch;
+}
+
+.invoice-dialog-main-col,
+.invoice-dialog-side-col {
+  min-height: 0;
+  height: 100%;
+}
+
+.invoice-dialog-main-col {
+  grid-template-rows: auto minmax(0, auto) auto minmax(0, 1fr);
+  align-content: stretch;
+}
+
+.invoice-dialog-side-col {
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
+}
+
+.invoice-dialog-side-col .admin-card-ghost {
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
 .invoice-dialog-section {
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .invoice-dialog-footer {
@@ -1744,14 +1783,31 @@
   min-height: 80px;
 }
 
+.invoice-dialog-line-items-card {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.invoice-dialog-line-items-shell {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 12px;
+}
+
 .invoice-dialog-line-items {
   display: grid;
   gap: 12px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .invoice-dialog-line-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 60px 100px auto;
+  grid-template-columns: minmax(0, 1.15fr) minmax(72px, 88px) minmax(96px, 118px) minmax(140px, 180px) minmax(140px, 180px) auto;
   gap: 8px;
   align-items: start;
   padding-bottom: 12px;
@@ -1778,7 +1834,7 @@
 }
 
 .invoice-dialog-line-actions {
-  margin-top: 8px;
+  margin-top: 0;
   align-items: center;
 }
 
@@ -1831,7 +1887,7 @@
 .invoice-dialog-stacked-actions {
   flex-direction: column;
   gap: 8px;
-  margin-top: 16px;
+  margin-top: auto;
 }
 
 .invoice-dialog-full-width,
@@ -1873,8 +1929,33 @@
     grid-template-columns: 1fr;
   }
 
+  .invoice-dialog-layout {
+    grid-template-columns: 1fr;
+    overflow: auto;
+    padding-right: 4px;
+  }
+
+  .invoice-dialog-body {
+    height: auto;
+    max-height: min(74vh, 780px);
+    overflow: auto;
+  }
+
+  .invoice-dialog-main-col {
+    grid-template-rows: auto auto auto;
+  }
+
+  .invoice-dialog-line-items-shell {
+    height: auto;
+    grid-template-rows: auto auto;
+  }
+
+  .invoice-dialog-line-items {
+    max-height: min(34vh, 320px);
+  }
+
   .invoice-dialog-line-item {
-    grid-template-columns: minmax(0, 1fr) minmax(72px, 96px) minmax(110px, 140px) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(72px, 96px) minmax(110px, 140px);
   }
 }
 
@@ -1920,6 +2001,15 @@
   .invoice-dialog-preset-select {
     width: 100%;
     min-width: 0;
+  }
+
+  .invoice-dialog-body {
+    height: auto;
+    max-height: min(76vh, 820px);
+  }
+
+  .invoice-dialog-line-items {
+    max-height: min(38vh, 340px);
   }
 
   .invoice-dialog-line-item {

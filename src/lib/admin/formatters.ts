@@ -38,6 +38,15 @@ export function readApiErrorMessage(payload: unknown, fallback: string): string 
   return fallback;
 }
 
+function stripHtmlTags(value: string): string {
+  return value
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export async function readApiErrorFromResponse(response: Response, fallback: string): Promise<string> {
   const contentType = response.headers.get("content-type") || "";
   let extracted: string = fallback;
@@ -51,7 +60,10 @@ export async function readApiErrorFromResponse(response: Response, fallback: str
   } else {
     try {
       const text = await response.text();
-      if (text) extracted = text.slice(0, 100);
+      if (text) {
+        const normalizedText = stripHtmlTags(text);
+        extracted = normalizedText ? normalizedText.slice(0, 160) : fallback;
+      }
     } catch {
       // Ignored
     }

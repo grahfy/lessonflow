@@ -134,6 +134,8 @@ export const createCustomerInvoiceSchema = z
 export const updateInvoiceSchema = z
   .object({
     action: z.enum(["edit", "mark_paid", "mark_unpaid", "void", "restore"]),
+    customerFirstName: z.string().trim().max(80).optional(),
+    customerLastName: z.string().trim().max(80).optional(),
     customerName: z.string().trim().min(2).max(140).optional(),
     customerEmail: z.string().trim().email().max(200).optional(),
     customerPhone: z.string().trim().min(6).max(40).optional(),
@@ -149,6 +151,8 @@ export const updateInvoiceSchema = z
     if (
       data.action === "edit" &&
       !data.lineItems &&
+      data.customerFirstName === undefined &&
+      data.customerLastName === undefined &&
       !data.customerName &&
       !data.customerEmail &&
       !data.customerPhone &&

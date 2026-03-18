@@ -167,7 +167,7 @@ describe("admin-invoices", () => {
     expect(body.invoice.lineItems.length).toBe(4);
   });
 
-  it("creates discounted invoices and blocks discount edits after send", async () => {
+  it("creates discounted invoices and keeps draft/sent invoices editable while locking paid invoices", async () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);
 
@@ -309,9 +309,45 @@ describe("admin-invoices", () => {
       ]
     });
     const updateSentRes = await patchInvoice(updateSentReq, { params: Promise.resolve({ id: createBody.invoice.id }) });
-    expect(updateSentRes.status).toBe(400);
-    const updateSentBody = (await updateSentRes.json()) as { error: string };
-    expect(updateSentBody.error).toBe("Discounts can only be changed while the invoice is still a draft.");
+    expect(updateSentRes.status).toBe(200);
+    const updateSentBody = (await updateSentRes.json()) as {
+      invoice: {
+        customerFirstName: string;
+        customerLastName: string;
+        discountKind: string | null;
+        discountValue: number | null;
+        lineItems: Array<{
+          description: string;
+          discountKind: string | null;
+          discountValue: number | null;
+        }>;
+      };
+    };
+    expect(updateSentBody.invoice.customerFirstName).toBe("Discount");
+    expect(updateSentBody.invoice.customerLastName).toBe("Student");
+    expect(updateSentBody.invoice.discountKind).toBe("amount");
+    expect(updateSentBody.invoice.discountValue).toBe(1500);
+    expect(updateSentBody.invoice.lineItems).toHaveLength(1);
+    expect(updateSentBody.invoice.lineItems[0]).toMatchObject({
+      description: "Lesson fee",
+      discountKind: "percent",
+      discountValue: 2500
+    });
+
+    const markPaidReq = adminRequest(`http://localhost/api/admin/invoices/${createBody.invoice.id}`, "PATCH", token, {
+      action: "mark_paid"
+    });
+    const markPaidRes = await patchInvoice(markPaidReq, { params: Promise.resolve({ id: createBody.invoice.id }) });
+    expect(markPaidRes.status).toBe(200);
+
+    const updatePaidReq = adminRequest(`http://localhost/api/admin/invoices/${createBody.invoice.id}`, "PATCH", token, {
+      action: "edit",
+      notes: "Should not save after payment"
+    });
+    const updatePaidRes = await patchInvoice(updatePaidReq, { params: Promise.resolve({ id: createBody.invoice.id }) });
+    expect(updatePaidRes.status).toBe(400);
+    const updatePaidBody = (await updatePaidRes.json()) as { error: string };
+    expect(updatePaidBody.error).toBe("Paid or void invoices cannot be edited directly.");
   });
 
   it("filters invoice list by aging bucket", async () => {
