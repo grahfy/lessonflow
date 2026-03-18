@@ -135,6 +135,9 @@ describe("admin-email-panel-layout", () => {
     expect(markup).toContain("admin-email-history-card");
     expect(markup).toContain("admin-email-history-list");
     expect(markup).toContain("admin-email-history-item");
+    expect(markup).not.toContain("Sync Now");
+    expect(markup).not.toContain("Syncing...");
+    expect(markup).not.toContain("Sync recent emails from connected providers.");
     expect(markup.indexOf("admin-email-history-list")).toBeGreaterThan(markup.indexOf("admin-email-history-card"));
     expect(markup.indexOf("admin-email-history-item")).toBeGreaterThan(markup.indexOf("admin-email-history-list"));
   });
@@ -200,6 +203,9 @@ describe("admin-email-panel-layout", () => {
     expect(markup).toContain("admin-email-panel-shell");
     expect(markup).toContain("admin-email-history-list");
     expect(markup).not.toContain("customer-dialog-panel");
+    expect(markup).not.toContain("Sync Now");
+    expect(markup).not.toContain("Syncing...");
+    expect(markup).not.toContain("Sync recent emails from connected providers.");
   });
 
   it("keeps booking communication on the shared neutral shell", () => {
@@ -256,5 +262,8 @@ describe("admin-email-panel-layout", () => {
     expect(markup).toContain("admin-email-panel-shell");
     expect(markup).toContain("admin-email-history-list");
     expect(markup).not.toContain("customer-dialog-panel");
+    expect(markup).not.toContain("Sync Now");
+    expect(markup).not.toContain("Syncing...");
+    expect(markup).not.toContain("Sync recent emails from connected providers.");
   });
 });

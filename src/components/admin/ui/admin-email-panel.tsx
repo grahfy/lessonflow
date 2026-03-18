@@ -63,9 +63,7 @@ export function AdminEmailPanel({
   message,
   setMessage,
   sending,
-  syncing,
   onSend,
-  onSync,
   panelClassName,
   historyClassName,
   historyListClassName,
@@ -110,21 +108,7 @@ export function AdminEmailPanel({
   return (
     <div className={["dialog-layout admin-email-panel-shell admin-email-panel", panelClassName].filter(Boolean).join(" ")}>
       <div className="dialog-col dialog-tab-section admin-email-history-shell">
-        <div className="section-header-with-action">
-          <h3 className="manual-section-title">{historyTitle}</h3>
-          {onSync ? (
-            <Tooltip content="Sync recent emails from connected providers.">
-              <button
-                type="button"
-                className="btn btn-secondary btn-small"
-                onClick={onSync}
-                disabled={syncing || loadingHistory}
-              >
-                {syncing ? "Syncing..." : "Sync Now"}
-              </button>
-            </Tooltip>
-          ) : null}
-        </div>
+        <h3 className="manual-section-title">{historyTitle}</h3>
         {historyWarning ? <AdminNotice tone="info">{historyWarning}</AdminNotice> : null}
         <AdminCard ghost className={["admin-email-history-card", historyClassName].filter(Boolean).join(" ")}>
           {loadingHistory ? (
