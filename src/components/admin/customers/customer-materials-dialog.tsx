@@ -31,7 +31,7 @@ export function CustomerMaterialsDialog({
   onBookingSelect
 }: Props) {
   return (
-    <div className="dialog-layout customer-tab-panel">
+    <div className="dialog-layout customer-tab-panel customer-materials-panel">
       <AdminMaterialsPanel
         materialsLoading={materialsLoading}
         materialsList={materialsList}

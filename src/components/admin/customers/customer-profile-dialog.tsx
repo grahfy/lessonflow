@@ -137,6 +137,7 @@ type Props = {
     onViewBillingHistory: () => void;
     onRevealPortalPassword: () => void;
     onRegeneratePortalPassword: () => void;
+    onCopyPortalPassword: (password: string) => void | Promise<void>;
 };
 
 export function CustomerProfileDialog({
@@ -160,7 +161,8 @@ export function CustomerProfileDialog({
     onDelete,
     onViewBillingHistory,
     onRevealPortalPassword,
-    onRegeneratePortalPassword
+    onRegeneratePortalPassword,
+    onCopyPortalPassword
 }: Props) {
     /** Local convenience wrapper so field components can patch one key at a time. */
     const updateForm = (patch: Partial<CustomerForm>) => setForm(prev => ({ ...prev, ...patch }));
@@ -169,7 +171,7 @@ export function CustomerProfileDialog({
         <>
             <div className="dialog-col customer-tab-section customer-profile-panel">
                 <h4>Contact & Profile</h4>
-                <AdminForm className="dialog-form-grid">
+                <AdminForm className="dialog-form-grid customer-form-grid">
                     <AdminField label="First Name" tooltip="Student's legal or preferred first name." required>
                         <input
                             value={form.firstName}
@@ -255,7 +257,7 @@ export function CustomerProfileDialog({
                         disabled={!isEditing || savingCustomer}
                     />
                 </div>
-                <AdminForm className="dialog-form-grid">
+                <AdminForm className="dialog-form-grid customer-form-grid">
                     <AdminField label="Unit / Apartment" tooltip="Unit or apartment number (optional).">
                         <input
                             value={form.unitNumber}
@@ -310,11 +312,12 @@ export function CustomerProfileDialog({
                             <input value={form.state} readOnly />
                         )}
                     </AdminField>
-                    <AdminField label="Postcode" tooltip="4-digit postal code." required>
+                    <AdminField label="Postcode" tooltip="4-digit postal code." required className="customer-postcode-field">
                         <input
                             value={form.postcode}
                             readOnly={!isEditing}
                             maxLength={4}
+                            inputMode="numeric"
                             onChange={e => updateForm({ postcode: toDigits(e.target.value, 4) })}
                         />
                     </AdminField>
@@ -348,13 +351,12 @@ export function CustomerProfileDialog({
                                     <button 
                                         type="button"
                                         className="btn btn-secondary customer-portal-copy-btn"
-                                        onClick={() => {
+                                        onClick={() =>
                                             // RATIONALE: Revealed credentials are
-                                    // short-lived in the UI, so clipboard
-                                    // copy reduces transcription mistakes.
-                                            void navigator.clipboard.writeText(revealedPortalPasswords[customer.id]);
-                                            alert("Password copied to clipboard");
-                                        }}
+                                            // short-lived in the UI, so clipboard
+                                            // copy reduces transcription mistakes.
+                                            void onCopyPortalPassword(revealedPortalPasswords[customer.id])
+                                        }
                                         disabled={!canManagePortalCredentials}
                                     >
                                         Copy

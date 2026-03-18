@@ -41,6 +41,7 @@ type Props = {
     onViewBillingHistory: () => void;
     onRevealPortalPassword: () => void;
     onRegeneratePortalPassword: () => void;
+    onCopyPortalPassword: (password: string) => void | Promise<void>;
 
     // Email Props
     loadingEmailHistory: boolean;
@@ -117,73 +118,77 @@ export function CustomerDialogWrapper({
             wide
             description={description}
             id="customer-dialog"
+            bodyClassName="customer-dialog-body-lock"
+            lockBodyScrollArea
         >
             <AdminNoticeStack
                 error={error}
                 notice={notice}
                 className="customer-dialog-notice-stack"
             />
+            <div className="customer-dialog-tab-body">
+                {activeTab === 'profile' && (
+                    <div className="dialog-layout customer-dialog-panel">
+                        {/* NOTE: The profile tab keeps its own two-column layout,
+                            unlike email/materials which render their own shells. */}
+                        <CustomerProfileDialog
+                            customer={selectedCustomer}
+                            isEditing={rest.isEditing}
+                            form={rest.customerForm}
+                            setForm={rest.setCustomerForm}
+                            savingCustomer={rest.savingCustomer}
+                            deletingCustomerId={rest.deletingCustomerId}
+                            canEditProfile={rest.canEditProfile}
+                            canEditAssignment={rest.canEditAssignment}
+                            teacherOptions={rest.teacherOptions}
+                            canManagePortalCredentials={rest.canManagePortalCredentials}
+                            canViewBillingHistory={rest.canViewBillingHistory}
+                            canDeleteCustomer={rest.canDeleteCustomer}
+                            revealedPortalPasswords={rest.revealedPortalPasswords}
+                            portalCredentialBusyCustomerId={rest.portalCredentialBusyCustomerId}
+                            onSave={rest.onSaveCustomer}
+                            onCancelEdit={rest.onCancelEdit}
+                            onStartEdit={rest.onStartEdit}
+                            onDelete={rest.onDeleteCustomer}
+                            onViewBillingHistory={rest.onViewBillingHistory}
+                            onRevealPortalPassword={rest.onRevealPortalPassword}
+                            onRegeneratePortalPassword={rest.onRegeneratePortalPassword}
+                            onCopyPortalPassword={rest.onCopyPortalPassword}
+                        />
+                    </div>
+                )}
 
-            {activeTab === 'profile' && (
-                <div className="dialog-layout customer-dialog-panel">
-                    {/* NOTE: The profile tab keeps its own two-column layout,
-                        unlike email/materials which render their own shells. */}
-                    <CustomerProfileDialog
-                        customer={selectedCustomer}
-                        isEditing={rest.isEditing}
-                        form={rest.customerForm}
-                        setForm={rest.setCustomerForm}
-                        savingCustomer={rest.savingCustomer}
-                        deletingCustomerId={rest.deletingCustomerId}
-                        canEditProfile={rest.canEditProfile}
-                        canEditAssignment={rest.canEditAssignment}
-                        teacherOptions={rest.teacherOptions}
-                        canManagePortalCredentials={rest.canManagePortalCredentials}
-                        canViewBillingHistory={rest.canViewBillingHistory}
-                        canDeleteCustomer={rest.canDeleteCustomer}
-                        revealedPortalPasswords={rest.revealedPortalPasswords}
-                        portalCredentialBusyCustomerId={rest.portalCredentialBusyCustomerId}
-                        onSave={rest.onSaveCustomer}
-                        onCancelEdit={rest.onCancelEdit}
-                        onStartEdit={rest.onStartEdit}
-                        onDelete={rest.onDeleteCustomer}
-                        onViewBillingHistory={rest.onViewBillingHistory}
-                        onRevealPortalPassword={rest.onRevealPortalPassword}
-                        onRegeneratePortalPassword={rest.onRegeneratePortalPassword}
+                {activeTab === 'emails' && (
+                    <CustomerEmailDialog
+                        loadingEmailHistory={rest.loadingEmailHistory}
+                        emailHistory={rest.emailHistory}
+                        emailComposerSubject={rest.emailComposerSubject}
+                        setEmailComposerSubject={rest.setEmailComposerSubject}
+                        emailComposerMessage={rest.emailComposerMessage}
+                        setEmailComposerMessage={rest.setEmailComposerMessage}
+                        sendingEmail={rest.sendingEmail}
+                        syncingEmail={rest.syncingEmail}
+                        onSendEmail={rest.onSendEmail}
+                        onSyncEmail={rest.onSyncEmail}
                     />
-                </div>
-            )}
+                )}
 
-            {activeTab === 'emails' && (
-                <CustomerEmailDialog
-                    loadingEmailHistory={rest.loadingEmailHistory}
-                    emailHistory={rest.emailHistory}
-                    emailComposerSubject={rest.emailComposerSubject}
-                    setEmailComposerSubject={rest.setEmailComposerSubject}
-                    emailComposerMessage={rest.emailComposerMessage}
-                    setEmailComposerMessage={rest.setEmailComposerMessage}
-                    sendingEmail={rest.sendingEmail}
-                    syncingEmail={rest.syncingEmail}
-                    onSendEmail={rest.onSendEmail}
-                    onSyncEmail={rest.onSyncEmail}
-                />
-            )}
-
-            {activeTab === 'materials' && (
-                <CustomerMaterialsDialog
-                    materialsLoading={rest.materialsLoading}
-                    materialsList={rest.materialsList}
-                    materialsBookings={rest.materialsBookings}
-                    materialsBookingId={rest.materialsBookingId}
-                    setMaterialsBookingId={rest.setMaterialsBookingId}
-                    materialsUploading={rest.materialsUploading}
-                    materialsDeletingId={rest.materialsDeletingId}
-                    materialsUploadFormRef={rest.materialsUploadFormRef}
-                    onUpload={rest.onUploadMaterial}
-                    onDelete={rest.onDeleteMaterial}
-                    onBookingSelect={rest.onMaterialBookingSelect}
-                />
-            )}
+                {activeTab === 'materials' && (
+                    <CustomerMaterialsDialog
+                        materialsLoading={rest.materialsLoading}
+                        materialsList={rest.materialsList}
+                        materialsBookings={rest.materialsBookings}
+                        materialsBookingId={rest.materialsBookingId}
+                        setMaterialsBookingId={rest.setMaterialsBookingId}
+                        materialsUploading={rest.materialsUploading}
+                        materialsDeletingId={rest.materialsDeletingId}
+                        materialsUploadFormRef={rest.materialsUploadFormRef}
+                        onUpload={rest.onUploadMaterial}
+                        onDelete={rest.onDeleteMaterial}
+                        onBookingSelect={rest.onMaterialBookingSelect}
+                    />
+                )}
+            </div>
         </AdminDialog>
     );
 }

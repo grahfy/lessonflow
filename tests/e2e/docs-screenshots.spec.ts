@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 const outputDir = path.resolve(process.cwd(), "Documentation/assets");
 const defaultAdminEmail = "owner@example.com";
@@ -122,6 +122,22 @@ async function saveShot(page: import("@playwright/test").Page, fileName: string)
 async function saveLocatorShot(locator: import("@playwright/test").Locator, fileName: string) {
   fs.mkdirSync(outputDir, { recursive: true });
   await locator.screenshot({ path: docsScreenshotPath(fileName) });
+}
+
+/** Keeps dialog shells visually stable as tab content changes. */
+async function expectStableDialogBounds(
+  locator: import("@playwright/test").Locator,
+  baseline: { width: number; height: number },
+  label: string
+) {
+  const box = await locator.boundingBox();
+  expect(box, `${label} dialog should be visible`).not.toBeNull();
+  if (!box) {
+    return;
+  }
+
+  expect(Math.abs(box.width - baseline.width), `${label} dialog width should stay stable across tabs`).toBeLessThanOrEqual(2);
+  expect(Math.abs(box.height - baseline.height), `${label} dialog height should stay stable across tabs`).toBeLessThanOrEqual(2);
 }
 
 /** Waits for network quiet without failing the capture on slow dev-only polling. */
@@ -289,6 +305,8 @@ async function captureCustomerScreenshots(page: import("@playwright/test").Page)
   await page.locator(".customer-table-row").first().click();
   await customerDialog.waitFor({ timeout: 10_000 });
   await stabilizePage(page);
+  const customerDialogBox = await customerDialog.boundingBox();
+  expect(customerDialogBox, "Customer dialog should expose stable bounds for tab checks").not.toBeNull();
   await saveLocatorShot(
     customerDialog.locator(".customer-tab-section.customer-profile-panel").first(),
     "customer-profile-assigned-teacher.png"
@@ -299,12 +317,18 @@ async function captureCustomerScreenshots(page: import("@playwright/test").Page)
   await customerDialog.getByText(/email history/i).first().waitFor({ timeout: 10_000 }).catch(() => null);
   await waitForPageSettle(page);
   await stabilizePage(page);
+  if (customerDialogBox) {
+    await expectStableDialogBounds(customerDialog, customerDialogBox, "Customer details");
+  }
   await saveLocatorShot(customerDialog, "customer-email-history-panel.png");
 
   await customerDialog.getByRole("button", { name: /learning materials/i }).click();
   await customerDialog.getByText(/upload new/i).first().waitFor({ timeout: 10_000 }).catch(() => null);
   await waitForPageSettle(page);
   await stabilizePage(page);
+  if (customerDialogBox) {
+    await expectStableDialogBounds(customerDialog, customerDialogBox, "Customer details");
+  }
   await saveLocatorShot(customerDialog, "customer-materials-list-upload-panel.png");
   await closeDialog(customerDialog, page);
 }
@@ -335,6 +359,8 @@ async function captureBookingScreenshots(page: import("@playwright/test").Page) 
     .first();
   await bookingDialog.waitFor({ timeout: 10_000 });
   await stabilizePage(page);
+  const bookingDialogBox = await bookingDialog.boundingBox();
+  expect(bookingDialogBox, "Booking dialog should expose stable bounds for tab checks").not.toBeNull();
   await saveLocatorShot(bookingDialog, "booking-detail-dialog-notes-and-actions.png");
   await saveLocatorShot(bookingDialog.locator(".dialog-col").first(), "booking-assigned-teacher-dialog.png");
 
@@ -342,7 +368,18 @@ async function captureBookingScreenshots(page: import("@playwright/test").Page) 
   await bookingDialog.getByText(/email history/i).first().waitFor({ timeout: 10_000 }).catch(() => null);
   await waitForPageSettle(page);
   await stabilizePage(page);
+  if (bookingDialogBox) {
+    await expectStableDialogBounds(bookingDialog, bookingDialogBox, "Booking details");
+  }
   await saveLocatorShot(bookingDialog, "booking-email-panel.png");
+
+  await bookingDialog.getByRole("button", { name: /learning materials/i }).click();
+  await bookingDialog.getByText(/upload new/i).first().waitFor({ timeout: 10_000 }).catch(() => null);
+  await waitForPageSettle(page);
+  await stabilizePage(page);
+  if (bookingDialogBox) {
+    await expectStableDialogBounds(bookingDialog, bookingDialogBox, "Booking details");
+  }
 
   await bookingDialog.getByRole("button", { name: /^appointment$/i }).click();
   await bookingDialog.getByRole("button", { name: /invoice/i }).click();

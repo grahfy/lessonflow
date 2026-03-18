@@ -4,7 +4,7 @@ import { NextRequest } from "next/server";
 import { POST as studentLogin } from "@/app/api/student/login/route";
 import { customerSnapshotFromInput } from "@/lib/customer-match";
 import { prisma } from "@/lib/db";
-import { ensurePortalCredentialForCustomer } from "@/lib/student-portal/credentials";
+import { ensurePortalCredentialForCustomer, rotatePortalCredential } from "@/lib/student-portal/credentials";
 
 describe("student-portal-auth", () => {
   beforeEach(async () => {
@@ -118,5 +118,56 @@ describe("student-portal-auth", () => {
     });
     const goodResponse = await studentLogin(goodRequest);
     expect(goodResponse.status).toBe(200);
+  });
+
+  it("authenticates with the regenerated portal password and rejects the previous one", async () => {
+    const customer = await createCustomer("Morgan Hale", "morgan@example.com", "0400666777", "3000");
+    const initialCredential = await ensurePortalCredentialForCustomer({
+      customerId: customer.id,
+      details: "Initial test credential generation"
+    });
+    expect(initialCredential.generatedPassword).toBeTruthy();
+
+    const rotatedCredential = await rotatePortalCredential({
+      customerId: customer.id,
+      details: "Test credential rotation"
+    });
+
+    expect(rotatedCredential.generatedPassword).toBeTruthy();
+    expect(rotatedCredential.generatedPassword).not.toBe(initialCredential.generatedPassword);
+    expect(rotatedCredential.generatedPassword).toMatch(/^[A-HJ-NP-Za-km-z2-9]+$/);
+
+    const stalePasswordRequest = new NextRequest("http://localhost/api/student/login", {
+      method: "POST",
+      body: JSON.stringify({
+        fullName: "Morgan Hale",
+        postcode: "3000",
+        password: initialCredential.generatedPassword,
+        captchaToken: "test-token",
+        captchaAnswer: "test-answer"
+      }),
+      headers: {
+        "content-type": "application/json"
+      }
+    });
+    const stalePasswordResponse = await studentLogin(stalePasswordRequest);
+    expect(stalePasswordResponse.status).toBe(401);
+
+    const newPasswordRequest = new NextRequest("http://localhost/api/student/login", {
+      method: "POST",
+      body: JSON.stringify({
+        fullName: "Morgan Hale",
+        postcode: "3000",
+        password: rotatedCredential.generatedPassword,
+        captchaToken: "test-token",
+        captchaAnswer: "test-answer"
+      }),
+      headers: {
+        "content-type": "application/json"
+      }
+    });
+    const newPasswordResponse = await studentLogin(newPasswordRequest);
+    expect(newPasswordResponse.status).toBe(200);
+    expect(newPasswordResponse.headers.get("set-cookie") || "").toContain("student_session=");
   });
 });

@@ -375,6 +375,23 @@ export function AdminCustomersClient() {
     void loadMaterials(selectedCustomer.id, bookingId);
   }
 
+  async function copyPortalPassword(password: string) {
+    setError("");
+    setNotice("");
+
+    if (typeof navigator === "undefined" || typeof navigator.clipboard?.writeText !== "function") {
+      setError("Clipboard copy is unavailable in this browser. Copy the visible password manually.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(password);
+      setNotice("Portal password copied to clipboard.");
+    } catch {
+      setError("Unable to copy the portal password automatically. Copy the visible password manually.");
+    }
+  }
+
   return (
     <AdminShell 
       title="Customers" 
@@ -595,6 +612,7 @@ export function AdminCustomersClient() {
               setNotice(result.emailMessage || "Portal password regenerated.");
             }
           }}
+          onCopyPortalPassword={copyPortalPassword}
           
           // Profile Tab Internal Actions
           onCancelEdit={() => setIsEditing(false)}

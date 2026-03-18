@@ -45,6 +45,7 @@ export function CustomerEmailDialog({
       syncing={syncingEmail}
       onSend={onSendEmail}
       onSync={onSyncEmail}
+      panelClassName="customer-email-panel"
       historyClassName="customer-email-history-card"
       historyListClassName="customer-email-history-list"
       historyItemClassName="customer-email-history-item"

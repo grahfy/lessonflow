@@ -145,7 +145,7 @@ export function BookingDetailDialog({
 
   /** Local helper for atomic form updates. */
   const updateForm = (patch: Partial<BookingDialogForm>) => setDialogForm({ ...dialogForm, ...patch });
-  const tabBodyClassName = "booking-dialog-layout";
+  const tabBodyClassName = "booking-dialog-layout booking-tab-panel";
 
   return (
     <>

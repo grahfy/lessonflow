@@ -27,8 +27,9 @@ import { decryptPortalSecret, encryptPortalSecret } from "@/lib/student-portal/c
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
 
-// Filtered charset to avoid visual confusion (e.g. no zero/O)
-const PASSWORD_CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+// Filtered charset avoids ambiguous glyphs and punctuation-entry mistakes when
+// students copy or manually type portal credentials from email/admin surfaces.
+const PASSWORD_CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
 const DEFAULT_PASSWORD_LENGTH = 14;
 const MIN_PASSWORD_LENGTH = 10;
 const MAX_PASSWORD_LENGTH = 64;
@@ -272,4 +273,3 @@ export async function revealPortalPasswordForAdmin(input: {
 
   return { password, credential };
 }
-

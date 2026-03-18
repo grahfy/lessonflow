@@ -1287,6 +1287,11 @@
   max-height: none;
 }
 
+.customer-email-panel,
+.customer-materials-panel {
+  margin-top: 10px;
+}
+
 .booking-email-panel {
   margin-top: 10px;
   grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
@@ -2819,9 +2824,28 @@
   overflow-y: hidden;
 }
 
+.customer-dialog-body-lock,
 .booking-dialog-body-lock {
   overflow-y: hidden !important;
   overscroll-behavior: contain;
+}
+
+#customer-dialog {
+  width: min(1380px, calc(100vw - 24px));
+  max-height: min(96vh, 1020px);
+}
+
+#customer-dialog .customer-dialog-body-lock {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+#customer-dialog .customer-dialog-tab-body {
+  flex: 1;
+  min-height: min(70vh, 760px);
+  overflow: auto;
+  padding-right: 4px;
 }
 
 #booking-detail-dialog {
@@ -2896,6 +2920,10 @@
   height: 100%;
   max-height: min(68vh, 760px);
   align-items: stretch;
+}
+
+.booking-tab-panel {
+  min-height: min(70vh, 760px);
 }
 
 #booking-detail-dialog .booking-dialog-layout {
@@ -3201,6 +3229,60 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+}
+
+#booking-detail-dialog .booking-appointment-panel,
+#booking-detail-dialog .booking-email-panel,
+#booking-detail-dialog .booking-materials-panel,
+#customer-dialog .customer-dialog-panel,
+#customer-dialog .customer-email-panel,
+#customer-dialog .customer-materials-panel {
+  min-height: min(70vh, 760px);
+  height: auto;
+  max-height: none;
+  align-items: stretch;
+}
+
+#customer-dialog .customer-tab-panel {
+  min-height: min(70vh, 760px);
+  height: auto;
+  max-height: none;
+}
+
+#customer-dialog .customer-profile-panel {
+  min-height: 100%;
+}
+
+#customer-dialog .customer-profile-panel,
+#customer-dialog .customer-email-panel .dialog-col,
+#customer-dialog .customer-materials-panel .dialog-col {
+  padding: 10px;
+  gap: 6px;
+}
+
+#customer-dialog .customer-form-grid {
+  gap: 8px;
+}
+
+#customer-dialog .customer-form-grid .field {
+  gap: 4px;
+}
+
+#customer-dialog .customer-form-grid .field label {
+  font-size: 0.72rem;
+  margin-bottom: 1px;
+}
+
+#customer-dialog .customer-form-grid input,
+#customer-dialog .customer-form-grid select,
+#customer-dialog .customer-form-grid textarea {
+  padding: 6px 9px;
+  font-size: 0.8rem;
+}
+
+#customer-dialog .customer-postcode-field input {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
 }
 
 #booking-detail-dialog .dialog-notes {
