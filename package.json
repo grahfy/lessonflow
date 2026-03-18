@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "eslint src/app src/components src/lib --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
+    "gmail:token": "npx tsx ./scripts/generate-gmail-token.ts",
     "test:prepare": "node ./scripts/prepare-test-db.cjs",
     "test": "npm run test:prepare && node ./scripts/run-vitest-with-test-db.cjs run",
     "test:watch": "npm run test:prepare && node ./scripts/run-vitest-with-test-db.cjs",

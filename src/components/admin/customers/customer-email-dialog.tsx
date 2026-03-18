@@ -6,6 +6,7 @@ import { AdminEmailPanel } from "@/components/admin/ui/admin-email-panel";
 type Props = {
   loadingEmailHistory: boolean;
   emailHistory: ReadonlyArray<EmailRecord>;
+  emailHistoryWarning?: string | null;
   emailComposerSubject: string;
   setEmailComposerSubject: (val: string) => void;
   emailComposerMessage: string;
@@ -23,6 +24,7 @@ type Props = {
 export function CustomerEmailDialog({
   loadingEmailHistory,
   emailHistory,
+  emailHistoryWarning,
   emailComposerSubject,
   setEmailComposerSubject,
   emailComposerMessage,
@@ -36,6 +38,7 @@ export function CustomerEmailDialog({
     <AdminEmailPanel
       emptyLabel="No email history found for this address."
       history={emailHistory}
+      historyWarning={emailHistoryWarning}
       loadingHistory={loadingEmailHistory}
       subject={emailComposerSubject}
       setSubject={setEmailComposerSubject}

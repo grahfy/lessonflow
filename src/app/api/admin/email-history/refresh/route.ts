@@ -176,6 +176,9 @@ export async function POST(request: NextRequest) {
       email: resolvedTarget.email,
       normalizedEmail: resolvedTarget.normalizedEmail,
       customerIds: resolvedTarget.customerIds
+    }, {
+      gmailMaxResults: 100,
+      imapMaxResults: 20
     });
     return NextResponse.json(result);
   } catch (error) {

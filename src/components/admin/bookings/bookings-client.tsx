@@ -209,6 +209,7 @@ export function AdminBookingsClient() {
   const singleTeacherOptionId = teacherOptions.length === 1 ? teacherOptions[0]?.id ?? "" : "";
   const { 
     history: emailHistory, 
+    syncWarning: emailHistoryWarning,
     loading: loadingEmailHistory, 
     sending: sendingEmail, 
     syncing: syncingEmail,
@@ -738,6 +739,7 @@ export function AdminBookingsClient() {
           }}
           onDismissMatchedCustomer={() => setDialogMatchDismissed(true)}
           emailHistory={emailHistory}
+          emailHistoryWarning={emailHistoryWarning}
           loadingEmailHistory={loadingEmailHistory}
           sendingEmail={sendingEmail}
           syncingEmail={syncingEmail}

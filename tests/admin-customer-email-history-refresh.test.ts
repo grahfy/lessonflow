@@ -19,6 +19,9 @@ import { POST } from "@/app/api/admin/customers/[id]/email/refresh/route";
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 
+const GMAIL_DEGRADED_WARNING =
+  "Gmail sync is running with metadata-only access. Reauthorize Gmail with send + readonly scopes, then refresh history again to recover full message bodies.";
+
 function authRequest(url: string, token: string) {
   return new NextRequest(url, {
     method: "POST",
@@ -103,14 +106,14 @@ describe("admin-customer-email-history-refresh", () => {
     expect(response.status).toBe(200);
     const body = (await response.json()) as {
       ok: boolean;
-      gmail?: { importedCount: number; skippedCount: number };
+      gmail?: { importedCount: number; skippedCount: number; degradedReadAccess?: boolean; warning?: string };
       imap?: { importedCount: number; skippedCount: number };
     };
 
     expect(body.ok).toBe(true);
     expect(body.gmail).toEqual({ importedCount: 2, skippedCount: 1 });
     expect(body.imap).toEqual({ importedCount: 1, skippedCount: 0 });
-    expect(mockSyncGmailSentMessages).toHaveBeenCalledWith(20, { targetToEmail: "alex@example.com" });
+    expect(mockSyncGmailSentMessages).toHaveBeenCalledWith(100, { targetToEmail: "alex@example.com" });
     expect(mockListRecentImapMessagesBySender).toHaveBeenCalledWith("alex@example.com", 20);
 
     const inboundRows = await prisma.customerInboundEmail.findMany({
@@ -177,6 +180,54 @@ describe("admin-customer-email-history-refresh", () => {
     const inboundRows = await prisma.customerInboundEmail.findMany();
     expect(inboundRows).toHaveLength(1);
     expect(inboundRows[0]?.externalId).toBe("imap-history-1");
+  });
+
+  it("returns Gmail warning metadata when refresh falls back to metadata-only access", async () => {
+    const owner = await ensureOwnerAdmin();
+    const token = createSessionToken(owner.email);
+
+    const customer = await prisma.customer.create({
+      data: {
+        fullName: "Warning Student",
+        normalizedFullName: "warning student",
+        email: "warning@example.com",
+        phone: "0400000021",
+        normalizedEmail: "warning@example.com",
+        normalizedPhone: "0400000021",
+        skillLevel: "beginner",
+        lessonMode: "in_person"
+      }
+    });
+
+    mockSyncGmailSentMessages.mockResolvedValue({
+      importedCount: 0,
+      skippedCount: 1,
+      degradedReadAccess: true,
+      warning: GMAIL_DEGRADED_WARNING
+    });
+    mockListRecentImapMessagesBySender.mockResolvedValue([]);
+
+    const response = await POST(
+      authRequest(`http://localhost/api/admin/customers/${customer.id}/email/refresh`, token),
+      { params: Promise.resolve({ id: customer.id }) }
+    );
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      ok: boolean;
+      gmail?: { importedCount: number; skippedCount: number; degradedReadAccess?: boolean; warning?: string };
+      imap?: { importedCount: number; skippedCount: number };
+    };
+
+    expect(body.ok).toBe(true);
+    expect(body.gmail).toEqual({
+      importedCount: 0,
+      skippedCount: 1,
+      degradedReadAccess: true,
+      warning: GMAIL_DEGRADED_WARNING
+    });
+    expect(body.imap).toEqual({ importedCount: 0, skippedCount: 0 });
+    expect(mockSyncGmailSentMessages).toHaveBeenCalledWith(100, { targetToEmail: "warning@example.com" });
   });
 
   it("updates existing IMAP rows without creating duplicates", async () => {

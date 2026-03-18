@@ -124,9 +124,10 @@ export function AdminCustomersClient() {
   });
 
   const {
-    history: emailHistory, 
-    loading: loadingEmailHistory, 
-    sending: sendingEmail, 
+    history: emailHistory,
+    syncWarning: emailHistoryWarning,
+    loading: loadingEmailHistory,
+    sending: sendingEmail,
     syncing: syncingEmail,
     load: loadEmailHistory, 
     send: sendEmailApi,
@@ -561,6 +562,7 @@ export function AdminCustomersClient() {
           // Email History & Sync Logic
           loadingEmailHistory={loadingEmailHistory}
           emailHistory={emailHistory}
+          emailHistoryWarning={emailHistoryWarning}
           emailComposerSubject={emailComposerSubject}
           setEmailComposerSubject={setEmailComposerSubject}
           emailComposerMessage={emailComposerMessage}

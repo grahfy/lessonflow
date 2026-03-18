@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import type { ReactNode } from "react";
 
 import { CaptchaField, useCaptcha } from "@/components/captcha";
 import { AdminCard } from "@/components/admin/ui/admin-card";
+import { AdminNotice } from "@/components/admin/ui/admin-notice";
 import { EmailViewerDialog } from "@/components/admin/ui/email-viewer-dialog";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { isCaptchaErrorResult } from "@/lib/admin/constants";
@@ -15,6 +16,7 @@ interface AdminEmailPanelProps {
   composeTitle?: string;
   emptyLabel: string;
   history: ReadonlyArray<EmailRecord>;
+  historyWarning?: string | null;
   loadingHistory: boolean;
   subject: string;
   setSubject: (value: string) => void;
@@ -54,6 +56,7 @@ export function AdminEmailPanel({
   composeTitle = "Send Email",
   emptyLabel,
   history,
+  historyWarning,
   loadingHistory,
   subject,
   setSubject,
@@ -122,6 +125,7 @@ export function AdminEmailPanel({
             </Tooltip>
           ) : null}
         </div>
+        {historyWarning ? <AdminNotice tone="info">{historyWarning}</AdminNotice> : null}
         <AdminCard ghost className={["admin-email-history-card", historyClassName].filter(Boolean).join(" ")}>
           {loadingHistory ? (
             <p className="helper-text">Loading history...</p>

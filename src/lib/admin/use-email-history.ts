@@ -27,6 +27,7 @@ export type SendEmailResult = {
 
 export interface UseEmailHistoryResult {
   history: ReadonlyArray<EmailRecord>;
+  syncWarning: string | null;
   loading: boolean;
   sending: boolean;
   syncing: boolean;
@@ -50,6 +51,7 @@ function toQueryString(target: EmailHistoryTarget): string {
 export function useEmailHistory(options: UseEmailHistoryOptions = {}): UseEmailHistoryResult {
   const { onAuthError, onError } = options;
   const [history, setHistory] = useState<ReadonlyArray<EmailRecord>>([]);
+  const [syncWarning, setSyncWarning] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -123,7 +125,8 @@ export function useEmailHistory(options: UseEmailHistoryOptions = {}): UseEmailH
         return false;
       }
 
-      await response.json().catch(() => null as EmailRefreshResult | null);
+      const data = await response.json().catch(() => null as EmailRefreshResult | null);
+      setSyncWarning(data?.gmail?.warning || null);
       void load(target);
       return true;
     } catch {
@@ -135,6 +138,7 @@ export function useEmailHistory(options: UseEmailHistoryOptions = {}): UseEmailH
 
   return {
     history,
+    syncWarning,
     loading,
     sending,
     syncing,

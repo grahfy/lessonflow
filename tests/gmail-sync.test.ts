@@ -13,6 +13,9 @@ vi.mock("@/lib/gmail/service", () => ({
 import { prisma } from "@/lib/db";
 import { syncGmailSentMessages } from "@/lib/gmail/sync";
 
+const GMAIL_DEGRADED_WARNING =
+  "Gmail sync is running with metadata-only access. Reauthorize Gmail with send + readonly scopes, then refresh history again to recover full message bodies.";
+
 describe("gmail-sync", () => {
   beforeEach(async () => {
     await prisma.outboundEmail.deleteMany();
@@ -156,7 +159,12 @@ describe("gmail-sync", () => {
 
     const result = await syncGmailSentMessages(2, { targetToEmail: "alex@example.com" });
 
-    expect(result).toEqual({ importedCount: 2, skippedCount: 0 });
+    expect(result).toEqual({
+      importedCount: 2,
+      skippedCount: 0,
+      degradedReadAccess: true,
+      warning: GMAIL_DEGRADED_WARNING
+    });
     expect(mockListSentMessages).toHaveBeenNthCalledWith(1, 2, undefined, "to:alex@example.com");
     expect(mockListSentMessages).toHaveBeenNthCalledWith(2, 20, undefined);
     expect(mockListSentMessages).toHaveBeenNthCalledWith(3, 20, "page-2");
@@ -341,7 +349,12 @@ describe("gmail-sync", () => {
 
     const result = await syncGmailSentMessages(10, { targetToEmail: "alex@example.com" });
 
-    expect(result).toEqual({ importedCount: 0, skippedCount: 1 });
+    expect(result).toEqual({
+      importedCount: 0,
+      skippedCount: 1,
+      degradedReadAccess: true,
+      warning: GMAIL_DEGRADED_WARNING
+    });
     const row = await prisma.outboundEmail.findUniqueOrThrow({
       where: {
         externalId: "gmail-fallback-repair-1"
@@ -349,6 +362,106 @@ describe("gmail-sync", () => {
     });
     expect(row.toEmail).toBe("alex@example.com, sam@example.com");
     expect(row.htmlBody).toBe("Recovered plain text body");
+  });
+
+  it("returns a degraded warning when Gmail body reads fall back to metadata-only access", async () => {
+    mockListSentMessages.mockResolvedValue({
+      messages: [{ id: "gmail-metadata-body-1" }]
+    });
+    mockGetMessageDetails.mockImplementation(async (messageId: string, format?: string) => {
+      if (messageId !== "gmail-metadata-body-1") {
+        throw new Error(`Unexpected message id: ${messageId}`);
+      }
+
+      if (format === "full") {
+        const error = new Error("Metadata scope does not support format FULL");
+        (error as Error & { code: number }).code = 403;
+        throw error;
+      }
+
+      return {
+        id: "gmail-metadata-body-1",
+        internalDate: "1710748800000",
+        snippet: "Snippet recovered from metadata-only access",
+        payload: {
+          headers: [
+            { name: "To", value: "alex@example.com" },
+            { name: "Subject", value: "Metadata-only body" }
+          ],
+          parts: []
+        }
+      };
+    });
+
+    const result = await syncGmailSentMessages(10);
+
+    expect(result).toEqual({
+      importedCount: 1,
+      skippedCount: 0,
+      degradedReadAccess: true,
+      warning: GMAIL_DEGRADED_WARNING
+    });
+    expect(mockGetMessageDetails).toHaveBeenNthCalledWith(1, "gmail-metadata-body-1", "full");
+    expect(mockGetMessageDetails).toHaveBeenNthCalledWith(2, "gmail-metadata-body-1", "metadata");
+
+    const row = await prisma.outboundEmail.findUniqueOrThrow({
+      where: {
+        externalId: "gmail-metadata-body-1"
+      }
+    });
+    expect(row.htmlBody).toBe("Snippet recovered from metadata-only access");
+  });
+
+  it("syncs older targeted Gmail messages when a higher manual maxResults is requested", async () => {
+    const firstPageMessages = Array.from({ length: 20 }, (_, index) => ({
+      id: `gmail-deep-target-${index + 1}`
+    }));
+    const secondPageMessages = Array.from({ length: 5 }, (_, index) => ({
+      id: `gmail-deep-target-${index + 21}`
+    }));
+
+    mockListSentMessages
+      .mockRejectedValueOnce(new Error("Metadata scope does not support 'q' parameter"))
+      .mockResolvedValueOnce({
+        messages: firstPageMessages,
+        nextPageToken: "page-2"
+      })
+      .mockResolvedValueOnce({
+        messages: secondPageMessages
+      });
+
+    mockGetMessageDetails.mockImplementation(async (messageId: string) => ({
+      id: messageId,
+      internalDate: String(1710748800000 + Number(messageId.split("-").pop() || "0")),
+      snippet: `Recovered message ${messageId}`,
+      payload: {
+        headers: [
+          { name: "To", value: "Alex Student <alex@example.com>" },
+          { name: "Subject", value: `Recovered ${messageId}` }
+        ],
+        parts: []
+      }
+    }));
+
+    const result = await syncGmailSentMessages(25, { targetToEmail: "alex@example.com" });
+
+    expect(result).toEqual({
+      importedCount: 25,
+      skippedCount: 0,
+      degradedReadAccess: true,
+      warning: GMAIL_DEGRADED_WARNING
+    });
+    expect(mockListSentMessages).toHaveBeenNthCalledWith(1, 25, undefined, "to:alex@example.com");
+    expect(mockListSentMessages).toHaveBeenNthCalledWith(2, 25, undefined);
+    expect(mockListSentMessages).toHaveBeenNthCalledWith(3, 25, "page-2");
+
+    const rows = await prisma.outboundEmail.findMany({
+      orderBy: {
+        createdAt: "asc"
+      }
+    });
+    expect(rows).toHaveLength(25);
+    expect(rows[24]?.externalId).toBe("gmail-deep-target-25");
   });
 
   it("falls back to the Gmail snippet when no body parts are available", async () => {

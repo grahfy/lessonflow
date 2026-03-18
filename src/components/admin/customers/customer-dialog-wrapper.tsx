@@ -46,6 +46,7 @@ type Props = {
     // Email Props
     loadingEmailHistory: boolean;
     emailHistory: ReadonlyArray<EmailRecord>;
+    emailHistoryWarning?: string | null;
     emailComposerSubject: string;
     setEmailComposerSubject: React.Dispatch<React.SetStateAction<string>>;
     emailComposerMessage: string;
@@ -162,6 +163,7 @@ export function CustomerDialogWrapper({
                     <CustomerEmailDialog
                         loadingEmailHistory={rest.loadingEmailHistory}
                         emailHistory={rest.emailHistory}
+                        emailHistoryWarning={rest.emailHistoryWarning}
                         emailComposerSubject={rest.emailComposerSubject}
                         setEmailComposerSubject={rest.setEmailComposerSubject}
                         emailComposerMessage={rest.emailComposerMessage}

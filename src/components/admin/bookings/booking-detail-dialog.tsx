@@ -75,6 +75,7 @@ interface BookingDetailDialogProps {
 
   // Communication Engine
   emailHistory: ReadonlyArray<EmailRecord>;
+  emailHistoryWarning?: string | null;
   loadingEmailHistory: boolean;
   sendingEmail: boolean;
   syncingEmail: boolean;
@@ -128,6 +129,7 @@ export function BookingDetailDialog({
   onOpenMatchedCustomer,
   onDismissMatchedCustomer,
   emailHistory,
+  emailHistoryWarning,
   loadingEmailHistory,
   sendingEmail,
   syncingEmail,
@@ -399,6 +401,7 @@ export function BookingDetailDialog({
             <AdminEmailPanel
               emptyLabel="No emails recorded."
               history={emailHistory}
+              historyWarning={emailHistoryWarning}
               loadingHistory={loadingEmailHistory}
               subject={emailSubject}
               setSubject={setEmailSubject}

@@ -1,6 +1,11 @@
 import { Prisma } from "@/generated/prisma/client";
 
-import { type EmailRecord, type EmailRefreshResult, getEmailRecordBodyFields } from "@/lib/admin/email-history";
+import {
+  type EmailProviderRefreshCounts,
+  type EmailRecord,
+  type EmailRefreshResult,
+  getEmailRecordBodyFields
+} from "@/lib/admin/email-history";
 import { prisma } from "@/lib/db";
 import { isGmailConfigured } from "@/lib/email/gmail-service";
 import { getOwnerEmail, isImapConfigured } from "@/lib/env";
@@ -22,6 +27,16 @@ export type EmailHistoryAddressTarget = {
 
 type OutboundEmailRow = Awaited<ReturnType<typeof prisma.outboundEmail.findMany>>[number];
 type InboundEmailRow = Awaited<ReturnType<typeof prisma.customerInboundEmail.findMany>>[number];
+
+export type EmailHistoryRefreshOptions = {
+  gmailMaxResults?: number;
+  imapMaxResults?: number;
+};
+
+const DEFAULT_EMAIL_HISTORY_REFRESH_OPTIONS: Required<EmailHistoryRefreshOptions> = {
+  gmailMaxResults: 20,
+  imapMaxResults: 20
+};
 
 const STORED_EMAIL_ADDRESS_PATTERN = /([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi;
 
@@ -159,7 +174,7 @@ function toEmailRecordFromInbound(row: InboundEmailRow): EmailRecord {
   };
 }
 
-async function syncCustomerImapMessages(customer: CustomerEmailTarget, maxResults: number): Promise<{ importedCount: number; skippedCount: number }> {
+async function syncCustomerImapMessages(customer: CustomerEmailTarget, maxResults: number): Promise<EmailProviderRefreshCounts> {
   const messages = await listRecentImapMessagesBySender(customer.normalizedEmail, maxResults);
   const matchedMessages = messages.filter((message) => normalizeEmail(message.senderEmail) === customer.normalizedEmail);
   const matchedExternalIds = matchedMessages.map((message) => message.messageId);
@@ -276,12 +291,19 @@ export async function getCustomerEmailHistory(customer: CustomerEmailTarget): Pr
  */
 export async function refreshEmailHistoryForAddress(
   target: EmailHistoryAddressTarget,
-  maxResults: number = 20
+  options: EmailHistoryRefreshOptions = DEFAULT_EMAIL_HISTORY_REFRESH_OPTIONS
 ): Promise<EmailRefreshResult> {
   const normalizedEmail = target.normalizedEmail ?? normalizeEmail(target.email);
   const customerIds = resolveTargetCustomerIds(target.customerIds);
   const gmailConfigured = isGmailConfigured();
   const imapConfigured = isImapConfigured();
+  const {
+    gmailMaxResults,
+    imapMaxResults
+  } = {
+    ...DEFAULT_EMAIL_HISTORY_REFRESH_OPTIONS,
+    ...options
+  };
 
   if (!gmailConfigured && !imapConfigured) {
     throw new Error("No mailbox providers are configured for email history refresh.");
@@ -292,7 +314,7 @@ export async function refreshEmailHistoryForAddress(
 
   if (gmailConfigured) {
     try {
-      result.gmail = await syncGmailSentMessages(maxResults, { targetToEmail: normalizedEmail });
+      result.gmail = await syncGmailSentMessages(gmailMaxResults, { targetToEmail: normalizedEmail });
     } catch (error) {
       logError("email_history.gmail_refresh_failed", error, {
         targetEmail: normalizedEmail,
@@ -317,7 +339,7 @@ export async function refreshEmailHistoryForAddress(
         }
       });
 
-      const imapResults = await Promise.all(customers.map((customer) => syncCustomerImapMessages(customer, maxResults)));
+      const imapResults = await Promise.all(customers.map((customer) => syncCustomerImapMessages(customer, imapMaxResults)));
       result.imap = imapResults.reduce(
         (aggregate, item) => ({
           importedCount: aggregate.importedCount + item.importedCount,
@@ -344,13 +366,16 @@ export async function refreshEmailHistoryForAddress(
 /**
  * Refreshes provider-backed email history snapshots for a customer.
  */
-export async function refreshCustomerEmailHistory(customer: CustomerEmailTarget, maxResults: number = 20): Promise<EmailRefreshResult> {
+export async function refreshCustomerEmailHistory(
+  customer: CustomerEmailTarget,
+  options: EmailHistoryRefreshOptions = DEFAULT_EMAIL_HISTORY_REFRESH_OPTIONS
+): Promise<EmailRefreshResult> {
   return refreshEmailHistoryForAddress(
     {
       email: customer.email,
       normalizedEmail: customer.normalizedEmail,
       customerIds: [customer.id]
     },
-    maxResults
+    options
   );
 }

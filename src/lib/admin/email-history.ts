@@ -72,14 +72,18 @@ export function getEmailViewerContent(email: Pick<EmailRecord, "htmlBody" | "tex
 
 export type EmailRefreshResult = {
   ok: boolean;
-  gmail?: {
-    importedCount: number;
-    skippedCount: number;
-  };
-  imap?: {
-    importedCount: number;
-    skippedCount: number;
-  };
+  gmail?: GmailRefreshSummary;
+  imap?: EmailProviderRefreshCounts;
+};
+
+export type EmailProviderRefreshCounts = {
+  importedCount: number;
+  skippedCount: number;
+};
+
+export type GmailRefreshSummary = EmailProviderRefreshCounts & {
+  degradedReadAccess?: boolean;
+  warning?: string;
 };
 
 export function getEmailSourceLabel(source?: string): string | null {

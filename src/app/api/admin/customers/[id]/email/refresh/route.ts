@@ -40,7 +40,10 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const result = await refreshCustomerEmailHistory(customer);
+    const result = await refreshCustomerEmailHistory(customer, {
+      gmailMaxResults: 100,
+      imapMaxResults: 20
+    });
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";

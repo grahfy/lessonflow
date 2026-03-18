@@ -20,6 +20,9 @@ import { POST as refreshEmailHistory } from "@/app/api/admin/email-history/refre
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 
+const GMAIL_DEGRADED_WARNING =
+  "Gmail sync is running with metadata-only access. Reauthorize Gmail with send + readonly scopes, then refresh history again to recover full message bodies.";
+
 function authGet(url: string, token: string) {
   return new NextRequest(url, {
     headers: {
@@ -142,7 +145,9 @@ describe("admin-email-history-route", () => {
 
     mockSyncGmailSentMessages.mockResolvedValue({
       importedCount: 1,
-      skippedCount: 0
+      skippedCount: 0,
+      degradedReadAccess: true,
+      warning: GMAIL_DEGRADED_WARNING
     });
     mockListRecentImapMessagesBySender.mockResolvedValue([]);
 
@@ -153,15 +158,73 @@ describe("admin-email-history-route", () => {
     );
     const body = (await response.json()) as {
       ok: boolean;
-      gmail?: { importedCount: number; skippedCount: number };
+      gmail?: { importedCount: number; skippedCount: number; degradedReadAccess?: boolean; warning?: string };
       imap?: { importedCount: number; skippedCount: number };
     };
 
     expect(response.status).toBe(200);
     expect(body.ok).toBe(true);
-    expect(body.gmail).toEqual({ importedCount: 1, skippedCount: 0 });
+    expect(body.gmail).toEqual({
+      importedCount: 1,
+      skippedCount: 0,
+      degradedReadAccess: true,
+      warning: GMAIL_DEGRADED_WARNING
+    });
     expect(body.imap).toBeUndefined();
-    expect(mockSyncGmailSentMessages).toHaveBeenCalledWith(20, { targetToEmail: "jordan@example.com" });
+    expect(mockSyncGmailSentMessages).toHaveBeenCalledWith(100, { targetToEmail: "jordan@example.com" });
+  });
+
+  it("returns repaired plain-text Gmail bodies through the generic history route", async () => {
+    const owner = await ensureOwnerAdmin();
+    const token = createSessionToken(owner.email);
+
+    const bookingRequest = await prisma.bookingRequest.create({
+      data: {
+        name: "Text Body Request",
+        email: "plain-history@example.com",
+        phone: "0400007777",
+        address: "18 Main Street",
+        houseNumber: "18",
+        streetName: "Main",
+        streetType: "Street",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070",
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min30",
+        requestedStartAt: new Date("2026-03-18T08:00:00.000Z"),
+        assignedTeacherId: owner.id
+      }
+    });
+
+    await prisma.outboundEmail.create({
+      data: {
+        toEmail: "plain-history@example.com",
+        subject: "Recovered plain text Gmail body",
+        htmlBody: "Lesson moved to Saturday at 10am.",
+        status: "sent",
+        provider: "gmail",
+        source: "gmail",
+        externalId: "gmail-generic-plain-1",
+        createdAt: new Date("2026-03-18T09:30:00.000Z")
+      }
+    });
+
+    const response = await getEmailHistory(
+      authGet(`http://localhost/api/admin/email-history?bookingRequestId=${bookingRequest.id}`, token)
+    );
+    const body = (await response.json()) as {
+      history: Array<{ subject: string; htmlBody?: string; textBody?: string }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.history).toHaveLength(1);
+    expect(body.history[0]).toMatchObject({
+      subject: "Recovered plain text Gmail body",
+      textBody: "Lesson moved to Saturday at 10am."
+    });
+    expect(body.history[0]?.htmlBody).toBeUndefined();
   });
 
   it("limits same-email inbound history to the current teacher's authorized customers", async () => {

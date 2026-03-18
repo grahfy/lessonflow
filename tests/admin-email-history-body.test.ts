@@ -1,6 +1,13 @@
+import * as React from "react";
+import { createElement } from "react";
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { getEmailRecordBodyFields, getEmailViewerContent } from "@/lib/admin/email-history";
+import { AdminEmailPanel } from "@/components/admin/ui/admin-email-panel";
+
+(globalThis as typeof globalThis & { React?: typeof React }).React = React;
 
 describe("admin-email-history-body", () => {
   it("keeps renderable markup in htmlBody", () => {
@@ -27,5 +34,31 @@ describe("admin-email-history-body", () => {
       kind: "empty",
       value: ""
     });
+  });
+
+  it("renders the shared history warning banner when Gmail refresh is degraded", () => {
+    const markup = renderToStaticMarkup(
+      createElement(
+        TooltipPrimitive.Provider,
+        null,
+        createElement(AdminEmailPanel, {
+          emptyLabel: "No emails",
+          history: [],
+          historyWarning: "Gmail sync warning",
+          loadingHistory: false,
+          subject: "",
+          setSubject: () => {},
+          message: "",
+          setMessage: () => {},
+          sending: false,
+          onSend: async () => ({ success: true }),
+          captchaIdPrefix: "admin-email-test",
+          renderHistoryHeader: () => null,
+          renderHistoryMeta: () => null
+        })
+      )
+    );
+
+    expect(markup).toContain("Gmail sync warning");
   });
 });

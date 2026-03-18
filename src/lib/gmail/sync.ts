@@ -2,18 +2,23 @@ import { prisma } from "@/lib/db";
 import { listSentMessages, getMessageDetails } from "./service";
 import type { gmail_v1 } from "googleapis";
 import { logError, logEvent } from "@/lib/observability";
-import { getEmailRecordBodyFields } from "@/lib/admin/email-history";
+import { type GmailRefreshSummary, getEmailRecordBodyFields } from "@/lib/admin/email-history";
+import { GMAIL_REQUIRED_SCOPES } from "@/lib/gmail/scopes";
 
 const HEADER_EMAIL_PATTERN = /([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi;
 
-type GmailSyncResult = {
-  importedCount: number;
-  skippedCount: number;
+type GmailSyncContext = {
+  degradedReadAccess: boolean;
 };
+
+type GmailSyncResult = Pick<GmailRefreshSummary, "importedCount" | "skippedCount">;
 
 type SyncedSentMessageResult = GmailSyncResult & {
   matchedTarget: boolean;
 };
+
+const GMAIL_DEGRADED_WARNING =
+  "Gmail sync is running with metadata-only access. Reauthorize Gmail with send + readonly scopes, then refresh history again to recover full message bodies.";
 
 function extractEmailAddresses(headerValue: string): string[] {
   return Array.from(headerValue.matchAll(HEADER_EMAIL_PATTERN), (match) => match[1].trim().toLowerCase());
@@ -109,7 +114,7 @@ function isMetadataQueryRestriction(error: unknown): boolean {
   return err.message?.includes("Metadata scope") === true && err.message?.includes("'q' parameter") === true;
 }
 
-async function getMessageDetailsWithFallback(messageId: string): Promise<gmail_v1.Schema$Message> {
+async function getMessageDetailsWithFallback(messageId: string, context: GmailSyncContext): Promise<gmail_v1.Schema$Message> {
   try {
     return await getMessageDetails(messageId, "full");
   } catch (error: unknown) {
@@ -117,16 +122,28 @@ async function getMessageDetailsWithFallback(messageId: string): Promise<gmail_v
       throw error;
     }
 
+    logEvent("gmail.sync_metadata_read_fallback", {
+      messageId,
+      requiredScopes: GMAIL_REQUIRED_SCOPES
+    });
+    context.degradedReadAccess = true;
+
     // NOTE: metadata format omits body content (parts/body.data not populated).
     // extractBestStoredBody will fall back to details.snippet (~100 chars).
-    // If this 403 persists (e.g., OAuth scope never upgraded), this message
-    // will be stored with snippet-only content and cannot be auto-repaired.
+    // If this 403 persists because the stored refresh token only has
+    // `gmail.metadata`-level access, this message will be stored with
+    // snippet-only content until the integration is reauthorized with the
+    // scopes listed in `GMAIL_REQUIRED_SCOPES`.
     return getMessageDetails(messageId, "metadata");
   }
 }
 
-async function syncSentMessage(messageId: string, targetToEmail?: string): Promise<SyncedSentMessageResult> {
-  const details = await getMessageDetailsWithFallback(messageId);
+async function syncSentMessage(
+  messageId: string,
+  targetToEmail: string | undefined,
+  context: GmailSyncContext
+): Promise<SyncedSentMessageResult> {
+  const details = await getMessageDetailsWithFallback(messageId, context);
   const headers = details.payload?.headers || [];
   const toHeader = headers.find((header) => header.name?.toLowerCase() === "to")?.value || "unknown";
   const subjectHeader = headers.find((header) => header.name?.toLowerCase() === "subject")?.value || "(no subject)";
@@ -188,10 +205,11 @@ async function syncSentMessage(messageId: string, targetToEmail?: string): Promi
 
 async function syncSentMessagesBatch(
   messages: gmail_v1.Schema$Message[],
-  options?: { targetToEmail?: string; maxMatchedMessages?: number }
+  options?: { targetToEmail?: string; maxMatchedMessages?: number; context: GmailSyncContext }
 ): Promise<GmailSyncResult & { matchedCount: number }> {
   const targetToEmail = options?.targetToEmail;
   const maxMatchedMessages = options?.maxMatchedMessages ?? Number.POSITIVE_INFINITY;
+  const context = options?.context ?? { degradedReadAccess: false };
   let importedCount = 0;
   let skippedCount = 0;
   let matchedCount = 0;
@@ -205,7 +223,7 @@ async function syncSentMessagesBatch(
       continue;
     }
 
-    const result = await syncSentMessage(message.id, targetToEmail);
+    const result = await syncSentMessage(message.id, targetToEmail, context);
     if (!result.matchedTarget) {
       continue;
     }
@@ -218,10 +236,14 @@ async function syncSentMessagesBatch(
   return { importedCount, skippedCount, matchedCount };
 }
 
-async function syncTargetedSentMessages(maxResults: number, targetToEmail: string): Promise<GmailSyncResult> {
+async function syncTargetedSentMessages(
+  maxResults: number,
+  targetToEmail: string,
+  context: GmailSyncContext
+): Promise<GmailSyncResult> {
   try {
     const { messages } = await listSentMessages(maxResults, undefined, `to:${targetToEmail}`);
-    const result = await syncSentMessagesBatch(messages, { targetToEmail, maxMatchedMessages: maxResults });
+    const result = await syncSentMessagesBatch(messages, { targetToEmail, maxMatchedMessages: maxResults, context });
     return {
       importedCount: result.importedCount,
       skippedCount: result.skippedCount
@@ -231,7 +253,12 @@ async function syncTargetedSentMessages(maxResults: number, targetToEmail: strin
       throw error;
     }
 
-    logEvent("gmail.sync_target_query_fallback", { maxResults, targetToEmail });
+    logEvent("gmail.sync_target_query_fallback", {
+      maxResults,
+      targetToEmail,
+      requiredScopes: GMAIL_REQUIRED_SCOPES
+    });
+    context.degradedReadAccess = true;
 
     const pageSize = Math.min(Math.max(maxResults, 20), 100);
     let importedCount = 0;
@@ -243,7 +270,8 @@ async function syncTargetedSentMessages(maxResults: number, targetToEmail: strin
       const response = await listSentMessages(pageSize, nextPageToken);
       const result = await syncSentMessagesBatch(response.messages, {
         targetToEmail,
-        maxMatchedMessages: maxResults - matchedCount
+        maxMatchedMessages: maxResults - matchedCount,
+        context
       });
 
       importedCount += result.importedCount;
@@ -263,14 +291,15 @@ async function syncTargetedSentMessages(maxResults: number, targetToEmail: strin
 export async function syncGmailSentMessages(maxResults: number = 50, options?: { targetToEmail?: string }) {
   try {
     const targetToEmail = options?.targetToEmail?.trim().toLowerCase() || undefined;
+    const context: GmailSyncContext = { degradedReadAccess: false };
     logEvent("gmail.sync_started", { maxResults, targetToEmail });
     let result: GmailSyncResult;
 
     if (targetToEmail) {
-      result = await syncTargetedSentMessages(maxResults, targetToEmail);
+      result = await syncTargetedSentMessages(maxResults, targetToEmail, context);
     } else {
       const { messages } = await listSentMessages(maxResults);
-      const batchResult = await syncSentMessagesBatch(messages);
+      const batchResult = await syncSentMessagesBatch(messages, { context });
       result = {
         importedCount: batchResult.importedCount,
         skippedCount: batchResult.skippedCount
@@ -278,8 +307,22 @@ export async function syncGmailSentMessages(maxResults: number = 50, options?: {
     }
 
     const { importedCount, skippedCount } = result;
-    logEvent("gmail.sync_completed", { importedCount, skippedCount });
-    return { importedCount, skippedCount };
+    logEvent("gmail.sync_completed", {
+      importedCount,
+      skippedCount,
+      degradedReadAccess: context.degradedReadAccess
+    });
+
+    return {
+      importedCount,
+      skippedCount,
+      ...(context.degradedReadAccess
+        ? {
+            degradedReadAccess: true,
+            warning: GMAIL_DEGRADED_WARNING
+          }
+        : {})
+    };
   } catch (error) {
     logError("gmail.sync_failed", error);
     throw error;
