@@ -6,7 +6,7 @@ import { getSetupReadiness, isSetupComplete } from "@/lib/setup";
 /**
  * Returns first-run setup completion state and production-readiness checks.
  */
-export async function GET(request?: Request) {
+export async function GET(request: Request) {
   if (!isSetupAccessAllowed(request)) {
     return NextResponse.json(
       {

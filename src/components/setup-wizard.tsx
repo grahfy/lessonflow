@@ -7,7 +7,7 @@ import { CountryMultiSelect } from "@/components/country-multi-select";
 import { useNoticeTween } from "@/components/motion/use-notice-tween";
 import type { SetupCheck, SetupReadiness } from "@/lib/setup";
 import { buildDefaultGeoblockingSettingsState } from "@/lib/geoblocking-settings-contract";
-import { SETUP_ACCESS_TOKEN_HEADER } from "@/lib/setup-access";
+import { SETUP_ACCESS_TOKEN_HEADER } from "@/lib/setup-access-constants";
 
 type SetupWizardProps = {
   initialReadiness: SetupReadiness;

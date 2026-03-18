@@ -3,10 +3,10 @@ import { redirect } from "next/navigation";
 import { AdminAuthShell } from "@/components/admin-auth-shell";
 import { SetupWizard } from "@/components/setup-wizard";
 import { getSetupReadiness } from "@/lib/setup";
+import { SETUP_ACCESS_TOKEN_QUERY_PARAM } from "@/lib/setup-access-constants";
 import {
   hasSetupAccessTokenConfigured,
-  isValidSetupAccessToken,
-  SETUP_ACCESS_TOKEN_QUERY_PARAM
+  isValidSetupAccessToken
 } from "@/lib/setup-access";
 
 type SetupPageProps = {

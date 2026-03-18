@@ -1,7 +1,10 @@
+import "server-only";
 import crypto from "node:crypto";
 
-export const SETUP_ACCESS_TOKEN_HEADER = "x-setup-access-token";
-export const SETUP_ACCESS_TOKEN_QUERY_PARAM = "setupToken";
+import {
+  SETUP_ACCESS_TOKEN_HEADER,
+  SETUP_ACCESS_TOKEN_QUERY_PARAM
+} from "@/lib/setup-access-constants";
 
 function getConfiguredSetupAccessToken(): string {
   return process.env.SETUP_ACCESS_TOKEN?.trim() || "";

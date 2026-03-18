@@ -7,7 +7,7 @@ import { CONFIGURABLE_ENV_VARS, getCurrentEnvValues, isSetupComplete } from "@/l
  * Returns current env var configuration for the setup UI.
  * Secrets are masked - only indicates whether they are set.
  */
-export async function GET(request?: Request) {
+export async function GET(request: Request) {
   if (!isSetupAccessAllowed(request)) {
     return NextResponse.json(
       {
