@@ -12,7 +12,7 @@ HOST="${HOST:-0.0.0.0}"
 PORT="${PORT:-3000}"
 SKIP_INSTALL=0
 SKIP_TESTS=0
-SEED_DATA=0
+SEED_MODE="none"
 SEED_COUNT=50
 NO_START=0
 CLEANUP=0
@@ -33,17 +33,33 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-install) SKIP_INSTALL=1; shift;;
     --skip-tests) SKIP_TESTS=1; shift;;
-    --seed) SEED_DATA=1; shift;;
+    --seed)
+      if [[ "$SEED_MODE" != "none" ]]; then
+        error "Choose only one seed mode: --seed or --seed-docs-demo."
+        exit 1
+      fi
+      SEED_MODE="fake"
+      shift
+      ;;
+    --seed-docs-demo)
+      if [[ "$SEED_MODE" != "none" ]]; then
+        error "Choose only one seed mode: --seed or --seed-docs-demo."
+        exit 1
+      fi
+      SEED_MODE="docs-demo"
+      shift
+      ;;
     --seed-count) SEED_COUNT="$2"; shift 2;;
     --no-start) NO_START=1; shift;;
     --cleanup) CLEANUP=1; shift;;
     --help|-h)
-      echo "Usage: scripts/test-full-site-local.sh [--skip-install] [--skip-tests] [--seed] [--seed-count <n>] [--no-start] [--cleanup]"
+      echo "Usage: scripts/test-full-site-local.sh [--skip-install] [--skip-tests] [--seed | --seed-docs-demo] [--seed-count <n>] [--no-start] [--cleanup]"
       echo "Options:"
       echo "  --skip-install       Skip \`npm ci\` dependency installation"
       echo "  --skip-tests         Skip \`npm test\` automated tests"
-      echo "  --seed              Clear existing customer/invoice data and seed fresh fake data"
-      echo "  --seed-count <n>    Number of fake customers to seed (default: 50)"
+      echo "  --seed              Clear the dev DB and seed generic fake admin/customer/invoice data"
+      echo "  --seed-docs-demo    Clear the dev DB and seed the deterministic docs/demo dataset"
+      echo "  --seed-count <n>    Number of fake customers to seed for --seed (default: 50)"
       echo "  --no-start          Do not start Next.js dev server after setup/checks"
       echo "  --cleanup           Stop database containers when script completes"
       echo "  --help              Show this help message"
@@ -95,6 +111,15 @@ fi
 
 log "Dev database: $DB_URL"
 log "Test database: $TEST_DB_URL"
+
+SITE_URL_HOST="$HOST"
+if [[ "$SITE_URL_HOST" == "0.0.0.0" ]]; then
+  SITE_URL_HOST="127.0.0.1"
+fi
+SITE_URL="http://${SITE_URL_HOST}:${PORT}"
+DOCS_DEMO_ADMIN_EMAIL="${DOCS_SCREENSHOTS_ADMIN_EMAIL:-owner@example.com}"
+DOCS_DEMO_ADMIN_PASSWORD="${DOCS_SCREENSHOTS_ADMIN_PASSWORD:-DocsDemoAdmin!23}"
+DOCS_DEMO_STUDENT_PASSWORD="${DOCS_SCREENSHOTS_STUDENT_PASSWORD:-StudentDemo!23}"
 
 # 4. Database Container Management
 start_mariadb_container() {
@@ -156,7 +181,7 @@ log "Generating Prisma client..."
 npx prisma generate >/dev/null
 
 # 6. Data Seeding
-if [[ "$SEED_DATA" -eq 1 ]]; then
+if [[ "$SEED_MODE" != "none" ]]; then
   log "Clearing existing data..."
   DATABASE_URL="${DB_URL}" npx tsx scripts/clear-customer-data.ts 2>/dev/null || true
   DATABASE_URL="${DB_URL}" npx tsx scripts/clear-all-data.ts 2>/dev/null || true
@@ -165,7 +190,7 @@ fi
 log "Seeding whitelabel defaults..."
 DATABASE_URL="${DB_URL}" npx tsx scripts/seed-whitelabel-defaults.ts
 
-if [[ "$SEED_DATA" -eq 1 ]]; then
+if [[ "$SEED_MODE" == "fake" ]]; then
   log "Seeding fake data ($SEED_COUNT customers)..."
   DATABASE_URL="${DB_URL}" npx tsx scripts/seed-fake-data.ts "$SEED_COUNT"
   DATABASE_URL="${DB_URL}" npx tsx scripts/seed-invoice-presets.ts
@@ -178,6 +203,31 @@ if [[ "$SEED_DATA" -eq 1 ]]; then
   log "  Mia Hart: teacher.mia@example.com / teacher123"
   log "  Luca Vale: teacher.luca@example.com / teacher123"
   log "  Sarah Quinn: teacher.sarah@example.com / teacher123"
+fi
+
+if [[ "$SEED_MODE" == "docs-demo" ]]; then
+  log "Seeding deterministic docs/demo dataset..."
+  export NEXT_PUBLIC_SITE_URL="$SITE_URL"
+  export DOCS_SCREENSHOTS_BASE_URL="$SITE_URL"
+  export DOCS_SCREENSHOTS_ADMIN_EMAIL="$DOCS_DEMO_ADMIN_EMAIL"
+  export DOCS_SCREENSHOTS_ADMIN_PASSWORD="$DOCS_DEMO_ADMIN_PASSWORD"
+  export DOCS_SCREENSHOTS_STUDENT_PASSWORD="$DOCS_DEMO_STUDENT_PASSWORD"
+  DATABASE_URL="${DB_URL}" npm run docs:screenshots:seed >/dev/null
+
+  CHECKLIST_PATH="Documentation/assets/SCREENSHOT_SEED_CHECKLIST.md"
+  STUDENT_NAME="$(sed -n 's/^- Student login name: `\(.*\)`/\1/p' "$CHECKLIST_PATH" | head -n 1)"
+  STUDENT_POSTCODE="$(sed -n 's/^- Student postcode: `\(.*\)`/\1/p' "$CHECKLIST_PATH" | head -n 1)"
+
+  log "Docs/demo admin account:"
+  log "  URL: ${SITE_URL}/admin/login"
+  log "  Email: ${DOCS_DEMO_ADMIN_EMAIL}"
+  log "  Password: ${DOCS_DEMO_ADMIN_PASSWORD}"
+  if [[ -n "$STUDENT_NAME" && -n "$STUDENT_POSTCODE" ]]; then
+    log "Docs/demo student account:"
+    log "  URL: ${SITE_URL}/student/login"
+    log "  Login: ${STUDENT_NAME} / ${STUDENT_POSTCODE}"
+    log "  Password: ${DOCS_DEMO_STUDENT_PASSWORD}"
+  fi
 fi
 
 # 7. Automated Testing

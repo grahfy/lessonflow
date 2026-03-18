@@ -660,13 +660,15 @@ export function AdminBookingsClient() {
         </AdminCard>
 
         <AdminCard noPadding className="admin-bookings-calendar-card">
-          <AdminBookingCalendar
-            view={view}
-            date={dateStr}
-            events={filteredEvents}
-            selectedEventId={selectedKey}
-            onSelect={openDialog}
-          />
+          <div className="admin-bookings-calendar-scroll">
+            <AdminBookingCalendar
+              view={view}
+              date={dateStr}
+              events={filteredEvents}
+              selectedEventId={selectedKey}
+              onSelect={openDialog}
+            />
+          </div>
         </AdminCard>
       </div>
 

@@ -15,6 +15,9 @@
 .PARAMETER Seed
     Clear existing customer/invoice data and seed fresh fake data.
 
+.PARAMETER SeedDocsDemo
+    Clear existing dev data and seed the deterministic docs/demo dataset.
+
 .PARAMETER NoStart
     Do not start Next.js dev server after setup/checks.
 
@@ -22,6 +25,7 @@
     .\test-full-site-local.ps1
     .\test-full-site-local.ps1 -SkipInstall -SkipTests -NoStart
     .\test-full-site-local.ps1 -Seed
+    .\test-full-site-local.ps1 -SeedDocsDemo
 #>
 
 param(
@@ -29,19 +33,21 @@ param(
     [switch]$SkipInstall,
     [switch]$SkipTests,
     [switch]$Seed,
+    [switch]$SeedDocsDemo,
     [int]$SeedCount = 50,
     [switch]$NoStart
 )
 
 if ($Help) {
     Write-Host @"
-Usage: scripts\test-full-site-local.ps1 [-SkipInstall] [-SkipTests] [-Seed] [-SeedCount <n>] [-NoStart] [-Help]
+Usage: scripts\test-full-site-local.ps1 [-SkipInstall] [-SkipTests] [-Seed | -SeedDocsDemo] [-SeedCount <n>] [-NoStart] [-Help]
 
 Options:
   -SkipInstall       Skip npm ci dependency installation
   -SkipTests         Skip npm test automated tests
-  -Seed              Clear existing customer/invoice data and seed fresh fake data
-  -SeedCount <n>     Number of fake customers to seed (default: 50)
+  -Seed              Clear the dev DB and seed generic fake admin/customer/invoice data
+  -SeedDocsDemo      Clear the dev DB and seed the deterministic docs/demo dataset
+  -SeedCount <n>     Number of fake customers to seed for -Seed (default: 50)
   -NoStart           Do not start Next.js dev server after setup/checks
   -Help              Show this help message
 "@
@@ -53,12 +59,24 @@ $ErrorActionPreference = "Stop"
 $LISTEN_HOST = if ($env:HOST) { $env:HOST } else { "0.0.0.0" }
 $PORT = if ($env:PORT) { $env:PORT } else { "3000" }
 $TESTS_FAILED = $false
+$SEED_MODE = if ($SeedDocsDemo) { "docs-demo" } elseif ($Seed) { "fake" } else { "none" }
+
+if ($Seed -and $SeedDocsDemo) {
+    Write-Error "Choose only one seed mode: -Seed or -SeedDocsDemo"
+    exit 1
+}
 
 $ROOT_DIR = Split-Path -Parent $PSScriptRoot
 if (-not $ROOT_DIR) {
     $ROOT_DIR = Get-Location
 }
 Set-Location $ROOT_DIR
+
+$SITE_URL_HOST = if ($LISTEN_HOST -eq "0.0.0.0") { "127.0.0.1" } else { $LISTEN_HOST }
+$SITE_URL = "http://${SITE_URL_HOST}:${PORT}"
+$DOCS_DEMO_ADMIN_EMAIL = if ($env:DOCS_SCREENSHOTS_ADMIN_EMAIL) { $env:DOCS_SCREENSHOTS_ADMIN_EMAIL } else { "owner@example.com" }
+$DOCS_DEMO_ADMIN_PASSWORD = if ($env:DOCS_SCREENSHOTS_ADMIN_PASSWORD) { $env:DOCS_SCREENSHOTS_ADMIN_PASSWORD } else { "DocsDemoAdmin!23" }
+$DOCS_DEMO_STUDENT_PASSWORD = if ($env:DOCS_SCREENSHOTS_STUDENT_PASSWORD) { $env:DOCS_SCREENSHOTS_STUDENT_PASSWORD } else { "StudentDemo!23" }
 
 function Log {
     param([string]$Message)
@@ -226,7 +244,7 @@ npx prisma generate > $null
 
 $env:DATABASE_URL = $DB_URL
 
-if ($Seed) {
+if ($SEED_MODE -ne "none") {
     Log "Clearing existing data..."
     npx tsx scripts/clear-customer-data.ts 2>$null
     npx tsx scripts/clear-all-data.ts 2>$null
@@ -238,7 +256,7 @@ if ($Seed) {
 Log "Seeding whitelabel defaults..."
 npx tsx scripts/seed-whitelabel-defaults.ts
 
-if ($Seed) {
+if ($SEED_MODE -eq "fake") {
     Log "Seeding fake data ($SeedCount customers)..."
     npx tsx scripts/seed-fake-data.ts $SeedCount
     npx tsx scripts/seed-invoice-presets.ts
@@ -247,6 +265,41 @@ if ($Seed) {
     Log "  URL: http://localhost:${PORT}/admin/login"
     Log "  Email: admin@example.com"
     Log "  Password: admin123"
+}
+
+if ($SEED_MODE -eq "docs-demo") {
+    Log "Seeding deterministic docs/demo dataset..."
+    $env:NEXT_PUBLIC_SITE_URL = $SITE_URL
+    $env:DOCS_SCREENSHOTS_BASE_URL = $SITE_URL
+    $env:DOCS_SCREENSHOTS_ADMIN_EMAIL = $DOCS_DEMO_ADMIN_EMAIL
+    $env:DOCS_SCREENSHOTS_ADMIN_PASSWORD = $DOCS_DEMO_ADMIN_PASSWORD
+    $env:DOCS_SCREENSHOTS_STUDENT_PASSWORD = $DOCS_DEMO_STUDENT_PASSWORD
+    npx tsx scripts/seed-docs-screenshots.ts > $null
+
+    $checklistPath = Join-Path $ROOT_DIR "Documentation/assets/SCREENSHOT_SEED_CHECKLIST.md"
+    $studentName = ""
+    $studentPostcode = ""
+    if (Test-Path $checklistPath) {
+        $studentNameMatch = Select-String -Path $checklistPath -Pattern '^- Student login name: `(.*)`' | Select-Object -First 1
+        $studentPostcodeMatch = Select-String -Path $checklistPath -Pattern '^- Student postcode: `(.*)`' | Select-Object -First 1
+        if ($studentNameMatch) {
+            $studentName = $studentNameMatch.Matches.Groups[1].Value
+        }
+        if ($studentPostcodeMatch) {
+            $studentPostcode = $studentPostcodeMatch.Matches.Groups[1].Value
+        }
+    }
+
+    Log "Docs/demo admin account:"
+    Log "  URL: ${SITE_URL}/admin/login"
+    Log "  Email: $DOCS_DEMO_ADMIN_EMAIL"
+    Log "  Password: $DOCS_DEMO_ADMIN_PASSWORD"
+    if ($studentName -and $studentPostcode) {
+        Log "Docs/demo student account:"
+        Log "  URL: ${SITE_URL}/student/login"
+        Log "  Login: ${studentName} / ${studentPostcode}"
+        Log "  Password: $DOCS_DEMO_STUDENT_PASSWORD"
+    }
 }
 
 if (-not $SkipTests) {

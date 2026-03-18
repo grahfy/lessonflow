@@ -767,6 +767,10 @@
   backdrop-filter: blur(12px);
 }
 
+.admin-card.no-padding {
+  padding: 0;
+}
+
 .admin-toolbar-card {
   padding: 12px 14px;
   gap: 10px;
@@ -2069,9 +2073,34 @@
 }
 
 .admin-bookings-calendar-card {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-shell-bookings .admin-layout-content {
+  min-height: 0;
+}
+
+.admin-shell-bookings .admin-range-card {
+  flex-shrink: 0;
+}
+
+.admin-bookings-calendar-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 14px;
+  scrollbar-gutter: stable;
+}
+
+.admin-bookings-calendar-scroll .calendar-wrap {
+  min-height: 100%;
+  align-content: start;
 }
 
 .admin-actions-group {
