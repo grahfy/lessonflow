@@ -30,6 +30,7 @@ import { AdminTabNav } from "@/components/admin/ui/admin-tab-nav";
 import { AdminPresetsEditor } from "@/components/admin/settings/presets-editor";
 import { AdminContentEditor } from "@/components/admin/settings/content-editor";
 import { AdminEmailSignatureEditor } from "@/components/admin/settings/email-signature-editor";
+import { AdminGeoblockingSettingsEditor } from "@/components/admin/settings/geoblocking-settings-editor";
 import { AdminNotificationSettingsEditor } from "@/components/admin/settings/notification-settings-editor";
 import { AdminEmailTemplateEditor } from "@/components/admin/settings/email-template-editor";
 import { AdminInvoiceTemplateEditor } from "@/components/admin/invoices/invoice-template-editor";
@@ -409,6 +410,7 @@ export function AdminSettingsClient() {
             {activeTab === "system" && (
               <>
                 {renderEnvFields("system")}
+                <AdminGeoblockingSettingsEditor />
                 <AdminCard>
                   <h2 className="admin-settings-section-title">Admin Password Management</h2>
                   <AdminForm>

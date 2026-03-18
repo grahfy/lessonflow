@@ -3,8 +3,10 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { CountryMultiSelect } from "@/components/country-multi-select";
 import { useNoticeTween } from "@/components/motion/use-notice-tween";
 import type { SetupCheck, SetupReadiness } from "@/lib/setup";
+import { buildDefaultGeoblockingSettingsState } from "@/lib/geoblocking-settings-contract";
 import { SETUP_ACCESS_TOKEN_HEADER } from "@/lib/setup-access";
 
 type SetupWizardProps = {
@@ -68,10 +70,15 @@ function SetupCheckRow({ check }: { check: SetupCheck }) {
  */
 export function SetupWizard({ initialReadiness, setupAccessToken = null }: SetupWizardProps) {
   const router = useRouter();
+  const initialGeoblockingState = useMemo(() => buildDefaultGeoblockingSettingsState(), []);
   const [readiness, setReadiness] = useState<SetupReadiness>(initialReadiness);
   const [isRefreshingChecks, setIsRefreshingChecks] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [selectedCountries, setSelectedCountries] = useState<string[]>(initialGeoblockingState.allowedCountries);
+  const [unknownCountryMode, setUnknownCountryMode] = useState<"allow" | "block">(
+    initialGeoblockingState.unknownCountryMode
+  );
 
   const [envConfigOpen, setEnvConfigOpen] = useState(false);
   const [envVars, setEnvVars] = useState<EnvVar[]>([]);
@@ -220,7 +227,9 @@ export function SetupWizard({ initialReadiness, setupAccessToken = null }: Setup
       displayName: String((form.elements.namedItem("displayName") as HTMLInputElement)?.value || ""),
       email: String((form.elements.namedItem("email") as HTMLInputElement)?.value || ""),
       password: String((form.elements.namedItem("password") as HTMLInputElement)?.value || ""),
-      confirmPassword: String((form.elements.namedItem("confirmPassword") as HTMLInputElement)?.value || "")
+      confirmPassword: String((form.elements.namedItem("confirmPassword") as HTMLInputElement)?.value || ""),
+      allowedCountries: selectedCountries,
+      unknownCountryMode
     };
 
     try {
@@ -353,12 +362,58 @@ export function SetupWizard({ initialReadiness, setupAccessToken = null }: Setup
           <input id="setup-confirm-password" name="confirmPassword" type="password" required autoComplete="new-password" />
         </div>
 
+        <div className="field full">
+          <label htmlFor="setup-allowed-countries">Allowed countries</label>
+          <p className="field-description">
+            New installs start unrestricted. Narrow the countries here if you want public booking and contact submissions
+            limited from day one.
+          </p>
+          <CountryMultiSelect
+            selectedCodes={selectedCountries}
+            onChange={setSelectedCountries}
+            summaryWhenEmpty="Choose allowed countries"
+          />
+        </div>
+
+        <div className="field full">
+          <label>Unknown country lookups</label>
+          <p className="field-description">
+            Choose what happens when the request IP cannot be resolved to a country code.
+          </p>
+          <div className="setup-radio-group">
+            <label className="admin-inline-checkbox">
+              <input
+                type="radio"
+                name="unknownCountryMode"
+                value="allow"
+                checked={unknownCountryMode === "allow"}
+                onChange={() => setUnknownCountryMode("allow")}
+              />
+              Allow the submission when lookup fails
+            </label>
+            <label className="admin-inline-checkbox">
+              <input
+                type="radio"
+                name="unknownCountryMode"
+                value="block"
+                checked={unknownCountryMode === "block"}
+                onChange={() => setUnknownCountryMode("block")}
+              />
+              Block the submission when lookup fails
+            </label>
+          </div>
+        </div>
+
         <p className="helper-text form-required-note">
           Password policy: 12+ chars, uppercase, lowercase, number, symbol.
         </p>
 
         <div className="button-row">
-          <button className="btn btn-primary" type="submit" disabled={isSubmitting || !readiness.canInitialize}>
+          <button
+            className="btn btn-primary"
+            type="submit"
+            disabled={isSubmitting || !readiness.canInitialize || selectedCountries.length === 0}
+          >
             {isSubmitting ? "Initializing..." : "Initialize setup"}
           </button>
         </div>
@@ -373,6 +428,12 @@ export function SetupWizard({ initialReadiness, setupAccessToken = null }: Setup
       {error ? (
         <p className="notice error" ref={errorNoticeRef} data-motion-item="setup-error-notice">
           {error}
+        </p>
+      ) : null}
+
+      {readiness.canInitialize && selectedCountries.length === 0 ? (
+        <p className="notice" data-motion-item="setup-geoblocking-notice">
+          Select at least one allowed country before finishing setup.
         </p>
       ) : null}
     </div>

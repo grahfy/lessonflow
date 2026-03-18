@@ -116,6 +116,11 @@ enum AdminRole {
   teacher
 }
 
+enum UnknownCountryMode {
+  allow
+  block
+}
+
 // Public website contact form submissions. These are stored even when email
 // delivery fails so admins can follow up later and inspect retry logs.
 model ContactSubmission {
@@ -601,6 +606,15 @@ model NotificationSettings {
   invoiceReminderResendIntervalDays Int    @default(7)
   createdAt                       DateTime @default(now())
   updatedAt                       DateTime @updatedAt
+}
+
+// Singleton config for public geoblocking policy on anonymous form/API submissions.
+model GeoblockingSettings {
+  id                 String             @id
+  allowedCountries   Json
+  unknownCountryMode UnknownCountryMode @default(allow)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 }
 
 // Layout and style customization for generated invoices.

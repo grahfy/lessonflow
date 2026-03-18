@@ -30,6 +30,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { isGmailConfigured } from "@/lib/email/gmail-service";
 import { getAdminCustomerEmailAlertsProvider, getOwnerEmail, isAdminCustomerEmailAlertsEnabled, isImapConfigured } from "@/lib/env";
+import { DEFAULT_GEOBLOCKING_SETTINGS_ID } from "@/lib/geoblocking-settings";
+import { geoblockingSettingsInputSchema } from "@/lib/geoblocking-settings-contract";
 import { getMaterialStorageDriverName } from "@/lib/student-portal/material-storage";
 
 /**
@@ -984,7 +986,9 @@ export const setupInitializeSchema = z
     displayName: z.string().trim().min(2, "Display name is required.").max(80, "Display name is too long."),
     email: z.string().trim().email("Enter a valid email address."),
     password: z.string().min(1, "Password is required.").max(128, "Password is too long."),
-    confirmPassword: z.string().min(1, "Confirm password is required.").max(128, "Confirm password is too long.")
+    confirmPassword: z.string().min(1, "Confirm password is required.").max(128, "Confirm password is too long."),
+    allowedCountries: geoblockingSettingsInputSchema.shape.allowedCountries,
+    unknownCountryMode: geoblockingSettingsInputSchema.shape.unknownCountryMode
   })
   .superRefine((input, ctx) => {
     if (input.password !== input.confirmPassword) {
@@ -1060,6 +1064,19 @@ export async function createInitialAdmin(input: SetupInitializeInput) {
         isActive: true
       })),
       skipDuplicates: true
+    });
+
+    await tx.geoblockingSettings.upsert({
+      where: { id: DEFAULT_GEOBLOCKING_SETTINGS_ID },
+      update: {
+        allowedCountries: input.allowedCountries,
+        unknownCountryMode: input.unknownCountryMode
+      },
+      create: {
+        id: DEFAULT_GEOBLOCKING_SETTINGS_ID,
+        allowedCountries: input.allowedCountries,
+        unknownCountryMode: input.unknownCountryMode
+      }
     });
 
     return admin;

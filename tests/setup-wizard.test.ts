@@ -21,6 +21,7 @@ const originalSetupAccessToken = env.SETUP_ACCESS_TOKEN;
  * Clears mutable business data for isolated setup tests.
  */
 async function clearData() {
+  await prisma.geoblockingSettings.deleteMany();
   await prisma.invoiceAuditLog.deleteMany();
   await prisma.invoiceLineItem.deleteMany();
   await prisma.invoice.deleteMany();
@@ -33,6 +34,18 @@ async function clearData() {
   await prisma.bookingRequest.deleteMany();
   await prisma.customer.deleteMany();
   await prisma.adminUser.deleteMany();
+}
+
+function buildSetupInitializePayload(overrides: Record<string, unknown> = {}) {
+  return {
+    displayName: "Owner",
+    email: "owner@melbourneguitar.school",
+    password: "StrongPass!234",
+    confirmPassword: "StrongPass!234",
+    allowedCountries: ["AU", "NZ"],
+    unknownCountryMode: "allow",
+    ...overrides
+  };
 }
 
 describe("setup-wizard", () => {
@@ -85,12 +98,7 @@ describe("setup-wizard", () => {
 
     const initializeRequest = new NextRequest("http://localhost/api/setup/initialize", {
       method: "POST",
-      body: JSON.stringify({
-        displayName: "Owner",
-        email: "owner@melbourneguitar.school",
-        password: "StrongPass!234",
-        confirmPassword: "StrongPass!234"
-      }),
+      body: JSON.stringify(buildSetupInitializePayload()),
       headers: {
         "content-type": "application/json"
       }
@@ -173,12 +181,7 @@ describe("setup-wizard", () => {
           "content-type": "application/json",
           "x-real-ip": "203.0.113.10"
         },
-        body: JSON.stringify({
-          displayName: "Owner",
-          email: "owner@melbourneguitar.school",
-          password: "StrongPass!234",
-          confirmPassword: "StrongPass!234"
-        })
+        body: JSON.stringify(buildSetupInitializePayload())
       })
     );
     expect(initializeResponse.status).toBe(403);
@@ -254,12 +257,7 @@ describe("setup-wizard", () => {
   it("creates first admin during setup and sets an admin session cookie", async () => {
     const request = new NextRequest("http://localhost/api/setup/initialize", {
       method: "POST",
-      body: JSON.stringify({
-        displayName: "Owner",
-        email: "owner@melbourneguitar.school",
-        password: "StrongPass!234",
-        confirmPassword: "StrongPass!234"
-      }),
+      body: JSON.stringify(buildSetupInitializePayload()),
       headers: {
         "content-type": "application/json"
       }
@@ -278,6 +276,12 @@ describe("setup-wizard", () => {
     const adminCount = await prisma.adminUser.count();
     expect(adminCount).toBe(1);
 
+    const geoblocking = await prisma.geoblockingSettings.findUnique({
+      where: { id: "default-geoblocking-settings" }
+    });
+    expect(geoblocking?.allowedCountries).toEqual(["AU", "NZ"]);
+    expect(geoblocking?.unknownCountryMode).toBe("allow");
+
     const statusResponse = await getSetupStatus();
     expect(statusResponse.status).toBe(409);
     const statusBody = (await statusResponse.json()) as { code?: string; completed?: boolean };
@@ -290,12 +294,7 @@ describe("setup-wizard", () => {
 
     const request = new NextRequest("http://localhost/api/setup/initialize", {
       method: "POST",
-      body: JSON.stringify({
-        displayName: "Owner",
-        email: "owner@melbourneguitar.school",
-        password: "StrongPass!234",
-        confirmPassword: "StrongPass!234"
-      }),
+      body: JSON.stringify(buildSetupInitializePayload()),
       headers: {
         "content-type": "application/json"
       }
@@ -313,5 +312,30 @@ describe("setup-wizard", () => {
 
     expect(body.error).toContain("Resolve all failing setup checks");
     expect(body.readiness.failCount).toBeGreaterThan(0);
+  });
+
+  it("rejects setup initialization when no allowed countries are selected", async () => {
+    const request = new NextRequest("http://localhost/api/setup/initialize", {
+      method: "POST",
+      body: JSON.stringify(
+        buildSetupInitializePayload({
+          allowedCountries: []
+        })
+      ),
+      headers: {
+        "content-type": "application/json"
+      }
+    });
+
+    const response = await initializeSetup(request);
+    expect(response.status).toBe(400);
+
+    const body = (await response.json()) as {
+      details?: {
+        fieldErrors?: Record<string, string[]>;
+      };
+    };
+
+    expect(body.details?.fieldErrors?.allowedCountries?.[0]).toContain("Select at least one allowed country");
   });
 });

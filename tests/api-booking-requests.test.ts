@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/db";
 import { GET, POST } from "@/app/api/booking-requests/route";
+import { DEFAULT_GEOBLOCKING_SETTINGS_ID, PUBLIC_GEOBLOCKED_MESSAGE } from "@/lib/geoblocking-settings";
 
 describe("api-booking-requests", () => {
   beforeEach(async () => {
@@ -13,6 +14,7 @@ describe("api-booking-requests", () => {
     await prisma.bookingRequest.deleteMany();
     await prisma.customer.deleteMany();
     await prisma.adminUser.deleteMany();
+    await prisma.geoblockingSettings.deleteMany();
   });
 
   it("does not expose booking request rows via public GET", async () => {
@@ -77,7 +79,15 @@ describe("api-booking-requests", () => {
     expect(row?.isRecurring).toBe(true);
   });
 
-  it("rejects booking requests from non-AU server-side geolocation", async () => {
+  it("rejects booking requests from blocked countries", async () => {
+    await prisma.geoblockingSettings.create({
+      data: {
+        id: DEFAULT_GEOBLOCKING_SETTINGS_ID,
+        allowedCountries: ["AU"],
+        unknownCountryMode: "allow"
+      }
+    });
+
     const startAt = addDays(new Date(), 7).toISOString();
     const request = new Request("http://localhost/api/booking-requests", {
       method: "POST",
@@ -105,7 +115,7 @@ describe("api-booking-requests", () => {
     const response = await POST(request);
     expect(response.status).toBe(403);
     const payload = (await response.json()) as { error?: string };
-    expect(payload.error).toContain("Australian residents");
+    expect(payload.error).toBe(PUBLIC_GEOBLOCKED_MESSAGE);
 
     const row = await prisma.bookingRequest.findFirst({
       where: {
@@ -113,6 +123,44 @@ describe("api-booking-requests", () => {
       }
     });
     expect(row).toBeNull();
+  });
+
+  it("rejects booking requests when unknown-country fallback is block", async () => {
+    await prisma.geoblockingSettings.create({
+      data: {
+        id: DEFAULT_GEOBLOCKING_SETTINGS_ID,
+        allowedCountries: ["AU"],
+        unknownCountryMode: "block"
+      }
+    });
+
+    const startAt = addDays(new Date(), 7).toISOString();
+    const request = new Request("http://localhost/api/booking-requests", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        firstName: "Taylor",
+        lastName: "Swift",
+        name: "Taylor Swift",
+        email: "taylor@example.com",
+        phone: "0401-111-111",
+        postcode: "3070",
+        lessonMode: "video",
+        skillLevel: "advanced",
+        lessonDuration: "min30",
+        requestedStartAt: startAt,
+        isRecurring: false,
+        captchaToken: "test-token",
+        captchaAnswer: "test-answer"
+      })
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(403);
+    const payload = (await response.json()) as { error?: string };
+    expect(payload.error).toBe(PUBLIC_GEOBLOCKED_MESSAGE);
   });
 
   it("enforces 30-minute duration for new customers", async () => {

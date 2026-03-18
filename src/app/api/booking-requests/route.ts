@@ -16,8 +16,12 @@ import { bookingRequestSchema, formatBookingAddress } from "@/lib/booking-rules"
 import { verifyCaptchaGuard } from "@/lib/captcha";
 import { prisma } from "@/lib/db";
 import { resolveAutoAssignedTeacherId } from "@/lib/admin/teacher-assignment";
-import { resolveRequestCountry } from "@/lib/geo-country";
 import { sendOwnerBookingEmail } from "@/lib/booking-events";
+import {
+  evaluatePublicGeoblocking,
+  logPublicGeoblockingBlock,
+  PUBLIC_GEOBLOCKED_MESSAGE
+} from "@/lib/geoblocking-settings";
 import { logError, logEvent } from "@/lib/observability";
 
 /** Timeout for the outbound notification email to the school owner. */
@@ -65,7 +69,7 @@ export async function GET() {
  * 
  * SECURITY & VALIDATION:
  * 1. Captcha: Throttles bots and automated spam.
- * 2. Geo-Blocking: Uses header-based geolocation to enforce domestic-only service.
+ * 2. Geo-Blocking: Uses shared settings-backed policy for public submissions.
  * 3. Zod Parsing: Strict type enforcement of the request body.
  * 
  * LOGIC:
@@ -100,12 +104,13 @@ export async function POST(request: Request) {
   }
 
   // STEP 2: Geo-Fencing
-  // RATIONALE: We only provide lessons in Australia. Server-side check prevents vpn/bot bypass.
-  const resolvedCountry = await resolveRequestCountry(request.headers);
-  if (resolvedCountry.country && resolvedCountry.country !== "AU") {
+  const geoblocking = await evaluatePublicGeoblocking(request.headers);
+  if (!geoblocking.allowed) {
+    logPublicGeoblockingBlock("booking_requests", request.headers, geoblocking);
+
     return NextResponse.json(
       {
-        error: "Booking requests are currently available to Australian residents only."
+        error: PUBLIC_GEOBLOCKED_MESSAGE
       },
       { status: 403 }
     );

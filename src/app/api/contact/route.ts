@@ -17,6 +17,11 @@ import { prisma } from "@/lib/db";
 import { ownerNewContactTemplate } from "@/lib/email/templates";
 import { sendEmail } from "@/lib/email/service";
 import { getOwnerEmail } from "@/lib/env";
+import {
+  evaluatePublicGeoblocking,
+  logPublicGeoblockingBlock,
+  PUBLIC_GEOBLOCKED_MESSAGE
+} from "@/lib/geoblocking-settings";
 import { logError, logEvent } from "@/lib/observability";
 
 /**
@@ -24,7 +29,8 @@ import { logError, logEvent } from "@/lib/observability";
  * 
  * SECURITY:
  * 1. Captcha Guard: Prevents bot spam via Turnstile/ReCAPTCHA and rate limiting.
- * 2. Zod Validation: Ensures incoming body matches the expected contact schema.
+ * 2. Geo-Blocking: Applies the shared public geoblocking policy.
+ * 3. Zod Validation: Ensures incoming body matches the expected contact schema.
  * 
  * @param request - Standard Next.js Request object
  * @returns JSON response with submission status
@@ -53,7 +59,20 @@ export async function POST(request: Request) {
     );
   }
 
-  // STEP 2: Schema Validation
+  // STEP 2: Geo-Blocking
+  const geoblocking = await evaluatePublicGeoblocking(request.headers);
+  if (!geoblocking.allowed) {
+    logPublicGeoblockingBlock("contact", request.headers, geoblocking);
+
+    return NextResponse.json(
+      {
+        error: PUBLIC_GEOBLOCKED_MESSAGE
+      },
+      { status: 403 }
+    );
+  }
+
+  // STEP 3: Schema Validation
   const parsed = contactSubmissionSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -66,7 +85,7 @@ export async function POST(request: Request) {
   let createdId: string | null = null;
 
   try {
-    // STEP 3: DB Persistence
+    // STEP 4: DB Persistence
     // RATIONALE: We save the record before attempting email delivery. 
     // This handles cases where the SMTP provider is down but the school still 
     // needs to see the message in the Admin Dashboard later.
@@ -81,7 +100,7 @@ export async function POST(request: Request) {
     createdId = created.id;
     logEvent("contact.created", { id: created.id, email: created.email });
 
-    // STEP 4: Owner Notification
+    // STEP 5: Owner Notification
     const template = ownerNewContactTemplate({
       name: created.name,
       email: created.email,
@@ -99,7 +118,7 @@ export async function POST(request: Request) {
       }
     });
 
-    // STEP 5: Response Coordination
+    // STEP 6: Response Coordination
     // If email failed but DB succeeded, return 202 (Accepted) with a warning.
     if (emailResult.status !== "sent") {
       return NextResponse.json(

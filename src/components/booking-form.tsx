@@ -5,7 +5,7 @@
  * 
  * DESIGN FEATURES:
  * 1. Multi-Step Validation: Captcha -> Geo-Fence -> Zod Schema.
- * 2. Geo-Blocking: Restricts submissions to Australian residents based on API signals.
+ * 2. Geo-Blocking: Applies the current public geoblocking policy before submit.
  * 3. Atomic Feedback: Shows success/error state in a dedicated dialog overlay.
  * 4. UX Rationale: Fields are simplified to reduce friction. New customers are 
  *    automatically capped at 30 minutes for their first lesson intro.
@@ -74,16 +74,16 @@ export function BookingForm() {
     try {
       /**
        * STEP 2: GEOLOCATION CHECK
-       * RATIONALE: We only serve students in Australia. Checking client IP via 
-       * /api/geo allows us to fail fast before processing heavy form data.
+       * RATIONALE: /api/geo mirrors the server-side geoblocking policy so we
+       * can fail fast without waiting for full payload processing.
        */
       const geoResponse = await fetch("/api/geo");
       if (geoResponse.ok) {
-        const geoData = await geoResponse.json();
-        if (geoData.country && geoData.country !== "AU") {
+        const geoData = (await geoResponse.json()) as { allowed?: boolean };
+        if (geoData.allowed === false) {
           setState({
             status: "error",
-            message: "Currently only AU residents are applicable for lessons."
+            message: "This form is not currently available from your region."
           });
           setLoading(false);
           await captcha.regenerate();
