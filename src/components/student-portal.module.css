@@ -46,10 +46,10 @@
 
 .portal-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  grid-template-columns: minmax(168px, 196px) minmax(0, 1fr) auto;
+  align-items: stretch;
   justify-content: unset;
-  min-height: 66px;
+  min-height: 90px;
   padding-top: 6px;
   padding-bottom: 6px;
   column-gap: 10px;
@@ -64,17 +64,19 @@
 
 .portal-header-visual {
   width: 196px;
-  align-self: start;
+  height: 100%;
+  min-height: 72px;
+  display: flex;
+  align-self: stretch;
   justify-self: start;
   opacity: 0.96;
-  margin-bottom: 3px;
 }
 
 .portal-header-illustration {
   display: block;
   width: 100%;
-  height: auto;
-  object-fit: contain;
+  height: 100%;
+  object-fit: cover;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.02);
@@ -108,8 +110,8 @@
 
 .portal-header-action-button {
   min-width: 86px;
-  padding: 6px 9px;
-  font-size: 0.64rem;
+  padding: 7px 11px;
+  font-size: 0.82rem;
 }
 
 .materials-header {
@@ -235,13 +237,14 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+  align-items: stretch;
 }
 
 .upcoming-panel,
 .previous-panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  min-height: 320px;
+  min-height: min(52vh, 480px);
 }
 
 .panel-title {
@@ -250,16 +253,17 @@
 
 .upcoming-viewport {
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
+  padding-right: 3px;
 }
 
 .upcoming-viewport .booking-list {
-  max-height: 100%;
-  overflow: hidden;
+  max-height: none;
+  overflow: visible;
 }
 
 .previous-panel .booking-list {
-  max-height: min(44vh, 430px);
+  max-height: none;
   overflow: auto;
   padding-right: 3px;
 }
@@ -285,7 +289,7 @@
   display: block;
   margin: 0;
   color: var(--ink-0);
-  font-size: 0.87rem;
+  font-size: 0.95rem;
   line-height: 1.22;
 }
 
@@ -304,7 +308,7 @@
   border: 1px solid rgba(189, 205, 255, 0.24);
   background: rgba(186, 205, 255, 0.06);
   color: #dbe5ff;
-  font-size: 0.74rem;
+  font-size: 0.8rem;
   letter-spacing: 0.02em;
   padding: 3px 8px;
 }
@@ -344,7 +348,7 @@
   min-width: 116px;
   height: 24px;
   padding: 0 10px;
-  font-size: 0.64rem;
+  font-size: 0.7rem;
   line-height: 1;
 }
 
@@ -362,13 +366,13 @@
 .booking-details summary {
   cursor: pointer;
   color: #d5e0ff;
-  font-size: 0.79rem;
+  font-size: 0.85rem;
 }
 
 .booking-details p {
   margin: 6px 0 0;
   color: #c4d0f6;
-  font-size: 0.82rem;
+  font-size: 0.88rem;
   line-height: 1.32;
 }
 
@@ -381,7 +385,7 @@
 }
 
 .materials-section-title {
-  font-size: 0.82rem;
+  font-size: 0.88rem;
 }
 
 .material-list {
@@ -652,7 +656,7 @@
   }
 
   .portal-header {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: 100px minmax(0, 1fr);
     min-height: 0;
     padding-top: 4px;
     padding-bottom: 4px;
@@ -661,8 +665,15 @@
   .portal-header-visual {
     display: block;
     width: 100px;
+    height: auto;
+    min-height: 0;
     align-self: start;
     justify-self: start;
+  }
+
+  .portal-header-illustration {
+    height: auto;
+    object-fit: contain;
   }
 
   .portal-header-actions {

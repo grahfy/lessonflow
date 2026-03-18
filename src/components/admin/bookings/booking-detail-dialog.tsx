@@ -275,7 +275,7 @@ export function BookingDetailDialog({
                   <AdminField label="Last Name" tooltip="Student's family name.">
                     <input value={dialogForm.lastName} onChange={e => updateForm({ lastName: e.target.value })} />
                   </AdminField>
-                  <AdminField label="Email" tooltip="Primary email address for communication and portal login." fullWidth>
+                  <AdminField label="Email" tooltip="Primary email address for communication and portal login.">
                     <input value={dialogForm.email} onChange={e => updateForm({ email: e.target.value })} />
                   </AdminField>
                   <AdminField label="Phone" tooltip="Contact phone number (10 digits).">

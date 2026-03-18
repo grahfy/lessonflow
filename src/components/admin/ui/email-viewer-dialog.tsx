@@ -18,6 +18,7 @@ export function EmailViewerDialog({ isOpen, onClose, email }: EmailViewerDialogP
   if (!email) return null;
 
   const viewerContent = getEmailViewerContent(email);
+  const formattedDate = format(new Date(email.createdAt), "dd MMM yyyy, HH:mm");
 
   return (
     <AdminDialog
@@ -37,33 +38,47 @@ export function EmailViewerDialog({ isOpen, onClose, email }: EmailViewerDialogP
     >
       <div className="admin-email-viewer">
         <div className="admin-email-viewer-header">
-          <div className="admin-email-viewer-meta-row">
-            <strong>Subject:</strong> {email.subject}
-          </div>
-          <div className="admin-email-viewer-meta-row">
-            <strong>To:</strong> {email.toEmail}
-          </div>
-          <div className="admin-email-viewer-meta-row">
-            <strong>From:</strong> {email.fromEmail || "Unknown"}
-          </div>
-          <div className="admin-email-viewer-meta-row">
-            <strong>Date:</strong> {format(new Date(email.createdAt), "dd MMM yyyy, HH:mm")}
-          </div>
-          <div className="admin-email-viewer-meta-row">
-            <strong>Direction:</strong> {email.direction === "inbound" ? "Inbound" : "Outbound"}
-          </div>
-          {email.provider ? (
+          <div className="admin-email-viewer-meta-column">
             <div className="admin-email-viewer-meta-row">
-              <strong>Provider:</strong> {email.provider.toUpperCase()}
+              <strong className="admin-email-viewer-meta-label">Subject</strong>
+              <span className="admin-email-viewer-meta-value">{email.subject}</span>
             </div>
-          ) : null}
-          {email.source ? (
             <div className="admin-email-viewer-meta-row">
-              <strong>Source:</strong> {email.source}
+              <strong className="admin-email-viewer-meta-label">To</strong>
+              <span className="admin-email-viewer-meta-value">{email.toEmail}</span>
             </div>
-          ) : null}
-          <div className="admin-email-viewer-meta-row">
-            <strong>Status:</strong> <span className={`status-badge status-${email.status.toLowerCase()}`}>{email.status}</span>
+            <div className="admin-email-viewer-meta-row">
+              <strong className="admin-email-viewer-meta-label">From</strong>
+              <span className="admin-email-viewer-meta-value">{email.fromEmail || "Unknown"}</span>
+            </div>
+            <div className="admin-email-viewer-meta-row">
+              <strong className="admin-email-viewer-meta-label">Date</strong>
+              <span className="admin-email-viewer-meta-value">{formattedDate}</span>
+            </div>
+          </div>
+          <div className="admin-email-viewer-meta-column">
+            <div className="admin-email-viewer-meta-row">
+              <strong className="admin-email-viewer-meta-label">Direction</strong>
+              <span className="admin-email-viewer-meta-value">{email.direction === "inbound" ? "Inbound" : "Outbound"}</span>
+            </div>
+            {email.provider ? (
+              <div className="admin-email-viewer-meta-row">
+                <strong className="admin-email-viewer-meta-label">Provider</strong>
+                <span className="admin-email-viewer-meta-value">{email.provider.toUpperCase()}</span>
+              </div>
+            ) : null}
+            {email.source ? (
+              <div className="admin-email-viewer-meta-row">
+                <strong className="admin-email-viewer-meta-label">Source</strong>
+                <span className="admin-email-viewer-meta-value">{email.source}</span>
+              </div>
+            ) : null}
+            <div className="admin-email-viewer-meta-row">
+              <strong className="admin-email-viewer-meta-label">Status</strong>
+              <span className="admin-email-viewer-meta-value">
+                <span className={`status-badge status-${email.status.toLowerCase()}`}>{email.status}</span>
+              </span>
+            </div>
           </div>
         </div>
         <div className="admin-email-viewer-body">
