@@ -1403,9 +1403,12 @@
   overflow: auto;
 }
 
-.customer-email-panel,
 .customer-materials-panel {
   margin-top: 10px;
+}
+
+.customer-email-panel {
+  margin-top: 0;
 }
 
 .booking-email-panel {
@@ -1442,22 +1445,20 @@
   margin-bottom: 6px;
 }
 
-.admin-email-panel {
-  margin-top: 10px;
-  align-items: stretch;
+.admin-email-panel-shell {
   min-height: 0;
   height: 100%;
+  max-height: none;
+  align-items: stretch;
   overflow: hidden;
+}
+
+.admin-email-panel {
+  margin-top: 10px;
 }
 
 .admin-email-history-shell,
 .admin-email-compose-shell {
-  min-height: 0;
-  grid-template-rows: auto minmax(0, 1fr);
-}
-
-.admin-email-history-card,
-.admin-email-composer-card {
   min-height: 0;
   height: 100%;
   display: flex;
@@ -1465,8 +1466,18 @@
   overflow: hidden;
 }
 
+.admin-email-history-card,
+.admin-email-composer-card {
+  min-height: 0;
+  flex: 1 1 auto;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .customer-email-history-card {
-  height: 100%;
+  height: auto;
 }
 
 .admin-email-history-list {
@@ -1568,7 +1579,8 @@
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto auto;
   gap: 10px;
-  min-height: 100%;
+  min-height: 0;
+  height: 100%;
 }
 
 .admin-email-composer-form .field.full {
@@ -2993,6 +3005,16 @@
   overflow: hidden;
 }
 
+#customer-dialog .customer-email-tab-shell {
+  margin-top: 10px;
+  min-height: min(62vh, 700px);
+  height: 100%;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 #booking-detail-dialog {
   width: min(1380px, calc(100vw - 24px));
   max-height: min(96vh, 1020px);
@@ -3485,6 +3507,11 @@
 #booking-detail-dialog .booking-email-panel,
 #customer-dialog .customer-email-panel {
   overflow: hidden;
+}
+
+#customer-dialog .customer-email-tab-shell > .admin-email-panel-shell {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 #customer-dialog .customer-profile-panel,

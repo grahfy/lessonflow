@@ -361,6 +361,50 @@
     grid-template-columns: 1fr;
   }
 
+  #customer-dialog .customer-email-tab-shell,
+  #booking-detail-dialog .booking-email-panel {
+    overflow: auto;
+    padding-right: 4px;
+  }
+
+  #customer-dialog .customer-email-panel,
+  #booking-detail-dialog .booking-email-panel {
+    min-height: 0;
+    height: auto;
+  }
+
+  #customer-dialog .customer-email-panel {
+    overflow: visible;
+  }
+
+  #customer-dialog .customer-email-panel .dialog-col,
+  #customer-dialog .customer-email-panel .admin-email-history-shell,
+  #customer-dialog .customer-email-panel .admin-email-compose-shell,
+  #customer-dialog .customer-email-panel .admin-email-history-card,
+  #customer-dialog .customer-email-panel .admin-email-composer-card,
+  #booking-detail-dialog .booking-email-panel .dialog-col,
+  #booking-detail-dialog .booking-email-panel .admin-email-history-shell,
+  #booking-detail-dialog .booking-email-panel .admin-email-compose-shell,
+  #booking-detail-dialog .booking-email-panel .admin-email-history-card,
+  #booking-detail-dialog .booking-email-panel .admin-email-composer-card {
+    min-height: 0;
+    height: auto;
+    overflow: visible;
+  }
+
+  #customer-dialog .customer-email-panel .admin-email-history-card,
+  #customer-dialog .customer-email-panel .admin-email-composer-card,
+  #booking-detail-dialog .booking-email-panel .admin-email-history-card,
+  #booking-detail-dialog .booking-email-panel .admin-email-composer-card {
+    flex: 0 0 auto;
+  }
+
+  #customer-dialog .customer-email-panel .admin-email-history-list,
+  #booking-detail-dialog .booking-email-panel .admin-email-history-list {
+    max-height: none;
+    overflow: visible;
+  }
+
   .dialog-tab-stack {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -377,7 +421,7 @@
   }
 
   #booking-detail-dialog .booking-email-panel {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-columns: 1fr !important;
   }
 
   .dialog-notes {

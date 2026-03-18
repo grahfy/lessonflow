@@ -160,19 +160,21 @@ export function CustomerDialogWrapper({
                 )}
 
                 {activeTab === 'emails' && (
-                    <CustomerEmailDialog
-                        loadingEmailHistory={rest.loadingEmailHistory}
-                        emailHistory={rest.emailHistory}
-                        emailHistoryWarning={rest.emailHistoryWarning}
-                        emailComposerSubject={rest.emailComposerSubject}
-                        setEmailComposerSubject={rest.setEmailComposerSubject}
-                        emailComposerMessage={rest.emailComposerMessage}
-                        setEmailComposerMessage={rest.setEmailComposerMessage}
-                        sendingEmail={rest.sendingEmail}
-                        syncingEmail={rest.syncingEmail}
-                        onSendEmail={rest.onSendEmail}
-                        onSyncEmail={rest.onSyncEmail}
-                    />
+                    <div className="customer-email-tab-shell">
+                        <CustomerEmailDialog
+                            loadingEmailHistory={rest.loadingEmailHistory}
+                            emailHistory={rest.emailHistory}
+                            emailHistoryWarning={rest.emailHistoryWarning}
+                            emailComposerSubject={rest.emailComposerSubject}
+                            setEmailComposerSubject={rest.setEmailComposerSubject}
+                            emailComposerMessage={rest.emailComposerMessage}
+                            setEmailComposerMessage={rest.setEmailComposerMessage}
+                            sendingEmail={rest.sendingEmail}
+                            syncingEmail={rest.syncingEmail}
+                            onSendEmail={rest.onSendEmail}
+                            onSyncEmail={rest.onSyncEmail}
+                        />
+                    </div>
                 )}
 
                 {activeTab === 'materials' && (

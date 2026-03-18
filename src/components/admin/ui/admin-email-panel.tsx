@@ -108,7 +108,7 @@ export function AdminEmailPanel({
   }
 
   return (
-    <div className={["dialog-layout customer-dialog-panel admin-email-panel", panelClassName].filter(Boolean).join(" ")}>
+    <div className={["dialog-layout admin-email-panel-shell admin-email-panel", panelClassName].filter(Boolean).join(" ")}>
       <div className="dialog-col dialog-tab-section admin-email-history-shell">
         <div className="section-header-with-action">
           <h3 className="manual-section-title">{historyTitle}</h3>
