@@ -591,6 +591,18 @@ model EmailSignatureSettings {
   updatedAt      DateTime @updatedAt
 }
 
+// Singleton config for automated outbound email preferences and invoice reminder cadence.
+model NotificationSettings {
+  id                              String   @id
+  globalAutomatedEmailEnabled     Boolean  @default(true)
+  categoryPreferences             Json
+  automaticInvoiceRemindersEnabled Boolean @default(true)
+  invoiceReminderFirstDelayDays   Int      @default(7)
+  invoiceReminderResendIntervalDays Int    @default(7)
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
+}
+
 // Layout and style customization for generated invoices.
 model InvoiceTemplate {
   id          String   @id @default(cuid())

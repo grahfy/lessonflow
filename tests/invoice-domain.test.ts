@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { getInvoiceReminderPolicy } from "@/lib/email/notification-settings";
 import { calculateInvoiceTotals } from "@/lib/invoices/calculate";
 import { getInvoiceAgingBucket, getInvoiceOverdueDays, getReminderStage } from "@/lib/invoices/aging";
 import { getDefaultInvoiceTaxMode } from "@/lib/invoices/gst-policy";
@@ -151,7 +152,15 @@ describe("invoice-domain", () => {
     const now = new Date("2026-07-31T00:00:00.000Z");
     const overdueDays = getInvoiceOverdueDays(new Date("2026-07-20T00:00:00.000Z"), now);
     expect(overdueDays).toBe(11);
-    expect(getReminderStage(overdueDays)).toBe(7);
+    expect(
+      getReminderStage(
+        overdueDays,
+        getInvoiceReminderPolicy({
+          invoiceReminderFirstDelayDays: 7,
+          invoiceReminderResendIntervalDays: 7
+        })
+      )
+    ).toBe(7);
 
     const bucket = getInvoiceAgingBucket({
       dueAt: new Date("2026-06-20T00:00:00.000Z"),

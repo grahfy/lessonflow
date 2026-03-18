@@ -1,5 +1,6 @@
 import { Invoice, InvoiceLineItem } from "@/generated/prisma/client";
 
+import { type InvoiceReminderPolicy } from "@/lib/email/notification-settings";
 import { sendCustomerInvoiceReminderEmail } from "@/lib/invoice-events";
 import { getInvoiceOverdueDays, getReminderStage } from "@/lib/invoices/aging";
 
@@ -17,9 +18,13 @@ export type InvoiceWithLines = Invoice & {
  *
  * This makes repeated cron runs idempotent and prevents duplicate reminders for the same stage.
  */
-export function getInvoiceReminderEligibility(invoice: InvoiceWithLines, now: Date = new Date()) {
+export function getInvoiceReminderEligibility(
+  invoice: InvoiceWithLines,
+  policy: InvoiceReminderPolicy,
+  now: Date = new Date()
+) {
   const overdueDays = getInvoiceOverdueDays(invoice.dueAt, now);
-  const stage = getReminderStage(overdueDays);
+  const stage = getReminderStage(overdueDays, policy);
   const nextStageEligible = stage !== null && (!invoice.lastReminderStage || stage > invoice.lastReminderStage);
 
   return {
@@ -35,7 +40,7 @@ export function getInvoiceReminderEligibility(invoice: InvoiceWithLines, now: Da
   };
 }
 
-export function buildInvoiceReminderPersistence(overdueDays: number, stage: 7 | 14 | 30) {
+export function buildInvoiceReminderPersistence(overdueDays: number, stage: number) {
   return {
     lastReminderSentAt: new Date(),
     lastReminderStage: stage,
@@ -49,7 +54,7 @@ export function buildInvoiceReminderPersistence(overdueDays: number, stage: 7 | 
  * The caller persists the returned fields so reminder sending can be composed into a larger
  * transaction/audit-log update without this helper owning database writes.
  */
-export async function sendInvoiceReminder(invoice: InvoiceWithLines, overdueDays: number, stage: 7 | 14 | 30) {
+export async function sendInvoiceReminder(invoice: InvoiceWithLines, overdueDays: number, stage: number) {
   const deliveryResult = await sendCustomerInvoiceReminderEmail(invoice, overdueDays);
 
   return {

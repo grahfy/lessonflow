@@ -125,7 +125,11 @@ export async function POST(request: NextRequest) {
     const sendResult = await sendEmail({
       to: getOwnerEmail(),
       subject: template.subject,
-      html: template.html
+      html: template.html,
+      notification: {
+        triggerMode: "automated",
+        category: "owner_booking_requests"
+      }
     });
 
     if (sendResult.status !== "sent") {
@@ -133,7 +137,10 @@ export async function POST(request: NextRequest) {
         studentPortalBookingRequestResponseSchema.parse({
           ...responsePayload,
           partial: true,
-          warning: "Lesson request submitted, but we could not deliver the owner notification email right now.",
+          warning:
+            sendResult.status === "suppressed"
+              ? "Lesson request submitted, but owner booking-request notifications are currently disabled in admin settings."
+              : "Lesson request submitted, but we could not deliver the owner notification email right now.",
           deliveryStatus: sendResult.status
         }),
         { status: 201 }

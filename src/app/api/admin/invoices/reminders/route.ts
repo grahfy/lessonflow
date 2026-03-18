@@ -6,7 +6,7 @@ import { runInvoiceReminderBatch } from "@/lib/invoices/reminder-runner";
 import { sendInvoiceRemindersSchema } from "@/lib/invoices/schema";
 
 /**
- * Sends staged overdue reminders (7/14/30 days) for eligible sent invoices.
+ * Sends automatic overdue reminders for eligible sent invoices using the saved reminder policy.
  */
 export async function POST(request: NextRequest) {
   const admin = await requireAdminFromRequest(request);

@@ -209,7 +209,7 @@ export const sendInvoiceRemindersSchema = z.object({
   dryRun: z.boolean().optional(),
   maxInvoices: z.number().int().min(1).max(500).optional(),
   customerId: z.string().trim().min(1).optional(),
-  stage: z.union([z.literal(7), z.literal(14), z.literal(30)]).optional()
+  stage: z.number().int().min(1).max(365).optional()
 });
 
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;

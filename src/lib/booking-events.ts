@@ -37,7 +37,11 @@ export async function sendOwnerBookingEmail(input: {
   return sendEmail({
     to: getOwnerEmail(),
     subject: template.subject,
-    html: template.html
+    html: template.html,
+    notification: {
+      triggerMode: "automated",
+      category: "owner_booking_requests"
+    }
   });
 }
 
@@ -82,7 +86,11 @@ export async function sendCustomerBookingStatusEmail(input: {
   const result = await sendEmail({
     to: input.email,
     subject: template.subject,
-    html: template.html
+    html: template.html,
+    notification: {
+      triggerMode: "automated",
+      category: "customer_booking_updates"
+    }
   });
 
   if (result.status === "sent") {
@@ -108,7 +116,11 @@ export async function sendCustomerBookingMovedEmail(input: {
   const result = await sendEmail({
     to: input.email,
     subject: template.subject,
-    html: template.html
+    html: template.html,
+    notification: {
+      triggerMode: "automated",
+      category: "customer_booking_updates"
+    }
   });
 
   if (result.status === "sent") {
@@ -132,7 +144,10 @@ export async function sendCustomerReminderEmail(input: {
   const result = await sendEmail({
     to: input.email,
     subject: template.subject,
-    html: template.html
+    html: template.html,
+    notification: {
+      triggerMode: "manual"
+    }
   });
 
   if (result.status === "sent") {
@@ -159,7 +174,10 @@ export async function sendCustomerCustomEmail(input: {
   const result = await sendEmail({
     to: input.email,
     subject: template.subject,
-    html: template.html
+    html: template.html,
+    notification: {
+      triggerMode: "manual"
+    }
   });
 
   if (result.status === "sent") {

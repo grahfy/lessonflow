@@ -8,6 +8,7 @@ const mockIsGmailConfigured = vi.fn();
 const mockSendGmailEmail = vi.fn();
 const mockOutboundEmailCreate = vi.fn();
 const mockEmailSignatureSettingsFindUnique = vi.fn();
+const mockNotificationSettingsFindUnique = vi.fn();
 const mockSystemLogCreate = vi.fn(() => Promise.resolve());
 
 vi.mock("nodemailer", () => ({
@@ -29,6 +30,9 @@ vi.mock("@/lib/db", () => ({
     emailSignatureSettings: {
       findUnique: mockEmailSignatureSettingsFindUnique
     },
+    notificationSettings: {
+      findUnique: mockNotificationSettingsFindUnique
+    },
     systemLog: {
       create: mockSystemLogCreate
     }
@@ -47,6 +51,7 @@ describe("email-service-fallback", () => {
     vi.stubEnv("ADMIN_EMAIL", "owner@example.com");
     mockOutboundEmailCreate.mockResolvedValue(undefined);
     mockEmailSignatureSettingsFindUnique.mockResolvedValue(null);
+    mockNotificationSettingsFindUnique.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -153,5 +158,84 @@ describe("email-service-fallback", () => {
     expect(result).toEqual({ status: "sent" });
     expect(mockSendMail).toHaveBeenCalledTimes(1);
     expect(mockOutboundEmailCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("suppresses automated emails when global automated notifications are disabled", async () => {
+    vi.stubEnv("EMAIL_PROVIDER", "smtp");
+    mockNotificationSettingsFindUnique.mockResolvedValue({
+      id: "default-notification-settings",
+      globalAutomatedEmailEnabled: false,
+      categoryPreferences: {
+        owner_contact: true,
+        owner_booking_requests: true,
+        customer_booking_updates: true,
+        owner_daily_digest: true,
+        owner_scheduled_reports: true
+      },
+      automaticInvoiceRemindersEnabled: true,
+      invoiceReminderFirstDelayDays: 7,
+      invoiceReminderResendIntervalDays: 7,
+      createdAt: new Date("2026-03-18T00:00:00.000Z"),
+      updatedAt: new Date("2026-03-18T00:00:00.000Z")
+    });
+
+    const { sendEmail } = await import("@/lib/email/service");
+    const result = await sendEmail({
+      to: "owner@example.com",
+      subject: "Daily digest",
+      html: "<p>Hello</p>",
+      notification: {
+        triggerMode: "automated",
+        category: "owner_daily_digest"
+      }
+    });
+
+    expect(result).toEqual({
+      status: "suppressed",
+      error: "Automated email notifications are disabled in notification settings."
+    });
+    expect(mockSendMail).not.toHaveBeenCalled();
+    expect(mockSendGmailEmail).not.toHaveBeenCalled();
+    expect(mockOutboundEmailCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        toEmail: "owner@example.com",
+        provider: "policy",
+        status: "suppressed"
+      })
+    });
+  });
+
+  it("bypasses notification suppression for manual admin sends", async () => {
+    vi.stubEnv("EMAIL_PROVIDER", "smtp");
+    mockNotificationSettingsFindUnique.mockResolvedValue({
+      id: "default-notification-settings",
+      globalAutomatedEmailEnabled: false,
+      categoryPreferences: {
+        owner_contact: false,
+        owner_booking_requests: false,
+        customer_booking_updates: false,
+        owner_daily_digest: false,
+        owner_scheduled_reports: false
+      },
+      automaticInvoiceRemindersEnabled: false,
+      invoiceReminderFirstDelayDays: 7,
+      invoiceReminderResendIntervalDays: 7,
+      createdAt: new Date("2026-03-18T00:00:00.000Z"),
+      updatedAt: new Date("2026-03-18T00:00:00.000Z")
+    });
+    mockSendMail.mockResolvedValue({ messageId: "smtp-message-id" });
+
+    const { sendEmail } = await import("@/lib/email/service");
+    const result = await sendEmail({
+      to: "student@example.com",
+      subject: "Manual portal email",
+      html: "<p>Hello</p>",
+      notification: {
+        triggerMode: "manual"
+      }
+    });
+
+    expect(result).toEqual({ status: "sent" });
+    expect(mockSendMail).toHaveBeenCalledTimes(1);
   });
 });

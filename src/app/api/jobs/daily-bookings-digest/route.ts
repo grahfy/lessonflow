@@ -76,8 +76,22 @@ export async function POST(request: NextRequest) {
   const sendResult = await sendEmail({
     to: getOwnerEmail(),
     subject: template.subject,
-    html: template.html
+    html: template.html,
+    notification: {
+      triggerMode: "automated",
+      category: "owner_daily_digest"
+    }
   });
+
+  if (sendResult.status === "suppressed") {
+    return NextResponse.json({
+      ok: true,
+      count: rows.length,
+      deliveryStatus: sendResult.status,
+      suppressed: true,
+      message: sendResult.error || "Daily bookings digest skipped by notification settings."
+    });
+  }
 
   if (sendResult.status === "queued_no_smtp") {
     return NextResponse.json(

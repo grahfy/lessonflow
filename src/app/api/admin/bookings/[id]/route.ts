@@ -101,7 +101,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           {
             ok: true,
             partial: true,
-            warning: deliveryResult.error || "Booking was cancelled, but the notification email could not be delivered.",
+            warning:
+              deliveryResult.status === "suppressed"
+                ? "Booking was cancelled, but automated customer booking-update emails are disabled in admin settings."
+                : deliveryResult.error || "Booking was cancelled, but the notification email could not be delivered.",
             deliveryStatus: deliveryResult.status
           },
           { status: 200 }
@@ -147,7 +150,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           {
             ok: true,
             partial: true,
-            warning: deliveryResult.error || "Booking was moved, but the notification email could not be delivered.",
+            warning:
+              deliveryResult.status === "suppressed"
+                ? "Booking was moved, but automated customer booking-update emails are disabled in admin settings."
+                : deliveryResult.error || "Booking was moved, but the notification email could not be delivered.",
             deliveryStatus: deliveryResult.status
           },
           { status: 200 }

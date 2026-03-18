@@ -48,8 +48,26 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const sendResult = await sendEmail({
       to: getOwnerEmail(),
       subject: template.subject,
-      html: template.html
+      html: template.html,
+      notification: {
+        triggerMode: "automated",
+        category: "owner_scheduled_reports"
+      }
     });
+
+    if (sendResult.status === "suppressed") {
+      return NextResponse.json({
+        ok: true,
+        period: periodKey,
+        deliveryStatus: sendResult.status,
+        suppressed: true,
+        message: sendResult.error || "Scheduled report skipped by notification settings.",
+        generatedAt: dashboard.generatedAt,
+        appointmentsConfirmed: report.appointments.confirmedCount,
+        outstandingInvoices: report.outstandingInvoices.count,
+        netPaidCents: report.earnings.netPaidCents
+      });
+    }
 
     if (sendResult.status === "queued_no_smtp") {
       return NextResponse.json(

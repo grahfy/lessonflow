@@ -20,6 +20,11 @@
  */
 
 import { prisma } from "@/lib/db";
+import {
+  getInvoiceReminderPolicy,
+  getNotificationSettingsState,
+  isAutomatedNotificationEnabled
+} from "@/lib/email/notification-settings";
 import { logError } from "@/lib/observability";
 import { sendCustomerInvoiceReminderEmail } from "@/lib/invoice-events";
 import { buildInvoiceReminderPersistence, getInvoiceReminderEligibility } from "@/lib/invoices/reminders";
@@ -34,7 +39,7 @@ type RunInvoiceReminderBatchInput = {
   /** Filter to a single customer (useful for targeted manual recovery). */
   customerId?: string;
   /** Force-limit to a specific escalation stage. */
-  stage?: 7 | 14 | 30;
+  stage?: number;
 };
 
 /** High-level summary of the batch operation results. */
@@ -42,11 +47,14 @@ export type InvoiceReminderRunResult = {
   dryRun: boolean;
   candidateCount: number;
   eligibleCount: number;
+  suppressedCount: number;
   sentCount: number;
   failedCount: number;
-  sent: Array<{ id: string; invoiceNumber: string; overdueDays: number; stage: 7 | 14 | 30 }>;
+  suppressed: boolean;
+  suppressionReason?: string;
+  sent: Array<{ id: string; invoiceNumber: string; overdueDays: number; stage: number }>;
   failed: Array<{ id: string; invoiceNumber: string; error: string }>;
-  invoices?: Array<{ id: string; invoiceNumber: string; overdueDays: number; stage: 7 | 14 | 30 }>;
+  invoices?: Array<{ id: string; invoiceNumber: string; overdueDays: number; stage: number }>;
 };
 
 /**
@@ -57,6 +65,8 @@ export type InvoiceReminderRunResult = {
  */
 export async function runInvoiceReminderBatch(input: RunInvoiceReminderBatchInput): Promise<InvoiceReminderRunResult> {
   const now = new Date();
+  const notificationSettings = await getNotificationSettingsState();
+  const reminderPolicy = getInvoiceReminderPolicy(notificationSettings);
   
   // 1. Fetch search candidates (overdue & currently sent)
   const candidates = await prisma.invoice.findMany({
@@ -77,7 +87,7 @@ export async function runInvoiceReminderBatch(input: RunInvoiceReminderBatchInpu
   // 2. Filter by business logic eligibility (Escalated stages: 7, 14, 30 days)
   const eligible = candidates
     .map((invoice) => {
-      const eligibility = getInvoiceReminderEligibility(invoice, now);
+      const eligibility = getInvoiceReminderEligibility(invoice, reminderPolicy, now);
       return { invoice, eligibility };
     })
     .filter(({ eligibility }) => {
@@ -92,20 +102,39 @@ export async function runInvoiceReminderBatch(input: RunInvoiceReminderBatchInpu
       dryRun: true,
       candidateCount: candidates.length,
       eligibleCount: eligible.length,
+      suppressedCount: 0,
       sentCount: 0,
       failedCount: 0,
+      suppressed: false,
       sent: [],
       failed: [],
       invoices: eligible.map(({ invoice, eligibility }) => ({
         id: invoice.id,
         invoiceNumber: invoice.invoiceNumber,
         overdueDays: eligibility.overdueDays,
-        stage: eligibility.stage as 7 | 14 | 30
+        stage: eligibility.stage as number
       }))
     };
   }
 
-  const sent: Array<{ id: string; invoiceNumber: string; overdueDays: number; stage: 7 | 14 | 30 }> = [];
+  if (!isAutomatedNotificationEnabled(notificationSettings, "automatic_invoice_reminders")) {
+    return {
+      dryRun: false,
+      candidateCount: candidates.length,
+      eligibleCount: eligible.length,
+      suppressedCount: eligible.length,
+      sentCount: 0,
+      failedCount: 0,
+      suppressed: true,
+      suppressionReason: notificationSettings.globalAutomatedEmailEnabled
+        ? "Automatic invoice reminders are disabled in notification settings."
+        : "Automated email notifications are disabled in notification settings.",
+      sent: [],
+      failed: []
+    };
+  }
+
+  const sent: Array<{ id: string; invoiceNumber: string; overdueDays: number; stage: number }> = [];
   const failed: Array<{ id: string; invoiceNumber: string; error: string }> = [];
 
   // 4. Dispatch Loop
@@ -134,7 +163,13 @@ export async function runInvoiceReminderBatch(input: RunInvoiceReminderBatchInpu
         }
       });
 
-      const deliveryResult = await sendCustomerInvoiceReminderEmail(invoice, eligibility.overdueDays);
+      const deliveryResult = await sendCustomerInvoiceReminderEmail(invoice, eligibility.overdueDays, {
+        notification: {
+          triggerMode: "automated",
+          category: "automatic_invoice_reminders"
+        },
+        skipNotificationPolicyCheck: true
+      });
       if (deliveryResult.status === "failed") {
         failed.push({
           id: invoice.id,
@@ -149,6 +184,15 @@ export async function runInvoiceReminderBatch(input: RunInvoiceReminderBatchInpu
           id: invoice.id,
           invoiceNumber: invoice.invoiceNumber,
           error: "Reminder metadata was saved, but no live email provider is configured for customer delivery."
+        });
+        continue;
+      }
+
+      if (deliveryResult.status === "suppressed") {
+        failed.push({
+          id: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          error: deliveryResult.error || "Reminder was suppressed by notification settings."
         });
         continue;
       }
@@ -177,8 +221,10 @@ export async function runInvoiceReminderBatch(input: RunInvoiceReminderBatchInpu
     dryRun: false,
     candidateCount: candidates.length,
     eligibleCount: eligible.length,
+    suppressedCount: 0,
     sentCount: sent.length,
     failedCount: failed.length,
+    suppressed: false,
     sent,
     failed
   };

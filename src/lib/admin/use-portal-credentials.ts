@@ -24,7 +24,7 @@ export interface UsePortalCredentialsResult {
     regenerate: (customerId: string) => Promise<{
         password: string;
         credential: PortalCredential;
-        emailStatus?: "sent" | "queued_no_smtp" | "failed" | "skipped";
+        emailStatus?: "sent" | "queued_no_smtp" | "failed" | "suppressed" | "skipped";
         emailMessage?: string;
     } | null>;
 }
@@ -67,7 +67,7 @@ export function usePortalCredentials(options: UsePortalCredentialsOptions = {}):
     const regenerate = useCallback(async (customerId: string): Promise<{
         password: string;
         credential: PortalCredential;
-        emailStatus?: "sent" | "queued_no_smtp" | "failed" | "skipped";
+        emailStatus?: "sent" | "queued_no_smtp" | "failed" | "suppressed" | "skipped";
         emailMessage?: string;
     } | null> => {
         setBusyCustomerId(customerId);

@@ -214,7 +214,10 @@ export async function POST(request: Request) {
           ok: true,
           id: created.id,
           partial: true,
-          warning: "Your booking request was saved, but we could not deliver the owner notification email right now.",
+          warning:
+            emailResult.status === "suppressed"
+              ? "Your booking request was saved, but owner booking-request notifications are currently disabled in admin settings."
+              : "Your booking request was saved, but we could not deliver the owner notification email right now.",
           deliveryStatus: emailResult.status
         },
         { status: 202 }

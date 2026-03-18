@@ -30,6 +30,7 @@ import { AdminTabNav } from "@/components/admin/ui/admin-tab-nav";
 import { AdminPresetsEditor } from "@/components/admin/settings/presets-editor";
 import { AdminContentEditor } from "@/components/admin/settings/content-editor";
 import { AdminEmailSignatureEditor } from "@/components/admin/settings/email-signature-editor";
+import { AdminNotificationSettingsEditor } from "@/components/admin/settings/notification-settings-editor";
 import { AdminEmailTemplateEditor } from "@/components/admin/settings/email-template-editor";
 import { AdminInvoiceTemplateEditor } from "@/components/admin/invoices/invoice-template-editor";
 import { CustomerEmailAlertStatus } from "@/components/admin/settings/customer-email-alert-status";
@@ -387,6 +388,7 @@ export function AdminSettingsClient() {
             {/* 3. Email Templates (Audit Logs, Receipts) */}
             {activeTab === "emails" && (
               <>
+                <AdminNotificationSettingsEditor />
                 <AdminEmailSignatureEditor />
                 <AdminEmailTemplateEditor />
               </>

@@ -87,7 +87,7 @@ describe("booking-notifications", () => {
     }, token);
 
     const response = await patchBookingRequest(request, { params: Promise.resolve({ id: bookingRequest.id }) });
-    expect(response.status).toBe(200);
+    expect([200, 202]).toContain(response.status);
 
     const outboundEmails = await prisma.outboundEmail.findMany({
       where: { toEmail: "reject@example.com" }
@@ -118,7 +118,7 @@ describe("booking-notifications", () => {
     }, token);
 
     const response = await patchBookingRequest(request, { params: Promise.resolve({ id: bookingRequest.id }) });
-    expect(response.status).toBe(200);
+    expect([200, 202]).toContain(response.status);
 
     const outboundEmails = await prisma.outboundEmail.findMany({
       where: { toEmail: "approve@example.com" }

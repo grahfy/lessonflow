@@ -97,7 +97,7 @@ describe("admin-portal-credential", () => {
     expect(regenerateResponse.status).toBe(200);
     const regeneratePayload = (await regenerateResponse.json()) as {
       password: string;
-      emailStatus?: "sent" | "queued_no_smtp" | "failed" | "skipped";
+      emailStatus?: "sent" | "queued_no_smtp" | "failed" | "suppressed" | "skipped";
       emailMessage?: string;
     };
     expect(regeneratePayload.password).not.toBe(initialPassword);
@@ -237,7 +237,7 @@ describe("admin-portal-credential", () => {
     const regeneratePayload = (await regenerateResponse.json()) as {
       password: string;
       partial?: boolean;
-      emailStatus?: "sent" | "queued_no_smtp" | "failed" | "skipped";
+      emailStatus?: "sent" | "queued_no_smtp" | "failed" | "suppressed" | "skipped";
       emailMessage?: string;
     };
 

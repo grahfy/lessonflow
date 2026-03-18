@@ -1,5 +1,7 @@
 import { InvoiceStatus } from "@/generated/prisma/client";
 
+import { type InvoiceReminderPolicy } from "@/lib/email/notification-settings";
+
 export type InvoiceAgingBucket = "current" | "overdue_1_30" | "overdue_31_plus";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -46,17 +48,17 @@ export function getInvoiceAgingBucket(input: {
 }
 
 /**
- * Returns reminder stage thresholds for 7/14/30-day overdue follow-up cadence.
+ * Returns the highest configured reminder threshold that the invoice has reached.
  */
-export function getReminderStage(overdueDays: number): 7 | 14 | 30 | null {
-  if (overdueDays >= 30) {
-    return 30;
-  }
-  if (overdueDays >= 14) {
-    return 14;
-  }
-  if (overdueDays >= 7) {
-    return 7;
+export function getReminderStage(
+  overdueDays: number,
+  policy: Pick<InvoiceReminderPolicy, "stages">
+): number | null {
+  for (let index = policy.stages.length - 1; index >= 0; index -= 1) {
+    const stage = policy.stages[index];
+    if (overdueDays >= stage) {
+      return stage;
+    }
   }
   return null;
 }

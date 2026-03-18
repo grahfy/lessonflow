@@ -126,7 +126,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       created: result.created
     };
 
-    let emailStatus: "sent" | "queued_no_smtp" | "failed" | "skipped" = "skipped";
+    let emailStatus: "sent" | "queued_no_smtp" | "failed" | "suppressed" | "skipped" = "skipped";
     let emailMessage = "Portal password regenerated. Customer email was skipped because no email address is saved.";
 
     if (customer.email.trim()) {
@@ -139,7 +139,10 @@ export async function POST(request: NextRequest, { params }: Params) {
         const emailResult = await sendEmail({
           to: customer.email,
           subject: template.subject,
-          html: template.html
+          html: template.html,
+          notification: {
+            triggerMode: "manual"
+          }
         });
         emailStatus = emailResult.status;
         emailMessage =

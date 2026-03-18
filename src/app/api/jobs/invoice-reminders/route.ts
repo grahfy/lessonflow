@@ -32,7 +32,7 @@ import { sendInvoiceRemindersSchema } from "@/lib/invoices/schema";
  * 3. Calls the `runInvoiceReminderBatch` service to perform the logic (filtering,
  *    rendering, and sending emails via SMTP).
  * 
- * @param request - JSON payload (maxInvoices, dryRun, stage)
+ * @param request - JSON payload (maxInvoices, dryRun, customerId, stage)
  * @returns Summary of reminder actions performed
  */
 export async function POST(request: NextRequest) {

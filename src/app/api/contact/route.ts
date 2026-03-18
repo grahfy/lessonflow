@@ -92,7 +92,11 @@ export async function POST(request: Request) {
     const emailResult = await sendEmail({
       to: getOwnerEmail(),
       subject: template.subject,
-      html: template.html
+      html: template.html,
+      notification: {
+        triggerMode: "automated",
+        category: "owner_contact"
+      }
     });
 
     // STEP 5: Response Coordination
@@ -103,7 +107,10 @@ export async function POST(request: Request) {
           ok: true,
           id: created.id,
           partial: true,
-          warning: "Your message was saved, but we could not deliver the email notification right now.",
+          warning:
+            emailResult.status === "suppressed"
+              ? "Your message was saved, but owner email notifications are currently disabled in admin settings."
+              : "Your message was saved, but we could not deliver the email notification right now.",
           deliveryStatus: emailResult.status
         },
         { status: 202 }

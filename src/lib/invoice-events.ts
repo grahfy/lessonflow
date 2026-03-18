@@ -1,6 +1,7 @@
 import { Invoice, InvoiceLineItem } from "@/generated/prisma/client";
 
 import { sendEmail, type SendEmailResult } from "@/lib/email/service";
+import { type EmailNotificationMetadata } from "@/lib/email/notification-settings";
 import { customerInvoiceReminderTemplate, customerInvoiceTemplate } from "@/lib/email/templates";
 import { renderInvoicePdf } from "@/lib/invoices/pdf";
 
@@ -25,6 +26,9 @@ export async function sendCustomerInvoiceEmail(invoice: InvoiceWithLines): Promi
     to: invoice.customerEmail,
     subject: template.subject,
     html: template.html,
+    notification: {
+      triggerMode: "manual"
+    },
     attachments: [
       {
         filename: `${invoice.invoiceNumber}.pdf`,
@@ -40,7 +44,11 @@ export async function sendCustomerInvoiceEmail(invoice: InvoiceWithLines): Promi
  */
 export async function sendCustomerInvoiceReminderEmail(
   invoice: InvoiceWithLines,
-  overdueDays: number
+  overdueDays: number,
+  options?: {
+    notification?: EmailNotificationMetadata;
+    skipNotificationPolicyCheck?: boolean;
+  }
 ): Promise<SendEmailResult> {
   const template = customerInvoiceReminderTemplate({
     invoiceNumber: invoice.invoiceNumber,
@@ -56,6 +64,10 @@ export async function sendCustomerInvoiceReminderEmail(
     to: invoice.customerEmail,
     subject: template.subject,
     html: template.html,
+    notification: options?.notification ?? {
+      triggerMode: "manual"
+    },
+    skipNotificationPolicyCheck: options?.skipNotificationPolicyCheck,
     attachments: [
       {
         filename: `${invoice.invoiceNumber}.pdf`,

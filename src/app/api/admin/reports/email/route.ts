@@ -45,7 +45,10 @@ export async function POST(request: NextRequest) {
     const sendResult = await sendEmail({
       to: getOwnerEmail(),
       subject: template.subject,
-      html: template.html
+      html: template.html,
+      notification: {
+        triggerMode: "manual"
+      }
     });
 
     if (sendResult.status === "queued_no_smtp") {

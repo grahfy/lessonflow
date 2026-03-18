@@ -26,6 +26,11 @@ import {
   EMAIL_SIGNATURE_START_MARKER,
   renderEmailLayout
 } from "@/lib/email/layout";
+import {
+  getNotificationSettingsState,
+  isAutomatedNotificationEnabled,
+  type EmailNotificationMetadata
+} from "@/lib/email/notification-settings";
 import { renderResolvedSignatureHtml } from "@/lib/email/signature";
 import { getOwnerEmail } from "@/lib/env";
 import { logError, logEvent } from "@/lib/observability";
@@ -33,7 +38,7 @@ import { renderTemplate } from "@/lib/email/render";
 import { PlaceholderContext } from "@/lib/email/placeholders";
 
 /** Input for standard email sending. */
-type SendEmailInput = {
+export type SendEmailInput = {
   to: string;
   subject: string;
   html: string;
@@ -45,6 +50,8 @@ type SendEmailInput = {
     content: Buffer;
     contentType?: string;
   }>;
+  notification?: EmailNotificationMetadata;
+  skipNotificationPolicyCheck?: boolean;
 };
 
 /** Standardized response for all email delivery attempts. */
@@ -53,8 +60,9 @@ export type SendEmailResult = {
    * 'sent': Delivered to provider successfully.
    * 'queued_no_smtp': Recorded in DB but no provider was available.
    * 'failed': Provider rejected the message.
+   * 'suppressed': Blocked by notification settings before provider delivery.
    */
-  status: "sent" | "queued_no_smtp" | "failed";
+  status: "sent" | "queued_no_smtp" | "failed" | "suppressed";
   error?: string;
 };
 
@@ -177,7 +185,55 @@ type SendTemplateEmailInput = {
     content: Buffer;
     contentType?: string;
   }>;
+  notification?: EmailNotificationMetadata;
+  skipNotificationPolicyCheck?: boolean;
 };
+
+function toPolicyAuditHtml(input: Pick<SendEmailInput, "html" | "subject">): string {
+  return isFullHtmlDocument(input.html)
+    ? input.html
+    : renderEmailLayout({
+        title: input.subject,
+        contentHtml: input.html
+      });
+}
+
+async function maybeSuppressAutomatedEmail(input: SendEmailInput): Promise<SendEmailResult | null> {
+  if (input.skipNotificationPolicyCheck || input.notification?.triggerMode !== "automated") {
+    return null;
+  }
+
+  const settings = await getNotificationSettingsState();
+  if (isAutomatedNotificationEnabled(settings, input.notification.category)) {
+    return null;
+  }
+
+  const message = settings.globalAutomatedEmailEnabled
+    ? `Automated email for ${input.notification.category} is disabled in notification settings.`
+    : "Automated email notifications are disabled in notification settings.";
+
+  await prisma.outboundEmail.create({
+    data: {
+      toEmail: input.to,
+      subject: input.subject,
+      htmlBody: toPolicyAuditHtml(input),
+      status: "suppressed",
+      provider: "policy",
+      source: "app",
+      error: message
+    }
+  });
+  logEvent("email.suppressed", {
+    to: input.to,
+    subject: input.subject,
+    category: input.notification.category
+  });
+
+  return {
+    status: "suppressed",
+    error: message
+  };
+}
 
 /**
  * High-level helper for sending templated emails.
@@ -193,7 +249,9 @@ export async function sendTemplateEmail(input: SendTemplateEmailInput): Promise<
     subject: rendered.subject,
     html: rendered.html,
     bcc: input.bcc,
-    attachments: input.attachments
+    attachments: input.attachments,
+    notification: input.notification,
+    skipNotificationPolicyCheck: input.skipNotificationPolicyCheck
   });
 }
 
@@ -209,19 +267,31 @@ export async function sendTemplateEmail(input: SendTemplateEmailInput): Promise<
  * @param input - Message body and attachments
  */
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
+  const suppressedResult = await maybeSuppressAutomatedEmail(input);
+  if (suppressedResult) {
+    return suppressedResult;
+  }
+
   const from = process.env.SMTP_FROM || "LessonFlow <no-reply@example.com>";
   const provider = (process.env.EMAIL_PROVIDER || "smtp").toLowerCase();
   const tx = getTransporter();
   const ownerBcc = getCustomerAuditBccRecipient(input.to);
   const bcc = ownerBcc ? mergeBccValues(input.bcc, ownerBcc) : input.bcc;
   const html = await injectEmailSignature(input.html, input.subject);
+  const providerInput = {
+    to: input.to,
+    subject: input.subject,
+    html: input.html,
+    bcc: input.bcc,
+    attachments: input.attachments
+  };
 
   const gmailConfigured = isGmailConfigured();
 
   // STEP 1: GMAIL PROVIDER PATH (Explicitly requested or only live provider available)
   if (provider === "gmail" || (!tx && gmailConfigured)) {
     if (gmailConfigured) {
-      const gmailResult = await sendGmailEmail({ ...input, html, bcc });
+      const gmailResult = await sendGmailEmail({ ...providerInput, html, bcc });
       if (gmailResult.status === "sent") {
         logEvent("email.sent_via_gmail", { to: input.to, subject: input.subject });
         return gmailResult;
@@ -317,7 +387,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
      */
     if (gmailConfigured) {
       logError("email.smtp_failed_attempting_gmail", error, { to: input.to, subject: input.subject });
-      const gmailResult = await sendGmailEmail({ ...input, html, bcc });
+      const gmailResult = await sendGmailEmail({ ...providerInput, html, bcc });
       if (gmailResult.status === "sent") {
         logEvent("email.smtp_failed_gmail_fallback_sent", { to: input.to, subject: input.subject });
         return gmailResult;

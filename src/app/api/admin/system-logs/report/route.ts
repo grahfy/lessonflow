@@ -88,6 +88,9 @@ ${logContext || "No logs included."}
       to: "contact@grahfmusic.com",
       subject: `[LessonFlow Bug] ${subject} — from ${admin.displayName}`,
       html: htmlBody,
+      notification: {
+        triggerMode: "manual"
+      }
     });
 
     if (result.status === "queued_no_smtp") {

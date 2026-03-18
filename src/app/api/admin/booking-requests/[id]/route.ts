@@ -359,7 +359,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             {
               ok: true,
               partial: true,
-              warning: deliveryResult.error || "Booking approved, but the customer notification email could not be sent.",
+              warning:
+                deliveryResult.status === "suppressed"
+                  ? "Booking approved, but automated customer booking-update emails are disabled in admin settings."
+                  : deliveryResult.error || "Booking approved, but the customer notification email could not be sent.",
               deliveryStatus: deliveryResult.status
             },
             { status: 202 }
@@ -416,7 +419,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             {
               ok: true,
               partial: true,
-              warning: deliveryResult.error || "Booking rejected, but the customer notification email could not be sent.",
+              warning:
+                deliveryResult.status === "suppressed"
+                  ? "Booking rejected, but automated customer booking-update emails are disabled in admin settings."
+                  : deliveryResult.error || "Booking rejected, but the customer notification email could not be sent.",
               deliveryStatus: deliveryResult.status
             },
             { status: 202 }
@@ -473,7 +479,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             {
               ok: true,
               partial: true,
-              warning: deliveryResult.error || "Booking cancelled, but the customer notification email could not be sent.",
+              warning:
+                deliveryResult.status === "suppressed"
+                  ? "Booking cancelled, but automated customer booking-update emails are disabled in admin settings."
+                  : deliveryResult.error || "Booking cancelled, but the customer notification email could not be sent.",
               deliveryStatus: deliveryResult.status
             },
             { status: 202 }

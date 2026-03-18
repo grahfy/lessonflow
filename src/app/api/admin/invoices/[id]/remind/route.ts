@@ -4,6 +4,7 @@ import { isOwnerAdmin } from "@/lib/admin-auth";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
+import { getInvoiceReminderPolicy, getNotificationSettingsState } from "@/lib/email/notification-settings";
 import { sendCustomerInvoiceReminderEmail } from "@/lib/invoice-events";
 import { getInvoiceOverdueDays } from "@/lib/invoices/aging";
 import { buildInvoiceReminderPersistence, getInvoiceReminderEligibility } from "@/lib/invoices/reminders";
@@ -62,7 +63,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       );
     }
 
-    const eligibility = getInvoiceReminderEligibility(invoice);
+    const notificationSettings = await getNotificationSettingsState();
+    const reminderPolicy = getInvoiceReminderPolicy(notificationSettings);
+    const eligibility = getInvoiceReminderEligibility(invoice, reminderPolicy);
     if (!eligibility.isEligible) {
       return NextResponse.json(
         {

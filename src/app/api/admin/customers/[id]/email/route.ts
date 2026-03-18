@@ -111,7 +111,10 @@ export async function POST(request: NextRequest, { params }: Params) {
     const result = await sendEmail({
       to: customer.email,
       subject: template.subject,
-      html: template.html
+      html: template.html,
+      notification: {
+        triggerMode: "manual"
+      }
     });
 
     if (result.status === "failed") {
