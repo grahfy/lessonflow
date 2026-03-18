@@ -186,3 +186,32 @@ test.describe("admin mobile responsiveness", () => {
     await expect(signOutBtn).toBeVisible();
   });
 });
+
+test.describe("admin intermediate-width header responsiveness", () => {
+  test.use({ viewport: { width: 1100, height: 844 } });
+
+  test("owner header collapses to the shared menu before awkward multi-row wrapping", async ({ page }) => {
+    if (!adminEmail || !adminPassword) {
+      test.skip(true, "DOCS_SCREENSHOTS_ADMIN_EMAIL/PASSWORD are required for authenticated admin mobile e2e checks.");
+    }
+
+    await loginAdmin(page, adminEmail!, adminPassword!);
+    await page.goto("/admin/system-logs", { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: /system logs/i }).waitFor({ timeout: 12_000 });
+
+    const menuToggle = page.getByRole("button", { name: /^menu$/i }).first();
+    await expect(menuToggle).toBeVisible();
+    await expect(menuToggle).toHaveAttribute("aria-controls", "admin-header-menu-panel");
+    await assertNoHorizontalOverflow(page, "/admin/system-logs intermediate header");
+
+    const navPanel = page.locator("#admin-header-menu-panel");
+    await expect(navPanel).toBeHidden();
+
+    await menuToggle.click();
+    await expect(navPanel).toBeVisible();
+    await expect(navPanel.getByRole("button", { name: /updates/i })).toBeVisible();
+    await expect(navPanel.getByRole("button", { name: /sign out/i })).toBeVisible();
+    await expect(navPanel.getByRole("button", { name: /settings/i })).toBeVisible();
+    await assertNoHorizontalOverflow(page, "/admin/system-logs intermediate open menu");
+  });
+});

@@ -401,22 +401,7 @@
   }
 }
 
-@media (max-width: 900px) {
-  .admin-shell {
-    height: auto;
-    max-height: none;
-    min-height: 100dvh;
-    padding: 12px;
-    overflow: visible;
-  }
-
-  .admin-shell-content,
-  .admin-layout-content,
-  .admin-layout-content.is-scrollable {
-    overflow: visible;
-    padding-right: 0;
-  }
-
+@media (max-width: 1180px) {
   .admin-header-row {
     align-items: flex-start;
     gap: 10px;
@@ -468,6 +453,23 @@
   .admin-header-quick-actions .btn {
     flex: 1 1 calc(50% - 4px);
     min-width: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .admin-shell {
+    height: auto;
+    max-height: none;
+    min-height: 100dvh;
+    padding: 12px;
+    overflow: visible;
+  }
+
+  .admin-shell-content,
+  .admin-layout-content,
+  .admin-layout-content.is-scrollable {
+    overflow: visible;
+    padding-right: 0;
   }
 
   .admin-actions-bar {
