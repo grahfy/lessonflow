@@ -4,7 +4,7 @@
  * Generates a large amount of fake customers, bookings, requests, and invoices
  * for test deployments and performance testing.
  * 
- * Usage: npx tsx scripts/seed-fake-data.ts [count]
+ * Usage: npx tsx scripts/seed-fake-data.ts [count] [--long-history-count <n>] [--long-history-customers <n>]
  * Default count: 50 customers
  */
 
@@ -213,10 +213,43 @@ async function ensureTeacherAccounts() {
 }
 
 async function seedFakeData() {
-  const argCount = process.argv[2];
-  const customerCount = argCount ? parseInt(argCount, 10) : 50;
+  const args = process.argv.slice(2);
+  let customerCount = 50;
+  let longHistoryCount = 0;
+  let longHistoryCustomers = 0;
+
+  if (args[0] && !args[0].startsWith('--')) {
+    customerCount = parseInt(args[0], 10);
+    args.shift();
+  }
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+
+    if (arg === '--long-history-count') {
+      longHistoryCount = parseInt(args[index + 1] || '0', 10);
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--long-history-customers') {
+      longHistoryCustomers = parseInt(args[index + 1] || '0', 10);
+      index += 1;
+      continue;
+    }
+  }
+
+  const normalizedLongHistoryCount = Number.isFinite(longHistoryCount) && longHistoryCount > 0
+    ? longHistoryCount
+    : 0;
+  const normalizedLongHistoryCustomers = Number.isFinite(longHistoryCustomers) && longHistoryCustomers > 0
+    ? longHistoryCustomers
+    : 0;
 
   console.log(`🌱 Seeding ${customerCount} fake customers and associated data...`);
+  if (normalizedLongHistoryCount > 0 && normalizedLongHistoryCustomers > 0) {
+    console.log(`📬 Seeding ${normalizedLongHistoryCount} emails each for the first ${normalizedLongHistoryCustomers} customers to create long communication histories...`);
+  }
 
   const admin = await ensureOwnerAdmin();
   const teachers = await ensureTeacherAccounts();
@@ -432,9 +465,10 @@ async function seedFakeData() {
     }
 
     // Generate some fake email history
-    const pastEmailCount = Math.floor(Math.random() * 4) + 1;
+    const useLongHistorySeed = i < normalizedLongHistoryCustomers;
+    const pastEmailCount = useLongHistorySeed ? normalizedLongHistoryCount : Math.floor(Math.random() * 4) + 1;
     for (let k = 0; k < pastEmailCount; k++) {
-      const daysAgo = Math.floor(Math.random() * 60) + 1;
+      const daysAgo = useLongHistorySeed ? k + 1 : Math.floor(Math.random() * 60) + 1;
       const type = getRandomItem(['Booking Confirmation', 'Lesson Reminder', 'Invoice Attached', 'Welcome to the Platform', 'Monthly Newsletter']);
       
       let content = '';
@@ -628,6 +662,10 @@ async function seedFakeData() {
           createdAt: subDays(now, daysAgo),
         }
       });
+    }
+
+    if (useLongHistorySeed) {
+      console.log(`📨 Long email history: ${customer.fullName} (${customer.email}) seeded with ${pastEmailCount} messages`);
     }
   }
 

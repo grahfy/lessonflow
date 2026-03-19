@@ -3014,8 +3014,8 @@
 #customer-dialog .customer-email-tab-shell {
   margin-top: 10px;
   flex: 1 1 auto;
-  min-height: 0;
-  height: 100%;
+  min-height: var(--admin-communication-shell-height, min(68vh, 760px));
+  height: var(--admin-communication-shell-height, min(68vh, 760px));
   max-height: none;
   display: flex;
   flex-direction: column;
@@ -3483,9 +3483,7 @@
   flex-direction: column;
 }
 
-#booking-detail-dialog .booking-appointment-panel,
 #booking-detail-dialog .booking-email-panel,
-#booking-detail-dialog .booking-materials-panel,
 #customer-dialog .customer-dialog-panel,
 #customer-dialog .customer-email-panel,
 #customer-dialog .customer-materials-panel {
