@@ -200,6 +200,7 @@ describe("admin-email-panel-layout", () => {
     );
 
     expect(markup).toContain("customer-email-tab-shell");
+    expect(markup.indexOf("customer-email-tab-shell")).toBeLessThan(markup.indexOf("admin-email-panel-shell"));
     expect(markup).toContain("admin-email-panel-shell");
     expect(markup).toContain("admin-email-history-list");
     expect(markup).not.toContain("customer-dialog-panel");
@@ -261,6 +262,7 @@ describe("admin-email-panel-layout", () => {
     expect(markup).toContain("booking-email-panel");
     expect(markup).toContain("admin-email-panel-shell");
     expect(markup).toContain("admin-email-history-list");
+    expect(markup.indexOf("booking-email-panel")).toBeLessThan(markup.indexOf("admin-email-history-list"));
     expect(markup).not.toContain("customer-dialog-panel");
     expect(markup).not.toContain("Sync Now");
     expect(markup).not.toContain("Syncing...");

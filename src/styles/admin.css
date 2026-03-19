@@ -1398,7 +1398,8 @@
 
 .customer-dialog-panel {
   margin-top: 10px;
-  height: min(68vh, 760px);
+  min-height: var(--admin-communication-shell-height, min(68vh, 760px));
+  height: var(--admin-communication-shell-height, min(68vh, 760px));
   max-height: none;
   overflow: auto;
 }
@@ -1446,6 +1447,7 @@
 }
 
 .admin-email-panel-shell {
+  flex: 1 1 auto;
   min-height: 0;
   height: 100%;
   max-height: none;
@@ -2989,6 +2991,7 @@
 }
 
 #customer-dialog {
+  --admin-communication-shell-height: min(68vh, 760px);
   width: min(1380px, calc(100vw - 24px));
   max-height: min(96vh, 1020px);
 }
@@ -2996,18 +2999,22 @@
 #customer-dialog .customer-dialog-body-lock {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   min-height: 0;
 }
 
 #customer-dialog .customer-dialog-tab-body {
+  display: flex;
+  flex-direction: column;
   flex: 1;
-  min-height: min(70vh, 760px);
+  min-height: 0;
   overflow: hidden;
 }
 
 #customer-dialog .customer-email-tab-shell {
   margin-top: 10px;
-  min-height: min(62vh, 700px);
+  flex: 1 1 auto;
+  min-height: 0;
   height: 100%;
   max-height: none;
   display: flex;
@@ -3016,6 +3023,7 @@
 }
 
 #booking-detail-dialog {
+  --admin-communication-shell-height: min(68vh, 760px);
   width: min(1380px, calc(100vw - 24px));
   max-height: min(96vh, 1020px);
 }
@@ -3085,7 +3093,7 @@
 .booking-dialog-layout {
   min-height: 0;
   height: 100%;
-  max-height: min(68vh, 760px);
+  max-height: var(--admin-communication-shell-height, min(68vh, 760px));
   align-items: stretch;
   overflow: hidden;
 }
@@ -3097,7 +3105,7 @@
 
 #booking-detail-dialog .booking-dialog-layout {
   flex: 1;
-  min-height: min(70vh, 760px);
+  min-height: var(--admin-communication-shell-height, min(68vh, 760px));
   height: 100%;
   max-height: none;
   overflow: hidden;
@@ -3481,14 +3489,14 @@
 #customer-dialog .customer-dialog-panel,
 #customer-dialog .customer-email-panel,
 #customer-dialog .customer-materials-panel {
-  min-height: min(62vh, 700px);
+  min-height: var(--admin-communication-shell-height, min(68vh, 760px));
   height: 100%;
   max-height: none;
   align-items: stretch;
 }
 
 #customer-dialog .customer-tab-panel {
-  min-height: min(62vh, 700px);
+  min-height: var(--admin-communication-shell-height, min(68vh, 760px));
   height: 100%;
   max-height: none;
 }
@@ -3511,6 +3519,7 @@
 
 #customer-dialog .customer-email-tab-shell > .admin-email-panel-shell {
   flex: 1 1 auto;
+  height: 100%;
   min-height: 0;
 }
 
