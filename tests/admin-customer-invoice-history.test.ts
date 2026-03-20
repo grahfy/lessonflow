@@ -631,4 +631,107 @@ describe("admin-customer-invoice-history", () => {
     });
     expect(links.map((link) => link.bookingId).sort()).toEqual([bookingA.id, bookingB.id, bookingC.id].sort());
   });
+
+  it("creates one invoice from lesson bookings plus manual line items", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    await prisma.lessonPricingOption.createMany({
+      data: [
+        {
+          durationMinutes: 30,
+          priceCents: 5000,
+          isActive: true,
+          sortOrder: 0
+        }
+      ]
+    });
+
+    const customer = await prisma.customer.create({
+      data: {
+        fullName: "Mixed Sources",
+        email: "mixed.sources@example.com",
+        phone: "0400111888",
+        normalizedEmail: "mixed.sources@example.com",
+        normalizedPhone: "0400111888",
+        skillLevel: "beginner",
+        lessonMode: "in_person"
+      }
+    });
+
+    const booking = await prisma.booking.create({
+      data: {
+        name: customer.fullName,
+        email: customer.email,
+        phone: customer.phone,
+        address: "10 Main Street, Northcote VIC 3070",
+        houseNumber: "10",
+        streetName: "Main",
+        streetType: "Street",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070",
+        lessonMode: "in_person",
+        skillLevel: customer.skillLevel,
+        lessonDuration: "min30",
+        startAt: new Date("2026-09-18T08:00:00.000Z"),
+        endAt: new Date("2026-09-18T08:30:00.000Z"),
+        timezone: "Australia/Melbourne",
+        customerId: customer.id,
+        modifiedById: admin.id
+      }
+    });
+
+    const createReq = adminRequest(`http://localhost/api/admin/customers/${customer.id}/invoices`, "POST", token, {
+      bookingIds: [booking.id],
+      taxMode: "taxable",
+      lineItems: [
+        {
+          description: "Instrument rental",
+          quantity: 1,
+          unitPriceCents: 2500,
+          kind: "custom",
+          taxMode: "taxable",
+          sortOrder: 0
+        },
+        {
+          description: "Printed music pack",
+          quantity: 1,
+          unitPriceCents: 1500,
+          kind: "custom",
+          taxMode: "taxable",
+          sortOrder: 1
+        }
+      ]
+    });
+    const createRes = await POST(createReq, { params: Promise.resolve({ id: customer.id }) });
+    expect(createRes.status).toBe(201);
+
+    const createBody = (await createRes.json()) as {
+      invoice: {
+        bookingId: string | null;
+        subtotalCents: number;
+        lineItems: Array<{ description: string; quantity: number; unitPriceCents: number }>;
+      };
+    };
+
+    expect(createBody.invoice.bookingId).toBe(booking.id);
+    expect(createBody.invoice.subtotalCents).toBe(9000);
+    expect(createBody.invoice.lineItems).toHaveLength(3);
+    expect(createBody.invoice.lineItems[0]).toMatchObject({
+      description: "1 x 30 minute lesson",
+      quantity: 1,
+      unitPriceCents: 5000
+    });
+    expect(createBody.invoice.lineItems[1]).toMatchObject({
+      description: "Instrument rental",
+      quantity: 1,
+      unitPriceCents: 2500
+    });
+    expect(createBody.invoice.lineItems[2]).toMatchObject({
+      description: "Printed music pack",
+      quantity: 1,
+      unitPriceCents: 1500
+    });
+  });
 });

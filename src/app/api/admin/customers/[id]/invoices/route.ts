@@ -295,6 +295,17 @@ export async function POST(request: NextRequest, { params }: Params) {
   );
   let resolvedBookingId = parsed.data.bookingId ?? null;
   let resolvedBookingIds: string[] = [];
+  const directLineItems = (parsed.data.lineItems ?? []).map((lineItem, index) => ({
+    description: lineItem.description,
+    quantity: lineItem.quantity,
+    unitPriceCents: lineItem.unitPriceCents,
+    taxMode: lineItem.taxMode ?? taxMode,
+    kind: lineItem.kind,
+    sortOrder: lineItem.sortOrder ?? index,
+    discountKind: lineItem.discountKind ?? null,
+    discountValue: lineItem.discountValue ?? null
+  }));
+  let lessonLineItems: InvoiceLineItemDraft[] = [];
   let lineItems: InvoiceLineItemDraft[] = [];
 
   if (selectedBookingIds.length > 0) {
@@ -351,7 +362,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     resolvedBookingIds = selectedBookingIds;
     resolvedBookingId = selectedBookingIds[0] ?? null;
-    lineItems = Array.from(groupedBookings.entries())
+    lessonLineItems = Array.from(groupedBookings.entries())
       .sort(([a], [b]) => a - b)
       .map(([durationMinutes, quantity], index) => {
         const price = lessonPricingMap.get(durationMinutes);
@@ -392,17 +403,16 @@ export async function POST(request: NextRequest, { params }: Params) {
       resolvedBookingIds = [selectedBookingId];
     }
 
-    lineItems = (parsed.data.lineItems ?? []).map((lineItem, index) => ({
-      description: lineItem.description,
-      quantity: lineItem.quantity,
-      unitPriceCents: lineItem.unitPriceCents,
-      taxMode: lineItem.taxMode ?? taxMode,
-      kind: lineItem.kind,
-      sortOrder: lineItem.sortOrder ?? index,
-      discountKind: lineItem.discountKind ?? null,
-      discountValue: lineItem.discountValue ?? null
-    }));
+    lessonLineItems = [];
   }
+
+  lineItems = [
+    ...lessonLineItems,
+    ...directLineItems
+  ].map((lineItem, index) => ({
+    ...lineItem,
+    sortOrder: index
+  }));
 
   const issuedAt = new Date();
   const dueAt = parsed.data.dueAt ? new Date(parsed.data.dueAt) : getDefaultDueAt(issuedAt);

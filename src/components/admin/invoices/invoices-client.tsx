@@ -47,9 +47,14 @@ type EditableLineItem = {
   isPreset?: boolean;
 };
 
-type CreateInvoiceBasis = "lesson_based" | "standalone" | (string & {});
 type InvoiceDisplayStatus = InvoiceRow["status"] | "overdue";
 type InvoiceBookingIneligibilityReason = "already_invoiced" | "missing_lesson_price" | "invalid_status";
+type CreateInvoiceSource = "lessons" | "standalone" | "presets";
+type CreateStandaloneItemDraft = {
+  key: string;
+  description: string;
+  unitPriceInput: string;
+};
 
 type CustomerInvoiceBookingOption = {
   id: string;
@@ -125,6 +130,14 @@ function describeBookingIneligibility(reason: InvoiceBookingIneligibilityReason 
   return "";
 }
 
+function makeCreateStandaloneItemDraft(): CreateStandaloneItemDraft {
+  return {
+    key: `standalone-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    description: "",
+    unitPriceInput: "0.00"
+  };
+}
+
 /**
  * Admin invoices console client.
  *
@@ -175,8 +188,10 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createSelectedCustomerId, setCreateSelectedCustomerId] = useState("");
-  const [createInvoiceBasis, setCreateInvoiceBasis] = useState<CreateInvoiceBasis>("lesson_based");
-  const [createStandalonePrice, setCreateStandalonePrice] = useState("0.00");
+  const [createIncludeLessons, setCreateIncludeLessons] = useState(true);
+  const [createIncludeStandalone, setCreateIncludeStandalone] = useState(false);
+  const [createIncludePresets, setCreateIncludePresets] = useState(false);
+  const [createStandaloneItems, setCreateStandaloneItems] = useState<CreateStandaloneItemDraft[]>([]);
   const [createSelectedPresetIds, setCreateSelectedPresetIds] = useState<string[]>([]);
   const [createDueAt, setCreateDueAt] = useState("");
   const [createCurrency, setCreateCurrency] = useState(getInvoiceCurrency(defaultCurrency));
@@ -338,8 +353,10 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
 
   const resetCreateDialog = () => {
     setCreateSelectedCustomerId("");
-    setCreateInvoiceBasis("lesson_based");
-    setCreateStandalonePrice("0.00");
+    setCreateIncludeLessons(true);
+    setCreateIncludeStandalone(false);
+    setCreateIncludePresets(false);
+    setCreateStandaloneItems([]);
     setCreateSelectedPresetIds([]);
     setCreateDueAt("");
     setCreateCurrency(getInvoiceCurrency(defaultCurrency));
@@ -370,7 +387,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
   };
 
   const loadCreateBookingOptions = useCallback(async () => {
-    if (!createSelectedCustomerId || createInvoiceBasis !== "lesson_based") {
+    if (!createSelectedCustomerId || !createIncludeLessons) {
       setCreateBookingOptions([]);
       setCreateSelectedBookingIds([]);
       return;
@@ -411,17 +428,46 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
   }, [
     createBookingFilterFrom,
     createBookingFilterTo,
-    createInvoiceBasis,
+    createIncludeLessons,
     createSelectedCustomerId,
     handleApiError,
     safeFetch
   ]);
 
   useEffect(() => {
-    if (createOpen && createInvoiceBasis === "lesson_based" && createSelectedCustomerId) {
+    if (createOpen && createIncludeLessons && createSelectedCustomerId) {
       void loadCreateBookingOptions();
     }
-  }, [createOpen, createInvoiceBasis, createSelectedCustomerId, createBookingFilterFrom, createBookingFilterTo, loadCreateBookingOptions]);
+  }, [createOpen, createIncludeLessons, createSelectedCustomerId, createBookingFilterFrom, createBookingFilterTo, loadCreateBookingOptions]);
+
+  const toggleCreateSource = (source: CreateInvoiceSource, enabled: boolean) => {
+    if (source === "lessons") {
+      setCreateIncludeLessons(enabled);
+      return;
+    }
+
+    if (source === "standalone") {
+      setCreateIncludeStandalone(enabled);
+      if (enabled) {
+        setCreateStandaloneItems((current) => (current.length > 0 ? current : [makeCreateStandaloneItemDraft()]));
+      }
+      return;
+    }
+
+    setCreateIncludePresets(enabled);
+  };
+
+  const addCreateStandaloneItem = () => {
+    setCreateStandaloneItems((current) => [...current, makeCreateStandaloneItemDraft()]);
+  };
+
+  const updateCreateStandaloneItem = (key: string, patch: Partial<CreateStandaloneItemDraft>) => {
+    setCreateStandaloneItems((current) => current.map((item) => (item.key === key ? { ...item, ...patch } : item)));
+  };
+
+  const removeCreateStandaloneItem = (key: string) => {
+    setCreateStandaloneItems((current) => current.filter((item) => item.key !== key));
+  };
 
   const addPresetToInvoice = (presetId: string) => {
     const preset = presets.find((p) => p.id === presetId);
@@ -471,23 +517,43 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
     }
   );
 
-  const createPreviewLineItems = useMemo(() => {
-    if (createInvoiceBasis === "presets") {
-      return presets
+  const createStandalonePreviewLineItems = useMemo(
+    () =>
+      createStandaloneItems
+        .filter((item) => item.description.trim().length > 0 && item.unitPriceInput.trim().length > 0)
+        .map((item) => ({
+          description: item.description.trim(),
+          quantity: 1,
+          unitPriceCents: parseMoneyInputToCents(item.unitPriceInput, resolvedCreateCurrency).cents || 0,
+          taxMode: createTaxMode,
+          kind: "custom" as const,
+          discountKind: null,
+          discountValue: null
+        })),
+    [createStandaloneItems, createTaxMode, resolvedCreateCurrency]
+  );
+
+  const createPresetPreviewLineItems = useMemo(
+    () =>
+      presets
         .filter((preset) => createSelectedPresetIds.includes(preset.id))
-        .map((preset, index) => ({
+        .map((preset) => ({
           description: preset.description || preset.label,
           quantity: 1,
           unitPriceCents: preset.unitPriceCents,
           taxMode: createTaxMode,
           kind: "custom" as const,
-          sortOrder: index,
           discountKind: preset.discountKind ?? null,
           discountValue: preset.discountValue ?? null
-        }));
+        })),
+    [createSelectedPresetIds, createTaxMode, presets]
+  );
+
+  const createLessonPreviewLineItems = useMemo(() => {
+    if (!createIncludeLessons) {
+      return [];
     }
 
-    if (createInvoiceBasis === "lesson_based") {
       const grouped = new Map<number, number>();
       for (const bookingId of createSelectedBookingIds) {
         const booking = createBookingOptions.find((option) => option.id === bookingId);
@@ -499,40 +565,85 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
 
       return Array.from(grouped.entries())
         .sort(([a], [b]) => a - b)
-        .map(([durationMinutes, quantity], index) => ({
+        .map(([durationMinutes, quantity]) => ({
           description: describeGroupedLessonLine(durationMinutes, quantity),
           quantity,
           unitPriceCents: activeLessonPricingMap.get(durationMinutes)?.priceCents ?? 0,
           taxMode: createTaxMode,
           kind: "lesson_fee" as const,
-          sortOrder: index,
           discountKind: null,
           discountValue: null
         }));
-    }
-
-    return [
-      {
-        description: "Standard Lesson Fee",
-        quantity: 1,
-        unitPriceCents: parseMoneyInputToCents(createStandalonePrice, resolvedCreateCurrency).cents || 0,
-        taxMode: createTaxMode,
-        kind: "lesson_fee" as const,
-        sortOrder: 0,
-        discountKind: null,
-        discountValue: null
-      }
-    ];
   }, [
     activeLessonPricingMap,
     createBookingOptions,
-    createInvoiceBasis,
+    createIncludeLessons,
     createSelectedBookingIds,
-    createSelectedPresetIds,
-    createStandalonePrice,
-    createTaxMode,
-    presets,
-    resolvedCreateCurrency
+    createTaxMode
+  ]);
+
+  const createPreviewLineItems = useMemo(() => {
+    const merged: Array<Omit<InvoiceLineItemDraft, "sortOrder">> = [];
+
+    if (createIncludeLessons) {
+      merged.push(...createLessonPreviewLineItems);
+    }
+    if (createIncludeStandalone) {
+      merged.push(...createStandalonePreviewLineItems);
+    }
+    if (createIncludePresets) {
+      merged.push(...createPresetPreviewLineItems);
+    }
+
+    return merged.map((lineItem, index) => ({
+      ...lineItem,
+      sortOrder: index
+    }));
+  }, [
+    createIncludeLessons,
+    createIncludePresets,
+    createIncludeStandalone,
+    createLessonPreviewLineItems,
+    createPresetPreviewLineItems,
+    createStandalonePreviewLineItems
+  ]);
+
+  const createHasIncompleteStandaloneItems = useMemo(
+    () =>
+      createStandaloneItems.some(
+        (item) =>
+          (item.description.trim().length > 0 && item.unitPriceInput.trim().length === 0) ||
+          (item.description.trim().length === 0 && item.unitPriceInput.trim().length > 0)
+      ),
+    [createStandaloneItems]
+  );
+
+  const createBlockingError = useMemo(() => {
+    if (!createIncludeLessons && !createIncludeStandalone && !createIncludePresets) {
+      return "Select at least one invoice source.";
+    }
+    if (createIncludeLessons && createSelectedCustomerId && createSelectedBookingIds.length === 0) {
+      return "Select at least one booking to include lesson charges.";
+    }
+    if (createIncludeStandalone && createHasIncompleteStandaloneItems) {
+      return "Complete or remove incomplete standalone items.";
+    }
+    if (createIncludeStandalone && createStandalonePreviewLineItems.length === 0) {
+      return "Add at least one standalone item with a description and price.";
+    }
+    if (createIncludePresets && createSelectedPresetIds.length === 0) {
+      return "Select at least one preset to include preset charges.";
+    }
+    return null;
+  }, [
+    createHasIncompleteStandaloneItems,
+    createIncludeLessons,
+    createIncludePresets,
+    createIncludeStandalone,
+    createSelectedCustomerId,
+    createSelectedBookingIds.length,
+    createSelectedPresetIds.length,
+    createStandalonePreviewLineItems.length
   ]);
 
   const createCalculation = calculateInvoiceTotals(
@@ -647,14 +758,9 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
 
     setBusyAction(shouldSend ? "create_send" : "create");
     setError("");
-    if (createInvoiceBasis === "lesson_based" && createSelectedBookingIds.length === 0) {
+    if (createBlockingError) {
       setBusyAction(null);
-      setError("Select at least one booking to create a lesson-based invoice.");
-      return;
-    }
-    if (createInvoiceBasis === "presets" && createSelectedPresetIds.length === 0) {
-      setBusyAction(null);
-      setError("Select at least one preset to create a preset-based invoice.");
+      setError(createBlockingError);
       return;
     }
 
@@ -666,32 +772,23 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
       discountValue: parseDiscountValueForCurrency(createDiscountKind, createDiscountValueInput, resolvedCreateCurrency)
     };
 
-    if (createInvoiceBasis === "lesson_based") {
+    if (createIncludeLessons) {
       payload.bookingIds = createSelectedBookingIds;
-    } else if (createInvoiceBasis === "presets") {
-      payload.lineItems = presets
-        .filter((preset) => createSelectedPresetIds.includes(preset.id))
-        .map((preset) => ({
-          description: preset.description || preset.label,
-          quantity: 1,
-          unitPriceCents: preset.unitPriceCents,
-          kind: "custom",
-          taxMode: createTaxMode,
-          discountKind: preset.discountKind ?? null,
-          discountValue: preset.discountValue ?? null
-        }));
-    } else {
+    }
+    if (createIncludeStandalone || createIncludePresets) {
       payload.lineItems = [
-        {
-          description: "Standard Lesson Fee",
-          quantity: 1,
-          unitPriceCents: parseMoneyInputToCents(createStandalonePrice, resolvedCreateCurrency).cents || 0,
-          kind: "lesson_fee",
-          taxMode: createTaxMode,
-          discountKind: null,
-          discountValue: null
-        }
-      ];
+        ...createStandalonePreviewLineItems,
+        ...createPresetPreviewLineItems
+      ].map((lineItem, index) => ({
+        ...lineItem,
+        sortOrder: index
+      }));
+    }
+
+    if (!("bookingIds" in payload) && !("lineItems" in payload)) {
+      setBusyAction(null);
+      setError("Select at least one invoice source with content before creating the invoice.");
+      return;
     }
 
     let result: InvoiceRow | null = null;
@@ -1112,7 +1209,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                         <option value="percent">Percentage</option>
                       </select>
                     </AdminField>
-                    <AdminField label="Invoice Discount Value" tooltip={`Amount discounts use ${resolvedEditingCurrency}. Percentage discounts use %.`} fullWidth>
+                    <AdminField label="Invoice Discount Value" tooltip={`Amount discounts use ${resolvedEditingCurrency}. Percentage discounts use %.`}>
                       <input
                         value={editingDiscountValueInput}
                         disabled={!editingDiscountKind || !canEditSelectedInvoice}
@@ -1120,26 +1217,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                         onChange={(e) => setEditingDiscountValueInput(e.target.value)}
                       />
                     </AdminField>
-                    <AdminField label="Notes" tooltip="Visible to the customer on the public invoice." fullWidth>
-                      <textarea
-                        className="invoice-dialog-notes"
-                        value={editingNotes}
-                        disabled={!canEditSelectedInvoice}
-                        onChange={(e) => setEditingNotes(e.target.value)}
-                        placeholder="Customer-facing notes..."
-                      />
-                    </AdminField>
                   </AdminForm>
-                  <div className="button-row invoice-dialog-button-row">
-                    <Tooltip content="Save edits to recipient details, due date, notes, and line items.">
-                      <button className="btn btn-secondary" disabled={!!busyAction || !canEditSelectedInvoice} onClick={saveInvoiceEdits}>
-                        {busyAction === 'save' ? 'Saving...' : 'Save Details'}
-                      </button>
-                    </Tooltip>
-                    <Tooltip content="Open this invoice's customer profile in the customers page.">
-                      <button className="btn btn-secondary" onClick={openLinkedCustomer}>Open Customer</button>
-                    </Tooltip>
-                  </div>
                 </AdminCard>
 
                 <h3 className="manual-section-title">Line Items</h3>
@@ -1292,6 +1370,27 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                     </p>
                   )}
 
+                  <AdminField label="Notes" tooltip="Visible to the customer on the public invoice.">
+                    <textarea
+                      className="invoice-dialog-notes"
+                      value={editingNotes}
+                      disabled={!canEditSelectedInvoice}
+                      onChange={(e) => setEditingNotes(e.target.value)}
+                      placeholder="Customer-facing notes..."
+                    />
+                  </AdminField>
+
+                  <div className="button-row invoice-dialog-button-row">
+                    <Tooltip content="Save edits to recipient details, due date, notes, and line items.">
+                      <button className="btn btn-secondary" disabled={!!busyAction || !canEditSelectedInvoice} onClick={saveInvoiceEdits}>
+                        {busyAction === 'save' ? 'Saving...' : 'Save Details'}
+                      </button>
+                    </Tooltip>
+                    <Tooltip content="Open this invoice's customer profile in the customers page.">
+                      <button className="btn btn-secondary" onClick={openLinkedCustomer}>Open Customer</button>
+                    </Tooltip>
+                  </div>
+
                   <div className="button-row invoice-dialog-stacked-actions">
                     <Tooltip content="Open the printable invoice PDF in a new browser tab.">
                       <button className="btn btn-secondary invoice-dialog-full-width" onClick={() => window.open(`/api/admin/invoices/${selectedInvoice.id}/pdf`, '_blank')}>VIEW PDF</button>
@@ -1330,7 +1429,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
             <Tooltip content="Create a new draft invoice only.">
               <button
                 className="btn btn-secondary"
-                disabled={!!busyAction || !createSelectedCustomerId || (createInvoiceBasis === "lesson_based" && createSelectedBookingIds.length === 0)}
+                disabled={!!busyAction || !createSelectedCustomerId || !!createBlockingError}
                 onClick={() => void createInvoice(false)}
               >
                 {busyAction === 'create' ? 'SAVING...' : 'SAVE DRAFT'}
@@ -1339,7 +1438,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
             <Tooltip content="Create and immediately email the invoice to the customer.">
               <button
                 className="btn btn-primary"
-                disabled={!!busyAction || !createSelectedCustomerId || (createInvoiceBasis === "lesson_based" && createSelectedBookingIds.length === 0)}
+                disabled={!!busyAction || !createSelectedCustomerId || !!createBlockingError}
                 onClick={() => void createInvoice(true)}
               >
                 {busyAction === 'create_send' ? 'SENDING...' : 'CREATE & SEND'}
@@ -1351,7 +1450,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
         <div className="booking-dialog-scroll">
           <div className="dialog-layout">
           <div className="dialog-col">
-            <h3 className="manual-section-title">Recipient & Basis</h3>
+            <h3 className="manual-section-title">Recipient & Sources</h3>
             <AdminCard ghost className="invoice-dialog-section">
               <AdminForm className="dialog-form-grid">
                 <AdminField label="Select Customer" tooltip="Choose which student to bill." fullWidth required>
@@ -1367,22 +1466,82 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                     {customerOptions.map(c => <option key={c.id} value={c.id}>{c.lastName ? `${c.lastName}, ${c.firstName}` : c.fullName}</option>)}
                   </select>
                 </AdminField>
-                <AdminField label="Invoice Basis" tooltip="How to generate line items for this invoice." className="invoice-dialog-basis-field">
-                  <div className="invoice-dialog-inline-control">
-                    <select
-                      className="invoice-dialog-inline-select"
-                      value={createInvoiceBasis}
-                      onChange={(e) => setCreateInvoiceBasis(e.target.value as CreateInvoiceBasis)}
-                    >
-                      <option value="lesson_based">Lessons (Calculated from bookings)</option>
-                      <option value="standalone">Standalone (Manual line items)</option>
-                      {/* RATIONALE: Preset-driven creation is only useful once at
-                          least one preset exists, so the option is hidden otherwise. */}
-                      {presets.length > 0 && (
-                        <option value="presets">Multiple Presets (Select below)...</option>
-                      )}
-                    </select>
-                    {createInvoiceBasis === "lesson_based" ? (
+                <AdminField label="Invoice Sources" tooltip="Choose one or more sources to combine in this invoice." fullWidth>
+                  <div className="invoice-dialog-source-list">
+                    <label className="admin-inline-checkbox invoice-dialog-source-option">
+                      <input
+                        type="checkbox"
+                        checked={createIncludeLessons}
+                        onChange={(e) => toggleCreateSource("lessons", e.target.checked)}
+                      />
+                      Lessons (Calculated from bookings)
+                    </label>
+                    <label className="admin-inline-checkbox invoice-dialog-source-option">
+                      <input
+                        type="checkbox"
+                        checked={createIncludeStandalone}
+                        onChange={(e) => toggleCreateSource("standalone", e.target.checked)}
+                      />
+                      Standalone Item
+                    </label>
+                    <label className="admin-inline-checkbox invoice-dialog-source-option">
+                      <input
+                        type="checkbox"
+                        checked={createIncludePresets}
+                        disabled={presets.length === 0}
+                        onChange={(e) => toggleCreateSource("presets", e.target.checked)}
+                      />
+                      Multiple Presets
+                    </label>
+                  </div>
+                </AdminField>
+                <AdminField label="Currency" tooltip="Three-letter ISO currency code used for this invoice.">
+                  <input
+                    value={createCurrency}
+                    maxLength={3}
+                    onChange={(e) => {
+                      const nextInput = e.target.value.toUpperCase();
+                      setCreateCurrency(nextInput);
+                      if (nextInput.trim().length === 3) {
+                        setCreateTaxMode(getDefaultInvoiceTaxModeForCurrencyValue(nextInput));
+                      }
+                    }}
+                  />
+                </AdminField>
+                <AdminField label="Tax Mode" tooltip={`Whether ${createTaxLabel} applies.`}>
+                  <select value={createTaxMode} onChange={(e) => setCreateTaxMode(e.target.value as InvoiceTaxMode)}>
+                    <option value="taxable">Taxable ({createTaxLabel})</option>
+                    <option value="gst_free">{createTaxLabel} Free</option>
+                  </select>
+                </AdminField>
+                {createIncludeLessons && (
+                  <AdminField
+                    label="Lesson Bookings"
+                    tooltip="Choose approved customer bookings to include as lesson charges."
+                    fullWidth
+                    className="invoice-dialog-source-field"
+                  >
+                    <div className="invoice-dialog-inline-control">
+                      <div className="invoice-dialog-status-card invoice-dialog-source-card">
+                        <div className="invoice-dialog-status-row">
+                          <span>Selected bookings:</span>
+                          <span>{createSelectedBookingIds.length}</span>
+                        </div>
+                        {createLessonPreviewLineItems.length > 0 ? (
+                          createLessonPreviewLineItems.map((lineItem) => (
+                            <div key={lineItem.description} className="invoice-dialog-status-row">
+                              <span>{lineItem.description}</span>
+                              <span>{toCurrency(lineItem.unitPriceCents * lineItem.quantity, resolvedCreateCurrency)}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="helper-text">
+                            {createSelectedCustomerId
+                              ? "Use the calendar button to choose bookings for this invoice."
+                              : "Choose a customer first, then use the calendar button to choose bookings for this invoice."}
+                          </p>
+                        )}
+                      </div>
                       <button
                         type="button"
                         className="btn btn-secondary btn-icon invoice-dialog-inline-trigger"
@@ -1396,63 +1555,49 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                       >
                         <CalendarDays size={18} />
                       </button>
-                    ) : null}
-                  </div>
-                </AdminField>
-                <AdminField label="Currency" tooltip="Three-letter ISO currency code used for this invoice." className="invoice-dialog-currency-field">
-                  <input
-                    value={createCurrency}
-                    maxLength={3}
-                    onChange={(e) => {
-                      const nextInput = e.target.value.toUpperCase();
-                      setCreateCurrency(nextInput);
-                      if (nextInput.trim().length === 3) {
-                        setCreateTaxMode(getDefaultInvoiceTaxModeForCurrencyValue(nextInput));
-                      }
-                    }}
-                  />
-                </AdminField>
-                <AdminField label="Tax Mode" tooltip={`Whether ${createTaxLabel} applies.`} className="invoice-dialog-tax-field">
-                  <select value={createTaxMode} onChange={(e) => setCreateTaxMode(e.target.value as InvoiceTaxMode)}>
-                    <option value="taxable">Taxable ({createTaxLabel})</option>
-                    <option value="gst_free">{createTaxLabel} Free</option>
-                  </select>
-                </AdminField>
-                {createInvoiceBasis === 'standalone' && (
-                  <AdminField label={`Initial Item Price (${resolvedCreateCurrency})`} tooltip="Starting price for the manual line item.">
-                    <input value={createStandalonePrice} onChange={(e) => setCreateStandalonePrice(e.target.value)} />
-                  </AdminField>
-                )}
-                {createInvoiceBasis === 'lesson_based' && (
-                  <AdminField
-                    label="Selected Lesson Bookings"
-                    tooltip="Choose the customer's approved bookings, then the server will group them by duration using Lesson Info / Prices."
-                    fullWidth
-                  >
-                    <div className="invoice-dialog-status-card">
-                      <div className="invoice-dialog-status-row">
-                        <span>Selected bookings:</span>
-                        <span>{createSelectedBookingIds.length}</span>
-                      </div>
-                      {createPreviewLineItems.length > 0 ? (
-                        createPreviewLineItems.map((lineItem) => (
-                          <div key={lineItem.description} className="invoice-dialog-status-row">
-                            <span>{lineItem.description}</span>
-                            <span>{toCurrency(lineItem.unitPriceCents * lineItem.quantity, resolvedCreateCurrency)}</span>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="helper-text">
-                          {createSelectedCustomerId
-                            ? "Use the calendar button to choose bookings for this invoice."
-                            : "Choose a customer first, then use the calendar button to choose bookings for this invoice."}
-                        </p>
-                      )}
                     </div>
                   </AdminField>
                 )}
-                {createInvoiceBasis === 'presets' && (
-                  <AdminField label="Select Presets" tooltip="Choose one or more configured products." fullWidth>
+                {createIncludeStandalone && (
+                  <AdminField
+                    label={`Standalone Items (${resolvedCreateCurrency})`}
+                    tooltip="Add one or more custom items with a description and price."
+                    fullWidth
+                    className="invoice-dialog-source-field"
+                  >
+                    <div className="invoice-dialog-standalone-list">
+                      {createStandaloneItems.map((item) => (
+                        <div key={item.key} className="invoice-dialog-standalone-row">
+                          <input
+                            value={item.description}
+                            placeholder="Description of service or item"
+                            onChange={(e) => updateCreateStandaloneItem(item.key, { description: e.target.value })}
+                          />
+                          <input
+                            value={item.unitPriceInput}
+                            placeholder="0.00"
+                            onChange={(e) => updateCreateStandaloneItem(item.key, { unitPriceInput: e.target.value })}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-secondary invoice-dialog-standalone-remove"
+                            onClick={() => removeCreateStandaloneItem(item.key)}
+                            disabled={createStandaloneItems.length === 1}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                      <div className="button-row invoice-dialog-source-actions">
+                        <button className="btn btn-secondary" type="button" onClick={addCreateStandaloneItem}>
+                          Add Item
+                        </button>
+                      </div>
+                    </div>
+                  </AdminField>
+                )}
+                {createIncludePresets && (
+                  <AdminField label="Preset Items" tooltip="Choose one or more configured products to include." fullWidth className="invoice-dialog-source-field">
                     <div className="invoice-dialog-preset-list">
                       {presets.map(p => (
                         <label key={`create-preset-${p.id}`} className="admin-inline-checkbox invoice-dialog-preset-option">
@@ -1468,6 +1613,11 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                         </label>
                       ))}
                     </div>
+                  </AdminField>
+                )}
+                {createBlockingError && (
+                  <AdminField label="Create Requirements" fullWidth>
+                    <p className="field-error">{createBlockingError}</p>
                   </AdminField>
                 )}
                 <AdminField label="Due Date (Optional)" tooltip="When the invoice must be paid.">
@@ -1504,15 +1654,21 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
             <h3 className="manual-section-title">Help</h3>
             <AdminCard ghost>
               <p className="helper-text">
-                {createInvoiceBasis === 'lesson_based' 
-                  ? lessonPricingOptions.filter((option) => option.isActive).length === 0
-                    ? "Add active lesson durations and prices in Lesson Info / Prices before creating a lessons-based invoice."
-                    : "Use the calendar button to choose which approved customer bookings to bill. Already invoiced or invalid bookings stay visible but cannot be selected."
-                  : createInvoiceBasis === 'standalone'
-                  ? "This will create a blank invoice with one line item at the specified price. You can add more items after creation."
-                  : "This will create a blank invoice pre-filled with the selected preset items."}
+                {createIncludeLessons && lessonPricingOptions.filter((option) => option.isActive).length === 0
+                  ? "Add active lesson durations and prices in Lesson Info / Prices before including lesson charges."
+                  : "Combine bookings, standalone items, and presets in one invoice. Enabled sources must each contribute at least one item before you can create the invoice."}
               </p>
               <div className="invoice-dialog-status-card">
+                <div className="invoice-dialog-status-row">
+                  <span>Sources:</span>
+                  <span>
+                    {[
+                      createIncludeLessons ? "Lessons" : null,
+                      createIncludeStandalone ? "Standalone" : null,
+                      createIncludePresets ? "Presets" : null
+                    ].filter(Boolean).join(", ") || "None"}
+                  </span>
+                </div>
                 <div className="invoice-dialog-status-row">
                   <span>Subtotal:</span>
                   <span>{toCurrency(createCalculation.totals.subtotalCents, resolvedCreateCurrency)}</span>
@@ -1531,6 +1687,16 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                   <span>Total:</span>
                   <span>{toCurrency(createCalculation.totals.totalCents, resolvedCreateCurrency)}</span>
                 </div>
+                {createPreviewLineItems.length > 0 && (
+                  <>
+                    {createPreviewLineItems.map((lineItem) => (
+                      <div key={`${lineItem.sortOrder}-${lineItem.description}`} className="invoice-dialog-status-row">
+                        <span>{lineItem.description}</span>
+                        <span>{toCurrency(lineItem.unitPriceCents * lineItem.quantity, resolvedCreateCurrency)}</span>
+                      </div>
+                    ))}
+                  </>
+                )}
               </div>
             </AdminCard>
           </div>

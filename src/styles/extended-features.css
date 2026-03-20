@@ -1851,7 +1851,7 @@
 
 .invoice-dialog-line-items {
   display: grid;
-  gap: 12px;
+  gap: 8px;
   min-height: 0;
   overflow: auto;
   padding-right: 4px;
@@ -1862,8 +1862,18 @@
   grid-template-columns: minmax(0, 1.15fr) minmax(72px, 88px) minmax(96px, 118px) minmax(140px, 180px) minmax(140px, 180px) auto;
   gap: 8px;
   align-items: start;
-  padding-bottom: 12px;
+  padding: 10px 12px 8px;
+  border-radius: 12px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--line);
+}
+
+.invoice-dialog-line-item:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.invoice-dialog-line-item:nth-child(even) {
+  background: rgba(148, 163, 184, 0.08);
 }
 
 .invoice-dialog-line-item:last-child {
@@ -1880,7 +1890,7 @@
 }
 
 .invoice-dialog-remove-item {
-  margin-top: 24px;
+  margin-top: 20px;
   padding: 8px;
   min-width: 40px;
 }
@@ -1947,6 +1957,27 @@
   width: 100%;
 }
 
+.invoice-dialog-source-list {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.invoice-dialog-source-option {
+  margin: 0;
+}
+
+.invoice-dialog-source-field {
+  grid-column: 1 / -1;
+}
+
+.invoice-dialog-source-card {
+  margin: 0;
+}
+
 .invoice-dialog-basis-field,
 .invoice-dialog-currency-field,
 .invoice-dialog-tax-field {
@@ -2001,6 +2032,26 @@
   margin: 0;
 }
 
+.invoice-dialog-standalone-list {
+  display: grid;
+  gap: 10px;
+}
+
+.invoice-dialog-standalone-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(120px, 180px) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.invoice-dialog-standalone-remove {
+  white-space: nowrap;
+}
+
+.invoice-dialog-source-actions {
+  margin-top: 0;
+}
+
 @media (max-width: 1180px) {
   .reports-period-grid {
     grid-template-columns: 1fr;
@@ -2049,6 +2100,10 @@
 
   .invoice-dialog-line-item {
     grid-template-columns: minmax(0, 1fr) minmax(72px, 96px) minmax(110px, 140px);
+  }
+
+  .invoice-dialog-standalone-row {
+    grid-template-columns: 1fr;
   }
 }
 
