@@ -1367,9 +1367,13 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                     {customerOptions.map(c => <option key={c.id} value={c.id}>{c.lastName ? `${c.lastName}, ${c.firstName}` : c.fullName}</option>)}
                   </select>
                 </AdminField>
-                <AdminField label="Invoice Basis" tooltip="How to generate line items for this invoice.">
-                  <div className="button-row">
-                    <select value={createInvoiceBasis} onChange={(e) => setCreateInvoiceBasis(e.target.value as CreateInvoiceBasis)}>
+                <AdminField label="Invoice Basis" tooltip="How to generate line items for this invoice." className="invoice-dialog-basis-field">
+                  <div className="invoice-dialog-inline-control">
+                    <select
+                      className="invoice-dialog-inline-select"
+                      value={createInvoiceBasis}
+                      onChange={(e) => setCreateInvoiceBasis(e.target.value as CreateInvoiceBasis)}
+                    >
                       <option value="lesson_based">Lessons (Calculated from bookings)</option>
                       <option value="standalone">Standalone (Manual line items)</option>
                       {/* RATIONALE: Preset-driven creation is only useful once at
@@ -1381,20 +1385,21 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                     {createInvoiceBasis === "lesson_based" ? (
                       <button
                         type="button"
-                        className="btn btn-secondary btn-icon"
+                        className="btn btn-secondary btn-icon invoice-dialog-inline-trigger"
                         disabled={!createSelectedCustomerId}
                         onClick={() => {
                           setCreateBookingDialogOpen(true);
                           void loadCreateBookingOptions();
                         }}
                         aria-label="Select lesson bookings"
+                        title={!createSelectedCustomerId ? "Choose a customer first to select lesson bookings." : "Select lesson bookings"}
                       >
                         <CalendarDays size={18} />
                       </button>
                     ) : null}
                   </div>
                 </AdminField>
-                <AdminField label="Currency" tooltip="Three-letter ISO currency code used for this invoice.">
+                <AdminField label="Currency" tooltip="Three-letter ISO currency code used for this invoice." className="invoice-dialog-currency-field">
                   <input
                     value={createCurrency}
                     maxLength={3}
@@ -1407,7 +1412,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                     }}
                   />
                 </AdminField>
-                <AdminField label="Tax Mode" tooltip={`Whether ${createTaxLabel} applies.`}>
+                <AdminField label="Tax Mode" tooltip={`Whether ${createTaxLabel} applies.`} className="invoice-dialog-tax-field">
                   <select value={createTaxMode} onChange={(e) => setCreateTaxMode(e.target.value as InvoiceTaxMode)}>
                     <option value="taxable">Taxable ({createTaxLabel})</option>
                     <option value="gst_free">{createTaxLabel} Free</option>
@@ -1437,7 +1442,11 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                           </div>
                         ))
                       ) : (
-                        <p className="helper-text">Use the calendar button to choose bookings for this invoice.</p>
+                        <p className="helper-text">
+                          {createSelectedCustomerId
+                            ? "Use the calendar button to choose bookings for this invoice."
+                            : "Choose a customer first, then use the calendar button to choose bookings for this invoice."}
+                        </p>
                       )}
                     </div>
                   </AdminField>

@@ -1947,6 +1947,43 @@
   width: 100%;
 }
 
+.invoice-dialog-basis-field,
+.invoice-dialog-currency-field,
+.invoice-dialog-tax-field {
+  min-width: 0;
+}
+
+.invoice-dialog-inline-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+  padding-top: 0;
+}
+
+.invoice-dialog-inline-select {
+  width: 100%;
+  min-width: 0;
+}
+
+.invoice-dialog-inline-trigger {
+  align-self: stretch;
+  min-width: 46px;
+  padding-inline: 12px;
+  z-index: 1;
+  pointer-events: auto;
+}
+
+.invoice-dialog-tax-field {
+  grid-column: 2;
+}
+
+.invoice-dialog-basis-field select,
+.invoice-dialog-currency-field input,
+.invoice-dialog-tax-field select {
+  min-height: 44px;
+}
+
 .invoice-dialog-preset-list {
   display: flex;
   flex-direction: column;
@@ -1985,6 +2022,10 @@
     grid-template-columns: 1fr;
     overflow: auto;
     padding-right: 4px;
+  }
+
+  .invoice-dialog-tax-field {
+    grid-column: auto;
   }
 
   .invoice-dialog-body {
