@@ -3,9 +3,10 @@ import {
   PUBLIC_BRAND_NAME, 
   CONTACT_PHONE, 
   CONTACT_ADDRESS, 
-  INVOICE_LOGO_URL,
-  DEFAULT_CURRENCY
+  INVOICE_LOGO_URL
 } from "@/lib/branding";
+import { formatCurrency } from "@/lib/invoices/currency";
+import { getInvoiceTaxName } from "@/lib/invoices/gst-policy";
 import { APP_TIMEZONE } from "@/lib/time";
 
 /**
@@ -28,16 +29,6 @@ function formatInvoiceDate(date: Date): string {
     dateStyle: "long",
     timeZone: APP_TIMEZONE
   }).format(date);
-}
-
-/**
- * Formats integer cents as currency.
- */
-function formatCurrency(cents: number, currency: string = DEFAULT_CURRENCY): string {
-  return new Intl.NumberFormat("en-AU", {
-    style: "currency",
-    currency: currency
-  }).format(cents / 100);
 }
 
 function formatPercentValue(basisPoints: number | null): string {
@@ -74,7 +65,8 @@ export type InvoiceTemplateRecord = Invoice & {
 export function renderInvoiceHtml(invoice: InvoiceTemplateRecord, templateConfig?: InvoiceTemplate | null): string {
   const heading = invoice.documentType === "credit_note" ? "Credit Note" : "Tax Invoice";
   const statusLabel = invoice.documentType === "credit_note" ? "credit note" : "invoice";
-  const currency = invoice.currency || DEFAULT_CURRENCY;
+  const currency = invoice.currency;
+  const taxLabel = getInvoiceTaxName(currency);
   const accentColor = templateConfig?.accentColor || "#2247d8";
   const logoUrl = templateConfig?.logoUrl || INVOICE_LOGO_URL;
   const footerText = templateConfig?.footerText || "";
@@ -91,7 +83,7 @@ export function renderInvoiceHtml(invoice: InvoiceTemplateRecord, templateConfig
           </td>
           <td style="padding:8px; border-bottom:1px solid #edf2f7;">${lineItem.quantity}</td>
           <td style="padding:8px; border-bottom:1px solid #edf2f7;">${formatCurrency(lineItem.unitPriceCents, currency)}</td>
-          <td style="padding:8px; border-bottom:1px solid #edf2f7;">${lineItem.taxMode === "taxable" ? "GST" : "GST-free"}</td>
+          <td style="padding:8px; border-bottom:1px solid #edf2f7;">${lineItem.taxMode === "taxable" ? escapeHtml(taxLabel) : `${escapeHtml(taxLabel)}-free`}</td>
           <td style="padding:8px; border-bottom:1px solid #edf2f7;">${formatCurrency(lineItem.lineTotalCents, currency)}</td>
         </tr>
       `
@@ -154,7 +146,7 @@ export function renderInvoiceHtml(invoice: InvoiceTemplateRecord, templateConfig
       <section style="margin-top:16px; text-align:right;">
         <p style="margin:2px 0;">Subtotal: ${formatCurrency(invoice.subtotalCents, currency)}</p>
         ${invoice.discountCents !== 0 ? `<p style="margin:2px 0;">Invoice Discount: ${formatCurrency(-invoice.discountCents, currency)}</p>` : ""}
-        <p style="margin:2px 0;">GST: ${formatCurrency(invoice.gstCents, currency)}</p>
+        <p style="margin:2px 0;">${escapeHtml(taxLabel)}: ${formatCurrency(invoice.gstCents, currency)}</p>
         <p style="margin:2px 0; font-weight:700; color:${accentColor}; font-size:1.1rem;">Total: ${formatCurrency(invoice.totalCents, currency)}</p>
       </section>
 

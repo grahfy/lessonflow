@@ -20,16 +20,13 @@
 
 import { InvoiceDiscountKind, InvoiceTaxMode } from "@/generated/prisma/client";
 
-import { shouldApplyGst } from "@/lib/invoices/gst-policy";
+import { calculateTaxCents } from "@/lib/invoices/gst-policy";
 import {
   CalculatedInvoiceLineItem,
   CalculatedInvoiceTotals,
   InvoiceDiscountDraft,
   InvoiceLineItemDraft
 } from "@/lib/invoices/types";
-
-/** Standard Australian GST rate (10%). */
-const GST_RATE = 0.1;
 
 function clampInteger(value: number): number {
   if (!Number.isFinite(value)) {
@@ -119,7 +116,7 @@ function allocateDiscountAcrossBases(baseCents: number[], totalDiscountCents: nu
  * @param lineItem - Input partial containing quantity, price, and tax mode
  * @returns Fully populated line item with calculated cents
  */
-export function calculateLineItem(lineItem: InvoiceLineItemDraft): CalculatedInvoiceLineItem {
+export function calculateLineItem(lineItem: InvoiceLineItemDraft, currency = "AUD"): CalculatedInvoiceLineItem {
   // RATIONALE: We use Math.trunc to ensure we are working with clean integers 
   // before starting any multiplication, preventing accidental float leaks.
   const normalizedQuantity = Math.max(1, Math.trunc(lineItem.quantity));
@@ -137,7 +134,7 @@ export function calculateLineItem(lineItem: InvoiceLineItemDraft): CalculatedInv
    * NOTE: GST is only applied if the business is registered AND 
    * the specific item mode warrants it (e.g. gst_inclusive).
    */
-  const lineGstCents = shouldApplyGst(lineItem.taxMode) ? Math.round(lineSubtotalCents * GST_RATE) : 0;
+  const lineGstCents = calculateTaxCents(lineSubtotalCents, currency, lineItem.taxMode);
 
   return {
     ...lineItem,
@@ -164,11 +161,18 @@ export function calculateLineItem(lineItem: InvoiceLineItemDraft): CalculatedInv
  * @param lineItems - List of line items (e.g. from a form draft)
  * @returns Object with recomputed lines and the aggregate totals
  */
-export function calculateInvoiceTotals(lineItems: InvoiceLineItemDraft[], invoiceDiscount: InvoiceDiscountDraft = {}): {
+export function calculateInvoiceTotals(
+  lineItems: InvoiceLineItemDraft[],
+  invoiceDiscount: InvoiceDiscountDraft = {},
+  options: {
+    currency?: string;
+  } = {}
+): {
   lineItems: CalculatedInvoiceLineItem[];
   totals: CalculatedInvoiceTotals;
 } {
-  const calculatedLines = lineItems.map((lineItem) => calculateLineItem(lineItem));
+  const currency = options.currency ?? "AUD";
+  const calculatedLines = lineItems.map((lineItem) => calculateLineItem(lineItem, currency));
   const subtotalCents = calculatedLines.reduce((sum, lineItem) => sum + lineItem.lineSubtotalCents, 0);
   const discountCents = resolveDiscountCents(subtotalCents, invoiceDiscount);
   const invoiceDiscountAllocations = allocateDiscountAcrossBases(
@@ -179,7 +183,7 @@ export function calculateInvoiceTotals(lineItems: InvoiceLineItemDraft[], invoic
   const adjustedLines = calculatedLines.map((lineItem, index) => {
     const allocatedInvoiceDiscountCents = invoiceDiscountAllocations[index];
     const adjustedLineSubtotalCents = Math.max(0, lineItem.lineSubtotalCents - allocatedInvoiceDiscountCents);
-    const adjustedLineGstCents = shouldApplyGst(lineItem.taxMode) ? Math.round(adjustedLineSubtotalCents * GST_RATE) : 0;
+    const adjustedLineGstCents = calculateTaxCents(adjustedLineSubtotalCents, currency, lineItem.taxMode);
 
     return {
       ...lineItem,

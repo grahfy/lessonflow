@@ -579,7 +579,10 @@ export const CONFIGURABLE_ENV_VARS: ConfigurableEnvVarDefinition[] = [
     placeholder: "AUD",
     isRequired: false,
     isSecret: false,
-    validation: () => null
+    validation: (v: string) => {
+      if (!v.trim()) return null;
+      return /^[A-Za-z]{3}$/.test(v.trim()) ? null : "Must be a 3-letter currency code";
+    }
   },
   {
     key: "NEXT_PUBLIC_TIMEZONE",
@@ -606,6 +609,14 @@ export const envConfigSchema = z.object(
 );
 
 export type EnvConfigInput = z.infer<typeof envConfigSchema>;
+
+function normalizeManagedEnvValue(key: string, value: string): string {
+  if (key === "NEXT_PUBLIC_DEFAULT_CURRENCY") {
+    return value.trim().toUpperCase();
+  }
+
+  return value;
+}
 
 /**
  * Schema for validating individual env var updates.
@@ -1282,7 +1293,7 @@ export async function saveAdminSettingsConfig(
   const validationInput: Record<string, string> = {};
   const currentValues = getStoredEnvValues();
   for (const envVar of CONFIGURABLE_ENV_VARS) {
-    const rawValue = normalizedInput[envVar.key] || "";
+    const rawValue = normalizeManagedEnvValue(envVar.key, normalizedInput[envVar.key] || "");
     if (envVar.isSecret && !rawValue.trim()) {
       // In the admin settings screen, blank secret inputs mean "keep current value" when a secret
       // is already configured. Validate against the currently loaded env value so required secrets
@@ -1344,7 +1355,7 @@ export async function saveAdminSettingsConfig(
   managedKeys.add("ADMIN_PASSWORD");
 
   for (const envVar of CONFIGURABLE_ENV_VARS) {
-    const value = normalizedInput[envVar.key] || "";
+    const value = normalizeManagedEnvValue(envVar.key, normalizedInput[envVar.key] || "");
     if (value && value !== "***SET***") {
       vars.set(envVar.key, value);
       // Update in-memory process.env so the current process sees the change immediately

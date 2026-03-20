@@ -58,6 +58,7 @@ function loadTestEnv() {
   env.INVOICE_PAYMENT_TERMS_DAYS ??= "14";
   env.INVOICE_GST_REGISTERED ??= "true";
   env.INVOICE_DEFAULT_TAX_MODE ??= "taxable";
+  env.INVOICE_TAX_PROFILES ??= "";
   env.INVOICE_CREDIT_NOTE_PREFIX ??= "MGSCN";
 
   return env;

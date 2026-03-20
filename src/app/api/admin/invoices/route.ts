@@ -232,6 +232,7 @@ export async function POST(request: NextRequest) {
       createInvoiceRecord({
         tx,
         adminId: admin.id,
+        currency: parsed.data.currency,
         taxMode: parsed.data.taxMode,
         customerId: parsed.data.customerId ?? null,
         bookingId: parsed.data.bookingId ?? null,

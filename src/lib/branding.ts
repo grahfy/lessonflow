@@ -15,6 +15,11 @@
 
 export const PLATFORM_NAME = "LessonFlow";
 
+export function getDefaultCurrency(): string {
+  const candidate = (process.env.NEXT_PUBLIC_DEFAULT_CURRENCY || "AUD").trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(candidate) ? candidate : "AUD";
+}
+
 /**
  * Resolves the full branding object from the environment.
  * RATIONALE: Used by layout components to ensure they have the latest 
@@ -30,7 +35,7 @@ export function getBranding() {
     LOGO_URL: process.env.NEXT_PUBLIC_LOGO_URL || "/images/mgs-logo.webp",
     INVOICE_LOGO_URL: process.env.NEXT_PUBLIC_INVOICE_LOGO_URL || "/images/company-logo-invoice.png",
     FAVICON_URL: process.env.NEXT_PUBLIC_FAVICON_URL || "/favicon.ico",
-    DEFAULT_CURRENCY: process.env.NEXT_PUBLIC_DEFAULT_CURRENCY || "AUD",
+    DEFAULT_CURRENCY: getDefaultCurrency(),
   };
 }
 
@@ -43,7 +48,7 @@ export const CONTACT_ADDRESS = process.env.NEXT_PUBLIC_CONTACT_ADDRESS || "Rear 
 export const LOGO_URL = process.env.NEXT_PUBLIC_LOGO_URL || "/images/mgs-logo.webp";
 export const INVOICE_LOGO_URL = process.env.NEXT_PUBLIC_INVOICE_LOGO_URL || "/images/company-logo-invoice.png";
 export const FAVICON_URL = process.env.NEXT_PUBLIC_FAVICON_URL || "/favicon.ico";
-export const DEFAULT_CURRENCY = process.env.NEXT_PUBLIC_DEFAULT_CURRENCY || "AUD";
+export const DEFAULT_CURRENCY = getDefaultCurrency();
 
 export const POWERED_BY_PLATFORM_COPY = `Powered by ${PLATFORM_NAME}`;
 export const STUDENT_PORTAL_PLATFORM_NAME = `${PLATFORM_NAME} Student Portal`;

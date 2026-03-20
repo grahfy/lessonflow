@@ -4,7 +4,7 @@ import { isOwnerAdmin } from "@/lib/admin-auth";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
-import { getDefaultInvoiceTaxMode } from "@/lib/invoices/gst-policy";
+import { getDefaultInvoiceTaxModeForCurrencyValue } from "@/lib/invoices/gst-policy";
 import { createBookingInvoiceSchema } from "@/lib/invoices/schema";
 import { getDefaultDueAt, createInvoiceRecord } from "@/lib/invoices/persistence";
 import { customerSnapshotFromBooking } from "@/lib/invoices/snapshots";
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Invalid invoice payload.", details: parsed.error.flatten() }, { status: 400 });
     }
 
-    const taxMode = parsed.data.taxMode ?? getDefaultInvoiceTaxMode();
+    const taxMode = parsed.data.taxMode ?? getDefaultInvoiceTaxModeForCurrencyValue(parsed.data.currency);
     const lineItems: InvoiceLineItemDraft[] = parsed.data.lineItems.map((item, index) => ({
       description: item.description,
       quantity: item.quantity,
@@ -61,6 +61,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       createInvoiceRecord({
         tx,
         adminId: admin.id,
+        currency: parsed.data.currency,
         taxMode,
         customerId: booking.customerId,
         bookingId: booking.id,

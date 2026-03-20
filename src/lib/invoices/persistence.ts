@@ -15,9 +15,10 @@
 import { InvoiceDocumentType, InvoiceStatus, InvoiceTaxMode, Prisma } from "@/generated/prisma/client";
 
 import { calculateInvoiceTotals } from "@/lib/invoices/calculate";
-import { getDefaultInvoiceTaxMode } from "@/lib/invoices/gst-policy";
+import { getDefaultInvoiceTaxModeForCurrencyValue } from "@/lib/invoices/gst-policy";
 import { generateNextInvoiceNumber } from "@/lib/invoices/numbering";
 import { sellerSnapshotFromEnv } from "@/lib/invoices/snapshots";
+import { getInvoiceCurrency } from "@/lib/invoices/tax-profile";
 import { InvoiceCustomerSnapshot, InvoiceDiscountDraft, InvoiceLineItemDraft } from "@/lib/invoices/types";
 
 /**
@@ -54,6 +55,7 @@ type CreateInvoiceRecordInput = {
   adminId: string;              // The ID of the admin creating the record
   status?: InvoiceStatus;
   documentType?: InvoiceDocumentType;
+  currency?: string;
   taxMode?: InvoiceTaxMode;
   customerId?: string | null;
   bookingId?: string | null;
@@ -79,7 +81,8 @@ type CreateInvoiceRecordInput = {
  * @returns The created invoice object including line items
  */
 export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
-  const taxMode = input.taxMode ?? getDefaultInvoiceTaxMode();
+  const currency = getInvoiceCurrency(input.currency);
+  const taxMode = input.taxMode ?? getDefaultInvoiceTaxModeForCurrencyValue(currency);
   
   // LOGIC: Normalize defaults before calculating totals.
   // This ensures that persisted ordering and tax mode assignment are deterministic 
@@ -95,6 +98,8 @@ export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
   const calculation = calculateInvoiceTotals(normalizedLineItems, {
     discountKind: input.invoiceDiscount?.discountKind ?? null,
     discountValue: input.invoiceDiscount?.discountValue ?? null
+  }, {
+    currency
   });
   const sellerSnapshot = sellerSnapshotFromEnv();
   
@@ -106,6 +111,7 @@ export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
       invoiceNumber,
       status: input.status ?? "draft",
       documentType: input.documentType ?? "invoice",
+      currency,
       taxMode,
       discountKind: input.invoiceDiscount?.discountKind ?? null,
       discountValue: input.invoiceDiscount?.discountValue ?? null,

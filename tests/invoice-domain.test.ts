@@ -17,6 +17,7 @@ describe("invoice-domain", () => {
     process.env.INVOICE_NUMBER_PREFIX = "MGS";
     process.env.INVOICE_GST_REGISTERED = "true";
     process.env.INVOICE_DEFAULT_TAX_MODE = "taxable";
+    process.env.INVOICE_TAX_PROFILES = "";
   });
 
   it("calculates taxable and gst-free line totals in cents", () => {
@@ -93,6 +94,34 @@ describe("invoice-domain", () => {
     expect(getDefaultInvoiceTaxMode()).toBe("taxable");
     process.env.INVOICE_DEFAULT_TAX_MODE = "gst_free";
     expect(getDefaultInvoiceTaxMode()).toBe("gst_free");
+  });
+
+  it("calculates configured non-aud tax rates", () => {
+    process.env.INVOICE_TAX_PROFILES = JSON.stringify({
+      USD: {
+        locale: "en-US",
+        taxLabel: "Sales Tax",
+        taxRateBasisPoints: 825,
+        registered: true,
+        defaultTaxMode: "taxable"
+      }
+    });
+
+    const result = calculateInvoiceTotals([
+      {
+        kind: "lesson_fee",
+        description: "Lesson",
+        quantity: 1,
+        unitPriceCents: 10000,
+        taxMode: "taxable",
+        sortOrder: 0
+      }
+    ], {}, {
+      currency: "USD"
+    });
+
+    expect(result.totals.gstCents).toBe(825);
+    expect(result.totals.totalCents).toBe(10825);
   });
 
   it("generates sequential invoice numbers", async () => {

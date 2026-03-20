@@ -196,6 +196,73 @@ describe.sequential("admin settings save contracts", () => {
     expect(envFileContents).toContain('NEXT_PUBLIC_LOGO_URL=""');
   });
 
+  it("saves and reloads the default currency setting and rejects malformed values", async () => {
+    vi.stubEnv("SYSTEMD_SERVICE_NAME", "invalid service name!");
+
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const initialResponse = await getSettings(adminRequest("http://localhost/api/admin/settings", token));
+    expect(initialResponse.status).toBe(200);
+
+    const initialBody = (await initialResponse.json()) as {
+      envVars: Array<{ key: string; currentValue: string }>;
+    };
+
+    const envPayload = Object.fromEntries(
+      initialBody.envVars.map((envVar) => [
+        envVar.key,
+        envVar.currentValue === "***SET***" ? "" : envVar.currentValue
+      ])
+    );
+
+    envPayload.NEXT_PUBLIC_DEFAULT_CURRENCY = "usd";
+
+    const saveResponse = await saveSettings(
+      adminRequest("http://localhost/api/admin/settings", token, {
+        method: "POST",
+        body: {
+          env: envPayload,
+          adminPassword: ""
+        }
+      })
+    );
+
+    expect(saveResponse.status).toBe(200);
+
+    const loadResponse = await getSettings(adminRequest("http://localhost/api/admin/settings", token));
+    expect(loadResponse.status).toBe(200);
+
+    const loadBody = (await loadResponse.json()) as {
+      envVars: Array<{ key: string; currentValue: string }>;
+    };
+    const valuesByKey = Object.fromEntries(loadBody.envVars.map((item) => [item.key, item.currentValue]));
+
+    expect(valuesByKey.NEXT_PUBLIC_DEFAULT_CURRENCY).toBe("USD");
+    expect(process.env.NEXT_PUBLIC_DEFAULT_CURRENCY).toBe("USD");
+
+    const invalidResponse = await saveSettings(
+      adminRequest("http://localhost/api/admin/settings", token, {
+        method: "POST",
+        body: {
+          env: {
+            ...envPayload,
+            NEXT_PUBLIC_DEFAULT_CURRENCY: "USDX"
+          },
+          adminPassword: ""
+        }
+      })
+    );
+
+    expect(invalidResponse.status).toBe(400);
+    const invalidBody = (await invalidResponse.json()) as {
+      ok: boolean;
+      fieldErrors?: Record<string, string>;
+    };
+    expect(invalidBody.ok).toBe(false);
+    expect(invalidBody.fieldErrors?.NEXT_PUBLIC_DEFAULT_CURRENCY).toBe("Must be a 3-letter currency code");
+  });
+
   it("saves and reloads the default invoice template", async () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);

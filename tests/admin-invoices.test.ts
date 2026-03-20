@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 import { POST as createBookingInvoice } from "@/app/api/admin/bookings/[id]/invoice/route";
+import { POST as createCustomerInvoice } from "@/app/api/admin/customers/[id]/invoices/route";
 import { PATCH as patchInvoice } from "@/app/api/admin/invoices/[id]/route";
 import { POST as sendInvoice } from "@/app/api/admin/invoices/[id]/send/route";
 import { GET, POST } from "@/app/api/admin/invoices/route";
@@ -98,6 +99,7 @@ describe("admin-invoices", () => {
   it("creates draft invoice from booking endpoint", async () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);
+    vi.stubEnv("NEXT_PUBLIC_DEFAULT_CURRENCY", "cad");
 
     const booking = await prisma.booking.create({
       data: {
@@ -161,15 +163,133 @@ describe("admin-invoices", () => {
     const res = await createBookingInvoice(req, { params: Promise.resolve({ id: booking.id }) });
     expect(res.status).toBe(201);
 
-    const body = (await res.json()) as { invoice: { status: string; bookingId: string; lineItems: Array<{ description: string }> } };
+    const body = (await res.json()) as {
+      invoice: {
+        status: string;
+        bookingId: string;
+        currency: string;
+        lineItems: Array<{ description: string }>;
+      };
+    };
     expect(body.invoice.status).toBe("draft");
     expect(body.invoice.bookingId).toBe(booking.id);
     expect(body.invoice.lineItems.length).toBe(4);
+    expect(body.invoice.currency).toBe("CAD");
+  });
+
+  it("uses the configured default currency when create payload omits currency", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+    vi.stubEnv("NEXT_PUBLIC_DEFAULT_CURRENCY", "usd");
+    process.env.INVOICE_TAX_PROFILES = JSON.stringify({
+      USD: {
+        locale: "en-US",
+        taxLabel: "Sales Tax",
+        taxRateBasisPoints: 1000,
+        registered: true,
+        defaultTaxMode: "taxable"
+      }
+    });
+
+    const createReq = adminRequest("http://localhost/api/admin/invoices", "POST", token, {
+      customerFirstName: "Default",
+      customerLastName: "Currency",
+      customerName: "Default Currency",
+      customerEmail: "default.currency@example.com",
+      customerPhone: "0400111000",
+      customerAddress: "10 Main Street, Northcote VIC 3070",
+      taxMode: "taxable",
+      dueAt: "2026-08-01T10:00:00.000Z",
+      lineItems: [
+        {
+          kind: "lesson_fee",
+          description: "Lesson fee",
+          quantity: 1,
+          unitPriceCents: 10000,
+          taxMode: "taxable",
+          sortOrder: 0
+        }
+      ]
+    });
+
+    const createRes = await POST(createReq);
+    expect(createRes.status).toBe(201);
+    const createBody = (await createRes.json()) as {
+      invoice: { currency: string; gstCents: number; totalCents: number };
+    };
+
+    expect(createBody.invoice.currency).toBe("USD");
+    expect(createBody.invoice.gstCents).toBe(1000);
+    expect(createBody.invoice.totalCents).toBe(11000);
+  });
+
+  it("uses the configured default currency when customer invoice payload omits currency", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+    vi.stubEnv("NEXT_PUBLIC_DEFAULT_CURRENCY", "usd");
+    process.env.INVOICE_TAX_PROFILES = JSON.stringify({
+      USD: {
+        locale: "en-US",
+        taxLabel: "Sales Tax",
+        taxRateBasisPoints: 1000,
+        registered: true,
+        defaultTaxMode: "taxable"
+      }
+    });
+
+    const customer = await prisma.customer.create({
+      data: {
+        fullName: "Customer Scoped",
+        email: "customer.scoped@example.com",
+        phone: "0400111001",
+        normalizedEmail: "customer.scoped@example.com",
+        normalizedPhone: "0400111001",
+        skillLevel: "beginner",
+        lessonMode: "in_person"
+      }
+    });
+
+    const createReq = adminRequest(`http://localhost/api/admin/customers/${customer.id}/invoices`, "POST", token, {
+      taxMode: "taxable",
+      dueAt: "2026-08-01T10:00:00.000Z",
+      lineItems: [
+        {
+          kind: "lesson_fee",
+          description: "Lesson fee",
+          quantity: 1,
+          unitPriceCents: 10000,
+          taxMode: "taxable",
+          sortOrder: 0
+        }
+      ]
+    });
+
+    const createRes = await createCustomerInvoice(createReq, {
+      params: Promise.resolve({ id: customer.id })
+    });
+    expect(createRes.status).toBe(201);
+    const createBody = (await createRes.json()) as {
+      invoice: { currency: string; gstCents: number; totalCents: number; customerId: string | null };
+    };
+
+    expect(createBody.invoice.customerId).toBe(customer.id);
+    expect(createBody.invoice.currency).toBe("USD");
+    expect(createBody.invoice.gstCents).toBe(1000);
+    expect(createBody.invoice.totalCents).toBe(11000);
   });
 
   it("creates discounted invoices and keeps draft/sent invoices editable while locking paid invoices", async () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);
+    process.env.INVOICE_TAX_PROFILES = JSON.stringify({
+      USD: {
+        locale: "en-US",
+        taxLabel: "Sales Tax",
+        taxRateBasisPoints: 1000,
+        registered: true,
+        defaultTaxMode: "taxable"
+      }
+    });
 
     const createReq = adminRequest("http://localhost/api/admin/invoices", "POST", token, {
       customerFirstName: "Discount",
@@ -178,6 +298,7 @@ describe("admin-invoices", () => {
       customerEmail: "discount@example.com",
       customerPhone: "0400123000",
       customerAddress: "10 Main Street, Northcote VIC 3070",
+      currency: "USD",
       taxMode: "taxable",
       dueAt: "2026-08-01T10:00:00.000Z",
       discountKind: "percent",
@@ -208,6 +329,7 @@ describe("admin-invoices", () => {
     const createBody = (await createRes.json()) as {
       invoice: {
         id: string;
+        currency: string;
         subtotalCents: number;
         discountCents: number;
         gstCents: number;
@@ -217,6 +339,7 @@ describe("admin-invoices", () => {
     };
 
     expect(createBody.invoice.lineItems[0].lineDiscountCents).toBe(500);
+    expect(createBody.invoice.currency).toBe("USD");
     expect(createBody.invoice.subtotalCents).toBe(12500);
     expect(createBody.invoice.discountCents).toBe(1250);
     expect(createBody.invoice.gstCents).toBe(1125);

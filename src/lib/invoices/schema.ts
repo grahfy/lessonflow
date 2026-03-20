@@ -5,6 +5,12 @@ import { z } from "zod";
  */
 export const invoiceTaxModeSchema = z.enum(["taxable", "gst_free"]);
 export const invoiceDiscountKindSchema = z.enum(["amount", "percent"]);
+export const invoiceCurrencySchema = z
+  .string()
+  .trim()
+  .length(3)
+  .regex(/^[A-Za-z]{3}$/, "Use a 3-letter ISO currency code.")
+  .transform((value) => value.toUpperCase());
 
 /**
  * Supported lifecycle states for invoices.
@@ -104,6 +110,7 @@ export const createInvoiceSchema = z
     customerEmail: z.string().trim().email().max(200),
     customerPhone: z.string().trim().min(6).max(40),
     customerAddress: z.string().trim().min(3).max(260),
+    currency: invoiceCurrencySchema.optional(),
     taxMode: invoiceTaxModeSchema.default("taxable"),
     notes: z.string().trim().max(2_000).optional(),
     issuedAt: z.string().datetime({ offset: true }).optional(),
@@ -123,6 +130,7 @@ export const createCustomerInvoiceSchema = z
     lineItems: z.array(invoiceLineItemInputSchema).min(1).max(100),
     dueAt: z.string().datetime({ offset: true }).optional(),
     notes: z.string().trim().max(2_000).optional(),
+    currency: invoiceCurrencySchema.optional(),
     taxMode: invoiceTaxModeSchema.optional()
   })
   .extend(optionalDiscountFieldShape)
@@ -140,6 +148,7 @@ export const updateInvoiceSchema = z
     customerEmail: z.string().trim().email().max(200).optional(),
     customerPhone: z.string().trim().min(6).max(40).optional(),
     customerAddress: z.string().trim().min(3).max(260).optional(),
+    currency: invoiceCurrencySchema.optional(),
     taxMode: invoiceTaxModeSchema.optional(),
     notes: z.string().trim().max(2_000).optional().nullable(),
     dueAt: z.string().datetime({ offset: true }).optional(),
@@ -157,6 +166,7 @@ export const updateInvoiceSchema = z
       !data.customerEmail &&
       !data.customerPhone &&
       !data.customerAddress &&
+      !data.currency &&
       !data.taxMode &&
       data.notes === undefined &&
       !data.dueAt &&
@@ -194,6 +204,7 @@ export const createBookingInvoiceSchema = z
     lineItems: z.array(invoiceLineItemInputSchema).min(1).max(100),
     dueAt: z.string().datetime({ offset: true }).optional(),
     notes: z.string().trim().max(2_000).optional(),
+    currency: invoiceCurrencySchema.optional(),
     taxMode: invoiceTaxModeSchema.optional()
   })
   .extend(optionalDiscountFieldShape)

@@ -10,8 +10,7 @@ import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { useTweenOrchestrator } from "@/components/motion/tween-orchestrator";
-import { basisPointsToPercentageInput, parseAudInputToCents, parsePercentageInputToBasisPoints } from "@/lib/invoices/currency";
-import { DEFAULT_CURRENCY } from "@/lib/branding";
+import { basisPointsToPercentageInput, formatCurrency, parseMoneyInputToCents, parsePercentageInputToBasisPoints } from "@/lib/invoices/currency";
 import { toDateTimeLocalValue, toMoneyInput } from "@/lib/admin/formatters";
 import { dateTimeLocalToIso } from "@/lib/time";
 
@@ -25,7 +24,9 @@ import {
 import { usePresets } from "@/lib/admin/use-presets";
 import { useCustomers } from "@/lib/admin/use-customers";
 import { calculateInvoiceTotals } from "@/lib/invoices/calculate";
+import { getDefaultInvoiceTaxModeForCurrencyValue, getInvoiceTaxName } from "@/lib/invoices/gst-policy";
 import { type InvoiceSortBy, type InvoiceSortDirection } from "@/lib/invoices/schema";
+import { getInvoiceCurrency } from "@/lib/invoices/tax-profile";
 import { canApplyInvoiceAction } from "@/lib/invoices/transitions";
 import { type InvoiceLineItemDraft } from "@/lib/invoices/types";
 
@@ -35,7 +36,7 @@ type EditableLineItem = {
   kind: InvoiceLineItemDraft["kind"];
   description: string;
   quantity: string;
-  unitPriceAud: string;
+  unitPriceInput: string;
   taxMode: InvoiceTaxMode;
   discountKind: InvoiceDiscountKind | null;
   discountValueInput: string;
@@ -64,10 +65,7 @@ function getDisplayStatus(invoice: InvoiceRow, overdueOnly: boolean): InvoiceDis
 
 /** Formats stored cent values for display in the invoices console. */
 function toCurrency(cents: number, currency: string) {
-  return new Intl.NumberFormat("en-AU", {
-    style: "currency",
-    currency: currency
-  }).format(cents / 100);
+  return formatCurrency(cents, currency);
 }
 
 function toDiscountValueInput(kind: InvoiceDiscountKind | null, value: number | null): string {
@@ -78,14 +76,14 @@ function toDiscountValueInput(kind: InvoiceDiscountKind | null, value: number | 
   return kind === "percent" ? basisPointsToPercentageInput(value) : toMoneyInput(value);
 }
 
-function parseDiscountValue(kind: InvoiceDiscountKind | null, rawInput: string): number | null {
+function parseDiscountValueForCurrency(kind: InvoiceDiscountKind | null, rawInput: string, currency: string): number | null {
   if (!kind) {
     return null;
   }
 
   return kind === "percent"
     ? parsePercentageInputToBasisPoints(rawInput).basisPoints
-    : parseAudInputToCents(rawInput).cents;
+    : parseMoneyInputToCents(rawInput, currency).cents;
 }
 
 function describeDiscount(kind: InvoiceDiscountKind | null, value: number | null, currency: string): string {
@@ -104,7 +102,7 @@ function describeDiscount(kind: InvoiceDiscountKind | null, value: number | null
  * hooks keep API details centralized, while the page owns the cross-dialog
  * state that determines what admins see next.
  */
-export function AdminInvoicesClient() {
+export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const searchInputId = useId();
@@ -139,6 +137,7 @@ export function AdminInvoicesClient() {
   const [editingLineItems, setEditingLineItems] = useState<EditableLineItem[]>([]);
   const [editingDiscountKind, setEditingDiscountKind] = useState<InvoiceDiscountKind | null>(null);
   const [editingDiscountValueInput, setEditingDiscountValueInput] = useState("");
+  const [editingCurrency, setEditingCurrency] = useState(getInvoiceCurrency(defaultCurrency));
   const [editingProductPresetId, setEditingProductPresetId] = useState("");
   const [editingCustomerFirstName, setEditingCustomerFirstName] = useState("");
   const [editingCustomerLastName, setEditingCustomerLastName] = useState("");
@@ -150,7 +149,8 @@ export function AdminInvoicesClient() {
   const [createStandalonePrice, setCreateStandalonePrice] = useState("0.00");
   const [createSelectedPresetIds, setCreateSelectedPresetIds] = useState<string[]>([]);
   const [createDueAt, setCreateDueAt] = useState("");
-  const [createTaxMode, setCreateTaxMode] = useState<InvoiceTaxMode>("taxable");
+  const [createCurrency, setCreateCurrency] = useState(getInvoiceCurrency(defaultCurrency));
+  const [createTaxMode, setCreateTaxMode] = useState<InvoiceTaxMode>(getDefaultInvoiceTaxModeForCurrencyValue(defaultCurrency));
   const [createDiscountKind, setCreateDiscountKind] = useState<InvoiceDiscountKind | null>(null);
   const [createDiscountValueInput, setCreateDiscountValueInput] = useState("");
 
@@ -178,6 +178,10 @@ export function AdminInvoicesClient() {
 
   const { presets } = usePresets({ onAuthError, onError: setError });
   const { customers: customerOptions, load: loadCustomers } = useCustomers({ pageSize: 250, onAuthError, onError: setError });
+  const resolvedEditingCurrency = getInvoiceCurrency(editingCurrency);
+  const resolvedCreateCurrency = getInvoiceCurrency(createCurrency);
+  const editingTaxLabel = getInvoiceTaxName(resolvedEditingCurrency);
+  const createTaxLabel = getInvoiceTaxName(resolvedCreateCurrency);
 
   // Actions
   /**
@@ -194,6 +198,7 @@ export function AdminInvoicesClient() {
     setEditingDueAt(toDateTimeLocalValue(invoice.dueAt));
     setEditingDiscountKind(invoice.discountKind ?? null);
     setEditingDiscountValueInput(toDiscountValueInput(invoice.discountKind ?? null, invoice.discountValue ?? null));
+    setEditingCurrency(getInvoiceCurrency(invoice.currency));
     setEditingCustomerFirstName(invoice.customerFirstName || invoice.customerName.split(' ')[0]);
     setEditingCustomerLastName(invoice.customerLastName || invoice.customerName.split(' ').slice(1).join(' '));
     setEditingLineItems(
@@ -203,7 +208,7 @@ export function AdminInvoicesClient() {
         kind: li.kind as InvoiceLineItemDraft["kind"],
         description: li.description,
         quantity: String(li.quantity),
-        unitPriceAud: toMoneyInput(li.unitPriceCents),
+        unitPriceInput: toMoneyInput(li.unitPriceCents),
         taxMode: li.taxMode,
         discountKind: li.discountKind ?? null,
         discountValueInput: toDiscountValueInput(li.discountKind ?? null, li.discountValue ?? null)
@@ -286,7 +291,8 @@ export function AdminInvoicesClient() {
     setCreateStandalonePrice("0.00");
     setCreateSelectedPresetIds([]);
     setCreateDueAt("");
-    setCreateTaxMode("taxable");
+    setCreateCurrency(getInvoiceCurrency(defaultCurrency));
+    setCreateTaxMode(getDefaultInvoiceTaxModeForCurrencyValue(defaultCurrency));
     setCreateDiscountKind(null);
     setCreateDiscountValueInput("");
   };
@@ -299,8 +305,8 @@ export function AdminInvoicesClient() {
         kind: "custom",
         description: "",
         quantity: "1",
-        unitPriceAud: "0.00",
-        taxMode: "taxable",
+        unitPriceInput: "0.00",
+        taxMode: getDefaultInvoiceTaxModeForCurrencyValue(resolvedEditingCurrency),
         discountKind: null,
         discountValueInput: ""
       }
@@ -317,8 +323,8 @@ export function AdminInvoicesClient() {
         kind: "custom",
         description: preset.description,
         quantity: "1",
-        unitPriceAud: toMoneyInput(preset.unitPriceCents),
-        taxMode: "taxable",
+        unitPriceInput: toMoneyInput(preset.unitPriceCents),
+        taxMode: getDefaultInvoiceTaxModeForCurrencyValue(resolvedEditingCurrency),
         discountKind: preset.discountKind ?? null,
         discountValueInput: toDiscountValueInput(preset.discountKind ?? null, preset.discountValue ?? null),
         isPreset: true
@@ -340,15 +346,18 @@ export function AdminInvoicesClient() {
       kind: li.kind,
       description: li.description,
       quantity: Number.parseFloat(li.quantity) || 0,
-      unitPriceCents: parseAudInputToCents(li.unitPriceAud).cents || 0,
+      unitPriceCents: parseMoneyInputToCents(li.unitPriceInput, resolvedEditingCurrency).cents || 0,
       taxMode: li.taxMode,
       sortOrder: index,
       discountKind: li.discountKind,
-      discountValue: parseDiscountValue(li.discountKind, li.discountValueInput)
+      discountValue: parseDiscountValueForCurrency(li.discountKind, li.discountValueInput, resolvedEditingCurrency)
     })),
     {
       discountKind: editingDiscountKind,
-      discountValue: parseDiscountValue(editingDiscountKind, editingDiscountValueInput)
+      discountValue: parseDiscountValueForCurrency(editingDiscountKind, editingDiscountValueInput, resolvedEditingCurrency)
+    },
+    {
+      currency: resolvedEditingCurrency
     }
   );
 
@@ -370,8 +379,8 @@ export function AdminInvoicesClient() {
       }
 
       const amount = createInvoiceBasis === "standalone"
-        ? parseAudInputToCents(createStandalonePrice).cents || 0
-        : parseAudInputToCents(createLessonPrice).cents || 0;
+        ? parseMoneyInputToCents(createStandalonePrice, resolvedCreateCurrency).cents || 0
+        : parseMoneyInputToCents(createLessonPrice, resolvedCreateCurrency).cents || 0;
 
       return [
         {
@@ -388,7 +397,10 @@ export function AdminInvoicesClient() {
     })(),
     {
       discountKind: createDiscountKind,
-      discountValue: parseDiscountValue(createDiscountKind, createDiscountValueInput)
+      discountValue: parseDiscountValueForCurrency(createDiscountKind, createDiscountValueInput, resolvedCreateCurrency)
+    },
+    {
+      currency: resolvedCreateCurrency
     }
   );
 
@@ -412,10 +424,10 @@ export function AdminInvoicesClient() {
       kind: li.kind,
       description: li.description,
       quantity: Number.parseFloat(li.quantity) || 0,
-      unitPriceCents: parseAudInputToCents(li.unitPriceAud).cents || 0,
+      unitPriceCents: parseMoneyInputToCents(li.unitPriceInput, resolvedEditingCurrency).cents || 0,
       taxMode: li.taxMode,
       discountKind: li.discountKind,
-      discountValue: parseDiscountValue(li.discountKind, li.discountValueInput)
+      discountValue: parseDiscountValueForCurrency(li.discountKind, li.discountValueInput, resolvedEditingCurrency)
     }));
 
     const result = await saveInvoiceApi(selectedInvoice.id, {
@@ -424,8 +436,9 @@ export function AdminInvoicesClient() {
       customerFirstName: editingCustomerFirstName,
       customerLastName: editingCustomerLastName,
       customerName: `${editingCustomerFirstName} ${editingCustomerLastName}`.trim(),
+      currency: resolvedEditingCurrency,
       discountKind: editingDiscountKind,
-      discountValue: parseDiscountValue(editingDiscountKind, editingDiscountValueInput),
+      discountValue: parseDiscountValueForCurrency(editingDiscountKind, editingDiscountValueInput, resolvedEditingCurrency),
       lineItems: lineItemsPayload
     });
 
@@ -510,12 +523,13 @@ export function AdminInvoicesClient() {
         customer.postcode
       ].filter(Boolean).join(" "),
       basis: createInvoiceBasis,
-      lessonPriceCents: parseAudInputToCents(createLessonPrice).cents || 0,
-      standalonePriceCents: parseAudInputToCents(createStandalonePrice).cents || 0,
+      currency: resolvedCreateCurrency,
+      lessonPriceCents: parseMoneyInputToCents(createLessonPrice, resolvedCreateCurrency).cents || 0,
+      standalonePriceCents: parseMoneyInputToCents(createStandalonePrice, resolvedCreateCurrency).cents || 0,
       dueAt,
       taxMode: createTaxMode,
       discountKind: createDiscountKind,
-      discountValue: parseDiscountValue(createDiscountKind, createDiscountValueInput),
+      discountValue: parseDiscountValueForCurrency(createDiscountKind, createDiscountValueInput, resolvedCreateCurrency),
       lineItems: (() => {
         if (createInvoiceBasis === "standalone" || createInvoiceBasis === "lesson_based") {
           return [{
@@ -523,8 +537,8 @@ export function AdminInvoicesClient() {
             quantity: 1,
             unitPriceCents:
               createInvoiceBasis === "standalone"
-                ? parseAudInputToCents(createStandalonePrice).cents || 0
-                : parseAudInputToCents(createLessonPrice).cents || 0,
+                ? parseMoneyInputToCents(createStandalonePrice, resolvedCreateCurrency).cents || 0
+                : parseMoneyInputToCents(createLessonPrice, resolvedCreateCurrency).cents || 0,
             kind: "lesson_fee",
             taxMode: createTaxMode,
             discountKind: null,
@@ -930,7 +944,15 @@ export function AdminInvoicesClient() {
                         onChange={(e) => setEditingDueAt(e.target.value)}
                       />
                     </AdminField>
-                    <AdminField label="Invoice Discount Type" tooltip="Optional discount applied to the full invoice subtotal before GST.">
+                    <AdminField label="Currency" tooltip="Three-letter ISO currency code used for totals and tax rendering.">
+                      <input
+                        value={editingCurrency}
+                        disabled={!canEditSelectedInvoice}
+                        maxLength={3}
+                        onChange={(e) => setEditingCurrency(e.target.value.toUpperCase())}
+                      />
+                    </AdminField>
+                    <AdminField label="Invoice Discount Type" tooltip={`Optional discount applied to the full invoice subtotal before ${editingTaxLabel}.`}>
                       <select
                         value={editingDiscountKind ?? ""}
                         disabled={!canEditSelectedInvoice}
@@ -947,7 +969,7 @@ export function AdminInvoicesClient() {
                         <option value="percent">Percentage</option>
                       </select>
                     </AdminField>
-                    <AdminField label="Invoice Discount Value" tooltip="Amount discounts use AUD. Percentage discounts use %." fullWidth>
+                    <AdminField label="Invoice Discount Value" tooltip={`Amount discounts use ${resolvedEditingCurrency}. Percentage discounts use %.`} fullWidth>
                       <input
                         value={editingDiscountValueInput}
                         disabled={!editingDiscountKind || !canEditSelectedInvoice}
@@ -1003,11 +1025,11 @@ export function AdminInvoicesClient() {
                             </AdminField>
                           </div>
                           <div className="invoice-dialog-line-item-price">
-                            <AdminField label="Price" tooltip="Unit price in AUD.">
+                            <AdminField label="Price" tooltip={`Unit price in ${resolvedEditingCurrency}.`}>
                               <input
-                                value={li.unitPriceAud}
+                                value={li.unitPriceInput}
                                 disabled={!canEditSelectedInvoice}
-                                onChange={(e) => updateLineItem(li.key, { unitPriceAud: e.target.value })}
+                                onChange={(e) => updateLineItem(li.key, { unitPriceInput: e.target.value })}
                               />
                             </AdminField>
                           </div>
@@ -1031,7 +1053,7 @@ export function AdminInvoicesClient() {
                             </AdminField>
                           </div>
                           <div className="invoice-dialog-line-item-price">
-                            <AdminField label="Discount Value" tooltip="Amount discounts use AUD. Percentage discounts use %.">
+                            <AdminField label="Discount Value" tooltip={`Amount discounts use ${resolvedEditingCurrency}. Percentage discounts use %.`}>
                               <input
                                 value={li.discountValueInput}
                                 disabled={!li.discountKind || !canEditSelectedInvoice}
@@ -1065,7 +1087,7 @@ export function AdminInvoicesClient() {
                           onChange={(e) => addPresetToInvoice(e.target.value)}
                         >
                           <option value="">Add preset...</option>
-                          {presets.map(p => <option key={p.id} value={p.id}>{p.label} ({toCurrency(p.unitPriceCents, DEFAULT_CURRENCY)}{p.discountKind ? `, ${describeDiscount(p.discountKind, p.discountValue ?? null, DEFAULT_CURRENCY)} off` : ""})</option>)}
+                          {presets.map(p => <option key={p.id} value={p.id}>{p.label} ({toCurrency(p.unitPriceCents, resolvedEditingCurrency)}{p.discountKind ? `, ${describeDiscount(p.discountKind, p.discountValue ?? null, resolvedEditingCurrency)} off` : ""})</option>)}
                         </select>
                       </div>
                     </div>
@@ -1081,21 +1103,21 @@ export function AdminInvoicesClient() {
                   <div className="invoice-dialog-status-card">
                     <div className="invoice-dialog-status-row">
                       <span>Subtotal:</span>
-                      <span>{toCurrency(editingCalculation.totals.subtotalCents, selectedInvoice.currency)}</span>
+                      <span>{toCurrency(editingCalculation.totals.subtotalCents, resolvedEditingCurrency)}</span>
                     </div>
                     {editingCalculation.totals.discountCents !== 0 && (
                       <div className="invoice-dialog-status-row">
                         <span>Discount:</span>
-                        <span>{toCurrency(-editingCalculation.totals.discountCents, selectedInvoice.currency)}</span>
+                        <span>{toCurrency(-editingCalculation.totals.discountCents, resolvedEditingCurrency)}</span>
                       </div>
                     )}
                     <div className="invoice-dialog-status-row">
-                      <span>GST:</span>
-                      <span>{toCurrency(editingCalculation.totals.gstCents, selectedInvoice.currency)}</span>
+                      <span>{editingTaxLabel}:</span>
+                      <span>{toCurrency(editingCalculation.totals.gstCents, resolvedEditingCurrency)}</span>
                     </div>
                     <div className="invoice-dialog-status-row">
                       <span>Total:</span>
-                      <span>{toCurrency(editingCalculation.totals.totalCents, selectedInvoice.currency)}</span>
+                      <span>{toCurrency(editingCalculation.totals.totalCents, resolvedEditingCurrency)}</span>
                     </div>
                     <div className="invoice-dialog-status-row">
                       <span>Status:</span>
@@ -1198,19 +1220,32 @@ export function AdminInvoicesClient() {
                     )}
                   </select>
                 </AdminField>
-                <AdminField label="Tax Mode" tooltip="Whether GST applies.">
+                <AdminField label="Currency" tooltip="Three-letter ISO currency code used for this invoice.">
+                  <input
+                    value={createCurrency}
+                    maxLength={3}
+                    onChange={(e) => {
+                      const nextInput = e.target.value.toUpperCase();
+                      setCreateCurrency(nextInput);
+                      if (nextInput.trim().length === 3) {
+                        setCreateTaxMode(getDefaultInvoiceTaxModeForCurrencyValue(nextInput));
+                      }
+                    }}
+                  />
+                </AdminField>
+                <AdminField label="Tax Mode" tooltip={`Whether ${createTaxLabel} applies.`}>
                   <select value={createTaxMode} onChange={(e) => setCreateTaxMode(e.target.value as InvoiceTaxMode)}>
-                    <option value="taxable">Taxable (standard)</option>
-                    <option value="gst_free">GST Free</option>
+                    <option value="taxable">Taxable ({createTaxLabel})</option>
+                    <option value="gst_free">{createTaxLabel} Free</option>
                   </select>
                 </AdminField>
                 {createInvoiceBasis === 'lesson_based' && (
-                  <AdminField label="Lesson Rate (AUD)" tooltip="Price per standard lesson block for this billing period.">
+                  <AdminField label={`Lesson Rate (${resolvedCreateCurrency})`} tooltip="Price per standard lesson block for this billing period.">
                     <input value={createLessonPrice} onChange={(e) => setCreateLessonPrice(e.target.value)} />
                   </AdminField>
                 )}
                 {createInvoiceBasis === 'standalone' && (
-                  <AdminField label="Initial Item Price (AUD)" tooltip="Starting price for the manual line item.">
+                  <AdminField label={`Initial Item Price (${resolvedCreateCurrency})`} tooltip="Starting price for the manual line item.">
                     <input value={createStandalonePrice} onChange={(e) => setCreateStandalonePrice(e.target.value)} />
                   </AdminField>
                 )}
@@ -1227,7 +1262,7 @@ export function AdminInvoicesClient() {
                               else setCreateSelectedPresetIds(prev => prev.filter(id => id !== p.id));
                             }}
                           />
-                          {p.label} ({toCurrency(p.unitPriceCents, DEFAULT_CURRENCY)}{p.discountKind ? `, ${describeDiscount(p.discountKind, p.discountValue ?? null, DEFAULT_CURRENCY)} off` : ""})
+                          {p.label} ({toCurrency(p.unitPriceCents, resolvedCreateCurrency)}{p.discountKind ? `, ${describeDiscount(p.discountKind, p.discountValue ?? null, resolvedCreateCurrency)} off` : ""})
                         </label>
                       ))}
                     </div>
@@ -1236,7 +1271,7 @@ export function AdminInvoicesClient() {
                 <AdminField label="Due Date (Optional)" tooltip="When the invoice must be paid.">
                   <input type="datetime-local" value={createDueAt} onChange={(e) => setCreateDueAt(e.target.value)} />
                 </AdminField>
-                <AdminField label="Invoice Discount Type" tooltip="Optional discount applied to the full invoice subtotal before GST.">
+                <AdminField label="Invoice Discount Type" tooltip={`Optional discount applied to the full invoice subtotal before ${createTaxLabel}.`}>
                   <select
                     value={createDiscountKind ?? ""}
                     onChange={(e) => {
@@ -1252,7 +1287,7 @@ export function AdminInvoicesClient() {
                     <option value="percent">Percentage</option>
                   </select>
                 </AdminField>
-                <AdminField label="Invoice Discount Value" tooltip="Amount discounts use AUD. Percentage discounts use %." fullWidth>
+                <AdminField label="Invoice Discount Value" tooltip={`Amount discounts use ${resolvedCreateCurrency}. Percentage discounts use %.`} fullWidth>
                   <input
                     value={createDiscountValueInput}
                     disabled={!createDiscountKind}
@@ -1276,21 +1311,21 @@ export function AdminInvoicesClient() {
               <div className="invoice-dialog-status-card">
                 <div className="invoice-dialog-status-row">
                   <span>Subtotal:</span>
-                  <span>{toCurrency(createCalculation.totals.subtotalCents, DEFAULT_CURRENCY)}</span>
+                  <span>{toCurrency(createCalculation.totals.subtotalCents, resolvedCreateCurrency)}</span>
                 </div>
                 {createCalculation.totals.discountCents !== 0 && (
                   <div className="invoice-dialog-status-row">
                     <span>Discount:</span>
-                    <span>{toCurrency(-createCalculation.totals.discountCents, DEFAULT_CURRENCY)}</span>
+                    <span>{toCurrency(-createCalculation.totals.discountCents, resolvedCreateCurrency)}</span>
                   </div>
                 )}
                 <div className="invoice-dialog-status-row">
-                  <span>GST:</span>
-                  <span>{toCurrency(createCalculation.totals.gstCents, DEFAULT_CURRENCY)}</span>
+                  <span>{createTaxLabel}:</span>
+                  <span>{toCurrency(createCalculation.totals.gstCents, resolvedCreateCurrency)}</span>
                 </div>
                 <div className="invoice-dialog-status-row">
                   <span>Total:</span>
-                  <span>{toCurrency(createCalculation.totals.totalCents, DEFAULT_CURRENCY)}</span>
+                  <span>{toCurrency(createCalculation.totals.totalCents, resolvedCreateCurrency)}</span>
                 </div>
               </div>
             </AdminCard>

@@ -194,6 +194,17 @@ npm run dev
 
 The site will be available at http://localhost:3000
 
+### Dev Server Route Troubleshooting
+
+If `next dev` starts returning a false `404` for a route that exists in `src/app` (for example `/admin/settings`) while the production build still resolves it correctly, clear the local Next.js build artifacts first:
+
+```bash
+npm run clean
+npm run dev
+```
+
+This removes stale `.next` output, which can occasionally leave the dev server in a bad routing state after larger App Router changes.
+
 ---
 
 **Optional: Seed Fake Data**

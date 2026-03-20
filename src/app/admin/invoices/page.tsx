@@ -1,4 +1,5 @@
 import { AdminInvoicesClient } from "@/components/admin/invoices/invoices-client";
+import { getDefaultCurrency } from "@/lib/branding";
 import { requireOwner } from "@/lib/admin/server-auth";
 
 export const metadata = {
@@ -10,5 +11,5 @@ export const metadata = {
  */
 export default async function AdminInvoicesPage() {
   await requireOwner();
-  return <AdminInvoicesClient />;
+  return <AdminInvoicesClient defaultCurrency={getDefaultCurrency()} />;
 }

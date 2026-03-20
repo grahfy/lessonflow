@@ -15,20 +15,13 @@
 
 import { InvoiceTaxMode } from "@/generated/prisma/client";
 
-/**
- * Strict boolean parser for environment variables.
- * RATIONALE: We avoid 'truthy' traps (like empty strings) to ensure 
- * financial flags are unambiguous.
- */
-function parseBoolean(value: string | undefined, fallback: boolean): boolean {
-  if (!value) return fallback;
-  const normalized = value.trim().toLowerCase();
-  
-  if (["true", "1", "yes", "on"].includes(normalized)) return true;
-  if (["false", "0", "no", "off"].includes(normalized)) return false;
-  
-  return fallback;
-}
+import {
+  calculateInvoiceTaxCents,
+  getDefaultInvoiceTaxModeForCurrency,
+  getInvoiceTaxLabel,
+  getInvoiceTaxProfile,
+  shouldApplyInvoiceTax
+} from "@/lib/invoices/tax-profile";
 
 /**
  * Global entity registration check.
@@ -38,7 +31,7 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
  * of line-item settings.
  */
 export function isInvoiceGstRegistered(): boolean {
-  return parseBoolean(process.env.INVOICE_GST_REGISTERED, false);
+  return getInvoiceTaxProfile("AUD").registered;
 }
 
 /**
@@ -50,13 +43,7 @@ export function isInvoiceGstRegistered(): boolean {
  *    to align with registration status.
  */
 export function getDefaultInvoiceTaxMode(): InvoiceTaxMode {
-  const configured = process.env.INVOICE_DEFAULT_TAX_MODE?.trim().toLowerCase();
-  
-  if (configured === "taxable" || configured === "gst_free") {
-    return configured as InvoiceTaxMode;
-  }
-  
-  return isInvoiceGstRegistered() ? "taxable" : "gst_free";
+  return getDefaultInvoiceTaxModeForCurrency("AUD");
 }
 
 /**
@@ -66,5 +53,21 @@ export function getDefaultInvoiceTaxMode(): InvoiceTaxMode {
  * @returns True if and only if both the BUSINESS is registered AND the LINE is taxable.
  */
 export function shouldApplyGst(taxMode: InvoiceTaxMode): boolean {
-  return isInvoiceGstRegistered() && taxMode === "taxable";
+  return shouldApplyInvoiceTax("AUD", taxMode);
+}
+
+export function getInvoiceTaxName(currency?: string | null): string {
+  return getInvoiceTaxLabel(currency);
+}
+
+export function getDefaultInvoiceTaxModeForCurrencyValue(currency?: string | null): InvoiceTaxMode {
+  return getDefaultInvoiceTaxModeForCurrency(currency);
+}
+
+export function shouldApplyTax(currency: string | undefined, taxMode: InvoiceTaxMode): boolean {
+  return shouldApplyInvoiceTax(currency, taxMode);
+}
+
+export function calculateTaxCents(subtotalCents: number, currency: string | undefined, taxMode: InvoiceTaxMode): number {
+  return calculateInvoiceTaxCents(subtotalCents, currency, taxMode);
 }

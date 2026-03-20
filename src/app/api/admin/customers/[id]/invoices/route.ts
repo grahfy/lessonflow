@@ -5,7 +5,7 @@ import { isOwnerAdmin } from "@/lib/admin-auth";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { prisma } from "@/lib/db";
 import { getInvoiceAgingBucket, getInvoiceOverdueDays } from "@/lib/invoices/aging";
-import { getDefaultInvoiceTaxMode } from "@/lib/invoices/gst-policy";
+import { getDefaultInvoiceTaxModeForCurrencyValue } from "@/lib/invoices/gst-policy";
 import { createCustomerInvoiceSchema, listInvoicesQuerySchema } from "@/lib/invoices/schema";
 import { createInvoiceRecord, getDefaultDueAt } from "@/lib/invoices/persistence";
 import { customerSnapshotFromCustomer } from "@/lib/invoices/snapshots";
@@ -203,7 +203,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
   }
 
-  const taxMode = parsed.data.taxMode ?? getDefaultInvoiceTaxMode();
+  const taxMode = parsed.data.taxMode ?? getDefaultInvoiceTaxModeForCurrencyValue(parsed.data.currency);
   // Normalize request payload into the persistence-layer draft shape before transactional create.
   const lineItems: InvoiceLineItemDraft[] = parsed.data.lineItems.map((lineItem, index) => ({
     description: lineItem.description,
@@ -223,6 +223,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     createInvoiceRecord({
       tx,
       adminId: admin.id,
+      currency: parsed.data.currency,
       taxMode,
       customerId: customer.id,
       bookingId: parsed.data.bookingId ?? null,

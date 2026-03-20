@@ -4,8 +4,10 @@ import { isOwnerAdmin } from "@/lib/admin-auth";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { prisma } from "@/lib/db";
 import { applyInvoiceTaxMode, calculateInvoiceTotals } from "@/lib/invoices/calculate";
+import { getDefaultInvoiceTaxModeForCurrencyValue } from "@/lib/invoices/gst-policy";
 import { updateInvoiceSchema } from "@/lib/invoices/schema";
 import { allowedStatusesForAction, canApplyInvoiceAction, type InvoiceLifecycleAction, type InvoiceLifecycleStatus } from "@/lib/invoices/transitions";
+import { getInvoiceCurrency } from "@/lib/invoices/tax-profile";
 import { InvoiceLineItemDraft } from "@/lib/invoices/types";
 
 type Params = {
@@ -236,14 +238,20 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     discountValue: lineItem.discountValue ?? null
   }));
 
-  const normalizedLines = parsed.data.taxMode ? applyInvoiceTaxMode(baseLineDrafts, parsed.data.taxMode) : baseLineDrafts;
+  const currency = getInvoiceCurrency(parsed.data.currency ?? existing.currency);
+  const resolvedTaxMode = parsed.data.taxMode ?? existing.taxMode ?? getDefaultInvoiceTaxModeForCurrencyValue(currency);
+  const normalizedLines = parsed.data.taxMode
+    ? applyInvoiceTaxMode(baseLineDrafts, resolvedTaxMode)
+    : baseLineDrafts;
   const calculation = calculateInvoiceTotals(normalizedLines, {
     discountKind: parsed.data.discountKind === undefined ? existing.discountKind : parsed.data.discountKind,
     discountValue: parsed.data.discountValue === undefined ? existing.discountValue : parsed.data.discountValue
+  }, {
+    currency
   });
 
   const updated = await prisma.$transaction(async (tx) => {
-    if (lineItemsProvided || parsed.data.taxMode) {
+    if (lineItemsProvided || parsed.data.taxMode || parsed.data.currency) {
       // RATIONALE: Replacing the line-item set inside one transaction keeps the
       // invoice totals and stored line rows in sync. Partial updates here would
       // risk stale totals or mismatched tax calculations.
@@ -276,7 +284,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         customerEmail: parsed.data.customerEmail ?? existing.customerEmail,
         customerPhone: parsed.data.customerPhone ?? existing.customerPhone,
         customerAddress: parsed.data.customerAddress ?? existing.customerAddress,
-        taxMode: parsed.data.taxMode ?? existing.taxMode,
+        currency,
+        taxMode: resolvedTaxMode,
         discountKind: parsed.data.discountKind === undefined ? existing.discountKind : parsed.data.discountKind,
         discountValue: parsed.data.discountValue === undefined ? existing.discountValue : parsed.data.discountValue,
         discountCents: calculation.totals.discountCents,

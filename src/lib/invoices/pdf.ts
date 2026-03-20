@@ -21,9 +21,10 @@ import {
   PUBLIC_BRAND_NAME, 
   CONTACT_PHONE, 
   CONTACT_ADDRESS, 
-  INVOICE_LOGO_URL,
-  DEFAULT_CURRENCY
+  INVOICE_LOGO_URL
 } from "@/lib/branding";
+import { formatCurrency } from "@/lib/invoices/currency";
+import { getInvoiceTaxName } from "@/lib/invoices/gst-policy";
 import fs from "fs/promises";
 import path from "path";
 
@@ -39,20 +40,6 @@ function hexToRgb(hex: string): RGB {
   const g = parseInt(normalized.substring(2, 4), 16) / 255;
   const b = parseInt(normalized.substring(4, 6), 16) / 255;
   return rgb(r, g, b);
-}
-
-/**
- * Formats a cent-based integer into a human-readable AUD currency string.
- * 
- * @param cents - Total amount in cents
- * @param currency - 3-letter currency code (default: AUD)
- * @returns Formatted string (e.g. "$120.00")
- */
-function formatCurrency(cents: number, currency: string = DEFAULT_CURRENCY): string {
-  return new Intl.NumberFormat("en-AU", {
-    style: "currency",
-    currency: currency
-  }).format(cents / 100);
 }
 
 function formatPercentValue(basisPoints: number | null): string {
@@ -106,7 +93,8 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord, templateC
   const logoUrl = templateConfig?.logoUrl || INVOICE_LOGO_URL;
   const footerText = templateConfig?.footerText || "";
   const headerInfo = templateConfig?.headerInfo || "";
-  const currency = invoice.currency || DEFAULT_CURRENCY;
+  const currency = invoice.currency;
+  const taxLabel = getInvoiceTaxName(currency);
 
   // Background - Fill entire page with white
   page.drawRectangle({
@@ -242,7 +230,7 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord, templateC
   drawMeta(isCreditNote ? "Credit Note #:" : "Invoice Number:", invoice.invoiceNumber, labelY);
   drawMeta(isCreditNote ? "Credit Note Date:" : "Invoice Date:", formatDate(invoice.issuedAt), labelY - 15);
   drawMeta(isCreditNote ? "Expiry Date:" : "Payment Due:", formatDate(invoice.dueAt), labelY - 30);
-  drawMeta(isCreditNote ? "Credit Amount (AUD):" : "Amount Due (AUD):", formatCurrency(invoice.totalCents, currency), labelY - 45, true);
+  drawMeta(isCreditNote ? `Credit Amount (${currency}):` : `Amount Due (${currency}):`, formatCurrency(invoice.totalCents, currency), labelY - 45, true);
 
   // --- TABLE SECTION ---
   y -= 40;
@@ -301,11 +289,11 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord, templateC
     drawTotal("Invoice Discount:", formatCurrency(-invoice.discountCents, currency), y);
     y -= 15;
   }
-  drawTotal("GST:", formatCurrency(invoice.gstCents, currency), y);
+  drawTotal(`${taxLabel}:`, formatCurrency(invoice.gstCents, currency), y);
   y -= 15;
   drawTotal("Total:", formatCurrency(invoice.totalCents, currency), y);
   y -= 30;
-  drawTotal(isCreditNote ? "Credit Amount (AUD):" : "Amount Due (AUD):", formatCurrency(invoice.totalCents, currency), y, true);
+  drawTotal(isCreditNote ? `Credit Amount (${currency}):` : `Amount Due (${currency}):`, formatCurrency(invoice.totalCents, currency), y, true);
 
   // --- PAYMENT DETAILS ---
   y -= 60;

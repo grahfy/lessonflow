@@ -90,14 +90,13 @@ function resolveProviderAttempts(): Array<Exclude<CustomerEmailAlertProvider, nu
   return gmailConfigured ? ["gmail"] : [];
 }
 
-async function listUnreadProviderMessages(provider: Exclude<CustomerEmailAlertProvider, null>): Promise<ProviderMessage[]> {
+async function listUnreadProviderMessages(): Promise<ProviderMessage[]> {
   return listUnreadGmailMessages();
 }
 
 function resolveActiveProviderFromStatuses(
   providerPreference: CustomerEmailAlertsProvider,
-  gmail: AlertProviderStatus,
-  _imap: AlertProviderStatus
+  gmail: AlertProviderStatus
 ): CustomerEmailAlertProvider {
   if (providerPreference === "gmail" && gmail.status === "connected") {
     return "gmail";
@@ -283,7 +282,7 @@ export async function getCustomerEmailAlertsStatusSummary(alertsEnabled: boolean
         }
       })();
 
-  const activeProvider = resolveActiveProviderFromStatuses(providerPreference, gmail, imap);
+  const activeProvider = resolveActiveProviderFromStatuses(providerPreference, gmail);
 
   return {
     alertsEnabled,
@@ -306,7 +305,7 @@ export async function getUnreadCustomerEmailAlertsSummary(): Promise<CustomerEma
     lastProvider = provider;
 
     try {
-      const providerMessages = await listUnreadProviderMessages(provider);
+      const providerMessages = await listUnreadProviderMessages();
 
       if (providerMessages.length === 0) {
         return emptySummary("ready", provider);
