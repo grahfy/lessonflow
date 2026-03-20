@@ -10,6 +10,7 @@
 
 import { prisma } from '../src/lib/db';
 import { normalizeEmail, normalizePhone } from '../src/lib/customer-match';
+import { generateNextInvoiceNumber } from '../src/lib/invoices/numbering';
 import { normalizeFullNameForLookup, buildNameSearchTokens } from '../src/lib/student-portal/credentials';
 import { addDays, subDays, startOfHour, addMinutes, format, startOfWeek, addWeeks } from 'date-fns';
 import bcrypt from 'bcryptjs';
@@ -327,7 +328,8 @@ async function seedFakeData() {
       // Maybe create an invoice for this past booking
       if (Math.random() > 0.3) {
         const isPaid = Math.random() > 0.2;
-        const invoiceNumber = `INV-${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
+        const issuedAt = subDays(startAt, 1);
+        const invoiceNumber = await generateNextInvoiceNumber(prisma, issuedAt);
         await prisma.invoice.create({
           data: {
             invoiceNumber,
@@ -349,7 +351,7 @@ async function seedFakeData() {
             subtotalCents: durationMinutes * 100, // $1/min for test
             gstCents: 0,
             totalCents: durationMinutes * 100,
-            issuedAt: subDays(startAt, 1),
+            issuedAt,
             dueAt: addDays(startAt, 13),
             paidAt: isPaid ? startAt : null,
             lineItems: {
