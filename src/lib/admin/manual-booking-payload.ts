@@ -1,4 +1,5 @@
 import { dateTimeLocalToIso } from "@/lib/time";
+import { durationMinutesToBookingPayload } from "@/lib/lesson-duration-utils";
 
 export type ManualMatchResolution = "use_existing" | "create_new" | "update_existing";
 
@@ -53,7 +54,8 @@ export function buildManualBookingPayload(
     return { ok: false, error: "Recurrence end date is required when recurring is enabled." };
   }
 
-  if (payload.lessonDuration === "custom") {
+  const rawDurationChoice = String(payload.lessonDuration || "").trim();
+  if (rawDurationChoice === "custom") {
     const rawCustomMinutes = String(payload.customDurationMinutes || "").trim();
     if (!rawCustomMinutes) {
       return { ok: false, error: "Enter custom duration minutes when using custom duration." };
@@ -64,11 +66,19 @@ export function buildManualBookingPayload(
       return { ok: false, error: "Custom duration must be a whole number between 15 and 300 minutes." };
     }
 
-    // Store custom-length lessons with a standard enum value plus explicit minutes.
     payload.lessonDuration = "min60";
     payload.customDurationMinutes = customDurationMinutes;
-  } else {
+  } else if (rawDurationChoice === "min30" || rawDurationChoice === "min60") {
     delete payload.customDurationMinutes;
+  } else {
+    const durationMinutes = Number(rawDurationChoice);
+    if (!Number.isInteger(durationMinutes) || durationMinutes < 15 || durationMinutes > 300) {
+      return { ok: false, error: "Select a configured lesson duration." };
+    }
+
+    const normalizedDuration = durationMinutesToBookingPayload(durationMinutes);
+    payload.lessonDuration = normalizedDuration.lessonDuration;
+    payload.customDurationMinutes = normalizedDuration.customDurationMinutes;
   }
 
   return { ok: true, payload };

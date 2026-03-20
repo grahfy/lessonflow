@@ -61,6 +61,8 @@ interface BookingDetailDialogProps {
   canEditTeacherAssignment: boolean;
   canInvoice: boolean;
   teacherOptions: Array<{ id: string; displayName: string }>;
+  lessonDurationOptions: Array<{ value: string; label: string }>;
+  durationIsConfigured: boolean;
 
   // Tabs Navigation
   activeTab: "appointment" | "emails" | "materials";
@@ -121,6 +123,8 @@ export function BookingDetailDialog({
   canEditTeacherAssignment,
   canInvoice,
   teacherOptions,
+  lessonDurationOptions,
+  durationIsConfigured,
   activeTab,
   setActiveTab,
   matchedCustomer,
@@ -356,17 +360,22 @@ export function BookingDetailDialog({
                   </AdminField>
                   <AdminField label="Duration" tooltip="Length of the lesson in minutes.">
                     <select value={dialogForm.durationChoice} onChange={e => updateForm({ durationChoice: e.target.value })}>
-                      <option value="min30">30 minutes</option>
-                      <option value="min60">60 minutes</option>
-                      <option value="custom">Custom</option>
+                      {!durationIsConfigured ? (
+                        <option value={dialogForm.durationChoice}>{dialogForm.durationChoice} minutes (unconfigured)</option>
+                      ) : null}
+                      {lessonDurationOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
                     </select>
                   </AdminField>
-                  {dialogForm.durationChoice === 'custom' && (
-                    <AdminField label="Minutes" tooltip="Custom duration in minutes.">
-                      <input value={dialogForm.customDurationMinutes} onChange={e => updateForm({ customDurationMinutes: e.target.value.replace(/\D/g, '') })} />
-                    </AdminField>
-                  )}
                 </AdminForm>
+                {!durationIsConfigured ? (
+                  <p className="helper-text">
+                    This booking uses a duration that is not configured in Lesson Info / Prices. Add it in settings or change the booking to a configured duration before saving.
+                  </p>
+                ) : null}
               </div>
 
               {/* SECTION: NOTES & DOMAIN ACTIONS */}

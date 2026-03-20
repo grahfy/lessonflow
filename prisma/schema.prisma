@@ -255,6 +255,7 @@ model Booking {
   modifiedBy            AdminUser?         @relation("BookingEdits", fields: [modifiedById], references: [id], onDelete: SetNull)
   auditLogs             BookingAuditLog[]
   invoices              Invoice[]
+  invoiceLinks          InvoiceBookingLink[]
   learningMaterials     LearningMaterial[]
 
   @@index([startAt, status])
@@ -511,6 +512,7 @@ model Invoice {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   lineItems          InvoiceLineItem[]
+  bookingLinks       InvoiceBookingLink[]
   auditLogs          InvoiceAuditLog[]
 
   @@index([status, isDeleted, dueAt])
@@ -520,6 +522,21 @@ model Invoice {
   @@index([bookingId, createdAt])
   @@index([paidAt])
   @@index([lastReminderStage, dueAt])
+}
+
+// Persisted provenance for which bookings were billed on an invoice.
+// This allows one invoice to cover multiple lessons without removing the
+// legacy single `bookingId` field still used by older flows.
+model InvoiceBookingLink {
+  id        String   @id @default(cuid())
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([invoiceId, bookingId])
+  @@index([bookingId, createdAt])
 }
 
 // Ordered invoice rows persisted with calculated subtotal/GST/total values so
@@ -559,6 +576,20 @@ model InvoiceProductPreset {
   sortOrder      Int      @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+}
+
+// Owner-managed lesson duration/price catalog used by admin billing and
+// admin booking duration selectors.
+model LessonPricingOption {
+  id              String   @id @default(cuid())
+  durationMinutes Int      @unique
+  priceCents      Int
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([isActive, sortOrder])
 }

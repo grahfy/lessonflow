@@ -13,6 +13,7 @@ import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
 import { getInvoiceAgingBucket, getInvoiceOverdueDays } from "@/lib/invoices/aging";
+import { findActiveInvoiceLinksForBookingIds } from "@/lib/invoices/booking-links";
 import { createInvoiceSchema, listInvoicesQuerySchema } from "@/lib/invoices/schema";
 import { createInvoiceRecord } from "@/lib/invoices/persistence";
 import { InvoiceLineItemDraft } from "@/lib/invoices/types";
@@ -200,15 +201,23 @@ export async function POST(request: NextRequest) {
     }
 
     if (parsed.data.bookingId) {
-      const booking = await prisma.booking.findUnique({
-        where: { id: parsed.data.bookingId },
-        select: { id: true, customerId: true }
+      const selectedBookingId = parsed.data.bookingId;
+      const [booking, activeLinks] = await prisma.$transaction(async (tx) => {
+        const booking = await tx.booking.findUnique({
+          where: { id: selectedBookingId },
+          select: { id: true, customerId: true }
+        });
+        const activeLinks = await findActiveInvoiceLinksForBookingIds(tx, [selectedBookingId]);
+        return [booking, activeLinks] as const;
       });
       if (!booking) {
         return NextResponse.json({ error: "Selected booking does not exist." }, { status: 400 });
       }
       if (parsed.data.customerId && booking.customerId && booking.customerId !== parsed.data.customerId) {
         return NextResponse.json({ error: "Selected booking does not belong to selected customer." }, { status: 400 });
+      }
+      if (activeLinks.length > 0) {
+        return NextResponse.json({ error: "Selected booking is already linked to an active invoice." }, { status: 400 });
       }
     }
 
@@ -236,6 +245,7 @@ export async function POST(request: NextRequest) {
         taxMode: parsed.data.taxMode,
         customerId: parsed.data.customerId ?? null,
         bookingId: parsed.data.bookingId ?? null,
+        bookingIds: parsed.data.bookingId ? [parsed.data.bookingId] : null,
         customerSnapshot: {
           customerFirstName: parsed.data.customerFirstName,
           customerLastName: parsed.data.customerLastName,

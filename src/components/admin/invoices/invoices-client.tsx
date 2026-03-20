@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { CalendarDays } from "lucide-react";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminCard } from "@/components/admin/ui/admin-card";
@@ -11,9 +12,11 @@ import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { useTweenOrchestrator } from "@/components/motion/tween-orchestrator";
 import { basisPointsToPercentageInput, formatCurrency, parseMoneyInputToCents, parsePercentageInputToBasisPoints } from "@/lib/invoices/currency";
-import { toDateTimeLocalValue, toMoneyInput } from "@/lib/admin/formatters";
+import { formatDateTime, toDateTimeLocalValue, toMoneyInput } from "@/lib/admin/formatters";
 import { dateTimeLocalToIso } from "@/lib/time";
 
+import { useLessonPricing } from "@/lib/admin/use-lesson-pricing";
+import { useSafeFetch } from "@/lib/admin/use-safe-fetch";
 import {
   useInvoices,
   type InvoiceAction,
@@ -24,6 +27,7 @@ import {
 import { usePresets } from "@/lib/admin/use-presets";
 import { useCustomers } from "@/lib/admin/use-customers";
 import { calculateInvoiceTotals } from "@/lib/invoices/calculate";
+import { describeGroupedLessonLine } from "@/lib/invoices/booking-links";
 import { getDefaultInvoiceTaxModeForCurrencyValue, getInvoiceTaxName } from "@/lib/invoices/gst-policy";
 import { type InvoiceSortBy, type InvoiceSortDirection } from "@/lib/invoices/schema";
 import { getInvoiceCurrency } from "@/lib/invoices/tax-profile";
@@ -45,6 +49,20 @@ type EditableLineItem = {
 
 type CreateInvoiceBasis = "lesson_based" | "standalone" | (string & {});
 type InvoiceDisplayStatus = InvoiceRow["status"] | "overdue";
+type InvoiceBookingIneligibilityReason = "already_invoiced" | "missing_lesson_price" | "invalid_status";
+
+type CustomerInvoiceBookingOption = {
+  id: string;
+  status: "approved" | "cancelled";
+  startAt: string;
+  lessonMode: "in_person" | "video";
+  lessonDuration: "min30" | "min60";
+  customDurationMinutes: number | null;
+  durationMinutes: number;
+  linkedInvoiceId: string | null;
+  isInvoiceSelectable: boolean;
+  invoiceIneligibilityReason: InvoiceBookingIneligibilityReason | null;
+};
 
 /**
  * Promotes sufficiently overdue unpaid invoices into a dedicated display state
@@ -92,6 +110,19 @@ function describeDiscount(kind: InvoiceDiscountKind | null, value: number | null
   }
 
   return kind === "percent" ? `${basisPointsToPercentageInput(value)}%` : toCurrency(value, currency);
+}
+
+function describeBookingIneligibility(reason: InvoiceBookingIneligibilityReason | null): string {
+  if (reason === "already_invoiced") {
+    return "Already invoiced";
+  }
+  if (reason === "missing_lesson_price") {
+    return "Missing lesson price";
+  }
+  if (reason === "invalid_status") {
+    return "Only approved bookings can be invoiced";
+  }
+  return "";
 }
 
 /**
@@ -145,7 +176,6 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
   const [createOpen, setCreateOpen] = useState(false);
   const [createSelectedCustomerId, setCreateSelectedCustomerId] = useState("");
   const [createInvoiceBasis, setCreateInvoiceBasis] = useState<CreateInvoiceBasis>("lesson_based");
-  const [createLessonPrice, setCreateLessonPrice] = useState("60.00");
   const [createStandalonePrice, setCreateStandalonePrice] = useState("0.00");
   const [createSelectedPresetIds, setCreateSelectedPresetIds] = useState<string[]>([]);
   const [createDueAt, setCreateDueAt] = useState("");
@@ -153,12 +183,19 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
   const [createTaxMode, setCreateTaxMode] = useState<InvoiceTaxMode>(getDefaultInvoiceTaxModeForCurrencyValue(defaultCurrency));
   const [createDiscountKind, setCreateDiscountKind] = useState<InvoiceDiscountKind | null>(null);
   const [createDiscountValueInput, setCreateDiscountValueInput] = useState("");
+  const [createBookingDialogOpen, setCreateBookingDialogOpen] = useState(false);
+  const [createBookingOptionsLoading, setCreateBookingOptionsLoading] = useState(false);
+  const [createBookingOptions, setCreateBookingOptions] = useState<CustomerInvoiceBookingOption[]>([]);
+  const [createSelectedBookingIds, setCreateSelectedBookingIds] = useState<string[]>([]);
+  const [createBookingFilterFrom, setCreateBookingFilterFrom] = useState("");
+  const [createBookingFilterTo, setCreateBookingFilterTo] = useState("");
 
   // NOTE: Auth failures are handled here instead of each button click so all
   // invoice hooks share the same redirect behavior.
   const onAuthError = useCallback(() => window.location.assign("/admin/login"), []);
 
   // Data Hooks
+  const { safeFetch, handleApiError } = useSafeFetch({ onAuthError, onError: setError });
   const { 
     invoices, 
     loading, 
@@ -167,7 +204,6 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
     load: loadInvoices, 
     save: saveInvoiceApi, 
     performAction: performActionApi, 
-    create: createInvoiceApi,
     sendBulkReminders: sendBulkRemindersApi,
     remove: removeInvoiceApi
   } = useInvoices({
@@ -178,10 +214,20 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
 
   const { presets } = usePresets({ onAuthError, onError: setError });
   const { customers: customerOptions, load: loadCustomers } = useCustomers({ pageSize: 250, onAuthError, onError: setError });
+  const { lessonPricingOptions, load: loadLessonPricing } = useLessonPricing({ onAuthError, onError: setError });
   const resolvedEditingCurrency = getInvoiceCurrency(editingCurrency);
   const resolvedCreateCurrency = getInvoiceCurrency(createCurrency);
   const editingTaxLabel = getInvoiceTaxName(resolvedEditingCurrency);
   const createTaxLabel = getInvoiceTaxName(resolvedCreateCurrency);
+  const activeLessonPricingMap = useMemo(
+    () =>
+      new Map(
+        lessonPricingOptions
+          .filter((option) => option.isActive)
+          .map((option) => [option.durationMinutes, option])
+      ),
+    [lessonPricingOptions]
+  );
 
   // Actions
   /**
@@ -282,12 +328,17 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
     }
   }, [searchParams, createOpen, loadCustomers, onAuthError, openDetail, router]);
 
+  useEffect(() => {
+    if (createOpen) {
+      void loadLessonPricing();
+    }
+  }, [createOpen, loadLessonPricing]);
+
   const closeDetail = () => setSelectedInvoice(null);
 
   const resetCreateDialog = () => {
     setCreateSelectedCustomerId("");
     setCreateInvoiceBasis("lesson_based");
-    setCreateLessonPrice("60.00");
     setCreateStandalonePrice("0.00");
     setCreateSelectedPresetIds([]);
     setCreateDueAt("");
@@ -295,6 +346,11 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
     setCreateTaxMode(getDefaultInvoiceTaxModeForCurrencyValue(defaultCurrency));
     setCreateDiscountKind(null);
     setCreateDiscountValueInput("");
+    setCreateBookingDialogOpen(false);
+    setCreateBookingOptions([]);
+    setCreateSelectedBookingIds([]);
+    setCreateBookingFilterFrom("");
+    setCreateBookingFilterTo("");
   };
 
   const addLineItem = () => {
@@ -312,6 +368,60 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
       }
     ]);
   };
+
+  const loadCreateBookingOptions = useCallback(async () => {
+    if (!createSelectedCustomerId || createInvoiceBasis !== "lesson_based") {
+      setCreateBookingOptions([]);
+      setCreateSelectedBookingIds([]);
+      return;
+    }
+
+    setCreateBookingOptionsLoading(true);
+    try {
+      const params = new URLSearchParams({
+        bookingOptions: "true"
+      });
+      if (createBookingFilterFrom) {
+        params.set("from", createBookingFilterFrom);
+      }
+      if (createBookingFilterTo) {
+        params.set("to", createBookingFilterTo);
+      }
+
+      const response = await safeFetch(`/api/admin/customers/${createSelectedCustomerId}/invoices?${params.toString()}`, {
+        cache: "no-store"
+      });
+      if (!response.ok) {
+        await handleApiError(response, "Failed to load customer bookings.");
+        return;
+      }
+
+      const data = (await response.json()) as {
+        bookingOptions?: CustomerInvoiceBookingOption[];
+      };
+      const nextOptions = data.bookingOptions ?? [];
+      const nextSelectableOptionIds = new Set(
+        nextOptions.filter((option) => option.isInvoiceSelectable).map((option) => option.id)
+      );
+      setCreateBookingOptions(nextOptions);
+      setCreateSelectedBookingIds((current) => current.filter((bookingId) => nextSelectableOptionIds.has(bookingId)));
+    } finally {
+      setCreateBookingOptionsLoading(false);
+    }
+  }, [
+    createBookingFilterFrom,
+    createBookingFilterTo,
+    createInvoiceBasis,
+    createSelectedCustomerId,
+    handleApiError,
+    safeFetch
+  ]);
+
+  useEffect(() => {
+    if (createOpen && createInvoiceBasis === "lesson_based" && createSelectedCustomerId) {
+      void loadCreateBookingOptions();
+    }
+  }, [createOpen, createInvoiceBasis, createSelectedCustomerId, createBookingFilterFrom, createBookingFilterTo, loadCreateBookingOptions]);
 
   const addPresetToInvoice = (presetId: string) => {
     const preset = presets.find((p) => p.id === presetId);
@@ -361,40 +471,72 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
     }
   );
 
-  const createCalculation = calculateInvoiceTotals(
-    (() => {
-      if (createInvoiceBasis === "presets") {
-        return presets
-          .filter((preset) => createSelectedPresetIds.includes(preset.id))
-          .map((preset, index) => ({
-            description: preset.description || preset.label,
-            quantity: 1,
-            unitPriceCents: preset.unitPriceCents,
-            taxMode: createTaxMode,
-            kind: "custom" as const,
-            sortOrder: index,
-            discountKind: preset.discountKind ?? null,
-            discountValue: preset.discountValue ?? null
-          }));
+  const createPreviewLineItems = useMemo(() => {
+    if (createInvoiceBasis === "presets") {
+      return presets
+        .filter((preset) => createSelectedPresetIds.includes(preset.id))
+        .map((preset, index) => ({
+          description: preset.description || preset.label,
+          quantity: 1,
+          unitPriceCents: preset.unitPriceCents,
+          taxMode: createTaxMode,
+          kind: "custom" as const,
+          sortOrder: index,
+          discountKind: preset.discountKind ?? null,
+          discountValue: preset.discountValue ?? null
+        }));
+    }
+
+    if (createInvoiceBasis === "lesson_based") {
+      const grouped = new Map<number, number>();
+      for (const bookingId of createSelectedBookingIds) {
+        const booking = createBookingOptions.find((option) => option.id === bookingId);
+        if (!booking) {
+          continue;
+        }
+        grouped.set(booking.durationMinutes, (grouped.get(booking.durationMinutes) ?? 0) + 1);
       }
 
-      const amount = createInvoiceBasis === "standalone"
-        ? parseMoneyInputToCents(createStandalonePrice, resolvedCreateCurrency).cents || 0
-        : parseMoneyInputToCents(createLessonPrice, resolvedCreateCurrency).cents || 0;
-
-      return [
-        {
-          description: "Standard Lesson Fee",
-          quantity: 1,
-          unitPriceCents: amount,
+      return Array.from(grouped.entries())
+        .sort(([a], [b]) => a - b)
+        .map(([durationMinutes, quantity], index) => ({
+          description: describeGroupedLessonLine(durationMinutes, quantity),
+          quantity,
+          unitPriceCents: activeLessonPricingMap.get(durationMinutes)?.priceCents ?? 0,
           taxMode: createTaxMode,
           kind: "lesson_fee" as const,
-          sortOrder: 0,
+          sortOrder: index,
           discountKind: null,
           discountValue: null
-        }
-      ];
-    })(),
+        }));
+    }
+
+    return [
+      {
+        description: "Standard Lesson Fee",
+        quantity: 1,
+        unitPriceCents: parseMoneyInputToCents(createStandalonePrice, resolvedCreateCurrency).cents || 0,
+        taxMode: createTaxMode,
+        kind: "lesson_fee" as const,
+        sortOrder: 0,
+        discountKind: null,
+        discountValue: null
+      }
+    ];
+  }, [
+    activeLessonPricingMap,
+    createBookingOptions,
+    createInvoiceBasis,
+    createSelectedBookingIds,
+    createSelectedPresetIds,
+    createStandalonePrice,
+    createTaxMode,
+    presets,
+    resolvedCreateCurrency
+  ]);
+
+  const createCalculation = calculateInvoiceTotals(
+    createPreviewLineItems,
     {
       discountKind: createDiscountKind,
       discountValue: parseDiscountValueForCurrency(createDiscountKind, createDiscountValueInput, resolvedCreateCurrency)
@@ -505,65 +647,66 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
 
     setBusyAction(shouldSend ? "create_send" : "create");
     setError("");
+    if (createInvoiceBasis === "lesson_based" && createSelectedBookingIds.length === 0) {
+      setBusyAction(null);
+      setError("Select at least one booking to create a lesson-based invoice.");
+      return;
+    }
+    if (createInvoiceBasis === "presets" && createSelectedPresetIds.length === 0) {
+      setBusyAction(null);
+      setError("Select at least one preset to create a preset-based invoice.");
+      return;
+    }
 
-    const payload = {
-      customerId: createSelectedCustomerId,
-      customerFirstName: customer.firstName || customer.fullName.split(' ')[0],
-      customerLastName: customer.lastName || customer.fullName.split(' ').slice(1).join(' '),
-      customerName: customer.fullName,
-      customerEmail: customer.email,
-      customerPhone: customer.phone,
-      customerAddress: [
-        customer.unitNumber ? `${customer.unitNumber}/` : "",
-        customer.houseNumber,
-        customer.streetName,
-        customer.streetType,
-        customer.suburb,
-        customer.state,
-        customer.postcode
-      ].filter(Boolean).join(" "),
-      basis: createInvoiceBasis,
-      currency: resolvedCreateCurrency,
-      lessonPriceCents: parseMoneyInputToCents(createLessonPrice, resolvedCreateCurrency).cents || 0,
-      standalonePriceCents: parseMoneyInputToCents(createStandalonePrice, resolvedCreateCurrency).cents || 0,
+    const payload: Record<string, unknown> = {
       dueAt,
+      currency: resolvedCreateCurrency,
       taxMode: createTaxMode,
       discountKind: createDiscountKind,
-      discountValue: parseDiscountValueForCurrency(createDiscountKind, createDiscountValueInput, resolvedCreateCurrency),
-      lineItems: (() => {
-        if (createInvoiceBasis === "standalone" || createInvoiceBasis === "lesson_based") {
-          return [{
-            description: "Standard Lesson Fee",
-            quantity: 1,
-            unitPriceCents:
-              createInvoiceBasis === "standalone"
-                ? parseMoneyInputToCents(createStandalonePrice, resolvedCreateCurrency).cents || 0
-                : parseMoneyInputToCents(createLessonPrice, resolvedCreateCurrency).cents || 0,
-            kind: "lesson_fee",
-            taxMode: createTaxMode,
-            discountKind: null,
-            discountValue: null
-          }];
-        }
-        if (createInvoiceBasis === "presets") {
-          // NOTE: Presets are resolved client-side so the create route receives
-          // an explicit immutable line-item payload rather than preset IDs.
-          const selectedPresets = presets.filter(p => createSelectedPresetIds.includes(p.id));
-          return selectedPresets.map(preset => ({
-            description: preset.description || preset.label,
-            quantity: 1,
-            unitPriceCents: preset.unitPriceCents,
-            kind: "custom",
-            taxMode: createTaxMode,
-            discountKind: preset.discountKind ?? null,
-            discountValue: preset.discountValue ?? null
-          }));
-        }
-        return undefined;
-      })()
+      discountValue: parseDiscountValueForCurrency(createDiscountKind, createDiscountValueInput, resolvedCreateCurrency)
     };
 
-    const result = await createInvoiceApi(payload);
+    if (createInvoiceBasis === "lesson_based") {
+      payload.bookingIds = createSelectedBookingIds;
+    } else if (createInvoiceBasis === "presets") {
+      payload.lineItems = presets
+        .filter((preset) => createSelectedPresetIds.includes(preset.id))
+        .map((preset) => ({
+          description: preset.description || preset.label,
+          quantity: 1,
+          unitPriceCents: preset.unitPriceCents,
+          kind: "custom",
+          taxMode: createTaxMode,
+          discountKind: preset.discountKind ?? null,
+          discountValue: preset.discountValue ?? null
+        }));
+    } else {
+      payload.lineItems = [
+        {
+          description: "Standard Lesson Fee",
+          quantity: 1,
+          unitPriceCents: parseMoneyInputToCents(createStandalonePrice, resolvedCreateCurrency).cents || 0,
+          kind: "lesson_fee",
+          taxMode: createTaxMode,
+          discountKind: null,
+          discountValue: null
+        }
+      ];
+    }
+
+    let result: InvoiceRow | null = null;
+    const response = await safeFetch(`/api/admin/customers/${customer.id}/invoices`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      setBusyAction(null);
+      await handleApiError(response, "Unable to create invoice.");
+      return;
+    }
+    const data = (await response.json()) as { invoice: InvoiceRow };
+    result = data.invoice;
 
     if (result && shouldSend) {
       const sentResult = await performActionApi(result.id, "send");
@@ -1185,12 +1328,20 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
               </button>
             </Tooltip>
             <Tooltip content="Create a new draft invoice only.">
-              <button className="btn btn-secondary" disabled={!!busyAction || !createSelectedCustomerId} onClick={() => void createInvoice(false)}>
+              <button
+                className="btn btn-secondary"
+                disabled={!!busyAction || !createSelectedCustomerId || (createInvoiceBasis === "lesson_based" && createSelectedBookingIds.length === 0)}
+                onClick={() => void createInvoice(false)}
+              >
                 {busyAction === 'create' ? 'SAVING...' : 'SAVE DRAFT'}
               </button>
             </Tooltip>
             <Tooltip content="Create and immediately email the invoice to the customer.">
-              <button className="btn btn-primary" disabled={!!busyAction || !createSelectedCustomerId} onClick={() => void createInvoice(true)}>
+              <button
+                className="btn btn-primary"
+                disabled={!!busyAction || !createSelectedCustomerId || (createInvoiceBasis === "lesson_based" && createSelectedBookingIds.length === 0)}
+                onClick={() => void createInvoice(true)}
+              >
                 {busyAction === 'create_send' ? 'SENDING...' : 'CREATE & SEND'}
               </button>
             </Tooltip>
@@ -1204,21 +1355,44 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
             <AdminCard ghost className="invoice-dialog-section">
               <AdminForm className="dialog-form-grid">
                 <AdminField label="Select Customer" tooltip="Choose which student to bill." fullWidth required>
-                  <select className="invoice-dialog-customer-select" value={createSelectedCustomerId} onChange={(e) => setCreateSelectedCustomerId(e.target.value)}>
+                  <select
+                    className="invoice-dialog-customer-select"
+                    value={createSelectedCustomerId}
+                    onChange={(e) => {
+                      setCreateSelectedCustomerId(e.target.value);
+                      setCreateSelectedBookingIds([]);
+                    }}
+                  >
                     <option value="">-- Choose student --</option>
                     {customerOptions.map(c => <option key={c.id} value={c.id}>{c.lastName ? `${c.lastName}, ${c.firstName}` : c.fullName}</option>)}
                   </select>
                 </AdminField>
                 <AdminField label="Invoice Basis" tooltip="How to generate line items for this invoice.">
-                  <select value={createInvoiceBasis} onChange={(e) => setCreateInvoiceBasis(e.target.value as CreateInvoiceBasis)}>
-                    <option value="lesson_based">Lessons (Calculated from bookings)</option>
-                    <option value="standalone">Standalone (Manual line items)</option>
-                    {/* RATIONALE: Preset-driven creation is only useful once at
-                        least one preset exists, so the option is hidden otherwise. */}
-                    {presets.length > 0 && (
-                      <option value="presets">Multiple Presets (Select below)...</option>
-                    )}
-                  </select>
+                  <div className="button-row">
+                    <select value={createInvoiceBasis} onChange={(e) => setCreateInvoiceBasis(e.target.value as CreateInvoiceBasis)}>
+                      <option value="lesson_based">Lessons (Calculated from bookings)</option>
+                      <option value="standalone">Standalone (Manual line items)</option>
+                      {/* RATIONALE: Preset-driven creation is only useful once at
+                          least one preset exists, so the option is hidden otherwise. */}
+                      {presets.length > 0 && (
+                        <option value="presets">Multiple Presets (Select below)...</option>
+                      )}
+                    </select>
+                    {createInvoiceBasis === "lesson_based" ? (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-icon"
+                        disabled={!createSelectedCustomerId}
+                        onClick={() => {
+                          setCreateBookingDialogOpen(true);
+                          void loadCreateBookingOptions();
+                        }}
+                        aria-label="Select lesson bookings"
+                      >
+                        <CalendarDays size={18} />
+                      </button>
+                    ) : null}
+                  </div>
                 </AdminField>
                 <AdminField label="Currency" tooltip="Three-letter ISO currency code used for this invoice.">
                   <input
@@ -1239,14 +1413,33 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                     <option value="gst_free">{createTaxLabel} Free</option>
                   </select>
                 </AdminField>
-                {createInvoiceBasis === 'lesson_based' && (
-                  <AdminField label={`Lesson Rate (${resolvedCreateCurrency})`} tooltip="Price per standard lesson block for this billing period.">
-                    <input value={createLessonPrice} onChange={(e) => setCreateLessonPrice(e.target.value)} />
-                  </AdminField>
-                )}
                 {createInvoiceBasis === 'standalone' && (
                   <AdminField label={`Initial Item Price (${resolvedCreateCurrency})`} tooltip="Starting price for the manual line item.">
                     <input value={createStandalonePrice} onChange={(e) => setCreateStandalonePrice(e.target.value)} />
+                  </AdminField>
+                )}
+                {createInvoiceBasis === 'lesson_based' && (
+                  <AdminField
+                    label="Selected Lesson Bookings"
+                    tooltip="Choose the customer's approved bookings, then the server will group them by duration using Lesson Info / Prices."
+                    fullWidth
+                  >
+                    <div className="invoice-dialog-status-card">
+                      <div className="invoice-dialog-status-row">
+                        <span>Selected bookings:</span>
+                        <span>{createSelectedBookingIds.length}</span>
+                      </div>
+                      {createPreviewLineItems.length > 0 ? (
+                        createPreviewLineItems.map((lineItem) => (
+                          <div key={lineItem.description} className="invoice-dialog-status-row">
+                            <span>{lineItem.description}</span>
+                            <span>{toCurrency(lineItem.unitPriceCents * lineItem.quantity, resolvedCreateCurrency)}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="helper-text">Use the calendar button to choose bookings for this invoice.</p>
+                      )}
+                    </div>
                   </AdminField>
                 )}
                 {createInvoiceBasis === 'presets' && (
@@ -1303,7 +1496,9 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
             <AdminCard ghost>
               <p className="helper-text">
                 {createInvoiceBasis === 'lesson_based' 
-                  ? "This will automatically pull all approved bookings for the selected customer that haven't been invoiced yet."
+                  ? lessonPricingOptions.filter((option) => option.isActive).length === 0
+                    ? "Add active lesson durations and prices in Lesson Info / Prices before creating a lessons-based invoice."
+                    : "Use the calendar button to choose which approved customer bookings to bill. Already invoiced or invalid bookings stay visible but cannot be selected."
                   : createInvoiceBasis === 'standalone'
                   ? "This will create a blank invoice with one line item at the specified price. You can add more items after creation."
                   : "This will create a blank invoice pre-filled with the selected preset items."}
@@ -1331,6 +1526,83 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
             </AdminCard>
           </div>
         </div>
+        </div>
+      </AdminDialog>
+
+      <AdminDialog
+        isOpen={createBookingDialogOpen}
+        onClose={() => setCreateBookingDialogOpen(false)}
+        title="Select Customer Bookings"
+        wide
+        footer={
+          <div className="dialog-footer-row dialog-footer-row-end">
+            <button className="btn btn-secondary" type="button" onClick={() => setCreateBookingDialogOpen(false)}>
+              CLOSE
+            </button>
+          </div>
+        }
+      >
+        <div className="booking-dialog-scroll">
+          <AdminForm className="dialog-form-grid">
+            <AdminField label="From" tooltip="Optional inclusive start date filter for the booking list.">
+              <input type="date" value={createBookingFilterFrom} onChange={(event) => setCreateBookingFilterFrom(event.target.value)} />
+            </AdminField>
+            <AdminField label="To" tooltip="Optional inclusive end date filter for the booking list.">
+              <input type="date" value={createBookingFilterTo} onChange={(event) => setCreateBookingFilterTo(event.target.value)} />
+            </AdminField>
+            <div className="field">
+              <label className="admin-field-label">Actions</label>
+              <div className="button-row">
+                <button className="btn btn-secondary" type="button" onClick={() => void loadCreateBookingOptions()}>
+                  Refresh
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  onClick={() => {
+                    setCreateBookingFilterFrom("");
+                    setCreateBookingFilterTo("");
+                  }}
+                >
+                  Clear Dates
+                </button>
+              </div>
+            </div>
+          </AdminForm>
+
+          <AdminCard ghost className="invoice-dialog-section">
+            {createBookingOptionsLoading ? (
+              <p className="helper-text">Loading bookings...</p>
+            ) : createBookingOptions.length === 0 ? (
+              <p className="helper-text">No bookings found for the selected customer and date range.</p>
+            ) : (
+              <div className="invoice-dialog-preset-list">
+                {createBookingOptions.map((booking) => {
+                  const disabled = !booking.isInvoiceSelectable;
+                  return (
+                    <label key={booking.id} className="admin-inline-checkbox invoice-dialog-preset-option">
+                      <input
+                        type="checkbox"
+                        checked={createSelectedBookingIds.includes(booking.id)}
+                        disabled={disabled}
+                        onChange={(event) => {
+                          if (event.target.checked) {
+                            setCreateSelectedBookingIds((current) => [...current, booking.id]);
+                          } else {
+                            setCreateSelectedBookingIds((current) => current.filter((bookingId) => bookingId !== booking.id));
+                          }
+                        }}
+                      />
+                      <span>
+                        {formatDateTime(booking.startAt)} · {booking.durationMinutes} min · {booking.lessonMode === "video" ? "Video" : "In-person"} · {booking.status}
+                        {disabled ? ` · ${describeBookingIneligibility(booking.invoiceIneligibilityReason)}` : ""}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </AdminCard>
         </div>
       </AdminDialog>
     </AdminShell>

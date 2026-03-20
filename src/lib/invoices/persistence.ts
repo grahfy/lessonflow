@@ -59,6 +59,7 @@ type CreateInvoiceRecordInput = {
   taxMode?: InvoiceTaxMode;
   customerId?: string | null;
   bookingId?: string | null;
+  bookingIds?: string[] | null;
   originalInvoiceId?: string | null;
   customerSnapshot: InvoiceCustomerSnapshot;
   lineItems: InvoiceLineItemDraft[];
@@ -102,6 +103,12 @@ export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
     currency
   });
   const sellerSnapshot = sellerSnapshotFromEnv();
+  const resolvedBookingIds = Array.from(
+    new Set(
+      [input.bookingId ?? null, ...(input.bookingIds ?? [])]
+        .filter((bookingId): bookingId is string => typeof bookingId === "string" && bookingId.trim().length > 0)
+    )
+  );
   
   // NOTE: Number generation is transaction-scoped to maintain consistency under concurrency.
   const invoiceNumber = await generateNextInvoiceNumber(input.tx, input.issuedAt);
@@ -165,6 +172,13 @@ export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
           sortOrder: lineItem.sortOrder
         }))
       },
+      bookingLinks: resolvedBookingIds.length > 0
+        ? {
+            create: resolvedBookingIds.map((bookingId) => ({
+              bookingId
+            }))
+          }
+        : undefined,
       
       // AUTOMATIC AUDIT LOGGING
       auditLogs: {

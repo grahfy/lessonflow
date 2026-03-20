@@ -127,14 +127,27 @@ export const createInvoiceSchema = z
 export const createCustomerInvoiceSchema = z
   .object({
     bookingId: z.string().trim().min(1).optional(),
-    lineItems: z.array(invoiceLineItemInputSchema).min(1).max(100),
+    bookingIds: z.array(z.string().trim().min(1)).min(1).max(100).optional(),
+    lineItems: z.array(invoiceLineItemInputSchema).min(1).max(100).optional(),
     dueAt: z.string().datetime({ offset: true }).optional(),
     notes: z.string().trim().max(2_000).optional(),
     currency: invoiceCurrencySchema.optional(),
     taxMode: invoiceTaxModeSchema.optional()
   })
   .extend(optionalDiscountFieldShape)
-  .superRefine(validateOptionalDiscountFields);
+  .superRefine(validateOptionalDiscountFields)
+  .superRefine((data, ctx) => {
+    const hasBookingIds = Array.isArray(data.bookingIds) && data.bookingIds.length > 0;
+    const hasLineItems = Array.isArray(data.lineItems) && data.lineItems.length > 0;
+
+    if (!hasBookingIds && !hasLineItems) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["lineItems"],
+        message: "Provide line items or selected booking IDs."
+      });
+    }
+  });
 
 /**
  * Invoice update payload for editing draft/sent invoices and toggling payment state.

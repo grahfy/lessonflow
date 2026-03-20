@@ -4,6 +4,7 @@ import { isOwnerAdmin } from "@/lib/admin-auth";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { prisma } from "@/lib/db";
 import { applyInvoiceTaxMode, calculateInvoiceTotals } from "@/lib/invoices/calculate";
+import { findActiveInvoiceLinksForBookingIds } from "@/lib/invoices/booking-links";
 import { getDefaultInvoiceTaxModeForCurrencyValue } from "@/lib/invoices/gst-policy";
 import { updateInvoiceSchema } from "@/lib/invoices/schema";
 import { allowedStatusesForAction, canApplyInvoiceAction, type InvoiceLifecycleAction, type InvoiceLifecycleStatus } from "@/lib/invoices/transitions";
@@ -94,6 +95,36 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 
   if (parsed.data.action === "restore") {
+    const bookingLinks = await prisma.invoiceBookingLink.findMany({
+      where: {
+        invoiceId: id
+      },
+      select: {
+        bookingId: true
+      }
+    });
+    const linkedBookingIds = Array.from(
+      new Set([
+        ...bookingLinks.map((link) => link.bookingId),
+        ...(existing.bookingId ? [existing.bookingId] : [])
+      ])
+    );
+    if (linkedBookingIds.length > 0) {
+      const activeLinks = await prisma.$transaction((tx) =>
+        findActiveInvoiceLinksForBookingIds(
+          tx,
+          linkedBookingIds,
+          { excludeInvoiceId: id }
+        )
+      );
+      if (activeLinks.length > 0) {
+        return NextResponse.json(
+          { error: "Invoice cannot be restored because one or more linked bookings are now billed on another active invoice." },
+          { status: 409 }
+        );
+      }
+    }
+
     const restored = await prisma.invoice.update({
       where: { id },
       data: {

@@ -227,6 +227,8 @@ describe("admin-email-panel-layout", () => {
         canEditTeacherAssignment: true,
         canInvoice: false,
         teacherOptions: [],
+        lessonDurationOptions: [],
+        durationIsConfigured: true,
         activeTab: "emails",
         setActiveTab: noop,
         matchedCustomer: null,

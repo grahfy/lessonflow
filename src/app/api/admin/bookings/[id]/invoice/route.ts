@@ -4,6 +4,7 @@ import { isOwnerAdmin } from "@/lib/admin-auth";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
+import { findActiveInvoiceLinksForBookingIds } from "@/lib/invoices/booking-links";
 import { getDefaultInvoiceTaxModeForCurrencyValue } from "@/lib/invoices/gst-policy";
 import { createBookingInvoiceSchema } from "@/lib/invoices/schema";
 import { getDefaultDueAt, createInvoiceRecord } from "@/lib/invoices/persistence";
@@ -37,6 +38,11 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Booking not found." }, { status: 404 });
     }
 
+    const activeLinks = await prisma.$transaction((tx) => findActiveInvoiceLinksForBookingIds(tx, [booking.id]));
+    if (activeLinks.length > 0) {
+      return NextResponse.json({ error: "Booking is already linked to an active invoice." }, { status: 400 });
+    }
+
     const body = await request.json().catch(() => null);
     const parsed = createBookingInvoiceSchema.safeParse(body);
     if (!parsed.success) {
@@ -65,6 +71,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         taxMode,
         customerId: booking.customerId,
         bookingId: booking.id,
+        bookingIds: [booking.id],
         customerSnapshot: customerSnapshotFromBooking(booking),
         invoiceDiscount: {
           discountKind: parsed.data.discountKind ?? null,

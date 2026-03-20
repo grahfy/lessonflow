@@ -9,6 +9,7 @@ import {
   auStateSchema,
   formatBookingAddress,
   getBookingEnd,
+  getDurationMinutes,
   lessonDurationSchema,
   lessonModeSchema,
   skillLevelSchema
@@ -17,6 +18,7 @@ import { sendCustomerBookingMovedEmail, sendCustomerBookingStatusEmail } from "@
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
+import { getActiveLessonPricingMap } from "@/lib/lesson-pricing";
 
 type Params = {
   params: Promise<{
@@ -186,6 +188,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         parsed.data.customDurationMinutes === undefined
           ? existing.customDurationMinutes
           : parsed.data.customDurationMinutes;
+      const nextDurationMinutes = getDurationMinutes(nextDuration, nextCustomDurationMinutes);
+      const lessonPricingMap = await getActiveLessonPricingMap();
+      if (lessonPricingMap.size > 0 && !lessonPricingMap.has(nextDurationMinutes)) {
+        return NextResponse.json(
+          { error: `No active lesson pricing is configured for ${nextDurationMinutes} minute lessons.` },
+          { status: 400 }
+        );
+      }
       const nextFirstName = parsed.data.firstName ?? existing.firstName;
       const nextLastName = parsed.data.lastName ?? existing.lastName;
       const nextName = parsed.data.name ?? existing.name;

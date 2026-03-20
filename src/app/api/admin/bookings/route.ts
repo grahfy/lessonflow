@@ -13,11 +13,12 @@ import { Prisma } from "@/generated/prisma/client";
 import { bookingColor, bookingRequestColor, getRecencyCutoff } from "@/lib/admin-calendar-events";
 import { canManagePrimaryTeacherCustomer } from "@/lib/admin/permissions";
 import { ensureCustomerPrimaryTeacher, resolveAssignedTeacherId } from "@/lib/admin/teacher-assignment";
-import { adminManualBookingSchema, formatBookingAddress, generateRecurringStartDates, getBookingEnd } from "@/lib/booking-rules";
+import { adminManualBookingSchema, formatBookingAddress, generateRecurringStartDates, getBookingEnd, getDurationMinutes } from "@/lib/booking-rules";
 import { customerSnapshotFromInput, normalizeEmail, normalizePhone } from "@/lib/customer-match";
 import { getCalendarRange } from "@/lib/calendar-range";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { prisma } from "@/lib/db";
+import { getActiveLessonPricingMap } from "@/lib/lesson-pricing";
 import { ensurePortalCredentialForCustomer } from "@/lib/student-portal/credentials";
 
 /**
@@ -245,6 +246,15 @@ export async function POST(request: NextRequest) {
     const parsed = manualBookingSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid booking payload.", details: parsed.error.flatten() }, { status: 400 });
+    }
+
+    const durationMinutes = getDurationMinutes(parsed.data.lessonDuration, parsed.data.customDurationMinutes);
+    const lessonPricingMap = await getActiveLessonPricingMap();
+    if (lessonPricingMap.size > 0 && !lessonPricingMap.has(durationMinutes)) {
+      return NextResponse.json(
+        { error: `No active lesson pricing is configured for ${durationMinutes} minute lessons.` },
+        { status: 400 }
+      );
     }
 
     const requestedAssignedTeacherId = await resolveAssignedTeacherId({

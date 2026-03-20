@@ -34,6 +34,7 @@ interface ManualBookingDialogProps {
   currentTeacherId: string | null;
   durationChoice: string;
   setDurationChoice: (val: string) => void;
+  lessonDurationOptions: Array<{ value: string; label: string }>;
   manualMatch: BookingMatchedCustomer | null;
   onResolveMatch: (resolution: "use_existing" | "update_existing" | "create_new") => void;
   onSave: () => void;
@@ -74,6 +75,7 @@ export function ManualBookingDialog({
   currentTeacherId,
   durationChoice,
   setDurationChoice,
+  lessonDurationOptions,
   manualMatch,
   onResolveMatch,
   onSave,
@@ -286,17 +288,19 @@ export function ManualBookingDialog({
                   name="lessonDuration"
                   value={durationChoice}
                   onChange={(e) => setDurationChoice(e.target.value)}
+                  disabled={lessonDurationOptions.length === 0}
                 >
-                  <option value="min30">30 minutes</option>
-                  <option value="min60">60 minutes</option>
-                  <option value="custom">Other amount</option>
+                  {lessonDurationOptions.length === 0 ? (
+                    <option value="">No lesson durations configured</option>
+                  ) : (
+                    lessonDurationOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))
+                  )}
                 </select>
               </AdminField>
-              {durationChoice === "custom" && (
-                <AdminField label="Custom Minutes" tooltip="Custom duration in minutes." required>
-                  <input name="customDurationMinutes" required maxLength={3} onInput={e => e.currentTarget.value = toDigits(e.currentTarget.value, 3)} />
-                </AdminField>
-              )}
             </AdminForm>
           </div>
 

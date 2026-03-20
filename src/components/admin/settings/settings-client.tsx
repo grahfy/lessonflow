@@ -31,6 +31,7 @@ import { AdminPresetsEditor } from "@/components/admin/settings/presets-editor";
 import { AdminContentEditor } from "@/components/admin/settings/content-editor";
 import { AdminEmailSignatureEditor } from "@/components/admin/settings/email-signature-editor";
 import { AdminGeoblockingSettingsEditor } from "@/components/admin/settings/geoblocking-settings-editor";
+import { AdminLessonPricingEditor } from "@/components/admin/settings/lesson-pricing-editor";
 import { AdminNotificationSettingsEditor } from "@/components/admin/settings/notification-settings-editor";
 import { AdminEmailTemplateEditor } from "@/components/admin/settings/email-template-editor";
 import { AdminInvoiceTemplateEditor } from "@/components/admin/invoices/invoice-template-editor";
@@ -40,7 +41,7 @@ import { Tooltip } from "@/components/admin/ui/tooltip";
 import { invalidateCustomerEmailAlertsSessionCache } from "@/lib/admin/customer-email-alerts";
 import { useSettings, type EnvVarField } from "@/lib/admin/use-settings";
 
-type TabKey = "branding" | "pages" | "emails" | "invoices" | "products" | "system";
+type TabKey = "branding" | "pages" | "emails" | "invoices" | "products" | "lesson-pricing" | "system";
 
 const SETTINGS_TABS: Array<{ key: TabKey; label: string; tooltip: string }> = [
   { key: "branding", label: "Branding", tooltip: "Configure brand names, logos, and contact information." },
@@ -48,6 +49,7 @@ const SETTINGS_TABS: Array<{ key: TabKey; label: string; tooltip: string }> = [
   { key: "emails", label: "Emails", tooltip: "Customize email templates sent to students and staff." },
   { key: "invoices", label: "Invoices", tooltip: "Manage invoice numbering, payment terms, and visual templates." },
   { key: "products", label: "Products", tooltip: "Configure catalog items like tuition types and textbooks." },
+  { key: "lesson-pricing", label: "Lesson Info / Prices", tooltip: "Manage lesson durations and prices used by admin invoicing and booking workflows." },
   { key: "system", label: "System", tooltip: "Advanced configuration for databases, security, and email delivery routes." }
 ];
 
@@ -408,8 +410,11 @@ export function AdminSettingsClient() {
             
             {/* 5. Product Presets (Textbooks, Tuition) */}
             {activeTab === "products" && <AdminPresetsEditor />}
+
+            {/* 6. Lesson duration and pricing catalog */}
+            {activeTab === "lesson-pricing" && <AdminLessonPricingEditor />}
             
-            {/* 6. System & Security Console */}
+            {/* 7. System & Security Console */}
             {activeTab === "system" && (
               <>
                 {renderEnvFields("system")}

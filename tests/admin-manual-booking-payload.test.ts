@@ -89,6 +89,21 @@ describe("buildManualBookingPayload", () => {
     expect(result.payload.customDurationMinutes).toBe(45);
   });
 
+  it("maps configured numeric duration values to enum plus custom minutes", () => {
+    const formData = baseFormData();
+    formData.set("lessonDuration", "120");
+
+    const result = buildManualBookingPayload(formData, {
+      manualCustomerId: "",
+      updateCustomerFromBooking: true
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.lessonDuration).toBe("min60");
+    expect(result.payload.customDurationMinutes).toBe(120);
+  });
+
   it("requires custom minutes when custom duration is selected", () => {
     const formData = baseFormData();
     formData.set("lessonDuration", "custom");

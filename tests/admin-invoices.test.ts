@@ -25,8 +25,10 @@ describe("admin-invoices", () => {
     // RATIONALE: Invoice flows span billing rows, line items, bookings, and
     // sometimes booking-originated invoice creation, so tests reset the full graph.
     await prisma.invoiceAuditLog.deleteMany();
+    await prisma.invoiceBookingLink.deleteMany();
     await prisma.invoiceLineItem.deleteMany();
     await prisma.invoice.deleteMany();
+    await prisma.lessonPricingOption.deleteMany();
     await prisma.bookingAuditLog.deleteMany();
     await prisma.booking.deleteMany();
     await prisma.bookingSeries.deleteMany();

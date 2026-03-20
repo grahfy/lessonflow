@@ -37,11 +37,13 @@ import { Tooltip } from "@/components/admin/ui/tooltip";
 import { useBookings, type BookingEvent } from "@/lib/admin/use-bookings";
 import { useCustomers } from "@/lib/admin/use-customers";
 import { useEmailHistory, type EmailHistoryTarget } from "@/lib/admin/use-email-history";
+import { useLessonPricing } from "@/lib/admin/use-lesson-pricing";
 import { useLearningMaterials } from "@/lib/admin/use-learning-materials";
 import { useAdminSession } from "@/lib/admin/use-admin-session";
 import { usePresets } from "@/lib/admin/use-presets";
 import { useTeachers } from "@/lib/admin/use-teachers";
 import { buildManualBookingPayload } from "@/lib/admin/manual-booking-payload";
+import { durationMinutesToBookingPayload, durationMinutesToChoiceValue, getPersistedDurationMinutes } from "@/lib/lesson-duration-utils";
 import { toDateKey, toDateTimeLocalValue } from "@/lib/time";
 
 import { BookingDetailDialog } from "./booking-detail-dialog";
@@ -205,6 +207,7 @@ export function AdminBookingsClient() {
   const events = useMemo(() => rawEvents as EventWithRow[], [rawEvents]);
 
   const { customers: customerOptions, load: loadCustomers } = useCustomers({ pageSize: 250, onAuthError, onError: setError });
+  const { lessonPricingOptions, load: loadLessonPricing } = useLessonPricing({ onAuthError, onError: setError });
   const { teachers: teacherOptions } = useTeachers({ onAuthError, onError: setError });
   const singleTeacherOptionId = teacherOptions.length === 1 ? teacherOptions[0]?.id ?? "" : "";
   const { 
@@ -219,6 +222,22 @@ export function AdminBookingsClient() {
   } = useEmailHistory({ onAuthError, onError: setError });
   const { materials: materialsList, loading: materialsLoading, uploading: materialsUploading, deletingId: materialsDeletingId, load: loadMaterials, upload: uploadMaterialApi, remove: removeMaterialApi } = useLearningMaterials({ onAuthError, onError: setError });
   const { presets } = usePresets({ onAuthError, onError: setError });
+  const activeLessonPricingOptions = useMemo(
+    () => lessonPricingOptions.filter((option) => option.isActive).sort((a, b) => a.sortOrder - b.sortOrder || a.durationMinutes - b.durationMinutes),
+    [lessonPricingOptions]
+  );
+  const configuredDurationChoices = useMemo(
+    () =>
+      activeLessonPricingOptions.map((option) => ({
+        value: durationMinutesToChoiceValue(option.durationMinutes),
+        label: `${option.durationMinutes} minutes`
+      })),
+    [activeLessonPricingOptions]
+  );
+  const configuredDurationValues = useMemo(
+    () => new Set(activeLessonPricingOptions.map((option) => option.durationMinutes)),
+    [activeLessonPricingOptions]
+  );
 
   const selectedEvent = useMemo(() => events.find((event) => event.id === selectedKey) || null, [events, selectedKey]);
   const filteredEvents = useMemo(() => {
@@ -253,6 +272,16 @@ export function AdminBookingsClient() {
   useEffect(() => {
     void loadBookings(view, dateStr);
   }, [view, dateStr, loadBookings]);
+
+  useEffect(() => {
+    void loadLessonPricing();
+  }, [loadLessonPricing]);
+
+  useEffect(() => {
+    if (manualDialogPresence.isMounted && !manualDurationChoice && configuredDurationChoices[0]) {
+      setManualDurationChoice(configuredDurationChoices[0].value);
+    }
+  }, [configuredDurationChoices, manualDialogPresence.isMounted, manualDurationChoice]);
 
   /** Navigation utility for changing calendar views. */
   const navigate = useCallback((newView: CalendarView, newDate: string) => {
@@ -310,7 +339,19 @@ export function AdminBookingsClient() {
         typeof row.assignedTeacherId === "string" && row.assignedTeacherId
           ? row.assignedTeacherId
           : singleTeacherOptionId,
-      durationChoice: typeof row.lessonDuration === "string" ? row.lessonDuration : "min30",
+      durationChoice: durationMinutesToChoiceValue(
+        typeof row.lessonDuration === "string" && (row.lessonDuration === "min30" || row.lessonDuration === "min60")
+          ? getPersistedDurationMinutes({
+              lessonDuration: row.lessonDuration,
+              customDurationMinutes:
+                typeof row.customDurationMinutes === "number"
+                  ? row.customDurationMinutes
+                  : typeof row.customDurationMinutes === "string" && row.customDurationMinutes.trim()
+                    ? Number(row.customDurationMinutes)
+                    : null
+            })
+          : 30
+      ),
       customDurationMinutes: row.customDurationMinutes == null ? "" : String(row.customDurationMinutes)
     });
     setActiveTab("appointment");
@@ -348,14 +389,15 @@ export function AdminBookingsClient() {
     setCustomerQuery("");
     setManualCustomerId("");
     setManualIsRecurring(false);
-    setManualDurationChoice("min30");
+    setManualDurationChoice(configuredDurationChoices[0]?.value ?? "");
     setManualMatch(null);
     setError("");
     setNotice("");
     void loadCustomers();
+    void loadLessonPricing();
     manualDialogPresence.show();
     if (manualDialogRootRef.current) animateIn(manualDialogRootRef.current);
-  }, [manualDialogPresence, loadCustomers]);
+  }, [configuredDurationChoices, loadCustomers, loadLessonPricing, manualDialogPresence]);
 
   const closeManualDialog = useCallback(() => {
     const root = manualDialogRootRef.current;
@@ -452,8 +494,23 @@ export function AdminBookingsClient() {
   async function saveBooking() {
     const event = events.find(e => e.id === selectedKey);
     if (!selectedKey || !dialogForm || !event) return;
+    const nextDurationMinutes = Number.parseInt(dialogForm.durationChoice, 10);
+    if (!Number.isInteger(nextDurationMinutes)) {
+      setError("Select a configured lesson duration before saving.");
+      return;
+    }
+    if (!configuredDurationValues.has(nextDurationMinutes)) {
+      setError("This booking uses a duration that is not configured in Lesson Info / Prices. Add that duration in settings or choose a configured duration before saving.");
+      return;
+    }
+
+    const normalizedDuration = durationMinutesToBookingPayload(nextDurationMinutes);
     setBusyAction("save");
-    const result = await updateBookingApi(selectedKey, event.entityType, "edit", dialogForm);
+    const result = await updateBookingApi(selectedKey, event.entityType, "edit", {
+      ...dialogForm,
+      lessonDuration: normalizedDuration.lessonDuration,
+      customDurationMinutes: normalizedDuration.customDurationMinutes
+    });
     setBusyAction(null);
     if (result.ok) {
       setNotice(result.notice || "Booking updated.");
@@ -514,6 +571,10 @@ export function AdminBookingsClient() {
   /** logic for resolving manual booking with potential duplicates. */
   async function addManualBooking(resolution?: "use_existing" | "update_existing" | "create_new") {
     if (!manualFormRef.current) return;
+    if (activeLessonPricingOptions.length === 0) {
+      setError("Add at least one active lesson duration in Lesson Info / Prices before creating manual bookings.");
+      return;
+    }
     setBusyAction("create");
     setError("");
 
@@ -692,6 +753,8 @@ export function AdminBookingsClient() {
           canEditTeacherAssignment={currentAdmin?.role === "owner"}
           canInvoice={currentAdmin?.role === "owner"}
           teacherOptions={teacherOptions}
+          lessonDurationOptions={configuredDurationChoices}
+          durationIsConfigured={configuredDurationValues.has(Number.parseInt(dialogForm?.durationChoice || "", 10))}
           onMove={() => {
             const event = events.find(e => e.id === selectedKey);
             if (event) {
@@ -818,6 +881,7 @@ export function AdminBookingsClient() {
           currentTeacherId={currentAdmin?.role === "teacher" ? currentAdmin.id : null}
           durationChoice={manualDurationChoice}
           setDurationChoice={setManualDurationChoice}
+          lessonDurationOptions={configuredDurationChoices}
           manualMatch={manualMatch}
           onResolveMatch={(resolution) => void addManualBooking(resolution)}
           onSave={() => void addManualBooking()}
