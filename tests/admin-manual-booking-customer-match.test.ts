@@ -111,6 +111,23 @@ describe("admin-manual-booking-customer-match", () => {
     expect(customer.normalizedEmail).toBe("taylor@example.com");
   });
 
+  it("creates and links a customer automatically for next-year manual bookings", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+    const nextYear = new Date().getUTCFullYear() + 1;
+    const startAt = new Date(Date.UTC(nextYear, 0, 10, 10, 0, 0)).toISOString();
+
+    const res = await POST(adminPost(basePayload(startAt), token));
+    expect(res.status).toBe(200);
+
+    const booking = await prisma.booking.findFirstOrThrow({
+      where: {
+        startAt: new Date(startAt)
+      }
+    });
+    expect(booking.customerId).toBeTruthy();
+  });
+
   it("returns conflict for existing deterministic customer match and allows using existing", async () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);
@@ -238,11 +255,66 @@ describe("admin-manual-booking-customer-match", () => {
     }
   });
 
-  it("rejects recurring manual bookings that start in the past", async () => {
+  it("creates recurring manual bookings that start in the past", async () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);
     const startAt = historicalIso();
     const recurrenceEndAt = historicalIso(-1, 6, 24, 10);
+
+    const response = await POST(
+      adminPost(
+        {
+          ...basePayload(startAt),
+          isRecurring: true,
+          recurrenceEndAt
+        },
+        token
+      )
+    );
+
+    expect(response.status).toBe(200);
+    const bookings = await prisma.booking.findMany({
+      where: { email: "taylor@example.com" },
+      orderBy: { startAt: "asc" }
+    });
+    expect(bookings).toHaveLength(3);
+    expect(bookings[0]?.startAt.toISOString()).toBe(startAt);
+    expect(bookings[2]?.startAt.toISOString()).toBe(recurrenceEndAt);
+  });
+
+  it("creates recurring manual bookings that span year boundaries", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+    const year = new Date().getUTCFullYear();
+    const startAt = new Date(Date.UTC(year, 11, 20, 10, 0, 0)).toISOString();
+    const recurrenceEndAt = new Date(Date.UTC(year + 1, 0, 17, 10, 0, 0)).toISOString();
+
+    const response = await POST(
+      adminPost(
+        {
+          ...basePayload(startAt),
+          isRecurring: true,
+          recurrenceEndAt
+        },
+        token
+      )
+    );
+
+    expect(response.status).toBe(200);
+    const bookings = await prisma.booking.findMany({
+      where: { email: "taylor@example.com" },
+      orderBy: { startAt: "asc" }
+    });
+    expect(bookings).toHaveLength(5);
+    expect(bookings[0]?.startAt.toISOString()).toBe(startAt);
+    expect(bookings[4]?.startAt.toISOString()).toBe(recurrenceEndAt);
+  });
+
+  it("rejects recurring manual bookings when the end is before the first booking", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+    const startAt = historicalIso(-1, 6, 24, 10);
+    const recurrenceEndAt = historicalIso(-1, 6, 10, 10);
 
     const response = await POST(
       adminPost(

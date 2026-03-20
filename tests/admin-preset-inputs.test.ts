@@ -20,7 +20,7 @@ describe("admin preset inputs", () => {
     expect(serializePresetAmountInput("12.34").value).toBe(1234);
     expect(serializePresetAmountInput("12.345")).toEqual({
       value: null,
-      error: "Use formats like $50, 50, or 50.00."
+      error: "Use a valid currency amount, for example 50 or 50.00."
     });
   });
 

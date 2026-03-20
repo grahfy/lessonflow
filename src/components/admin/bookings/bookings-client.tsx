@@ -334,11 +334,13 @@ export function AdminBookingsClient() {
     if (dialogRootRef.current) animateIn(dialogRootRef.current);
   }, [currentAdmin, dialogPresence, loadCustomers, loadEmailHistory, loadMaterials, singleTeacherOptionId]);
 
-  const closeDialog = useCallback(async () => {
-    if (dialogRootRef.current) await animateOut(dialogRootRef.current);
-    dialogPresence.hide();
-    setSelectedKey(null);
-    setDialogForm(null);
+  const closeDialog = useCallback(() => {
+    const root = dialogRootRef.current;
+    dialogPresence.hide(() => {
+      setSelectedKey(null);
+      setDialogForm(null);
+    });
+    void animateOut(root).catch(() => undefined);
   }, [dialogPresence]);
 
   const openManualDialog = useCallback(async () => {
@@ -355,9 +357,10 @@ export function AdminBookingsClient() {
     if (manualDialogRootRef.current) animateIn(manualDialogRootRef.current);
   }, [manualDialogPresence, loadCustomers]);
 
-  const closeManualDialog = useCallback(async () => {
-    if (manualDialogRootRef.current) await animateOut(manualDialogRootRef.current);
+  const closeManualDialog = useCallback(() => {
+    const root = manualDialogRootRef.current;
     manualDialogPresence.hide();
+    void animateOut(root).catch(() => undefined);
   }, [manualDialogPresence]);
 
 

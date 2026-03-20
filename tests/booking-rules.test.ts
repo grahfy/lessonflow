@@ -143,20 +143,122 @@ describe("booking-rules", () => {
       isRecurring: false
     });
 
+    expect(parsed.success).toBe(true);
+  });
+
+  it("allows admin recurring bookings in the past", () => {
+    const previousYear = new Date().getUTCFullYear() - 1;
+    const start = toIso(previousYear, 6, 10, 3);
+    const end = toIso(previousYear, 6, 24, 3);
+
+    const parsed = adminManualBookingSchema.safeParse({
+      firstName: "Alex",
+      lastName: "Student",
+      name: "Alex Student",
+      email: "alex@example.com",
+      phone: "0400-123-456",
+      houseNumber: "1",
+      streetName: "Smith",
+      streetType: "St",
+      suburb: "Northcote",
+      state: "VIC",
+      postcode: "3070",
+      lessonMode: "video",
+      skillLevel: "intermediate",
+      lessonDuration: "min30",
+      requestedStartAt: start,
+      isRecurring: true,
+      recurrenceEndAt: end
+    });
+
+    expect(parsed.success).toBe(true);
+  });
+
+  it("allows admin recurring bookings that span year boundaries", () => {
+    const year = new Date().getUTCFullYear();
+    const start = toIso(year, 12, 20, 3);
+    const end = toIso(year + 1, 1, 17, 3);
+
+    const parsed = adminManualBookingSchema.safeParse({
+      firstName: "Alex",
+      lastName: "Student",
+      name: "Alex Student",
+      email: "alex@example.com",
+      phone: "0400-123-456",
+      houseNumber: "1",
+      streetName: "Smith",
+      streetType: "St",
+      suburb: "Northcote",
+      state: "VIC",
+      postcode: "3070",
+      lessonMode: "video",
+      skillLevel: "intermediate",
+      lessonDuration: "min30",
+      requestedStartAt: start,
+      isRecurring: true,
+      recurrenceEndAt: end
+    });
+
+    expect(parsed.success).toBe(true);
+  });
+
+  it("still rejects recurrence end dates before the first booking", () => {
+    const year = new Date().getUTCFullYear();
+    const start = toIso(year, 6, 24, 3);
+    const end = toIso(year, 6, 10, 3);
+
+    const parsed = adminManualBookingSchema.safeParse({
+      firstName: "Alex",
+      lastName: "Student",
+      name: "Alex Student",
+      email: "alex@example.com",
+      phone: "0400-123-456",
+      houseNumber: "1",
+      streetName: "Smith",
+      streetType: "St",
+      suburb: "Northcote",
+      state: "VIC",
+      postcode: "3070",
+      lessonMode: "video",
+      skillLevel: "intermediate",
+      lessonDuration: "min30",
+      requestedStartAt: start,
+      isRecurring: true,
+      recurrenceEndAt: end
+    });
+
     expect(parsed.success).toBe(false);
   });
 
   it("creates weekly recurrence dates", () => {
     const dates = generateRecurringStartDates({
       startAt: new Date("2026-03-02T10:00:00.000Z"),
-      recurrenceEndAt: new Date("2026-03-16T10:00:00.000Z"),
-      currentYear: 2026
+      recurrenceEndAt: new Date("2026-03-16T10:00:00.000Z")
     });
 
     // RATIONALE: Recurrence generation is inclusive of the start date and then
     // advances in weekly steps until the inclusive recurrence end boundary.
     expect(dates.length).toBe(3);
     expect(dates[1].toISOString()).toBe("2026-03-09T10:00:00.000Z");
+  });
+
+  it("creates weekly recurrence dates across year boundaries", () => {
+    const dates = generateRecurringStartDates({
+      startAt: new Date("2026-12-20T10:00:00.000Z"),
+      recurrenceEndAt: new Date("2027-01-17T10:00:00.000Z")
+    });
+
+    expect(dates).toHaveLength(5);
+    expect(dates[4].toISOString()).toBe("2027-01-17T10:00:00.000Z");
+  });
+
+  it("rejects recurrence generation when the end is before the start", () => {
+    expect(() =>
+      generateRecurringStartDates({
+        startAt: new Date("2026-06-24T10:00:00.000Z"),
+        recurrenceEndAt: new Date("2026-06-10T10:00:00.000Z")
+      })
+    ).toThrow("Recurrence end must be after first booking.");
   });
 
   it("computes booking end times from duration", () => {

@@ -94,34 +94,35 @@ const bookingRequestFields = z.object({
   recurrenceEndAt: isoDateParser.optional()
 });
 
-function createBookingRequestSchema(options?: { allowHistoricalSingleBookings?: boolean }) {
+type BookingDatePolicy = {
+  allowPastStartDates?: boolean;
+  allowNonCurrentYearStartDates?: boolean;
+  allowNonCurrentYearRecurrenceEndDates?: boolean;
+};
+
+function createBookingRequestSchema(options?: BookingDatePolicy) {
   return bookingRequestFields.superRefine((data, ctx) => {
     const startAt = new Date(data.requestedStartAt);
     const now = new Date();
     const currentYear = getCurrentCalendarYear();
-    // NOTE: No lower-bound date limit is enforced — admins may backfill single bookings for any past date.
-    // Recurring entries still require the standard current-year and future-only rules.
-    const allowHistoricalSingleBookings =
-      options?.allowHistoricalSingleBookings === true && !data.isRecurring && isBefore(startAt, now);
+    const allowPastStartDates = options?.allowPastStartDates === true;
+    const allowNonCurrentYearStartDates = options?.allowNonCurrentYearStartDates === true;
+    const allowNonCurrentYearRecurrenceEndDates = options?.allowNonCurrentYearRecurrenceEndDates === true;
 
-    if (!allowHistoricalSingleBookings) {
-      // SECURITY: Prevent booking dates in the past or far future outside the business cycle.
-      if (!isDateInCalendarYear(startAt, currentYear)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `Bookings must be in the current calendar year (${currentYear}).`,
-          path: ["requestedStartAt"]
-        });
-      }
+    if (!allowNonCurrentYearStartDates && !isDateInCalendarYear(startAt, currentYear)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Bookings must be in the current calendar year (${currentYear}).`,
+        path: ["requestedStartAt"]
+      });
+    }
 
-      // LOGIC: Ensure booking is in the future
-      if (isBefore(startAt, now)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Requested start must be in the future.",
-          path: ["requestedStartAt"]
-        });
-      }
+    if (!allowPastStartDates && isBefore(startAt, now)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Requested start must be in the future.",
+        path: ["requestedStartAt"]
+      });
     }
 
     // VALIDATION: Custom duration must be whole number
@@ -153,8 +154,9 @@ function createBookingRequestSchema(options?: { allowHistoricalSingleBookings?: 
         });
       }
 
-      // Ensure recurring bookings stay within calendar year
-      if (!isDateInCalendarYear(end, currentYear)) {
+      // Public/student requests remain bounded to the current year, while
+      // admin manual bookings may span historical and cross-year ranges.
+      if (!allowNonCurrentYearRecurrenceEndDates && !isDateInCalendarYear(end, currentYear)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: `Recurring bookings must end in ${currentYear}.`,
@@ -188,14 +190,13 @@ export const bookingRequestSchema = createBookingRequestSchema();
 /**
  * Admin-only manual booking schema.
  *
- * RATIONALE: Admins may backfill one-off historical bookings for record keeping,
- * but recurring entries still follow the normal current-year and future-only rules.
- * 
- * NOTE: This bypass only applies to past dates (isBefore check). Future single bookings
- * that fall outside the current calendar year are still rejected by the normal year guard.
+ * RATIONALE: Admin manual bookings need to support operational backfill and
+ * future planning beyond the public booking-request constraints.
  */
 export const adminManualBookingSchema = createBookingRequestSchema({
-  allowHistoricalSingleBookings: true
+  allowPastStartDates: true,
+  allowNonCurrentYearStartDates: true,
+  allowNonCurrentYearRecurrenceEndDates: true
 });
 
 export type BookingRequestInput = z.infer<typeof bookingRequestSchema>;
@@ -286,11 +287,9 @@ export function getBookingEnd(
 export function generateRecurringStartDates(input: {
   startAt: Date;
   recurrenceEndAt: Date;
-  currentYear?: number;
 }): Date[] {
-  const year = input.currentYear ?? getCurrentCalendarYear();
-  if (!isDateInCalendarYear(input.startAt, year) || !isDateInCalendarYear(input.recurrenceEndAt, year)) {
-    throw new Error(`Recurring bookings must be in the current year (${year}).`);
+  if (isAfter(input.startAt, input.recurrenceEndAt)) {
+    throw new Error("Recurrence end must be after first booking.");
   }
 
   const dates: Date[] = [];

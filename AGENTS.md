@@ -51,7 +51,11 @@ Example: `npm run test:prepare && node ./scripts/run-vitest-with-test-db.cjs run
 ### Test Database Notes
 - `TEST_DATABASE_URL` is already wired into [`scripts/test-full-site-local.sh`](/home/grahf/jon/melbourne-guitar-school/scripts/test-full-site-local.sh).
 - That script first reads `TEST_DATABASE_URL` from `.env.test.local` when present.
-- If `.env.test.local` is missing, it derives the test DB URL from the main DB URL by switching `mgs_dev` → `mgs_test` and port `3306` → `3307`, then exports `TEST_DATABASE_URL` before running Prisma/test commands.
+- If `.env.test.local` is missing, it derives the test DB URL from `DATABASE_URL` in `.env` by switching `mgs_dev` → `mgs_test` and port `3306` → `3307`, then exports that value before running Prisma/test commands.
+- With the repo example env files and the local smoke script defaults, the expected local URLs are:
+  - Dev DB: `mysql://root:root@127.0.0.1:3306/mgs_dev`
+  - Test DB: `mysql://root:root@127.0.0.1:3307/mgs_test`
+- The local smoke script logs both resolved URLs and treats dev/test as shared if they resolve to the same value, which matters for seeded manual-QA data restoration during automated runs.
 
 ## Coding Style & Naming Conventions
 
@@ -139,6 +143,12 @@ export function validateBookingData(data: unknown) {
 - Unit tests live alongside components: `src/components/foo.tsx` → `src/components/foo.test.ts`.
 - E2E tests live in `tests/e2e/`.
 - Use Vitest for unit/integration tests, Playwright for e2e.
+
+### Public Form Geoblocking Note
+- Public `/book` and `/contact` submissions run geoblocking before schema validation.
+- Local browser tests may therefore fail with `This form is not currently available from your region.` before reaching the field-validation branch you intended to verify.
+- For local Playwright/manual verification of public booking/contact validation, use a request context that resolves to Australia, for example `x-vercel-ip-country: AU`, or configure geoblocking settings so unknown localhost traffic is allowed.
+- Do not treat a local geoblocking response as evidence that booking-schema validation changed unless the request has already passed geoblocking.
 
 ### Manual Verification Checklist
 After significant changes, verify:
