@@ -193,6 +193,72 @@ describe("admin-invoice-mutations", () => {
     expect(creditBody.invoice.originalInvoiceId).toBe(invoice.id);
   });
 
+  it("saves added lesson fee line items during invoice edit", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+    const invoice = await seedInvoice(admin.id, "MGS-2026-9913");
+
+    const editReq = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}`, "PATCH", token, {
+      action: "edit",
+      lineItems: [
+        {
+          id: invoice.lineItems[0].id,
+          kind: "lesson_fee",
+          description: "Lesson fee",
+          quantity: 1,
+          unitPriceCents: 9000,
+          taxMode: "taxable",
+          sortOrder: 0
+        },
+        {
+          kind: "lesson_fee",
+          description: "1 x 60 minute lesson",
+          quantity: 1,
+          unitPriceCents: 12000,
+          taxMode: "taxable",
+          sortOrder: 1
+        }
+      ]
+    });
+    const editRes = await PATCH(editReq, { params: Promise.resolve({ id: invoice.id }) });
+    expect(editRes.status).toBe(200);
+
+    const body = (await editRes.json()) as {
+      invoice: {
+        subtotalCents: number;
+        gstCents: number;
+        totalCents: number;
+        lineItems: Array<{ kind: string; description: string; unitPriceCents: number }>;
+      };
+    };
+    expect(body.invoice.subtotalCents).toBe(21000);
+    expect(body.invoice.gstCents).toBe(2100);
+    expect(body.invoice.totalCents).toBe(23100);
+    expect(body.invoice.lineItems).toHaveLength(2);
+    expect(body.invoice.lineItems[1]).toMatchObject({
+      kind: "lesson_fee",
+      description: "1 x 60 minute lesson",
+      unitPriceCents: 12000
+    });
+
+    const reloaded = await prisma.invoice.findUniqueOrThrow({
+      where: { id: invoice.id },
+      include: {
+        lineItems: {
+          orderBy: {
+            sortOrder: "asc"
+          }
+        }
+      }
+    });
+    expect(reloaded.lineItems).toHaveLength(2);
+    expect(reloaded.lineItems[1]).toMatchObject({
+      kind: "lesson_fee",
+      description: "1 x 60 minute lesson",
+      unitPriceCents: 12000
+    });
+  });
+
   it("rejects invalid invoice transitions and keeps status unchanged", async () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);
