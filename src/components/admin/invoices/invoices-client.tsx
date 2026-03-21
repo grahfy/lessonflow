@@ -40,6 +40,7 @@ type EditableLineItem = {
   kind: InvoiceLineItemDraft["kind"];
   description: string;
   quantity: string;
+  quantityLocked?: boolean;
   unitPriceInput: string;
   taxMode: InvoiceTaxMode;
   discountKind: InvoiceDiscountKind | null;
@@ -283,6 +284,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
         kind: li.kind as InvoiceLineItemDraft["kind"],
         description: li.description,
         quantity: String(li.quantity),
+        quantityLocked: false,
         unitPriceInput: toMoneyInput(li.unitPriceCents),
         taxMode: li.taxMode,
         discountKind: li.discountKind ?? null,
@@ -397,6 +399,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
         kind: "custom",
         description: "",
         quantity: "1",
+        quantityLocked: false,
         unitPriceInput: "0.00",
         taxMode: getDefaultInvoiceTaxModeForCurrencyValue(resolvedEditingCurrency),
         discountKind: null,
@@ -503,6 +506,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
         kind: "custom",
         description: preset.description,
         quantity: "1",
+        quantityLocked: true,
         unitPriceInput: toMoneyInput(preset.unitPriceCents),
         taxMode: getDefaultInvoiceTaxModeForCurrencyValue(resolvedEditingCurrency),
         discountKind: preset.discountKind ?? null,
@@ -533,6 +537,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
         kind: "lesson_fee",
         description: describeGroupedLessonLine(durationMinutes, 1),
         quantity: "1",
+        quantityLocked: true,
         unitPriceInput: toMoneyInput(lessonPrice.priceCents),
         taxMode: getDefaultInvoiceTaxModeForCurrencyValue(resolvedEditingCurrency),
         discountKind: null,
@@ -554,7 +559,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
     editingLineItems.map((li, index) => ({
       kind: li.kind,
       description: li.description,
-      quantity: Number.parseFloat(li.quantity) || 0,
+      quantity: li.quantityLocked ? 1 : Number.parseFloat(li.quantity) || 0,
       unitPriceCents: parseMoneyInputToCents(li.unitPriceInput, resolvedEditingCurrency).cents || 0,
       taxMode: li.taxMode,
       sortOrder: index,
@@ -776,7 +781,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
       id: li.id,
       kind: li.kind,
       description: li.description,
-      quantity: Number.parseFloat(li.quantity) || 0,
+      quantity: li.quantityLocked ? 1 : Number.parseFloat(li.quantity) || 0,
       unitPriceCents: parseMoneyInputToCents(li.unitPriceInput, resolvedEditingCurrency).cents || 0,
       taxMode: li.taxMode,
       discountKind: li.discountKind,
@@ -1332,7 +1337,10 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                   <div className="invoice-dialog-line-items-shell">
                     <div className="invoice-dialog-line-items">
                       {editingLineItems.map((li) => (
-                        <div key={li.key} className="invoice-dialog-line-item">
+                        <div
+                          key={li.key}
+                          className={`invoice-dialog-line-item${li.quantityLocked ? " invoice-dialog-line-item-fixed-quantity" : ""}`}
+                        >
                           <div className="invoice-dialog-line-item-main">
                             <AdminField label="Description" tooltip="Line item name or service provided.">
                               <input
@@ -1342,16 +1350,18 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                               />
                             </AdminField>
                           </div>
-                          <div className="invoice-dialog-line-item-qty">
-                            <AdminField label="Qty" tooltip="Quantity.">
-                              <input
-                                type="number"
-                                value={li.quantity}
-                                disabled={!canEditSelectedInvoice}
-                                onChange={(e) => updateLineItem(li.key, { quantity: e.target.value })}
-                              />
-                            </AdminField>
-                          </div>
+                          {!li.quantityLocked && (
+                            <div className="invoice-dialog-line-item-qty">
+                              <AdminField label="Qty" tooltip="Quantity.">
+                                <input
+                                  type="number"
+                                  value={li.quantity}
+                                  disabled={!canEditSelectedInvoice}
+                                  onChange={(e) => updateLineItem(li.key, { quantity: e.target.value })}
+                                />
+                              </AdminField>
+                            </div>
+                          )}
                           <div className="invoice-dialog-line-item-price">
                             <AdminField label="Price" tooltip={`Unit price in ${resolvedEditingCurrency}.`}>
                               <input

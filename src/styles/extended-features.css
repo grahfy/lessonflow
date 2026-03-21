@@ -1861,12 +1861,16 @@
 
 .invoice-dialog-line-item {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(72px, 88px) minmax(96px, 118px) minmax(140px, 180px) minmax(140px, 180px) auto;
+  grid-template-columns: minmax(0, 1.28fr) minmax(72px, 88px) minmax(96px, 118px) minmax(118px, 148px) minmax(92px, 120px) auto;
   gap: 8px;
   align-items: start;
   padding: 6px 10px 4px;
   border-radius: 12px;
   border-bottom: 1px solid var(--line);
+}
+
+.invoice-dialog-line-item-fixed-quantity {
+  grid-template-columns: minmax(0, 1.58fr) minmax(108px, 136px) minmax(118px, 148px) minmax(92px, 120px) auto;
 }
 
 .invoice-dialog-line-item:nth-child(odd) {
