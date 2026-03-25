@@ -725,6 +725,25 @@ h1 {
   width: 100%;
 }
 
+.home-legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: -6px 0 0;
+}
+
+.home-legal-links a {
+  color: var(--ink-1);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  transition: color var(--motion-fast) var(--ease-out);
+}
+
+.home-legal-links a:hover {
+  color: var(--ink-0);
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
