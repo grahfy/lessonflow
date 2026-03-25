@@ -126,6 +126,9 @@ npx prisma generate >/dev/null
 log "Seeding whitelabel defaults..."
 npx tsx scripts/seed-whitelabel-defaults.ts >/dev/null
 
+log "Seeding lesson info / prices..."
+npx tsx scripts/seed-lesson-pricing.ts >/dev/null
+
 log "Seeding demo dataset..."
 npx tsx scripts/seed-docs-screenshots.ts >/dev/null
 
