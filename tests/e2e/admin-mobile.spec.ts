@@ -84,6 +84,25 @@ async function assertNoDialogContentOverflow(page: Page, dialog: Locator, label:
   expect(offenders, `${label} has off-screen content in mobile viewport`).toHaveLength(0);
 }
 
+/** Reads the effective grid column count for a CSS grid container. */
+async function readGridColumnCount(locator: Locator): Promise<number> {
+  return locator.evaluate((node) => {
+    const styles = window.getComputedStyle(node);
+    const template = styles.gridTemplateColumns.trim();
+
+    if (!template || template === "none") {
+      return 0;
+    }
+
+    return template.split(" ").length;
+  });
+}
+
+/** Checks whether an element stretches to a substantial share of its container width. */
+async function readsAsFullWidthButton(locator: Locator, minimumWidth = 200): Promise<boolean> {
+  return locator.evaluate((node, expectedWidth) => node.getBoundingClientRect().width >= expectedWidth, minimumWidth);
+}
+
 test.describe("admin mobile responsiveness", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
@@ -100,6 +119,7 @@ test.describe("admin mobile responsiveness", () => {
       { path: "/admin/invoices", heading: /invoices/i },
       { path: "/admin/reports", heading: /reports console/i },
       { path: "/admin/settings", heading: /admin configuration/i },
+      { path: "/admin/teachers", heading: /teachers/i },
       { path: "/admin/manual", heading: /manual/i }
     ];
 
@@ -169,6 +189,18 @@ test.describe("admin mobile responsiveness", () => {
     expect(canScrollSettings.end, "Settings page should support downward scrolling on mobile.").toBeGreaterThanOrEqual(canScrollSettings.start);
     await assertNoHorizontalOverflow(page, "/admin/settings scroll state");
 
+    await page.goto("/admin/teachers", { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: /teachers/i }).waitFor({ timeout: 12_000 });
+    const teacherMetrics = page.locator(".teacher-directory-metrics").first();
+    await expect(teacherMetrics).toBeVisible();
+    await expect(readGridColumnCount(teacherMetrics)).resolves.toBe(1);
+    await expect(page.locator(".teacher-directory-header .admin-workspace-chip-row")).toHaveCount(0);
+    await assertNoHorizontalOverflow(page, "/admin/teachers sidebar");
+
+    const teacherFooter = page.locator(".teacher-profile-footer").first();
+    await expect(teacherFooter).toBeVisible();
+    await expect(page.locator(".teacher-tab-bar").first()).toBeVisible();
+
     // Verify Latest Updates and Sign Out are in the mobile menu.
     // NOTE: These controls moved behind the header sheet, so they need an
     // explicit regression assertion separate from page-overflow checks.
@@ -217,5 +249,34 @@ test.describe("admin intermediate-width header responsiveness", () => {
     await expect(navPanel.getByRole("button", { name: /sign out/i })).toBeVisible();
     await expect(navPanel.getByRole("button", { name: /settings/i })).toBeVisible();
     await assertNoHorizontalOverflow(page, "/admin/system-logs intermediate open menu");
+
+    await page.goto("/admin/teachers", { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: /teachers/i }).waitFor({ timeout: 12_000 });
+
+    const teacherMetrics = page.locator(".teacher-directory-metrics").first();
+    await expect(teacherMetrics).toBeVisible();
+    await expect(readGridColumnCount(teacherMetrics)).resolves.toBe(1);
+    await expect(page.locator(".teacher-directory-header .admin-workspace-chip-row")).toHaveCount(0);
+
+    const teacherEditorSection = page.locator(".teacher-editor-section").first();
+    await expect(teacherEditorSection).toBeVisible();
+    await expect(teacherEditorSection).toHaveCSS("min-height", "0px");
+
+    const teacherHero = page.locator(".teacher-workspace-hero").first();
+    await expect(teacherHero).toBeVisible();
+
+    const teacherEmail = page.locator(".teacher-directory-item-identity p").first();
+    await expect(teacherEmail).toBeVisible();
+    await expect(teacherEmail).toHaveAttribute("title", /@/);
+    await expect(teacherEmail).toHaveCSS("white-space", "nowrap");
+    await expect(teacherEmail).toHaveCSS("text-overflow", "ellipsis");
+
+    const teacherFooter = page.locator(".teacher-profile-footer").first();
+    await expect(teacherFooter).toBeVisible();
+
+    const newTeacherButton = page.getByRole("button", { name: /new teacher/i }).first();
+    await expect(newTeacherButton).toBeVisible();
+    await expect(readsAsFullWidthButton(newTeacherButton)).resolves.toBe(true);
+    await assertNoHorizontalOverflow(page, "/admin/teachers intermediate layout");
   });
 });

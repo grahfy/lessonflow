@@ -42,6 +42,8 @@ type DirectoryEntry = StaffSummary & {
   isSelf: boolean;
 };
 
+const DIRECTORY_SEARCH_INPUT_ID = "teacher-directory-search";
+
 const TAB_ITEMS: ReadonlyArray<AdminTabItem<StaffEditorTab>> = [
   { key: "basics", label: "Basics", tooltip: "Identity, sign-in, and account status." },
   { key: "teaching", label: "Teaching", tooltip: "Instruments, specialisations, and teaching profile." },
@@ -441,11 +443,6 @@ export function AdminTeachersClient() {
                 <p className="helper-text teacher-directory-copy">
                   Jump between staff accounts without leaving the page, then make changes in the workspace beside it.
                 </p>
-                <div className="admin-workspace-chip-row" aria-label="Staff directory context">
-                  <span className="admin-workspace-chip">{directoryEntries.length} visible</span>
-                  <span className="admin-workspace-chip">{activeTeacherCount} active</span>
-                  <span className="admin-workspace-chip">{inactiveTeacherCount} inactive</span>
-                </div>
               </div>
               <Tooltip content="Create a new teacher account.">
                 <button className="btn btn-primary" type="button" onClick={beginCreateTeacher}>
@@ -484,17 +481,18 @@ export function AdminTeachersClient() {
               </Tooltip>
             </div>
 
-            <label className="teacher-directory-search">
-              <span className="helper-text">Search staff</span>
+            <div className="teacher-directory-search search-box admin-search-box">
+              <label htmlFor={DIRECTORY_SEARCH_INPUT_ID}>Search staff</label>
               <Tooltip content="Search the directory by staff name, email, instruments, or specialisations.">
                 <input
+                  id={DIRECTORY_SEARCH_INPUT_ID}
                   type="search"
                   value={directoryQuery}
                   placeholder="Name, email, instrument"
                   onChange={(event) => setDirectoryQuery(event.target.value)}
                 />
               </Tooltip>
-            </label>
+            </div>
 
             <div className="teacher-directory-scroll">
               <div className="teacher-directory-list">
@@ -526,9 +524,9 @@ export function AdminTeachersClient() {
                         </div>
                         <div className="teacher-directory-item-body">
                           <div className="teacher-directory-item-head">
-                            <div>
+                            <div className="teacher-directory-item-identity">
                               <strong>{entry.isSelf ? `${entry.displayName} (You)` : entry.displayName}</strong>
-                              <p>{entry.email}</p>
+                              <p title={entry.email}>{entry.email}</p>
                             </div>
                             <div className="teacher-directory-badges">
                               <span className={`teacher-role-badge is-${entry.role}`}>
@@ -892,6 +890,18 @@ export function AdminTeachersClient() {
                   </button>
                 </Tooltip>
               ) : null}
+              {activeSelection?.profilePhotoUrl ? (
+                <Tooltip content="Remove the current profile image and fall back to initials in the workspace and directory.">
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    disabled={uploadingPhoto}
+                    onClick={() => void handlePhotoDelete()}
+                  >
+                    Remove Photo
+                  </button>
+                </Tooltip>
+              ) : null}
               <Tooltip
                 content={
                   isCreating
@@ -908,18 +918,6 @@ export function AdminTeachersClient() {
                   {saving ? "Saving..." : isCreating ? "Create Teacher" : "Save Profile"}
                 </button>
               </Tooltip>
-              {activeSelection?.profilePhotoUrl ? (
-                <Tooltip content="Remove the current profile image and fall back to initials in the workspace and directory.">
-                  <button
-                    className="btn btn-secondary"
-                    type="button"
-                    disabled={uploadingPhoto}
-                    onClick={() => void handlePhotoDelete()}
-                  >
-                    Remove Photo
-                  </button>
-                </Tooltip>
-              ) : null}
             </div>
           </div>
         </AdminCard>
