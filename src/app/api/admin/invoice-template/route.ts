@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { isOwnerAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
+
+const updateTemplateSchema = z.object({
+  logoUrl: z.string().trim().max(500).optional().nullable(),
+  accentColor: z.string().trim().max(30).optional().nullable(),
+  footerText: z.string().trim().max(2000).optional().nullable(),
+  headerInfo: z.string().trim().max(2000).optional().nullable(),
+});
 
 export async function GET(request: NextRequest) {
   const admin = await requireAdminFromRequest(request);
@@ -30,7 +38,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { logoUrl, accentColor, footerText, headerInfo } = body;
+    const parsed = updateTemplateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { ok: false, error: "Invalid template data.", details: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const { logoUrl, accentColor, footerText, headerInfo } = parsed.data;
 
     const existing = await prisma.invoiceTemplate.findFirst({
       where: { isDefault: true }

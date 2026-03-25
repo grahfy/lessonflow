@@ -131,8 +131,8 @@ export function StudentMaterialsClient(): ReactElement {
         </div>
       </div>
 
-      {loading ? <p className="notice">Loading learning materials...</p> : null}
-      {error ? <p className="notice error">{error}</p> : null}
+      {loading ? <p className="notice" role="status">Loading learning materials...</p> : null}
+      {error ? <p className="notice error" role="alert">{error}</p> : null}
 
       {!loading && !error ? (
         <section className={cx("admin-card", styles["drive-panel"])}>

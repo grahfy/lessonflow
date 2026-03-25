@@ -45,11 +45,13 @@ export function PublicSiteFrame({ brandName, children }: PublicSiteFrameProps) {
 
     // Defer preload work until idle time so first paint/navigation remains responsive.
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-      const idleCallback = (window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
-      idleCallback(run, { timeout: 1000 });
-      return;
+      const ric = (window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number; cancelIdleCallback: (id: number) => void }).requestIdleCallback;
+      const cic = (window as Window & { cancelIdleCallback: (id: number) => void }).cancelIdleCallback;
+      const id = ric(run, { timeout: 1000 });
+      return () => cic(id);
     }
-    globalThis.setTimeout(run, 80);
+    const timer = globalThis.setTimeout(run, 80);
+    return () => globalThis.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -61,11 +63,13 @@ export function PublicSiteFrame({ brandName, children }: PublicSiteFrameProps) {
 
     // Route prefetching is also pushed to idle time to avoid competing with initial hydration.
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-      const idleCallback = (window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
-      idleCallback(run, { timeout: 1200 });
-      return;
+      const ric = (window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
+      const cic = (window as Window & { cancelIdleCallback: (id: number) => void }).cancelIdleCallback;
+      const id = ric(run, { timeout: 1200 });
+      return () => cic(id);
     }
-    globalThis.setTimeout(run, 140);
+    const timer = globalThis.setTimeout(run, 140);
+    return () => globalThis.clearTimeout(timer);
   }, [router]);
 
   if (!isPublicRoute(pathname)) {

@@ -37,6 +37,14 @@ interface AdminFieldProps extends PropsWithChildren {
 }
 
 /**
+ * Returns the error element ID for a given field, enabling aria-describedby
+ * on the associated input. Pass the same `htmlFor` value used on the field.
+ */
+export function adminFieldErrorId(htmlFor: string): string {
+  return `${htmlFor}-error`;
+}
+
+/**
  * Standard form field for admin sections.
  */
 export const AdminField = forwardRef<HTMLDivElement, AdminFieldProps>(
@@ -46,6 +54,8 @@ export const AdminField = forwardRef<HTMLDivElement, AdminFieldProps>(
       fullWidth ? "full" : "",
       className
     ].filter(Boolean).join(" ");
+
+    const errorId = htmlFor ? adminFieldErrorId(htmlFor) : undefined;
 
     return (
       <div ref={ref} className={classes}>
@@ -61,7 +71,7 @@ export const AdminField = forwardRef<HTMLDivElement, AdminFieldProps>(
         </label>
         {description && <p className="field-description">{description}</p>}
         {children}
-        {error && <p className="field-error">{error}</p>}
+        {error && <p id={errorId} className="field-error" role="alert">{error}</p>}
       </div>
     );
   }

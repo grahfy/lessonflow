@@ -159,12 +159,12 @@ export function ContactForm() {
       </div>
 
       {state.status === "success" ? (
-        <p className="notice success" ref={successNoticeRef} data-motion-item="contact-success-notice">
+        <p className="notice success" role="status" ref={successNoticeRef} data-motion-item="contact-success-notice">
           {state.message}
         </p>
       ) : null}
       {state.status === "error" ? (
-        <p className="notice error" ref={errorNoticeRef} data-motion-item="contact-error-notice">
+        <p className="notice error" role="alert" ref={errorNoticeRef} data-motion-item="contact-error-notice">
           {state.message}
         </p>
       ) : null}

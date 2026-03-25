@@ -268,9 +268,9 @@ export function StudentPortalClient(): ReactElement {
         </div>
       </div>
 
-      {loading ? <p className="notice">Loading portal...</p> : null}
-      {error ? <p className="notice error">{error}</p> : null}
-      {notice ? <p className="notice success">{notice}</p> : null}
+      {loading ? <p className="notice" role="status">Loading portal...</p> : null}
+      {error ? <p className="notice error" role="alert">{error}</p> : null}
+      {notice ? <p className="notice success" role="status">{notice}</p> : null}
 
       {!loading && !error && data ? (
         <>

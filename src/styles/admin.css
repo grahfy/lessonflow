@@ -1758,7 +1758,7 @@
   top: 100%;
   left: 0;
   right: 0;
-  z-index: 1000;
+  z-index: 100;
   max-height: 300px;
   overflow-y: auto;
   margin: 0;
@@ -1782,7 +1782,8 @@
   border-bottom: 0;
 }
 
-.address-autocomplete-result:hover {
+.address-autocomplete-result:hover,
+.address-autocomplete-result.active {
   background: var(--surface-hover);
 }
 
@@ -2942,7 +2943,7 @@
 .dialog-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 70;
+  z-index: 200;
   background: rgba(2, 6, 23, 0.82);
   display: grid;
   place-items: center;
@@ -2950,7 +2951,7 @@
 }
 
 .deploy-updates-backdrop {
-  z-index: 13010;
+  z-index: 400;
 }
 
 .dialog-panel {
@@ -3752,7 +3753,7 @@
 }
 
 .dialog-backdrop.is-secondary {
-  z-index: 75;
+  z-index: 210;
   background: rgba(5, 9, 24, 0.6);
   padding: 24px;
 }

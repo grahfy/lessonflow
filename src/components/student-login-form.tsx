@@ -107,7 +107,7 @@ export function StudentLoginForm() {
         <TweenLink href="/terms-of-service">Terms of Service</TweenLink>
       </p>
       {error ? (
-        <p className="notice error" ref={errorNoticeRef} data-motion-item="student-login-error-notice">
+        <p className="notice error" role="alert" ref={errorNoticeRef} data-motion-item="student-login-error-notice">
           {error}
         </p>
       ) : null}

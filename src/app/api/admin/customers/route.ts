@@ -75,6 +75,7 @@ export async function GET(request: NextRequest) {
 
     const { q, customerIds, sortBy, sortDir, page, pageSize, isArchived } = parsed.data;
     const skip = (page - 1) * pageSize;
+    const MAX_CUSTOMER_IDS = 500;
     const customerIdList = customerIds
       ? Array.from(
           new Set(
@@ -83,7 +84,7 @@ export async function GET(request: NextRequest) {
               .map((value) => value.trim())
               .filter(Boolean)
           )
-        )
+        ).slice(0, MAX_CUSTOMER_IDS)
       : [];
 
     const where: Prisma.CustomerWhereInput = {

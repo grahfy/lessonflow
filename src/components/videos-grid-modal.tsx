@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type VideoItem = {
   id: string;
@@ -18,13 +18,18 @@ type VideosGridModalProps = {
  */
 export function VideosGridModal({ videos }: VideosGridModalProps) {
   const [openVideoId, setOpenVideoId] = useState<string | null>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
 
   const activeVideo = useMemo(
     () => videos.find((video) => video.id === openVideoId) ?? null,
     [videos, openVideoId]
   );
 
-  const closeModal = useCallback(() => setOpenVideoId(null), []);
+  const closeModal = useCallback(() => {
+    setOpenVideoId(null);
+    triggerRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     if (!activeVideo) return;
@@ -37,6 +42,7 @@ export function VideosGridModal({ videos }: VideosGridModalProps) {
 
     document.addEventListener("keydown", onKeyDown);
     document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
 
     return () => {
       document.removeEventListener("keydown", onKeyDown);
@@ -53,7 +59,11 @@ export function VideosGridModal({ videos }: VideosGridModalProps) {
             <button
               type="button"
               className="video-launch-button"
-              onClick={() => setOpenVideoId(video.id)}
+              ref={(el) => { if (video.id === openVideoId) triggerRef.current = el; }}
+              onClick={() => {
+                triggerRef.current = document.activeElement as HTMLButtonElement;
+                setOpenVideoId(video.id);
+              }}
               aria-label={`Open ${video.title} video popup`}
             >
               <div className="video-embed-frame" aria-hidden="true">
@@ -80,7 +90,7 @@ export function VideosGridModal({ videos }: VideosGridModalProps) {
           aria-label={`${activeVideo.title} video popup`}
         >
           <div className="modal-content video-modal-content" onClick={(event) => event.stopPropagation()}>
-            <button type="button" onClick={closeModal} className="modal-close" aria-label="Close video">
+            <button ref={closeRef} type="button" onClick={closeModal} className="modal-close" aria-label="Close video">
               ×
             </button>
             <div className="video-modal-frame">
@@ -100,4 +110,3 @@ export function VideosGridModal({ videos }: VideosGridModalProps) {
     </>
   );
 }
-

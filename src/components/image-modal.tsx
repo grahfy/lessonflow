@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 
 type ImageModalProps = {
@@ -12,9 +12,14 @@ type ImageModalProps = {
 
 export function ImageModal({ src, alt, triggerText, caption }: ImageModalProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const openModal = useCallback(() => setIsOpen(true), []);
-  const closeModal = useCallback(() => setIsOpen(false), []);
+  const closeModal = useCallback(() => {
+    setIsOpen(false);
+    triggerRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -25,6 +30,7 @@ export function ImageModal({ src, alt, triggerText, caption }: ImageModalProps) 
 
     document.addEventListener("keydown", handleEscape);
     document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
 
     return () => {
       document.removeEventListener("keydown", handleEscape);
@@ -35,6 +41,7 @@ export function ImageModal({ src, alt, triggerText, caption }: ImageModalProps) 
   return (
     <>
       <button
+        ref={triggerRef}
         type="button"
         onClick={openModal}
         className="btn btn-secondary"
@@ -47,18 +54,15 @@ export function ImageModal({ src, alt, triggerText, caption }: ImageModalProps) 
         <div
           className="modal-overlay"
           onClick={closeModal}
-          onKeyDown={(e) => e.key === "Escape" && closeModal()}
           role="dialog"
           aria-modal="true"
           aria-label={alt}
         >
-          <div className="modal-content">
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <button
+              ref={closeRef}
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                closeModal();
-              }}
+              onClick={closeModal}
               className="modal-close"
               aria-label="Close"
             >

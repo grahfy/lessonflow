@@ -125,7 +125,7 @@ export function AdminLoginForm() {
         </button>
       </div>
       {error ? (
-        <p className="notice error" ref={errorNoticeRef} data-motion-item="admin-login-error-notice">
+        <p className="notice error" role="alert" ref={errorNoticeRef} data-motion-item="admin-login-error-notice">
           {error}
         </p>
       ) : null}

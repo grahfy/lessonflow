@@ -2,7 +2,28 @@ const path = require("path");
 const isProduction = process.env.NODE_ENV === "production";
 const isLowMemoryDeployBuild = process.env.NEXT_LOW_MEMORY_BUILD === "1";
 
+// Content Security Policy — defense-in-depth against XSS.
+// Directives are split across lines for readability; joined into a single header value below.
+const cspDirectives = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data: blob: https://images.unsplash.com https://i.ytimg.com",
+  "frame-src https://www.youtube-nocookie.com",
+  "connect-src 'self' https://nominatim.openstreetmap.org",
+  "media-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'"
+];
+
 const baseSecurityHeaders = [
+  {
+    key: "Content-Security-Policy",
+    value: cspDirectives.join("; ")
+  },
   {
     key: "X-Content-Type-Options",
     value: "nosniff"

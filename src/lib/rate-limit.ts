@@ -87,6 +87,15 @@ export function getRequestIp(request: NextRequest): string {
   return getRequestIpFromHeaders(request.headers);
 }
 
+/** Evicts expired entries from the store to prevent unbounded memory growth. */
+function evictExpiredEntries(now: number): void {
+  for (const [key, state] of store) {
+    if (state.resetAt <= now) {
+      store.delete(key);
+    }
+  }
+}
+
 /**
  * Tickers the rate limiter for a specific key.
  * 
@@ -103,6 +112,12 @@ export function consumeRateLimit(input: RateLimitInput): RateLimitResult {
   }
 
   const now = Date.now();
+
+  // Lazy eviction: remove expired entries to prevent unbounded memory growth.
+  // Runs on every call but is O(n) only on the current store size which stays
+  // small for single-instance deployments.
+  evictExpiredEntries(now);
+
   const existing = store.get(input.key);
 
   // Scenario A: New window or expired window - start fresh

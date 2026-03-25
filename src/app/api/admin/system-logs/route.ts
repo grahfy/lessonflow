@@ -90,9 +90,11 @@ export async function GET(request: NextRequest) {
     const where = buildLogsWhere(level, event);
 
     if (download === "true") {
+      const MAX_EXPORT_RECORDS = 50_000;
       const logs = await prisma.systemLog.findMany({
         where,
-        orderBy: { createdAt: "desc" }
+        orderBy: { createdAt: "desc" },
+        take: MAX_EXPORT_RECORDS
       });
 
       const body = logs.length > 0

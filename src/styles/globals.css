@@ -895,7 +895,7 @@ h1 {
   font-size: 0.78rem;
   line-height: 1.4;
   letter-spacing: 0.01em;
-  z-index: 12000;
+  z-index: 500;
   pointer-events: none;
   animation: ui-tooltip-fade-in 120ms var(--ease-out);
 }
@@ -1420,4 +1420,45 @@ h1 {
 .form-required-note {
   grid-column: 1 / -1;
   margin-top: -2px;
+}
+
+/* Error boundary and not-found pages */
+.error-boundary,
+.not-found-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 48px 24px;
+  text-align: center;
+  gap: 12px;
+}
+
+.error-boundary h1,
+.not-found-page h1 {
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.error-boundary p,
+.not-found-page p {
+  color: var(--ink-1);
+  margin: 0 0 8px;
+  max-width: 420px;
+}
+
+.error-boundary-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.route-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40vh;
+  padding: 48px 24px;
 }
