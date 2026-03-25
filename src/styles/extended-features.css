@@ -447,20 +447,21 @@
 
 @media (max-width: 1180px) {
   .admin-header-row {
-    align-items: flex-start;
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "overview"
+      "toolbar"
+      "nav";
     gap: 10px;
   }
 
-  .admin-header-controls {
-    width: 100%;
-    display: grid;
-    gap: 8px;
-    margin-left: 0;
+  .admin-header-overview {
+    gap: 10px;
   }
 
-  .admin-header-menu-toggle {
-    display: inline-flex;
-    justify-self: start;
+  .admin-header-toolbar {
+    justify-content: flex-start;
+    width: 100%;
   }
 
   .admin-header-nav {
@@ -478,6 +479,28 @@
     background: rgba(255, 255, 255, 0.04);
   }
 
+  .admin-header-menu-toggle {
+    display: inline-flex;
+    justify-self: start;
+  }
+
+  .admin-header-nav-sections,
+  .admin-header-nav-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .admin-header-nav-sections {
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .admin-header-group-label {
+    display: block;
+  }
+
   .admin-header-nav.is-open .btn,
   .admin-header-nav.is-open .admin-header-nav-primary .btn {
     width: 100%;
@@ -491,11 +514,13 @@
   }
 
   .admin-header-quick-actions {
+    grid-area: auto;
     width: 100%;
+    justify-content: stretch;
   }
 
   .admin-header-quick-actions .btn {
-    flex: 1 1 calc(50% - 4px);
+    flex: 1 1 100%;
     min-width: 0;
   }
 }

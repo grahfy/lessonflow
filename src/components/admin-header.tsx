@@ -22,6 +22,16 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const adminRoleLabel = admin?.role === "owner" ? "Owner" : "Teacher";
+  const visibleNavItems = ADMIN_NAV_ITEMS.filter((item) => {
+    if (!item.roles) {
+      return true;
+    }
+    if (adminLoading || !admin) {
+      return false;
+    }
+    return item.roles.includes(admin.role);
+  });
 
   useEffect(() => {
     // NOTE: Close the mobile menu on route change so stale open state does not
@@ -40,19 +50,28 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
   }
 
   return (
-    <div className="admin-card booking-row admin-header-row" data-motion-item="admin-header-card">
-      <div className="admin-header-title-group">
-        <p className="admin-console-kicker">Admin Console</p>
-        <h1 className="admin-console-title" data-motion-item="admin-title">
-          {title}
-        </h1>
-        {admin ? (
+    <div className="admin-card admin-header-row" data-motion-item="admin-header-card">
+      <div className="admin-header-overview">
+        <div className="admin-header-title-group">
+          <p className="admin-console-kicker">Admin Console</p>
+          <h1 className="admin-console-title" data-motion-item="admin-title">
+            {title}
+          </h1>
           <p className="helper-text admin-console-subtitle">
-            Signed in as {admin.displayName} · {admin.role === "owner" ? "Owner" : "Teacher"}
+            Shared operations workspace for bookings, teaching, billing, and system admin.
           </p>
+        </div>
+
+        {admin ? (
+          <div className="admin-header-session" aria-label={`Signed in as ${admin.displayName} (${adminRoleLabel})`}>
+            <span className="admin-header-session-label">Signed in as</span>
+            <span className="admin-header-session-name">{admin.displayName}</span>
+            <span className="admin-header-session-role">{adminRoleLabel}</span>
+          </div>
         ) : null}
       </div>
-      <div className="admin-header-controls">
+
+      <div className="admin-header-toolbar">
         <Tooltip content="Toggle mobile navigation menu.">
           <button
             className="btn btn-secondary admin-header-menu-toggle"
@@ -64,22 +83,13 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
             Menu
           </button>
         </Tooltip>
+      </div>
 
-        <div
-          id="admin-header-menu-panel"
-          className={`admin-header-nav ${menuOpen ? "is-open" : ""}`}
-          aria-hidden={!menuOpen}
-        >
+      <div id="admin-header-menu-panel" className={`admin-header-nav ${menuOpen ? "is-open" : ""}`}>
+        <div className="admin-header-nav-sections">
+          <p className="admin-header-group-label">Sections</p>
           <nav className="admin-header-nav-primary" aria-label="Admin sections">
-            {ADMIN_NAV_ITEMS.filter((item) => {
-              if (!item.roles) {
-                return true;
-              }
-              if (adminLoading || !admin) {
-                return false;
-              }
-              return item.roles.includes(admin.role);
-            }).map((item) => {
+            {visibleNavItems.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <Tooltip key={item.href} content={item.tooltip}>
@@ -97,7 +107,10 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
               );
             })}
           </nav>
+        </div>
 
+        <div className="admin-header-nav-actions">
+          <p className="admin-header-group-label">Actions</p>
           <div className="admin-header-quick-actions">
             {admin?.role === "owner" ? <AdminDeployUpdatesButton /> : null}
             <Tooltip content="Sign out of the admin console.">

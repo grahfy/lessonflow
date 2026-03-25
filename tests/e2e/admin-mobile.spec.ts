@@ -178,11 +178,13 @@ test.describe("admin mobile responsiveness", () => {
     
     const navPanel = page.locator("#admin-header-menu-panel");
     await expect(navPanel).toBeVisible();
+    await expect(navPanel.getByText(/^sections$/i)).toBeVisible();
+    await expect(navPanel.getByText(/^actions$/i)).toBeVisible();
     
-    const latestUpdatesBtn = navPanel.getByRole("button", { name: /latest updates/i });
+    const updatesBtn = navPanel.getByRole("button", { name: /updates/i });
     const signOutBtn = navPanel.getByRole("button", { name: /sign out/i });
     
-    await expect(latestUpdatesBtn).toBeVisible();
+    await expect(updatesBtn).toBeVisible();
     await expect(signOutBtn).toBeVisible();
   });
 });
@@ -209,6 +211,8 @@ test.describe("admin intermediate-width header responsiveness", () => {
 
     await menuToggle.click();
     await expect(navPanel).toBeVisible();
+    await expect(navPanel.getByText(/^sections$/i)).toBeVisible();
+    await expect(navPanel.getByText(/^actions$/i)).toBeVisible();
     await expect(navPanel.getByRole("button", { name: /updates/i })).toBeVisible();
     await expect(navPanel.getByRole("button", { name: /sign out/i })).toBeVisible();
     await expect(navPanel.getByRole("button", { name: /settings/i })).toBeVisible();
