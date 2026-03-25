@@ -149,9 +149,9 @@ export function AdminLessonPlansClient() {
       <div className="admin-layout-content lesson-plan-library">
         <AdminCard className="lesson-plan-library-sidebar">
           <div className="lesson-plan-library-sidebar-head">
-            <div>
+            <div className="lesson-plan-library-sidebar-copy">
               <p className="admin-inline-field">Template Library</p>
-              <strong className="admin-range-label">Reusable lesson structures</strong>
+              <strong className="admin-range-label lesson-plan-library-sidebar-summary">Reusable lesson structures</strong>
             </div>
             <Tooltip content="Start a brand-new lesson-plan template from scratch.">
               <button

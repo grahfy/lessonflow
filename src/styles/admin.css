@@ -1073,8 +1073,12 @@
 .lesson-plan-library {
   display: grid;
   grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .lesson-plan-library-sidebar,
@@ -1083,6 +1087,7 @@
 .booking-lesson-plan-editor-card {
   display: grid;
   gap: 14px;
+  min-height: 0;
 }
 
 .lesson-plan-library-sidebar-head,
@@ -1104,13 +1109,34 @@
   flex-wrap: wrap;
 }
 
+.lesson-plan-library-sidebar-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.lesson-plan-library-sidebar-summary {
+  margin: 0;
+  display: block;
+}
+
 .lesson-plan-library-search {
   margin-bottom: 0;
+}
+
+.lesson-plan-library-sidebar {
+  grid-template-rows: auto auto minmax(0, 1fr);
+  align-content: start;
+  overflow: hidden;
 }
 
 .lesson-plan-template-list {
   display: grid;
   gap: 10px;
+  min-height: 0;
+  align-content: start;
+  overflow: auto;
+  padding-right: 4px;
+  overscroll-behavior: contain;
 }
 
 .lesson-plan-template-list-item {
@@ -1161,6 +1187,12 @@
   margin: 6px 0 0;
 }
 
+.lesson-plan-library-editor {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-content: start;
+  overflow: hidden;
+}
+
 .lesson-plan-template-meta-grid,
 .lesson-plan-template-fields,
 .booking-lesson-plan-fields {
@@ -1173,6 +1205,14 @@
 .booking-lesson-plan-editor-side {
   display: grid;
   gap: 14px;
+}
+
+.lesson-plan-library-editor-sections {
+  min-height: 0;
+  align-content: start;
+  overflow: auto;
+  padding-right: 4px;
+  overscroll-behavior: contain;
 }
 
 .lesson-plan-editor-section {
