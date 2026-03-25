@@ -63,7 +63,9 @@ export function AdminEmailPanel({
   message,
   setMessage,
   sending,
+  syncing,
   onSend,
+  onSync,
   panelClassName,
   historyClassName,
   historyListClassName,
@@ -108,7 +110,21 @@ export function AdminEmailPanel({
   return (
     <div className={["dialog-layout admin-email-panel-shell admin-email-panel", panelClassName].filter(Boolean).join(" ")}>
       <div className="dialog-col dialog-tab-section admin-email-history-shell">
-        <h3 className="manual-section-title">{historyTitle}</h3>
+        <div className="admin-email-history-header-row">
+          <h3 className="manual-section-title">{historyTitle}</h3>
+          {onSync ? (
+            <Tooltip content="Refresh provider-backed email history.">
+              <button
+                className="btn btn-secondary"
+                type="button"
+                disabled={syncing || loadingHistory}
+                onClick={() => void onSync()}
+              >
+                {syncing ? "Refreshing..." : "Refresh History"}
+              </button>
+            </Tooltip>
+          ) : null}
+        </div>
         {historyWarning ? <AdminNotice tone="info">{historyWarning}</AdminNotice> : null}
         <AdminCard ghost className={["admin-email-history-card", historyClassName].filter(Boolean).join(" ")}>
           {loadingHistory ? (

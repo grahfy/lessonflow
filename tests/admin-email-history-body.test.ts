@@ -61,4 +61,31 @@ describe("admin-email-history-body", () => {
 
     expect(markup).toContain("Gmail sync warning");
   });
+
+  it("renders a manual refresh action when history sync is available", () => {
+    const markup = renderToStaticMarkup(
+      createElement(
+        TooltipPrimitive.Provider,
+        null,
+        createElement(AdminEmailPanel, {
+          emptyLabel: "No emails",
+          history: [],
+          loadingHistory: false,
+          subject: "",
+          setSubject: () => {},
+          message: "",
+          setMessage: () => {},
+          sending: false,
+          syncing: false,
+          onSend: async () => ({ success: true }),
+          onSync: () => {},
+          captchaIdPrefix: "admin-email-test-refresh",
+          renderHistoryHeader: () => null,
+          renderHistoryMeta: () => null
+        })
+      )
+    );
+
+    expect(markup).toContain("Refresh History");
+  });
 });

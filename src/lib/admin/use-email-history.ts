@@ -60,6 +60,7 @@ export function useEmailHistory(options: UseEmailHistoryOptions = {}): UseEmailH
 
   const load = useCallback(async (target: EmailHistoryTarget) => {
     setLoading(true);
+    setSyncWarning(null);
     try {
       const response = await safeFetch(`/api/admin/email-history?${toQueryString(target)}`, { cache: "no-store" });
       if (!response.ok) {
@@ -113,6 +114,7 @@ export function useEmailHistory(options: UseEmailHistoryOptions = {}): UseEmailH
 
   const sync = useCallback(async (target: EmailHistoryTarget): Promise<boolean> => {
     setSyncing(true);
+    setSyncWarning(null);
     try {
       const response = await safeFetch("/api/admin/email-history/refresh", {
         method: "POST",

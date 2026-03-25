@@ -1459,6 +1459,18 @@
   margin-top: 10px;
 }
 
+.admin-email-history-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.admin-email-history-header-row .manual-section-title {
+  margin-bottom: 0;
+}
+
 .admin-email-history-shell,
 .admin-email-compose-shell {
   min-height: 0;
