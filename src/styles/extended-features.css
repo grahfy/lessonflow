@@ -1803,8 +1803,9 @@
 }
 
 .invoice-dialog-main-col {
-  grid-template-rows: auto minmax(0, auto) auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, auto) auto auto auto minmax(0, 1fr);
   align-content: stretch;
+  overflow: hidden;
 }
 
 .invoice-dialog-side-col {
@@ -1852,7 +1853,7 @@
 .invoice-dialog-line-items {
   display: grid;
   align-content: start;
-  gap: 6px;
+  gap: 2px;
   grid-auto-rows: max-content;
   min-height: 0;
   overflow: auto;
@@ -1864,7 +1865,7 @@
   grid-template-columns: minmax(0, 1.28fr) minmax(72px, 88px) minmax(96px, 118px) minmax(118px, 148px) minmax(92px, 120px) auto;
   gap: 8px;
   align-items: start;
-  padding: 6px 10px 4px;
+  padding: 4px 10px 3px;
   border-radius: 12px;
   border-bottom: 1px solid var(--line);
 }
@@ -1898,15 +1899,26 @@
   gap: 4px;
 }
 
+.invoice-dialog-line-item:not(:first-child) .field > label {
+  display: none;
+}
+
+.invoice-dialog-line-item:not(:first-child) .field {
+  gap: 0;
+}
+
 .invoice-dialog-line-item .field input,
 .invoice-dialog-line-item .field select {
   padding: 8px 10px;
 }
 
 .invoice-dialog-remove-item {
-  margin-top: 16px;
   padding: 8px;
   min-width: 40px;
+}
+
+.invoice-dialog-line-item:first-child .invoice-dialog-remove-item {
+  margin-top: 16px;
 }
 
 .invoice-dialog-line-actions {
@@ -2200,6 +2212,14 @@
 
   .invoice-dialog-line-item {
     grid-template-columns: 1fr;
+  }
+
+  .invoice-dialog-line-item:not(:first-child) .field > label {
+    display: revert;
+  }
+
+  .invoice-dialog-line-item:not(:first-child) .field {
+    gap: 4px;
   }
 
   .invoice-dialog-remove-item {
