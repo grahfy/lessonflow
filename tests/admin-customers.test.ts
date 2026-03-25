@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
+import { getCustomerNamePresentation } from "@/lib/customers/name";
 import { prisma } from "@/lib/db";
 import { DELETE, PATCH } from "@/app/api/admin/customers/[id]/route";
 import { GET, POST } from "@/app/api/admin/customers/route";
@@ -163,14 +164,68 @@ describe("admin-customers", () => {
     await prisma.customer.createMany({
       data: [
         {
+          fullName: "Alex McGilvray",
+          normalizedFullName: "alex mcgilvray",
+          email: "alex@example.com",
+          phone: "0400000001",
+          normalizedEmail: "alex@example.com",
+          normalizedPhone: "0400000001",
+          skillLevel: "intermediate",
+          lessonMode: "video"
+        },
+        {
+          fullName: "Ashlee Hutchinson",
+          normalizedFullName: "ashlee hutchinson",
+          email: "ashlee@example.com",
+          phone: "0400000002",
+          normalizedEmail: "ashlee@example.com",
+          normalizedPhone: "0400000002",
+          skillLevel: "beginner",
+          lessonMode: "video"
+        },
+        {
+          firstName: "Andrew",
+          lastName: "Stephenson",
+          fullName: "Andrew Stephenson",
+          normalizedFullName: "andrew stephenson",
+          email: "andrew@example.com",
+          phone: "0400000003",
+          normalizedEmail: "andrew@example.com",
+          normalizedPhone: "0400000003",
+          skillLevel: "beginner",
+          lessonMode: "in_person"
+        },
+        {
+          firstName: "Dean",
+          lastName: "Thomson",
+          fullName: "Dean Thomson",
+          normalizedFullName: "dean thomson",
+          email: "dean@example.com",
+          phone: "0400000004",
+          normalizedEmail: "dean@example.com",
+          normalizedPhone: "0400000004",
+          skillLevel: "advanced",
+          lessonMode: "in_person"
+        },
+        {
+          fullName: "Madonna",
+          normalizedFullName: "madonna",
+          email: "madonna@example.com",
+          phone: "0400000005",
+          normalizedEmail: "madonna@example.com",
+          normalizedPhone: "0400000005",
+          skillLevel: "advanced",
+          lessonMode: "video"
+        },
+        {
           firstName: "Charlie",
           lastName: "Student",
           fullName: "Charlie Student",
           normalizedFullName: "charlie student",
           email: "charlie@example.com",
-          phone: "0400000001",
+          phone: "0400000006",
           normalizedEmail: "charlie@example.com",
-          normalizedPhone: "0400000001",
+          normalizedPhone: "0400000006",
           skillLevel: "intermediate",
           lessonMode: "video"
         },
@@ -179,10 +234,10 @@ describe("admin-customers", () => {
           lastName: "Student",
           fullName: "Alice Student",
           normalizedFullName: "alice student",
-          email: "alice@example.com",
-          phone: "0400000002",
-          normalizedEmail: "alice@example.com",
-          normalizedPhone: "0400000002",
+          email: "alice2@example.com",
+          phone: "0400000007",
+          normalizedEmail: "alice2@example.com",
+          normalizedPhone: "0400000007",
           skillLevel: "beginner",
           lessonMode: "video"
         },
@@ -192,9 +247,9 @@ describe("admin-customers", () => {
           fullName: "Bob Student",
           normalizedFullName: "bob student",
           email: "bob@example.com",
-          phone: "0400000003",
+          phone: "0400000008",
           normalizedEmail: "bob@example.com",
-          normalizedPhone: "0400000003",
+          normalizedPhone: "0400000008",
           skillLevel: "beginner",
           lessonMode: "in_person"
         },
@@ -203,10 +258,10 @@ describe("admin-customers", () => {
           lastName: "Student",
           fullName: "Dylan Student",
           normalizedFullName: "dylan student",
-          email: "dylan@example.com",
-          phone: "0400000004",
-          normalizedEmail: "dylan@example.com",
-          normalizedPhone: "0400000004",
+          email: "dylan2@example.com",
+          phone: "0400000009",
+          normalizedEmail: "dylan2@example.com",
+          normalizedPhone: "0400000009",
           skillLevel: "advanced",
           lessonMode: "in_person"
         }
@@ -226,30 +281,64 @@ describe("admin-customers", () => {
     };
 
     expect(await fetchNames("customer", "asc")).toEqual([
+      "Ashlee Hutchinson",
+      "Madonna",
+      "Alex McGilvray",
+      "Andrew Stephenson",
       "Alice Student",
       "Bob Student",
       "Charlie Student",
-      "Dylan Student"
+      "Dylan Student",
+      "Dean Thomson"
     ]);
     expect(await fetchNames("customer", "desc")).toEqual([
+      "Dean Thomson",
       "Dylan Student",
       "Charlie Student",
       "Bob Student",
-      "Alice Student"
+      "Alice Student",
+      "Andrew Stephenson",
+      "Alex McGilvray",
+      "Madonna",
+      "Ashlee Hutchinson"
     ]);
 
     expect(await fetchNames("skill_mode", "asc")).toEqual([
+      "Andrew Stephenson",
       "Bob Student",
       "Alice Student",
+      "Ashlee Hutchinson",
+      "Alex McGilvray",
       "Charlie Student",
-      "Dylan Student"
+      "Dean Thomson",
+      "Dylan Student",
+      "Madonna"
     ]);
     expect(await fetchNames("skill_mode", "desc")).toEqual([
+      "Madonna",
+      "Dean Thomson",
       "Dylan Student",
+      "Alex McGilvray",
       "Charlie Student",
       "Alice Student",
+      "Ashlee Hutchinson",
+      "Andrew Stephenson",
       "Bob Student"
     ]);
+  });
+
+  it("formats legacy fullName rows as last name, first name for the customer column", () => {
+    expect(getCustomerNamePresentation({
+      firstName: "",
+      lastName: "",
+      fullName: "Alex McGilvray"
+    }).displayName).toBe("McGilvray, Alex");
+
+    expect(getCustomerNamePresentation({
+      firstName: "",
+      lastName: "",
+      fullName: "Madonna"
+    }).displayName).toBe("Madonna");
   });
 
   it("filters customer lists to a supplied set of customer ids", async () => {

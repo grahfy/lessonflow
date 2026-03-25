@@ -15,6 +15,7 @@ import { lessonModeSchema, skillLevelSchema, auPostcodeSchema, auPhoneSchema, au
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { customerSnapshotFromInput, normalizeEmail, normalizePhone } from "@/lib/customer-match";
+import { getCustomerNamePresentation } from "@/lib/customers/name";
 import { prisma } from "@/lib/db";
 import { ensurePortalCredentialForCustomer } from "@/lib/student-portal/credentials";
 import { listCustomersQuerySchema } from "@/lib/customers/schema";
@@ -39,6 +40,50 @@ const createCustomerSchema = z.object({
   postcode: auPostcodeSchema.optional().default("3000"),
   primaryTeacherId: z.string().trim().min(1).nullable().optional()
 });
+
+function compareCustomersByDisplayName(
+  left: {
+    id: string;
+    createdAt: Date;
+    firstName: string;
+    lastName: string;
+    fullName: string;
+  },
+  right: {
+    id: string;
+    createdAt: Date;
+    firstName: string;
+    lastName: string;
+    fullName: string;
+  },
+  sortDir: "asc" | "desc"
+): number {
+  const direction = sortDir === "asc" ? 1 : -1;
+  const leftName = getCustomerNamePresentation(left);
+  const rightName = getCustomerNamePresentation(right);
+
+  const lastNameComparison = leftName.sortLastName.localeCompare(rightName.sortLastName, undefined, { sensitivity: "base" });
+  if (lastNameComparison !== 0) {
+    return lastNameComparison * direction;
+  }
+
+  const firstNameComparison = leftName.sortFirstName.localeCompare(rightName.sortFirstName, undefined, { sensitivity: "base" });
+  if (firstNameComparison !== 0) {
+    return firstNameComparison * direction;
+  }
+
+  const fullNameComparison = leftName.fullName.localeCompare(rightName.fullName, undefined, { sensitivity: "base" });
+  if (fullNameComparison !== 0) {
+    return fullNameComparison * direction;
+  }
+
+  const createdAtComparison = right.createdAt.getTime() - left.createdAt.getTime();
+  if (createdAtComparison !== 0) {
+    return createdAtComparison;
+  }
+
+  return left.id.localeCompare(right.id);
+}
 
 /**
  * GET: Lists active customers for admin search/select controls and directory tables.
@@ -112,37 +157,49 @@ export async function GET(request: NextRequest) {
         : {})
     };
 
-    const orderBy: Prisma.CustomerOrderByWithRelationInput[] =
-      sortBy === "skill_mode"
-        ? [{ skillLevel: sortDir }, { lessonMode: sortDir }, { fullName: "asc" }, { createdAt: "desc" }]
-        : [{ fullName: sortDir }, { createdAt: "desc" }];
+    const include = {
+      primaryTeacher: {
+        select: {
+          id: true,
+          displayName: true
+        }
+      },
+      portalCredential: {
+        select: {
+          id: true,
+          generatedAt: true,
+          rotatedAt: true,
+          isActive: true
+        }
+      }
+    } satisfies Prisma.CustomerInclude;
 
-    // Execute paged queries in parallel
-    const [customers, total] = await prisma.$transaction([
-      prisma.customer.findMany({
+    const [customers, total] = await prisma.$transaction(async (tx) => {
+      const totalCount = await tx.customer.count({ where });
+
+      if (sortBy === "customer") {
+        const matchingCustomers = await tx.customer.findMany({
+          where,
+          include
+        });
+
+        const sortedCustomers = matchingCustomers
+          .sort((left, right) => compareCustomersByDisplayName(left, right, sortDir))
+          .slice(skip, skip + pageSize);
+
+        return [sortedCustomers, totalCount] as const;
+      }
+
+      const pagedCustomers = await tx.customer.findMany({
         where,
-        orderBy,
+        orderBy: [{ skillLevel: sortDir }, { lessonMode: sortDir }, { fullName: "asc" }, { createdAt: "desc" }],
         take: pageSize,
         skip,
-        include: {
-          primaryTeacher: {
-            select: {
-              id: true,
-              displayName: true
-            }
-          },
-          portalCredential: {
-            select: {
-              id: true,
-              generatedAt: true,
-              rotatedAt: true,
-              isActive: true
-            }
-          }
-        }
-      }),
-      prisma.customer.count({ where })
-    ]);
+        include
+      });
+
+      return [pagedCustomers, totalCount] as const;
+    });
 
     return NextResponse.json({ 
       customers,
