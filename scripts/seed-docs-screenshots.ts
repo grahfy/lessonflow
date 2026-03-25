@@ -162,6 +162,8 @@ async function seed() {
     // same disposable database without manual cleanup between screenshot passes.
     await prisma.$transaction([
       prisma.lessonPricingOption.deleteMany({}),
+      prisma.lessonPlan.deleteMany({}),
+      prisma.lessonPlanTemplate.deleteMany({}),
       prisma.invoiceAuditLog.deleteMany({}),
       prisma.invoiceLineItem.deleteMany({}),
       prisma.invoice.deleteMany({}),
@@ -400,6 +402,32 @@ async function seed() {
       }
     });
 
+    const portalSummaryBooking = await prisma.booking.create({
+      data: {
+        status: "approved",
+        name: customer1.fullName,
+        email: customer1.email,
+        phone: customer1.phone,
+        address: makeAddress(customer1),
+        houseNumber: customer1.houseNumber,
+        streetName: customer1.streetName,
+        streetType: customer1.streetType,
+        suburb: customer1.suburb,
+        state: customer1.state,
+        postcode: customer1.postcode,
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min60",
+        startAt: daysFromNow(-3, 16, 0),
+        endAt: addMinutes(daysFromNow(-3, 16, 0), 60),
+        timezone: "Australia/Melbourne",
+        notes: "Reviewed open chords and first strumming pattern.",
+        customerId: customer1.id,
+        modifiedById: teacher.id,
+        assignedTeacherId: teacher.id
+      }
+    });
+
     await prisma.booking.create({
       data: {
         status: "cancelled",
@@ -480,8 +508,54 @@ async function seed() {
     await prisma.bookingAuditLog.createMany({
       data: [
         { bookingId: upcomingBooking.id, action: "edited", actorId: admin.id, details: "Demo seed booking" },
-        { bookingId: pastBooking.id, action: "approved", actorId: admin.id, details: "Demo seed approved booking" }
+        { bookingId: pastBooking.id, action: "approved", actorId: admin.id, details: "Demo seed approved booking" },
+        { bookingId: portalSummaryBooking.id, action: "edited", actorId: teacher.id, details: "Demo lesson-plan summary booking" }
       ]
+    });
+
+    const foundationalTemplate = await prisma.lessonPlanTemplate.create({
+      data: {
+        title: "Foundations Follow-Up",
+        description: "Reusable beginner structure for chord changes, rhythm recall, and take-home practice.",
+        lessonFocus: "Posture, open-chord recall, and clean transitions",
+        goals: "Keep a steady four-count strum and change between G, C, and D without stopping.",
+        activities: "Warm-up, guided transition drill, slow strumming loop, and one short song fragment.",
+        homework: "Practice the G-C-D loop for five minutes a day and play the assigned chorus twice.",
+        sharedNotes: "Keep fretting fingers close to the strings between changes to avoid losing time.",
+        privateNotes: "Student responds best to call-and-response counting before independent strumming.",
+        createdById: teacher.id,
+        updatedById: teacher.id
+      }
+    });
+
+    await prisma.lessonPlan.create({
+      data: {
+        bookingId: upcomingBooking.id,
+        sourceTemplateId: foundationalTemplate.id,
+        lessonFocus: "Open-chord revision before introducing Em",
+        goals: "Stabilize the G-C-D progression and prepare the student for the next chord family.",
+        activities: "Review last week's progression, one-bar count-in drills, and slower chorus play-throughs.",
+        homework: "Repeat the warm-up loop daily and record one clean G-C-D cycle for the next lesson.",
+        sharedNotes: "Use the written count aloud before each change so the transition stays even.",
+        privateNotes: "Keep the next lesson on rhythm confidence unless the current homework is mastered.",
+        createdById: teacher.id,
+        updatedById: teacher.id
+      }
+    });
+
+    await prisma.lessonPlan.create({
+      data: {
+        bookingId: portalSummaryBooking.id,
+        sourceTemplateId: foundationalTemplate.id,
+        lessonFocus: "Chord changes with consistent down-strums",
+        goals: "Move between G, C, and D while keeping the beat steady for one full verse.",
+        activities: "Used the four-count lead-in, repeated chord-pair changes, then played a short song section.",
+        homework: "Practice the verse loop three times per day and pause only after finishing each full cycle.",
+        sharedNotes: "Count aloud on beat one before each chord change. Your timing improved once the count stayed consistent.",
+        privateNotes: "Keep next week's lesson focused on rhythm endurance before introducing faster transitions.",
+        createdById: teacher.id,
+        updatedById: teacher.id
+      }
     });
 
     const studentPasswordHash = await bcrypt.hash(studentPassword, 10);

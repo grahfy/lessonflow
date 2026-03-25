@@ -310,6 +310,10 @@ async function captureStudentPortal(page: import("@playwright/test").Page): Prom
   }
 
   await saveShot(page, "student-portal-page.png");
+  const lessonPlanSummary = page.locator('[class*="lesson-plan-summary"]').first();
+  if (await lessonPlanSummary.isVisible().catch(() => false)) {
+    await saveLocatorShot(lessonPlanSummary, "student-portal-lesson-plan-summary.png");
+  }
 
   await gotoWithRetry(page, "/student/materials");
   await waitForPageSettle(page);
@@ -335,6 +339,14 @@ async function captureTeacherScreenshots(page: import("@playwright/test").Page) 
 
   await saveLocatorShot(page.locator(".teacher-directory-card").first(), "teachers-directory-list.png");
   await saveLocatorShot(page.locator(".teacher-profile-card").first(), "teacher-profile-editor-basics.png");
+}
+
+async function captureLessonPlanScreenshots(page: import("@playwright/test").Page) {
+  await gotoWithRetry(page, "/admin/lesson-plans");
+  await page.getByRole("heading", { name: /^lesson plans$/i }).waitFor({ timeout: 10_000 });
+  await waitForPageSettle(page);
+  await stabilizePage(page);
+  await saveShot(page, "lesson-plan-library-page.png");
 }
 
 async function captureCustomerScreenshots(page: import("@playwright/test").Page) {
@@ -438,6 +450,15 @@ async function captureBookingScreenshots(page: import("@playwright/test").Page) 
   if (bookingDialogBox) {
     await expectStableDialogBounds(bookingDialog, bookingDialogBox, "Booking details");
   }
+
+  await bookingDialog.getByRole("button", { name: /lesson plan/i }).click();
+  await bookingDialog.getByText(/booking lesson plan|create from scratch/i).first().waitFor({ timeout: 10_000 }).catch(() => null);
+  await waitForPageSettle(page);
+  await stabilizePage(page);
+  if (bookingDialogBox) {
+    await expectStableDialogBounds(bookingDialog, bookingDialogBox, "Booking details");
+  }
+  await saveLocatorShot(bookingDialog, "booking-lesson-plan-tab.png");
 
   await bookingDialog.getByRole("button", { name: /^appointment$/i }).click();
   await bookingDialog.getByRole("button", { name: /invoice/i }).click();
@@ -742,6 +763,7 @@ test.describe("documentation screenshots", () => {
     }
 
     await captureTeacherScreenshots(page);
+    await captureLessonPlanScreenshots(page);
     await captureBookingScreenshots(page);
     await captureInvoiceScreenshots(page);
     await captureReportScreenshots(page);
