@@ -1,13 +1,13 @@
 # Screenshot Seed Checklist
 
-Last seeded: 2026-03-17T23:46:10.236Z
+Last seeded: 2026-03-20T10:23:53.568Z
 
 ## Demo Credentials
-- Admin email: `demo-admin@lessonflow.local`
-- Admin password: `DemoAdmin!23`
+- Admin email: `owner@example.com`
+- Admin password: `DocsDemoAdmin!23`
 - Student login name: `Alex Student`
 - Student postcode: `3000`
-- Student password: `DemoStudent!23`
+- Student password: `StudentDemo!23`
 
 ## Dataset Summary
 - Staff accounts: 2 (owner + teacher)
