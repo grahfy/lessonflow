@@ -135,6 +135,8 @@ describe("admin-email-panel-layout", () => {
     expect(markup).toContain("admin-email-history-card");
     expect(markup).toContain("admin-email-history-list");
     expect(markup).toContain("admin-email-history-item");
+    expect(markup).toContain("admin-email-history-preview");
+    expect(markup).toContain("Thanks for the lesson.");
     expect(markup).not.toContain("Sync Now");
     expect(markup).not.toContain("Syncing...");
     expect(markup).not.toContain("Sync recent emails from connected providers.");
@@ -203,6 +205,8 @@ describe("admin-email-panel-layout", () => {
     expect(markup.indexOf("customer-email-tab-shell")).toBeLessThan(markup.indexOf("admin-email-panel-shell"));
     expect(markup).toContain("admin-email-panel-shell");
     expect(markup).toContain("admin-email-history-list");
+    expect(markup).toContain("admin-email-history-preview");
+    expect(markup).toContain("Thanks for the lesson.");
     expect(markup).not.toContain("customer-dialog-panel");
     expect(markup).not.toContain("Sync Now");
     expect(markup).not.toContain("Syncing...");
@@ -260,7 +264,15 @@ describe("admin-email-panel-layout", () => {
         },
         lessonPlanDialogProps: {
           lessonPlan: null,
-          draft: null,
+          draft: {
+            lessonFocus: "Focus",
+            goals: "Goals",
+            activities: "Activities",
+            homework: "Homework",
+            sharedNotes: "Shared",
+            privateNotes: "Private",
+            sourceTemplateId: null
+          },
           loading: false,
           saving: false,
           templates: [],
@@ -278,10 +290,91 @@ describe("admin-email-panel-layout", () => {
     expect(markup).toContain("booking-email-panel");
     expect(markup).toContain("admin-email-panel-shell");
     expect(markup).toContain("admin-email-history-list");
+    expect(markup).toContain("admin-email-history-preview");
+    expect(markup).toContain("Thanks for the lesson.");
     expect(markup.indexOf("booking-email-panel")).toBeLessThan(markup.indexOf("admin-email-history-list"));
     expect(markup).not.toContain("customer-dialog-panel");
     expect(markup).not.toContain("Sync Now");
     expect(markup).not.toContain("Syncing...");
     expect(markup).not.toContain("Sync recent emails from connected providers.");
+  });
+
+  it("moves booking lesson-plan actions into the dialog footer", () => {
+    const markup = renderMarkup(
+      createElement(BookingDetailDialog, {
+        isOpen: true,
+        onClose: noop,
+        rootRef,
+        event: bookingEvent,
+        dialogForm: bookingDialogForm,
+        setDialogForm: noop,
+        busyAction: null,
+        onSave: noop,
+        onDelete: noop,
+        onMove: noop,
+        canManageAppointment: true,
+        canApproveRequest: false,
+        canEditTeacherAssignment: true,
+        canInvoice: false,
+        teacherOptions: [],
+        lessonDurationOptions: [],
+        durationIsConfigured: true,
+        activeTab: "lesson-plan",
+        setActiveTab: noop,
+        matchedCustomer: customer,
+        hasHeuristicMatch: false,
+        onApplyMatchedCustomer: noop,
+        onOpenMatchedCustomer: noop,
+        onDismissMatchedCustomer: noop,
+        emailHistory,
+        emailHistoryWarning: null,
+        loadingEmailHistory: false,
+        sendingEmail: false,
+        syncingEmail: false,
+        emailSubject: "",
+        setEmailSubject: noop,
+        emailMessage: "",
+        setEmailMessage: noop,
+        onSendEmail: asyncNoop,
+        onSyncEmail: noop,
+        onPerformAction: noop,
+        onOpenInvoice: noop,
+        materialsDialogProps: {
+          materialsList: [],
+          materialsLoading: false,
+          materialsUploading: false,
+          materialsDeletingId: null,
+          onUpload: noop,
+          onDelete: noop,
+          uploadFormRef: rootRef
+        },
+        lessonPlanDialogProps: {
+          lessonPlan: null,
+          draft: {
+            lessonFocus: "Focus",
+            goals: "Goals",
+            activities: "Activities",
+            homework: "Homework",
+            sharedNotes: "Shared",
+            privateNotes: "Private",
+            sourceTemplateId: null
+          },
+          loading: false,
+          saving: false,
+          templates: [],
+          templatesLoading: false,
+          templateSelection: "",
+          onTemplateSelectionChange: noop,
+          onCreateFromScratch: noop,
+          onApplyTemplate: noop,
+          onDraftChange: noop,
+          onSave: noop
+        }
+      })
+    );
+
+    expect(markup).toContain("Back to Appointment");
+    expect(markup).toContain("Create Lesson Plan");
+    expect(markup).toContain("Open Customer");
   });
 });

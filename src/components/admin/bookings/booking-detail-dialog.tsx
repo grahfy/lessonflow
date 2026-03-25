@@ -190,6 +190,13 @@ export function BookingDetailDialog({
             </Tooltip>
           </div>
           <div className="dialog-footer-right">
+            {matchedCustomer ? (
+              <Tooltip content="Open the linked customer profile in the customer directory.">
+                <button type="button" className="btn btn-secondary" onClick={onOpenMatchedCustomer}>
+                  Open Customer
+                </button>
+              </Tooltip>
+            ) : null}
             {activeTab === 'appointment' ? (
               <>
                 <Tooltip content="Save edits to booking details, schedule, and notes.">
@@ -205,6 +212,29 @@ export function BookingDetailDialog({
                     </button>
                   </Tooltip>
                 )}
+              </>
+            ) : activeTab === "lesson-plan" ? (
+              <>
+                <Tooltip content="Return to appointment details and actions.">
+                  <button className="btn btn-secondary" onClick={() => setActiveTab("appointment")}>
+                    Back to Appointment
+                  </button>
+                </Tooltip>
+                {lessonPlanDialogProps.draft ? (
+                  <Tooltip content="Save this lesson plan to the selected booking.">
+                    <button
+                      className="btn btn-primary"
+                      disabled={!canManageAppointment || lessonPlanDialogProps.saving}
+                      onClick={lessonPlanDialogProps.onSave}
+                    >
+                      {lessonPlanDialogProps.saving
+                        ? "Saving..."
+                        : lessonPlanDialogProps.lessonPlan
+                          ? "Save Lesson Plan"
+                          : "Create Lesson Plan"}
+                    </button>
+                  </Tooltip>
+                ) : null}
               </>
             ) : (
               <Tooltip content="Return to appointment details and actions.">
@@ -252,15 +282,6 @@ export function BookingDetailDialog({
             disabled: !canManageAppointment || event.entityType !== "booking"
           }
         ]}
-        rightSlot={
-          matchedCustomer ? (
-            <Tooltip content="Open the linked customer profile in the customer directory.">
-              <button type="button" className="btn btn-secondary" onClick={onOpenMatchedCustomer}>
-                Open Customer
-              </button>
-            </Tooltip>
-          ) : null
-        }
       />
 
       <div className={tabBodyClassName}>
@@ -488,7 +509,6 @@ export function BookingDetailDialog({
               lessonPlan={lessonPlanDialogProps.lessonPlan}
               draft={lessonPlanDialogProps.draft}
               loading={lessonPlanDialogProps.loading}
-              saving={lessonPlanDialogProps.saving}
               templates={lessonPlanDialogProps.templates}
               templatesLoading={lessonPlanDialogProps.templatesLoading}
               templateSelection={lessonPlanDialogProps.templateSelection}
@@ -497,7 +517,6 @@ export function BookingDetailDialog({
               onCreateFromScratch={lessonPlanDialogProps.onCreateFromScratch}
               onApplyTemplate={lessonPlanDialogProps.onApplyTemplate}
               onDraftChange={lessonPlanDialogProps.onDraftChange}
-              onSave={lessonPlanDialogProps.onSave}
             />
           ) : null}
       </div>

@@ -1168,6 +1168,27 @@
   gap: 12px;
 }
 
+.lesson-plan-library-editor-sections,
+.booking-lesson-plan-editor-main,
+.booking-lesson-plan-editor-side {
+  display: grid;
+  gap: 14px;
+}
+
+.lesson-plan-editor-section {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 14px;
+}
+
+.lesson-plan-editor-section-head {
+  display: grid;
+  gap: 4px;
+}
+
 .lesson-plan-template-editor-actions,
 .booking-lesson-plan-editor-actions {
   border-top: 1px solid rgba(255, 255, 255, 0.12);
@@ -1175,9 +1196,49 @@
   flex-wrap: wrap;
 }
 
+.booking-lesson-plan-panel {
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.booking-lesson-plan-empty-intro {
+  display: grid;
+  gap: 6px;
+}
+
+.booking-lesson-plan-start-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.booking-lesson-plan-start-card {
+  align-content: start;
+}
+
 .booking-lesson-plan-template-apply {
   display: grid;
   gap: 10px;
+}
+
+.booking-lesson-plan-editor-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.9fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.booking-lesson-plan-editor-side {
+  position: sticky;
+  top: 0;
+}
+
+.booking-lesson-plan-summary-card .lesson-plan-badge {
+  margin-top: 2px;
+}
+
+.booking-lesson-plan-side-note {
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .booking-lesson-plan-panel .field {
@@ -1187,6 +1248,15 @@
 @media (max-width: 1024px) {
   .lesson-plan-library {
     grid-template-columns: 1fr;
+  }
+
+  .booking-lesson-plan-start-layout,
+  .booking-lesson-plan-editor-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .booking-lesson-plan-editor-side {
+    position: static;
   }
 }
 
@@ -1726,6 +1796,17 @@
 .admin-email-history-item:hover {
   border-color: rgba(96, 165, 250, 0.24);
   background: rgba(30, 41, 59, 0.7);
+}
+
+.admin-email-history-preview {
+  margin: 6px 0 0;
+  color: var(--ink-1);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .customer-email-history-item {
@@ -3600,10 +3681,10 @@
 
 #booking-detail-dialog .dialog-tabs-left {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  flex: 1 1 640px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  flex: 1 1 760px;
   width: 100%;
-  max-width: 680px;
+  max-width: none;
 }
 
 .dialog-section-heading {
@@ -3732,6 +3813,7 @@
 }
 
 #booking-detail-dialog .booking-appointment-panel,
+#booking-detail-dialog .booking-lesson-plan-panel,
 #booking-detail-dialog .booking-materials-panel,
 #customer-dialog .customer-materials-panel {
   overflow: auto;
@@ -3848,9 +3930,9 @@
   margin-top: 16px;
 }
 
-@media (max-width: 820px) {
+@media (max-width: 960px) {
   #booking-detail-dialog .dialog-tabs-left {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     max-width: none;
   }
 
@@ -3860,6 +3942,13 @@
 
   #booking-detail-dialog .booking-notes-actions .btn {
     flex: 1 1 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  #booking-detail-dialog .dialog-tabs-left {
+    grid-template-columns: 1fr;
+    max-width: none;
   }
 }
 
@@ -3900,6 +3989,10 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+}
+
+.booking-email-history-item .admin-email-history-preview {
+  margin-top: 6px;
 }
 
 .booking-email-history-error {

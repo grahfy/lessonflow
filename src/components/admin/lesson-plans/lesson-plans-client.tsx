@@ -8,6 +8,7 @@ import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AdminField, AdminForm } from "@/components/admin/ui/admin-form";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { formatDateTime } from "@/lib/admin/formatters";
+import { resolveLessonPlanTemplateSelection } from "@/lib/admin/lesson-plan-template-selection";
 import { useAdminSession } from "@/lib/admin/use-admin-session";
 import { useLessonPlanTemplates } from "@/lib/admin/use-lesson-plan-templates";
 import {
@@ -36,8 +37,9 @@ export function AdminLessonPlansClient() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("new");
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [draft, setDraft] = useState<LessonPlanTemplateInput>(buildEmptyLessonPlanTemplateInput());
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   const onAuthError = () => window.location.assign("/admin/login");
   const { admin } = useAdminSession({ onAuthError, onError: setError });
@@ -47,11 +49,17 @@ export function AdminLessonPlansClient() {
   });
 
   useEffect(() => {
-    void load();
+    void load().finally(() => setHasLoadedOnce(true));
   }, [load]);
 
   useEffect(() => {
-    if (selectedTemplateId === "new") {
+    if (!hasLoadedOnce) {
+      return;
+    }
+
+    const nextSelectionId = resolveLessonPlanTemplateSelection(selectedTemplateId, templates);
+    if (nextSelectionId !== selectedTemplateId) {
+      setSelectedTemplateId(nextSelectionId);
       return;
     }
 
@@ -61,16 +69,13 @@ export function AdminLessonPlansClient() {
       return;
     }
 
-    if (templates.length > 0) {
-      const fallback = templates[0]!;
-      setSelectedTemplateId(fallback.id);
-      setDraft(draftFromTemplate(fallback));
+    if (selectedTemplateId === "new") {
+      setDraft(buildEmptyLessonPlanTemplateInput());
       return;
     }
 
-    setSelectedTemplateId("new");
     setDraft(buildEmptyLessonPlanTemplateInput());
-  }, [selectedTemplateId, templates]);
+  }, [hasLoadedOnce, selectedTemplateId, templates]);
 
   const filteredTemplates = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -128,7 +133,7 @@ export function AdminLessonPlansClient() {
       return;
     }
 
-    setSelectedTemplateId("new");
+    setSelectedTemplateId("");
     setDraft(buildEmptyLessonPlanTemplateInput());
     setNotice("Lesson-plan template archived.");
   }
@@ -221,38 +226,69 @@ export function AdminLessonPlansClient() {
             ) : null}
           </div>
 
-          <AdminForm className="lesson-plan-template-meta-grid">
-            <AdminField
-              label="Template Title"
-              tooltip="A short staff-facing name for this reusable template."
-              fullWidth
-            >
-              <input
-                value={draft.title}
-                onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
-                disabled={!canEditSelectedTemplate}
-              />
-            </AdminField>
-            <AdminField
-              label="Description"
-              tooltip="Optional staff-facing context about when to apply this template."
-              fullWidth
-            >
-              <textarea
-                className="admin-editor-textarea admin-editor-textarea-sm"
-                value={draft.description}
-                onChange={(event) => setDraft((prev) => ({ ...prev, description: event.target.value }))}
-                disabled={!canEditSelectedTemplate}
-              />
-            </AdminField>
-          </AdminForm>
+          <div className="lesson-plan-library-editor-sections">
+            <section className="lesson-plan-editor-section">
+              <div className="lesson-plan-editor-section-head">
+                <p className="admin-inline-field">Template Meta</p>
+                <p className="helper-text">Name the template and describe when staff should use it.</p>
+              </div>
+              <AdminForm className="lesson-plan-template-meta-grid">
+                <AdminField
+                  label="Template Title"
+                  tooltip="A short staff-facing name for this reusable template."
+                  fullWidth
+                >
+                  <input
+                    value={draft.title}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
+                    disabled={!canEditSelectedTemplate}
+                  />
+                </AdminField>
+                <AdminField
+                  label="Description"
+                  tooltip="Optional staff-facing context about when to apply this template."
+                  fullWidth
+                >
+                  <textarea
+                    className="admin-editor-textarea admin-editor-textarea-sm"
+                    value={draft.description}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, description: event.target.value }))}
+                    disabled={!canEditSelectedTemplate}
+                  />
+                </AdminField>
+              </AdminForm>
+            </section>
 
-          <LessonPlanStructuredFields
-            value={draft}
-            disabled={!canEditSelectedTemplate}
-            className="lesson-plan-template-fields"
-            onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
-          />
+            <section className="lesson-plan-editor-section">
+              <div className="lesson-plan-editor-section-head">
+                <p className="admin-inline-field">Lesson Structure</p>
+                <p className="helper-text">Capture the focus, checkpoints, and in-lesson activities.</p>
+              </div>
+              <LessonPlanStructuredFields
+                value={draft}
+                disabled={!canEditSelectedTemplate}
+                className="lesson-plan-template-fields"
+                fields={["lessonFocus", "goals", "activities"]}
+                onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
+              />
+            </section>
+
+            <section className="lesson-plan-editor-section">
+              <div className="lesson-plan-editor-section-head">
+                <p className="admin-inline-field">Student Follow-Up</p>
+                <p className="helper-text">
+                  Keep post-lesson homework, shared notes, and private coaching notes together.
+                </p>
+              </div>
+              <LessonPlanStructuredFields
+                value={draft}
+                disabled={!canEditSelectedTemplate}
+                className="lesson-plan-template-fields"
+                fields={["homework", "sharedNotes", "privateNotes"]}
+                onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
+              />
+            </section>
+          </div>
 
           <div className="lesson-plan-template-editor-actions">
             <div className="helper-text">
