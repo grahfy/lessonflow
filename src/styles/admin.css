@@ -764,6 +764,7 @@
   border-radius: 24px;
   background: var(--admin-shell-bg);
   box-shadow: var(--admin-shell-shadow);
+  font-family: "Overpass", "Segoe UI", Tahoma, sans-serif;
 }
 
 .admin-shell > * {
@@ -993,9 +994,14 @@
   border-radius: 14px;
   font-size: 0.82rem;
   letter-spacing: 0.03em;
+  font-family: inherit;
   box-shadow:
     0 6px 16px rgba(2, 8, 23, 0.18),
     0 1px 0 rgba(255, 255, 255, 0.05) inset;
+}
+
+.dialog-panel .btn {
+  font-family: inherit;
 }
 
 .admin-shell .btn::before,
@@ -1805,17 +1811,8 @@
 }
 
 .customer-dialog-description {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  display: block;
   width: 100%;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.customer-dialog-description > div:first-child {
-  min-width: 0;
-  max-width: 100%;
   font-size: 0.76rem;
   color: var(--ink-1);
   overflow: hidden;
@@ -1823,26 +1820,7 @@
   white-space: nowrap;
 }
 
-.customer-dialog-tabs {
-  display: flex;
-  width: 100%;
-}
-
-.customer-dialog-tabs-list {
-  display: flex;
-  gap: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  padding: 3px;
-  background: rgba(15, 23, 42, 0.6);
-}
-
-.customer-dialog-tabs-list .btn {
-  min-width: 118px;
-}
-
 .customer-dialog-notice-stack {
-  margin-top: 10px;
   display: grid;
   gap: 6px;
 }
@@ -3802,6 +3780,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  font-family: "Overpass", "Segoe UI", Tahoma, sans-serif;
   border-radius: 20px;
   border: 1px solid rgba(148, 163, 184, 0.18);
   background:
@@ -3867,18 +3846,28 @@
 
 #booking-detail-dialog {
   --admin-communication-shell-height: min(68vh, 760px);
+  --booking-detail-dialog-height: min(96vh, 1020px);
   width: min(1380px, calc(100vw - 24px));
-  max-height: min(96vh, 1020px);
+  min-height: var(--booking-detail-dialog-height);
+  height: var(--booking-detail-dialog-height);
+  max-height: var(--booking-detail-dialog-height);
 }
 
 #booking-detail-dialog .booking-dialog-body-lock {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  height: 100%;
+}
+
+#booking-detail-dialog .dialog-body-scroll {
+  min-height: 0;
+  height: 100%;
 }
 
 .booking-dialog-panel {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
   max-height: min(90vh, 920px);
   width: min(1100px, 97vw);
@@ -4227,6 +4216,13 @@
   min-width: 0;
 }
 
+#customer-dialog .dialog-tabs-left .btn,
+#booking-detail-dialog .dialog-tabs-left .btn {
+  width: 100%;
+  min-width: 0;
+}
+
+#customer-dialog .dialog-tabs-left,
 #booking-detail-dialog .dialog-tabs-left {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -4815,6 +4811,82 @@
 
 .route-loading .notice {
   margin: 0;
+}
+
+.admin-route-loading-toast {
+  position: fixed;
+  right: 24px;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  z-index: 120;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: min(300px, calc(100vw - 32px));
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 14px 16px;
+  border: 1px solid rgba(96, 165, 250, 0.24);
+  border-radius: 18px;
+  background:
+    linear-gradient(150deg, rgba(15, 23, 42, 0.96), rgba(15, 23, 42, 0.88)),
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.14), transparent 48%);
+  box-shadow: 0 24px 46px rgba(2, 8, 23, 0.38);
+  backdrop-filter: blur(14px);
+}
+
+.admin-route-loading-spinner {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: 2px solid rgba(191, 219, 254, 0.2);
+  border-top-color: rgba(239, 246, 255, 0.98);
+  border-right-color: rgba(96, 165, 250, 0.72);
+  animation: admin-route-loading-spin 0.8s linear infinite;
+}
+
+.admin-route-loading-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-route-loading-title,
+.admin-route-loading-message {
+  margin: 0;
+}
+
+.admin-route-loading-title {
+  color: #eff6ff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-route-loading-message {
+  color: #cbd5e1;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+@keyframes admin-route-loading-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-route-loading-toast {
+    right: 16px;
+    left: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    min-width: 0;
+    max-width: none;
+  }
 }
 
 .manual-match-card {

@@ -90,30 +90,15 @@ export function CustomerDialogWrapper({
     onClose,
     ...rest
 }: Props) {
-    // RATIONALE: The dialog description doubles as the tab/navigation header so
-    // the modal chrome stays compact even when each tab has its own dense UI.
+    // RATIONALE: Keep customer identity in the modal header while the shared
+    // tab rail sits in the dialog body, matching the booking editor pattern.
     const description = (
         <div className="customer-dialog-description">
-            <div>
-                {selectedCustomer ? (
-                    <>Profile: <strong>{selectedCustomer.fullName}</strong> · ID: <code>{selectedCustomer.id}</code></>
-                ) : (
-                    <>New Customer Profile</>
-                )}
-            </div>
-
-            <AdminTabBar
-                activeTab={activeTab}
-                onChange={setActiveTab}
-                className="customer-dialog-tabs"
-                listClassName="customer-dialog-tabs-list"
-                items={[
-                    { key: "profile", label: "Profile & Address" },
-                    { key: "history", label: "Lesson History", disabled: !selectedCustomer || !rest.canAccessCustomerActions },
-                    { key: "emails", label: "Communication", disabled: !selectedCustomer || !rest.canAccessCustomerActions },
-                    { key: "materials", label: "Learning Materials", disabled: !selectedCustomer || !rest.canAccessCustomerActions }
-                ]}
-            />
+            {selectedCustomer ? (
+                <>Profile: <strong>{selectedCustomer.fullName}</strong> · ID: <code>{selectedCustomer.id}</code></>
+            ) : (
+                <>New Customer Profile</>
+            )}
         </div>
     );
 
@@ -129,6 +114,18 @@ export function CustomerDialogWrapper({
             bodyClassName="customer-dialog-body-lock"
             lockBodyScrollArea
         >
+            <AdminTabBar
+                activeTab={activeTab}
+                onChange={setActiveTab}
+                className="dialog-tabs dialog-tabs-booking"
+                listClassName="dialog-tabs-left"
+                items={[
+                    { key: "profile", label: "Profile & Address" },
+                    { key: "history", label: "Lesson History", disabled: !selectedCustomer || !rest.canAccessCustomerActions },
+                    { key: "emails", label: "Communication", disabled: !selectedCustomer || !rest.canAccessCustomerActions },
+                    { key: "materials", label: "Learning Materials", disabled: !selectedCustomer || !rest.canAccessCustomerActions }
+                ]}
+            />
             <AdminNoticeStack
                 error={error}
                 notice={notice}
