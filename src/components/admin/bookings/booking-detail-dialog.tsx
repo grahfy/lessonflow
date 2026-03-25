@@ -222,6 +222,17 @@ export function BookingDetailDialog({
                   </button>
                 </Tooltip>
                 {lessonPlanDialogProps.draft ? (
+                  <Tooltip content="Clear this booking lesson plan and return the tab to its empty start state.">
+                    <button
+                      className="btn btn-danger"
+                      disabled={!canManageAppointment || lessonPlanDialogProps.saving}
+                      onClick={lessonPlanDialogProps.onClearLessonPlan}
+                    >
+                      Clear Lesson Plan
+                    </button>
+                  </Tooltip>
+                ) : null}
+                {lessonPlanDialogProps.draft ? (
                   <Tooltip content="Save this lesson plan to the selected booking.">
                     <button
                       className="btn btn-primary"
@@ -517,7 +528,6 @@ export function BookingDetailDialog({
               onTemplateSelectionChange={lessonPlanDialogProps.onTemplateSelectionChange}
               onCreateFromScratch={lessonPlanDialogProps.onCreateFromScratch}
               onApplyTemplate={lessonPlanDialogProps.onApplyTemplate}
-              onClearLessonPlan={lessonPlanDialogProps.onClearLessonPlan}
               onDraftChange={lessonPlanDialogProps.onDraftChange}
             />
           ) : null}

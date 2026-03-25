@@ -458,6 +458,7 @@ export function MotionProvider({ children }: PropsWithChildren) {
   const pathname = usePathname();
   const [transitionState, setTransitionState] = useState<TransitionState>("idle");
   const lockedRef = useRef(false);
+  const hasMountedRef = useRef(false);
   const lastPathnameRef = useRef(pathname);
   const pendingDirectionRef = useRef<MotionDirection>(0);
 
@@ -497,6 +498,17 @@ export function MotionProvider({ children }: PropsWithChildren) {
   }, []);
 
   useEffect(() => {
+    if (!hasMountedRef.current) {
+      // RATIONALE: Skipping the initial enter animation prevents GSAP from mutating
+      // server-rendered markup before nested client components finish hydrating.
+      hasMountedRef.current = true;
+      lastPathnameRef.current = pathname;
+      pendingDirectionRef.current = 0;
+      lockedRef.current = false;
+      setTransitionState("idle");
+      return;
+    }
+
     const inferredDirection = (() => {
       const previous = lastPathnameRef.current;
       lastPathnameRef.current = pathname;

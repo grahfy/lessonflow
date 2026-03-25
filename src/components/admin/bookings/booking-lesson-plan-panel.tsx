@@ -17,7 +17,6 @@ interface BookingLessonPlanPanelProps {
   onTemplateSelectionChange: (value: string) => void;
   onCreateFromScratch: () => void;
   onApplyTemplate: () => void;
-  onClearLessonPlan: () => void;
   onDraftChange: (patch: Partial<BookingLessonPlanInput>) => void;
 }
 
@@ -35,7 +34,6 @@ export function BookingLessonPlanPanel({
   onTemplateSelectionChange,
   onCreateFromScratch,
   onApplyTemplate,
-  onClearLessonPlan,
   onDraftChange
 }: BookingLessonPlanPanelProps) {
   if (loading) {
@@ -160,6 +158,9 @@ export function BookingLessonPlanPanel({
                   <p className="helper-text">
                     Students only see Lesson Focus, Goals, Homework, and Shared Notes after the lesson has happened.
                   </p>
+                  <p className="helper-text">
+                    Template changes never update existing booking plans automatically. This booking keeps its own snapshot.
+                  </p>
                 </div>
                 {lessonPlan?.sourceTemplateTitle || draft.sourceTemplateId ? (
                   <span className="lesson-plan-badge">
@@ -230,24 +231,6 @@ export function BookingLessonPlanPanel({
                 fields={["sharedNotes", "privateNotes"]}
                 onChange={onDraftChange}
               />
-            </section>
-
-            <section className="lesson-plan-editor-section booking-lesson-plan-side-note">
-              <p className="helper-text">
-                Template changes never update existing booking plans automatically. This booking keeps its own snapshot.
-              </p>
-              <div className="button-row">
-                <Tooltip content="Remove this booking lesson plan and return the tab to its empty start state.">
-                  <button
-                    className="btn btn-danger"
-                    type="button"
-                    disabled={!canManageLessonPlan}
-                    onClick={onClearLessonPlan}
-                  >
-                    Clear Lesson Plan
-                  </button>
-                </Tooltip>
-              </div>
             </section>
           </aside>
         </div>

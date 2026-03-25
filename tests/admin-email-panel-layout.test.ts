@@ -376,6 +376,7 @@ describe("admin-email-panel-layout", () => {
     );
 
     expect(markup).toContain("Back to Appointment");
+    expect(markup).toContain("Clear Lesson Plan");
     expect(markup).toContain("Create Lesson Plan");
     expect(markup).toContain("Open Customer");
   });
