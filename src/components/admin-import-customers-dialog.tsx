@@ -4,6 +4,8 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import Papa from "papaparse";
 
+import { Tooltip } from "@/components/admin/ui/tooltip";
+
 import { useSafeFetch } from "@/lib/admin/use-safe-fetch";
 
 interface ImportCustomersDialogProps {
@@ -85,10 +87,12 @@ export function ImportCustomersDialog({ open, onOpenChange, onSuccess }: ImportC
           <div className="flex items-center justify-between mb-4">
             <DialogPrimitive.Title className="text-xl font-bold">Import Customers</DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
-              <button className="rounded-full p-1.5 hover:bg-slate-100">
-                <X className="h-5 w-5" />
-                <span className="sr-only">Close</span>
-              </button>
+              <Tooltip content="Close import dialog.">
+                <button className="rounded-full p-1.5 hover:bg-slate-100">
+                  <X className="h-5 w-5" />
+                  <span className="sr-only">Close</span>
+                </button>
+              </Tooltip>
             </DialogPrimitive.Close>
           </div>
           

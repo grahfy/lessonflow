@@ -2,6 +2,7 @@
 
 import { useGmailStatus } from "@/lib/admin/use-gmail-status";
 import { AdminCard } from "@/components/admin/ui/admin-card";
+import { Tooltip } from "@/components/admin/ui/tooltip";
 import { RefreshCw, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 
 export function GmailStatus() {
@@ -36,14 +37,17 @@ export function GmailStatus() {
           {renderIcon()}
           <strong>Gmail API Status: {getStatusLabel()}</strong>
         </div>
-        <button 
-          type="button" 
-          className="btn btn-secondary btn-small"
-          onClick={check}
-          disabled={status.status === "loading"}
-        >
-          <RefreshCw size={14} className={status.status === "loading" ? "icon-spin" : ""} />
-        </button>
+        <Tooltip content="Refresh Gmail connection status.">
+          <button
+            type="button"
+            className="btn btn-secondary btn-small"
+            onClick={check}
+            disabled={status.status === "loading"}
+            aria-label="Refresh"
+          >
+            <RefreshCw size={14} className={status.status === "loading" ? "icon-spin" : ""} />
+          </button>
+        </Tooltip>
       </div>
       
       {status.status === "connected" && (

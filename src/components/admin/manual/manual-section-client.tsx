@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminCard } from "@/components/admin/ui/admin-card";
+import { Tooltip } from "@/components/admin/ui/tooltip";
 import type {
   AdminManualIndex,
   AdminManualSection,
@@ -223,9 +224,11 @@ export function AdminManualSectionClient({
           {/* NOTE: Clicks on the inner panel are stopped so the same overlay can
               support both click-away close and interactive image controls. */}
           <div className="modal-content admin-manual-modal-content" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" onClick={closeScreenshot} aria-label="Close screenshot">
-              ×
-            </button>
+            <Tooltip content="Close screenshot.">
+              <button type="button" className="modal-close" onClick={closeScreenshot} aria-label="Close screenshot">
+                ×
+              </button>
+            </Tooltip>
             <div className="modal-image-container admin-manual-modal-image-container">
               <Image src={activeScreenshot.publicPath} alt={activeScreenshot.alt} fill className="modal-image" sizes="95vw" />
             </div>

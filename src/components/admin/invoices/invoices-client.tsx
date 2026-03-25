@@ -1758,27 +1758,30 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                           </p>
                         )}
                       </div>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-icon invoice-dialog-inline-trigger"
-                        disabled={!createSelectedCustomerId}
-                        onClick={() => {
-                          setCreateBookingDialogOpen(true);
-                          void loadCreateBookingOptions();
-                        }}
-                        aria-label={createUsesSingleBookingLesson ? "Select one lesson booking" : "Select lesson bookings"}
-                        title={
+                      <Tooltip
+                        content={
                           !createSelectedCustomerId
                             ? createUsesSingleBookingLesson
                               ? "Choose a customer first to select one lesson booking."
                               : "Choose a customer first to select lesson bookings."
                             : createUsesSingleBookingLesson
-                              ? "Select one lesson booking"
-                              : "Select lesson bookings"
+                              ? "Select one lesson booking."
+                              : "Select lesson bookings."
                         }
                       >
-                        <CalendarDays size={18} />
-                      </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-icon invoice-dialog-inline-trigger"
+                          disabled={!createSelectedCustomerId}
+                          onClick={() => {
+                            setCreateBookingDialogOpen(true);
+                            void loadCreateBookingOptions();
+                          }}
+                          aria-label={createUsesSingleBookingLesson ? "Select one lesson booking" : "Select lesson bookings"}
+                        >
+                          <CalendarDays size={18} />
+                        </button>
+                      </Tooltip>
                     </div>
                   </AdminField>
                 )}

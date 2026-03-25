@@ -3,6 +3,7 @@
 import { AlertCircle, CheckCircle2, RefreshCw, XCircle } from "lucide-react";
 
 import { AdminCard } from "@/components/admin/ui/admin-card";
+import { Tooltip } from "@/components/admin/ui/tooltip";
 import { useCustomerEmailAlertStatus, type InboxProviderStatus } from "@/lib/admin/use-customer-email-alert-status";
 
 function renderStatusIcon(status: InboxProviderStatus["status"]) {
@@ -47,17 +48,20 @@ export function CustomerEmailAlertStatus() {
             {status.activeProvider ? ` · Active ${status.activeProvider.toUpperCase()}` : ""}
           </strong>
         </div>
-        <button
-          type="button"
-          className="btn btn-secondary btn-small"
-          onClick={check}
-          disabled={loading}
-        >
-          <RefreshCw
-            size={14}
-            className={loading ? "icon-spin" : ""}
-          />
-        </button>
+        <Tooltip content="Refresh inbox alert connection status.">
+          <button
+            type="button"
+            className="btn btn-secondary btn-small"
+            onClick={check}
+            disabled={loading}
+            aria-label="Refresh"
+          >
+            <RefreshCw
+              size={14}
+              className={loading ? "icon-spin" : ""}
+            />
+          </button>
+        </Tooltip>
       </div>
 
       <div className="gmail-status-details">

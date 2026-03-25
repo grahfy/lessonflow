@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 
+import { Tooltip } from "@/components/admin/ui/tooltip";
+
 type ImageModalProps = {
   src: string;
   alt: string;
@@ -59,15 +61,17 @@ export function ImageModal({ src, alt, triggerText, caption }: ImageModalProps) 
           aria-label={alt}
         >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <button
-              ref={closeRef}
-              type="button"
-              onClick={closeModal}
-              className="modal-close"
-              aria-label="Close"
-            >
-              ×
-            </button>
+            <Tooltip content="Close image preview.">
+              <button
+                ref={closeRef}
+                type="button"
+                onClick={closeModal}
+                className="modal-close"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </Tooltip>
             <div className="modal-image-container">
               <Image src={src} alt={alt} fill className="modal-image" sizes="90vw" />
             </div>

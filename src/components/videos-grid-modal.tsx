@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { Tooltip } from "@/components/admin/ui/tooltip";
+
 type VideoItem = {
   id: string;
   title: string;
@@ -90,9 +92,11 @@ export function VideosGridModal({ videos }: VideosGridModalProps) {
           aria-label={`${activeVideo.title} video popup`}
         >
           <div className="modal-content video-modal-content" onClick={(event) => event.stopPropagation()}>
-            <button ref={closeRef} type="button" onClick={closeModal} className="modal-close" aria-label="Close video">
-              ×
-            </button>
+            <Tooltip content="Close video.">
+              <button ref={closeRef} type="button" onClick={closeModal} className="modal-close" aria-label="Close video">
+                ×
+              </button>
+            </Tooltip>
             <div className="video-modal-frame">
               <iframe
                 title={activeVideo.title}
