@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { GET as getBookingLessonPlan, PUT as saveBookingLessonPlan } from "@/app/api/admin/bookings/[id]/lesson-plan/route";
+import { DELETE as clearBookingLessonPlan, GET as getBookingLessonPlan, PUT as saveBookingLessonPlan } from "@/app/api/admin/bookings/[id]/lesson-plan/route";
 import { DELETE as archiveLessonPlanTemplate, PATCH as updateLessonPlanTemplate } from "@/app/api/admin/lesson-plan-templates/[id]/route";
 import { GET as listLessonPlanTemplates, POST as createLessonPlanTemplate } from "@/app/api/admin/lesson-plan-templates/route";
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
@@ -316,5 +316,41 @@ describe("admin-lesson-plans", () => {
       { params: Promise.resolve({ id: booking.id }) }
     );
     expect(forbiddenResponse.status).toBe(403);
+  });
+
+  it("clears a saved booking lesson plan for the assigned teacher", async () => {
+    await ensureOwnerAdmin();
+    const assignedTeacher = await createTeacher("clear-booking-teacher@example.com", "Clear Booking Teacher");
+    const assignedToken = createSessionToken(assignedTeacher.email);
+
+    const booking = await createAssignedBooking(assignedTeacher.id);
+    await prisma.lessonPlan.create({
+      data: {
+        bookingId: booking.id,
+        lessonFocus: "Focus",
+        goals: "Goals",
+        activities: "Activities",
+        homework: "Homework",
+        sharedNotes: "Shared",
+        privateNotes: "Private",
+        createdById: assignedTeacher.id,
+        updatedById: assignedTeacher.id
+      }
+    });
+
+    const clearResponse = await clearBookingLessonPlan(
+      adminJsonRequest(`http://localhost/api/admin/bookings/${booking.id}/lesson-plan`, assignedToken, {
+        method: "DELETE"
+      }),
+      { params: Promise.resolve({ id: booking.id }) }
+    );
+    expect(clearResponse.status).toBe(200);
+
+    const loadResponse = await getBookingLessonPlan(
+      adminJsonRequest(`http://localhost/api/admin/bookings/${booking.id}/lesson-plan`, assignedToken),
+      { params: Promise.resolve({ id: booking.id }) }
+    );
+    const loadBody = (await loadResponse.json()) as { lessonPlan: null };
+    expect(loadBody.lessonPlan).toBeNull();
   });
 });

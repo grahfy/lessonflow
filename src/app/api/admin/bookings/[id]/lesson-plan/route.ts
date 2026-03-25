@@ -5,7 +5,7 @@ import { jsonUnexpectedError } from "@/lib/api-errors";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { prisma } from "@/lib/db";
 import { bookingLessonPlanInputSchema } from "@/lib/lesson-plan-contract";
-import { getBookingLessonPlanState, upsertBookingLessonPlan } from "@/lib/lesson-plans";
+import { deleteBookingLessonPlan, getBookingLessonPlanState, upsertBookingLessonPlan } from "@/lib/lesson-plans";
 
 type Params = {
   params: Promise<{
@@ -104,5 +104,25 @@ export async function PUT(request: NextRequest, params: Params) {
     });
   } catch (error) {
     return jsonUnexpectedError(error, "Unable to save lesson plan.");
+  }
+}
+
+/**
+ * Clears the lesson plan attached to one booking.
+ */
+export async function DELETE(request: NextRequest, params: Params) {
+  try {
+    const resolved = await resolveManagedBooking(request, params);
+    if (resolved.response) {
+      return resolved.response;
+    }
+
+    await deleteBookingLessonPlan(resolved.booking!.id);
+    return NextResponse.json({
+      ok: true,
+      lessonPlan: null
+    });
+  } catch (error) {
+    return jsonUnexpectedError(error, "Unable to clear lesson plan.");
   }
 }

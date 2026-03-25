@@ -281,6 +281,7 @@ describe("admin-email-panel-layout", () => {
           onTemplateSelectionChange: noop,
           onCreateFromScratch: noop,
           onApplyTemplate: noop,
+          onClearLessonPlan: noop,
           onDraftChange: noop,
           onSave: noop
         }
@@ -367,6 +368,7 @@ describe("admin-email-panel-layout", () => {
           onTemplateSelectionChange: noop,
           onCreateFromScratch: noop,
           onApplyTemplate: noop,
+          onClearLessonPlan: noop,
           onDraftChange: noop,
           onSave: noop
         }

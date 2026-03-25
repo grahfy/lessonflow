@@ -115,6 +115,7 @@ interface BookingDetailDialogProps {
     onTemplateSelectionChange: (value: string) => void;
     onCreateFromScratch: () => void;
     onApplyTemplate: () => void;
+    onClearLessonPlan: () => void;
     onDraftChange: (patch: Partial<BookingLessonPlanInput>) => void;
     onSave: () => void;
   };
@@ -516,6 +517,7 @@ export function BookingDetailDialog({
               onTemplateSelectionChange={lessonPlanDialogProps.onTemplateSelectionChange}
               onCreateFromScratch={lessonPlanDialogProps.onCreateFromScratch}
               onApplyTemplate={lessonPlanDialogProps.onApplyTemplate}
+              onClearLessonPlan={lessonPlanDialogProps.onClearLessonPlan}
               onDraftChange={lessonPlanDialogProps.onDraftChange}
             />
           ) : null}

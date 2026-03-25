@@ -199,6 +199,17 @@ export async function getBookingLessonPlanState(bookingId: string): Promise<Less
 }
 
 /**
+ * Deletes the single lesson plan attached to a booking when one exists.
+ */
+export async function deleteBookingLessonPlan(bookingId: string): Promise<void> {
+  await prisma.lessonPlan.deleteMany({
+    where: {
+      bookingId
+    }
+  });
+}
+
+/**
  * Creates or updates the single lesson plan attached to a booking.
  */
 export async function upsertBookingLessonPlan(

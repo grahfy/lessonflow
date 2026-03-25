@@ -1261,6 +1261,11 @@
   gap: 10px;
 }
 
+.booking-lesson-plan-template-tools {
+  display: grid;
+  gap: 10px;
+}
+
 .booking-lesson-plan-editor-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.9fr);

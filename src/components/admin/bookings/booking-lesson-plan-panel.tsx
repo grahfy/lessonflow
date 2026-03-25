@@ -17,6 +17,7 @@ interface BookingLessonPlanPanelProps {
   onTemplateSelectionChange: (value: string) => void;
   onCreateFromScratch: () => void;
   onApplyTemplate: () => void;
+  onClearLessonPlan: () => void;
   onDraftChange: (patch: Partial<BookingLessonPlanInput>) => void;
 }
 
@@ -34,6 +35,7 @@ export function BookingLessonPlanPanel({
   onTemplateSelectionChange,
   onCreateFromScratch,
   onApplyTemplate,
+  onClearLessonPlan,
   onDraftChange
 }: BookingLessonPlanPanelProps) {
   if (loading) {
@@ -172,6 +174,49 @@ export function BookingLessonPlanPanel({
             <section className="lesson-plan-editor-section">
               <div className="booking-lesson-plan-editor-head">
                 <div>
+                  <p className="admin-inline-field">Choose From Template</p>
+                  <p className="helper-text">
+                    Replace this draft with one reusable template, then save the updated snapshot for this booking.
+                  </p>
+                </div>
+              </div>
+              <div className="booking-lesson-plan-template-tools">
+                <AdminField
+                  label="Template"
+                  tooltip="Choose one active lesson-plan template and copy its fields into this booking draft."
+                  fullWidth
+                >
+                  <select
+                    value={templateSelection}
+                    onChange={(event) => onTemplateSelectionChange(event.target.value)}
+                    disabled={!canManageLessonPlan || templatesLoading || templates.length === 0}
+                  >
+                    <option value="">Select a template</option>
+                    {templates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.title} · {template.createdByDisplayName}
+                      </option>
+                    ))}
+                  </select>
+                </AdminField>
+                <div className="button-row">
+                  <Tooltip content="Copy the selected template into this booking draft and replace the current lesson-plan fields.">
+                    <button
+                      className="btn btn-secondary"
+                      type="button"
+                      disabled={!canManageLessonPlan || !templateSelection || templatesLoading}
+                      onClick={onApplyTemplate}
+                    >
+                      Replace With Template
+                    </button>
+                  </Tooltip>
+                </div>
+              </div>
+            </section>
+
+            <section className="lesson-plan-editor-section">
+              <div className="booking-lesson-plan-editor-head">
+                <div>
                   <p className="admin-inline-field">Notes and Follow-Up</p>
                   <p className="helper-text">
                     Shared notes appear in the portal later. Private notes stay internal.
@@ -191,6 +236,18 @@ export function BookingLessonPlanPanel({
               <p className="helper-text">
                 Template changes never update existing booking plans automatically. This booking keeps its own snapshot.
               </p>
+              <div className="button-row">
+                <Tooltip content="Remove this booking lesson plan and return the tab to its empty start state.">
+                  <button
+                    className="btn btn-danger"
+                    type="button"
+                    disabled={!canManageLessonPlan}
+                    onClick={onClearLessonPlan}
+                  >
+                    Clear Lesson Plan
+                  </button>
+                </Tooltip>
+              </div>
             </section>
           </aside>
         </div>

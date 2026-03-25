@@ -231,7 +231,15 @@ export function AdminBookingsClient() {
   } = useEmailHistory({ onAuthError, onError: setError });
   const { materials: materialsList, loading: materialsLoading, uploading: materialsUploading, deletingId: materialsDeletingId, load: loadMaterials, upload: uploadMaterialApi, remove: removeMaterialApi } = useLearningMaterials({ onAuthError, onError: setError });
   const { templates: lessonPlanTemplates, loading: lessonPlanTemplatesLoading, load: loadLessonPlanTemplates } = useLessonPlanTemplates({ onAuthError, onError: setError });
-  const { lessonPlan, loading: lessonPlanLoading, saving: lessonPlanSaving, load: loadBookingLessonPlan, save: saveBookingLessonPlan, reset: resetBookingLessonPlan } = useBookingLessonPlan({ onAuthError, onError: setError });
+  const {
+    lessonPlan,
+    loading: lessonPlanLoading,
+    saving: lessonPlanSaving,
+    load: loadBookingLessonPlan,
+    save: saveBookingLessonPlan,
+    clear: clearBookingLessonPlan,
+    reset: resetBookingLessonPlan
+  } = useBookingLessonPlan({ onAuthError, onError: setError });
   const { presets } = usePresets({ onAuthError, onError: setError });
   const activeLessonPricingOptions = useMemo(
     () => lessonPricingOptions.filter((option) => option.isActive).sort((a, b) => a.sortOrder - b.sortOrder || a.durationMinutes - b.durationMinutes),
@@ -412,6 +420,7 @@ export function AdminBookingsClient() {
       return;
     }
 
+    setLessonPlanTemplateSelection(lessonPlan.sourceTemplateId || "");
     setLessonPlanDraft({
       sourceTemplateId: lessonPlan.sourceTemplateId,
       lessonFocus: lessonPlan.lessonFocus,
@@ -663,6 +672,13 @@ export function AdminBookingsClient() {
       return;
     }
 
+    if (lessonPlanDraft) {
+      const shouldReplace = window.confirm(`Replace the current booking lesson plan with "${template.title}"? Unsaved changes in this draft will be overwritten.`);
+      if (!shouldReplace) {
+        return;
+      }
+    }
+
     setLessonPlanDraft({
       sourceTemplateId: template.id,
       lessonFocus: template.lessonFocus,
@@ -672,7 +688,35 @@ export function AdminBookingsClient() {
       sharedNotes: template.sharedNotes,
       privateNotes: template.privateNotes
     });
-    setNotice(`Template "${template.title}" copied into this booking.`);
+    setNotice(lessonPlan ? `Template "${template.title}" copied into this booking draft. Save to keep it.` : `Template "${template.title}" copied into this booking.`);
+  }
+
+  async function clearLessonPlanDraft() {
+    if (!lessonPlanDraft) {
+      return;
+    }
+
+    const shouldClear = window.confirm(
+      lessonPlan
+        ? "Clear this booking lesson plan? This will remove the saved lesson plan for this booking."
+        : "Clear this unsaved booking lesson-plan draft?"
+    );
+    if (!shouldClear) {
+      return;
+    }
+
+    if (lessonPlan && selectedEvent?.entityType === "booking") {
+      const cleared = await clearBookingLessonPlan(selectedEvent.id);
+      if (!cleared) {
+        return;
+      }
+      setNotice("Lesson plan cleared.");
+    } else {
+      setNotice("Lesson-plan draft cleared.");
+    }
+
+    setLessonPlanDraft(null);
+    setLessonPlanTemplateSelection("");
   }
 
   async function saveLessonPlan() {
@@ -969,6 +1013,7 @@ export function AdminBookingsClient() {
             onTemplateSelectionChange: setLessonPlanTemplateSelection,
             onCreateFromScratch: createScratchLessonPlanDraft,
             onApplyTemplate: applySelectedLessonPlanTemplate,
+            onClearLessonPlan: clearLessonPlanDraft,
             onDraftChange: (patch) => setLessonPlanDraft((prev) => (prev ? { ...prev, ...patch } : prev)),
             onSave: saveLessonPlan
           }}

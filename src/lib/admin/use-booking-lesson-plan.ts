@@ -64,6 +64,24 @@ export function useBookingLessonPlan(options: { onAuthError?: () => void; onErro
     }
   }, [safeFetch, handleApiError]);
 
+  const clear = useCallback(async (bookingId: string) => {
+    setSaving(true);
+    try {
+      const response = await safeFetch(`/api/admin/bookings/${bookingId}/lesson-plan`, {
+        method: "DELETE"
+      });
+      if (!response.ok) {
+        await handleApiError(response, "Unable to clear lesson plan.");
+        return false;
+      }
+
+      setLessonPlan(null);
+      return true;
+    } finally {
+      setSaving(false);
+    }
+  }, [safeFetch, handleApiError]);
+
   const reset = useCallback(() => {
     setLessonPlan(null);
     setLoading(false);
@@ -76,6 +94,7 @@ export function useBookingLessonPlan(options: { onAuthError?: () => void; onErro
     saving,
     load,
     save,
+    clear,
     reset
   };
 }
