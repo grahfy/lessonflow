@@ -1704,6 +1704,13 @@
   stroke-linejoin: round;
 }
 
+.report-step-stroke {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .report-area-fill {
   opacity: 0.2;
 }
@@ -1713,14 +1720,33 @@
   stroke-width: 1.4;
 }
 
+.report-step-point,
+.report-lollipop-head {
+  stroke: rgba(9, 14, 30, 0.82);
+  stroke-width: 1.4;
+}
+
+.report-lollipop-stem {
+  stroke-width: 2;
+  opacity: 0.92;
+}
+
 .report-bar-appointments.report-line-stroke,
-.report-bar-appointments.report-line-point {
+.report-bar-appointments.report-step-stroke,
+.report-bar-appointments.report-line-point,
+.report-bar-appointments.report-step-point,
+.report-bar-appointments.report-lollipop-stem,
+.report-bar-appointments.report-lollipop-head {
   stroke: #67d3ff;
   fill: #67d3ff;
 }
 
 .report-bar-earnings.report-line-stroke,
-.report-bar-earnings.report-line-point {
+.report-bar-earnings.report-step-stroke,
+.report-bar-earnings.report-line-point,
+.report-bar-earnings.report-step-point,
+.report-bar-earnings.report-lollipop-stem,
+.report-bar-earnings.report-lollipop-head {
   stroke: #9effbc;
   fill: #9effbc;
 }

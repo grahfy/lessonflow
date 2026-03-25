@@ -1,16 +1,20 @@
 "use client";
 import { APP_TIMEZONE } from "@/lib/time";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactElement } from "react";
 import { useRouter } from "next/navigation";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
+import {
+  ReportTrendChart,
+  type ReportChartStyle,
+  type ReportDateFormat,
+  type TrendGrainKey,
+  type TrendPoint
+} from "@/components/admin/reports/report-trend-chart";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 
 type ReportPeriodKey = "daily" | "weekly" | "monthly" | "yearly";
-type TrendGrainKey = "daily" | "weekly" | "monthly" | "yearly";
-type ReportDateFormat = "readable" | "ddmmyy";
-type ReportChartStyle = "bar" | "line" | "area";
 
 type PeriodReport = {
   key: ReportPeriodKey;
@@ -41,13 +45,6 @@ type PeriodReport = {
     earningsDeltaPercent: number | null;
     appointmentsDelta: number;
   };
-};
-
-type TrendPoint = {
-  key: string;
-  label: string;
-  appointments: number;
-  earningsNetCents: number;
 };
 
 type CustomRangeReport = Omit<PeriodReport, "key"> & { key: "custom" };
@@ -179,22 +176,6 @@ function splitComparisonLabel(label: string): { primary: string; secondary?: str
   return { primary: label };
 }
 
-/** Converts the trend key into a stable Date for compact axis formatting. */
-function parseTrendKey(key: string): Date {
-  return new Date(`${key}T00:00:00`);
-}
-
-function formatTrendLabel(point: TrendPoint, grain: TrendGrainKey, mode: ReportDateFormat): string {
-  if (mode === "readable") {
-    return point.label;
-  }
-  const date = parseTrendKey(point.key);
-  if (grain === "yearly") {
-    return String(date.getFullYear());
-  }
-  return formatDate(date, mode);
-}
-
 function periodTitle(key: ReportPeriodKey): string {
   if (key === "daily") return "Daily";
   if (key === "weekly") return "Weekly";
@@ -213,104 +194,6 @@ function trendTitle(key: TrendGrainKey, customRangeActive = false): string {
   if (key === "weekly") return "Weekly trend (last 8 weeks)";
   if (key === "monthly") return "Monthly trend (last 12 months)";
   return "Yearly trend (last 6 years)";
-}
-
-function MiniBarChart({
-  points,
-  grain,
-  dateFormat,
-  valueKey,
-  strokeClass,
-  chartStyle,
-  emptyLabel,
-  moneyValues = false
-}: {
-  points: TrendPoint[];
-  grain: TrendGrainKey;
-  dateFormat: ReportDateFormat;
-  valueKey: "appointments" | "earningsNetCents";
-  strokeClass: string;
-  chartStyle: ReportChartStyle;
-  emptyLabel: string;
-  moneyValues?: boolean;
-}) {
-  const width = 560;
-  const height = 188;
-  const padX = 14;
-  const top = 14;
-  const bottom = 34;
-  const chartHeight = height - top - bottom;
-
-  const values = points.map((point) => point[valueKey]);
-  const maxValue = Math.max(...values, 0);
-
-  if (points.length === 0) {
-    return <p className="report-chart-empty">{emptyLabel}</p>;
-  }
-
-  const slotWidth = (width - padX * 2) / points.length;
-  const barWidth = Math.max(6, Math.min(24, slotWidth * 0.56));
-  const labelStep = points.length > 10 ? Math.ceil(points.length / 6) : 1;
-  const firstLabel = formatTrendLabel(points[0], grain, dateFormat);
-  const lastLabel = formatTrendLabel(points[points.length - 1], grain, dateFormat);
-  // RATIONALE: SVG coordinates are precomputed once so the render branch can
-  // switch between bar, line, and area modes without duplicating geometry math.
-  const pointsWithCoords = points.map((point, index) => {
-    const value = point[valueKey];
-    const normalized = maxValue <= 0 ? 0 : Math.max(0, value) / maxValue;
-    const barHeight = normalized * chartHeight;
-    const x = padX + slotWidth * index + slotWidth / 2;
-    const y = height - bottom - barHeight;
-    return {
-      point,
-      value,
-      x,
-      y,
-      label: formatTrendLabel(point, grain, dateFormat)
-    };
-  });
-  const linePath = pointsWithCoords.map((entry, index) => `${index === 0 ? "M" : "L"} ${entry.x} ${entry.y}`).join(" ");
-  const areaPath = pointsWithCoords.length
-    ? `${linePath} L ${pointsWithCoords[pointsWithCoords.length - 1].x} ${height - bottom} L ${pointsWithCoords[0].x} ${height - bottom} Z`
-    : "";
-
-  return (
-    <div className="report-chart-shell">
-      <svg viewBox={`0 0 ${width} ${height}`} className="report-chart-svg" role="img" aria-label={emptyLabel}>
-        <line x1={padX} y1={height - bottom} x2={width - padX} y2={height - bottom} className="report-chart-axis" />
-        {chartStyle === "area" && areaPath ? <path d={areaPath} className={`${strokeClass} report-area-fill`} /> : null}
-        {(chartStyle === "line" || chartStyle === "area") && linePath ? <path d={linePath} className={`${strokeClass} report-line-stroke`} /> : null}
-        {pointsWithCoords.map((entry, index) => {
-          const { point, value, x, y, label } = entry;
-          const barX = padX + slotWidth * index + (slotWidth - barWidth) / 2;
-          const barY = y;
-          const barHeight = height - bottom - y;
-          const showLabel = index % labelStep === 0 || index === points.length - 1;
-          const tooltip = moneyValues ? `${label}: ${formatAud(value)}` : `${label}: ${value}`;
-
-          return (
-            <g key={`${point.key}-${valueKey}`}>
-              <title>{tooltip}</title>
-              {chartStyle === "bar" ? (
-                <rect x={barX} y={barY} width={barWidth} height={Math.max(barHeight, 2)} rx={3} className={strokeClass} />
-              ) : (
-                <circle cx={x} cy={y} r={3} className={`${strokeClass} report-line-point`} />
-              )}
-              {showLabel ? (
-                <text x={padX + slotWidth * index + slotWidth / 2} y={height - 10} textAnchor="middle" className="report-chart-label">
-                  {label}
-                </text>
-              ) : null}
-            </g>
-          );
-        })}
-      </svg>
-      <div className="report-chart-summary">
-        <span>Range: {firstLabel} to {lastLabel}</span>
-        <span>Peak: {moneyValues ? formatAud(maxValue) : maxValue}</span>
-      </div>
-    </div>
-  );
 }
 
 /** Shared chart card for one grain of report comparison data. */
@@ -337,7 +220,7 @@ function TrendPanel({
         <div className="report-trend-title-row">
           <h3>Appointments</h3>
         </div>
-        <MiniBarChart
+        <ReportTrendChart
           points={points}
           grain={grain}
           dateFormat={dateFormat}
@@ -351,7 +234,7 @@ function TrendPanel({
         <div className="report-trend-title-row">
           <h3>Earnings (net paid)</h3>
         </div>
-        <MiniBarChart
+        <ReportTrendChart
           points={points}
           grain={grain}
           dateFormat={dateFormat}
@@ -494,7 +377,7 @@ function CustomRangeCard({ period, dateFormat }: { period: CustomRangeReport; da
 /**
  * Admin reports dashboard client for operational snapshots and trend charts.
  */
-export function AdminReportsClient() {
+export function AdminReportsClient(): ReactElement {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -703,11 +586,13 @@ export function AdminReportsClient() {
             </div>
             <div className="field report-chart-style-field">
               <label>Chart type</label>
-              <Tooltip content="Choose bar, line, or area style for trend visualisation.">
+              <Tooltip content="Choose bar, line, area, step, or lollipop style for trend visualisation.">
                 <select value={chartStyle} onChange={(event) => setChartStyle(event.target.value as ReportChartStyle)}>
                   <option value="bar">Bar charts</option>
                   <option value="line">Line charts</option>
                   <option value="area">Area charts</option>
+                  <option value="step">Step charts</option>
+                  <option value="lollipop">Lollipop charts</option>
                 </select>
               </Tooltip>
             </div>
