@@ -4,7 +4,7 @@ import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { getEmailRecordBodyFields, getEmailViewerContent } from "@/lib/admin/email-history";
+import { getEmailPreviewText, getEmailRecordBodyFields, getEmailViewerContent } from "@/lib/admin/email-history";
 import { AdminEmailPanel } from "@/components/admin/ui/admin-email-panel";
 
 (globalThis as typeof globalThis & { React?: typeof React }).React = React;
@@ -34,6 +34,45 @@ describe("admin-email-history-body", () => {
       kind: "empty",
       value: ""
     });
+  });
+
+  it("derives preview text from html email content", () => {
+    expect(
+      getEmailPreviewText({
+        htmlBody: "<div><style>.hidden{display:none;}</style><p>Hello <strong>student</strong></p></div>"
+      })
+    ).toBe("Hello student");
+  });
+
+  it("uses plain text bodies directly for row previews", () => {
+    expect(
+      getEmailPreviewText({
+        textBody: "Lesson moved to Thursday at 4pm."
+      })
+    ).toBe("Lesson moved to Thursday at 4pm.");
+  });
+
+  it("falls back to snippet-shaped text content for previews", () => {
+    expect(
+      getEmailPreviewText({
+        textBody: "Can we start 15 minutes later?"
+      })
+    ).toBe("Can we start 15 minutes later?");
+  });
+
+  it("returns an empty preview when no recoverable content exists", () => {
+    expect(getEmailPreviewText({ htmlBody: " ", textBody: undefined })).toBe("");
+  });
+
+  it("normalizes whitespace and truncates long preview text", () => {
+    const preview = getEmailPreviewText(
+      {
+        textBody: "Line one.\n\nLine two.\tLine three. ".repeat(10)
+      },
+      48
+    );
+
+    expect(preview).toBe("Line one. Line two. Line three. Line one. Lin...");
   });
 
   it("renders the shared history warning banner when Gmail refresh is degraded", () => {
@@ -87,5 +126,42 @@ describe("admin-email-history-body", () => {
     );
 
     expect(markup).toContain("Refresh History");
+  });
+
+  it("renders shared row previews when recoverable email content exists", () => {
+    const markup = renderToStaticMarkup(
+      createElement(
+        TooltipPrimitive.Provider,
+        null,
+        createElement(AdminEmailPanel, {
+          emptyLabel: "No emails",
+          history: [
+            {
+              id: "email-1",
+              fromEmail: "teacher@example.com",
+              toEmail: "student@example.com",
+              subject: "Lesson update",
+              textBody: "Your lesson has moved to Thursday at 4pm.",
+              status: "sent",
+              createdAt: "2026-03-19T10:30:00.000Z",
+              direction: "outbound"
+            }
+          ],
+          loadingHistory: false,
+          subject: "",
+          setSubject: () => {},
+          message: "",
+          setMessage: () => {},
+          sending: false,
+          onSend: async () => ({ success: true }),
+          captchaIdPrefix: "admin-email-preview",
+          renderHistoryHeader: () => null,
+          renderHistoryMeta: () => null
+        })
+      )
+    );
+
+    expect(markup).toContain("admin-email-history-preview");
+    expect(markup).toContain("Your lesson has moved to Thursday at 4pm.");
   });
 });

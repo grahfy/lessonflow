@@ -9,6 +9,7 @@ import { AdminNotice } from "@/components/admin/ui/admin-notice";
 import { EmailViewerDialog } from "@/components/admin/ui/email-viewer-dialog";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { isCaptchaErrorResult } from "@/lib/admin/constants";
+import { getEmailPreviewText } from "@/lib/admin/email-history";
 import type { EmailRecord, SendEmailResult } from "@/lib/admin/use-email-history";
 
 interface AdminEmailPanelProps {
@@ -131,20 +132,25 @@ export function AdminEmailPanel({
             <p className="helper-text">Loading history...</p>
           ) : history.length > 0 ? (
             <div className={["admin-email-history-list", historyListClassName].filter(Boolean).join(" ")}>
-              {history.map((email) => (
-                <button
-                  key={email.id}
-                  type="button"
-                  className={["admin-email-history-item", historyItemClassName].filter(Boolean).join(" ")}
-                  // RATIONALE: The row acts as a disclosure trigger instead of a
-                  // nested button/link combination to keep the history list
-                  // keyboard-friendly inside dense admin dialogs.
-                  onClick={() => setSelectedEmail(email)}
-                >
-                  {renderHistoryHeader(email)}
-                  {renderHistoryMeta(email)}
-                </button>
-              ))}
+              {history.map((email) => {
+                const previewText = getEmailPreviewText(email);
+
+                return (
+                  <button
+                    key={email.id}
+                    type="button"
+                    className={["admin-email-history-item", historyItemClassName].filter(Boolean).join(" ")}
+                    // RATIONALE: The row acts as a disclosure trigger instead of a
+                    // nested button/link combination to keep the history list
+                    // keyboard-friendly inside dense admin dialogs.
+                    onClick={() => setSelectedEmail(email)}
+                  >
+                    {renderHistoryHeader(email)}
+                    {renderHistoryMeta(email)}
+                    {previewText ? <p className="admin-email-history-preview">{previewText}</p> : null}
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <p className="helper-text">{emptyLabel}</p>
