@@ -230,7 +230,12 @@ export function AdminManualSectionClient({
               </button>
             </Tooltip>
             <div className="modal-image-container admin-manual-modal-image-container">
-              <Image src={activeScreenshot.publicPath} alt={activeScreenshot.alt} fill className="modal-image" sizes="95vw" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={activeScreenshot.publicPath}
+                alt={activeScreenshot.alt}
+                className="modal-image admin-manual-modal-image"
+              />
             </div>
             <p className="modal-caption">{activeScreenshot.caption}</p>
           </div>

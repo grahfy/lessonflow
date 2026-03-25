@@ -1318,18 +1318,22 @@
 .admin-manual-modal-image-container {
   width: min(1400px, 95vw);
   max-width: none;
-  height: min(82vh, 920px);
-  aspect-ratio: 16 / 10;
+  min-height: 0;
+  max-height: min(82vh, 920px);
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
-.admin-manual-modal-image-container .modal-image {
-  max-height: 82vh;
+.admin-manual-modal-image-container .admin-manual-modal-image {
+  display: block;
+  width: 100%;
+  max-width: none;
+  height: auto;
 }
 
 @media (max-width: 900px) {
   .admin-manual-modal-image-container {
-    height: min(70vh, 560px);
-    aspect-ratio: 4 / 3;
+    max-height: min(70vh, 560px);
   }
 }
 
@@ -2602,7 +2606,11 @@
 .admin-manual-shot-trigger {
   width: 100%;
   padding: 0;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  padding: 14px;
   cursor: zoom-in;
   transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
 }
@@ -2620,8 +2628,11 @@
 
 .admin-manual-shot-frame img {
   display: block;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
+  max-height: min(45vh, 520px);
   height: auto;
+  object-fit: contain;
 }
 
 .admin-manual-shot figcaption {
@@ -2749,11 +2760,14 @@
 
 .admin-manual-markdown img {
   display: block;
-  width: min(100%, 860px);
+  width: auto;
+  max-width: min(100%, 860px);
+  max-height: min(68vh, 820px);
   height: auto;
+  object-fit: contain;
   border-radius: 16px;
   border: 1px solid rgba(148, 163, 184, 0.18);
-  margin: 12px 0;
+  margin: 12px auto;
 }
 
 .admin-manual-markdown table {
