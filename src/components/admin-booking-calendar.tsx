@@ -45,6 +45,7 @@ type Props = {
   events: AdminCalendarEvent[];
   selectedEventId: string | null;
   onSelect: (event: AdminCalendarEvent) => void;
+  teacherFilterLabel?: string;
 };
 
 /** Human-readable heading for one calendar day cell or day-view header. */
@@ -105,6 +106,31 @@ function assignedTeacherLabel(event: AdminCalendarEvent): string | null {
     return row.assignedTeacherName.trim();
   }
   return null;
+}
+
+function countLabel(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function calendarSummary(view: Props["view"], events: AdminCalendarEvent[], teacherFilterLabel?: string): string {
+  const pending = events.filter((event) => event.status === "pending").length;
+  const approved = events.filter((event) => event.status === "approved").length;
+  const scope = teacherFilterLabel || "all teachers";
+
+  if (events.length === 0) {
+    return `No bookings or requests are scheduled in this ${view} window for ${scope.toLowerCase()}.`;
+  }
+
+  return `${countLabel(events.length, "item")} in view · ${countLabel(approved, "confirmed booking", "confirmed bookings")} · ${countLabel(pending, "pending request", "pending requests")}.`;
+}
+
+function calendarLegendCounts(events: AdminCalendarEvent[]) {
+  return {
+    confirmed: events.filter((event) => event.color === "green").length,
+    pending: events.filter((event) => event.color === "yellow").length,
+    attention: events.filter((event) => event.color === "red").length,
+    archived: events.filter((event) => event.color === "slate").length
+  };
 }
 
 /** Shared day cell for day/week/month views. */
@@ -190,13 +216,28 @@ function YearMonthCell(props: {
  */
 export function AdminBookingCalendar(props: Props) {
   const baseDate = parseISO(`${props.date}T00:00:00`);
+  const legendCounts = calendarLegendCounts(props.events);
+  const summaryText = calendarSummary(props.view, props.events, props.teacherFilterLabel);
+
+  const headerMeta = (
+    <div className="calendar-header-meta" aria-label="Calendar legend">
+      <span className="calendar-legend-chip is-green">Confirmed {legendCounts.confirmed}</span>
+      <span className="calendar-legend-chip is-yellow">Pending {legendCounts.pending}</span>
+      <span className="calendar-legend-chip is-red">Attention {legendCounts.attention}</span>
+      <span className="calendar-legend-chip is-slate">Archived {legendCounts.archived}</span>
+    </div>
+  );
 
   if (props.view === "day") {
     const dayEvents = props.events.filter((event) => eventDay(event, baseDate));
     return (
       <div className="calendar-wrap is-day" data-motion-item="calendar-wrap-day">
         <header className="calendar-header-row" data-motion-item="calendar-header">
-          <h3>{dayLabel(baseDate)}</h3>
+          <div className="calendar-header-copy">
+            <h3>{dayLabel(baseDate)}</h3>
+            <p className="helper-text">{summaryText}</p>
+          </div>
+          {headerMeta}
         </header>
         <div className="calendar-grid is-day">
           <DayCell day={baseDate} events={dayEvents} selectedEventId={props.selectedEventId} onSelect={props.onSelect} />
@@ -210,7 +251,11 @@ export function AdminBookingCalendar(props: Props) {
     return (
       <div className="calendar-wrap is-week" data-motion-item="calendar-wrap-week">
         <header className="calendar-header-row" data-motion-item="calendar-header">
-          <h3>Week of {dayLabel(days[0])}</h3>
+          <div className="calendar-header-copy">
+            <h3>Week of {dayLabel(days[0])}</h3>
+            <p className="helper-text">{summaryText}</p>
+          </div>
+          {headerMeta}
         </header>
         <div className="calendar-grid is-week">
           {days.map((day) => (
@@ -232,7 +277,11 @@ export function AdminBookingCalendar(props: Props) {
     return (
       <div className="calendar-wrap is-year" data-motion-item="calendar-wrap-year">
         <header className="calendar-header-row" data-motion-item="calendar-header">
-          <h3>{format(baseDate, "yyyy")}</h3>
+          <div className="calendar-header-copy">
+            <h3>{format(baseDate, "yyyy")}</h3>
+            <p className="helper-text">{summaryText}</p>
+          </div>
+          {headerMeta}
         </header>
         <div className="calendar-grid is-year">
           {months.map((monthStart) => (
@@ -256,7 +305,11 @@ export function AdminBookingCalendar(props: Props) {
   return (
     <div className="calendar-wrap is-month" data-motion-item="calendar-wrap-month">
       <header className="calendar-header-row" data-motion-item="calendar-header">
-        <h3>{format(baseDate, "MMMM yyyy")}</h3>
+        <div className="calendar-header-copy">
+          <h3>{format(baseDate, "MMMM yyyy")}</h3>
+          <p className="helper-text">{summaryText}</p>
+        </div>
+        {headerMeta}
       </header>
       <div className="calendar-grid is-month">
         {days.map((day) => (

@@ -26,7 +26,7 @@ export function EmailViewerDialog({ isOpen, onClose, email }: EmailViewerDialogP
       onClose={onClose}
       title="View Email"
       rootRef={rootRef}
-      wide
+      size="wide"
       id="email-viewer-dialog"
       bodyClassName="email-viewer-dialog-body"
       lockBodyScrollArea

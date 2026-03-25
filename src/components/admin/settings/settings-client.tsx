@@ -68,6 +68,7 @@ export function AdminSettingsClient() {
   const [activeTab, setActiveTab] = useState<TabKey>("branding");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [hasLoadedInitialSettings, setHasLoadedInitialSettings] = useState(false);
   
   // Form State
   const [values, setValues] = useState<Record<string, string>>({});
@@ -87,9 +88,20 @@ export function AdminSettingsClient() {
     load: loadSettings, 
     save: saveSettingsApi 
   } = useSettings({ onAuthError, onError: setError });
+  const isSettingsWorkspaceLoading = loading || !hasLoadedInitialSettings;
 
   useEffect(() => {
-    void loadSettings();
+    let cancelled = false;
+
+    void loadSettings().finally(() => {
+      if (!cancelled) {
+        setHasLoadedInitialSettings(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [loadSettings]);
 
   /** Hydrate form values from server settings once loaded. */
@@ -212,6 +224,22 @@ export function AdminSettingsClient() {
 
     return ordered;
   }, [settings]);
+
+  const activeTabConfig = useMemo(
+    () => SETTINGS_TABS.find((tab) => tab.key === activeTab) ?? SETTINGS_TABS[0],
+    [activeTab]
+  );
+  const activeGroupCount = useMemo(
+    () => groupedVars.filter((group) => group.tab === activeTab).length,
+    [activeTab, groupedVars]
+  );
+  const activeFieldCount = useMemo(
+    () =>
+      groupedVars
+        .filter((group) => group.tab === activeTab)
+        .reduce((total, group) => total + group.items.length, 0),
+    [activeTab, groupedVars]
+  );
 
   /** Finalizes form submission and handles re-auth consequences. */
   async function handleSave() {
@@ -375,13 +403,60 @@ export function AdminSettingsClient() {
       title="Admin Configuration" 
       error={error} 
       notice={notice} 
-      loading={loading} 
+      loading={isSettingsWorkspaceLoading} 
       className="admin-shell-settings"
     >
       <div className="admin-layout-content is-scrollable">
-        <AdminCard className="admin-toolbar-card admin-tab-toolbar booking-row admin-actions-bar">
-          <AdminTabNav activeKey={activeTab} items={SETTINGS_TABS} onChange={setActiveTab} />
-        </AdminCard>
+        <div className="admin-settings-sticky-stack">
+          <AdminCard className="admin-toolbar-card admin-actions-card admin-workspace-panel admin-settings-workspace">
+            <div className="admin-workspace-head">
+              <div className="admin-workspace-copy">
+                <p className="admin-inline-field">Configuration Console</p>
+                <h2 className="admin-workspace-title">{activeTabConfig.label}</h2>
+                <p className="helper-text admin-workspace-summary">{activeTabConfig.tooltip}</p>
+                <div className="admin-workspace-chip-row" aria-label="Settings workspace context">
+                  <span className="admin-workspace-chip">
+                    {isSettingsWorkspaceLoading ? "Loading sections" : `${activeGroupCount} section${activeGroupCount === 1 ? "" : "s"} in view`}
+                  </span>
+                  <span className="admin-workspace-chip">
+                    {isSettingsWorkspaceLoading ? "Loading fields" : `${activeFieldCount} environment field${activeFieldCount === 1 ? "" : "s"}`}
+                  </span>
+                  <span className="admin-workspace-chip">{isSettingsWorkspaceLoading ? "Hydrating settings" : saving ? "Save in progress" : "Draft edits local"}</span>
+                </div>
+              </div>
+              <div className="admin-workspace-actions">
+                <Tooltip content="Apply and save configuration changes for this admin section.">
+                  <button className="btn btn-primary" type="button" disabled={saving || isSettingsWorkspaceLoading} onClick={handleSave}>
+                    {saving ? "Saving..." : "Save Configuration"}
+                  </button>
+                </Tooltip>
+              </div>
+            </div>
+
+            <div className="admin-workspace-stats" aria-label="Configuration summary">
+              <div className="admin-workspace-stat">
+                <span className="admin-workspace-stat-label">Current tab</span>
+                <strong>{activeTabConfig.label}</strong>
+              </div>
+              <div className="admin-workspace-stat">
+                <span className="admin-workspace-stat-label">Visible groups</span>
+                <strong>{isSettingsWorkspaceLoading ? "—" : activeGroupCount}</strong>
+              </div>
+              <div className="admin-workspace-stat">
+                <span className="admin-workspace-stat-label">Visible fields</span>
+                <strong>{isSettingsWorkspaceLoading ? "—" : activeFieldCount}</strong>
+              </div>
+              <div className="admin-workspace-stat">
+                <span className="admin-workspace-stat-label">Config tabs</span>
+                <strong>{SETTINGS_TABS.length}</strong>
+              </div>
+            </div>
+          </AdminCard>
+
+          <AdminCard className="admin-toolbar-card admin-tab-toolbar booking-row admin-actions-bar">
+            <AdminTabNav activeKey={activeTab} items={SETTINGS_TABS} onChange={setActiveTab} />
+          </AdminCard>
+        </div>
 
         {!loading && (
           <>

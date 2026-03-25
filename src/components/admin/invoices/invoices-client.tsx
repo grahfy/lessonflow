@@ -158,6 +158,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
   
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [hasLoadedInitialInvoices, setHasLoadedInitialInvoices] = useState(false);
 
   useEffect(() => {
     if (notice) {
@@ -262,6 +263,22 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
     createLessonSourceMode === "single_booking" || createLessonSourceMode === "multiple_bookings";
   const createUsesQuickLesson = createLessonSourceMode === "single_quick";
   const createUsesSingleBookingLesson = createLessonSourceMode === "single_booking";
+  const overdueVisibleCount = useMemo(
+    () => invoices.filter((invoice) => invoice.overdueDays !== null && invoice.overdueDays > 0 && invoice.status !== "paid" && invoice.status !== "void").length,
+    [invoices]
+  );
+  const draftVisibleCount = useMemo(
+    () => invoices.filter((invoice) => invoice.status === "draft").length,
+    [invoices]
+  );
+  const visibleOpenBalanceCents = useMemo(
+    () =>
+      invoices
+        .filter((invoice) => invoice.status !== "paid" && invoice.status !== "void")
+        .reduce((sum, invoice) => sum + invoice.totalCents, 0),
+    [invoices]
+  );
+  const isInvoicesWorkspaceLoading = loading || !hasLoadedInitialInvoices;
 
   // Actions
   /**
@@ -307,7 +324,17 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
 
   // Effects
   useEffect(() => {
-    void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
+    let cancelled = false;
+
+    void loadInvoices(query, page, overdueOnly, sortBy, sortDir).finally(() => {
+      if (!cancelled) {
+        setHasLoadedInitialInvoices(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [query, page, overdueOnly, sortBy, sortDir, loadInvoices]);
 
   useEffect(() => {
@@ -1015,14 +1042,36 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
   );
 
   return (
-    <AdminShell title="Invoices" error={error} notice={notice} className="admin-shell-invoices">
+    <AdminShell title="Invoices" error={error} notice={notice} loading={isInvoicesWorkspaceLoading} className="admin-shell-invoices">
       <div className="admin-layout-content">
-        <AdminCard className="admin-toolbar-card admin-actions-card">
-          <div className="admin-actions-bar">
-            <div className="admin-actions-group">
+        <AdminCard className="admin-toolbar-card admin-actions-card admin-workspace-panel">
+          <div className="admin-workspace-head">
+            <div className="admin-workspace-copy">
+              <p className="admin-inline-field">Invoice Console</p>
+              <h2 className="admin-workspace-title">Billing, reminders, and overdue follow-up</h2>
+              <p className="helper-text admin-workspace-summary">
+                Monitor invoice status, chase overdue balances, and open customer billing records from one list.
+              </p>
+              <div className="admin-workspace-chip-row" aria-label="Invoice workspace context">
+                <span className="admin-workspace-chip">{overdueOnly ? "Overdue filter on" : "All invoice states"}</span>
+                <span className="admin-workspace-chip">{sortDir === "asc" ? "Ascending" : "Descending"}</span>
+                <span className="admin-workspace-chip">
+                  {sortBy === "invoice_number"
+                    ? "Sorted by invoice number"
+                    : sortBy === "customer_last_name"
+                      ? "Sorted by customer"
+                      : sortBy === "status"
+                        ? "Sorted by status"
+                        : sortBy === "total"
+                          ? "Sorted by total"
+                          : "Sorted by due date"}
+                </span>
+              </div>
+            </div>
+            <div className="admin-workspace-actions">
               <Tooltip content="Create a new invoice for a selected customer.">
                 <button className="btn btn-primary" type="button" onClick={() => { setCreateOpen(true); void loadCustomers(); }}>
-                  New Invoice
+                  Create Invoice
                 </button>
               </Tooltip>
               <Tooltip content="Send reminders for all eligible overdue invoices in one action.">
@@ -1031,7 +1080,32 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                 </button>
               </Tooltip>
             </div>
+          </div>
 
+          <div className="admin-workspace-stats" aria-label="Invoice summary stats">
+            <div className="admin-workspace-stat">
+              <span className="admin-workspace-stat-label">Visible now</span>
+              <strong>{isInvoicesWorkspaceLoading ? "—" : invoices.length}</strong>
+            </div>
+            <div className="admin-workspace-stat">
+              <span className="admin-workspace-stat-label">Total invoices</span>
+              <strong>{isInvoicesWorkspaceLoading ? "—" : totalCount}</strong>
+            </div>
+            <div className="admin-workspace-stat">
+              <span className="admin-workspace-stat-label">Drafts visible</span>
+              <strong>{isInvoicesWorkspaceLoading ? "—" : draftVisibleCount}</strong>
+            </div>
+            <div className="admin-workspace-stat">
+              <span className="admin-workspace-stat-label">Overdue visible</span>
+              <strong>{isInvoicesWorkspaceLoading ? "—" : overdueVisibleCount}</strong>
+            </div>
+            <div className="admin-workspace-stat">
+              <span className="admin-workspace-stat-label">Open balance</span>
+              <strong>{isInvoicesWorkspaceLoading ? "—" : toCurrency(visibleOpenBalanceCents, defaultCurrency)}</strong>
+            </div>
+          </div>
+
+          <div className="admin-actions-bar">
             <div className="admin-toolbar-filters">
               <Tooltip content="Show only invoices that are past their due date.">
                 <label className="admin-inline-checkbox" htmlFor={overdueFilterId}>
@@ -1210,7 +1284,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
         isOpen={!!selectedInvoice}
         onClose={closeDetail}
         title={`Invoice ${selectedInvoice?.invoiceNumber}`}
-        wide
+        size="wide"
         id="invoice-detail-dialog"
         bodyClassName="invoice-dialog-body-lock"
         lockBodyScrollArea
@@ -1596,7 +1670,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
           setCreateOpen(false);
         }}
         title="New Invoice"
-        wide
+        size="wide"
         id="invoice-create-dialog"
         bodyClassName="invoice-dialog-body-lock"
         lockBodyScrollArea
@@ -1979,7 +2053,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
         isOpen={createBookingDialogOpen}
         onClose={() => setCreateBookingDialogOpen(false)}
         title={createUsesSingleBookingLesson ? "Select Single Lesson Booking" : "Select Customer Bookings"}
-        wide
+        size="wide"
         footer={
           <div className="dialog-footer-row dialog-footer-row-end">
             <button className="btn btn-secondary" type="button" onClick={() => setCreateBookingDialogOpen(false)}>

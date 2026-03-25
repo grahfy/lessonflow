@@ -546,6 +546,18 @@
     gap: 10px;
   }
 
+  .admin-workspace-head {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-workspace-actions {
+    justify-content: flex-start;
+  }
+
+  .admin-workspace-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .admin-bookings-calendar-card,
   .admin-bookings-calendar-scroll {
     min-height: auto;
@@ -665,6 +677,14 @@
     gap: 10px;
   }
 
+  .admin-bookings-workspace-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-bookings-workspace-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .admin-range-label {
     min-width: 0;
     font-size: 1rem;
@@ -684,6 +704,11 @@
 
   .admin-range-divider {
     display: none;
+  }
+
+  .calendar-header-meta {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .admin-range-actions > .btn,
@@ -1486,8 +1511,8 @@
 }
 
 .report-toolbar-card {
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  grid-template-columns: 1fr;
+  align-items: start;
   background:
     radial-gradient(130% 120% at 6% 5%, rgba(90, 176, 255, 0.17), transparent 58%),
     linear-gradient(148deg, rgba(12, 24, 56, 0.92), rgba(17, 32, 64, 0.78));

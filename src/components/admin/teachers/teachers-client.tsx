@@ -435,12 +435,17 @@ export function AdminTeachersClient() {
         {showDirectory ? (
           <AdminCard className="admin-card admin-toolbar-card teacher-directory-card">
             <div className="teacher-directory-header">
-              <div>
+              <div className="admin-workspace-copy">
                 <p className="helper-text">Staff directory</p>
                 <h2>Teachers and owner account</h2>
                 <p className="helper-text teacher-directory-copy">
                   Jump between staff accounts without leaving the page, then make changes in the workspace beside it.
                 </p>
+                <div className="admin-workspace-chip-row" aria-label="Staff directory context">
+                  <span className="admin-workspace-chip">{directoryEntries.length} visible</span>
+                  <span className="admin-workspace-chip">{activeTeacherCount} active</span>
+                  <span className="admin-workspace-chip">{inactiveTeacherCount} inactive</span>
+                </div>
               </div>
               <Tooltip content="Create a new teacher account.">
                 <button className="btn btn-primary" type="button" onClick={beginCreateTeacher}>
@@ -450,6 +455,15 @@ export function AdminTeachersClient() {
             </div>
 
             <div className="teacher-directory-metrics">
+              <Tooltip content="Number of staff cards currently visible in the directory list.">
+                <div className="teacher-directory-metric-card">
+                  <UserRound size={16} aria-hidden="true" />
+                  <div>
+                    <span className="teacher-directory-metric-label">Visible staff</span>
+                    <strong>{directoryEntries.length}</strong>
+                  </div>
+                </div>
+              </Tooltip>
               <Tooltip content="Number of teacher accounts that can currently sign in and receive assignments.">
                 <div className="teacher-directory-metric-card">
                   <Users size={16} aria-hidden="true" />

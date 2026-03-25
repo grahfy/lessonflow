@@ -180,7 +180,7 @@ export function BookingDetailDialog({
       id="booking-detail-dialog"
       title={event.entityType === 'booking' ? "Edit Booking" : "Booking Request"}
       description={`Status: ${event.status} / Type: ${event.entityType === 'booking' ? "Confirmed" : "Request"}`}
-      wide
+      size="wide"
       bodyClassName="booking-dialog-body-lock"
       lockBodyScrollArea
       footer={

@@ -534,6 +534,7 @@ export function SystemLogsClient() {
         isOpen={isReportingBug}
         onClose={() => setIsReportingBug(false)}
         title="Report Technical Issue"
+        size="compact"
         description="Describe the issue you're experiencing. Recent system logs will be attached automatically to help the developer with troubleshooting."
         footer={
           <>
@@ -665,6 +666,7 @@ export function SystemLogsClient() {
         isOpen={isClearBeforeOpen}
         onClose={() => setIsClearBeforeOpen(false)}
         title="Clear Logs Up To"
+        size="compact"
         description={`Delete every log entry at or before the selected ${APP_TIMEZONE} timestamp.`}
         footer={
           <>

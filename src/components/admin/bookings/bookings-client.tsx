@@ -24,6 +24,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format, parseISO, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, addYears, subYears } from "date-fns";
+import { AlertCircle, CalendarRange, Clock3, UserRound } from "lucide-react";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminCard } from "@/components/admin/ui/admin-card";
@@ -67,6 +68,10 @@ type CalendarView = "day" | "week" | "month" | "year";
 /** Extends the base booking event with raw row data for detailed editing. */
 interface EventWithRow extends BookingEvent {
   row: BookingRowData;
+}
+
+function countLabel(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`;
 }
 
 /** Normalization for email matching. */
@@ -158,6 +163,7 @@ export function AdminBookingsClient() {
 
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [hasLoadedInitialBookings, setHasLoadedInitialBookings] = useState(false);
 
   useEffect(() => {
     if (notice) {
@@ -270,6 +276,52 @@ export function AdminBookingsClient() {
     }
     return events.filter((event) => event.row.assignedTeacherId === teacherFilter);
   }, [events, teacherFilter]);
+  const teacherFilterLabel = useMemo(() => {
+    if (teacherFilter === "all") {
+      return "All teachers";
+    }
+    if (teacherFilter === "unassigned") {
+      return "Unassigned only";
+    }
+    return teacherOptions.find((teacher) => teacher.id === teacherFilter)?.displayName || "Teacher filter";
+  }, [teacherFilter, teacherOptions]);
+  const viewLabel = useMemo(() => {
+    if (view === "day") return "Day view";
+    if (view === "week") return "Week view";
+    if (view === "month") return "Month view";
+    return "Year view";
+  }, [view]);
+  const bookingWorkspaceStats = useMemo(() => {
+    const pending = filteredEvents.filter((event) => event.status === "pending").length;
+    const confirmed = filteredEvents.filter((event) => event.status === "approved").length;
+    const unassigned = filteredEvents.filter((event) => !event.row.assignedTeacherId).length;
+    return {
+      total: filteredEvents.length,
+      pending,
+      confirmed,
+      unassigned
+    };
+  }, [filteredEvents]);
+  const workspaceSummary = useMemo(() => {
+    if (loadingBookings || !hasLoadedInitialBookings) {
+      return `Loading bookings for this ${view} window...`;
+    }
+    if (bookingWorkspaceStats.total === 0) {
+      return `No bookings or requests are visible in this ${view} window for ${teacherFilterLabel.toLowerCase()}.`;
+    }
+
+    const summaryParts = [`${countLabel(bookingWorkspaceStats.total, "visible item")}`];
+
+    if (bookingWorkspaceStats.pending > 0) {
+      summaryParts.push(`${countLabel(bookingWorkspaceStats.pending, "pending request", "pending requests")}`);
+    }
+
+    if (bookingWorkspaceStats.unassigned > 0) {
+      summaryParts.push(`${countLabel(bookingWorkspaceStats.unassigned, "unassigned lesson", "unassigned lessons")}`);
+    }
+
+    return `${summaryParts.join(" · ")} across ${teacherFilterLabel.toLowerCase()}.`;
+  }, [bookingWorkspaceStats, hasLoadedInitialBookings, loadingBookings, teacherFilterLabel, view]);
   const canManageSelectedEvent = useMemo(() => {
     if (!currentAdmin || !selectedEvent) return false;
     return currentAdmin.role === "owner" || selectedEvent.row.assignedTeacherId === currentAdmin.id;
@@ -293,7 +345,17 @@ export function AdminBookingsClient() {
 
   // Sync data with view/date parameters
   useEffect(() => {
-    void loadBookings(view, dateStr);
+    let cancelled = false;
+
+    void loadBookings(view, dateStr).finally(() => {
+      if (!cancelled) {
+        setHasLoadedInitialBookings(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [view, dateStr, loadBookings]);
 
   useEffect(() => {
@@ -877,57 +939,116 @@ export function AdminBookingsClient() {
       title="Bookings"
       error={error}
       notice={notice}
+      loading={loadingBookings || !hasLoadedInitialBookings}
       className="admin-shell-bookings"
     >
       <div className="admin-layout-content">
-        <AdminCard className="admin-toolbar-card admin-range-card booking-row admin-range-row">
-          <div className="admin-range-primary">
-            <div className="button-row admin-range-nav-buttons">
-              <Tooltip content="Go to the previous date range.">
-                <button className="btn btn-secondary btn-icon" type="button" onClick={goPrev} aria-label="Previous range">←</button>
-              </Tooltip>
-              <Tooltip content="Go to the next date range.">
-                <button className="btn btn-secondary btn-icon" type="button" onClick={goNext} aria-label="Next range">→</button>
-              </Tooltip>
+        <AdminCard className="admin-toolbar-card admin-range-card admin-bookings-workspace">
+          <div className="admin-bookings-workspace-hero">
+            <div className="admin-bookings-workspace-copy">
+              <p className="admin-console-kicker">Schedule Workspace</p>
+              <div className="admin-bookings-workspace-heading">
+                <h2>{rangeLabel}</h2>
+                <span className="admin-bookings-workspace-view-pill">{viewLabel}</span>
+              </div>
+              <p className="helper-text admin-bookings-workspace-summary">{workspaceSummary}</p>
+
+              <div className="admin-bookings-workspace-chips" aria-label="Current bookings context">
+                <span className="admin-bookings-workspace-chip">
+                  <UserRound size={15} aria-hidden="true" />
+                  {teacherFilterLabel}
+                </span>
+                <span className="admin-bookings-workspace-chip">
+                  <CalendarRange size={15} aria-hidden="true" />
+                  {rangeLabel}
+                </span>
+                <span className="admin-bookings-workspace-chip">
+                  <Clock3 size={15} aria-hidden="true" />
+                  {loadingBookings || !hasLoadedInitialBookings
+                    ? "Loading bookings"
+                    : countLabel(bookingWorkspaceStats.confirmed, "confirmed booking", "confirmed bookings")}
+                </span>
+              </div>
             </div>
-            <div className="admin-range-copy">
-              <span className="admin-inline-field">Schedule Window</span>
-              <strong className="admin-range-label">{rangeLabel}</strong>
+
+            <div className="admin-bookings-workspace-stats" aria-label="Visible booking totals">
+              <div className="admin-bookings-workspace-stat">
+                <span className="admin-bookings-workspace-stat-label">Visible items</span>
+                <strong>{loadingBookings || !hasLoadedInitialBookings ? "—" : bookingWorkspaceStats.total}</strong>
+              </div>
+              <div className="admin-bookings-workspace-stat">
+                <span className="admin-bookings-workspace-stat-label">Confirmed</span>
+                <strong>{loadingBookings || !hasLoadedInitialBookings ? "—" : bookingWorkspaceStats.confirmed}</strong>
+              </div>
+              <div className="admin-bookings-workspace-stat">
+                <span className="admin-bookings-workspace-stat-label">Pending</span>
+                <strong>{loadingBookings || !hasLoadedInitialBookings ? "—" : bookingWorkspaceStats.pending}</strong>
+              </div>
+              <div className="admin-bookings-workspace-stat is-warning">
+                <span className="admin-bookings-workspace-stat-label">Unassigned</span>
+                <strong>{loadingBookings || !hasLoadedInitialBookings ? "—" : bookingWorkspaceStats.unassigned}</strong>
+              </div>
             </div>
           </div>
 
-          <div className="admin-range-actions">
-            <div className="site-nav admin-range-view-nav">
-              <Tooltip content="Switch to a single-day booking timeline.">
-                <button className={`btn ${view === "day" ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => navigate("day", dateStr)}>Day</button>
-              </Tooltip>
-              <Tooltip content="Switch to week view for lesson planning.">
-                <button className={`btn ${view === "week" ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => navigate("week", dateStr)}>Week</button>
-              </Tooltip>
-              <Tooltip content="Switch to month view for broader scheduling.">
-                <button className={`btn ${view === "month" ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => navigate("month", dateStr)}>Month</button>
-              </Tooltip>
-              <Tooltip content="Switch to year view for long-range planning.">
-                <button className={`btn ${view === "year" ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => navigate("year", dateStr)}>Year</button>
+          <div className="admin-range-row">
+            <div className="admin-range-primary">
+              <div className="button-row admin-range-nav-buttons">
+                <Tooltip content="Go to the previous date range.">
+                  <button className="btn btn-secondary btn-icon" type="button" onClick={goPrev} aria-label="Previous range">←</button>
+                </Tooltip>
+                <Tooltip content="Go to the next date range.">
+                  <button className="btn btn-secondary btn-icon" type="button" onClick={goNext} aria-label="Next range">→</button>
+                </Tooltip>
+              </div>
+              <div className="admin-range-copy">
+                <span className="admin-inline-field">Schedule Window</span>
+                <strong className="admin-range-label">{rangeLabel}</strong>
+              </div>
+            </div>
+
+            <div className="admin-range-actions">
+              <div className="site-nav admin-range-view-nav">
+                <Tooltip content="Switch to a single-day booking timeline.">
+                  <button className={`btn ${view === "day" ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => navigate("day", dateStr)}>Day</button>
+                </Tooltip>
+                <Tooltip content="Switch to week view for lesson planning.">
+                  <button className={`btn ${view === "week" ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => navigate("week", dateStr)}>Week</button>
+                </Tooltip>
+                <Tooltip content="Switch to month view for broader scheduling.">
+                  <button className={`btn ${view === "month" ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => navigate("month", dateStr)}>Month</button>
+                </Tooltip>
+                <Tooltip content="Switch to year view for long-range planning.">
+                  <button className={`btn ${view === "year" ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => navigate("year", dateStr)}>Year</button>
+                </Tooltip>
+              </div>
+              <div className="field admin-inline-field booking-teacher-filter-field">
+                <label htmlFor="booking-teacher-filter">Teacher</label>
+                <select id="booking-teacher-filter" value={teacherFilter} onChange={(event) => setTeacherFilter(event.target.value)}>
+                  <option value="all">All teachers</option>
+                  <option value="unassigned">Unassigned</option>
+                  {teacherOptions.map((teacher) => (
+                    <option key={teacher.id} value={teacher.id}>
+                      {teacher.displayName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="admin-range-divider" />
+              <Tooltip content="Create a new booking directly from the admin calendar.">
+                <button className="btn btn-primary" type="button" onClick={openManualDialog}>Add Manual Booking</button>
               </Tooltip>
             </div>
-            <div className="field admin-inline-field booking-teacher-filter-field">
-              <label htmlFor="booking-teacher-filter">Teacher</label>
-              <select id="booking-teacher-filter" value={teacherFilter} onChange={(event) => setTeacherFilter(event.target.value)}>
-                <option value="all">All teachers</option>
-                <option value="unassigned">Unassigned</option>
-                {teacherOptions.map((teacher) => (
-                  <option key={teacher.id} value={teacher.id}>
-                    {teacher.displayName}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="admin-range-divider" />
-            <Tooltip content="Create a new booking directly from the admin calendar.">
-              <button className="btn btn-primary" type="button" onClick={openManualDialog}>New Booking</button>
-            </Tooltip>
           </div>
+
+          {!loadingBookings && hasLoadedInitialBookings && bookingWorkspaceStats.unassigned > 0 ? (
+            <div className="admin-bookings-workspace-alert" role="status">
+              <AlertCircle size={16} aria-hidden="true" />
+              <span>
+                {countLabel(bookingWorkspaceStats.unassigned, "unassigned lesson", "unassigned lessons")} still need a teacher in this window.
+              </span>
+            </div>
+          ) : null}
         </AdminCard>
 
         <AdminCard noPadding className="admin-bookings-calendar-card">
@@ -938,6 +1059,7 @@ export function AdminBookingsClient() {
               events={filteredEvents}
               selectedEventId={selectedKey}
               onSelect={openDialog}
+              teacherFilterLabel={teacherFilterLabel}
             />
           </div>
         </AdminCard>
@@ -1118,7 +1240,7 @@ export function AdminBookingsClient() {
           isOpen={true}
           onClose={() => setIsMoveOpen(false)}
           title="Move Lesson Time"
-          wide
+          size="wide"
           footer={
             <div className="dialog-footer-row dialog-footer-row-end">
               <button className="btn btn-secondary" onClick={() => setIsMoveOpen(false)}>CANCEL</button>

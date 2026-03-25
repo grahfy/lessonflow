@@ -14,11 +14,12 @@ export default function AdminError({
   }, [error]);
 
   return (
-    <div className="admin-shell">
-      <div className="admin-shell-content">
-        <div className="error-boundary">
+    <div className="admin-shell admin-shell-route-state">
+      <main className="admin-shell-content admin-route-state-shell">
+        <div className="admin-card admin-route-state-card error-boundary">
+          <p className="admin-console-kicker">Admin Console</p>
           <h1>Something went wrong</h1>
-          <p>An error occurred in the admin area. Please try again or return to the dashboard.</p>
+          <p className="helper-text">An error occurred in the admin area. Please try again or return to the dashboard.</p>
           <div className="error-boundary-actions">
             <button type="button" className="btn btn-primary" onClick={reset}>
               Try again
@@ -28,7 +29,7 @@ export default function AdminError({
             </a>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

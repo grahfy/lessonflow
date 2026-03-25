@@ -523,54 +523,86 @@ export function AdminReportsClient(): ReactElement {
     () => (Object.entries(visibleComparisons).filter(([, on]) => on).map(([key]) => key) as TrendGrainKey[]),
     [visibleComparisons]
   );
+  const summaryPeriod = dashboard?.customRange ?? dashboard?.periods.monthly ?? null;
 
   return (
     <AdminShell title="Reports Console" error={error} notice={notice} loading={loading} className="admin-shell-reports">
       <div className="admin-layout-content report-layout-content">
-        <div className="admin-card admin-toolbar-card report-toolbar-card">
-          <div>
-            <p className="helper-text report-toolbar-title">Daily, weekly, monthly and yearly operational reporting</p>
-            <p className="helper-text">
-              Includes appointment activity, outstanding invoices, paid earnings and comparisons to previous periods.
-            </p>
+        <div className="admin-card admin-toolbar-card report-toolbar-card admin-workspace-panel">
+          <div className="admin-workspace-head">
+            <div className="admin-workspace-copy">
+              <p className="helper-text report-toolbar-title">Daily, weekly, monthly and yearly operational reporting</p>
+              <h2 className="admin-workspace-title">Owner reporting, trend tracking, and custom range analysis</h2>
+              <p className="helper-text admin-workspace-summary">
+                Includes appointment activity, outstanding invoices, paid earnings, and comparisons to previous periods.
+              </p>
+              <div className="admin-workspace-chip-row" aria-label="Reports workspace context">
+                <span className="admin-workspace-chip">{dashboard?.customRange ? "Custom range active" : "Standard report windows"}</span>
+                <span className="admin-workspace-chip">{visibleTrendKeys.length} trend panels visible</span>
+                <span className="admin-workspace-chip">{chartStyle} charts</span>
+                <span className="admin-workspace-chip">{dateFormat === "readable" ? "Readable dates" : "DD/MM/YY dates"}</span>
+              </div>
+            </div>
+            <div className="admin-workspace-actions">
+              <Tooltip content="Reload dashboard figures and chart data immediately.">
+                <button className="btn btn-secondary" type="button" onClick={() => void load("refresh")} disabled={loading || refreshing}>
+                  {refreshing ? "Refreshing..." : "Refresh reports"}
+                </button>
+              </Tooltip>
+              <Tooltip content="Email the latest daily report to the owner account.">
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  onClick={() => void sendReportEmail("daily")}
+                  disabled={loading || refreshing || sendingReportPeriod !== null}
+                >
+                  {sendingReportPeriod === "daily" ? "Sending Today..." : "Send Today Report"}
+                </button>
+              </Tooltip>
+              <Tooltip content="Email the latest monthly summary to the owner account.">
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  onClick={() => void sendReportEmail("monthly")}
+                  disabled={loading || refreshing || sendingReportPeriod !== null}
+                >
+                  {sendingReportPeriod === "monthly" ? "Sending Month..." : "Send Month Report"}
+                </button>
+              </Tooltip>
+              <Tooltip content="Email the yearly summary to the owner account.">
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  onClick={() => void sendReportEmail("yearly")}
+                  disabled={loading || refreshing || sendingReportPeriod !== null}
+                >
+                  {sendingReportPeriod === "yearly" ? "Sending Year..." : "Send Year Report"}
+                </button>
+              </Tooltip>
+            </div>
           </div>
-          <div className="button-row">
-            <Tooltip content="Reload dashboard figures and chart data immediately.">
-              <button className="btn btn-secondary" type="button" onClick={() => void load("refresh")} disabled={loading || refreshing}>
-                {refreshing ? "Refreshing..." : "Refresh reports"}
-              </button>
-            </Tooltip>
-            <Tooltip content="Email the latest daily report to the owner account.">
-              <button
-                className="btn btn-secondary"
-                type="button"
-                onClick={() => void sendReportEmail("daily")}
-                disabled={loading || refreshing || sendingReportPeriod !== null}
-              >
-                {sendingReportPeriod === "daily" ? "Sending Today..." : "Send Today Report"}
-              </button>
-            </Tooltip>
-            <Tooltip content="Email the latest monthly summary to the owner account.">
-              <button
-                className="btn btn-secondary"
-                type="button"
-                onClick={() => void sendReportEmail("monthly")}
-                disabled={loading || refreshing || sendingReportPeriod !== null}
-              >
-                {sendingReportPeriod === "monthly" ? "Sending Month..." : "Send Month Report"}
-              </button>
-            </Tooltip>
-            <Tooltip content="Email the yearly summary to the owner account.">
-              <button
-                className="btn btn-secondary"
-                type="button"
-                onClick={() => void sendReportEmail("yearly")}
-                disabled={loading || refreshing || sendingReportPeriod !== null}
-              >
-                {sendingReportPeriod === "yearly" ? "Sending Year..." : "Send Year Report"}
-              </button>
-            </Tooltip>
-          </div>
+
+          {summaryPeriod ? (
+            <div className="admin-workspace-stats" aria-label="Report summary metrics">
+              <div className="admin-workspace-stat">
+                <span className="admin-workspace-stat-label">Confirmed</span>
+                <strong>{summaryPeriod.appointments.confirmedCount}</strong>
+              </div>
+              <div className="admin-workspace-stat">
+                <span className="admin-workspace-stat-label">Cancelled</span>
+                <strong>{summaryPeriod.appointments.cancelledCount}</strong>
+              </div>
+              <div className="admin-workspace-stat">
+                <span className="admin-workspace-stat-label">Overdue invoices</span>
+                <strong>{summaryPeriod.outstandingInvoices.overdueCount}</strong>
+              </div>
+              <div className="admin-workspace-stat">
+                <span className="admin-workspace-stat-label">Net paid</span>
+                <strong>{formatAud(summaryPeriod.earnings.netPaidCents)}</strong>
+              </div>
+            </div>
+          ) : null}
+
         </div>
 
         <div className="admin-card admin-toolbar-card report-controls-card">

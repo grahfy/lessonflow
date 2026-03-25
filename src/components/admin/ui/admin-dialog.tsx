@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useId } from "react";
+import { useEffect, useId, useRef } from "react";
 import { type PropsWithChildren, type ReactNode, type RefObject } from "react";
+import { createPortal } from "react-dom";
 
 interface AdminDialogProps extends PropsWithChildren {
   isOpen: boolean;
@@ -10,7 +11,7 @@ interface AdminDialogProps extends PropsWithChildren {
   rootRef?: RefObject<HTMLDivElement | null>;
   description?: ReactNode;
   footer?: ReactNode;
-  wide?: boolean;
+  size?: "default" | "wide" | "compact";
   id?: string;
   bodyClassName?: string;
   lockBodyScrollArea?: boolean;
@@ -69,16 +70,19 @@ export function AdminDialog({
   rootRef, 
   description, 
   footer, 
-  wide,
+  size,
   id,
   bodyClassName,
   lockBodyScrollArea,
   children 
 }: AdminDialogProps) {
+  const dialogPanelRef = useRef<HTMLDivElement | null>(null);
+  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
   const generatedTitleId = useId();
   const generatedDescriptionId = useId();
   const titleId = id ? `${id}-title` : generatedTitleId;
   const descriptionId = description ? (id ? `${id}-description` : generatedDescriptionId) : undefined;
+  const resolvedSize = size || "default";
 
   useEffect(() => {
     if (!isOpen) return;
@@ -91,45 +95,124 @@ export function AdminDialog({
   useEffect(() => {
     if (!isOpen) return;
 
+    previouslyFocusedElementRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    const focusFirstElement = window.requestAnimationFrame(() => {
+      const panel = dialogPanelRef.current;
+      if (!panel) {
+        return;
+      }
+
+      const focusableElements = panel.querySelectorAll<HTMLElement>(
+        [
+          "button:not([disabled])",
+          "[href]",
+          "input:not([disabled])",
+          "select:not([disabled])",
+          "textarea:not([disabled])",
+          "[tabindex]:not([tabindex='-1'])"
+        ].join(",")
+      );
+
+      const initialTarget = focusableElements[0] ?? panel;
+      initialTarget.focus();
+    });
+
     const onKeyDown = (event: KeyboardEvent) => {
+      const panel = dialogPanelRef.current;
       if (event.key === "Escape") {
         onClose();
+        return;
+      }
+
+      if (event.key !== "Tab" || !panel) {
+        return;
+      }
+
+      const focusableElements = Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          [
+            "button:not([disabled])",
+            "[href]",
+            "input:not([disabled])",
+            "select:not([disabled])",
+            "textarea:not([disabled])",
+            "[tabindex]:not([tabindex='-1'])"
+          ].join(",")
+        )
+      ).filter((element) => !element.hasAttribute("disabled") && element.getAttribute("aria-hidden") !== "true");
+
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        panel.focus();
+        return;
+      }
+
+      const first = focusableElements[0];
+      const last = focusableElements[focusableElements.length - 1];
+      const activeElement = document.activeElement;
+
+      if (event.shiftKey && activeElement === first) {
+        event.preventDefault();
+        last.focus();
+        return;
+      }
+
+      if (!event.shiftKey && activeElement === last) {
+        event.preventDefault();
+        first.focus();
       }
     };
 
     document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.cancelAnimationFrame(focusFirstElement);
+      document.removeEventListener("keydown", onKeyDown);
+      previouslyFocusedElementRef.current?.focus();
+    };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  return (
-    <div 
+  const dialogMarkup = (
+    <div
       ref={rootRef}
-      className="dialog-backdrop" 
-      onClick={onClose}
+      className="dialog-backdrop"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
       data-motion-root="admin"
       data-motion-item="true"
     >
-      <div 
+      <div
+        ref={dialogPanelRef}
         id={id}
-        className={`dialog-panel ${wide ? 'dialog-panel-wide' : ''}`}
+        className={[
+          "dialog-panel",
+          resolvedSize === "wide" ? "dialog-panel-wide" : "",
+          resolvedSize === "compact" ? "dialog-panel-compact" : ""
+        ].filter(Boolean).join(" ")}
         // NOTE: Stop propagation so click-away close only applies to the
         // backdrop, not interactive controls inside the dialog panel.
-        onClick={(e) => e.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
+        tabIndex={-1}
       >
         <div className="dialog-head">
-          <h3 id={titleId}>{title}</h3>
+          <div className="dialog-head-copy">
+            <h3 id={titleId}>{title}</h3>
+            {description ? <div id={descriptionId} className="dialog-status helper-text">{description}</div> : null}
+          </div>
           <button className="btn btn-secondary" type="button" onClick={onClose}>
             Close
           </button>
         </div>
-        
-        {description && <div id={descriptionId} className="dialog-status helper-text">{description}</div>}
 
         <div
           className={[
@@ -149,4 +232,10 @@ export function AdminDialog({
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") {
+    return dialogMarkup;
+  }
+
+  return createPortal(dialogMarkup, document.body);
 }

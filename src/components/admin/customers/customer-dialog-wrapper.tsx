@@ -123,7 +123,7 @@ export function CustomerDialogWrapper({
             onClose={onClose}
             title="Customer Details"
             rootRef={dialogRootRef}
-            wide
+            size="wide"
             description={description}
             id="customer-dialog"
             bodyClassName="customer-dialog-body-lock"

@@ -47,7 +47,9 @@ export function AdminShell({ title, error, notice, loading, style, className, ch
           <AdminNoticeStack error={error} notice={notice} loading={loading} />
         </div>
 
-        <div className="admin-shell-content">{children}</div>
+        <main className="admin-shell-content" aria-busy={loading || undefined}>
+          {children}
+        </main>
         <CustomerEmailAlertToast
           adminId={session.admin?.id}
           loading={customerEmailAlertsLoading}

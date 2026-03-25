@@ -100,6 +100,20 @@ export function AdminLessonPlansClient() {
     ? null
     : templates.find((template) => template.id === selectedTemplateId) || null;
   const canEditSelectedTemplate = !selectedTemplate || admin?.role === "owner" || selectedTemplate.createdById === admin?.id;
+  const editableTemplateCount = useMemo(
+    () => templates.filter((template) => admin?.role === "owner" || template.createdById === admin?.id).length,
+    [admin?.id, admin?.role, templates]
+  );
+  const selectedTemplateMeta = useMemo(() => {
+    if (!selectedTemplate) {
+      return [];
+    }
+
+    return [
+      selectedTemplate.createdByDisplayName,
+      `Updated ${formatDateTime(selectedTemplate.updatedAt)}`
+    ];
+  }, [selectedTemplate]);
 
   async function saveTemplate() {
     setError("");
@@ -149,9 +163,12 @@ export function AdminLessonPlansClient() {
       <div className="admin-layout-content lesson-plan-library">
         <AdminCard className="lesson-plan-library-sidebar">
           <div className="lesson-plan-library-sidebar-head">
-            <div className="lesson-plan-library-sidebar-copy">
+            <div className="lesson-plan-library-sidebar-copy admin-workspace-copy">
               <p className="admin-inline-field">Template Library</p>
               <strong className="admin-range-label lesson-plan-library-sidebar-summary">Reusable lesson structures</strong>
+              <p className="helper-text admin-workspace-summary">
+                Maintain reusable plans that staff can apply from bookings and tailor per lesson.
+              </p>
             </div>
             <Tooltip content="Start a brand-new lesson-plan template from scratch.">
               <button
@@ -167,6 +184,21 @@ export function AdminLessonPlansClient() {
                 New Template
               </button>
             </Tooltip>
+          </div>
+
+          <div className="admin-workspace-stats lesson-plan-library-stats" aria-label="Lesson plan template stats">
+            <div className="admin-workspace-stat">
+              <span className="admin-workspace-stat-label">Visible templates</span>
+              <strong>{filteredTemplates.length}</strong>
+            </div>
+            <div className="admin-workspace-stat">
+              <span className="admin-workspace-stat-label">Library total</span>
+              <strong>{templates.length}</strong>
+            </div>
+            <div className="admin-workspace-stat">
+              <span className="admin-workspace-stat-label">Editable by you</span>
+              <strong>{editableTemplateCount}</strong>
+            </div>
           </div>
 
           <div className="field full lesson-plan-library-search">
@@ -210,7 +242,7 @@ export function AdminLessonPlansClient() {
 
         <AdminCard className="lesson-plan-library-editor">
           <div className="lesson-plan-library-editor-head">
-            <div>
+            <div className="admin-workspace-copy">
               <p className="admin-inline-field">
                 {selectedTemplate ? "Template Editor" : "New Template"}
               </p>
@@ -220,6 +252,13 @@ export function AdminLessonPlansClient() {
               <p className="helper-text lesson-plan-library-editor-summary">
                 Staff can apply these templates from a booking and then tailor the copied lesson plan for that one lesson.
               </p>
+              {selectedTemplateMeta.length ? (
+                <div className="admin-workspace-chip-row" aria-label="Selected template metadata">
+                  {selectedTemplateMeta.map((item) => (
+                    <span key={item} className="admin-workspace-chip">{item}</span>
+                  ))}
+                </div>
+              ) : null}
             </div>
             {selectedTemplate && !canEditSelectedTemplate ? (
               <span className="lesson-plan-badge">Read-only</span>

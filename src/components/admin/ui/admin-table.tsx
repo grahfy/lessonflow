@@ -36,7 +36,7 @@ export function AdminTable({
       <div className="admin-list-scroll admin-table-scroll">
         <div className="admin-table-inner">
           {header && (
-            <div className="invoice-list-header admin-table-header-row is-sticky">
+            <div className="admin-table-header-row is-sticky">
               {header}
             </div>
           )}

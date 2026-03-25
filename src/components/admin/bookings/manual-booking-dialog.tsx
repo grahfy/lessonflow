@@ -116,7 +116,7 @@ export function ManualBookingDialog({
       onClose={onClose}
       rootRef={rootRef}
       title="Add Manual Booking"
-      wide
+      size="wide"
       footer={
         <div className="manual-dialog-footer">
           <div>

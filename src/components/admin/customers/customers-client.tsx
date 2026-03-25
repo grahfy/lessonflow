@@ -62,6 +62,7 @@ export function AdminCustomersClient() {
   const [notice, setNotice] = useState("");
   const [emailAlertSummary, setEmailAlertSummary] = useState<CustomerEmailAlertsSummary | null>(null);
   const [loadingEmailAlertSummary, setLoadingEmailAlertSummary] = useState(false);
+  const [hasLoadedInitialCustomers, setHasLoadedInitialCustomers] = useState(false);
 
   // Transient feedback timer (Auto-clear notices)
   useEffect(() => {
@@ -166,6 +167,20 @@ export function AdminCustomersClient() {
   );
   const canManagePortalCredentials = currentAdmin?.role === "owner";
   const customersBasePath = emailAlertMode ? "/admin/customers?emailAlert=customer-email" : "/admin/customers";
+  const visiblePortalCount = useMemo(
+    () => customers.filter((customer) => customer.portalCredential?.isActive).length,
+    [customers]
+  );
+  const visibleAssignedTeacherCount = useMemo(
+    () => new Set(customers.map((customer) => customer.primaryTeacher?.id).filter(Boolean)).size,
+    [customers]
+  );
+  const isCustomersWorkspaceLoading = loadingCustomers || !hasLoadedInitialCustomers;
+  const workspaceSummary = isCustomersWorkspaceLoading
+    ? "Loading customer records and workspace context..."
+    : emailAlertMode
+      ? "Customer alert mode highlights unread inbox activity linked to student records."
+      : "Search, sort, and open student records without leaving the customer directory.";
 
   // -- DIALOG HANDLERS --
 
@@ -214,13 +229,23 @@ export function AdminCustomersClient() {
 
   // React to search/sort changes
   useEffect(() => {
+    let cancelled = false;
+
     void loadCustomers(
       debouncedCustomerQuery,
       page,
       sortBy,
       sortDir,
       emailAlertMode ? { customerIds: alertCustomerIds } : undefined
-    );
+    ).finally(() => {
+      if (!cancelled) {
+        setHasLoadedInitialCustomers(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [alertCustomerIds, debouncedCustomerQuery, emailAlertMode, page, sortBy, sortDir, loadCustomers]);
 
   useEffect(() => {
@@ -422,6 +447,7 @@ export function AdminCustomersClient() {
       title="Customers" 
       error={error && !dialogPresence.isMounted ? error : undefined}
       notice={notice && !dialogPresence.isMounted ? notice : undefined}
+      loading={isCustomersWorkspaceLoading && !dialogPresence.isMounted}
       className="admin-shell-customers"
     >
       <div className="admin-layout-content">
@@ -484,16 +510,47 @@ export function AdminCustomersClient() {
           </AdminCard>
         ) : null}
 
-        <AdminCard className="admin-toolbar-card admin-actions-card">
-          <div className="admin-actions-bar">
-            <div className="admin-actions-group">
+        <AdminCard className="admin-toolbar-card admin-actions-card admin-workspace-panel">
+          <div className="admin-workspace-head">
+            <div className="admin-workspace-copy">
+              <p className="admin-inline-field">Customer Directory</p>
+              <h2 className="admin-workspace-title">Student records and communication context</h2>
+              <p className="helper-text admin-workspace-summary">{workspaceSummary}</p>
+              <div className="admin-workspace-chip-row" aria-label="Customer workspace context">
+                <span className="admin-workspace-chip">{sortBy === "customer" ? "Sorted by customer" : "Sorted by skill / mode"}</span>
+                <span className="admin-workspace-chip">{sortDir === "asc" ? "Ascending" : "Descending"}</span>
+                {emailAlertMode ? <span className="admin-workspace-chip">Alert mode</span> : null}
+              </div>
+            </div>
+            <div className="admin-workspace-actions">
               {currentAdmin?.role === "owner" ? (
                 <button className="btn btn-primary" type="button" onClick={() => openCustomerDialog(null, true)}>
-                  New Customer
+                  Create New Customer
                 </button>
               ) : null}
             </div>
+          </div>
 
+          <div className="admin-workspace-stats" aria-label="Customer directory stats">
+            <div className="admin-workspace-stat">
+              <span className="admin-workspace-stat-label">Visible now</span>
+              <strong>{isCustomersWorkspaceLoading ? "—" : customers.length}</strong>
+            </div>
+            <div className="admin-workspace-stat">
+              <span className="admin-workspace-stat-label">Total records</span>
+              <strong>{isCustomersWorkspaceLoading ? "—" : totalCount}</strong>
+            </div>
+            <div className="admin-workspace-stat">
+              <span className="admin-workspace-stat-label">Portal active</span>
+              <strong>{isCustomersWorkspaceLoading ? "—" : visiblePortalCount}</strong>
+            </div>
+            <div className="admin-workspace-stat">
+              <span className="admin-workspace-stat-label">Assigned teachers</span>
+              <strong>{isCustomersWorkspaceLoading ? "—" : visibleAssignedTeacherCount}</strong>
+            </div>
+          </div>
+
+          <div className="admin-actions-bar">
             <div className="admin-toolbar-filters">
               <div className="search-box admin-search-box">
                 <label htmlFor={searchInputId}>Search</label>

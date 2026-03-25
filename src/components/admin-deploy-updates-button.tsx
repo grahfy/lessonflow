@@ -19,8 +19,9 @@
 
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 
+import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AdminNoticeStack } from "@/components/admin/ui/admin-notice";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { useSafeFetch } from "@/lib/admin/use-safe-fetch";
 import { APP_TIMEZONE } from "@/lib/time";
@@ -209,126 +210,6 @@ export function AdminDeployUpdatesButton() {
     }
   }
 
-  const updatesDialog = open && typeof document !== "undefined"
-    ? createPortal(
-        <div className="dialog-backdrop deploy-updates-backdrop" onClick={closeModal}>
-          <div
-            className="dialog-panel dialog-panel-wide deploy-updates-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Deployment updates"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="dialog-head">
-              <div className="deploy-updates-tabs">
-                <button
-                  className={`tab-link ${activeTab === "latest" ? "active" : ""}`}
-                  onClick={() => setActiveTab("latest")}
-                >
-                  Latest
-                </button>
-                <button
-                  className={`tab-link ${activeTab === "history" ? "active" : ""}`}
-                  onClick={() => setActiveTab("history")}
-                >
-                  History
-                </button>
-              </div>
-              <button className="btn btn-secondary" type="button" onClick={closeModal}>Close</button>
-            </div>
-
-            {error ? <p className="notice error">{error}</p> : null}
-
-            {activeTab === "latest" && update ? (
-              <div className="deploy-updates-content">
-                <p className="helper-text dialog-status">
-                  Applied {formatDateTime(update.appliedAt)} · branch <strong>{update.branch}</strong> · release <strong>{update.release || "-"}</strong>
-                </p>
-                <div className="deploy-updates-meta-grid">
-                  <div className="deploy-updates-meta-card">
-                    <p className="deploy-updates-meta-label">Current commit</p>
-                    <p className="deploy-updates-meta-value"><code>{update.shortCommit}</code></p>
-                  </div>
-                  <div className="deploy-updates-meta-card">
-                    <p className="deploy-updates-meta-label">Previous commit</p>
-                    <p className="deploy-updates-meta-value"><code>{update.previousCommit ? update.previousCommit.slice(0, 7) : "-"}</code></p>
-                  </div>
-                  <div className="deploy-updates-meta-card">
-                    <p className="deploy-updates-meta-label">Included changes</p>
-                    <p className="deploy-updates-meta-value">{commitCountLabel(update.commits)}</p>
-                  </div>
-                </div>
-
-                <div className="deploy-updates-list">
-                  {(update.commits || []).length ? (
-                    update.commits.map((commit) => (
-                      <article key={commit.hash} className="deploy-updates-item">
-                        <div className="deploy-updates-item-head">
-                          <strong>{commit.subject}</strong>
-                          <span>
-                            <code>{commit.shortHash}</code> · {commit.authorName} · {formatDateTime(commit.authoredAt)}
-                          </span>
-                        </div>
-                        {commit.body ? <pre className="deploy-updates-body">{commit.body}</pre> : null}
-                      </article>
-                    ))
-                  ) : (
-                    <p className="helper-text">No commit details were recorded for this deploy.</p>
-                  )}
-                </div>
-              </div>
-            ) : null}
-
-            {activeTab === "history" && (
-              <div className="deploy-updates-content">
-                {history.length === 0 && !loading ? (
-                  <p className="helper-text">No deployment history found.</p>
-                ) : (
-                  <div className="deploy-history-list">
-                    {history.map((item) => (
-                      <div key={item.commit} className={`deploy-history-item ${expandedHistoryCommit === item.commit ? "expanded" : ""}`}>
-                        <div
-                          className="deploy-history-item-summary"
-                          onClick={() => setExpandedHistoryCommit(expandedHistoryCommit === item.commit ? null : item.commit)}
-                        >
-                          <div className="deploy-history-item-main">
-                            <strong>{formatDateTime(item.appliedAt)}</strong>
-                            <span className="helper-text">
-                              branch <strong>{item.branch}</strong> · release <strong>{item.release || "-"}</strong>
-                            </span>
-                          </div>
-                          <div className="deploy-history-item-meta">
-                            <code>{item.shortCommit}</code> · {commitCountLabel(item.commits)}
-                            <span className="expand-icon">{expandedHistoryCommit === item.commit ? "−" : "+"}</span>
-                          </div>
-                        </div>
-
-                        {expandedHistoryCommit === item.commit && (
-                          <div className="deploy-history-item-details">
-                            {(item.commits || []).map((commit) => (
-                              <article key={commit.hash} className="deploy-updates-item small">
-                                <div className="deploy-updates-item-head">
-                                  <strong>{commit.subject}</strong>
-                                  <span>
-                                    <code>{commit.shortHash}</code> · {commit.authorName}
-                                  </span>
-                                </div>
-                              </article>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>,
-        document.body
-      )
-    : null;
-
   return (
     <>
       <Tooltip content="Review recent code deployments and updates to the platform.">
@@ -336,7 +217,122 @@ export function AdminDeployUpdatesButton() {
           {loading ? "Loading..." : "Updates"}
         </button>
       </Tooltip>
-      {updatesDialog}
+      <AdminDialog
+        isOpen={open}
+        onClose={closeModal}
+        title="Deployment Updates"
+        size="wide"
+        id="deploy-updates-dialog"
+      >
+        <div className="deploy-updates-content">
+          <div className="deploy-updates-tabs" role="tablist" aria-label="Deployment update views">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "latest"}
+              className={`tab-link ${activeTab === "latest" ? "active" : ""}`}
+              onClick={() => setActiveTab("latest")}
+            >
+              Latest
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "history"}
+              className={`tab-link ${activeTab === "history" ? "active" : ""}`}
+              onClick={() => setActiveTab("history")}
+            >
+              History
+            </button>
+          </div>
+
+          <AdminNoticeStack error={error || undefined} loading={loading} loadingLabel="Loading deployment metadata..." />
+
+          {activeTab === "latest" && update ? (
+            <>
+              <p className="helper-text dialog-status">
+                Applied {formatDateTime(update.appliedAt)} · branch <strong>{update.branch}</strong> · release <strong>{update.release || "-"}</strong>
+              </p>
+              <div className="deploy-updates-meta-grid">
+                <div className="deploy-updates-meta-card">
+                  <p className="deploy-updates-meta-label">Current commit</p>
+                  <p className="deploy-updates-meta-value"><code>{update.shortCommit}</code></p>
+                </div>
+                <div className="deploy-updates-meta-card">
+                  <p className="deploy-updates-meta-label">Previous commit</p>
+                  <p className="deploy-updates-meta-value"><code>{update.previousCommit ? update.previousCommit.slice(0, 7) : "-"}</code></p>
+                </div>
+                <div className="deploy-updates-meta-card">
+                  <p className="deploy-updates-meta-label">Included changes</p>
+                  <p className="deploy-updates-meta-value">{commitCountLabel(update.commits)}</p>
+                </div>
+              </div>
+
+              <div className="deploy-updates-list">
+                {(update.commits || []).length ? (
+                  update.commits.map((commit) => (
+                    <article key={commit.hash} className="deploy-updates-item">
+                      <div className="deploy-updates-item-head">
+                        <strong>{commit.subject}</strong>
+                        <span>
+                          <code>{commit.shortHash}</code> · {commit.authorName} · {formatDateTime(commit.authoredAt)}
+                        </span>
+                      </div>
+                      {commit.body ? <pre className="deploy-updates-body">{commit.body}</pre> : null}
+                    </article>
+                  ))
+                ) : (
+                  <p className="helper-text">No commit details were recorded for this deploy.</p>
+                )}
+              </div>
+            </>
+          ) : null}
+
+          {activeTab === "history" ? (
+            history.length === 0 && !loading ? (
+              <p className="helper-text">No deployment history found.</p>
+            ) : (
+              <div className="deploy-history-list">
+                {history.map((item) => (
+                  <div key={item.commit} className={`deploy-history-item ${expandedHistoryCommit === item.commit ? "expanded" : ""}`}>
+                    <button
+                      type="button"
+                      className="deploy-history-item-summary"
+                      onClick={() => setExpandedHistoryCommit(expandedHistoryCommit === item.commit ? null : item.commit)}
+                    >
+                      <span className="deploy-history-item-main">
+                        <strong>{formatDateTime(item.appliedAt)}</strong>
+                        <span className="helper-text">
+                          branch <strong>{item.branch}</strong> · release <strong>{item.release || "-"}</strong>
+                        </span>
+                      </span>
+                      <span className="deploy-history-item-meta">
+                        <code>{item.shortCommit}</code> · {commitCountLabel(item.commits)}
+                        <span className="expand-icon">{expandedHistoryCommit === item.commit ? "−" : "+"}</span>
+                      </span>
+                    </button>
+
+                    {expandedHistoryCommit === item.commit ? (
+                      <div className="deploy-history-item-details">
+                        {(item.commits || []).map((commit) => (
+                          <article key={commit.hash} className="deploy-updates-item small">
+                            <div className="deploy-updates-item-head">
+                              <strong>{commit.subject}</strong>
+                              <span>
+                                <code>{commit.shortHash}</code> · {commit.authorName}
+                              </span>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )
+          ) : null}
+        </div>
+      </AdminDialog>
     </>
   );
 }

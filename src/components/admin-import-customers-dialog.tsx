@@ -1,11 +1,11 @@
+"use client";
+
 import * as React from "react";
-import { useState } from "react";
-import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
+import { useRef, useState } from "react";
 import Papa from "papaparse";
 
-import { Tooltip } from "@/components/admin/ui/tooltip";
-
+import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AdminNoticeStack } from "@/components/admin/ui/admin-notice";
 import { useSafeFetch } from "@/lib/admin/use-safe-fetch";
 
 interface ImportCustomersDialogProps {
@@ -21,18 +21,27 @@ interface ImportCustomersDialogProps {
  * caught before the admin import route spends time validating each row.
  */
 export function ImportCustomersDialog({ open, onOpenChange, onSuccess }: ImportCustomersDialogProps) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const { safeFetch, handleApiError } = useSafeFetch({
     onError: (message) => setError(message)
   });
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const closeDialog = () => {
+    onOpenChange(false);
+    setError(null);
+    setNotice(null);
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (!file) return;
 
     setIsImporting(true);
     setError(null);
+    setNotice(null);
 
     Papa.parse(file, {
       header: true,
@@ -52,24 +61,23 @@ export function ImportCustomersDialog({ open, onOpenChange, onSuccess }: ImportC
             return;
           }
 
-          const data = await response.json();
-          if (data.errors?.length > 0) {
-            // RATIONALE: Partial success is normal for imports, so the dialog
-            // surfaces the imported count and leaves the row-level details in the console.
+          const data = await response.json() as { importedCount?: number; errors?: unknown[] };
+          const importedCount = data.importedCount ?? 0;
+          const failedCount = Array.isArray(data.errors) ? data.errors.length : 0;
+
+          if (failedCount > 0) {
             console.warn("Import completed with some errors:", data.errors);
-            alert(`Imported ${data.importedCount} customers. ${data.errors.length} failed. Check console for details.`);
+            setNotice(`Imported ${importedCount} customers. ${failedCount} row${failedCount === 1 ? "" : "s"} failed. Check the browser console for details.`);
           } else {
-            alert(`Successfully imported ${data.importedCount} customers.`);
+            setNotice(`Successfully imported ${importedCount} customers.`);
           }
 
           onSuccess();
-          onOpenChange(false);
         } catch (err: unknown) {
           setError(err instanceof Error ? err.message : "An error occurred during import.");
         } finally {
           setIsImporting(false);
-          // reset input
-          e.target.value = "";
+          event.target.value = "";
         }
       },
       error: (err) => {
@@ -80,53 +88,50 @@ export function ImportCustomersDialog({ open, onOpenChange, onSuccess }: ImportC
   };
 
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
-      <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />
-        <DialogPrimitive.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-lg translate-x-[-50%] translate-y-[-50%] rounded-xl bg-white p-6 shadow-xl">
-          <div className="flex items-center justify-between mb-4">
-            <DialogPrimitive.Title className="text-xl font-bold">Import Customers</DialogPrimitive.Title>
-            <DialogPrimitive.Close asChild>
-              <Tooltip content="Close import dialog.">
-                <button className="rounded-full p-1.5 hover:bg-slate-100">
-                  <X className="h-5 w-5" />
-                  <span className="sr-only">Close</span>
-                </button>
-              </Tooltip>
-            </DialogPrimitive.Close>
-          </div>
-          
-          <div className="space-y-4">
-            <p className="text-sm text-slate-600">
-              Upload a CSV file containing your customers. Required columns are:
-              <br />
-              <code className="font-mono bg-slate-100 px-1 rounded">first_name</code>, <code className="font-mono bg-slate-100 px-1 rounded">last_name</code>, and <code className="font-mono bg-slate-100 px-1 rounded">email</code>.
-            </p>
+    <AdminDialog
+      isOpen={open}
+      onClose={closeDialog}
+      rootRef={rootRef}
+      title="Import Customers"
+      size="compact"
+      id="import-customers-dialog"
+      footer={(
+        <div className="dialog-footer-row dialog-footer-row-end">
+          <button className="btn btn-secondary" type="button" onClick={closeDialog}>
+            Close
+          </button>
+        </div>
+      )}
+    >
+      <div className="import-customers-dialog">
+        <p className="helper-text">
+          Upload a CSV file with customer records. Required columns are <code>first_name</code>, <code>last_name</code>, and <code>email</code>.
+        </p>
 
-            <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-lg p-8 hover:bg-slate-50 transition-colors">
-              <label htmlFor="csv-upload" className="cursor-pointer text-center">
-                <div className="text-sm font-medium text-slate-900 bg-white border border-slate-300 rounded-md px-4 py-2 hover:bg-slate-50">
-                  {isImporting ? 'Importing...' : 'Select CSV File'}
-                </div>
-                <input 
-                  id="csv-upload" 
-                  type="file" 
-                  accept=".csv" 
-                  className="hidden" 
-                  onChange={handleFileUpload}
-                  disabled={isImporting}
-                />
-              </label>
-            </div>
+        <AdminNoticeStack error={error ?? undefined} notice={notice ?? undefined} loading={isImporting} loadingLabel="Importing customers..." />
 
-            {error && (
-              <div className="p-3 rounded-md bg-red-50 text-red-600 text-sm">
-                {error}
-              </div>
-            )}
-          </div>
-        </DialogPrimitive.Content>
-      </DialogPrimitive.Portal>
-    </DialogPrimitive.Root>
+        <div className="import-customers-dropzone">
+          <label htmlFor="csv-upload" className="import-customers-dropzone-label">
+            <strong>{isImporting ? "Importing..." : "Select CSV File"}</strong>
+            <span className="helper-text">Choose a CSV export and the admin import route will validate each row.</span>
+          </label>
+          <input
+            id="csv-upload"
+            type="file"
+            accept=".csv"
+            className="import-customers-input"
+            onChange={handleFileUpload}
+            disabled={isImporting}
+          />
+        </div>
+
+        <div className="import-customers-columns">
+          <span className="admin-workspace-chip">first_name</span>
+          <span className="admin-workspace-chip">last_name</span>
+          <span className="admin-workspace-chip">email</span>
+        </div>
+        <p className="helper-text">Large imports may complete with partial success, so row-level failures are reported separately from successful records.</p>
+      </div>
+    </AdminDialog>
   );
 }
