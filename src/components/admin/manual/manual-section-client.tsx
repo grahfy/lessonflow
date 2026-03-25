@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminCard } from "@/components/admin/ui/admin-card";
@@ -22,6 +22,13 @@ type AdminManualSectionClientProps = {
   next: AdminManualSectionIndex | null;
 };
 
+type ActiveManualImage = {
+  src: string;
+  alt: string;
+  caption: string;
+  mode: "contain" | "scroll";
+};
+
 const GROUP_TITLES: Record<ManualSectionGroup, string> = {
   foundation: "Orientation",
   operations: "Operations",
@@ -37,6 +44,24 @@ function sectionsForGroup(index: AdminManualIndex, group: ManualSectionGroup) {
   return index.sections.filter((entry) => entry.group === group);
 }
 
+function normalizeImagePath(src: string): string {
+  if (!src) return "";
+
+  try {
+    return new URL(src, "http://localhost").pathname;
+  } catch {
+    return src;
+  }
+}
+
+function getImageModalMode(image: Pick<HTMLImageElement, "naturalWidth" | "naturalHeight">): "contain" | "scroll" {
+  if (!image.naturalWidth || !image.naturalHeight) {
+    return "contain";
+  }
+
+  return image.naturalHeight > image.naturalWidth ? "scroll" : "contain";
+}
+
 /**
  * Renders a single admin manual article, including local group navigation and
  * optional screenshot lightbox handling.
@@ -47,7 +72,7 @@ export function AdminManualSectionClient({
   previous,
   next
 }: AdminManualSectionClientProps) {
-  const [activeScreenshot, setActiveScreenshot] = useState<ManualScreenshot | null>(null);
+  const [activeScreenshot, setActiveScreenshot] = useState<ActiveManualImage | null>(null);
 
   const closeScreenshot = useCallback(() => setActiveScreenshot(null), []);
 
@@ -86,6 +111,50 @@ export function AdminManualSectionClient({
       .map((id) => index.screenshots.find((s) => s.id === id))
       .filter((screenshot): screenshot is ManualScreenshot => Boolean(screenshot));
   }, [index.screenshots, section.screenshotIds]);
+
+  const openScreenshot = useCallback((screenshot: ManualScreenshot, image?: HTMLImageElement | null) => {
+    setActiveScreenshot({
+      src: screenshot.publicPath,
+      alt: screenshot.alt,
+      caption: screenshot.caption,
+      mode: image ? getImageModalMode(image) : "contain"
+    });
+  }, []);
+
+  const openInlineImage = useCallback(
+    (image: HTMLImageElement) => {
+      const normalizedSrc = normalizeImagePath(image.currentSrc || image.src);
+      const matchingScreenshot = index.screenshots.find((screenshot) => {
+        return normalizeImagePath(screenshot.publicPath) === normalizedSrc;
+      });
+
+      setActiveScreenshot({
+        src: normalizedSrc || image.currentSrc || image.src,
+        alt: image.alt || matchingScreenshot?.alt || "Manual screenshot",
+        caption: matchingScreenshot?.caption || image.alt || "",
+        mode: getImageModalMode(image)
+      });
+    },
+    [index.screenshots]
+  );
+
+  const onMarkdownClick = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      const image = target.closest("img");
+      if (!(image instanceof HTMLImageElement)) {
+        return;
+      }
+
+      event.preventDefault();
+      openInlineImage(image);
+    },
+    [openInlineImage]
+  );
 
   const groupSections = sectionsForGroup(index, section.group);
 
@@ -165,7 +234,11 @@ export function AdminManualSectionClient({
               </section>
             ) : null}
 
-            <div className="admin-manual-markdown" dangerouslySetInnerHTML={{ __html: section.html }} />
+            <div
+              className="admin-manual-markdown"
+              onClick={onMarkdownClick}
+              dangerouslySetInnerHTML={{ __html: section.html }}
+            />
           </section>
 
           {screenshots.length > 0 ? (
@@ -177,7 +250,10 @@ export function AdminManualSectionClient({
                     <button
                       type="button"
                       className="admin-manual-shot-frame admin-manual-shot-trigger"
-                      onClick={() => setActiveScreenshot(s)}
+                      onClick={(event) => {
+                        const image = event.currentTarget.querySelector("img");
+                        openScreenshot(s, image);
+                      }}
                       aria-label={`Open screenshot: ${s.alt}`}
                     >
                       <Image
@@ -229,10 +305,14 @@ export function AdminManualSectionClient({
                 ×
               </button>
             </Tooltip>
-            <div className="modal-image-container admin-manual-modal-image-container">
+            <div
+              className={`modal-image-container admin-manual-modal-image-container ${
+                activeScreenshot.mode === "scroll" ? "is-scrollable" : "is-contained"
+              }`}
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={activeScreenshot.publicPath}
+                src={activeScreenshot.src}
                 alt={activeScreenshot.alt}
                 className="modal-image admin-manual-modal-image"
               />
