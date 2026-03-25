@@ -535,7 +535,10 @@ export function AdminTeachersClient() {
                               {!entry.isActive ? <span className="teacher-role-badge is-inactive">Inactive</span> : null}
                             </div>
                           </div>
-                          <p className="teacher-directory-summary">
+                          <p
+                            className="teacher-directory-summary"
+                            title={[entry.instruments, entry.specialisations].filter(Boolean).join(" · ") || "Ready for teaching details."}
+                          >
                             {[entry.instruments, entry.specialisations].filter(Boolean).join(" · ") || "Ready for teaching details."}
                           </p>
                         </div>
