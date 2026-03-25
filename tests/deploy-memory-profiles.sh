@@ -154,7 +154,7 @@ run_deploy_swap_probe() {
           ;;
       esac
     }
-    $(sed -n '/^ensure_temporary_build_swap()/,/^}/p' "${REPO_ROOT}/deploy/deploy.sh")
+    $(sed -n '/^next_temporary_build_swap_path()/,/^}/p;/^ensure_temporary_build_swap()/,/^}/p' "${REPO_ROOT}/deploy/deploy.sh")
     ensure_temporary_build_swap
     printf 'ACTIVE=%s CREATED=%s EXISTS=%s\n' \"\$TEMP_BUILD_SWAP_ACTIVE\" \"\$TEMP_BUILD_SWAP_CREATED_FILE\" \"\$(test -e \"\$TEMP_BUILD_SWAP_PATH\" && echo true || echo false)\"
   "
@@ -183,9 +183,61 @@ run_deploy_swap_no_privilege_probe() {
     log_warn() { printf '%s\n' \"\$*\"; }
     detect_total_ram_mb() { echo 1967; }
     detect_total_swap_mb() { echo 0; }
-    $(sed -n '/^ensure_temporary_build_swap()/,/^}/p' "${REPO_ROOT}/deploy/deploy.sh")
+    $(sed -n '/^next_temporary_build_swap_path()/,/^}/p;/^ensure_temporary_build_swap()/,/^}/p' "${REPO_ROOT}/deploy/deploy.sh")
     ensure_temporary_build_swap
     printf 'ACTIVE=%s CREATED=%s EXISTS=%s\n' \"\$TEMP_BUILD_SWAP_ACTIVE\" \"\$TEMP_BUILD_SWAP_CREATED_FILE\" \"\$(test -e \"\$TEMP_BUILD_SWAP_PATH\" && echo true || echo false)\"
+  "
+}
+
+run_deploy_swap_stale_cleanup_fallback_probe() {
+  bash -lc "
+    set -euo pipefail
+    TEST_ROOT=\$(mktemp -d)
+    trap 'rm -rf \"\$TEST_ROOT\"' EXIT
+    TEMP_BUILD_SWAP_AUTO_ENABLED=true
+    OSTYPE=linux-gnu
+    ORIGINAL_TEMP_BUILD_SWAP_PATH=\"\$TEST_ROOT/build.swap\"
+    TEMP_BUILD_SWAP_PATH=\"\$ORIGINAL_TEMP_BUILD_SWAP_PATH\"
+    TEMP_BUILD_SWAP_MIN_CREATE_MB=128
+    LOW_RAM_1GB_AUTO_HEAP_MIN_MB=900
+    LOW_RAM_1GB_AUTO_HEAP_MAX_MB=1280
+    LOW_RAM_2GB_AUTO_HEAP_MIN_MB=1700
+    LOW_RAM_2GB_AUTO_HEAP_MAX_MB=2560
+    LOW_RAM_1GB_TARGET_TOTAL_SWAP_MB=2048
+    LOW_RAM_2GB_TARGET_TOTAL_SWAP_MB=2048
+    TEMP_BUILD_SWAP_ACTIVE=false
+    TEMP_BUILD_SWAP_CREATED_FILE=false
+    : > \"\$TEMP_BUILD_SWAP_PATH\"
+    has_privileged_swap_access() { return 0; }
+    log_info() { :; }
+    log_warn() { printf '%s\n' \"\$*\"; }
+    detect_total_ram_mb() { echo 1967; }
+    detect_total_swap_mb() { echo 0; }
+    run_sudo_cmd() {
+      case \"\$1\" in
+        rm)
+          if [[ \"\$3\" == \"\$ORIGINAL_TEMP_BUILD_SWAP_PATH\" ]]; then
+            return 1
+          fi
+          rm -f \"\$3\"
+          ;;
+        chmod|mkswap|swapon|swapoff)
+          :
+          ;;
+        fallocate)
+          : > \"\$4\"
+          ;;
+        dd)
+          : > \"\$5\"
+          ;;
+        *)
+          \"\$@\"
+          ;;
+      esac
+    }
+    $(sed -n '/^next_temporary_build_swap_path()/,/^}/p;/^ensure_temporary_build_swap()/,/^}/p' "${REPO_ROOT}/deploy/deploy.sh")
+    ensure_temporary_build_swap
+    printf 'ACTIVE=%s CREATED=%s EXISTS=%s PATH=%s\n' \"\$TEMP_BUILD_SWAP_ACTIVE\" \"\$TEMP_BUILD_SWAP_CREATED_FILE\" \"\$(test -e \"\$TEMP_BUILD_SWAP_PATH\" && echo true || echo false)\" \"\$TEMP_BUILD_SWAP_PATH\"
   "
 }
 
@@ -202,5 +254,9 @@ assert_contains "${swap_no_privilege_output}" "deploy user lacks root or non-int
 assert_contains "${swap_no_privilege_output}" "ACTIVE=false CREATED=false EXISTS=true" "deploy.sh should leave the stale swap file untouched when it skips temp swap management"
 assert_not_contains "${swap_no_privilege_output}" "Removing stale temporary swap file" "deploy.sh should skip stale swap cleanup when privileged swap access is unavailable"
 assert_not_contains "${swap_no_privilege_output}" "Operation not permitted" "deploy.sh should not surface raw rm permission errors when temp swap is skipped"
+swap_fallback_output="$(run_deploy_swap_stale_cleanup_fallback_probe)"
+assert_contains "${swap_fallback_output}" "retrying temporary build swap with alternate path" "deploy.sh should retry temp swap creation with an alternate path when stale swap cleanup fails"
+assert_contains "${swap_fallback_output}" "ACTIVE=true CREATED=true EXISTS=true PATH=" "deploy.sh should still activate temporary swap after falling back to a fresh path"
+assert_contains "${swap_fallback_output}" "build-1.swap" "deploy.sh should choose a deterministic sibling swap filename for the retry"
 
 echo "Deploy memory profile checks passed."

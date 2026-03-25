@@ -79,7 +79,7 @@ For an already-installed system, the standard update path is:
 
 This is the preferred routine path for ordinary code or configuration updates.
 
-For the current DigitalOcean 2GB droplet profile, the deploy/update scripts now keep the low-memory build path, enable Next.js webpack memory optimisations for deploy builds, and target a conservative build heap plus temporary swap during updates. Non-root web-update runs skip temporary swap management when the deploy user lacks privileged swap access. This affects the deployment build only and does not change the runtime systemd service memory cap.
+For the current DigitalOcean 2GB droplet profile, the deploy/update scripts now keep the low-memory build path, enable Next.js webpack memory optimisations for deploy builds, and target a conservative build heap plus temporary swap during updates. If a stale build swap file cannot be removed, the deploy step retries with a fresh sibling swap-file path instead of abandoning temporary swap for that build. Non-root web-update runs still skip temporary swap management when the deploy user lacks privileged swap access. This affects the deployment build only and does not change the runtime systemd service memory cap.
 
 ### Release 1.2.0 Upgrade Checks
 

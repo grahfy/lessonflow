@@ -3457,6 +3457,32 @@ detect_total_swap_mb() {
     return 1
 }
 
+# When a previous deploy leaves behind an inaccessible swap file, fall back to a
+# fresh sibling path instead of giving up on temporary build swap entirely.
+next_temporary_build_swap_path() {
+    local current_path="$1"
+    local current_dir=""
+    local current_file=""
+    local current_stem=""
+    local candidate=""
+    local attempt=1
+
+    current_dir="$(dirname "${current_path}")"
+    current_file="$(basename "${current_path}")"
+    current_stem="${current_file%.swap}"
+
+    while (( attempt <= 25 )); do
+        candidate="${current_dir}/${current_stem}-${attempt}.swap"
+        if [[ ! -e "${candidate}" ]] && ! grep -qE "[[:space:]]${candidate//\//\\/}([[:space:]]|$)" /proc/swaps 2>/dev/null; then
+            printf '%s\n' "${candidate}"
+            return 0
+        fi
+        attempt=$((attempt + 1))
+    done
+
+    return 1
+}
+
 # Creates temporary swap during the Next.js build on low-memory Linux hosts.
 # The function is best-effort and safely skips setup when prerequisites are
 # missing or when sufficient swap already exists on the machine.
@@ -3528,17 +3554,24 @@ ensure_temporary_build_swap() {
 
     if [[ -e "${TEMP_BUILD_SWAP_PATH}" ]]; then
         log_warn "Removing stale temporary swap file: ${TEMP_BUILD_SWAP_PATH}"
-        run_sudo_cmd rm -f "${TEMP_BUILD_SWAP_PATH}" || {
-            log_warn "Failed to remove stale temporary swap file; skipping temporary build swap"
-            return 0
-        }
+        if ! run_sudo_cmd rm -f "${TEMP_BUILD_SWAP_PATH}"; then
+            local fallback_swap_path=""
+            fallback_swap_path="$(next_temporary_build_swap_path "${TEMP_BUILD_SWAP_PATH}" || true)"
+            if [[ -z "${fallback_swap_path}" ]]; then
+                log_warn "Failed to remove stale temporary swap file; skipping temporary build swap"
+                return 0
+            fi
+
+            log_warn "Failed to remove stale temporary swap file; retrying temporary build swap with alternate path: ${fallback_swap_path}"
+            TEMP_BUILD_SWAP_PATH="${fallback_swap_path}"
+        fi
     fi
 
     log_warn "Creating temporary build swap (${swap_mb}MB) at ${TEMP_BUILD_SWAP_PATH} to reach ~${target_total_swap_mb}MB total swap"
-    if command -v run_sudo_cmd fallocate >/dev/null 2>&1; then
-        run_sudo_cmd fallocate -l "${swap_mb}M" "${TEMP_BUILD_SWAP_PATH}" 2>/dev/null || dd if=/dev/zero of="${TEMP_BUILD_SWAP_PATH}" bs=1M count="${swap_mb}" status=none
+    if command -v fallocate >/dev/null 2>&1; then
+        run_sudo_cmd fallocate -l "${swap_mb}M" "${TEMP_BUILD_SWAP_PATH}" 2>/dev/null || run_sudo_cmd dd if=/dev/zero of="${TEMP_BUILD_SWAP_PATH}" bs=1M count="${swap_mb}" status=none
     else
-        dd if=/dev/zero of="${TEMP_BUILD_SWAP_PATH}" bs=1M count="${swap_mb}" status=none
+        run_sudo_cmd dd if=/dev/zero of="${TEMP_BUILD_SWAP_PATH}" bs=1M count="${swap_mb}" status=none
     fi
 
     run_sudo_cmd chmod 600 "${TEMP_BUILD_SWAP_PATH}"
