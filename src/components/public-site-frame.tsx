@@ -16,6 +16,8 @@ const PUBLIC_FOOTER_COPY: Record<string, string> = {
   "/contact": "Fast response by phone, text, or email.",
   "/book": "Pending requests are reviewed quickly.",
   "/terms": "Policy clarity keeps lessons predictable for everyone.",
+  "/privacy": "Privacy disclosures explain how student and communication data is handled.",
+  "/terms-of-service": "Service terms cover portal use and connected communication tools.",
   "/student/login": "Use your approval email credentials to access your portal."
 };
 

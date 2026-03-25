@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { CaptchaField, useCaptcha } from "@/components/captcha";
+import { TweenLink } from "@/components/motion/tween-link";
 import { useNoticeTween } from "@/components/motion/use-notice-tween";
 
 /**
@@ -100,6 +101,11 @@ export function StudentLoginForm() {
           </button>
         </Tooltip>
       </div>
+      <p className="helper-text student-login-legal-links" data-motion-item="student-login-legal-links">
+        <TweenLink href="/privacy">Privacy Policy</TweenLink>
+        <span aria-hidden="true">•</span>
+        <TweenLink href="/terms-of-service">Terms of Service</TweenLink>
+      </p>
       {error ? (
         <p className="notice error" ref={errorNoticeRef} data-motion-item="student-login-error-notice">
           {error}

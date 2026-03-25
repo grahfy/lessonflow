@@ -1264,6 +1264,28 @@ h1 {
   margin: 0;
 }
 
+.student-login-legal-links {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: -2px;
+}
+
+.student-login-legal-links a {
+  color: var(--ink-1);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  transition:
+    color var(--motion-fast) var(--ease-out),
+    opacity var(--motion-fast) var(--ease-out);
+}
+
+.student-login-legal-links a:hover {
+  color: var(--ink-0);
+}
+
 .field label {
   color: var(--ink-1);
   font-size: 0.8rem;

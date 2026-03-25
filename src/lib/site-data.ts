@@ -27,6 +27,8 @@ export const publicRouteOrder = [
   "/contact",
   "/book",
   "/terms",
+  "/privacy",
+  "/terms-of-service",
   "/student/login"
 ] as const;
 
@@ -47,6 +49,8 @@ export const publicHeroImageByRoute: Record<(typeof publicRouteOrder)[number], s
   "/contact": "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1300&q=80",
   "/book": "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1300&q=80",
   "/terms": "https://images.unsplash.com/photo-1519659528534-7fd733a832a0?auto=format&fit=crop&w=1300&q=80",
+  "/privacy": "/images/terms-photo.webp",
+  "/terms-of-service": "/images/terms-photo.webp",
   "/student/login": "/images/student-portal-hero.webp"
 };
 

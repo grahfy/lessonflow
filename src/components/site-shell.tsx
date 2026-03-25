@@ -28,6 +28,8 @@ export function SiteShell({ footerCopy, children }: SiteShellProps) {
     "/contact": "site-shell-theme-contact",
     "/book": "site-shell-theme-book",
     "/terms": "site-shell-theme-terms",
+    "/privacy": "site-shell-theme-terms",
+    "/terms-of-service": "site-shell-theme-terms",
     "/student/login": "site-shell-theme-student-login"
   };
   const themeClassName = routeThemeClass[pathname] || "";

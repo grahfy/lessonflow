@@ -74,6 +74,24 @@
       "keywords": [],
       "noindex": true
     },
+    "/privacy": {
+      "enabled": true,
+      "priority": 0.3,
+      "changeFrequency": "yearly",
+      "title": "Privacy Policy - {{BRAND_NAME}}",
+      "description": "Privacy policy for {{BRAND_NAME}} website, student portal, and connected services.",
+      "keywords": [],
+      "noindex": false
+    },
+    "/terms-of-service": {
+      "enabled": true,
+      "priority": 0.3,
+      "changeFrequency": "yearly",
+      "title": "Terms of Service - {{BRAND_NAME}}",
+      "description": "Terms of service for {{BRAND_NAME}} website, student portal, and connected services.",
+      "keywords": [],
+      "noindex": false
+    },
     "/student/portal": {
       "enabled": false,
       "priority": 0.0,
