@@ -5,16 +5,24 @@ import { PanelLayout } from "@/components/panel-layout";
 import { buildPublicPageMetadata } from "@/lib/seo";
 
 import { getContent } from "@/lib/cms";
-import { getSubjectLabel } from "@/lib/branding";
+import { getBranding, getSubjectLabel } from "@/lib/branding";
 
-export const metadata: Metadata = buildPublicPageMetadata({
-  title: `${getSubjectLabel()} Lesson Paths | Creative Coaching for Every Level`,
-  path: "/lessons",
-  description:
-    `Structured, creative ${getSubjectLabel().toLowerCase()} coaching for beginners through advanced players. Learn songs faster, sharpen technique, and develop a more confident sound.`
-});
+export function generateMetadata(): Metadata {
+  const branding = getBranding();
+  const subjectLabel = getSubjectLabel(branding.PRIMARY_SUBJECT);
+
+  return buildPublicPageMetadata({
+    title: `${subjectLabel} Lesson Paths | Creative Coaching for Every Level`,
+    path: "/lessons",
+    description:
+      `Structured, creative ${subjectLabel.toLowerCase()} coaching for beginners through advanced players. Learn songs faster, sharpen technique, and develop a more confident sound.`
+  });
+}
 
 export default async function LessonsPage() {
+  const branding = getBranding();
+  const subjectLabel = getSubjectLabel(branding.PRIMARY_SUBJECT);
+
   const heroContent = await getContent("/lessons", "hero", {
     kicker: "Lesson Paths",
     title: "A lesson path that meets you where you are and grows with your sound.",
@@ -24,7 +32,7 @@ export default async function LessonsPage() {
   });
 
   const bodyContent = await getContent("/lessons", "body", {
-    helperText: `Lessons can include song learning, rhythm ${getSubjectLabel().toLowerCase()}, lead ${getSubjectLabel().toLowerCase()}, improvisation, technique development, ear training, tone guidance, and smart practice planning. The focus is steady progress and musical confidence, not just collecting theory or random tips.`,
+    helperText: `Lessons can include song learning, rhythm ${subjectLabel.toLowerCase()}, lead ${subjectLabel.toLowerCase()}, improvisation, technique development, ear training, tone guidance, and smart practice planning. The focus is steady progress and musical confidence, not just collecting theory or random tips.`,
     beginnerTitle: "Beginner",
     beginnerBody: "Start strong with posture, tuning, chord changes, rhythm fundamentals, and songs you actually want to play. Build a foundation that makes practice feel clear, creative, and productive from day one.",
     intermediateTitle: "Intermediate",
@@ -34,11 +42,11 @@ export default async function LessonsPage() {
   });
 
   const pricingContent = await getContent("/lessons", "pricing", {
-    title: `${getSubjectLabel()} Lesson Prices`,
-    min30Label: `30 minute ${getSubjectLabel()} lessons`,
+    title: `${subjectLabel} Lesson Prices`,
+    min30Label: `30 minute ${subjectLabel} lessons`,
     min30Option1: "5 lessons - $200 ($40 each)",
     min30Option2: "10 lessons - $388 ($38.80 each)",
-    min60Label: `1 Hour ${getSubjectLabel()} lessons`,
+    min60Label: `1 Hour ${subjectLabel} lessons`,
     min60Option1: "5 lessons - $375 ($75 each)",
     min60Option2: "10 lessons - $725 ($72.50 each)",
     note: "Gift vouchers are available."

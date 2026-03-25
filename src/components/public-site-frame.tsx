@@ -30,7 +30,11 @@ function isPublicRoute(pathname: string): boolean {
  *
  * Student/admin pages bypass this wrapper so they can use their own shells and motion scopes.
  */
-export function PublicSiteFrame({ children }: PropsWithChildren) {
+type PublicSiteFrameProps = PropsWithChildren<{
+  brandName: string;
+}>;
+
+export function PublicSiteFrame({ brandName, children }: PublicSiteFrameProps) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -70,5 +74,5 @@ export function PublicSiteFrame({ children }: PropsWithChildren) {
   }
 
   const footerCopy = PUBLIC_FOOTER_COPY[pathname] || PUBLIC_FOOTER_COPY["/"];
-  return <SiteShell footerCopy={footerCopy}>{children}</SiteShell>;
+  return <SiteShell brandName={brandName} footerCopy={footerCopy}>{children}</SiteShell>;
 }

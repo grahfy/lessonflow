@@ -3,20 +3,20 @@ import type { Metadata } from "next";
 import { BookingForm } from "@/components/booking-form";
 import { PanelLayout } from "@/components/panel-layout";
 import { buildPublicPageMetadata } from "@/lib/seo";
-import { 
-  PUBLIC_BRAND_NAME, 
-  PRIMARY_SUBJECT, 
-  PRIMARY_LOCATION,
-  getSubjectLabel 
-} from "@/lib/branding";
+import { getBranding, getSubjectLabel } from "@/lib/branding";
 import { getContent } from "@/lib/cms";
 
-export const metadata: Metadata = buildPublicPageMetadata({
-  title: `Book a ${getSubjectLabel()} Lesson | ${PUBLIC_BRAND_NAME}`,
-  path: "/book",
-  description:
-    `Request your ${PRIMARY_SUBJECT.toLowerCase()} tuition session in minutes. Share your goals and preferred time, and we will confirm availability and the best fit for your playing.`
-});
+export function generateMetadata(): Metadata {
+  const branding = getBranding();
+  const subjectLabel = getSubjectLabel(branding.PRIMARY_SUBJECT);
+
+  return buildPublicPageMetadata({
+    title: `Book a ${subjectLabel} Lesson | ${branding.PUBLIC_BRAND_NAME}`,
+    path: "/book",
+    description:
+      `Request your ${branding.PRIMARY_SUBJECT.toLowerCase()} tuition session in minutes. Share your goals and preferred time, and we will confirm availability and the best fit for your playing.`
+  });
+}
 
 /**
  * Public booking page wrapper.
@@ -25,6 +25,8 @@ export const metadata: Metadata = buildPublicPageMetadata({
  * validation and submission flow live in `BookingForm`.
  */
 export default async function BookPage() {
+  const branding = getBranding();
+
   const heroContent = await getContent("/book", "hero", {
     kicker: "Book Lesson",
     title: "Request a lesson. We'll shape your starting point.",
@@ -39,7 +41,7 @@ export default async function BookPage() {
     card2Title: "Who It Suits",
     card2Body: "Beginners through to advanced players. All ages are welcome, with coaching tailored to your musical interests and creative goals.",
     card3Title: "Flexible Formats",
-    card3Body: `Choose between focused in-person sessions at our ${PRIMARY_LOCATION} studio or high-quality video lessons from anywhere across Australia.`
+    card3Body: `Choose between focused in-person sessions at our ${branding.PRIMARY_LOCATION} studio or high-quality video lessons from anywhere across Australia.`
   });
 
   return (

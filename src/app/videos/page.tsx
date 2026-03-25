@@ -4,28 +4,32 @@ import { TweenLink } from "@/components/motion/tween-link";
 import { PanelLayout } from "@/components/panel-layout";
 import { VideosGridModal } from "@/components/videos-grid-modal";
 import { buildPublicPageMetadata } from "@/lib/seo";
-import { 
-  PUBLIC_BRAND_NAME, 
-  PRIMARY_SUBJECT,
-  getSubjectLabel 
-} from "@/lib/branding";
+import { getBranding, getSubjectLabel } from "@/lib/branding";
 import { getContent } from "@/lib/cms";
 
-export const metadata: Metadata = buildPublicPageMetadata({
-  title: `Videos & Music | ${getSubjectLabel()} Performance Showcase`,
-  path: "/videos",
-  description:
-    `Watch ${PRIMARY_SUBJECT.toLowerCase()} performance videos and explore original music written and performed by our team at ${PUBLIC_BRAND_NAME}.`
-});
+export function generateMetadata(): Metadata {
+  const branding = getBranding();
+  const subjectLabel = getSubjectLabel(branding.PRIMARY_SUBJECT);
+
+  return buildPublicPageMetadata({
+    title: `Videos & Music | ${subjectLabel} Performance Showcase`,
+    path: "/videos",
+    description:
+      `Watch ${branding.PRIMARY_SUBJECT.toLowerCase()} performance videos and explore original music written and performed by our team at ${branding.PUBLIC_BRAND_NAME}.`
+  });
+}
 
 /**
  * Public media showcase page for teacher video and audio work.
  */
 export default async function VideosPage() {
+  const branding = getBranding();
+  const subjectLabel = getSubjectLabel(branding.PRIMARY_SUBJECT);
+
   const heroContent = await getContent("/videos", "hero", {
     kicker: "Videos & Music",
-    title: `Watch and hear the sound behind the ${PRIMARY_SUBJECT.toLowerCase()} tuition.`,
-    lead: `This page showcases our ${PRIMARY_SUBJECT.toLowerCase()} performance videos and original music. It is a quick way to get a feel for our musical voice and approach before booking your lessons.`,
+    title: `Watch and hear the sound behind the ${branding.PRIMARY_SUBJECT.toLowerCase()} tuition.`,
+    lead: `This page showcases our ${branding.PRIMARY_SUBJECT.toLowerCase()} performance videos and original music. It is a quick way to get a feel for our musical voice and approach before booking your lessons.`,
     visualLabel: "Performance showcase",
     visualClassName: "teacher-hero"
   });
@@ -57,7 +61,7 @@ export default async function VideosPage() {
 
       <div className="button-row button-row-justify" data-motion-item="videos-actions">
         <TweenLink className="btn btn-primary" href="/book" data-motion-item="videos-action-book">
-          Book {getSubjectLabel()} Tuition
+          Book {subjectLabel} Tuition
         </TweenLink>
         <TweenLink className="btn btn-secondary" href="/teacher" data-motion-item="videos-action-teacher">
           Meet Your Teacher

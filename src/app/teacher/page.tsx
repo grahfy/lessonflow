@@ -5,21 +5,29 @@ import { PanelLayout } from "@/components/panel-layout";
 import { buildPublicPageMetadata } from "@/lib/seo";
 
 import { getContent } from "@/lib/cms";
-import { getSubjectLabel } from "@/lib/branding";
+import { getBranding, getSubjectLabel } from "@/lib/branding";
 
-export const metadata: Metadata = buildPublicPageMetadata({
-  title: `Meet Your ${getSubjectLabel()} Teacher | Musician & Mentor`,
-  path: "/teacher",
-  description:
-    `Train with an experienced ${getSubjectLabel().toLowerCase()} teacher, musician, and mentor with a focus on practical progress and creative growth.`
-});
+export function generateMetadata(): Metadata {
+  const branding = getBranding();
+  const subjectLabel = getSubjectLabel(branding.PRIMARY_SUBJECT);
+
+  return buildPublicPageMetadata({
+    title: `Meet Your ${subjectLabel} Teacher | Musician & Mentor`,
+    path: "/teacher",
+    description:
+      `Train with an experienced ${subjectLabel.toLowerCase()} teacher, musician, and mentor with a focus on practical progress and creative growth.`
+  });
+}
 
 export default async function TeacherPage() {
+  const branding = getBranding();
+  const subjectLabel = getSubjectLabel(branding.PRIMARY_SUBJECT);
+
   const heroContent = await getContent("/teacher", "hero", {
     kicker: "Your Teacher",
-    title: `Work with a ${getSubjectLabel().toLowerCase()} mentor who teaches from lived musical experience.`,
-    lead: `Our teaching approach brings together years of professional experience, a music production background, and a long history helping students of different ages and levels make meaningful progress. The focus is practical, creative, and personalised, helping you sound better in real playing situations, not just isolated exercises.`,
-    visualLabel: `Teacher playing ${getSubjectLabel().toLowerCase()}`,
+    title: `Work with a ${subjectLabel.toLowerCase()} mentor who teaches from lived musical experience.`,
+    lead: "Our teaching approach brings together years of professional experience, a music production background, and a long history helping students of different ages and levels make meaningful progress. The focus is practical, creative, and personalised, helping you sound better in real playing situations, not just isolated exercises.",
+    visualLabel: `Teacher playing ${subjectLabel.toLowerCase()}`,
     visualClassName: "teacher-hero"
   });
 

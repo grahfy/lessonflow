@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+
 import { getPublicSiteUrl } from "@/lib/env";
-import { PUBLIC_BRAND_NAME, LOGO_URL, PRIMARY_SUBJECT } from "@/lib/branding";
+import { getBranding, getSubjectLabel } from "@/lib/branding";
 
 type PublicPageMetadataInput = {
   title: string;
@@ -14,9 +15,12 @@ type PublicPageMetadataInput = {
  */
 function interpolateSeo(text: string): string {
   if (!text) return "";
+  const branding = getBranding();
   return text
-    .replace(/\{\{BRAND_NAME\}\}/g, PUBLIC_BRAND_NAME)
-    .replace(/\{\{SUBJECT\}\}/g, PRIMARY_SUBJECT);
+    .replace(/\{\{BRAND_NAME\}\}/g, branding.PUBLIC_BRAND_NAME)
+    .replace(/\{\{SUBJECT\}\}/g, branding.PRIMARY_SUBJECT)
+    .replace(/\{\{SUBJECT_LABEL\}\}/g, getSubjectLabel(branding.PRIMARY_SUBJECT))
+    .replace(/\{\{LOCATION\}\}/g, branding.PRIMARY_LOCATION);
 }
 
 /**
@@ -34,10 +38,11 @@ export function getSeoSiteUrl(): string {
  * their own route segments so the public website remains the indexed surface.
  */
 export function buildPublicPageMetadata(input: PublicPageMetadataInput): Metadata {
+  const branding = getBranding();
   const base = getSeoSiteUrl();
   const path = input.path === "/" ? "/" : `/${input.path.replace(/^\/+/, "")}`;
   const url = `${base}${path === "/" ? "" : path}`;
-  const imageUrl = LOGO_URL.startsWith("http") ? LOGO_URL : `${base}${LOGO_URL}`;
+  const imageUrl = branding.LOGO_URL.startsWith("http") ? branding.LOGO_URL : `${base}${branding.LOGO_URL}`;
 
   const title = interpolateSeo(input.title);
   const description = interpolateSeo(input.description);
@@ -52,7 +57,7 @@ export function buildPublicPageMetadata(input: PublicPageMetadataInput): Metadat
     },
     openGraph: {
       type: "website",
-      siteName: PUBLIC_BRAND_NAME,
+      siteName: branding.PUBLIC_BRAND_NAME,
       locale: "en_AU",
       url,
       title,
@@ -60,7 +65,7 @@ export function buildPublicPageMetadata(input: PublicPageMetadataInput): Metadat
       images: [
         {
           url: imageUrl,
-          alt: PUBLIC_BRAND_NAME
+          alt: branding.PUBLIC_BRAND_NAME
         }
       ]
     },

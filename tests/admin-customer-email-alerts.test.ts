@@ -173,7 +173,69 @@ describe("admin-customer-email-alerts", () => {
     expect(mockListUnreadImapMessages).not.toHaveBeenCalled();
   });
 
-  it("returns not_configured when gmail is unavailable even if imap is configured", async () => {
+  it("returns matching unread customer emails via imap when imap is selected", async () => {
+    vi.stubEnv("ADMIN_CUSTOMER_EMAIL_ALERTS_PROVIDER", "imap");
+    delete process.env.GMAIL_CLIENT_ID;
+    delete process.env.GMAIL_CLIENT_SECRET;
+    delete process.env.GMAIL_REFRESH_TOKEN;
+    delete process.env.GMAIL_USER_EMAIL;
+    vi.stubEnv("IMAP_HOST", "imap.example.com");
+    vi.stubEnv("IMAP_USER", "owner@example.com");
+    vi.stubEnv("IMAP_PASS", "imap-pass");
+
+    const owner = await ensureOwnerAdmin();
+    const token = createSessionToken(owner.email);
+
+    const customer = await prisma.customer.create({
+      data: {
+        fullName: "Alex Student",
+        normalizedFullName: "alex student",
+        email: "alex@example.com",
+        phone: "0400000001",
+        normalizedEmail: "alex@example.com",
+        normalizedPhone: "0400000001",
+        skillLevel: "beginner",
+        lessonMode: "in_person"
+      }
+    });
+
+    mockListUnreadImapMessages.mockResolvedValue([
+      {
+        messageId: "imap-1",
+        senderEmail: "alex@example.com",
+        toEmail: "owner@example.com",
+        subject: "IMAP lesson question",
+        snippet: "Can we move to Friday?",
+        bodyText: "Can we move to Friday?",
+        receivedAt: "2026-04-05T09:45:00.000Z"
+      }
+    ]);
+
+    const response = await getAlerts(requestWithToken(token));
+    expect(response.status).toBe(200);
+
+    const body = (await response.json()) as {
+      state: string;
+      provider: string | null;
+      unreadCount: number;
+      messages: Array<{ customerId: string; senderEmail: string; subject: string }>;
+    };
+
+    expect(body.state).toBe("ready");
+    expect(body.provider).toBe("imap");
+    expect(body.unreadCount).toBe(1);
+    expect(body.messages).toEqual([
+      expect.objectContaining({
+        customerId: customer.id,
+        senderEmail: "alex@example.com",
+        subject: "IMAP lesson question"
+      })
+    ]);
+    expect(mockListUnreadInboxMessages).not.toHaveBeenCalled();
+    expect(mockListUnreadImapMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns not_configured when gmail is selected but unavailable even if imap is configured", async () => {
     delete process.env.GMAIL_CLIENT_ID;
     delete process.env.GMAIL_CLIENT_SECRET;
     delete process.env.GMAIL_REFRESH_TOKEN;
@@ -200,7 +262,8 @@ describe("admin-customer-email-alerts", () => {
     expect(mockListUnreadImapMessages).not.toHaveBeenCalled();
   });
 
-  it("does not fall back to imap when gmail fails at runtime", async () => {
+  it("falls back to imap in auto mode when gmail fails at runtime", async () => {
+    vi.stubEnv("ADMIN_CUSTOMER_EMAIL_ALERTS_PROVIDER", "auto");
     vi.stubEnv("IMAP_HOST", "imap.example.com");
     vi.stubEnv("IMAP_USER", "owner@example.com");
     vi.stubEnv("IMAP_PASS", "imap-pass");
@@ -221,6 +284,18 @@ describe("admin-customer-email-alerts", () => {
     });
 
     mockListUnreadInboxMessages.mockRejectedValue(new Error("Gmail token expired"));
+    mockListUnreadImapMessages.mockResolvedValue([
+      {
+        messageId: "imap-2",
+        senderEmail: "alex@example.com",
+        toEmail: "owner@example.com",
+        subject: "Fallback IMAP message",
+        snippet: "Using IMAP fallback",
+        bodyText: "Using IMAP fallback",
+        receivedAt: "2026-04-05T10:45:00.000Z"
+      }
+    ]);
+
     const response = await getAlerts(requestWithToken(token));
     expect(response.status).toBe(200);
 
@@ -230,13 +305,13 @@ describe("admin-customer-email-alerts", () => {
       messages: Array<{ customerId: string; subject: string }>;
     };
 
-    expect(body.provider).toBe("gmail");
-    expect(body.unreadCount).toBe(0);
+    expect(body.provider).toBe("imap");
+    expect(body.unreadCount).toBe(1);
     expect(mockListUnreadInboxMessages).toHaveBeenCalledTimes(1);
-    expect(mockListUnreadImapMessages).not.toHaveBeenCalled();
+    expect(mockListUnreadImapMessages).toHaveBeenCalledTimes(1);
   });
 
-  it("always uses gmail even if imap is configured", async () => {
+  it("uses gmail without touching imap when gmail is explicitly selected", async () => {
     vi.stubEnv("IMAP_HOST", "imap.example.com");
     vi.stubEnv("IMAP_USER", "owner@example.com");
     vi.stubEnv("IMAP_PASS", "imap-pass");
@@ -273,18 +348,17 @@ describe("admin-customer-email-alerts", () => {
     expect(mockListUnreadImapMessages).not.toHaveBeenCalled();
   });
 
-  it("remains enabled even when the old feature toggle env is false", async () => {
+  it("returns disabled state when the feature toggle env is false", async () => {
     vi.stubEnv("ADMIN_CUSTOMER_EMAIL_ALERTS_ENABLED", "false");
     const owner = await ensureOwnerAdmin();
     const token = createSessionToken(owner.email);
-    mockListUnreadInboxMessages.mockResolvedValue({ messages: [] });
 
     const response = await getAlerts(requestWithToken(token));
     expect(response.status).toBe(200);
 
     const body = (await response.json()) as { state: string; unreadCount: number; provider: string | null };
-    expect(body).toMatchObject({ state: "ready", unreadCount: 0, provider: "gmail" });
-    expect(mockListUnreadInboxMessages).toHaveBeenCalled();
+    expect(body).toMatchObject({ state: "disabled", unreadCount: 0, provider: null });
+    expect(mockListUnreadInboxMessages).not.toHaveBeenCalled();
     expect(mockListUnreadImapMessages).not.toHaveBeenCalled();
   });
 
@@ -347,6 +421,44 @@ describe("admin-customer-email-alerts", () => {
     expect(body.activeProvider).toBe("gmail");
     expect(body.gmail.status).toBe("connected");
     expect(body.imap).toMatchObject({ status: "connected", mailbox: "INBOX" });
+  });
+
+  it("reports auto mode with imap as active when gmail is unavailable", async () => {
+    vi.stubEnv("ADMIN_CUSTOMER_EMAIL_ALERTS_PROVIDER", "auto");
+    delete process.env.GMAIL_CLIENT_ID;
+    delete process.env.GMAIL_CLIENT_SECRET;
+    delete process.env.GMAIL_REFRESH_TOKEN;
+    delete process.env.GMAIL_USER_EMAIL;
+    vi.stubEnv("IMAP_HOST", "imap.example.com");
+    vi.stubEnv("IMAP_USER", "owner@example.com");
+    vi.stubEnv("IMAP_PASS", "imap-pass");
+
+    mockGetImapConnectionStatus.mockResolvedValue({
+      user: "owner@example.com",
+      mailbox: "INBOX"
+    });
+
+    const owner = await ensureOwnerAdmin();
+    const token = createSessionToken(owner.email);
+
+    const response = await getAlertStatus(
+      requestWithToken(token, "http://localhost/api/admin/customer-email-alerts/status")
+    );
+    expect(response.status).toBe(200);
+
+    const body = (await response.json()) as {
+      alertsEnabled: boolean;
+      providerPreference: string;
+      activeProvider: string | null;
+      gmail: { status: string };
+      imap: { status: string };
+    };
+
+    expect(body.alertsEnabled).toBe(true);
+    expect(body.providerPreference).toBe("auto");
+    expect(body.activeProvider).toBe("imap");
+    expect(body.gmail.status).toBe("not_configured");
+    expect(body.imap.status).toBe("connected");
   });
 
   it("does not report imap as active when gmail fails", async () => {

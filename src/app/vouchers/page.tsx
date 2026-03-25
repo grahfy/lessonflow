@@ -5,23 +5,28 @@ import { PanelLayout } from "@/components/panel-layout";
 import { buildPublicPageMetadata } from "@/lib/seo";
 
 import { getContent } from "@/lib/cms";
-import { 
-  PUBLIC_BRAND_NAME, 
-  getSubjectLabel
-} from "@/lib/branding";
+import { getBranding, getSubjectLabel } from "@/lib/branding";
 
-export const metadata: Metadata = buildPublicPageMetadata({
-  title: `${getSubjectLabel()} Lesson Gift Vouchers | ${PUBLIC_BRAND_NAME}`,
-  path: "/vouchers",
-  description:
-    `Give a memorable gift with ${getSubjectLabel().toLowerCase()} lesson vouchers. Digital delivery, flexible booking, and suitable for beginners through experienced players.`
-});
+export function generateMetadata(): Metadata {
+  const branding = getBranding();
+  const subjectLabel = getSubjectLabel(branding.PRIMARY_SUBJECT);
+
+  return buildPublicPageMetadata({
+    title: `${subjectLabel} Lesson Gift Vouchers | ${branding.PUBLIC_BRAND_NAME}`,
+    path: "/vouchers",
+    description:
+      `Give a memorable gift with ${subjectLabel.toLowerCase()} lesson vouchers. Digital delivery, flexible booking, and suitable for beginners through experienced players.`
+  });
+}
 
 export default async function VouchersPage() {
+  const branding = getBranding();
+  const subjectLabel = getSubjectLabel(branding.PRIMARY_SUBJECT);
+
   const heroContent = await getContent("/vouchers", "hero", {
-    kicker: `Gift ${getSubjectLabel()} Lessons`,
+    kicker: `Gift ${subjectLabel} Lessons`,
     title: "Give a music gift that inspires creativity long after the day itself.",
-    lead: `${PUBLIC_BRAND_NAME} gift vouchers are ideal for beginners, returning players, and music lovers of any age. Delivered digitally and redeemed on a schedule that suits the recipient, they are a thoughtful gift that can spark confidence, creativity, and long-term progress.`,
+    lead: `${branding.PUBLIC_BRAND_NAME} gift vouchers are ideal for beginners, returning players, and music lovers of any age. Delivered digitally and redeemed on a schedule that suits the recipient, they are a thoughtful gift that can spark confidence, creativity, and long-term progress.`,
     visualLabel: "Gift voucher",
     visualClassName: "vouchers-hero"
   });

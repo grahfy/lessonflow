@@ -4,15 +4,19 @@ import { TweenLink } from "@/components/motion/tween-link";
 import { PanelLayout } from "@/components/panel-layout";
 import { buildPublicPageMetadata } from "@/lib/seo";
 
-import { PUBLIC_BRAND_NAME } from "@/lib/branding";
+import { getBranding } from "@/lib/branding";
 import { getContent } from "@/lib/cms";
 
-export const metadata: Metadata = buildPublicPageMetadata({
-  title: "Lesson Terms, Cancellations & Voucher Policies",
-  path: "/terms",
-  description:
-    `Read ${PUBLIC_BRAND_NAME} policies for cancellations, make-up lessons, payments, and gift vouchers before booking.`
-});
+export function generateMetadata(): Metadata {
+  const branding = getBranding();
+
+  return buildPublicPageMetadata({
+    title: "Lesson Terms, Cancellations & Voucher Policies",
+    path: "/terms",
+    description:
+      `Read ${branding.PUBLIC_BRAND_NAME} policies for cancellations, make-up lessons, payments, and gift vouchers before booking.`
+  });
+}
 
 export default async function TermsPage() {
   const heroContent = await getContent("/terms", "hero", {

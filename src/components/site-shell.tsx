@@ -5,9 +5,9 @@ import { PropsWithChildren } from "react";
 
 import { TweenLink } from "@/components/motion/tween-link";
 import { navItems } from "@/lib/site-data";
-import { PUBLIC_BRAND_NAME } from "@/lib/branding";
 
 type SiteShellProps = PropsWithChildren<{
+  brandName: string;
   footerCopy: string;
 }>;
 
@@ -17,7 +17,7 @@ type SiteShellProps = PropsWithChildren<{
  * Admin and student portal pages intentionally use different shells to keep operational UI state
  * and motion scopes isolated from public marketing pages.
  */
-export function SiteShell({ footerCopy, children }: SiteShellProps) {
+export function SiteShell({ brandName, footerCopy, children }: SiteShellProps) {
   const pathname = usePathname();
   const routeThemeClass: Record<string, string> = {
     "/": "site-shell-home-admin-theme",
@@ -46,7 +46,7 @@ export function SiteShell({ footerCopy, children }: SiteShellProps) {
       <header className="site-header">
         <TweenLink className="brand" href="/">
           <span className="brand-mark" aria-hidden="true"></span>
-          <span className="brand-text">{PUBLIC_BRAND_NAME}</span>
+          <span className="brand-text">{brandName}</span>
         </TweenLink>
 
         <nav className="site-nav" aria-label="Primary Navigation">
@@ -70,7 +70,7 @@ export function SiteShell({ footerCopy, children }: SiteShellProps) {
 
       <footer className="site-footer">
         <p>{footerCopy}</p>
-        <p>{PUBLIC_BRAND_NAME} {new Date().getFullYear()}</p>
+        <p>{brandName} {new Date().getFullYear()}</p>
       </footer>
     </div>
   );

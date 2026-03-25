@@ -78,6 +78,35 @@ describe("setup-wizard", () => {
     expect(body.readiness.checks.some((entry) => entry.id === "database-connectivity")).toBe(true);
   });
 
+  it("keeps setup available in development until the first admin exists", async () => {
+    env.NODE_ENV = "development";
+
+    const statusResponse = await getSetupStatus(new Request("http://localhost/api/setup/status"));
+    expect(statusResponse.status).toBe(200);
+    const statusBody = (await statusResponse.json()) as {
+      readiness: {
+        completed: boolean;
+      };
+    };
+    expect(statusBody.readiness.completed).toBe(false);
+
+    const loginResponse = await adminLogin(
+      new NextRequest("http://localhost/api/admin/login", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          email: "owner@melbourneguitar.school",
+          password: "StrongPass!234"
+        })
+      })
+    );
+    expect(loginResponse.status).toBe(409);
+    const loginBody = (await loginResponse.json()) as { code?: string };
+    expect(loginBody.code).toBe("SETUP_REQUIRED");
+  });
+
   it("allows setup env endpoints before setup completes and blocks them after initialization", async () => {
     const preEnvResponse = await getSetupEnv(new Request("http://localhost/api/setup/env"));
     expect(preEnvResponse.status).toBe(200);

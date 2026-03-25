@@ -710,11 +710,6 @@ async function canWriteLocalMaterialRoot(): Promise<boolean> {
  * Returns true once at least one admin account exists.
  */
 export async function isSetupComplete(): Promise<boolean> {
-  // Only bypass setup checks in true development mode, test mode must actually
-  // run the setup workflow for end-to-end tests to pass.
-  if (process.env.NODE_ENV === "development" && process.env.VITEST !== "true" && process.env.PLAYWRIGHT_TEST_BASE_URL === undefined) {
-    return true;
-  }
   const adminCount = await prisma.adminUser.count();
   return adminCount > 0;
 }
@@ -1285,11 +1280,7 @@ export async function saveAdminSettingsConfig(
   input: AdminSettingsSaveInput,
   options: { currentAdminId: string }
 ): Promise<AdminSettingsSaveResult> {
-  const normalizedInput: Record<string, string | undefined> = {
-    ...input,
-    ADMIN_CUSTOMER_EMAIL_ALERTS_PROVIDER: "gmail",
-    ADMIN_CUSTOMER_EMAIL_ALERTS_ENABLED: "true"
-  };
+  const normalizedInput: Record<string, string | undefined> = { ...input };
   const validationInput: Record<string, string> = {};
   const currentValues = getStoredEnvValues();
   for (const envVar of CONFIGURABLE_ENV_VARS) {

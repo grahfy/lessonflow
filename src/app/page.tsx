@@ -4,27 +4,29 @@ import { TweenLink } from "@/components/motion/tween-link";
 import { PanelLayout } from "@/components/panel-layout";
 import { buildPublicPageMetadata } from "@/lib/seo";
 import { getContent } from "@/lib/cms";
-import { 
-  PUBLIC_BRAND_NAME, 
-  PRIMARY_SUBJECT, 
-  PRIMARY_LOCATION,
-  getSubjectLabel
-} from "@/lib/branding";
+import { getBranding, getSubjectLabel } from "@/lib/branding";
 
-export const metadata: Metadata = buildPublicPageMetadata({
-  title: `${PUBLIC_BRAND_NAME}: Creative ${getSubjectLabel()} Lessons in ${PRIMARY_LOCATION}`,
-  path: "/",
-  description:
-    `Artist-minded one-on-one ${PRIMARY_SUBJECT.toLowerCase()} lessons in ${PRIMARY_LOCATION} tailored to your sound, goals, and pace. Build technique, confidence, and musical identity with modern coaching.`
-});
+export function generateMetadata(): Metadata {
+  const branding = getBranding();
+  const subjectLabel = getSubjectLabel(branding.PRIMARY_SUBJECT);
+
+  return buildPublicPageMetadata({
+    title: `${branding.PUBLIC_BRAND_NAME}: Creative ${subjectLabel} Lessons in ${branding.PRIMARY_LOCATION}`,
+    path: "/",
+    description:
+      `Artist-minded one-on-one ${branding.PRIMARY_SUBJECT.toLowerCase()} lessons in ${branding.PRIMARY_LOCATION} tailored to your sound, goals, and pace. Build technique, confidence, and musical identity with modern coaching.`
+  });
+}
 
 export default async function HomePage() {
+  const branding = getBranding();
+  const subjectLabel = getSubjectLabel(branding.PRIMARY_SUBJECT);
   const heroContent = await getContent("/", "hero", {
-    kicker: `${PRIMARY_LOCATION.toUpperCase()}, MELBOURNE`,
+    kicker: `${branding.PRIMARY_LOCATION.toUpperCase()}, MELBOURNE`,
     title: "Build your sound. Refine your voice. Play with more intention.",
-    lead: `${PUBLIC_BRAND_NAME} offers artist-minded one-on-one coaching and ${PRIMARY_SUBJECT.toLowerCase()} tuition shaped around your musical identity, goals, and pace. Whether you are starting from scratch, returning to the instrument, or chasing a sharper and more expressive sound, each lesson is built to create progress you can hear in real music, not just practice-room exercises.`,
+    lead: `${branding.PUBLIC_BRAND_NAME} offers artist-minded one-on-one coaching and ${branding.PRIMARY_SUBJECT.toLowerCase()} tuition shaped around your musical identity, goals, and pace. Whether you are starting from scratch, returning to the instrument, or chasing a sharper and more expressive sound, each lesson is built to create progress you can hear in real music, not just practice-room exercises.`,
     visualClassName: "home-hero",
-    visualLabel: `${getSubjectLabel()} performance`
+    visualLabel: `${subjectLabel} performance`
   });
 
   const metricsContent = await getContent("/", "metrics", {
@@ -32,12 +34,12 @@ export default async function HomePage() {
     experienceLabel: "YEARS OF PLAYING + TEACHING",
     levelsValue: "All Levels",
     levelsLabel: "BEGINNERS TO ADVANCED",
-    locationValue: PRIMARY_LOCATION,
+    locationValue: branding.PRIMARY_LOCATION,
     locationLabel: "STUDIO + ONLINE SESSIONS"
   });
 
   const bodyContent = await getContent("/", "body", {
-    note: `${getSubjectLabel()} tuition focuses on practical musicianship: cleaner technique, stronger rhythm, better fretboard awareness, and the confidence to play with control, feel, and expression. You will work on music you genuinely connect with, while building the technical foundation and creative instinct that make your playing recognisable as your own.`
+    note: `${subjectLabel} tuition focuses on practical musicianship: cleaner technique, stronger rhythm, better fretboard awareness, and the confidence to play with control, feel, and expression. You will work on music you genuinely connect with, while building the technical foundation and creative instinct that make your playing recognisable as your own.`
   });
 
   return (
@@ -52,7 +54,7 @@ export default async function HomePage() {
         <>
           <div className="home-actions home-actions-justified" data-motion-item="home-actions">
             <TweenLink className="btn btn-primary" href="/book" data-motion-item="home-action-book">
-              Book Your {getSubjectLabel()} Lesson Today
+              Book Your {subjectLabel} Lesson Today
             </TweenLink>
             <TweenLink className="btn btn-secondary" href="/videos" data-motion-item="home-action-videos">
               Watch Videos

@@ -12,10 +12,11 @@ import { isGmailConfigured } from "@/lib/email/gmail-service";
 import {
   getAdminCustomerEmailAlertsProvider,
   type CustomerEmailAlertsProvider,
+  isAdminCustomerEmailAlertsEnabled,
   isImapConfigured
 } from "@/lib/env";
 import { listUnreadInboxMessages, getMessageDetails } from "@/lib/gmail/service";
-import { getImapConnectionStatus } from "@/lib/imap/service";
+import { getImapConnectionStatus, listUnreadImapMessages } from "@/lib/imap/service";
 import { logError, logEvent } from "@/lib/observability";
 
 const GMAIL_ALERT_BATCH_SIZE = 20;
@@ -86,20 +87,51 @@ function parseReceivedAt(dateHeader: string | undefined, fallbackTimestamp: stri
 }
 
 function resolveProviderAttempts(): Array<Exclude<CustomerEmailAlertProvider, null>> {
+  const providerPreference = getAdminCustomerEmailAlertsProvider();
   const gmailConfigured = isGmailConfigured();
-  return gmailConfigured ? ["gmail"] : [];
+  const imapConfigured = isImapConfigured();
+
+  if (providerPreference === "gmail") {
+    return gmailConfigured ? ["gmail"] : [];
+  }
+
+  if (providerPreference === "imap") {
+    return imapConfigured ? ["imap"] : [];
+  }
+
+  return [
+    ...(gmailConfigured ? (["gmail"] as const) : []),
+    ...(imapConfigured ? (["imap"] as const) : [])
+  ];
 }
 
-async function listUnreadProviderMessages(): Promise<ProviderMessage[]> {
+async function listUnreadProviderMessages(provider: Exclude<CustomerEmailAlertProvider, null>): Promise<ProviderMessage[]> {
+  if (provider === "imap") {
+    return listUnreadImapProviderMessages();
+  }
+
   return listUnreadGmailMessages();
 }
 
 function resolveActiveProviderFromStatuses(
   providerPreference: CustomerEmailAlertsProvider,
-  gmail: AlertProviderStatus
+  gmail: AlertProviderStatus,
+  imap: AlertProviderStatus
 ): CustomerEmailAlertProvider {
-  if (providerPreference === "gmail" && gmail.status === "connected") {
+  if (providerPreference === "gmail") {
+    return gmail.status === "connected" ? "gmail" : null;
+  }
+
+  if (providerPreference === "imap") {
+    return imap.status === "connected" ? "imap" : null;
+  }
+
+  if (gmail.status === "connected") {
     return "gmail";
+  }
+
+  if (imap.status === "connected") {
+    return "imap";
   }
 
   return null;
@@ -148,6 +180,27 @@ async function listUnreadGmailMessages(): Promise<ProviderMessage[]> {
         subject: subjectHeader,
         snippet: message.snippet || "",
         receivedAt: parseReceivedAt(dateHeader ?? undefined, message.internalDate ?? undefined)
+      };
+    })
+    .filter((message): message is ProviderMessage => Boolean(message));
+}
+
+async function listUnreadImapProviderMessages(): Promise<ProviderMessage[]> {
+  const messages = await listUnreadImapMessages(GMAIL_ALERT_BATCH_SIZE);
+
+  return messages
+    .map((message) => {
+      const parsed = z.string().email().safeParse(message.senderEmail);
+      if (!parsed.success) {
+        return null;
+      }
+
+      return {
+        messageId: message.messageId,
+        senderEmail: normalizeEmail(parsed.data),
+        subject: message.subject,
+        snippet: message.snippet,
+        receivedAt: message.receivedAt
       };
     })
     .filter((message): message is ProviderMessage => Boolean(message));
@@ -271,18 +324,20 @@ export async function getCustomerEmailAlertsStatusSummary(alertsEnabled: boolean
             status: "connected" as const,
             email: status.user,
             mailbox: status.mailbox,
-            message: `IMAP inbox access is available for mailbox ${status.mailbox}, but inbox alerts stay on Gmail.`
+            message: `IMAP inbox access is available for mailbox ${status.mailbox}.`
           };
         } catch (error) {
           logError("imap.customer_email_alerts_status_failed", error);
           return {
             status: "error" as const,
-            message: "Unable to connect to the configured IMAP inbox. Inbox alerts still remain Gmail-only."
+            message: "Unable to connect to the configured IMAP inbox. Check host, credentials, and mailbox settings."
           };
         }
       })();
 
-  const activeProvider = resolveActiveProviderFromStatuses(providerPreference, gmail);
+  const activeProvider = alertsEnabled
+    ? resolveActiveProviderFromStatuses(providerPreference, gmail, imap)
+    : null;
 
   return {
     alertsEnabled,
@@ -294,6 +349,10 @@ export async function getCustomerEmailAlertsStatusSummary(alertsEnabled: boolean
 }
 
 export async function getUnreadCustomerEmailAlertsSummary(): Promise<CustomerEmailAlertsSummary> {
+  if (!isAdminCustomerEmailAlertsEnabled()) {
+    return emptySummary("disabled");
+  }
+
   const providers = resolveProviderAttempts();
   if (providers.length === 0) {
     return emptySummary("not_configured");
@@ -305,7 +364,7 @@ export async function getUnreadCustomerEmailAlertsSummary(): Promise<CustomerEma
     lastProvider = provider;
 
     try {
-      const providerMessages = await listUnreadProviderMessages();
+      const providerMessages = await listUnreadProviderMessages(provider);
 
       if (providerMessages.length === 0) {
         return emptySummary("ready", provider);

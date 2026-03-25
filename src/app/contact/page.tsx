@@ -7,21 +7,19 @@ import { getOwnerEmail } from "@/lib/env";
 import { buildPublicPageMetadata } from "@/lib/seo";
 
 import { getContent } from "@/lib/cms";
-import { 
-  PUBLIC_BRAND_NAME, 
-  PRIMARY_SUBJECT, 
-  PRIMARY_LOCATION,
-  CONTACT_PHONE,
-  CONTACT_ADDRESS,
-  getSubjectLabel
-} from "@/lib/branding";
+import { getBranding, getSubjectLabel } from "@/lib/branding";
 
-export const metadata: Metadata = buildPublicPageMetadata({
-  title: `Contact ${PUBLIC_BRAND_NAME} | ${PRIMARY_LOCATION} ${getSubjectLabel()} Lessons`,
-  path: "/contact",
-  description:
-    `Contact ${PUBLIC_BRAND_NAME} to book private ${PRIMARY_SUBJECT.toLowerCase()} tuition, ask questions, or discuss the right lesson path. Studio based in ${PRIMARY_LOCATION}, Melbourne.`
-});
+export function generateMetadata(): Metadata {
+  const branding = getBranding();
+  const subjectLabel = getSubjectLabel(branding.PRIMARY_SUBJECT);
+
+  return buildPublicPageMetadata({
+    title: `Contact ${branding.PUBLIC_BRAND_NAME} | ${branding.PRIMARY_LOCATION} ${subjectLabel} Lessons`,
+    path: "/contact",
+    description:
+      `Contact ${branding.PUBLIC_BRAND_NAME} to book private ${branding.PRIMARY_SUBJECT.toLowerCase()} tuition, ask questions, or discuss the right lesson path. Studio based in ${branding.PRIMARY_LOCATION}, Melbourne.`
+  });
+}
 
 /**
  * Public contact page wrapper with location guidance + contact form.
@@ -30,21 +28,23 @@ export const metadata: Metadata = buildPublicPageMetadata({
  */
 export default async function ContactPage() {
   const contactEmail = getOwnerEmail();
+  const branding = getBranding();
+  const subjectLabel = getSubjectLabel(branding.PRIMARY_SUBJECT);
 
   const heroContent = await getContent("/contact", "hero", {
     kicker: "Inquiries",
     title: "Let’s map out the right next step for your playing.",
-    lead: `Reach out by call, text, or email for bookings, ${PRIMARY_SUBJECT.toLowerCase()} tuition options, pricing, vouchers, or general questions. We can help you choose the best place to begin based on your level, musical interests, and what kind of player you want to become.`,
-    visualLabel: `${getSubjectLabel()} lesson studio`,
+    lead: `Reach out by call, text, or email for bookings, ${branding.PRIMARY_SUBJECT.toLowerCase()} tuition options, pricing, vouchers, or general questions. We can help you choose the best place to begin based on your level, musical interests, and what kind of player you want to become.`,
+    visualLabel: `${subjectLabel} lesson studio`,
     visualClassName: "contact-hero"
   });
 
   const bodyContent = await getContent("/contact", "body", {
     mapImage: "/images/google-map.webp",
     mapTriggerText: "Google Maps Location",
-    mapCaption: `${PUBLIC_BRAND_NAME} Location & Directions\n\nAddress: ${CONTACT_ADDRESS}\n\nContact us for detailed directions to our ${PRIMARY_LOCATION} studio.`,
-    formatsLabel: `Lesson formats: In-person (${PRIMARY_LOCATION}) and online (Australia)`,
-    helperText: `If you are unsure where to start, send a quick message about your current level, the styles you enjoy, and what you want to achieve. We can help you choose the right ${PRIMARY_SUBJECT.toLowerCase()} tuition format and a practical, motivating first step.`
+    mapCaption: `${branding.PUBLIC_BRAND_NAME} Location & Directions\n\nAddress: ${branding.CONTACT_ADDRESS}\n\nContact us for detailed directions to our ${branding.PRIMARY_LOCATION} studio.`,
+    formatsLabel: `Lesson formats: In-person (${branding.PRIMARY_LOCATION}) and online (Australia)`,
+    helperText: `If you are unsure where to start, send a quick message about your current level, the styles you enjoy, and what you want to achieve. We can help you choose the right ${branding.PRIMARY_SUBJECT.toLowerCase()} tuition format and a practical, motivating first step.`
   });
 
   return (
@@ -61,14 +61,14 @@ export default async function ContactPage() {
         <li className="map-trigger-item" data-motion-item="map-button">
           <ImageModal
             src={bodyContent.mapImage}
-            alt={`${PUBLIC_BRAND_NAME} location map`}
+            alt={`${branding.PUBLIC_BRAND_NAME} location map`}
             triggerText={bodyContent.mapTriggerText}
             caption={bodyContent.mapCaption}
           />
         </li>
-        <li data-motion-item="contact-phone">Phone: {CONTACT_PHONE}</li>
+        <li data-motion-item="contact-phone">Phone: {branding.CONTACT_PHONE}</li>
         <li data-motion-item="contact-email">Email: {contactEmail}</li>
-        <li data-motion-item="contact-studio">Studio: {CONTACT_ADDRESS}</li>
+        <li data-motion-item="contact-studio">Studio: {branding.CONTACT_ADDRESS}</li>
         <li data-motion-item="contact-formats">{bodyContent.formatsLabel}</li>
       </ul>
 

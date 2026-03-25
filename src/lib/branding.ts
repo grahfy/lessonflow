@@ -15,6 +15,18 @@
 
 export const PLATFORM_NAME = "LessonFlow";
 
+export type BrandingConfig = {
+  PUBLIC_BRAND_NAME: string;
+  PRIMARY_SUBJECT: string;
+  PRIMARY_LOCATION: string;
+  CONTACT_PHONE: string;
+  CONTACT_ADDRESS: string;
+  LOGO_URL: string;
+  INVOICE_LOGO_URL: string;
+  FAVICON_URL: string;
+  DEFAULT_CURRENCY: string;
+};
+
 export function getDefaultCurrency(): string {
   const candidate = (process.env.NEXT_PUBLIC_DEFAULT_CURRENCY || "AUD").trim().toUpperCase();
   return /^[A-Z]{3}$/.test(candidate) ? candidate : "AUD";
@@ -25,7 +37,7 @@ export function getDefaultCurrency(): string {
  * RATIONALE: Used by layout components to ensure they have the latest 
  * school identity without being tightly coupled to specific ENV keys.
  */
-export function getBranding() {
+export function getBranding(): BrandingConfig {
   return {
     PUBLIC_BRAND_NAME: process.env.NEXT_PUBLIC_BRAND_NAME || "Melbourne Guitar School",
     PRIMARY_SUBJECT: process.env.NEXT_PUBLIC_PRIMARY_SUBJECT || "Guitar",
@@ -54,12 +66,12 @@ export const POWERED_BY_PLATFORM_COPY = `Powered by ${PLATFORM_NAME}`;
 export const STUDENT_PORTAL_PLATFORM_NAME = `${PLATFORM_NAME} Student Portal`;
 
 /** Capitalized version of the primary instrument. */
-export function getSubjectLabel(): string {
-  const subject = process.env.NEXT_PUBLIC_PRIMARY_SUBJECT || PRIMARY_SUBJECT;
+export function getSubjectLabel(subjectValue?: string): string {
+  const subject = (subjectValue || getBranding().PRIMARY_SUBJECT).trim();
   return subject.charAt(0).toUpperCase() + subject.slice(1);
 }
 
 /** Primary school name. */
 export function getBrandTitle(): string {
-  return process.env.NEXT_PUBLIC_BRAND_NAME || PUBLIC_BRAND_NAME;
+  return getBranding().PUBLIC_BRAND_NAME;
 }

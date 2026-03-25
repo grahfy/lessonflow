@@ -119,8 +119,8 @@ describe.sequential("admin settings save contracts", () => {
     expect(valuesByKey.NEXT_PUBLIC_BRAND_NAME).toBe("Settings Save Test Brand");
     expect(valuesByKey.INVOICE_BUSINESS_NAME).toBe("Settings Save Test Business");
     expect(valuesByKey.NEXT_PUBLIC_CONTACT_PHONE).toBe("0412 000 111");
-    expect(valuesByKey.ADMIN_CUSTOMER_EMAIL_ALERTS_PROVIDER).toBe("gmail");
-    expect(valuesByKey.ADMIN_CUSTOMER_EMAIL_ALERTS_ENABLED).toBe("true");
+    expect(valuesByKey.ADMIN_CUSTOMER_EMAIL_ALERTS_PROVIDER).toBe("imap");
+    expect(valuesByKey.ADMIN_CUSTOMER_EMAIL_ALERTS_ENABLED).toBe("false");
     expect(valuesByKey.IMAP_HOST).toBe("imap.example.com");
     expect(valuesByKey.IMAP_USER).toBe("owner@example.com");
 
@@ -128,8 +128,8 @@ describe.sequential("admin settings save contracts", () => {
     expect(envFileContents).toContain('NEXT_PUBLIC_BRAND_NAME="Settings Save Test Brand"');
     expect(envFileContents).toContain('INVOICE_BUSINESS_NAME="Settings Save Test Business"');
     expect(envFileContents).toContain('NEXT_PUBLIC_CONTACT_PHONE="0412 000 111"');
-    expect(envFileContents).toContain('ADMIN_CUSTOMER_EMAIL_ALERTS_PROVIDER="gmail"');
-    expect(envFileContents).toContain('ADMIN_CUSTOMER_EMAIL_ALERTS_ENABLED="true"');
+    expect(envFileContents).toContain('ADMIN_CUSTOMER_EMAIL_ALERTS_PROVIDER="imap"');
+    expect(envFileContents).toContain('ADMIN_CUSTOMER_EMAIL_ALERTS_ENABLED="false"');
     expect(envFileContents).toContain('IMAP_HOST="imap.example.com"');
     expect(envFileContents).toContain('IMAP_USER="owner@example.com"');
   });

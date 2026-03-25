@@ -2,29 +2,31 @@ import type { Metadata } from "next";
 
 import { TweenLink } from "@/components/motion/tween-link";
 import { PanelLayout } from "@/components/panel-layout";
-import {
-  CONTACT_PHONE,
-  PUBLIC_BRAND_NAME,
-  getSubjectLabel
-} from "@/lib/branding";
+import { getBranding, getSubjectLabel } from "@/lib/branding";
 import { getOwnerEmail } from "@/lib/env";
 import { buildPublicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = buildPublicPageMetadata({
-  title: `Privacy Policy | ${PUBLIC_BRAND_NAME}`,
-  path: "/privacy",
-  description:
-    `Read how ${PUBLIC_BRAND_NAME} handles student, booking, and Google-connected service data when you use the website and student portal.`
-});
+export function generateMetadata(): Metadata {
+  const branding = getBranding();
+
+  return buildPublicPageMetadata({
+    title: `Privacy Policy | ${branding.PUBLIC_BRAND_NAME}`,
+    path: "/privacy",
+    description:
+      `Read how ${branding.PUBLIC_BRAND_NAME} handles student, booking, and Google-connected service data when you use the website and student portal.`
+  });
+}
 
 export default function PrivacyPage() {
   const ownerEmail = getOwnerEmail();
+  const branding = getBranding();
+  const subjectLabel = getSubjectLabel(branding.PRIMARY_SUBJECT);
 
   return (
     <PanelLayout
       kicker="Privacy"
       title="How information is collected and used."
-      lead={`This policy explains how ${PUBLIC_BRAND_NAME} collects, uses, and protects personal information when you make inquiries, request lessons, or use the student portal. It also covers limited Google-connected service data used for operational email workflows.`}
+      lead={`This policy explains how ${branding.PUBLIC_BRAND_NAME} collects, uses, and protects personal information when you make inquiries, request lessons, or use the student portal. It also covers limited Google-connected service data used for operational email workflows.`}
       visualLabel="Privacy policy"
       visualClassName="terms-hero"
       leadJustified
@@ -48,11 +50,11 @@ export default function PrivacyPage() {
       </ul>
 
       <p className="helper-text copy-justify" data-motion-item="privacy-contact-copy">
-        Privacy questions or requests can be sent to {ownerEmail} or raised by phone on {CONTACT_PHONE}. If this policy changes materially, the updated version will be published on this page.
+        Privacy questions or requests can be sent to {ownerEmail} or raised by phone on {branding.CONTACT_PHONE}. If this policy changes materially, the updated version will be published on this page.
       </p>
 
       <p className="helper-text copy-justify" data-motion-item="privacy-scope-copy">
-        This page is intended to satisfy public disclosure requirements for the website, the {getSubjectLabel().toLowerCase()} lesson student portal, and connected Google API workflows used to operate communications for the school.
+        This page is intended to satisfy public disclosure requirements for the website, the {subjectLabel.toLowerCase()} lesson student portal, and connected Google API workflows used to operate communications for the school.
       </p>
 
       <div className="button-row button-row-justify" data-motion-item="privacy-actions">

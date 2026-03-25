@@ -2,22 +2,28 @@ import type { Metadata } from "next";
 
 import { TweenLink } from "@/components/motion/tween-link";
 import { PanelLayout } from "@/components/panel-layout";
-import { PLATFORM_NAME, PUBLIC_BRAND_NAME } from "@/lib/branding";
+import { PLATFORM_NAME, getBranding } from "@/lib/branding";
 import { buildPublicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = buildPublicPageMetadata({
-  title: `Terms of Service | ${PUBLIC_BRAND_NAME}`,
-  path: "/terms-of-service",
-  description:
-    `Read the service terms for ${PUBLIC_BRAND_NAME}, including website use, student portal access, and connected Google API services.`
-});
+export function generateMetadata(): Metadata {
+  const branding = getBranding();
+
+  return buildPublicPageMetadata({
+    title: `Terms of Service | ${branding.PUBLIC_BRAND_NAME}`,
+    path: "/terms-of-service",
+    description:
+      `Read the service terms for ${branding.PUBLIC_BRAND_NAME}, including website use, student portal access, and connected Google API services.`
+  });
+}
 
 export default function TermsOfServicePage() {
+  const branding = getBranding();
+
   return (
     <PanelLayout
       kicker="Terms of Service"
       title="Conditions for using the website and student portal."
-      lead={`These terms explain the conditions for using ${PUBLIC_BRAND_NAME} online services, including the ${PLATFORM_NAME} student portal and any connected Google-enabled communication tools used by the school.`}
+      lead={`These terms explain the conditions for using ${branding.PUBLIC_BRAND_NAME} online services, including the ${PLATFORM_NAME} student portal and any connected Google-enabled communication tools used by the school.`}
       visualLabel="Terms of service"
       visualClassName="terms-hero"
       leadJustified

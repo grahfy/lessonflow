@@ -34,6 +34,9 @@ function renderStatusLabel(status: InboxProviderStatus["status"]) {
 export function CustomerEmailAlertStatus() {
   const { status, check } = useCustomerEmailAlertStatus();
   const loading = status.gmail.status === "loading" || status.imap.status === "loading";
+  const providerDescription = status.providerPreference === "auto"
+    ? "Auto (prefers Gmail, then IMAP)"
+    : status.providerPreference.toUpperCase();
 
   return (
     <AdminCard ghost className="gmail-status-card">
@@ -58,7 +61,12 @@ export function CustomerEmailAlertStatus() {
       </div>
 
       <div className="gmail-status-details">
-        <p className="helper-text">Inbox alerts are locked to <code>{status.providerPreference}</code>.</p>
+        <p className="helper-text">
+          Configured provider preference: <code>{providerDescription}</code>.
+        </p>
+        {!status.alertsEnabled ? (
+          <p className="helper-text">Owner inbox alerts are currently disabled.</p>
+        ) : null}
       </div>
 
       <div className="customer-email-provider-status-grid">
