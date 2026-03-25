@@ -1271,6 +1271,7 @@
   color: inherit;
   padding: 12px;
   cursor: pointer;
+  font-family: inherit;
 }
 
 .lesson-plan-template-list-item.is-active {
@@ -1295,6 +1296,7 @@
   background: rgba(255, 255, 255, 0.05);
   color: var(--ink-1);
   font-size: 0.75rem;
+  font-family: inherit;
   letter-spacing: 0.03em;
   text-transform: uppercase;
 }
