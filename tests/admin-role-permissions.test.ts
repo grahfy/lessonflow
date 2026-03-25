@@ -825,4 +825,43 @@ describe("admin role permissions", () => {
     );
     expect(otherResponse.status).toBe(403);
   });
+
+  it("revokes a teacher's old session after a password change", async () => {
+    await ensureOwnerAdmin();
+    const teacher = await createTeacher("teacher-password-rotate@example.com", "Teacher Password Rotate");
+    const token = createSessionToken(teacher.email);
+
+    const response = await updateStaff(
+      new NextRequest(`http://localhost/api/admin/staff/${teacher.id}`, {
+        method: "PATCH",
+        headers: authHeaders(token, true),
+        body: JSON.stringify({
+          mode: "password",
+          password: "teacher-password-rotated"
+        })
+      }),
+      { params: Promise.resolve({ id: teacher.id }) }
+    );
+    expect(response.status).toBe(200);
+
+    const updatedTeacher = await prisma.adminUser.findUniqueOrThrow({
+      where: { id: teacher.id }
+    });
+    expect(updatedTeacher.sessionInvalidBefore).not.toBeNull();
+
+    const oldTokenResponse = await listCustomers(
+      new NextRequest("http://localhost/api/admin/customers", {
+        headers: authHeaders(token)
+      })
+    );
+    expect(oldTokenResponse.status).toBe(401);
+
+    const freshToken = createSessionToken(teacher.email);
+    const freshTokenResponse = await listCustomers(
+      new NextRequest("http://localhost/api/admin/customers", {
+        headers: authHeaders(freshToken)
+      })
+    );
+    expect(freshTokenResponse.status).toBe(200);
+  });
 });

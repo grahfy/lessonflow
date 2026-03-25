@@ -81,7 +81,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       const updated = await prisma.adminUser.update({
         where: { id },
         data: {
-          passwordHash: await bcrypt.hash(parsed.data.password, 12)
+          passwordHash: await bcrypt.hash(parsed.data.password, 12),
+          sessionInvalidBefore: new Date()
         }
       });
 

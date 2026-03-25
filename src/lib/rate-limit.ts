@@ -61,7 +61,7 @@ if (!globalStore.__rateLimitStore) {
  * 
  * LOGIC:
  * 1. Check `X-Real-IP` (Set by Nginx/Caddy proxies).
- * 2. Check `X-Forwarded-For` (Taking the last hop as the most reliable).
+ * 2. Check `X-Forwarded-For` (Taking the left-most client hop).
  * 
  * @param headers - Request headers
  */
@@ -75,8 +75,8 @@ export function getRequestIpFromHeaders(headers: Headers): string {
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean);
-    const last = parts.at(-1);
-    if (last) return last;
+    const first = parts[0];
+    if (first) return first;
   }
 
   return "unknown";

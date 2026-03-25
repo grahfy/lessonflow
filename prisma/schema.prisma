@@ -304,6 +304,7 @@ model AdminUser {
   profilePhotoStorageKey    String?
   profilePhotoMimeType      String?
   isActive                  Boolean                            @default(true)
+  sessionInvalidBefore      DateTime?
   createdAt                 DateTime                           @default(now())
   updatedAt                 DateTime                           @updatedAt
   approvedRequests          BookingRequest[]                   @relation("RequestApprovals")

@@ -1369,18 +1369,17 @@ export async function saveAdminSettingsConfig(
     }
   }
 
-  if (shouldUpdateAdminPassword) {
-    vars.set("ADMIN_PASSWORD", adminPassword);
-    process.env.ADMIN_PASSWORD = adminPassword;
-  } else if (process.env.ADMIN_PASSWORD) {
-    vars.set("ADMIN_PASSWORD", process.env.ADMIN_PASSWORD);
-  }
+  // RATIONALE: Admin passwords are stored only as database hashes. Saving settings
+  // must scrub any legacy plaintext env copy rather than preserve it in .env.
+  vars.set("ADMIN_PASSWORD", "");
+  delete process.env.ADMIN_PASSWORD;
 
   await writeEnvFile(vars, managedKeys);
 
   const adminUpdate: {
     email?: string;
     passwordHash?: string;
+    sessionInvalidBefore?: Date;
   } = {};
 
   let requiresReauth = false;
@@ -1391,6 +1390,8 @@ export async function saveAdminSettingsConfig(
   }
   if (shouldUpdateAdminPassword) {
     adminUpdate.passwordHash = await bcrypt.hash(adminPassword, 12);
+    adminUpdate.sessionInvalidBefore = new Date();
+    requiresReauth = true;
   }
 
   if (Object.keys(adminUpdate).length > 0) {

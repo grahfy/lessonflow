@@ -6,7 +6,7 @@
  * 
  * SECURITY ARCHITECTURE:
  * 1. HMAC-SHA256: Tokens are signed with a server-side secret to prevent tampering.
- * 2. Stateles Sessions: Contains email and expiration (base64url encoded).
+ * 2. Stateless Sessions: Contains email, issued-at time, and expiration (base64url encoded).
  * 3. BCrypt: Passwords hashed with high cost factor (12).
  * 4. Secure Cookies: HttpOnly and Secure flags mitigate session hijacking.
  * 
@@ -54,7 +54,7 @@ function encode(data: object): string {
  * 1. Verifies the signature matches the payload via HMAC.
  * 2. Checks the `exp` timestamp against current server time.
  */
-function decode(token: string): { email: string; exp: number } | null {
+function decode(token: string): { email: string; exp: number; iat: number | null } | null {
   try {
     const [payload, signature] = token.split(".");
     if (!payload || !signature) return null;
@@ -64,12 +64,14 @@ function decode(token: string): { email: string; exp: number } | null {
     const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
       email?: unknown;
       exp?: unknown;
+      iat?: unknown;
     };
 
     if (typeof parsed.email !== "string" || typeof parsed.exp !== "number") return null;
+    const issuedAt = typeof parsed.iat === "number" ? parsed.iat : null;
     if (!parsed.exp || Date.now() > parsed.exp) return null;
 
-    return { email: parsed.email, exp: parsed.exp };
+    return { email: parsed.email, exp: parsed.exp, iat: issuedAt };
   } catch {
     return null;
   }
@@ -80,8 +82,10 @@ function decode(token: string): { email: string; exp: number } | null {
  * Expire duration is hardcoded to 7 days for a balance of UX and security.
  */
 export function createSessionToken(email: string): string {
+  const issuedAt = Date.now();
   const payload = encode({
     email,
+    iat: issuedAt,
     exp: Date.now() + 1000 * 60 * 60 * 24 * 7 // 7 days
   });
   return `${payload}.${signPayload(payload)}`;
@@ -173,13 +177,23 @@ export async function getAdminFromToken(token?: string | null): Promise<AdminUse
   if (!token) return null;
   const data = decode(token);
   if (!data) return null;
-  
-  return prisma.adminUser.findFirst({
+
+  const admin = await prisma.adminUser.findFirst({
     where: {
       email: data.email,
       isActive: true
     }
   });
+  if (!admin) return null;
+
+  if (admin.sessionInvalidBefore) {
+    const invalidBeforeMs = admin.sessionInvalidBefore.getTime();
+    if (data.iat === null || data.iat < invalidBeforeMs) {
+      return null;
+    }
+  }
+
+  return admin;
 }
 
 /**

@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import bcrypt from "bcryptjs";
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -299,6 +300,61 @@ describe.sequential("admin settings save contracts", () => {
       headerInfo: "Line 1\nLine 2",
       footerText: "Pay within 7 days."
     });
+  });
+
+  it("rotates the admin password without persisting plaintext and revokes the previous session", async () => {
+    vi.stubEnv("SYSTEMD_SERVICE_NAME", "invalid service name!");
+
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const initialResponse = await getSettings(adminRequest("http://localhost/api/admin/settings", token));
+    expect(initialResponse.status).toBe(200);
+
+    const initialBody = (await initialResponse.json()) as {
+      envVars: Array<{ key: string; currentValue: string }>;
+    };
+
+    const envPayload = Object.fromEntries(
+      initialBody.envVars.map((envVar) => [
+        envVar.key,
+        envVar.currentValue === "***SET***" ? "" : envVar.currentValue
+      ])
+    );
+
+    const newPassword = "UpdatedAdmin!234";
+    const response = await saveSettings(
+      adminRequest("http://localhost/api/admin/settings", token, {
+        method: "POST",
+        body: {
+          env: envPayload,
+          adminPassword: newPassword
+        }
+      })
+    );
+
+    expect(response.status).toBe(200);
+    const saveBody = (await response.json()) as { ok: boolean; requiresReauth?: boolean };
+    expect(saveBody.ok).toBe(true);
+    expect(saveBody.requiresReauth).toBe(true);
+    expect(response.headers.get("set-cookie") || "").toContain(`${getSessionCookieName()}=;`);
+
+    const envFileContents = await fs.readFile(envFilePath, "utf-8");
+    expect(envFileContents).toContain('ADMIN_PASSWORD=""');
+    expect(envFileContents).not.toContain(`ADMIN_PASSWORD="${newPassword}"`);
+
+    const updatedAdmin = await prisma.adminUser.findUniqueOrThrow({
+      where: { id: admin.id }
+    });
+    expect(updatedAdmin.sessionInvalidBefore).not.toBeNull();
+    await expect(bcrypt.compare(newPassword, updatedAdmin.passwordHash)).resolves.toBe(true);
+
+    const oldSessionResponse = await getSettings(adminRequest("http://localhost/api/admin/settings", token));
+    expect(oldSessionResponse.status).toBe(403);
+
+    const freshToken = createSessionToken(admin.email);
+    const freshSessionResponse = await getSettings(adminRequest("http://localhost/api/admin/settings", freshToken));
+    expect(freshSessionResponse.status).toBe(200);
   });
 
   it("creates, updates, lists, and soft-deletes presets", async () => {
