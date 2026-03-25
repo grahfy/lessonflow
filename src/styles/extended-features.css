@@ -2199,6 +2199,142 @@
   margin-top: 0;
 }
 
+@media (max-height: 1080px) {
+  .report-toolbar-card,
+  .report-controls-card,
+  .report-generated-card,
+  .report-chart-card,
+  .report-period-card {
+    gap: 10px;
+  }
+
+  .report-toolbar-card,
+  .report-controls-card {
+    padding: 12px 13px;
+  }
+
+  .report-toolbar-title,
+  .report-card-header-row h2 {
+    font-size: 0.98rem;
+  }
+
+  .reports-period-grid,
+  .reports-chart-grid,
+  .report-metric-grid {
+    gap: 12px;
+  }
+
+  .report-metric-cell {
+    padding: 8px 10px;
+  }
+
+  .invoice-dialog-body {
+    height: min(66vh, 700px);
+  }
+
+  .invoice-dialog-layout {
+    grid-template-columns: minmax(0, 1.22fr) minmax(280px, 0.78fr);
+    gap: 10px;
+  }
+
+  .invoice-dialog-section {
+    margin-bottom: 6px;
+  }
+
+  .invoice-dialog-line-items-shell {
+    gap: 10px;
+  }
+
+  .invoice-dialog-line-items {
+    gap: 1px;
+  }
+
+  .invoice-dialog-line-item {
+    grid-template-columns: minmax(0, 1.22fr) minmax(68px, 80px) minmax(88px, 108px) minmax(108px, 132px) minmax(88px, 108px) auto;
+    gap: 6px;
+    padding: 4px 8px 3px;
+  }
+
+  .invoice-dialog-line-item-fixed-quantity {
+    grid-template-columns: minmax(0, 1.48fr) minmax(100px, 124px) minmax(108px, 132px) minmax(88px, 108px) auto;
+  }
+
+  .invoice-dialog-line-item .field input,
+  .invoice-dialog-line-item .field select,
+  .invoice-dialog-preset-select {
+    padding: 7px 9px;
+  }
+
+  .invoice-dialog-status-card,
+  .invoice-dialog-source-list,
+  .invoice-dialog-preset-list {
+    gap: 6px;
+    padding: 10px;
+  }
+
+  .invoice-dialog-standalone-list {
+    gap: 8px;
+  }
+
+  .invoice-dialog-standalone-row {
+    grid-template-columns: minmax(0, 1.3fr) minmax(108px, 152px) auto;
+    gap: 6px;
+  }
+
+  .admin-manual-layout {
+    gap: 14px;
+  }
+
+  .admin-manual-panel,
+  .admin-manual-toc-panel {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .admin-manual-hero {
+    gap: 10px;
+  }
+
+  .admin-manual-article-title {
+    font-size: 1.3rem;
+  }
+
+  .admin-manual-article-abstract,
+  .admin-manual-markdown p,
+  .admin-manual-markdown ul,
+  .admin-manual-markdown ol {
+    line-height: 1.55;
+  }
+
+  .admin-manual-shot-trigger {
+    min-height: 220px;
+  }
+}
+
+@media (max-height: 900px) {
+  .invoice-dialog-body {
+    height: min(64vh, 600px);
+  }
+
+  .invoice-dialog-line-items {
+    max-height: min(28vh, 250px);
+  }
+
+  .report-toolbar-card,
+  .report-controls-card {
+    padding: 11px 12px;
+  }
+
+  .admin-manual-panel,
+  .admin-manual-toc-panel {
+    padding: 12px;
+  }
+
+  .admin-manual-shot-trigger {
+    min-height: 180px;
+  }
+}
+
 @media (max-width: 1180px) {
   .reports-period-grid {
     grid-template-columns: 1fr;

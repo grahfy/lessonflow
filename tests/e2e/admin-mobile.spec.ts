@@ -359,3 +359,118 @@ test.describe("admin intermediate-width header responsiveness", () => {
     await assertNoHorizontalOverflow(page, "/admin/teachers intermediate layout");
   });
 });
+
+test.describe("admin compact 1080p desktop density", () => {
+  test.use({ viewport: { width: 1920, height: 1080 } });
+
+  test("admin routes and major dialogs stay compact and within 1080p viewport", async ({ page }) => {
+    await loginAdmin(page, adminEmail, adminPassword);
+
+    const routes: Array<{ path: string; heading: RegExp }> = [
+      { path: "/admin/bookings", heading: /bookings/i },
+      { path: "/admin/customers", heading: /customers/i },
+      { path: "/admin/invoices", heading: /invoices/i },
+      { path: "/admin/reports", heading: /reports console/i },
+      { path: "/admin/settings", heading: /admin configuration/i },
+      { path: "/admin/teachers", heading: /teachers/i },
+      { path: "/admin/manual", heading: /manual/i }
+    ];
+
+    for (const route of routes) {
+      await page.goto(route.path, { waitUntil: "domcontentloaded" });
+      await page.getByRole("heading", { name: route.heading }).first().waitFor({ timeout: 12_000 });
+      await closeBlockingAdminDialogs(page);
+      await assertNoHorizontalOverflow(page, `${route.path} compact desktop`);
+
+      const shell = page.locator(".admin-shell").first();
+      await expect(shell).toBeVisible();
+
+      const shellBox = await shell.boundingBox();
+      expect(shellBox, `${route.path} shell should expose a bounding box.`).not.toBeNull();
+      if (shellBox) {
+        expect(shellBox.y, `${route.path} shell should remain anchored at the top of the 1080p viewport.`).toBeGreaterThanOrEqual(0);
+
+        if (!["/admin/reports", "/admin/manual"].includes(route.path)) {
+          expect(shellBox.height, `${route.path} shell should fit inside 1080p viewport.`).toBeLessThanOrEqual(1080);
+        }
+      }
+
+      const header = page.locator(".admin-header-row").first();
+      await expect(header).toBeVisible();
+      const headerBox = await header.boundingBox();
+      expect(headerBox, `${route.path} header should expose a bounding box.`).not.toBeNull();
+      if (headerBox) {
+        expect(headerBox.y + headerBox.height, `${route.path} header should remain within the initial 1080p viewport.`).toBeLessThanOrEqual(360);
+      }
+    }
+
+    await page.goto("/admin/bookings", { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle");
+    await closeBlockingAdminDialogs(page);
+    const bookingsToolbar = page.locator(".admin-range-card").first();
+    await expect(bookingsToolbar).toBeVisible();
+    const bookingsToolbarBox = await bookingsToolbar.boundingBox();
+    expect(bookingsToolbarBox, "Bookings toolbar should have a bounding box on compact desktop.").not.toBeNull();
+    if (bookingsToolbarBox) {
+      expect(bookingsToolbarBox.y + bookingsToolbarBox.height, "Bookings toolbar should remain near the top of the viewport at 1080p.").toBeLessThanOrEqual(440);
+    }
+
+    await page.getByRole("button", { name: /add manual booking/i }).click();
+    const manualDialog = page.locator(".dialog-panel").filter({ has: page.getByRole("heading", { name: /add manual booking/i }) }).first();
+    await expect(manualDialog).toBeVisible();
+    await assertDialogFitsViewport(page, manualDialog, "Manual booking compact desktop");
+    await assertNoDialogContentOverflow(page, manualDialog, "Manual booking compact desktop");
+    await page.keyboard.press("Escape");
+
+    await page.goto("/admin/customers", { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle");
+    await closeBlockingAdminDialogs(page);
+    await page.getByRole("button", { name: /create new customer/i }).first().click();
+    const customerDialog = page.locator(".dialog-panel").filter({ has: page.getByRole("heading", { name: /customer details/i }) }).first();
+    await expect(customerDialog).toBeVisible();
+    await assertDialogFitsViewport(page, customerDialog, "Customer create compact desktop");
+    await assertNoDialogContentOverflow(page, customerDialog, "Customer create compact desktop");
+    await page.keyboard.press("Escape");
+
+    await page.goto("/admin/invoices", { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle");
+    await closeBlockingAdminDialogs(page);
+    await page.getByRole("button", { name: /create invoice/i }).first().click();
+    const invoiceDialog = page.locator(".dialog-panel").filter({ has: page.getByRole("heading", { name: /new invoice/i }) }).first();
+    await expect(invoiceDialog).toBeVisible();
+    await assertDialogFitsViewport(page, invoiceDialog, "Invoice create compact desktop");
+    await assertNoDialogContentOverflow(page, invoiceDialog, "Invoice create compact desktop");
+
+    const invoiceBody = page.locator(".invoice-dialog-body").first();
+    await expect(invoiceBody).toBeVisible();
+    const invoiceBodyMetrics = await invoiceBody.evaluate((node) => ({
+      clientHeight: node.clientHeight,
+      scrollHeight: node.scrollHeight
+    }));
+    expect(
+      invoiceBodyMetrics.clientHeight,
+      "Invoice dialog body should use a compact bounded scroll region on 1080p."
+    ).toBeLessThanOrEqual(760);
+    expect(
+      invoiceBodyMetrics.scrollHeight,
+      "Invoice dialog body should still allow scrolling when content exceeds the compact height."
+    ).toBeGreaterThanOrEqual(invoiceBodyMetrics.clientHeight);
+    await page.keyboard.press("Escape");
+
+    await page.goto("/admin/teachers", { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle");
+    await closeBlockingAdminDialogs(page);
+    const teacherHero = page.locator(".teacher-workspace-hero").first();
+    const teacherFooter = page.locator(".teacher-profile-footer").first();
+    await expect(teacherHero).toBeVisible();
+    await expect(teacherFooter).toBeVisible();
+    const heroBox = await teacherHero.boundingBox();
+    const footerBox = await teacherFooter.boundingBox();
+    expect(heroBox, "Teacher hero should have a bounding box at 1080p.").not.toBeNull();
+    expect(footerBox, "Teacher footer should have a bounding box at 1080p.").not.toBeNull();
+    if (heroBox && footerBox) {
+      expect(heroBox.height, "Teacher hero should stay compact at 1080p.").toBeLessThanOrEqual(240);
+      expect(footerBox.height, "Teacher footer should stay compact at 1080p.").toBeLessThanOrEqual(120);
+    }
+  });
+});

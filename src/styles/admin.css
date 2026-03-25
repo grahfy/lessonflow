@@ -727,6 +727,29 @@
   --line: rgba(148, 163, 184, 0.18);
   --panel: rgba(15, 23, 42, 0.78);
   --panel-strong: rgba(15, 23, 42, 0.92);
+  --admin-density-shell-padding: 16px;
+  --admin-density-shell-gap: 12px;
+  --admin-density-shell-radius: 24px;
+  --admin-density-card-padding: 16px;
+  --admin-density-card-radius: 18px;
+  --admin-density-toolbar-padding-block: 12px;
+  --admin-density-toolbar-padding-inline: 14px;
+  --admin-density-control-height: 36px;
+  --admin-density-control-radius: 14px;
+  --admin-density-control-padding-block: 7px;
+  --admin-density-control-padding-inline: 12px;
+  --admin-density-dialog-padding: 14px;
+  --admin-density-dialog-radius: 20px;
+  --admin-density-dialog-gap: 10px;
+  --admin-density-dialog-head-gap: 12px;
+  --admin-density-status-padding-block: 8px;
+  --admin-density-status-padding-inline: 10px;
+  --admin-density-table-row-padding-block: 10px;
+  --admin-density-table-row-padding-inline: 14px;
+  --admin-density-table-head-padding-block: 11px;
+  --admin-density-table-head-padding-inline: 14px;
+  --admin-density-pagination-padding-block: 12px;
+  --admin-density-pagination-padding-inline: 14px;
   --admin-shell-border: rgba(96, 165, 250, 0.16);
   --admin-shell-bg:
     radial-gradient(circle at 10% 12%, rgba(59, 130, 246, 0.14), transparent 34%),
@@ -756,14 +779,14 @@
   max-height: 100dvh;
   width: min(1500px, 100%);
   margin: 0 auto;
-  padding: 16px;
+  padding: var(--admin-density-shell-padding);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto minmax(0, 1fr) auto;
-  gap: 12px;
+  gap: var(--admin-density-shell-gap);
   overflow: hidden;
   border: 1px solid var(--admin-shell-border);
-  border-radius: 24px;
+  border-radius: var(--admin-density-shell-radius);
   background: var(--admin-shell-bg);
   box-shadow: var(--admin-shell-shadow);
   font-family: "Overpass", "Segoe UI", Tahoma, sans-serif;
@@ -950,11 +973,11 @@
 
 .admin-card {
   border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 18px;
+  border-radius: var(--admin-density-card-radius);
   background:
     linear-gradient(165deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.82)),
     radial-gradient(180% 160% at 0% 0%, rgba(59, 130, 246, 0.05), transparent 48%);
-  padding: 16px;
+  padding: var(--admin-density-card-padding);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.04),
     0 12px 28px rgba(2, 8, 23, 0.2);
@@ -966,7 +989,7 @@
 }
 
 .admin-toolbar-card {
-  padding: 12px 14px;
+  padding: var(--admin-density-toolbar-padding-block) var(--admin-density-toolbar-padding-inline);
   gap: 10px;
 }
 
@@ -991,9 +1014,9 @@
 }
 
 .admin-shell .btn {
-  min-height: 36px;
-  padding: 7px 12px;
-  border-radius: 14px;
+  min-height: var(--admin-density-control-height);
+  padding: var(--admin-density-control-padding-block) var(--admin-density-control-padding-inline);
+  border-radius: var(--admin-density-control-radius);
   font-size: 0.82rem;
   letter-spacing: 0.03em;
   font-family: inherit;
@@ -2351,13 +2374,13 @@
     "overview toolbar"
     "nav nav";
   align-items: start;
-  gap: 16px 18px;
+  gap: 14px 16px;
 }
 
 .admin-header-overview {
   grid-area: overview;
   display: grid;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -2439,9 +2462,9 @@
 .admin-header-nav-sections {
   grid-area: nav;
   display: grid;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
-  padding-top: 14px;
+  padding-top: 12px;
   border-top: 1px solid rgba(148, 163, 184, 0.12);
 }
 
@@ -3892,13 +3915,13 @@
   display: flex;
   flex-direction: column;
   font-family: "Overpass", "Segoe UI", Tahoma, sans-serif;
-  border-radius: 20px;
+  border-radius: var(--admin-density-dialog-radius);
   border: 1px solid rgba(148, 163, 184, 0.18);
   background:
     linear-gradient(168deg, rgba(15, 23, 42, 0.985), rgba(15, 23, 42, 0.95)),
     radial-gradient(150% 150% at 0% 0%, rgba(59, 130, 246, 0.06), transparent 50%);
   box-shadow: 0 24px 64px rgba(2, 8, 23, 0.4);
-  padding: 14px;
+  padding: var(--admin-density-dialog-padding);
 }
 
 .admin-shell .dialog-panel {
@@ -3993,14 +4016,14 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: var(--admin-density-dialog-gap);
+  margin-bottom: var(--admin-density-dialog-head-gap);
   flex-shrink: 0;
 }
 
 .dialog-head-copy {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -4017,7 +4040,7 @@
 
 .dialog-form {
   display: grid;
-  gap: 10px;
+  gap: var(--admin-density-dialog-gap);
   min-height: 0;
 }
 
@@ -4033,7 +4056,7 @@
   border: 1px solid rgba(148, 163, 184, 0.16);
   background: rgba(30, 41, 59, 0.58);
   border-radius: 12px;
-  padding: 8px 10px;
+  padding: var(--admin-density-status-padding-block) var(--admin-density-status-padding-inline);
   flex-shrink: 0;
 }
 
@@ -4043,7 +4066,7 @@
 
 .dialog-layout {
   display: grid;
-  gap: 10px;
+  gap: var(--admin-density-dialog-gap);
   grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
 }
 
@@ -5051,7 +5074,7 @@
 .admin-table-header-row {
   display: flex;
   align-items: center;
-  padding: 11px 14px;
+  padding: var(--admin-density-table-head-padding-block) var(--admin-density-table-head-padding-inline);
   gap: 10px;
   width: 100%;
   border: 0;
@@ -5191,7 +5214,7 @@
 .invoice-table-row {
   display: flex;
   align-items: center;
-  padding: 10px 14px;
+  padding: var(--admin-density-table-row-padding-block) var(--admin-density-table-row-padding-inline);
   gap: 10px;
   cursor: pointer;
   width: 100%;
@@ -5302,7 +5325,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
+  padding: var(--admin-density-pagination-padding-block) var(--admin-density-pagination-padding-inline);
   border-top: 1px solid var(--line);
   background: rgba(15, 23, 42, 0.72);
   font-size: 0.8rem;
@@ -5737,6 +5760,313 @@
 
 .material-upload-form {
   margin-top: 10px;
+}
+
+@media (max-height: 1080px) {
+  .admin-shell {
+    --admin-density-shell-padding: 12px;
+    --admin-density-shell-gap: 10px;
+    --admin-density-shell-radius: 20px;
+    --admin-density-card-padding: 13px;
+    --admin-density-card-radius: 16px;
+    --admin-density-toolbar-padding-block: 10px;
+    --admin-density-toolbar-padding-inline: 12px;
+    --admin-density-control-height: 34px;
+    --admin-density-control-radius: 12px;
+    --admin-density-control-padding-block: 6px;
+    --admin-density-control-padding-inline: 10px;
+    --admin-density-dialog-padding: 12px;
+    --admin-density-dialog-radius: 18px;
+    --admin-density-dialog-gap: 8px;
+    --admin-density-dialog-head-gap: 10px;
+    --admin-density-status-padding-block: 7px;
+    --admin-density-status-padding-inline: 9px;
+    --admin-density-table-row-padding-block: 8px;
+    --admin-density-table-row-padding-inline: 12px;
+    --admin-density-table-head-padding-block: 9px;
+    --admin-density-table-head-padding-inline: 12px;
+    --admin-density-pagination-padding-block: 10px;
+    --admin-density-pagination-padding-inline: 12px;
+  }
+
+  .admin-actions-bar,
+  .admin-toolbar-filters,
+  .search-box,
+  .admin-workspace-panel,
+  .admin-workspace-head,
+  .admin-workspace-actions,
+  .admin-workspace-stats,
+  .customers-toolbar,
+  .pagination-controls {
+    gap: 8px;
+  }
+
+  .search-box input,
+  .search-box select,
+  .admin-search-inline-row select,
+  .admin-sort-inline-row select {
+    min-height: 34px;
+    padding: 7px 10px;
+    border-radius: 10px;
+  }
+
+  .admin-workspace-title {
+    font-size: clamp(1rem, 1.35vw, 1.18rem);
+  }
+
+  .admin-workspace-summary,
+  .admin-console-subtitle {
+    font-size: 0.82rem;
+    line-height: 1.45;
+  }
+
+  .admin-workspace-chip,
+  .admin-header-session-name,
+  .admin-header-session-role,
+  .teacher-unsaved-pill {
+    min-height: 24px;
+    padding-inline: 8px;
+    font-size: 0.68rem;
+  }
+
+  .admin-workspace-stat {
+    padding: 8px 10px;
+    border-radius: 12px;
+  }
+
+  .admin-workspace-stat strong {
+    font-size: 0.96rem;
+  }
+
+  .admin-console-title {
+    font-size: clamp(1.12rem, 1.65vw, 1.42rem);
+  }
+
+  .admin-header-row {
+    gap: 12px 14px;
+  }
+
+  .admin-header-nav-primary,
+  .admin-header-quick-actions,
+  .admin-workspace-chip-row,
+  .teacher-workspace-chips {
+    gap: 6px;
+  }
+
+  .admin-header-nav-sections {
+    padding-top: 10px;
+  }
+
+  .admin-build-info-footer {
+    padding: 8px 12px;
+    border-radius: 14px;
+  }
+
+  .customer-email-alert-toast {
+    right: 18px;
+    bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    gap: 10px;
+  }
+
+  .dialog-backdrop {
+    padding: 10px;
+  }
+
+  .dialog-panel {
+    width: min(860px, calc(100vw - 28px));
+    max-height: min(86vh, 860px);
+  }
+
+  .dialog-panel-wide,
+  .booking-dialog-panel,
+  #customer-dialog,
+  #booking-detail-dialog {
+    width: min(1320px, calc(100vw - 24px));
+    max-height: min(91vh, 940px);
+  }
+
+  #customer-dialog,
+  #booking-detail-dialog {
+    --admin-communication-shell-height: min(60vh, 620px);
+  }
+
+  #booking-detail-dialog {
+    --booking-detail-dialog-height: min(91vh, 940px);
+  }
+
+  .booking-dialog-scroll {
+    max-height: min(62vh, 640px);
+  }
+
+  .dialog-head h3 {
+    font-size: 1rem;
+  }
+
+  .dialog-col {
+    gap: 6px;
+    border-radius: 12px;
+    padding: 10px;
+  }
+
+  .admin-table-card {
+    border-radius: 16px;
+  }
+
+  .admin-list-col {
+    font-size: 0.66rem;
+  }
+
+  .admin-list-cell.admin-list-col-status,
+  .admin-list-cell.admin-list-col-total,
+  .admin-list-cell.admin-list-col-due {
+    font-size: 0.84rem;
+  }
+
+  .admin-list-subtext {
+    font-size: 0.69rem;
+  }
+
+  .admin-list-action-btn {
+    min-height: 28px;
+    padding: 4px 8px;
+    font-size: 0.64rem;
+  }
+
+  .pagination-container {
+    font-size: 0.76rem;
+  }
+
+  .teacher-directory-card {
+    gap: 10px;
+    max-height: min(76vh, 820px);
+  }
+
+  .teacher-profile-card {
+    gap: 12px;
+    min-height: min(76vh, 820px);
+    max-height: min(76vh, 820px);
+  }
+
+  .teacher-directory-header h2 {
+    font-size: clamp(1.08rem, 1.35vw, 1.28rem);
+  }
+
+  .teacher-directory-copy,
+  .teacher-workspace-copy,
+  .teacher-editor-section-head p,
+  .teacher-profile-footer-copy {
+    font-size: 0.74rem;
+  }
+
+  .teacher-directory-metric-card,
+  .teacher-hero-stat,
+  .teacher-editor-feature-card,
+  .teacher-security-card,
+  .teacher-address-lookup-card,
+  .teacher-editor-section,
+  .teacher-workspace-hero {
+    border-radius: 14px;
+  }
+
+  .teacher-directory-metric-card,
+  .teacher-hero-stat {
+    padding: 8px 10px;
+  }
+
+  .teacher-workspace-hero {
+    gap: 12px;
+    padding: 13px;
+  }
+
+  .teacher-workspace-hero-main {
+    gap: 12px;
+  }
+
+  .teacher-workspace-avatar {
+    width: 82px;
+    height: 82px;
+    border-radius: 20px;
+  }
+
+  .teacher-workspace-avatar span {
+    font-size: 1.12rem;
+  }
+
+  .teacher-workspace-title-group h2 {
+    font-size: clamp(1.2rem, 1.55vw, 1.5rem);
+  }
+
+  .teacher-tab-bar {
+    padding: 8px 10px;
+    border-radius: 16px;
+  }
+
+  .teacher-tab-bar-list .btn {
+    min-width: 112px;
+  }
+
+  .teacher-editor-section {
+    gap: 12px;
+    padding: 13px;
+  }
+
+  .teacher-profile-footer {
+    padding: 10px 10px 8px;
+    border-radius: 14px;
+  }
+}
+
+@media (max-height: 900px) {
+  .admin-shell {
+    --admin-density-shell-padding: 10px;
+    --admin-density-shell-gap: 8px;
+    --admin-density-shell-radius: 18px;
+    --admin-density-card-padding: 12px;
+    --admin-density-toolbar-padding-block: 9px;
+    --admin-density-toolbar-padding-inline: 11px;
+    --admin-density-control-height: 32px;
+    --admin-density-dialog-padding: 10px;
+    --admin-density-dialog-radius: 16px;
+    --admin-density-table-row-padding-block: 7px;
+    --admin-density-table-row-padding-inline: 10px;
+    --admin-density-table-head-padding-block: 8px;
+    --admin-density-table-head-padding-inline: 10px;
+    --admin-density-pagination-padding-block: 8px;
+    --admin-density-pagination-padding-inline: 10px;
+  }
+
+  .dialog-panel {
+    max-height: min(88vh, 760px);
+  }
+
+  .dialog-panel-wide,
+  .booking-dialog-panel,
+  #customer-dialog,
+  #booking-detail-dialog {
+    max-height: min(92vh, 820px);
+  }
+
+  #customer-dialog,
+  #booking-detail-dialog {
+    --admin-communication-shell-height: min(56vh, 520px);
+  }
+
+  #booking-detail-dialog {
+    --booking-detail-dialog-height: min(92vh, 820px);
+  }
+
+  .booking-dialog-scroll {
+    max-height: min(58vh, 540px);
+  }
+
+  .teacher-directory-card {
+    max-height: min(74vh, 720px);
+  }
+
+  .teacher-profile-card {
+    min-height: min(74vh, 720px);
+    max-height: min(74vh, 720px);
+  }
 }
 
 @media (max-width: 960px) {
