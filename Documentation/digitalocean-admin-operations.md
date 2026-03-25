@@ -79,7 +79,7 @@ For an already-installed system, the standard update path is:
 
 This is the preferred routine path for ordinary code or configuration updates.
 
-For the current DigitalOcean 2GB droplet profile, the deploy/update scripts now auto-raise build-time Node heap headroom during updates. This affects the deployment build only and does not change the runtime systemd service memory cap.
+For the current DigitalOcean 2GB droplet profile, the deploy/update scripts now keep the low-memory build path but raise the build heap cap and temporary swap target during updates. This affects the deployment build only and does not change the runtime systemd service memory cap.
 
 ### Release 1.2.0 Upgrade Checks
 
