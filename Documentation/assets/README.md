@@ -43,4 +43,5 @@ Recapture screenshots whenever:
 - major labels/buttons change,
 - modal layouts are redesigned,
 - manual steps are updated,
-- logs/settings/manual structure changes enough that the current image no longer matches the documented workflow.
+- logs/settings/manual structure changes enough that the current image no longer matches the documented workflow,
+- customer email alert or settings sub-tab behaviour changes in a way the current images would misrepresent.

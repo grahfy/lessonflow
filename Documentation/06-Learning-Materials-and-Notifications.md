@@ -1,6 +1,6 @@
 # Learning Materials and Notifications
 
-You use learning materials and manual notifications as your primary tools for supporting students directly from LessonFlow. These tools allow you to send reminders, custom messages, and practice resources without leaving your administrative workflow.
+Learning materials and staff-initiated notifications are the primary student-facing support tools exposed from operational screens in LessonFlow. They allow reminders, custom messages, and practice resources to be handled without leaving the administrative workflow.
 
 <div class="manual-callout info">
 <strong>Scope note:</strong> This chapter concerns manual communication and material handling initiated by staff. Automated template editing is documented separately in [Settings and Configuration](08-Settings-and-Configuration.md).
@@ -8,63 +8,63 @@ You use learning materials and manual notifications as your primary tools for su
 
 ## Notification Types
 
-You'll find two main types of manual notifications in your booking and request workflows:
+Booking and request workflows expose two main staff-initiated notification types:
 
 | Notification type | Intended use |
 | --- | --- |
-| Reminder email | Send a standard follow-up for a specific lesson or request time |
-| Custom email | Write your own message for special arrangements or clarifications |
+| Reminder email | Standard follow-up related to a lesson or request time |
+| Custom email | Staff-authored communication for special arrangements or clarification |
 
-Use custom emails when you need to communicate something that doesn't fit the standard reminder format.
+Custom email is appropriate where the message cannot be expressed through the standard reminder path.
 
 ## Notification Preconditions
 
-Before you send a manual notification, perform these checks:
+Before a manual notification is sent, the following checks should be made:
 
-1. Open the correct booking or request
-2. Verify the recipient address
-3. Review the subject and message for clarity
-4. Complete the CAPTCHA challenge
+1. the correct booking or request is open
+2. the recipient address is correct
+3. the subject and message are clear
+4. the CAPTCHA challenge has been completed
 
-Following these steps helps you avoid sending misdirected or incomplete messages.
+These checks reduce the chance of misdirected or incomplete communication.
 
 ## Communication History and Sync
 
-Your communication history helps you answer common support questions, such as:
+Communication history is intended to answer routine support questions such as:
 
-- what you sent to your student
-- when you sent the message
-- whether your message started in LessonFlow or came through Gmail sync
-- whether your message reached your student successfully
+- what was sent
+- when it was sent
+- whether the item originated in LessonFlow or through provider-backed history refresh
+- whether the send succeeded or failed
 
-If you see a <code>Sync Now</code> control, use it to pull your recent activity from your email provider into the history view.
+Where a <code>Refresh History</code> control is available, it may be used to import recent provider-side activity into the visible history.
 
 ![Booking email panel](assets/booking-email-panel.png)
 
 ## Learning Materials
 
-You can manage learning materials in two ways:
+LessonFlow supports learning materials in two broad modes:
 
 | Material mode | Description |
 | --- | --- |
-| Booking-linked material | Attach a file to a specific lesson |
-| Unassigned material | Provide a general resource for your student's overall practice |
+| Booking-linked material | A file associated with a specific lesson |
+| Unassigned material | A general resource available across the student’s wider practice context |
 
-You can upload PDFs, images, audio files, and other teaching assets through the upload flow.
+Supported resources may include PDFs, images, audio files, and other teaching assets accepted by the upload flow.
 
 ## Upload and Deletion
 
-To upload a file, follow these steps:
+The upload workflow typically involves:
 
-1. Select a booking (optional)
-2. Choose your file
-3. Enter a description (optional)
-4. Complete the CAPTCHA
-5. Confirm the upload
+1. optional booking selection
+2. file selection
+3. optional description entry
+4. CAPTCHA completion
+5. upload confirmation
 
 ![Customer materials upload panel](assets/customer-materials-list-upload-panel.png)
 
-Delete materials only when you want them to disappear from your student's view permanently.
+Deletion is permanent and should only be used when the material should no longer remain visible to the student.
 
 <div class="manual-callout warning">
 <strong>Deletion note:</strong> Removing a material is not a reversible hide action. It should be treated as permanent removal from the student-facing record.
@@ -72,19 +72,19 @@ Delete materials only when you want them to disappear from your student's view p
 
 ## Student Experience
 
-Your students access their materials through the portal. They'll see some items linked to specific lessons, while others appear as general resources.
+Students encounter materials through the portal. Some items appear with a specific past or upcoming lesson, while others appear as general resources unconnected to a single booking.
 
 ![Student portal materials view](assets/student-portal-materials-view.png)
 
-If your student reports a missing file, check these factors:
+When a student reports that a file is missing, the following factors should be checked:
 
-1. Confirm the upload finished successfully
-2. Verify if the file is linked to a booking or left unassigned
-3. Ensure the correct student record is being reviewed
+- whether the upload completed successfully
+- whether the file was linked to the intended booking or left unassigned
+- whether the correct student record is being reviewed
 
 ## Normal States
 
-You might encounter these states during normal operation; they don't usually indicate an error:
+The following states can be valid and do not necessarily indicate failure:
 
 - <code>No materials found for this selection</code>
 - <code>No materials yet</code>

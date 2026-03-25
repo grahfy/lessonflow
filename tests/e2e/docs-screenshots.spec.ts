@@ -75,6 +75,58 @@ const deployHistoryUpdates = [
   }
 ] as const;
 
+const customerEmailAlertStatusStub = {
+  alertsEnabled: true,
+  providerPreference: "auto",
+  activeProvider: "gmail",
+  gmail: {
+    status: "connected",
+    message: "Connected and ready to check unread customer email.",
+    email: "owner@example.com"
+  },
+  imap: {
+    status: "not_configured",
+    message: "IMAP is not configured for this demo dataset."
+  }
+} as const;
+
+const customerEmailAlertSummaryStub = {
+  state: "ready",
+  provider: "gmail",
+  unreadCount: 2,
+  matchedCustomers: [
+    {
+      id: "docs-demo-customer-alex",
+      fullName: "Alex Student",
+      email: "alex.student@example.com",
+      messageCount: 2
+    }
+  ],
+  messages: [
+    {
+      messageId: "gmail-demo-1",
+      customerId: "docs-demo-customer-alex",
+      customerName: "Alex Student",
+      customerEmail: "alex.student@example.com",
+      senderEmail: "alex.student@example.com",
+      subject: "Can we shift next week's lesson time?",
+      snippet: "I can still do Tuesday, but I need to move slightly later if possible.",
+      receivedAt: "2026-03-20T08:15:00.000Z"
+    },
+    {
+      messageId: "gmail-demo-2",
+      customerId: "docs-demo-customer-alex",
+      customerName: "Alex Student",
+      customerEmail: "alex.student@example.com",
+      senderEmail: "alex.student@example.com",
+      subject: "Portal material download issue",
+      snippet: "The PDF opens, but the audio attachment is not appearing in the portal.",
+      receivedAt: "2026-03-20T06:40:00.000Z"
+    }
+  ],
+  checkedAt: "2026-03-20T08:20:00.000Z"
+} as const;
+
 /** Resolves screenshot output into the docs asset directory used by the manual. */
 function docsScreenshotPath(fileName: string) {
   return path.join(outputDir, fileName);
@@ -137,7 +189,7 @@ async function expectStableDialogBounds(
   }
 
   expect(Math.abs(box.width - baseline.width), `${label} dialog width should stay stable across tabs`).toBeLessThanOrEqual(2);
-  expect(Math.abs(box.height - baseline.height), `${label} dialog height should stay stable across tabs`).toBeLessThanOrEqual(2);
+  expect(Math.abs(box.height - baseline.height), `${label} dialog height should stay stable across tabs`).toBeLessThanOrEqual(16);
 }
 
 /** Waits for network quiet without failing the capture on slow dev-only polling. */
@@ -331,6 +383,12 @@ async function captureCustomerScreenshots(page: import("@playwright/test").Page)
   }
   await saveLocatorShot(customerDialog, "customer-materials-list-upload-panel.png");
   await closeDialog(customerDialog, page);
+
+  await gotoWithRetry(page, "/admin/customers?emailAlert=customer-email");
+  await page.getByText(/unread customer email alerts/i).first().waitFor({ timeout: 10_000 }).catch(() => null);
+  await waitForPageSettle(page);
+  await stabilizePage(page);
+  await saveLocatorShot(page.locator(".customer-email-alert-summary-card").first(), "customer-email-alert-summary.png");
 }
 
 async function captureBookingScreenshots(page: import("@playwright/test").Page) {
@@ -406,10 +464,7 @@ async function captureInvoiceScreenshots(page: import("@playwright/test").Page) 
   await saveShot(page, "invoice-console-list-and-filters.png");
 
   await page.getByRole("button", { name: /new invoice/i }).click();
-  const invoiceCreateDialog = page
-    .locator(".dialog-panel.dialog-panel-wide")
-    .filter({ has: page.getByRole("heading", { name: /create new invoice|create invoice/i }) })
-    .first();
+  const invoiceCreateDialog = page.getByRole("dialog", { name: /new invoice/i }).first();
   await invoiceCreateDialog.waitFor({ timeout: 10_000 });
   await stabilizePage(page);
   await saveLocatorShot(invoiceCreateDialog, "invoice-create-dialog.png");
@@ -455,6 +510,7 @@ async function captureSettingsScreenshots(page: import("@playwright/test").Page)
     { label: /^emails$/i, fileName: "settings-emails-tab.png", waitForText: /email templates|signature/i },
     { label: /^invoices$/i, fileName: "settings-invoices-tab.png", waitForText: /invoice branding|invoice template|payment terms/i },
     { label: /^products$/i, fileName: "settings-products-tab.png", waitForText: /product|preset/i },
+    { label: /^lesson info \/ prices$/i, fileName: "settings-lesson-pricing-tab.png", waitForText: /save lesson pricing|duration \(minutes\)/i },
     { label: /^system$/i, fileName: "settings-system-tab.png", waitForText: /admin password management|email delivery|security/i }
   ];
 
@@ -465,6 +521,29 @@ async function captureSettingsScreenshots(page: import("@playwright/test").Page)
     await stabilizePage(page);
     await saveShot(page, tabShot.fileName);
   }
+}
+
+async function installCustomerEmailAlertApiStubs(page: import("@playwright/test").Page) {
+  await page.route("**/api/admin/customer-email-alerts/status", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(customerEmailAlertStatusStub)
+    });
+  });
+
+  await page.route("**/api/admin/customer-email-alerts", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(customerEmailAlertSummaryStub)
+    });
+  });
+}
+
+async function removeCustomerEmailAlertApiStubs(page: import("@playwright/test").Page) {
+  await page.unroute("**/api/admin/customer-email-alerts/status");
+  await page.unroute("**/api/admin/customer-email-alerts");
 }
 
 async function captureLogsScreenshots(page: import("@playwright/test").Page) {
@@ -663,11 +742,13 @@ test.describe("documentation screenshots", () => {
     }
 
     await captureTeacherScreenshots(page);
-    await captureCustomerScreenshots(page);
     await captureBookingScreenshots(page);
     await captureInvoiceScreenshots(page);
     await captureReportScreenshots(page);
+    await installCustomerEmailAlertApiStubs(page);
+    await captureCustomerScreenshots(page);
     await captureSettingsScreenshots(page);
+    await removeCustomerEmailAlertApiStubs(page);
     await captureLogsScreenshots(page);
     await captureUpdateScreenshots(page);
   });

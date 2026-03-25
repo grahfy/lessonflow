@@ -54,7 +54,19 @@ The screenshot pipeline keeps the manual visually aligned with the current UI.
    ```bash
    npm run docs:screenshots:sync
    ```
+4. Validate registry and asset parity:
+   ```bash
+   npm run docs:screenshots:validate
+   ```
 
 ## Update Discipline
 
 If a workflow changes, the relevant manual chapter should change in the same delivery cycle. If the UI changes materially, the corresponding screenshots should be refreshed so the reference remains trustworthy in both repository and in-app form.
+
+Particular attention is required when changes affect:
+
+- booking-to-invoice behaviour
+- customer communication history or inbox-backed alerts
+- report chart interpretation
+- settings-tab structure or live policy controls
+- public intake policy, privacy, or portal-linked disclosures

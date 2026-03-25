@@ -53,11 +53,32 @@ The editor should be used only when the operator is comfortable editing structur
 
 ## Emails Tab
 
-The Emails tab controls the wording of automated email templates. Each template includes a subject field and an HTML body field.
+The Emails tab combines delivery policy, the shared outbound signature, and the wording of automated email templates.
+
+It includes:
+
+- notification delivery controls for automated categories
+- automatic invoice-reminder timing controls
+- a shared outbound email signature and optional dedicated signature logo
+- automated email templates with subject and HTML body fields
 
 Placeholder tokens required for dynamic content should be preserved unless the technical meaning of the template is fully understood.
 
 ![Settings emails tab](assets/settings-emails-tab.png)
+
+### Notification Delivery Controls
+
+Notification delivery controls are intended for category-level suppression or recovery of automated mail without changing environment configuration.
+
+The operator can:
+
+- disable automated/system-triggered mail globally
+- disable automatic invoice reminders while keeping manual reminders available
+- toggle individual categories such as contact alerts, booking-request alerts, customer booking updates, daily digests, and scheduled reports
+
+### Email Signature
+
+The signature editor controls the shared footer used across outbound mail. It also supports a dedicated email-signature logo that falls back to the normal branding logo when no custom signature image exists.
 
 ## Invoices Tab
 
@@ -92,10 +113,26 @@ The Products tab stores reusable billing presets. Each preset typically contains
 - label
 - price
 - default description
+- optional reusable discount configuration
 
 Presets are intended to make common invoice creation faster and more consistent across repeated products or lesson packages.
 
 ![Settings products tab](assets/settings-products-tab.png)
+
+## Lesson Info / Prices Tab
+
+The Lesson Info / Prices tab defines the lesson durations and prices used by admin booking and invoice workflows.
+
+Each row stores:
+
+- duration in minutes
+- price
+- active or inactive state
+- row ordering for display
+
+Inactive rows remain stored but are hidden from active booking and invoicing choices. This tab should therefore be treated as the operational catalogue for billable lesson lengths rather than as a temporary scratchpad.
+
+![Settings lesson pricing tab](assets/settings-lesson-pricing-tab.png)
 
 ## System Tab
 
@@ -120,7 +157,7 @@ Presets are intended to make common invoice creation faster and more consistent 
 
 ### Email Delivery
 
-The System tab supports both Gmail API and SMTP delivery paths.
+The System tab supports Gmail API, IMAP-backed inbox monitoring, and SMTP delivery paths.
 
 | Field | Operational meaning |
 | --- | --- |
@@ -128,13 +165,25 @@ The System tab supports both Gmail API and SMTP delivery paths.
 | `GMAIL_CLIENT_SECRET` | Gmail API client secret |
 | `GMAIL_REFRESH_TOKEN` | Gmail refresh token |
 | `GMAIL_USER_EMAIL` | Gmail sender address |
+| `IMAP_HOST` | IMAP inbox host for customer email alerts |
+| `IMAP_PORT` | IMAP inbox port |
+| `IMAP_USER` | IMAP inbox username |
+| `IMAP_PASS` | IMAP inbox password |
+| `IMAP_TLS` | IMAP TLS requirement |
+| `IMAP_MAILBOX` | IMAP mailbox folder |
 | `SMTP_HOST` | SMTP host |
 | `SMTP_PORT` | SMTP port |
 | `SMTP_USER` | SMTP username |
 | `SMTP_PASS` | SMTP password |
 | `SMTP_FROM` | Sender display and address |
 
-This area also includes the Gmail API status card, which is used to review connection state and authorised sender information.
+This area also includes the inbox alert status card, which is used to review whether owner customer email alerts are enabled and which inbox provider is currently usable.
+
+### Geoblocking
+
+The System tab also contains the public geoblocking editor. This controls which countries are allowed to submit the public booking and contact forms, plus the fallback rule used when a request country cannot be resolved.
+
+Changes apply immediately and should be treated as live intake policy rather than as a cosmetic site preference.
 
 ### Security and Portal Access
 
@@ -157,9 +206,10 @@ The password-management card is used when the administrative password must be re
 | --- | --- |
 | Branding | Public identity or contact details change |
 | Pages | Structured site content needs revision |
-| Emails | Automated email wording needs revision |
+| Emails | Automated email policy, signature, or template wording needs revision |
 | Invoices | Billing defaults or invoice presentation changes |
 | Products | Reusable billing presets need maintenance |
+| Lesson Info / Prices | Active lesson durations or admin billing prices need revision |
 | System | Infrastructure, secrets, delivery, or admin credentials change |
 
 ## Verification After Save

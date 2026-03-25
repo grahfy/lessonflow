@@ -9,6 +9,11 @@ import { PrismaClient } from "../src/generated/prisma/client";
 const projectRoot = process.cwd();
 const checklistPath = path.join(projectRoot, "Documentation", "assets", "SCREENSHOT_SEED_CHECKLIST.md");
 const learningMaterialsRoot = path.join(projectRoot, ".data", "learning-materials");
+const DEFAULT_LESSON_PRICING = [
+  { durationMinutes: 30, priceCents: 5000, isActive: true, sortOrder: 0 },
+  { durationMinutes: 60, priceCents: 9000, isActive: true, sortOrder: 1 },
+  { durationMinutes: 120, priceCents: 17000, isActive: true, sortOrder: 2 }
+];
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -156,6 +161,7 @@ async function seed() {
     // RATIONALE: Delete in dependency order so the script can be rerun on the
     // same disposable database without manual cleanup between screenshot passes.
     await prisma.$transaction([
+      prisma.lessonPricingOption.deleteMany({}),
       prisma.invoiceAuditLog.deleteMany({}),
       prisma.invoiceLineItem.deleteMany({}),
       prisma.invoice.deleteMany({}),
@@ -171,6 +177,10 @@ async function seed() {
       prisma.customer.deleteMany({}),
       prisma.adminUser.deleteMany({})
     ]);
+
+    await prisma.lessonPricingOption.createMany({
+      data: DEFAULT_LESSON_PRICING
+    });
 
     const admin = await prisma.adminUser.create({
       data: {
@@ -702,7 +712,7 @@ async function seed() {
 
     fs.writeFileSync(
       checklistPath,
-      `# Screenshot Seed Checklist\n\nLast seeded: ${new Date().toISOString()}\n\n## Demo Credentials\n- Admin email: \`${adminEmail}\`\n- Admin password: \`${adminPassword}\`\n- Student login name: \`${customer1.fullName}\`\n- Student postcode: \`${customer1.postcode}\`\n- Student password: \`${studentPassword}\`\n\n## Dataset Summary\n- Staff accounts: 2 (owner + teacher)\n- Customers: 2\n- Booking requests: 4 (pending/approved/rejected/cancelled)\n- Bookings: 5 (approved + cancelled, cross-period)\n- Invoices: 5 (draft/sent/paid + comparisons)\n- Learning materials: 2 (booking-linked + general)\n`,
+      `# Screenshot Seed Checklist\n\nLast seeded: ${new Date().toISOString()}\n\n## Demo Credentials\n- Admin email: \`${adminEmail}\`\n- Admin password: \`${adminPassword}\`\n- Student login name: \`${customer1.fullName}\`\n- Student postcode: \`${customer1.postcode}\`\n- Student password: \`${studentPassword}\`\n\n## Dataset Summary\n- Staff accounts: 2 (owner + teacher)\n- Customers: 2\n- Booking requests: 4 (pending/approved/rejected/cancelled)\n- Bookings: 5 (approved + cancelled, cross-period)\n- Invoices: 5 (draft/sent/paid + comparisons)\n- Lesson pricing rows: 3 (30 / 60 / 120 minutes)\n- Learning materials: 2 (booking-linked + general)\n`,
       "utf8"
     );
 

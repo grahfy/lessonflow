@@ -152,6 +152,11 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
     "Customer communication history shows message status, provider source, and manual send controls."
   ),
   createManualScreenshot(
+    "customer-email-alert-summary",
+    "Unread customer email alerts summary",
+    "Unread customer email alerts surface matched inbox messages that should be handled from the customer workflow."
+  ),
+  createManualScreenshot(
     "customer-materials-list-upload-panel",
     "Customer materials upload panel",
     "The customer materials tab combines booking selection, uploads, and file deletion in one panel."
@@ -210,6 +215,11 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
     "settings-products-tab",
     "Settings products tab",
     "The Products tab manages reusable billing presets such as lesson packages and textbooks."
+  ),
+  createManualScreenshot(
+    "settings-lesson-pricing-tab",
+    "Settings lesson pricing tab",
+    "The Lesson Info / Prices tab manages active lesson durations and prices used by admin booking and invoice workflows."
   ),
   createManualScreenshot(
     "settings-system-tab",
@@ -349,7 +359,8 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
       "customer-editor-create",
       "customer-profile-assigned-teacher",
       "customer-portal-credential-panel",
-      "customer-email-history-panel"
+      "customer-email-history-panel",
+      "customer-email-alert-summary"
     ]
   },
   {
@@ -405,6 +416,7 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
       "settings-emails-tab",
       "settings-invoices-tab",
       "settings-products-tab",
+      "settings-lesson-pricing-tab",
       "settings-system-tab"
     ]
   },

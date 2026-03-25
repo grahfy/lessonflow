@@ -1,9 +1,9 @@
 # Daily Operations and Booking Lifecycle
 
-The booking calendar is the principal operational surface of LessonFlow. It combines pending requests, confirmed lessons, and lesson-history actions within one workflow, making it the usual starting point for daily administration. This chapter describes the routine operating pattern, the lifecycle states visible in the calendar, and the actions that can be taken from each state.
+The booking calendar is the principal operational surface of LessonFlow. It combines pending requests, confirmed lessons, cancellations, and historical lesson administration within one workflow, making it the usual starting point for daily work. This chapter describes the lifecycle states visible in the calendar, the interpretation of booking-time controls, and the hand-offs from bookings into customer, communication, and billing workflows.
 
 <div class="manual-callout success">
-<strong>Operational note:</strong> For most schools, the Bookings area functions as the daily control room. Billing, customer support, notifications, and materials frequently begin here even when they conclude on another screen.
+<strong>Operational note:</strong> For most schools, the Bookings area functions as the daily control room. Billing, customer support, notifications, and materials often begin here even when they conclude elsewhere.
 </div>
 
 ## Daily Operating Pattern
@@ -11,11 +11,11 @@ The booking calendar is the principal operational surface of LessonFlow. It comb
 A routine day in LessonFlow commonly follows this sequence:
 
 1. review pending requests and upcoming lessons
-2. resolve schedule changes, cancellations, and manual bookings
+2. resolve schedule changes, cancellations, or manual entries
 3. hand off customer, invoice, or communication issues to the relevant workflow
 4. confirm that urgent follow-up has been recorded
 
-This pattern is recommended because the booking calendar exposes the most time-sensitive work first.
+This pattern remains useful because the booking calendar exposes the most time-sensitive work first.
 
 ## Calendar Views
 
@@ -26,7 +26,9 @@ The bookings interface provides the following views:
 - <code>Month</code>
 - <code>Year</code>
 
-The week view is generally the most practical for day-to-day administration, while month and year views are more useful for forward planning and broader schedule review.
+The week view is generally the most practical for routine administration, while month and year views are more useful for forward planning or broader schedule review.
+
+![Booking calendar week view](assets/booking-calendar-week-view.png)
 
 ## Booking States
 
@@ -34,9 +36,10 @@ Pending requests and confirmed bookings share the same calendar surface but repr
 
 | Record type | Meaning | Common next actions |
 | --- | --- | --- |
-| Pending request | A lesson has been requested but not confirmed | Review, approve, remind, or send a custom message |
+| Pending request | A lesson has been requested but not confirmed | Review, approve, reject, remind, or send a custom message |
 | Confirmed booking | A scheduled lesson exists in the live calendar | Edit, move, cancel, notify, assign materials, or invoice |
 | Cancelled record | Historical evidence of a cancelled request or lesson | Review context only; no longer active work |
+| Historical lesson | A past lesson entered for record-keeping or later billing | Confirm timing, notes, teacher assignment, and invoice path |
 
 ## Request Approval
 
@@ -47,9 +50,10 @@ Approving a booking request converts intake activity into a live booking workflo
 - requested time
 - notes or special circumstances
 - possible customer matches suggested by the system
+- assigned-teacher context where staff ownership matters
 
 <div class="manual-callout info">
-<strong>System behaviour:</strong> Request approval may also attach the booking to an existing customer record, create a new customer, and ensure that a student portal credential exists.
+<strong>System behaviour:</strong> Request approval can attach the booking to an existing customer record, create a new customer, and ensure that a portal credential exists for the student workflow.
 </div>
 
 ## Manual Booking Creation
@@ -65,17 +69,21 @@ The dialog proceeds through four broad stages:
 
 Where a likely duplicate customer is detected, the operator should deliberately choose between using the existing record, updating that record, or creating a distinct new one. Duplicate creation should be treated as an exceptional choice rather than the default.
 
+Manual booking entry can also be used for already-completed lessons. Historical lessons should be treated as record-correction work rather than as future scheduling. When a historical lesson is entered, the most important follow-up is usually billing, notes, or student-history continuity rather than reminder traffic.
+
+![Manual booking dialog customer step](assets/manual-booking-dialog-customer-step.png)
+
 ## Teacher Assignment During Booking Work
 
-LessonFlow now treats teacher assignment as part of normal booking administration rather than as background metadata. Pending requests, confirmed bookings, recurring series, and the related customer record can all carry an assigned teacher.
+Teacher assignment is part of normal booking administration rather than background metadata. Pending requests, confirmed bookings, recurring series, and the related customer record can all carry an assigned teacher.
 
-The normal interpretation is:
+The intended interpretation is:
 
 - owners can choose or change the assigned teacher deliberately
 - teachers are scoped to records already assigned to them unless owner-level access is required
 - single-user installs treat the owner account as the valid assignable teacher when no separate teacher account exists
 
-This model is intended to keep scheduling, customer ownership, and later billing or support activity aligned around the same responsible staff account.
+This model keeps scheduling, customer ownership, and later billing or support activity aligned around the same responsible staff account.
 
 ## Timezone Interpretation
 
@@ -87,13 +95,29 @@ This means a <code>datetime-local</code> value such as <code>12:00</code> is tre
 
 ## Booking Editing and Movement
 
-Confirmed bookings can be edited to update lesson details, student information, notes, and address data. Rescheduling is performed through the lesson-move flow and should only be done after the intended replacement time is confirmed.
+Confirmed bookings can be edited to update lesson details, customer information, notes, invoice linkage, and address data. Rescheduling is performed through the lesson-move flow and should only be done after the intended replacement time is confirmed.
 
 Before moving a lesson, confirm:
 
 - the correct lesson is open
 - the correct week or day is being edited
 - the replacement time has been agreed
+- the assigned teacher and billing implications still make sense after the move
+
+![Booking detail dialog actions](assets/booking-detail-dialog-notes-and-actions.png)
+
+## Billing From Bookings
+
+Booking records serve as one of the main invoice-entry paths. When billing begins from a booking, LessonFlow can either open an existing linked invoice, show likely invoice matches, or create a new booking-linked draft depending on what already exists for that customer and lesson context.
+
+When a booking needs billing, the operator should confirm:
+
+- whether the booking is already linked to an invoice
+- whether a likely existing draft should be reused instead of creating another invoice
+- whether lesson pricing has been configured for the intended duration
+- whether the booking should remain traceably linked to the invoice
+
+![Create invoice from booking dialog](assets/booking-create-invoice-dialog.png)
 
 ## Cancellation
 
@@ -117,7 +141,7 @@ At the end of a normal operating period, administrators should confirm:
 
 1. urgent pending requests have been reviewed
 2. schedule changes and cancellations are reflected correctly
-3. lessons that need billing have an invoice path
+3. lessons that need billing have a clear invoice path
 4. required follow-up communication has been sent or recorded
 
 ## Related Sections

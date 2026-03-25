@@ -26,7 +26,7 @@ The reports console includes controls for refresh, report-email dispatch, chart 
 | --- | --- |
 | Refresh | Reload current report data |
 | Report email actions | Send a prepared summary to an owner or stakeholder |
-| Chart and date controls | Adjust presentation for review |
+| Chart and date controls | Adjust trend visualisation and label formatting for review |
 | Custom-range inputs | Investigate a non-standard period |
 
 ![Admin reports dashboard](assets/admin-reports-dashboard.png)
@@ -38,6 +38,12 @@ Custom range reporting is intended for questions not answered by the default tim
 Both dates are required, and the start date must not be later than the end date.
 
 ![Reports custom range controls](assets/reports-custom-range-controls.png)
+
+## Trend Charts
+
+Trend panels are intended to show change over time rather than to replace the fixed period summary cards. The chart-style control can switch between bar, line, area, step, and lollipop presentation. This changes the visual treatment only; the underlying report totals do not change.
+
+Step and lollipop views are particularly useful when the operator wants to emphasise discrete period changes rather than a smoothed visual trend.
 
 ## High-Value Metrics
 

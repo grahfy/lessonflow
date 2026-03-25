@@ -45,3 +45,5 @@ latest-deploy-update-test.json
 rebase.txt
 scn1.png
 settings-*.png
+!Documentation/assets/settings-*.png
+!public/documentation/screenshots/settings-*.png

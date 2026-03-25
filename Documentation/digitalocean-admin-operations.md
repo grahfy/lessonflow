@@ -79,7 +79,14 @@ For an already-installed system, the standard update path is:
 
 This is the preferred routine path for ordinary code or configuration updates.
 
-For the current DigitalOcean 2GB droplet profile, the deploy/update scripts now keep the low-memory build path, enable Next.js webpack memory optimisations for deploy builds, and target a conservative build heap plus temporary swap during updates. If a stale build swap file cannot be removed, the deploy step retries with a fresh sibling swap-file path instead of abandoning temporary swap for that build. Non-root web-update runs still skip temporary swap management when the deploy user lacks privileged swap access. This affects the deployment build only and does not change the runtime systemd service memory cap.
+For the current DigitalOcean 2GB droplet profile, the deploy/update scripts keep the low-memory build path, enable Next.js webpack memory optimisations for deploy builds, and target a conservative build heap plus temporary swap during updates. If a stale build swap file cannot be removed, the deploy step retries with a fresh sibling swap-file path instead of abandoning temporary swap for that build. Non-root web-update runs still skip temporary swap management when the deploy user lacks privileged swap access. This affects the deployment build only and does not change the runtime systemd service memory cap.
+
+Routine update interpretation should include the following rules:
+
+- `update.sh` remains the preferred wrapper because it handles source-mode detection, env-sync behaviour, and deploy hand-off
+- archive-source installs do not pull from git and depend on the operator replacing the extracted files before running `update.sh`
+- checkout ownership problems should be fixed before pull attempts rather than bypassed
+- shared environment upgrades append new blank placeholders instead of silently inventing values
 
 ### Release 1.2.0 Upgrade Checks
 
@@ -105,6 +112,19 @@ When moving to `1.2.0`, the technical owner should explicitly confirm:
 | `deploy/nginx.conf` | Main nginx configuration template |
 | `deploy/nginx-http.conf` | Transitional or HTTP-only nginx configuration |
 | `deploy/lessonflow.service` | Main systemd unit for the application runtime |
+
+## Source Ownership and Permission Boundaries
+
+Deploy and update workflows assume that the operator can read the source tree and that the deployment user can read the shared runtime files after sync.
+
+The most common permission interpretations are:
+
+- persistent git checkout: the working tree must be writable enough for fetch and pull
+- archive source: the extracted source tree must be readable before deployment and writable before replacement
+- sudo deploy mode: used when release directories or shared runtime paths are root-owned
+- runtime file repair: env edits may reapply app ownership so the service user can still read the resulting files
+
+If the update wrapper reports a checkout-ownership or archive-permission problem, that should be corrected before another deploy attempt is started.
 
 ## Service and Timer Verification
 

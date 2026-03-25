@@ -14,6 +14,7 @@ The public booking form creates a pending request rather than a confirmed lesson
 
 Typical consequences of a public booking submission include:
 
+- geoblocking evaluation before schema validation
 - creation of a pending booking request for admin review
 - requirement for CAPTCHA completion
 - possible guidance toward an introductory lesson duration for new students
@@ -29,6 +30,7 @@ The public contact form records general enquiries for later follow-up.
 
 These enquiries may lead to:
 
+- geoblocking rejection before normal validation where the public intake policy blocks the request
 - a manual email reply
 - progression into a booking conversation
 - later follow-up without immediate conversion
@@ -42,6 +44,8 @@ Student sign-in requires:
 - portal password
 
 ![Student portal login page](assets/student-login-page.png)
+
+The student login page also links directly to the public privacy policy and terms-of-service pages. These routes exist so public and student-facing policy disclosures stay available without requiring admin access.
 
 If a student cannot sign in, the customer record and current portal credential should be reviewed before regeneration is attempted.
 
@@ -59,6 +63,16 @@ The portal provides the following student-facing actions:
 
 Portal-originated requests and cancellations remain subject to administrative review and historical context.
 
+## Public Policy Pages
+
+LessonFlow now exposes separate public routes for privacy and service-terms disclosure in addition to the main lesson-policy page. These routes are relevant to operators because:
+
+- the student login page links to them directly
+- the privacy page describes website, portal, and Google-connected communication handling
+- the terms-of-service page covers portal use and connected Google-enabled communication tools
+
+Changes to these pages should therefore be treated as public-operational policy changes, not only as marketing copy edits.
+
 ## Administrative Interpretation
 
 From an admin perspective, the most important interpretation rules are:
@@ -69,6 +83,7 @@ From an admin perspective, the most important interpretation rules are:
 | Public contact enquiry | Support or sales intake requiring response |
 | Student portal request | Pending request originating from an existing student context |
 | Student portal cancellation | A meaningful historical event, not a disappearance of the record |
+| Public geoblocking rejection | Intake policy blocked the submission before ordinary field-validation handling |
 | “No materials yet” | Potentially normal state if nothing has been uploaded |
 
 ## Related Sections

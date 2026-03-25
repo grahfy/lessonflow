@@ -33,6 +33,8 @@ The main invoice list is the primary review surface for:
 
 This makes the list the preferred location for identifying what requires follow-up before opening an individual invoice.
 
+![Invoice console list and filters](assets/invoice-console-list-and-filters.png)
+
 ## Invoice Creation Paths
 
 LessonFlow supports more than one invoice origin:
@@ -40,10 +42,41 @@ LessonFlow supports more than one invoice origin:
 | Creation path | Typical use |
 | --- | --- |
 | Booking-based invoice | Billing that should remain tied to a lesson workflow |
+| Customer-based invoice | Billing that should stay attached to a known customer without requiring a booking-origin entry |
 | Standalone invoice | Manual billing that does not need to originate from a lesson |
 | Preset-based line items | Reusable billing patterns such as lesson packages or standard products |
 
 When a lesson relationship matters, creating the invoice from the booking context is generally the more traceable approach.
+
+Booking-linked invoice entry now checks for existing invoice linkage and likely invoice matches before a new draft is created. This is intended to reduce accidental duplicate billing when a lesson already belongs to an earlier draft or when a customer has a likely open invoice that should be reused.
+
+![Invoice create dialog](assets/invoice-create-dialog.png)
+
+## Line Items, Presets, and Discounts
+
+Invoice editing supports manual line items, preset-derived rows, and invoice-level or line-level discounts.
+
+The intended interpretation is:
+
+- presets speed up recurring product or package entry
+- discounts are part of the stored billing record, not temporary display adjustments
+- invoice-level discounts apply before tax calculation
+- line-level discounts remain attached to the specific billed row
+
+Where mixed invoice sources are present, a single invoice may contain lesson-linked rows alongside manual or preset-based entries. That is normal when one customer-facing bill needs to cover more than one billing origin.
+
+## Currency and Tax Profiles
+
+LessonFlow supports a three-letter invoice currency code per invoice. Tax behaviour is then resolved from the active currency and tax-profile configuration.
+
+The default interpretation is:
+
+- the configured default currency supplies the starting point for new invoices
+- <code>AUD</code> uses GST-aware behaviour based on the school’s invoice settings
+- non-<code>AUD</code> currencies fall back to safe generic tax defaults unless an explicit tax profile has been configured
+- tax labels, locale formatting, and default tax mode follow the resolved currency profile
+
+This means operators should treat currency as part of the billing contract rather than as a cosmetic display toggle.
 
 ## Draft and Send States
 
@@ -76,7 +109,7 @@ Not every action remains available at every stage.
 | --- | --- | --- |
 | Draft | Internal invoice preparation | Edit, save, send, delete if still safe |
 | Sent | Customer-facing invoice awaiting collection | Resend, remind, mark paid, void |
-| Paid | Collected invoice recorded in reporting | Mark unpaid if correction is required, review history |
+| Paid | Collected invoice recorded in reporting | Correct payment details, mark unpaid if correction is required, review history |
 | Voided | Invoice formally withdrawn from collection | Review only unless a new billing path is required |
 
 <div class="manual-callout warning">
@@ -92,6 +125,22 @@ Reminder use is appropriate when:
 - the invoice is overdue
 - collection is still expected
 - the customer address and invoice state have been confirmed
+
+Automatic reminder timing and category controls are configured separately in [Settings and Configuration](08-Settings-and-Configuration.md). Manual single-invoice reminders remain part of the invoice workflow even when scheduled reminders are disabled.
+
+![Invoice outstanding aging filters](assets/invoice-filters-outstanding-aging.png)
+
+## Payment Corrections
+
+Paid invoices remain editable for payment-detail correction where the billing document should stay intact but the recorded collection data was incomplete or wrong. This is distinct from deleting an invoice and should be treated as audit-preserving correction work.
+
+Typical examples include:
+
+- correcting payment date
+- correcting recorded payment method or note fields
+- moving a paid invoice back to unpaid when the paid state was recorded in error
+
+![Invoice detail actions](assets/invoice-detail-send-and-download-pdf.png)
 
 ## Credit Notes
 

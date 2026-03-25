@@ -83,12 +83,27 @@ It may be used to determine:
 
 - whether a reminder or invoice email was already sent
 - which subject line or delivery route was used
-- whether the item originated in the app or through Gmail sync
+- whether the item originated in the app or through provider-backed history refresh
 - whether an error was recorded
+
+Where the workflow exposes <code>Refresh History</code>, the panel can pull newer provider-side activity into the visible timeline. This is intended for customer-support reconciliation rather than for routine repeated polling.
 
 Manual email composition remains available for messages that do not fit the automated workflow.
 
 ![Customer email history panel](assets/customer-email-history-panel.png)
+
+## Unread Customer Email Alerts
+
+Owner accounts can use inbox-backed customer email alerts to identify unread messages that match known customer records. This workflow is separate from ordinary email history review: it is intended to surface likely support work before a customer record is opened.
+
+The alert summary should be interpreted as:
+
+- a matched unread count rather than a full inbox replacement
+- an owner-only support aid
+- dependent on the configured inbox provider and alert settings
+- a route back into the correct customer record when a message requires action
+
+![Unread customer email alerts](assets/customer-email-alert-summary.png)
 
 ### Manual Email Practice
 
