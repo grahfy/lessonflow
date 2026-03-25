@@ -202,6 +202,32 @@ describe("booking-rules", () => {
     expect(parsed.success).toBe(true);
   });
 
+  it("allows preset admin bookings when custom duration is sent as null", () => {
+    const start = addDays(new Date(), 7).toISOString().replace("Z", "+00:00");
+
+    const parsed = adminManualBookingSchema.safeParse({
+      firstName: "Alex",
+      lastName: "Student",
+      name: "Alex Student",
+      email: "alex@example.com",
+      phone: "0400-123-456",
+      houseNumber: "1",
+      streetName: "Smith",
+      streetType: "St",
+      suburb: "Northcote",
+      state: "VIC",
+      postcode: "3070",
+      lessonMode: "video",
+      skillLevel: "intermediate",
+      lessonDuration: "min30",
+      customDurationMinutes: null,
+      requestedStartAt: start,
+      isRecurring: false
+    });
+
+    expect(parsed.success).toBe(true);
+  });
+
   it("still rejects recurrence end dates before the first booking", () => {
     const year = new Date().getUTCFullYear();
     const start = toIso(year, 6, 24, 3);

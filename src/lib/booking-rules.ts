@@ -38,6 +38,20 @@ export const auStateSchema = z.enum(["NSW", "VIC", "QLD", "SA", "WA", "TAS", "NT
 /** Country restriction for public lesson bookings */
 export const bookingCountrySchema = z.literal("Australia");
 
+function normalizeOptionalCustomDurationInput(value: unknown): unknown {
+  if (value === "" || value === undefined || value === null) {
+    return undefined;
+  }
+  return value;
+}
+
+function normalizeNullableCustomDurationInput(value: unknown): unknown {
+  if (value === "") {
+    return null;
+  }
+  return value;
+}
+
 // Australian phone number formats: 10 digits, mobile xxx-xxx-xxx, landline xx-xxxx-xxxx
 const isoDateParser = z.string().datetime({ offset: true });
 const auPhoneRegex = /^(?:\d{10}|\d{4}-\d{3}-\d{3}|\d{2}-\d{4}-\d{4})$/;
@@ -52,6 +66,18 @@ export const auPostcodeSchema = z
   .string()
   .trim()
   .regex(/^\d{4}$/, "Postcode must be exactly 4 digits.");
+
+/** Optional custom lesson duration that ignores blank form-string submissions. */
+export const optionalCustomDurationMinutesSchema = z.preprocess(
+  normalizeOptionalCustomDurationInput,
+  z.coerce.number().int().min(15).max(300).optional()
+);
+
+/** Nullable custom lesson duration that treats blank form-string submissions as cleared. */
+export const nullableOptionalCustomDurationMinutesSchema = z.preprocess(
+  normalizeNullableCustomDurationInput,
+  z.coerce.number().int().min(15).max(300).nullable().optional()
+);
 
 /** Contact form submission - used for general inquiries */
 export const contactSubmissionSchema = z.object({
@@ -87,7 +113,7 @@ const bookingRequestFields = z.object({
   lessonMode: lessonModeSchema,
   skillLevel: skillLevelSchema,
   lessonDuration: lessonDurationSchema,
-  customDurationMinutes: z.coerce.number().int().min(15).max(300).optional(),
+  customDurationMinutes: optionalCustomDurationMinutesSchema,
   requestedStartAt: isoDateParser,
   notes: z.string().trim().max(1000).optional(),
   isRecurring: z.boolean().default(false),

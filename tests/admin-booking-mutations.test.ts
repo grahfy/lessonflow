@@ -85,6 +85,49 @@ describe("admin-booking-mutations", () => {
     expect(updated.endAt.toISOString()).toBe("2026-06-01T11:30:00.000Z");
   });
 
+  it("accepts blank custom duration when editing a preset confirmed booking", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const booking = await prisma.booking.create({
+      data: {
+        name: "Preset Student",
+        email: "preset.student@example.com",
+        phone: "0400-000-012",
+        address: "66 Street",
+        houseNumber: "66",
+        streetName: "Street",
+        streetType: "Rd",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070",
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min60",
+        customDurationMinutes: null,
+        startAt: new Date("2026-06-01T09:00:00.000Z"),
+        endAt: new Date("2026-06-01T10:00:00.000Z"),
+        timezone: "Australia/Melbourne",
+        modifiedById: admin.id
+      }
+    });
+
+    const editReq = adminRequest("http://localhost/api/admin/bookings/id_1", {
+      action: "edit",
+      lessonDuration: "min30",
+      customDurationMinutes: ""
+    }, token);
+    const editRes = await patchBooking(editReq, { params: Promise.resolve({ id: booking.id }) });
+    expect(editRes.status).toBe(200);
+
+    const updated = await prisma.booking.findUniqueOrThrow({
+      where: { id: booking.id }
+    });
+    expect(updated.lessonDuration).toBe("min30");
+    expect(updated.customDurationMinutes).toBeNull();
+    expect(updated.endAt.toISOString()).toBe("2026-06-01T09:30:00.000Z");
+  });
+
   it("returns partial success when a booking move persists but notification delivery fails", async () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);
@@ -240,6 +283,46 @@ describe("admin-booking-mutations", () => {
     expect(updated.phone).toBe("0411-111-111");
     expect(updated.requestedStartAt.toISOString()).toBe("2026-06-04T12:00:00.000Z");
     expect(updated.status).toBe("cancelled");
+  });
+
+  it("accepts blank custom duration when editing a preset pending request", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const requestRow = await prisma.bookingRequest.create({
+      data: {
+        name: "Preset Request",
+        email: "preset.request@example.com",
+        phone: "0400-000-013",
+        address: "11 Street",
+        houseNumber: "11",
+        streetName: "Street",
+        streetType: "Ave",
+        suburb: "Brunswick",
+        state: "VIC",
+        postcode: "3056",
+        lessonMode: "video",
+        skillLevel: "intermediate",
+        lessonDuration: "min60",
+        customDurationMinutes: null,
+        requestedStartAt: new Date("2026-06-04T09:00:00.000Z"),
+        status: "pending"
+      }
+    });
+
+    const editReq = adminRequest("http://localhost/api/admin/booking-requests/id_1", {
+      action: "edit",
+      lessonDuration: "min30",
+      customDurationMinutes: ""
+    }, token);
+    const editRes = await patchBookingRequest(editReq, { params: Promise.resolve({ id: requestRow.id }) });
+    expect(editRes.status).toBe(200);
+
+    const updated = await prisma.bookingRequest.findUniqueOrThrow({
+      where: { id: requestRow.id }
+    });
+    expect(updated.lessonDuration).toBe("min30");
+    expect(updated.customDurationMinutes).toBeNull();
   });
 
   it("returns partial success when request cancellation persists but notification delivery fails", async () => {

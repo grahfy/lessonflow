@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Booking, BookingRequest, LearningMaterial } from "@/generated/prisma/client";
+import { nullableOptionalCustomDurationMinutesSchema } from "@/lib/booking-rules";
 
 const studentPortalLessonModeSchema = z.enum(["in_person", "video"]);
 const studentPortalLessonDurationSchema = z.enum(["min30", "min60"]);
@@ -57,7 +58,7 @@ export const studentPortalBookingRequestInputSchema = z.object({
   requestedStartAt: z.string().datetime({ offset: true }),
   lessonMode: studentPortalLessonModeSchema.optional(),
   lessonDuration: studentPortalLessonDurationSchema.default("min60"),
-  customDurationMinutes: z.coerce.number().int().min(15).max(300).nullable().optional(),
+  customDurationMinutes: nullableOptionalCustomDurationMinutesSchema,
   notes: z.string().trim().max(1000).optional()
 });
 

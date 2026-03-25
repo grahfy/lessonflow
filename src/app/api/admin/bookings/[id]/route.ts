@@ -12,6 +12,7 @@ import {
   getDurationMinutes,
   lessonDurationSchema,
   lessonModeSchema,
+  nullableOptionalCustomDurationMinutesSchema,
   skillLevelSchema
 } from "@/lib/booking-rules";
 import { sendCustomerBookingMovedEmail, sendCustomerBookingStatusEmail } from "@/lib/booking-events";
@@ -42,7 +43,7 @@ const editSchema = z.object({
   lessonMode: lessonModeSchema.optional(),
   skillLevel: skillLevelSchema.optional(),
   lessonDuration: lessonDurationSchema.optional(),
-  customDurationMinutes: z.coerce.number().int().min(15).max(300).nullable().optional(),
+  customDurationMinutes: nullableOptionalCustomDurationMinutesSchema,
   assignedTeacherId: z.string().trim().min(1).nullable().optional(),
   notes: z.string().trim().max(1000).nullable().optional()
 });
