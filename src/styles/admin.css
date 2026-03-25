@@ -5738,3 +5738,262 @@
 .material-upload-form {
   margin-top: 10px;
 }
+
+@media (max-width: 960px) {
+  .admin-shell {
+    height: auto;
+    max-height: none;
+    min-height: 100dvh;
+    padding: 14px;
+    border-radius: 20px;
+    overflow: visible;
+  }
+
+  .admin-shell-content {
+    overflow: visible;
+  }
+
+  .admin-actions-bar,
+  .admin-toolbar-filters,
+  .search-box,
+  .admin-range-row,
+  .admin-range-primary,
+  .admin-range-actions,
+  .dialog-head,
+  .dialog-tabs-booking,
+  .dialog-section-heading {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-box input,
+  .search-box select {
+    width: 100%;
+  }
+
+  .admin-workspace-head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-workspace-actions,
+  .admin-tab-bar,
+  .admin-tab-bar-right,
+  .dialog-footer-row {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .admin-tab-bar-list,
+  .admin-tab-bar-right {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .admin-tab-bar-list .btn,
+  .admin-tab-bar-right .btn {
+    flex: 1 1 180px;
+    min-width: 0;
+  }
+
+  .dialog-backdrop {
+    place-items: end center;
+    padding: 10px;
+  }
+
+  .dialog-panel,
+  .dialog-panel-wide,
+  .booking-dialog-panel,
+  #customer-dialog,
+  #booking-detail-dialog {
+    width: min(100vw - 20px, 1380px);
+    max-height: min(92dvh, 980px);
+  }
+
+  #booking-detail-dialog {
+    min-height: auto;
+    height: auto;
+  }
+
+  .dialog-panel {
+    padding: 12px;
+    border-radius: 18px;
+  }
+
+  .dialog-panel-compact {
+    width: min(100vw - 20px, 640px);
+    max-height: min(88dvh, 760px);
+    padding: 12px;
+    border-radius: 18px;
+  }
+
+  .dialog-head .btn {
+    width: 100%;
+  }
+
+  .dialog-body-scroll {
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
+  .dialog-layout,
+  .dialog-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dialog-col {
+    padding: 10px;
+  }
+
+  .dialog-actions,
+  .dialog-footer-left,
+  .dialog-footer-right,
+  .manual-dialog-footer,
+  .manual-dialog-footer-right,
+  .manual-match-actions,
+  .customer-item-actions {
+    width: 100%;
+  }
+
+  .dialog-actions .btn,
+  .dialog-footer-left .btn,
+  .dialog-footer-right .btn,
+  .manual-dialog-footer-right .btn,
+  .manual-match-actions .btn,
+  .customer-item-actions .btn {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .manual-dialog-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .manual-steps,
+  .manual-grid-3,
+  .manual-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .manual-span-2,
+  .manual-span-3 {
+    grid-column: auto;
+  }
+
+  .manual-booking-scroll {
+    max-height: none;
+    padding-right: 0;
+  }
+
+  #customer-dialog .dialog-tabs-left,
+  #booking-detail-dialog .dialog-tabs-left {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  .dialog-tabs-booking > *,
+  .dialog-tabs-left > * {
+    min-width: 0;
+  }
+
+  #customer-dialog .customer-booking-history-head,
+  #customer-dialog .customer-booking-history-item,
+  #customer-dialog .customer-booking-history-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #customer-dialog .customer-booking-history-actions .btn {
+    width: 100%;
+  }
+
+  .admin-table-header-row,
+  .customer-table-row,
+  .invoice-table-row {
+    padding-inline: 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-shell {
+    padding: 10px;
+    gap: 10px;
+    border-radius: 18px;
+  }
+
+  .admin-workspace-stats,
+  .setup-summary,
+  .setup-check-row,
+  .dialog-tabs-left,
+  .admin-tab-bar-list {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-shell .btn {
+    min-height: 38px;
+    padding-inline: 11px;
+  }
+
+  .dialog-backdrop {
+    padding: 6px;
+  }
+
+  .dialog-panel,
+  .dialog-panel-wide,
+  .dialog-panel-compact,
+  .booking-dialog-panel,
+  #customer-dialog,
+  #booking-detail-dialog {
+    width: calc(100vw - 12px);
+    max-height: min(94dvh, 920px);
+    border-radius: 16px;
+  }
+
+  .dialog-panel,
+  .dialog-panel-compact {
+    padding: 10px;
+  }
+
+  .dialog-actions,
+  .dialog-footer,
+  .dialog-footer-left,
+  .dialog-footer-right,
+  .dialog-tabs-left,
+  .admin-tab-bar-right,
+  .booking-notes-actions {
+    align-items: stretch;
+  }
+
+  #customer-dialog .dialog-tabs-left,
+  #booking-detail-dialog .dialog-tabs-left {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-tab-bar-list .btn,
+  .admin-tab-bar-right .btn,
+  .dialog-tabs-left .btn {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .manual-step-chip {
+    padding: 10px 12px;
+  }
+
+  .manual-form-footer,
+  .setup-summary,
+  .setup-check-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-table-header-row,
+  .customer-table-row,
+  .invoice-table-row {
+    padding-inline: 10px;
+  }
+}
