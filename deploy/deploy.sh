@@ -51,7 +51,7 @@ DEFAULT_BUILD_NODE_HEAP_MB="${DEFAULT_BUILD_NODE_HEAP_MB:-6144}"
 LOW_RAM_1GB_AUTO_HEAP_MB="${LOW_RAM_1GB_AUTO_HEAP_MB:-3072}"
 LOW_RAM_2GB_AUTO_HEAP_MB="${LOW_RAM_2GB_AUTO_HEAP_MB:-3072}"
 LOW_RAM_1GB_NEXT_BUILD_HEAP_MB="${LOW_RAM_1GB_NEXT_BUILD_HEAP_MB:-1024}"
-LOW_RAM_2GB_NEXT_BUILD_HEAP_MB="${LOW_RAM_2GB_NEXT_BUILD_HEAP_MB:-3072}"
+LOW_RAM_2GB_NEXT_BUILD_HEAP_MB="${LOW_RAM_2GB_NEXT_BUILD_HEAP_MB:-2048}"
 TEMP_BUILD_SWAP_AUTO_ENABLED="${TEMP_BUILD_SWAP_AUTO_ENABLED:-true}"
 LOW_RAM_1GB_TARGET_TOTAL_SWAP_MB="${LOW_RAM_1GB_TARGET_TOTAL_SWAP_MB:-2048}"
 LOW_RAM_2GB_TARGET_TOTAL_SWAP_MB="${LOW_RAM_2GB_TARGET_TOTAL_SWAP_MB:-2048}"
@@ -284,6 +284,26 @@ run_sudo_cmd() {
     else
         "$@"
     fi
+}
+
+# Checks whether this deploy run can perform privileged swap management without
+# relying on an interactive sudo prompt. Browser-triggered updates run without a
+# TTY, so they must degrade cleanly when root access is unavailable.
+has_privileged_swap_access() {
+    if [[ ${EUID} -eq 0 ]]; then
+        return 0
+    fi
+
+    if ! command -v sudo >/dev/null 2>&1; then
+        return 1
+    fi
+
+    if [[ -n "${MGS_SUDO_PASSWORD:-}" ]]; then
+        printf '%s\n' "$MGS_SUDO_PASSWORD" | sudo -S -p '' -v >/dev/null 2>&1
+        return $?
+    fi
+
+    sudo -n true >/dev/null 2>&1
 }
 
 resolve_source_git_user() {
@@ -3456,9 +3476,13 @@ ensure_temporary_build_swap() {
         return 0
     fi
 
-
-    if ! command -v run_sudo_cmd mkswap >/dev/null 2>&1 || ! command -v run_sudo_cmd swapon >/dev/null 2>&1 || ! command -v run_sudo_cmd swapoff >/dev/null 2>&1; then
+    if ! command -v mkswap >/dev/null 2>&1 || ! command -v swapon >/dev/null 2>&1 || ! command -v swapoff >/dev/null 2>&1; then
         log_warn "Swap tools not available (mkswap/swapon/swapoff); skipping temporary build swap"
+        return 0
+    fi
+
+    if ! has_privileged_swap_access; then
+        log_warn "Skipping temporary build swap management for ${TEMP_BUILD_SWAP_PATH}: deploy user lacks root or non-interactive sudo access"
         return 0
     fi
 

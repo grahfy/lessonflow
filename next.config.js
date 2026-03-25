@@ -45,6 +45,11 @@ const nextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.join(__dirname),
   poweredByHeader: false,
+  experimental: {
+    // RATIONALE: Next.js documents this as a low-risk way to reduce peak
+    // Webpack memory usage during builds on smaller hosts.
+    webpackMemoryOptimizations: isLowMemoryDeployBuild
+  },
   // Low-memory deploy builds can skip duplicate validation work because the
   // project already exposes dedicated lint/typecheck commands for CI/manual use.
   eslint: {

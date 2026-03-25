@@ -340,7 +340,8 @@ sudo ./deploy/update.sh --interactive
 
 Notes:
 - The deploy script auto-applies `NODE_OPTIONS=--max-old-space-size=3072` on ~1GB and ~2GB RAM hosts unless you already set a heap limit.
-- On ~2GB RAM hosts, the Next.js build step now caps its low-memory heap at `3072` MB and temporarily targets `2048` MB total swap while keeping the existing low-memory build path.
+- On ~2GB RAM hosts, the Next.js build step now uses `experimental.webpackMemoryOptimizations`, caps its low-memory heap at `2048` MB, and temporarily targets `2048` MB total swap while keeping the existing low-memory build path.
+- Browser-triggered or other non-root deploy runs now skip temporary swap management cleanly when the deploy user lacks privileged swap access, instead of failing on stale swap-file cleanup.
 - The deploy script prunes old Node/npm temp files in `/tmp`, `/var/tmp`, and npm cache temp before builds to reduce ENOSPC failures.
 - Use `--no-spinner --no-color` for CI/log-only environments.
 - `deploy/update.sh` wraps `git fetch/pull` + `deploy.sh` for git checkouts, or runs a reduced deploy-only archive mode when the source tree has no `.git` directory.
