@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  dismissCustomerEmailAlertsToast,
   getCustomerEmailAlertsSessionKey,
+  getCustomerEmailAlertsSummarySignature,
   invalidateCustomerEmailAlertsSessionCache,
+  isCustomerEmailAlertsToastDismissed,
   readCustomerEmailAlertsSessionCache,
   subscribeCustomerEmailAlertsInvalidation,
   writeCustomerEmailAlertsSessionCache,
@@ -95,5 +98,49 @@ describe("admin customer email alerts session cache", () => {
 
   it("uses the shared session key prefix", () => {
     expect(getCustomerEmailAlertsSessionKey("admin-123")).toBe("customer-email-alerts:admin-123");
+  });
+
+  it("tracks toast dismissal by admin id and alert signature", () => {
+    dismissCustomerEmailAlertsToast("admin-1", baseSummary);
+
+    expect(isCustomerEmailAlertsToastDismissed("admin-1", baseSummary)).toBe(true);
+    expect(isCustomerEmailAlertsToastDismissed("admin-2", baseSummary)).toBe(false);
+    expect(
+      isCustomerEmailAlertsToastDismissed("admin-1", {
+        ...baseSummary,
+        unreadCount: 2
+      })
+    ).toBe(false);
+  });
+
+  it("derives the dismissal signature from unread count and newest message", () => {
+    const summaryWithMessage: CustomerEmailAlertsSummary = {
+      ...baseSummary,
+      messages: [
+        {
+          messageId: "msg-1",
+          customerId: "cust-1",
+          customerName: "Alex Student",
+          customerEmail: "alex@example.com",
+          senderEmail: "alex@example.com",
+          subject: "Lesson question",
+          snippet: "Can we move this week's lesson?",
+          receivedAt: "2026-03-18T09:00:00.000Z"
+        }
+      ]
+    };
+
+    expect(getCustomerEmailAlertsSummarySignature(summaryWithMessage)).toContain("\"unreadCount\":1");
+    expect(getCustomerEmailAlertsSummarySignature(summaryWithMessage)).toContain("\"latestMessageId\":\"msg-1\"");
+  });
+
+  it("clears dismissed toast state when the shared session cache is invalidated", () => {
+    dismissCustomerEmailAlertsToast("admin-1", baseSummary);
+
+    expect(isCustomerEmailAlertsToastDismissed("admin-1", baseSummary)).toBe(true);
+
+    invalidateCustomerEmailAlertsSessionCache();
+
+    expect(isCustomerEmailAlertsToastDismissed("admin-1", baseSummary)).toBe(false);
   });
 });

@@ -6,7 +6,6 @@ import { AdminDeployUpdatesButton } from "@/components/admin-deploy-updates-butt
 import { invalidateCustomerEmailAlertsSessionCache } from "@/lib/admin/customer-email-alerts";
 import { ADMIN_NAV_ITEMS } from "@/lib/admin/config";
 import { Tooltip } from "@/components/admin/ui/tooltip";
-import { useCustomerEmailAlerts } from "@/lib/admin/use-customer-email-alerts";
 import type { AdminSessionSummary } from "@/lib/admin/use-admin-session";
 
 interface AdminHeaderProps {
@@ -23,12 +22,6 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-  const { summary: customerEmailAlerts } = useCustomerEmailAlerts({
-    adminId: admin?.id,
-    enabled: admin?.role === "owner"
-  });
-  const hasUnreadCustomerEmailAlerts =
-    customerEmailAlerts?.state === "ready" && customerEmailAlerts.unreadCount > 0;
 
   useEffect(() => {
     // NOTE: Close the mobile menu on route change so stale open state does not
@@ -103,17 +96,6 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
                 </Tooltip>
               );
             })}
-            {hasUnreadCustomerEmailAlerts ? (
-              <Tooltip content="Open matched customer records for unread customer emails.">
-                <button
-                  className="btn btn-primary admin-header-alert-button"
-                  type="button"
-                  onClick={() => router.push("/admin/customers?emailAlert=customer-email")}
-                >
-                  {customerEmailAlerts.unreadCount} new customer email{customerEmailAlerts.unreadCount === 1 ? "" : "s"}
-                </button>
-              </Tooltip>
-            ) : null}
           </nav>
 
           <div className="admin-header-quick-actions">

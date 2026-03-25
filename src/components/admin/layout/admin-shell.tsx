@@ -4,8 +4,10 @@ import type { CSSProperties, PropsWithChildren } from "react";
 
 import { AdminHeader } from "@/components/admin-header";
 import { AdminBuildInfoFooter } from "@/components/admin/layout/admin-build-info-footer";
+import { CustomerEmailAlertToast } from "@/components/admin/layout/customer-email-alert-toast";
 import { AdminNoticeStack } from "@/components/admin/ui/admin-notice";
 import { UpdateNotificationBanner } from "@/components/admin/updates/update-notification-banner";
+import { useCustomerEmailAlerts } from "@/lib/admin/use-customer-email-alerts";
 import { AdminSessionProvider, useAdminSession } from "@/lib/admin/use-admin-session";
 
 interface AdminShellProps extends PropsWithChildren {
@@ -25,6 +27,10 @@ export function AdminShell({ title, error, notice, loading, style, className, ch
   const session = useAdminSession({
     onAuthError: () => window.location.assign("/admin/login")
   });
+  const { summary: customerEmailAlerts, loading: customerEmailAlertsLoading } = useCustomerEmailAlerts({
+    adminId: session.admin?.id,
+    enabled: session.admin?.role === "owner"
+  });
 
   return (
     <AdminSessionProvider value={session}>
@@ -42,6 +48,11 @@ export function AdminShell({ title, error, notice, loading, style, className, ch
         </div>
 
         <div className="admin-shell-content">{children}</div>
+        <CustomerEmailAlertToast
+          adminId={session.admin?.id}
+          loading={customerEmailAlertsLoading}
+          summary={customerEmailAlerts}
+        />
         <AdminBuildInfoFooter admin={session.admin} />
       </div>
     </AdminSessionProvider>

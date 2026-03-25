@@ -29,10 +29,27 @@ export type CustomerEmailAlertsSummary = {
 };
 
 const CUSTOMER_EMAIL_ALERTS_SESSION_PREFIX = "customer-email-alerts:";
+const CUSTOMER_EMAIL_ALERTS_DISMISSED_PREFIX = "customer-email-alerts-dismissed:";
 const CUSTOMER_EMAIL_ALERTS_INVALIDATED_EVENT = "admin:customer-email-alerts-invalidated";
 
 export function getCustomerEmailAlertsSessionKey(adminId: string): string {
   return `${CUSTOMER_EMAIL_ALERTS_SESSION_PREFIX}${adminId}`;
+}
+
+export function getCustomerEmailAlertsDismissedSessionKey(adminId: string): string {
+  return `${CUSTOMER_EMAIL_ALERTS_DISMISSED_PREFIX}${adminId}`;
+}
+
+export function getCustomerEmailAlertsSummarySignature(summary: CustomerEmailAlertsSummary): string {
+  const latestMessage = summary.messages[0];
+
+  return JSON.stringify({
+    state: summary.state,
+    provider: summary.provider,
+    unreadCount: summary.unreadCount,
+    latestMessageId: latestMessage?.messageId || "",
+    latestReceivedAt: latestMessage?.receivedAt || ""
+  });
 }
 
 export function readCustomerEmailAlertsSessionCache(adminId: string): CustomerEmailAlertsSummary | null {
@@ -64,6 +81,37 @@ export function writeCustomerEmailAlertsSessionCache(adminId: string, summary: C
   }
 }
 
+export function readCustomerEmailAlertsDismissedSignature(adminId: string): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return window.sessionStorage.getItem(getCustomerEmailAlertsDismissedSessionKey(adminId));
+  } catch {
+    return null;
+  }
+}
+
+export function dismissCustomerEmailAlertsToast(adminId: string, summary: CustomerEmailAlertsSummary) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.sessionStorage.setItem(
+      getCustomerEmailAlertsDismissedSessionKey(adminId),
+      getCustomerEmailAlertsSummarySignature(summary)
+    );
+  } catch {
+    // NOTE: Toast dismissal is best-effort; the UI still works without it.
+  }
+}
+
+export function isCustomerEmailAlertsToastDismissed(adminId: string, summary: CustomerEmailAlertsSummary): boolean {
+  return readCustomerEmailAlertsDismissedSignature(adminId) === getCustomerEmailAlertsSummarySignature(summary);
+}
+
 export function clearCustomerEmailAlertsSessionCache() {
   if (typeof window === "undefined") {
     return;
@@ -73,7 +121,10 @@ export function clearCustomerEmailAlertsSessionCache() {
     const keysToRemove: string[] = [];
     for (let index = 0; index < window.sessionStorage.length; index += 1) {
       const key = window.sessionStorage.key(index);
-      if (key && key.startsWith(CUSTOMER_EMAIL_ALERTS_SESSION_PREFIX)) {
+      if (
+        key &&
+        (key.startsWith(CUSTOMER_EMAIL_ALERTS_SESSION_PREFIX) || key.startsWith(CUSTOMER_EMAIL_ALERTS_DISMISSED_PREFIX))
+      ) {
         keysToRemove.push(key);
       }
     }
