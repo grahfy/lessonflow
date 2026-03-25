@@ -43,6 +43,10 @@ export interface InvoiceRow {
     customerEmail: string;
     customerPhone: string;
     customerAddress: string;
+    bankName: string;
+    bankBsb: string;
+    bankAccountName: string;
+    bankAccountNumber: string;
     customerId: string | null;
     notes: string | null;
     lineItems: InvoiceLineItem[];

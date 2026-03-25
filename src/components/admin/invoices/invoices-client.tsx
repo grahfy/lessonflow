@@ -188,6 +188,10 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
   const [editingProductPresetId, setEditingProductPresetId] = useState("");
   const [editingCustomerFirstName, setEditingCustomerFirstName] = useState("");
   const [editingCustomerLastName, setEditingCustomerLastName] = useState("");
+  const [editingBankName, setEditingBankName] = useState("");
+  const [editingBankBsb, setEditingBankBsb] = useState("");
+  const [editingBankAccountName, setEditingBankAccountName] = useState("");
+  const [editingBankAccountNumber, setEditingBankAccountNumber] = useState("");
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createSelectedCustomerId, setCreateSelectedCustomerId] = useState("");
@@ -277,6 +281,10 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
     setEditingCurrency(getInvoiceCurrency(invoice.currency));
     setEditingCustomerFirstName(invoice.customerFirstName || invoice.customerName.split(' ')[0]);
     setEditingCustomerLastName(invoice.customerLastName || invoice.customerName.split(' ').slice(1).join(' '));
+    setEditingBankName(invoice.bankName || "");
+    setEditingBankBsb(invoice.bankBsb || "");
+    setEditingBankAccountName(invoice.bankAccountName || "");
+    setEditingBankAccountNumber(invoice.bankAccountNumber || "");
     setEditingLineItems(
       invoice.lineItems.map((li) => ({
         key: li.id,
@@ -794,6 +802,10 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
       customerFirstName: editingCustomerFirstName,
       customerLastName: editingCustomerLastName,
       customerName: `${editingCustomerFirstName} ${editingCustomerLastName}`.trim(),
+      bankName: editingBankName,
+      bankBsb: editingBankBsb,
+      bankAccountName: editingBankAccountName,
+      bankAccountNumber: editingBankAccountNumber,
       currency: resolvedEditingCurrency,
       discountKind: editingDiscountKind,
       discountValue: parseDiscountValueForCurrency(editingDiscountKind, editingDiscountValueInput, resolvedEditingCurrency),
@@ -1241,7 +1253,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
               </Tooltip>
             </div>
             <div className="dialog-footer-right">
-              <Tooltip content="Save edits to recipient details, due date, notes, and line items. This does not send the invoice to the customer.">
+              <Tooltip content="Save edits to recipient details, payment details, due date, notes, and line items. This does not send the invoice to the customer.">
                 <button className="btn btn-secondary" disabled={!!busyAction || !canEditSelectedInvoice} onClick={saveInvoiceEdits}>
                   {busyAction === 'save' ? 'Saving...' : 'Save'}
                 </button>
@@ -1327,6 +1339,40 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                         disabled={!editingDiscountKind || !canEditSelectedInvoice}
                         placeholder={editingDiscountKind === "percent" ? "10%" : "0.00"}
                         onChange={(e) => setEditingDiscountValueInput(e.target.value)}
+                      />
+                    </AdminField>
+                  </AdminForm>
+                </AdminCard>
+
+                <h3 className="manual-section-title">Payment Details</h3>
+                <AdminCard ghost className="invoice-dialog-section">
+                  <AdminForm className="dialog-form-grid">
+                    <AdminField label="Bank Name" tooltip="Bank shown in the PDF payment instructions.">
+                      <input
+                        value={editingBankName}
+                        disabled={!canEditSelectedInvoice}
+                        onChange={(e) => setEditingBankName(e.target.value)}
+                      />
+                    </AdminField>
+                    <AdminField label="BSB" tooltip="BSB shown in the PDF payment instructions.">
+                      <input
+                        value={editingBankBsb}
+                        disabled={!canEditSelectedInvoice}
+                        onChange={(e) => setEditingBankBsb(e.target.value)}
+                      />
+                    </AdminField>
+                    <AdminField label="Account Name" tooltip="Account name shown in the PDF payment instructions.">
+                      <input
+                        value={editingBankAccountName}
+                        disabled={!canEditSelectedInvoice}
+                        onChange={(e) => setEditingBankAccountName(e.target.value)}
+                      />
+                    </AdminField>
+                    <AdminField label="Account Number" tooltip="Account number shown in the PDF payment instructions.">
+                      <input
+                        value={editingBankAccountNumber}
+                        disabled={!canEditSelectedInvoice}
+                        onChange={(e) => setEditingBankAccountNumber(e.target.value)}
                       />
                     </AdminField>
                   </AdminForm>
@@ -1524,7 +1570,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                   </AdminField>
 
                   <div className="button-row invoice-dialog-button-row invoice-dialog-side-actions">
-                    <Tooltip content="Save edits to recipient details, due date, notes, and line items. This does not send the invoice to the customer.">
+                    <Tooltip content="Save edits to recipient details, payment details, due date, notes, and line items. This does not send the invoice to the customer.">
                       <button className="btn btn-secondary invoice-dialog-full-width" disabled={!!busyAction || !canEditSelectedInvoice} onClick={saveInvoiceEdits}>
                         {busyAction === 'save' ? 'Saving...' : 'Save Details'}
                       </button>

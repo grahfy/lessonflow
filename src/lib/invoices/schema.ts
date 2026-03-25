@@ -161,6 +161,10 @@ export const updateInvoiceSchema = z
     customerEmail: z.string().trim().email().max(200).optional(),
     customerPhone: z.string().trim().min(6).max(40).optional(),
     customerAddress: z.string().trim().min(3).max(260).optional(),
+    bankName: z.string().trim().max(120).optional(),
+    bankBsb: z.string().trim().max(32).optional(),
+    bankAccountName: z.string().trim().max(120).optional(),
+    bankAccountNumber: z.string().trim().max(34).optional(),
     currency: invoiceCurrencySchema.optional(),
     taxMode: invoiceTaxModeSchema.optional(),
     notes: z.string().trim().max(2_000).optional().nullable(),
@@ -179,6 +183,10 @@ export const updateInvoiceSchema = z
       !data.customerEmail &&
       !data.customerPhone &&
       !data.customerAddress &&
+      data.bankName === undefined &&
+      data.bankBsb === undefined &&
+      data.bankAccountName === undefined &&
+      data.bankAccountNumber === undefined &&
       !data.currency &&
       !data.taxMode &&
       data.notes === undefined &&

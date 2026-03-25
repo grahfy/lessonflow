@@ -259,6 +259,50 @@ describe("admin-invoice-mutations", () => {
     });
   });
 
+  it("updates saved payment details used by the invoice pdf", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+    const invoice = await seedInvoice(admin.id, "MGS-2026-9914");
+
+    const editReq = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}`, "PATCH", token, {
+      action: "edit",
+      bankName: "Commonwealth Bank",
+      bankBsb: "063-162",
+      bankAccountName: "Melbourne Guitar School Pty Ltd",
+      bankAccountNumber: "87654321"
+    });
+    const editRes = await PATCH(editReq, { params: Promise.resolve({ id: invoice.id }) });
+    expect(editRes.status).toBe(200);
+
+    const body = (await editRes.json()) as {
+      invoice: {
+        bankName: string;
+        bankBsb: string;
+        bankAccountName: string;
+        bankAccountNumber: string;
+      };
+    };
+    expect(body.invoice).toMatchObject({
+      bankName: "Commonwealth Bank",
+      bankBsb: "063-162",
+      bankAccountName: "Melbourne Guitar School Pty Ltd",
+      bankAccountNumber: "87654321"
+    });
+
+    const pdfReq = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}/pdf`, "GET", token);
+    const pdfRes = await getInvoicePdf(pdfReq, { params: Promise.resolve({ id: invoice.id }) });
+    expect(pdfRes.status).toBe(200);
+    expect(pdfRes.headers.get("content-type")).toContain("application/pdf");
+
+    const reloaded = await prisma.invoice.findUniqueOrThrow({ where: { id: invoice.id } });
+    expect(reloaded).toMatchObject({
+      bankName: "Commonwealth Bank",
+      bankBsb: "063-162",
+      bankAccountName: "Melbourne Guitar School Pty Ltd",
+      bankAccountNumber: "87654321"
+    });
+  });
+
   it("rejects invalid invoice transitions and keeps status unchanged", async () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);
