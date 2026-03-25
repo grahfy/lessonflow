@@ -10,6 +10,7 @@ import { CustomerDialogWrapper } from "@/components/admin/customers/customer-dia
 import type { CustomerForm, CustomerRow } from "@/components/admin/customers/customer-profile-dialog";
 import { AdminEmailPanel } from "@/components/admin/ui/admin-email-panel";
 import type { EmailRecord } from "@/lib/admin/use-email-history";
+import type { CustomerBookingHistoryRow } from "@/lib/admin/types";
 import type { BookingEvent } from "@/lib/admin/use-bookings";
 
 (globalThis as typeof globalThis & { React?: typeof React }).React = React;
@@ -110,6 +111,23 @@ const bookingDialogForm: BookingDialogForm = {
   customDurationMinutes: ""
 };
 
+const customerBookingHistory: CustomerBookingHistoryRow[] = [
+  {
+    id: "booking-1",
+    startAt: "2026-03-19T10:00:00.000Z",
+    endAt: "2026-03-19T11:00:00.000Z",
+    status: "approved",
+    lessonMode: "in_person",
+    lessonDuration: "min60",
+    customDurationMinutes: null,
+    notes: "Focused on chord transitions.",
+    assignedTeacher: {
+      id: "teacher-1",
+      displayName: "Ava Teacher"
+    }
+  }
+];
+
 describe("admin-email-panel-layout", () => {
   it("renders the shared panel with a neutral shell class", () => {
     const markup = renderMarkup(
@@ -176,6 +194,9 @@ describe("admin-email-panel-layout", () => {
         onRevealPortalPassword: noop,
         onRegeneratePortalPassword: noop,
         onCopyPortalPassword: noop,
+        bookingsLoading: false,
+        bookings: customerBookingHistory,
+        onOpenBooking: noop,
         loadingEmailHistory: false,
         emailHistory,
         emailHistoryWarning: null,
@@ -211,6 +232,73 @@ describe("admin-email-panel-layout", () => {
     expect(markup).not.toContain("Sync Now");
     expect(markup).not.toContain("Syncing...");
     expect(markup).not.toContain("Sync recent emails from connected providers.");
+  });
+
+  it("renders the lesson history tab with booking rows and actions", () => {
+    const markup = renderMarkup(
+      createElement(CustomerDialogWrapper, {
+        dialogRootRef: rootRef,
+        selectedCustomer: customer,
+        activeTab: "history",
+        setActiveTab: noop,
+        error: "",
+        notice: "",
+        onClose: noop,
+        canAccessCustomerActions: true,
+        isEditing: false,
+        customerForm,
+        setCustomerForm: noop,
+        savingCustomer: false,
+        deletingCustomerId: null,
+        canEditProfile: true,
+        canEditAssignment: true,
+        teacherOptions: [],
+        canManagePortalCredentials: false,
+        canViewBillingHistory: false,
+        canDeleteCustomer: false,
+        revealedPortalPasswords: {},
+        portalCredentialBusyCustomerId: null,
+        onSaveCustomer: noop,
+        onCancelEdit: noop,
+        onStartEdit: noop,
+        onDeleteCustomer: noop,
+        onViewBillingHistory: noop,
+        onRevealPortalPassword: noop,
+        onRegeneratePortalPassword: noop,
+        onCopyPortalPassword: noop,
+        bookingsLoading: false,
+        bookings: customerBookingHistory,
+        onOpenBooking: noop,
+        loadingEmailHistory: false,
+        emailHistory,
+        emailHistoryWarning: null,
+        emailComposerSubject: "",
+        setEmailComposerSubject: noop,
+        emailComposerMessage: "",
+        setEmailComposerMessage: noop,
+        sendingEmail: false,
+        syncingEmail: false,
+        onSendEmail: asyncNoop,
+        onSyncEmail: noop,
+        materialsLoading: false,
+        materialsList: [],
+        materialsBookings: [],
+        materialsBookingId: "",
+        setMaterialsBookingId: noop,
+        materialsUploading: false,
+        materialsDeletingId: null,
+        materialsUploadFormRef: rootRef,
+        onUploadMaterial: noop,
+        onDeleteMaterial: noop,
+        onMaterialBookingSelect: noop
+      })
+    );
+
+    expect(markup).toContain("Lesson History");
+    expect(markup).toContain("customer-booking-history-panel");
+    expect(markup).toContain("customer-booking-history-item");
+    expect(markup).toContain("Focused on chord transitions.");
+    expect(markup).toContain("Open Booking");
   });
 
   it("keeps booking communication on the shared neutral shell", () => {

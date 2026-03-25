@@ -35,6 +35,8 @@ import { Tooltip } from "@/components/admin/ui/tooltip";
 import { emptyCustomerForm, customerFormFromRow, type CustomerRow, type CustomerForm } from "@/components/admin/customers/customer-profile-dialog";
 
 import { useAdminSession } from "@/lib/admin/use-admin-session";
+import { type CustomerBookingHistoryRow } from "@/lib/admin/types";
+import { useCustomerBookings } from "@/lib/admin/use-customer-bookings";
 import { useCustomers } from "@/lib/admin/use-customers";
 import { useEmailHistory } from "@/lib/admin/use-email-history";
 import { useLearningMaterials } from "@/lib/admin/use-learning-materials";
@@ -42,6 +44,7 @@ import { usePortalCredentials } from "@/lib/admin/use-portal-credentials";
 import { useTeachers } from "@/lib/admin/use-teachers";
 import type { CustomerEmailAlertsSummary } from "@/lib/admin/customer-email-alerts";
 import { type CustomersSortBy, type CustomersSortDirection } from "@/lib/customers/schema";
+import { toDateKey } from "@/lib/time";
 
 /**
  * Main Client Component for the /admin/customers route.
@@ -82,7 +85,7 @@ export function AdminCustomersClient() {
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerRow | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [customerForm, setCustomerForm] = useState<CustomerForm>(emptyCustomerForm());
-  const [activeTab, setActiveTab] = useState<"profile" | "emails" | "materials">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "history" | "emails" | "materials">("profile");
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(null);
 
@@ -122,6 +125,12 @@ export function AdminCustomersClient() {
     onError: setError,
     onAuthError
   });
+
+  const {
+    bookings: customerBookings,
+    loading: loadingCustomerBookings,
+    load: loadCustomerBookings
+  } = useCustomerBookings({ onAuthError, onError: setError });
 
   const {
     history: emailHistory,
@@ -270,6 +279,14 @@ export function AdminCustomersClient() {
     return () => clearTimeout(timer);
   }, [customerQuery]);
 
+  useEffect(() => {
+    if (activeTab !== "history" || !selectedCustomer) {
+      return;
+    }
+
+    void loadCustomerBookings(selectedCustomer.id);
+  }, [activeTab, loadCustomerBookings, selectedCustomer]);
+
   // -- ACTION HANDLERS --
 
   /** Creates or updates a customer profile. */
@@ -374,6 +391,13 @@ export function AdminCustomersClient() {
   function handleMaterialBookingSelect(bookingId: string) {
     if (!selectedCustomer) return;
     void loadMaterials(selectedCustomer.id, bookingId);
+  }
+
+  function openCustomerBooking(booking: CustomerBookingHistoryRow) {
+    const bookingDate = toDateKey(booking.startAt);
+    void beginExitTransition(null, 0, () =>
+      router.push(`/admin/bookings?view=day&date=${encodeURIComponent(bookingDate)}&bookingId=${encodeURIComponent(booking.id)}&open=true`)
+    );
   }
 
   async function copyPortalPassword(password: string) {
@@ -560,6 +584,9 @@ export function AdminCustomersClient() {
           notice={notice}
           
           // Email History & Sync Logic
+          bookingsLoading={loadingCustomerBookings}
+          bookings={customerBookings}
+          onOpenBooking={openCustomerBooking}
           loadingEmailHistory={loadingEmailHistory}
           emailHistory={emailHistory}
           emailHistoryWarning={emailHistoryWarning}

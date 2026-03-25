@@ -22,6 +22,21 @@ export type LearningMaterialBooking = {
     customDurationMinutes: number | null;
 };
 
+export type CustomerBookingHistoryRow = {
+    id: string;
+    startAt: string;
+    endAt: string;
+    status: "approved" | "cancelled";
+    lessonMode: "in_person" | "video";
+    lessonDuration: "min30" | "min60";
+    customDurationMinutes: number | null;
+    notes: string | null;
+    assignedTeacher: {
+        id: string;
+        displayName: string;
+    } | null;
+};
+
 export type LearningMaterialRow = {
     id: string;
     title: string;

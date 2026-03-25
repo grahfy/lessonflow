@@ -3977,6 +3977,7 @@
 #booking-detail-dialog .booking-appointment-panel,
 #booking-detail-dialog .booking-lesson-plan-panel,
 #booking-detail-dialog .booking-materials-panel,
+#customer-dialog .customer-booking-history-panel,
 #customer-dialog .customer-materials-panel {
   overflow: auto;
   padding-right: 4px;
@@ -3994,6 +3995,7 @@
 }
 
 #customer-dialog .customer-profile-panel,
+#customer-dialog .customer-booking-history-card,
 #customer-dialog .customer-email-panel .dialog-col,
 #customer-dialog .customer-materials-panel .dialog-col {
   padding: 12px;
@@ -4021,6 +4023,76 @@
 
 #customer-dialog .customer-form-grid .field {
   gap: 5px;
+}
+
+#customer-dialog .customer-booking-history-card {
+  display: grid;
+  gap: 14px;
+}
+
+#customer-dialog .customer-booking-history-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#customer-dialog .customer-booking-history-list {
+  display: grid;
+  gap: 12px;
+}
+
+#customer-dialog .customer-booking-history-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.44);
+}
+
+#customer-dialog .customer-booking-history-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+#customer-dialog .customer-booking-history-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+#customer-dialog .customer-booking-history-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(71, 85, 105, 0.36);
+  color: var(--ink-0);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+#customer-dialog .customer-booking-history-notes {
+  margin: 0;
+  color: var(--ink-1);
+  line-height: 1.5;
+}
+
+#customer-dialog .customer-booking-history-actions {
+  flex: 0 0 auto;
+}
+
+#customer-dialog .customer-booking-history-empty {
+  padding: 12px;
+  border: 1px dashed rgba(148, 163, 184, 0.2);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.28);
 }
 
 #customer-dialog .customer-form-grid .field label {

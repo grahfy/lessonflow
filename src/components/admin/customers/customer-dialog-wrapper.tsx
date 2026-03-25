@@ -4,11 +4,12 @@ import { AdminNoticeStack } from "@/components/admin/ui/admin-notice";
 import { AdminTabBar } from "@/components/admin/ui/admin-tab-bar";
 import { CustomerProfileDialog, type CustomerForm, type CustomerRow } from "./customer-profile-dialog";
 import { CustomerEmailDialog } from "./customer-email-dialog";
+import { CustomerBookingHistoryDialog } from "./customer-booking-history-dialog";
 import { CustomerMaterialsDialog } from "./customer-materials-dialog";
 import { type EmailRecord, type SendEmailResult } from "@/lib/admin/use-email-history";
-import { type LearningMaterialBooking, type LearningMaterialRow } from "@/lib/admin/types";
+import { type CustomerBookingHistoryRow, type LearningMaterialBooking, type LearningMaterialRow } from "@/lib/admin/types";
 
-type Tab = "profile" | "emails" | "materials";
+type Tab = "profile" | "history" | "emails" | "materials";
 
 type Props = {
     dialogRootRef: RefObject<HTMLDivElement | null>;
@@ -42,6 +43,11 @@ type Props = {
     onRevealPortalPassword: () => void;
     onRegeneratePortalPassword: () => void;
     onCopyPortalPassword: (password: string) => void | Promise<void>;
+
+    // Email Props
+    bookingsLoading: boolean;
+    bookings: CustomerBookingHistoryRow[];
+    onOpenBooking: (booking: CustomerBookingHistoryRow) => void;
 
     // Email Props
     loadingEmailHistory: boolean;
@@ -103,6 +109,7 @@ export function CustomerDialogWrapper({
                 listClassName="customer-dialog-tabs-list"
                 items={[
                     { key: "profile", label: "Profile & Address" },
+                    { key: "history", label: "Lesson History", disabled: !selectedCustomer || !rest.canAccessCustomerActions },
                     { key: "emails", label: "Communication", disabled: !selectedCustomer || !rest.canAccessCustomerActions },
                     { key: "materials", label: "Learning Materials", disabled: !selectedCustomer || !rest.canAccessCustomerActions }
                 ]}
@@ -157,6 +164,14 @@ export function CustomerDialogWrapper({
                             onCopyPortalPassword={rest.onCopyPortalPassword}
                         />
                     </div>
+                )}
+
+                {activeTab === "history" && (
+                    <CustomerBookingHistoryDialog
+                        bookingsLoading={rest.bookingsLoading}
+                        bookings={rest.bookings}
+                        onOpenBooking={rest.onOpenBooking}
+                    />
                 )}
 
                 {activeTab === 'emails' && (

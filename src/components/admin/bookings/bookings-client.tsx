@@ -153,6 +153,8 @@ export function AdminBookingsClient() {
   // PARAMS: Sync calendar view state with URL for shareable/bookmarkable states.
   const view = (searchParams.get("view") as CalendarView) || "week";
   const dateStr = searchParams.get("date") || toDateKey(new Date());
+  const deepLinkedBookingId = searchParams.get("bookingId") || "";
+  const shouldOpenDeepLinkedBooking = searchParams.get("open") === "true";
 
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -198,6 +200,7 @@ export function AdminBookingsClient() {
 
   const dialogRootRef = useRef<HTMLDivElement | null>(null);
   const manualDialogRootRef = useRef<HTMLDivElement | null>(null);
+  const handledDeepLinkedBookingIdRef = useRef<string | null>(null);
 
   const materialsUploadFormRef = useRef<HTMLFormElement | null>(null);
   const manualFormRef = useRef<HTMLFormElement | null>(null);
@@ -208,6 +211,7 @@ export function AdminBookingsClient() {
   // Data Fetching Hooks (Abstracted for reuse and clean component logic)
   const { 
     events: rawEvents, 
+    loading: loadingBookings,
     load: loadBookings, 
     update: updateBookingApi,
     remove: removeBookingApi
@@ -307,6 +311,8 @@ export function AdminBookingsClient() {
     const params = new URLSearchParams(searchParams.toString());
     params.set("view", newView);
     params.set("date", newDate);
+    params.delete("bookingId");
+    params.delete("open");
     router.push(`/admin/bookings?${params.toString()}`);
   }, [router, searchParams]);
 
@@ -401,6 +407,31 @@ export function AdminBookingsClient() {
     dialogPresence.show();
     if (dialogRootRef.current) animateIn(dialogRootRef.current);
   }, [currentAdmin, dialogPresence, loadBookingLessonPlan, loadCustomers, loadEmailHistory, loadLessonPlanTemplates, loadMaterials, resetBookingLessonPlan, singleTeacherOptionId]);
+
+  useEffect(() => {
+    if (!deepLinkedBookingId || !shouldOpenDeepLinkedBooking) {
+      handledDeepLinkedBookingIdRef.current = null;
+      return;
+    }
+
+    if (handledDeepLinkedBookingIdRef.current === deepLinkedBookingId) {
+      return;
+    }
+
+    const matchedEvent = events.find((event) => event.id === deepLinkedBookingId && event.entityType === "booking");
+    if (matchedEvent) {
+      handledDeepLinkedBookingIdRef.current = deepLinkedBookingId;
+      openDialog(matchedEvent);
+      return;
+    }
+
+    if (loadingBookings) {
+      return;
+    }
+
+    handledDeepLinkedBookingIdRef.current = deepLinkedBookingId;
+    setNotice("The requested booking was not found in the selected day view.");
+  }, [deepLinkedBookingId, events, loadingBookings, openDialog, shouldOpenDeepLinkedBooking]);
 
   const closeDialog = useCallback(() => {
     const root = dialogRootRef.current;
