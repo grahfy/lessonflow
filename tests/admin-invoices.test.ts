@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-import { POST as createBookingInvoice } from "@/app/api/admin/bookings/[id]/invoice/route";
+import { GET as resolveBookingInvoice, POST as createBookingInvoice } from "@/app/api/admin/bookings/[id]/invoice/route";
 import { POST as createCustomerInvoice } from "@/app/api/admin/customers/[id]/invoices/route";
 import { PATCH as patchInvoice } from "@/app/api/admin/invoices/[id]/route";
 import { POST as sendInvoice } from "@/app/api/admin/invoices/[id]/send/route";
@@ -163,6 +163,9 @@ describe("admin-invoices", () => {
       ]
     });
     const res = await createBookingInvoice(req, { params: Promise.resolve({ id: booking.id }) });
+    if (!res) {
+      throw new Error("Expected booking invoice create response.");
+    }
     expect(res.status).toBe(201);
 
     const body = (await res.json()) as {
@@ -177,6 +180,377 @@ describe("admin-invoices", () => {
     expect(body.invoice.bookingId).toBe(booking.id);
     expect(body.invoice.lineItems.length).toBe(4);
     expect(body.invoice.currency).toBe("CAD");
+  });
+
+  it("resolves existing linked invoice from booking endpoint via invoice booking link", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const customer = await prisma.customer.create({
+      data: {
+        fullName: "Linked Student",
+        email: "linked.student@example.com",
+        phone: "0400111555",
+        normalizedEmail: "linked.student@example.com",
+        normalizedPhone: "0400111555",
+        skillLevel: "beginner",
+        lessonMode: "in_person"
+      }
+    });
+
+    const booking = await prisma.booking.create({
+      data: {
+        name: customer.fullName,
+        email: customer.email,
+        phone: customer.phone,
+        address: "10 Main Street, Northcote VIC 3070",
+        houseNumber: "10",
+        streetName: "Main",
+        streetType: "Street",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070",
+        lessonMode: "in_person",
+        skillLevel: customer.skillLevel,
+        lessonDuration: "min60",
+        startAt: new Date("2026-07-10T09:00:00.000Z"),
+        endAt: new Date("2026-07-10T10:00:00.000Z"),
+        timezone: "Australia/Melbourne",
+        customerId: customer.id,
+        modifiedById: admin.id
+      }
+    });
+
+    const invoice = await prisma.invoice.create({
+      data: {
+        invoiceNumber: "INV-LINKED",
+        status: "draft",
+        documentType: "invoice",
+        currency: "AUD",
+        taxMode: "taxable",
+        customerId: customer.id,
+        bookingId: booking.id,
+        customerFirstName: "Linked",
+        customerLastName: "Student",
+        customerName: customer.fullName,
+        customerEmail: customer.email,
+        customerPhone: customer.phone,
+        customerAddress: "10 Main Street, Northcote VIC 3070",
+        sellerBusinessName: "School",
+        sellerAbn: "12345678901",
+        sellerEmail: "school@example.com",
+        bankName: "Bank",
+        bankBsb: "123-456",
+        bankAccountName: "School",
+        bankAccountNumber: "12345678",
+        subtotalCents: 9000,
+        gstCents: 900,
+        totalCents: 9900,
+        issuedAt: new Date("2026-07-10T00:00:00.000Z"),
+        dueAt: new Date("2026-07-24T00:00:00.000Z")
+      }
+    });
+    await prisma.invoiceBookingLink.create({
+      data: {
+        invoiceId: invoice.id,
+        bookingId: booking.id
+      }
+    });
+
+    const req = adminRequest(`http://localhost/api/admin/bookings/${booking.id}/invoice`, "GET", token);
+    const res = await resolveBookingInvoice(req, { params: Promise.resolve({ id: booking.id }) });
+    if (!res) {
+      throw new Error("Expected booking invoice resolver response.");
+    }
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { outcome: string; invoiceId?: string };
+    expect(body).toEqual({
+      outcome: "open_existing",
+      invoiceId: invoice.id
+    });
+  });
+
+  it("resolves existing linked invoice from booking endpoint via legacy bookingId", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const customer = await prisma.customer.create({
+      data: {
+        fullName: "Legacy Student",
+        email: "legacy.student@example.com",
+        phone: "0400111666",
+        normalizedEmail: "legacy.student@example.com",
+        normalizedPhone: "0400111666",
+        skillLevel: "beginner",
+        lessonMode: "in_person"
+      }
+    });
+
+    const booking = await prisma.booking.create({
+      data: {
+        name: customer.fullName,
+        email: customer.email,
+        phone: customer.phone,
+        address: "10 Main Street, Northcote VIC 3070",
+        houseNumber: "10",
+        streetName: "Main",
+        streetType: "Street",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070",
+        lessonMode: "in_person",
+        skillLevel: customer.skillLevel,
+        lessonDuration: "min60",
+        startAt: new Date("2026-08-12T09:00:00.000Z"),
+        endAt: new Date("2026-08-12T10:00:00.000Z"),
+        timezone: "Australia/Melbourne",
+        customerId: customer.id,
+        modifiedById: admin.id
+      }
+    });
+
+    const invoice = await prisma.invoice.create({
+      data: {
+        invoiceNumber: "INV-LEGACY-LINK",
+        status: "sent",
+        documentType: "invoice",
+        currency: "AUD",
+        taxMode: "taxable",
+        customerId: customer.id,
+        bookingId: booking.id,
+        customerFirstName: "Legacy",
+        customerLastName: "Student",
+        customerName: customer.fullName,
+        customerEmail: customer.email,
+        customerPhone: customer.phone,
+        customerAddress: "10 Main Street, Northcote VIC 3070",
+        sellerBusinessName: "School",
+        sellerAbn: "12345678901",
+        sellerEmail: "school@example.com",
+        bankName: "Bank",
+        bankBsb: "123-456",
+        bankAccountName: "School",
+        bankAccountNumber: "12345678",
+        subtotalCents: 9000,
+        gstCents: 900,
+        totalCents: 9900,
+        issuedAt: new Date("2026-08-12T00:00:00.000Z"),
+        dueAt: new Date("2026-08-26T00:00:00.000Z")
+      }
+    });
+
+    const req = adminRequest(`http://localhost/api/admin/bookings/${booking.id}/invoice`, "GET", token);
+    const res = await resolveBookingInvoice(req, { params: Promise.resolve({ id: booking.id }) });
+    if (!res) {
+      throw new Error("Expected booking invoice resolver response.");
+    }
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { outcome: string; invoiceId?: string };
+    expect(body).toEqual({
+      outcome: "open_existing",
+      invoiceId: invoice.id
+    });
+  });
+
+  it("returns booking invoice candidates when nearby invoice history suggests a match", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const customer = await prisma.customer.create({
+      data: {
+        fullName: "Candidate Student",
+        email: "candidate.student@example.com",
+        phone: "0400111777",
+        normalizedEmail: "candidate.student@example.com",
+        normalizedPhone: "0400111777",
+        skillLevel: "beginner",
+        lessonMode: "in_person"
+      }
+    });
+
+    const booking = await prisma.booking.create({
+      data: {
+        name: customer.fullName,
+        email: customer.email,
+        phone: customer.phone,
+        address: "10 Main Street, Northcote VIC 3070",
+        houseNumber: "10",
+        streetName: "Main",
+        streetType: "Street",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070",
+        lessonMode: "in_person",
+        skillLevel: customer.skillLevel,
+        lessonDuration: "min60",
+        startAt: new Date("2026-09-18T08:00:00.000Z"),
+        endAt: new Date("2026-09-18T09:00:00.000Z"),
+        timezone: "Australia/Melbourne",
+        customerId: customer.id,
+        modifiedById: admin.id
+      }
+    });
+
+    const dateMatchInvoice = await prisma.invoice.create({
+      data: {
+        invoiceNumber: "INV-CANDIDATE-DATE",
+        status: "draft",
+        documentType: "invoice",
+        currency: "AUD",
+        taxMode: "taxable",
+        customerId: customer.id,
+        customerFirstName: "Candidate",
+        customerLastName: "Student",
+        customerName: customer.fullName,
+        customerEmail: customer.email,
+        customerPhone: customer.phone,
+        customerAddress: "10 Main Street, Northcote VIC 3070",
+        sellerBusinessName: "School",
+        sellerAbn: "12345678901",
+        sellerEmail: "school@example.com",
+        bankName: "Bank",
+        bankBsb: "123-456",
+        bankAccountName: "School",
+        bankAccountNumber: "12345678",
+        subtotalCents: 9000,
+        gstCents: 900,
+        totalCents: 9900,
+        issuedAt: new Date("2026-09-16T00:00:00.000Z"),
+        dueAt: new Date("2026-09-30T00:00:00.000Z"),
+        notes: "Covers lesson on 18/09/2026"
+      }
+    });
+    await prisma.invoiceLineItem.create({
+      data: {
+        invoiceId: dateMatchInvoice.id,
+        kind: "lesson_fee",
+        description: "Lesson fee",
+        quantity: 1,
+        unitPriceCents: 9000,
+        taxMode: "taxable",
+        lineDiscountCents: 0,
+        lineSubtotalCents: 9000,
+        lineGstCents: 900,
+        lineTotalCents: 9900,
+        sortOrder: 0
+      }
+    });
+
+    const nearbyLessonInvoice = await prisma.invoice.create({
+      data: {
+        invoiceNumber: "INV-CANDIDATE-NEARBY",
+        status: "sent",
+        documentType: "invoice",
+        currency: "AUD",
+        taxMode: "taxable",
+        customerId: customer.id,
+        customerFirstName: "Candidate",
+        customerLastName: "Student",
+        customerName: customer.fullName,
+        customerEmail: customer.email,
+        customerPhone: customer.phone,
+        customerAddress: "10 Main Street, Northcote VIC 3070",
+        sellerBusinessName: "School",
+        sellerAbn: "12345678901",
+        sellerEmail: "school@example.com",
+        bankName: "Bank",
+        bankBsb: "123-456",
+        bankAccountName: "School",
+        bankAccountNumber: "12345678",
+        subtotalCents: 5000,
+        gstCents: 500,
+        totalCents: 5500,
+        issuedAt: new Date("2026-09-21T00:00:00.000Z"),
+        dueAt: new Date("2026-10-05T00:00:00.000Z")
+      }
+    });
+    await prisma.invoiceLineItem.create({
+      data: {
+        invoiceId: nearbyLessonInvoice.id,
+        kind: "lesson_fee",
+        description: "30 minute lesson",
+        quantity: 1,
+        unitPriceCents: 5000,
+        taxMode: "taxable",
+        lineDiscountCents: 0,
+        lineSubtotalCents: 5000,
+        lineGstCents: 500,
+        lineTotalCents: 5500,
+        sortOrder: 0
+      }
+    });
+
+    const req = adminRequest(`http://localhost/api/admin/bookings/${booking.id}/invoice`, "GET", token);
+    const res = await resolveBookingInvoice(req, { params: Promise.resolve({ id: booking.id }) });
+    if (!res) {
+      throw new Error("Expected booking invoice resolver response.");
+    }
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as {
+      outcome: string;
+      candidates?: Array<{ invoiceId: string; matchReason: string }>;
+    };
+
+    expect(body.outcome).toBe("choose_candidate");
+    expect(body.candidates?.map((candidate) => candidate.invoiceId)).toEqual([
+      dateMatchInvoice.id,
+      nearbyLessonInvoice.id
+    ]);
+    expect(body.candidates?.[0]?.matchReason).toContain("Mentions booking date");
+    expect(body.candidates?.[1]?.matchReason).toContain("Nearby lesson invoice");
+  });
+
+  it("returns create_new when no linked invoice or likely candidates exist", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const customer = await prisma.customer.create({
+      data: {
+        fullName: "Fresh Student",
+        email: "fresh.student@example.com",
+        phone: "0400111888",
+        normalizedEmail: "fresh.student@example.com",
+        normalizedPhone: "0400111888",
+        skillLevel: "beginner",
+        lessonMode: "in_person"
+      }
+    });
+
+    const booking = await prisma.booking.create({
+      data: {
+        name: customer.fullName,
+        email: customer.email,
+        phone: customer.phone,
+        address: "10 Main Street, Northcote VIC 3070",
+        houseNumber: "10",
+        streetName: "Main",
+        streetType: "Street",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070",
+        lessonMode: "in_person",
+        skillLevel: customer.skillLevel,
+        lessonDuration: "min30",
+        startAt: new Date("2026-10-20T08:00:00.000Z"),
+        endAt: new Date("2026-10-20T08:30:00.000Z"),
+        timezone: "Australia/Melbourne",
+        customerId: customer.id,
+        modifiedById: admin.id
+      }
+    });
+
+    const req = adminRequest(`http://localhost/api/admin/bookings/${booking.id}/invoice`, "GET", token);
+    const res = await resolveBookingInvoice(req, { params: Promise.resolve({ id: booking.id }) });
+    if (!res) {
+      throw new Error("Expected booking invoice resolver response.");
+    }
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { outcome: string };
+    expect(body).toEqual({ outcome: "create_new" });
   });
 
   it("uses the configured default currency when create payload omits currency", async () => {

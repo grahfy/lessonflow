@@ -33,6 +33,7 @@ import { usePresenceExit } from "@/components/motion/use-presence-exit";
 import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { Tooltip } from "@/components/admin/ui/tooltip";
+import { formatDateTime } from "@/lib/admin/formatters";
 
 import { useBookings, type BookingEvent } from "@/lib/admin/use-bookings";
 import { useCustomers } from "@/lib/admin/use-customers";
@@ -44,6 +45,8 @@ import { usePresets } from "@/lib/admin/use-presets";
 import { useTeachers } from "@/lib/admin/use-teachers";
 import { buildManualBookingPayload } from "@/lib/admin/manual-booking-payload";
 import { durationMinutesToBookingPayload, durationMinutesToChoiceValue, getPersistedDurationMinutes } from "@/lib/lesson-duration-utils";
+import { formatCurrency } from "@/lib/invoices/currency";
+import { type BookingInvoiceCandidateSummary, type BookingInvoiceResolveResponse } from "@/lib/invoices/schema";
 import { toDateKey, toDateTimeLocalValue } from "@/lib/time";
 
 import { BookingDetailDialog } from "./booking-detail-dialog";
@@ -166,6 +169,7 @@ export function AdminBookingsClient() {
   const [activeTab, setActiveTab] = useState<"appointment" | "emails" | "materials">("appointment");
   const [dialogForm, setDialogForm] = useState<BookingDialogForm | null>(null);
   const [dialogMatchDismissed, setDialogMatchDismissed] = useState(false);
+  const [invoiceCandidates, setInvoiceCandidates] = useState<BookingInvoiceCandidateSummary[]>([]);
 
   // Manual Booking State
   const [manualStep, setManualStep] = useState<ManualStep>("customer");
@@ -380,9 +384,47 @@ export function AdminBookingsClient() {
     dialogPresence.hide(() => {
       setSelectedKey(null);
       setDialogForm(null);
+      setInvoiceCandidates([]);
     });
     void animateOut(root).catch(() => undefined);
   }, [dialogPresence]);
+
+  const openInvoiceById = useCallback(async (invoiceId: string, noticeMessage: string) => {
+    setNotice(noticeMessage);
+    setInvoiceCandidates([]);
+    await closeDialog();
+    void beginExitTransition(null, 0, () => router.push(`/admin/invoices?openInvoiceId=${encodeURIComponent(invoiceId)}`));
+  }, [beginExitTransition, closeDialog, router]);
+
+  const createBookingInvoiceDraft = useCallback(async (bookingId: string) => {
+    const lessonPreset = presets.find((preset) => `${preset.label} ${preset.description}`.toLowerCase().includes("lesson")) || presets[0] || null;
+    const res = await fetch(`/api/admin/bookings/${bookingId}/invoice`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lineItems: [{
+          description: lessonPreset?.description || lessonPreset?.label || "Standard Lesson Fee",
+          quantity: 1,
+          unitPriceCents: lessonPreset?.unitPriceCents ?? 6000,
+          kind: "lesson_fee",
+          discountKind: lessonPreset?.discountKind ?? null,
+          discountValue: lessonPreset?.discountValue ?? null
+        }]
+      })
+    });
+
+    if (!res.ok) {
+      const payload = await res.json().catch(() => null);
+      throw new Error(payload?.error || "Unable to create invoice draft.");
+    }
+
+    const payload = await res.json() as { invoice?: { id?: string } };
+    if (!payload.invoice?.id) {
+      throw new Error("Invoice draft was created but no invoice id was returned.");
+    }
+
+    await openInvoiceById(payload.invoice.id, "Draft invoice created.");
+  }, [openInvoiceById, presets]);
 
   const openManualDialog = useCallback(async () => {
     setManualStep("customer");
@@ -771,34 +813,30 @@ export function AdminBookingsClient() {
           onOpenInvoice={async () => {
             const event = selectedEvent;
             if (!event || event.entityType !== "booking") return;
-            const lessonPreset = presets.find((p) => `${p.label} ${p.description}`.toLowerCase().includes("lesson")) || presets[0] || null;
             setBusyAction("invoice");
             try {
               const res = await fetch(`/api/admin/bookings/${event.id}/invoice`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  lineItems: [{
-                    description: lessonPreset?.description || lessonPreset?.label || "Standard Lesson Fee",
-                    quantity: 1,
-                    unitPriceCents: lessonPreset?.unitPriceCents ?? 6000,
-                    kind: "lesson_fee",
-                    discountKind: lessonPreset?.discountKind ?? null,
-                    discountValue: lessonPreset?.discountValue ?? null
-                  }]
-                })
+                cache: "no-store"
               });
               if (!res.ok) {
-                const p = await res.json().catch(() => null);
-                setError(p?.error || "Unable to create invoice draft.");
+                const payload = await res.json().catch(() => null);
+                setError(payload?.error || "Unable to resolve invoice billing.");
                 return;
               }
-              const p = await res.json();
-              setNotice("Draft invoice created.");
-              await closeDialog();
-              void beginExitTransition(null, 0, () => router.push(`/admin/invoices?openInvoiceId=${encodeURIComponent(p?.invoice?.id)}`));
-            } catch {
-              setError("Network error creating invoice draft.");
+
+              const payload = await res.json() as BookingInvoiceResolveResponse;
+              if (payload.outcome === "open_existing") {
+                await openInvoiceById(payload.invoiceId, "Linked invoice opened.");
+                return;
+              }
+              if (payload.outcome === "choose_candidate") {
+                setInvoiceCandidates(payload.candidates);
+                return;
+              }
+
+              await createBookingInvoiceDraft(event.id);
+            } catch (error) {
+              setError(error instanceof Error ? error.message : "Network error resolving invoice billing.");
             } finally {
               setBusyAction(null);
             }
@@ -833,6 +871,68 @@ export function AdminBookingsClient() {
           }}
         />
       )}
+
+      <AdminDialog
+        isOpen={invoiceCandidates.length > 0}
+        onClose={() => setInvoiceCandidates([])}
+        title="Possible Existing Invoices"
+        description="Choose an existing invoice for this booking or create a new booking-linked draft."
+        footer={(
+          <div className="dialog-footer-row dialog-footer-row-end">
+            <button className="btn btn-secondary" type="button" onClick={() => setInvoiceCandidates([])}>
+              Close
+            </button>
+            <button
+              className="btn btn-primary"
+              type="button"
+              disabled={busyAction === "invoice" || !selectedEvent || selectedEvent.entityType !== "booking"}
+              onClick={async () => {
+                if (!selectedEvent || selectedEvent.entityType !== "booking") return;
+                setBusyAction("invoice");
+                try {
+                  await createBookingInvoiceDraft(selectedEvent.id);
+                } catch (error) {
+                  setError(error instanceof Error ? error.message : "Unable to create invoice draft.");
+                } finally {
+                  setBusyAction(null);
+                }
+              }}
+            >
+              {busyAction === "invoice" ? "Creating..." : "Create New"}
+            </button>
+          </div>
+        )}
+      >
+        <AdminCard ghost>
+          {invoiceCandidates.length === 0 ? (
+            <p className="helper-text">No candidate invoices found.</p>
+          ) : (
+            <div className="invoice-dialog-preset-list">
+              {invoiceCandidates.map((candidate) => (
+                <div key={candidate.invoiceId} className="invoice-dialog-preset-option">
+                  <div className="admin-list-strong">
+                    {candidate.invoiceNumber} · {candidate.status}
+                  </div>
+                  <div className="helper-text">
+                    Issued {formatDateTime(candidate.issuedAt)} · Due {formatDateTime(candidate.dueAt)} · {formatCurrency(candidate.totalCents, candidate.currency)}
+                  </div>
+                  <div className="helper-text">{candidate.matchReason}</div>
+                  <div className="button-row">
+                    <button
+                      className="btn btn-secondary"
+                      type="button"
+                      disabled={busyAction === "invoice"}
+                      onClick={() => void openInvoiceById(candidate.invoiceId, "Candidate invoice opened.")}
+                    >
+                      Open Existing
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </AdminCard>
+      </AdminDialog>
 
       {isMoveOpen && (
         <AdminDialog

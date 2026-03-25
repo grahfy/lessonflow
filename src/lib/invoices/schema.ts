@@ -256,3 +256,27 @@ export type CreateCreditNoteInput = z.infer<typeof createCreditNoteSchema>;
 export type SendInvoiceRemindersInput = z.infer<typeof sendInvoiceRemindersSchema>;
 export type InvoiceSortBy = z.infer<typeof invoiceSortBySchema>;
 export type InvoiceSortDirection = z.infer<typeof invoiceSortDirectionSchema>;
+
+export type BookingInvoiceCandidateSummary = {
+  invoiceId: string;
+  invoiceNumber: string;
+  status: z.infer<typeof invoiceStatusSchema>;
+  issuedAt: string;
+  dueAt: string;
+  totalCents: number;
+  currency: string;
+  matchReason: string;
+};
+
+export type BookingInvoiceResolveResponse =
+  | {
+      outcome: "open_existing";
+      invoiceId: string;
+    }
+  | {
+      outcome: "choose_candidate";
+      candidates: BookingInvoiceCandidateSummary[];
+    }
+  | {
+      outcome: "create_new";
+    };
