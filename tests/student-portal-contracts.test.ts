@@ -58,6 +58,7 @@ describe("student-portal-contracts", () => {
     // NOTE: Booking mapping also recursively normalizes nested materials, which
     // is why this test asserts the derived materials array rather than only top-level fields.
     expect(booking.materials).toHaveLength(1);
+    expect(booking.lessonPlanSummary).toBeNull();
 
     const pendingRequest = mapStudentPortalPendingRequest({
       id: "req_1",
@@ -103,6 +104,7 @@ describe("student-portal-contracts", () => {
           startAt: "2026-03-10T08:00:00.000Z",
           endAt: "2026-03-10T09:00:00.000Z",
           notes: null,
+          lessonPlanSummary: null,
           materials: []
         }
       ],

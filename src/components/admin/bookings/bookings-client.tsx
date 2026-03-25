@@ -38,12 +38,15 @@ import { formatDateTime } from "@/lib/admin/formatters";
 import { useBookings, type BookingEvent } from "@/lib/admin/use-bookings";
 import { useCustomers } from "@/lib/admin/use-customers";
 import { useEmailHistory, type EmailHistoryTarget } from "@/lib/admin/use-email-history";
+import { useBookingLessonPlan } from "@/lib/admin/use-booking-lesson-plan";
 import { useLessonPricing } from "@/lib/admin/use-lesson-pricing";
 import { useLearningMaterials } from "@/lib/admin/use-learning-materials";
+import { useLessonPlanTemplates } from "@/lib/admin/use-lesson-plan-templates";
 import { useAdminSession } from "@/lib/admin/use-admin-session";
 import { usePresets } from "@/lib/admin/use-presets";
 import { useTeachers } from "@/lib/admin/use-teachers";
 import { buildManualBookingPayload } from "@/lib/admin/manual-booking-payload";
+import { buildEmptyLessonPlanFieldValues, type BookingLessonPlanInput } from "@/lib/lesson-plan-contract";
 import { durationMinutesToBookingPayload, durationMinutesToChoiceValue, getPersistedDurationMinutes } from "@/lib/lesson-duration-utils";
 import { formatCurrency } from "@/lib/invoices/currency";
 import { type BookingInvoiceCandidateSummary, type BookingInvoiceResolveResponse } from "@/lib/invoices/schema";
@@ -166,10 +169,12 @@ export function AdminBookingsClient() {
 
   // Dialog & Selection State
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"appointment" | "emails" | "materials">("appointment");
+  const [activeTab, setActiveTab] = useState<"appointment" | "emails" | "materials" | "lesson-plan">("appointment");
   const [dialogForm, setDialogForm] = useState<BookingDialogForm | null>(null);
   const [dialogMatchDismissed, setDialogMatchDismissed] = useState(false);
   const [invoiceCandidates, setInvoiceCandidates] = useState<BookingInvoiceCandidateSummary[]>([]);
+  const [lessonPlanDraft, setLessonPlanDraft] = useState<BookingLessonPlanInput | null>(null);
+  const [lessonPlanTemplateSelection, setLessonPlanTemplateSelection] = useState("");
 
   // Manual Booking State
   const [manualStep, setManualStep] = useState<ManualStep>("customer");
@@ -225,6 +230,8 @@ export function AdminBookingsClient() {
     sync: syncEmailApi
   } = useEmailHistory({ onAuthError, onError: setError });
   const { materials: materialsList, loading: materialsLoading, uploading: materialsUploading, deletingId: materialsDeletingId, load: loadMaterials, upload: uploadMaterialApi, remove: removeMaterialApi } = useLearningMaterials({ onAuthError, onError: setError });
+  const { templates: lessonPlanTemplates, loading: lessonPlanTemplatesLoading, load: loadLessonPlanTemplates } = useLessonPlanTemplates({ onAuthError, onError: setError });
+  const { lessonPlan, loading: lessonPlanLoading, saving: lessonPlanSaving, load: loadBookingLessonPlan, save: saveBookingLessonPlan, reset: resetBookingLessonPlan } = useBookingLessonPlan({ onAuthError, onError: setError });
   const { presets } = usePresets({ onAuthError, onError: setError });
   const activeLessonPricingOptions = useMemo(
     () => lessonPricingOptions.filter((option) => option.isActive).sort((a, b) => a.sortOrder - b.sortOrder || a.durationMinutes - b.durationMinutes),
@@ -360,8 +367,11 @@ export function AdminBookingsClient() {
     });
     setActiveTab("appointment");
     setDialogMatchDismissed(false);
+    setLessonPlanDraft(null);
+    setLessonPlanTemplateSelection("");
     setError("");
     setNotice("");
+    resetBookingLessonPlan();
 
     void loadCustomers();
 
@@ -375,9 +385,14 @@ export function AdminBookingsClient() {
       }
     }
 
+    if (event.entityType === "booking") {
+      void loadLessonPlanTemplates();
+      void loadBookingLessonPlan(event.id);
+    }
+
     dialogPresence.show();
     if (dialogRootRef.current) animateIn(dialogRootRef.current);
-  }, [currentAdmin, dialogPresence, loadCustomers, loadEmailHistory, loadMaterials, singleTeacherOptionId]);
+  }, [currentAdmin, dialogPresence, loadBookingLessonPlan, loadCustomers, loadEmailHistory, loadLessonPlanTemplates, loadMaterials, resetBookingLessonPlan, singleTeacherOptionId]);
 
   const closeDialog = useCallback(() => {
     const root = dialogRootRef.current;
@@ -385,9 +400,28 @@ export function AdminBookingsClient() {
       setSelectedKey(null);
       setDialogForm(null);
       setInvoiceCandidates([]);
+      setLessonPlanDraft(null);
+      setLessonPlanTemplateSelection("");
+      resetBookingLessonPlan();
     });
     void animateOut(root).catch(() => undefined);
-  }, [dialogPresence]);
+  }, [dialogPresence, resetBookingLessonPlan]);
+
+  useEffect(() => {
+    if (!lessonPlan) {
+      return;
+    }
+
+    setLessonPlanDraft({
+      sourceTemplateId: lessonPlan.sourceTemplateId,
+      lessonFocus: lessonPlan.lessonFocus,
+      goals: lessonPlan.goals,
+      activities: lessonPlan.activities,
+      homework: lessonPlan.homework,
+      sharedNotes: lessonPlan.sharedNotes,
+      privateNotes: lessonPlan.privateNotes
+    });
+  }, [lessonPlan]);
 
   const openInvoiceById = useCallback(async (invoiceId: string, noticeMessage: string) => {
     setNotice(noticeMessage);
@@ -608,6 +642,61 @@ export function AdminBookingsClient() {
     if (success) {
       setNotice("Material uploaded.");
     }
+  }
+
+  function createScratchLessonPlanDraft() {
+    setLessonPlanDraft({
+      sourceTemplateId: null,
+      ...buildEmptyLessonPlanFieldValues()
+    });
+  }
+
+  function applySelectedLessonPlanTemplate() {
+    if (!lessonPlanTemplateSelection) {
+      setError("Choose a lesson-plan template first.");
+      return;
+    }
+
+    const template = lessonPlanTemplates.find((row) => row.id === lessonPlanTemplateSelection);
+    if (!template) {
+      setError("Selected lesson-plan template could not be loaded.");
+      return;
+    }
+
+    setLessonPlanDraft({
+      sourceTemplateId: template.id,
+      lessonFocus: template.lessonFocus,
+      goals: template.goals,
+      activities: template.activities,
+      homework: template.homework,
+      sharedNotes: template.sharedNotes,
+      privateNotes: template.privateNotes
+    });
+    setNotice(`Template "${template.title}" copied into this booking.`);
+  }
+
+  async function saveLessonPlan() {
+    if (!selectedEvent || selectedEvent.entityType !== "booking") return;
+    if (!lessonPlanDraft) {
+      setError("Create a lesson plan draft before saving.");
+      return;
+    }
+
+    const saved = await saveBookingLessonPlan(selectedEvent.id, lessonPlanDraft);
+    if (!saved) {
+      return;
+    }
+
+    setLessonPlanDraft({
+      sourceTemplateId: saved.sourceTemplateId,
+      lessonFocus: saved.lessonFocus,
+      goals: saved.goals,
+      activities: saved.activities,
+      homework: saved.homework,
+      sharedNotes: saved.sharedNotes,
+      privateNotes: saved.privateNotes
+    });
+    setNotice(lessonPlan ? "Lesson plan saved." : "Lesson plan created.");
   }
 
   /** logic for resolving manual booking with potential duplicates. */
@@ -868,6 +957,20 @@ export function AdminBookingsClient() {
             onUpload: uploadMaterial,
             onDelete: removeMaterialApi,
             uploadFormRef: materialsUploadFormRef
+          }}
+          lessonPlanDialogProps={{
+            lessonPlan,
+            draft: lessonPlanDraft,
+            loading: lessonPlanLoading,
+            saving: lessonPlanSaving,
+            templates: lessonPlanTemplates,
+            templatesLoading: lessonPlanTemplatesLoading,
+            templateSelection: lessonPlanTemplateSelection,
+            onTemplateSelectionChange: setLessonPlanTemplateSelection,
+            onCreateFromScratch: createScratchLessonPlanDraft,
+            onApplyTemplate: applySelectedLessonPlanTemplate,
+            onDraftChange: (patch) => setLessonPlanDraft((prev) => (prev ? { ...prev, ...patch } : prev)),
+            onSave: saveLessonPlan
           }}
         />
       )}

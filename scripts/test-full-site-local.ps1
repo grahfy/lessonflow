@@ -13,10 +13,10 @@
     Skip npm test automated tests.
 
 .PARAMETER Seed
-    Clear existing customer/invoice data and seed fresh fake data.
+    Clear existing customer/invoice data and seed fresh fake data including lesson planning.
 
 .PARAMETER SeedDocsDemo
-    Clear existing dev data and seed the deterministic docs/demo dataset.
+    Clear existing dev data and seed the deterministic docs/demo dataset including lesson planning.
 
 .PARAMETER NoStart
     Do not start Next.js dev server after setup/checks.
@@ -45,8 +45,8 @@ Usage: scripts\test-full-site-local.ps1 [-SkipInstall] [-SkipTests] [-Seed | -Se
 Options:
   -SkipInstall       Skip npm ci dependency installation
   -SkipTests         Skip npm test automated tests
-  -Seed              Clear the dev DB and seed generic fake admin/customer/invoice data
-  -SeedDocsDemo      Clear the dev DB and seed the deterministic docs/demo dataset
+  -Seed              Clear the dev DB and seed generic fake admin/customer/invoice/lesson-plan data
+  -SeedDocsDemo      Clear the dev DB and seed the deterministic docs/demo dataset including lesson planning
   -SeedCount <n>     Number of fake customers to seed for -Seed (default: 50)
   -NoStart           Do not start Next.js dev server after setup/checks
   -Help              Show this help message
@@ -260,6 +260,7 @@ if ($SEED_MODE -eq "fake") {
     Log "Seeding fake data ($SeedCount customers)..."
     npx tsx scripts/seed-fake-data.ts $SeedCount
     npx tsx scripts/seed-invoice-presets.ts
+    npx tsx scripts/seed-lesson-planning.ts --profile fake
 
     Log "Default admin account:"
     Log "  URL: http://localhost:${PORT}/admin/login"
@@ -275,6 +276,7 @@ if ($SEED_MODE -eq "docs-demo") {
     $env:DOCS_SCREENSHOTS_ADMIN_PASSWORD = $DOCS_DEMO_ADMIN_PASSWORD
     $env:DOCS_SCREENSHOTS_STUDENT_PASSWORD = $DOCS_DEMO_STUDENT_PASSWORD
     npx tsx scripts/seed-docs-screenshots.ts > $null
+    npx tsx scripts/seed-lesson-planning.ts --profile docs-demo > $null
 
     $checklistPath = Join-Path $ROOT_DIR "Documentation/assets/SCREENSHOT_SEED_CHECKLIST.md"
     $studentName = ""

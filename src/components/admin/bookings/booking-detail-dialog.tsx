@@ -39,8 +39,10 @@ import { type EmailRecord, type SendEmailResult } from "@/lib/admin/use-email-hi
 import { AU_STATES, type LearningMaterialRow } from "@/lib/admin/types";
 import { toAuState } from "@/lib/admin/utils";
 import { AddressAutocomplete } from "@/components/admin/ui/address-autocomplete";
+import type { BookingLessonPlanInput, LessonPlanState, LessonPlanTemplateState } from "@/lib/lesson-plan-contract";
 
 import { BookingMaterialsDialog } from "./booking-materials-dialog";
+import { BookingLessonPlanPanel } from "./booking-lesson-plan-panel";
 import { type BookingDialogForm, type BookingMatchedCustomer } from "./types";
 
 interface BookingDetailDialogProps {
@@ -65,8 +67,8 @@ interface BookingDetailDialogProps {
   durationIsConfigured: boolean;
 
   // Tabs Navigation
-  activeTab: "appointment" | "emails" | "materials";
-  setActiveTab: (tab: "appointment" | "emails" | "materials") => void;
+  activeTab: "appointment" | "emails" | "materials" | "lesson-plan";
+  setActiveTab: (tab: "appointment" | "emails" | "materials" | "lesson-plan") => void;
 
   // CRM Integration
   matchedCustomer: BookingMatchedCustomer | null;
@@ -101,6 +103,20 @@ interface BookingDetailDialogProps {
     onUpload: (captcha?: { captchaToken: string; captchaAnswer: string }) => void;
     onDelete: (id: string) => void;
     uploadFormRef: RefObject<HTMLFormElement | null>;
+  };
+  lessonPlanDialogProps: {
+    lessonPlan: LessonPlanState | null;
+    draft: BookingLessonPlanInput | null;
+    loading: boolean;
+    saving: boolean;
+    templates: LessonPlanTemplateState[];
+    templatesLoading: boolean;
+    templateSelection: string;
+    onTemplateSelectionChange: (value: string) => void;
+    onCreateFromScratch: () => void;
+    onApplyTemplate: () => void;
+    onDraftChange: (patch: Partial<BookingLessonPlanInput>) => void;
+    onSave: () => void;
   };
 }
 
@@ -145,7 +161,8 @@ export function BookingDetailDialog({
   onSyncEmail,
   onPerformAction,
   onOpenInvoice,
-  materialsDialogProps
+  materialsDialogProps,
+  lessonPlanDialogProps
 }: BookingDetailDialogProps) {
   if (!event || !dialogForm) return null;
 
@@ -227,6 +244,12 @@ export function BookingDetailDialog({
             label: "Learning Materials",
             tooltip: "View and manage learning materials for this booking.",
             disabled: !canManageAppointment
+          },
+          {
+            key: "lesson-plan",
+            label: "Lesson Plan",
+            tooltip: "Create and edit the lesson plan snapshot attached to this booking.",
+            disabled: !canManageAppointment || event.entityType !== "booking"
           }
         ]}
         rightSlot={
@@ -460,6 +483,22 @@ export function BookingDetailDialog({
                 onDelete={materialsDialogProps.onDelete}
               />
             </>
+        ) : activeTab === 'lesson-plan' ? (
+            <BookingLessonPlanPanel
+              lessonPlan={lessonPlanDialogProps.lessonPlan}
+              draft={lessonPlanDialogProps.draft}
+              loading={lessonPlanDialogProps.loading}
+              saving={lessonPlanDialogProps.saving}
+              templates={lessonPlanDialogProps.templates}
+              templatesLoading={lessonPlanDialogProps.templatesLoading}
+              templateSelection={lessonPlanDialogProps.templateSelection}
+              canManageLessonPlan={canManageAppointment}
+              onTemplateSelectionChange={lessonPlanDialogProps.onTemplateSelectionChange}
+              onCreateFromScratch={lessonPlanDialogProps.onCreateFromScratch}
+              onApplyTemplate={lessonPlanDialogProps.onApplyTemplate}
+              onDraftChange={lessonPlanDialogProps.onDraftChange}
+              onSave={lessonPlanDialogProps.onSave}
+            />
           ) : null}
       </div>
     </AdminDialog>

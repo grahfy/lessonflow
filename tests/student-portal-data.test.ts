@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 
 import { GET as downloadMaterial } from "@/app/api/student/learning-materials/[id]/download/route";
 import { GET as studentPortal } from "@/app/api/student/portal/route";
+import { ensureOwnerAdmin } from "@/lib/admin-auth";
 import { customerSnapshotFromInput } from "@/lib/customer-match";
 import { prisma } from "@/lib/db";
 import { studentPortalPayloadSchema } from "@/lib/student-portal/contracts";
@@ -14,6 +15,7 @@ describe("student-portal-data", () => {
   beforeEach(async () => {
     // RATIONALE: Portal responses depend on both relational DB rows and the
     // on-disk materials store, so each scenario resets both surfaces.
+    await prisma.lessonPlan.deleteMany();
     await prisma.learningMaterial.deleteMany();
     await prisma.customerPortalCredentialAuditLog.deleteMany();
     await prisma.customerPortalCredential.deleteMany();
@@ -21,6 +23,7 @@ describe("student-portal-data", () => {
     await prisma.bookingSeries.deleteMany();
     await prisma.bookingRequest.deleteMany();
     await prisma.customer.deleteMany();
+    await prisma.adminUser.deleteMany();
     await fs.rm(process.env.LEARNING_MATERIALS_LOCAL_ROOT || ".data/learning-materials-test", {
       recursive: true,
       force: true
@@ -28,6 +31,7 @@ describe("student-portal-data", () => {
   });
 
   it("returns upcoming/previous appointments and material links", async () => {
+    const owner = await ensureOwnerAdmin();
     const customer = await prisma.customer.create({
       data: customerSnapshotFromInput({
         name: "Dana Student",
@@ -87,6 +91,30 @@ describe("student-portal-data", () => {
         customerId: customer.id
       }
     });
+    await prisma.lessonPlan.create({
+      data: {
+        bookingId: previousBooking.id,
+        lessonFocus: "Chord changes",
+        goals: "Smoother transitions",
+        activities: "Two-chord loop",
+        homework: "Five clean changes per day",
+        sharedNotes: "Relax the strumming arm",
+        privateNotes: "Keep an eye on left-hand collapse",
+        createdById: owner.id
+      }
+    });
+    await prisma.lessonPlan.create({
+      data: {
+        bookingId: upcomingBooking.id,
+        lessonFocus: "Future prep",
+        goals: "Keep portal hidden for upcoming lessons",
+        activities: "Prep notes",
+        homework: "Not visible yet",
+        sharedNotes: "Do not show yet",
+        privateNotes: "Private future note",
+        createdById: owner.id
+      }
+    });
 
     const storage = createMaterialStorageDriver();
     const storageKey = `${customer.id}/${upcomingBooking.id}/material.pdf`;
@@ -122,6 +150,14 @@ describe("student-portal-data", () => {
     expect(payload.previous.map((row) => row.id)).toContain(previousBooking.id);
     expect(payload.upcoming[0]?.materials[0]?.id).toBe(material.id);
     expect(payload.upcoming[0]?.materials[0]?.downloadUrl).toContain(`/api/student/learning-materials/${material.id}/download`);
+    expect(payload.upcoming[0]?.lessonPlanSummary).toBeNull();
+    expect(payload.previous[0]?.lessonPlanSummary).toMatchObject({
+      lessonFocus: "Chord changes",
+      goals: "Smoother transitions",
+      homework: "Five clean changes per day",
+      sharedNotes: "Relax the strumming arm"
+    });
+    expect(JSON.stringify(payload.previous[0]?.lessonPlanSummary || {})).not.toContain("Keep an eye on left-hand collapse");
   });
 
   it("streams owned learning material downloads", async () => {

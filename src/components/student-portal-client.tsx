@@ -467,6 +467,38 @@ function BookingList(input: BookingListProps) {
             </details>
           ) : null}
 
+          {booking.lessonPlanSummary ? (
+            <div className={styles["lesson-plan-summary"]}>
+              <strong className={styles["materials-section-title"]}>Lesson plan summary</strong>
+              <div className={styles["lesson-plan-summary-grid"]}>
+                {booking.lessonPlanSummary.lessonFocus ? (
+                  <div className={styles["lesson-plan-summary-item"]}>
+                    <span className={styles["lesson-plan-summary-label"]}>Lesson focus</span>
+                    <p>{booking.lessonPlanSummary.lessonFocus}</p>
+                  </div>
+                ) : null}
+                {booking.lessonPlanSummary.goals ? (
+                  <div className={styles["lesson-plan-summary-item"]}>
+                    <span className={styles["lesson-plan-summary-label"]}>Goals</span>
+                    <p>{booking.lessonPlanSummary.goals}</p>
+                  </div>
+                ) : null}
+                {booking.lessonPlanSummary.homework ? (
+                  <div className={styles["lesson-plan-summary-item"]}>
+                    <span className={styles["lesson-plan-summary-label"]}>Homework</span>
+                    <p>{booking.lessonPlanSummary.homework}</p>
+                  </div>
+                ) : null}
+                {booking.lessonPlanSummary.sharedNotes ? (
+                  <div className={styles["lesson-plan-summary-item"]}>
+                    <span className={styles["lesson-plan-summary-label"]}>Shared notes</span>
+                    <p>{booking.lessonPlanSummary.sharedNotes}</p>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
           <div className={styles["materials-group"]}>
             <strong className={styles["materials-section-title"]}>Learning materials</strong>
             {booking.materials.length ? (

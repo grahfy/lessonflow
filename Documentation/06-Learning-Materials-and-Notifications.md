@@ -76,6 +76,8 @@ Students encounter materials through the portal. Some items appear with a specif
 
 ![Student portal materials view](assets/student-portal-materials-view.png)
 
+Lesson-plan summaries can appear alongside previous lessons in the portal, but they are separate from uploaded materials. Shared notes and homework may support the same practice outcome as an uploaded file without replacing the file-delivery workflow itself.
+
 When a student reports that a file is missing, the following factors should be checked:
 
 - whether the upload completed successfully
@@ -94,5 +96,6 @@ The following states can be valid and do not necessarily indicate failure:
 
 - [Daily Operations and Booking Lifecycle](03-Daily-Operations-and-Booking-Lifecycle.md)
 - [Customers, Communication, and Portal Support](04-Customers-Communication-and-Portal-Support.md)
+- [Lesson Planning and Templates](03b-Lesson-Planning-and-Templates.md)
 - [Public Intake and Student Portal](10-Public-Intake-and-Student-Portal.md)
 - [Logs and Bug Reporting](09-Logs-and-Bug-Reporting.md)

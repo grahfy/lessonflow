@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Booking, BookingRequest, LearningMaterial } from "@/generated/prisma/client";
 import { nullableOptionalCustomDurationMinutesSchema } from "@/lib/booking-rules";
+import { studentPortalLessonPlanSummarySchema } from "@/lib/lesson-plan-contract";
 
 const studentPortalLessonModeSchema = z.enum(["in_person", "video"]);
 const studentPortalLessonDurationSchema = z.enum(["min30", "min60"]);
@@ -29,6 +30,7 @@ export const studentPortalBookingSchema = z.object({
   startAt: z.string().datetime({ offset: true }),
   endAt: z.string().datetime({ offset: true }),
   notes: z.string().nullable(),
+  lessonPlanSummary: studentPortalLessonPlanSummarySchema.nullable(),
   materials: z.array(studentPortalMaterialSchema)
 });
 
@@ -106,6 +108,12 @@ type BookingMapInput = Pick<
   | "endAt"
   | "notes"
 > & {
+  lessonPlan?: {
+    lessonFocus: string;
+    goals: string;
+    homework: string;
+    sharedNotes: string;
+  } | null;
   learningMaterials: MaterialMapInput[];
 };
 
@@ -132,6 +140,34 @@ export function mapStudentPortalMaterial(material: MaterialMapInput): StudentPor
 }
 
 /**
+ * Builds the student-safe lesson-plan summary for one booking.
+ */
+export function mapStudentPortalLessonPlanSummary(
+  lessonPlan:
+    | {
+        lessonFocus: string;
+        goals: string;
+        homework: string;
+        sharedNotes: string;
+      }
+    | null
+    | undefined
+) {
+  if (!lessonPlan) {
+    return null;
+  }
+
+  const summary = {
+    lessonFocus: lessonPlan.lessonFocus || "",
+    goals: lessonPlan.goals || "",
+    homework: lessonPlan.homework || "",
+    sharedNotes: lessonPlan.sharedNotes || ""
+  };
+  const hasVisibleContent = Object.values(summary).some((value) => value.trim().length > 0);
+  return hasVisibleContent ? studentPortalLessonPlanSummarySchema.parse(summary) : null;
+}
+
+/**
  * Maps one DB booking row (with materials) to the student-portal booking contract.
  */
 export function mapStudentPortalBooking(booking: BookingMapInput): StudentPortalBooking {
@@ -145,6 +181,7 @@ export function mapStudentPortalBooking(booking: BookingMapInput): StudentPortal
     startAt: booking.startAt.toISOString(),
     endAt: booking.endAt.toISOString(),
     notes: booking.notes,
+    lessonPlanSummary: mapStudentPortalLessonPlanSummary(booking.lessonPlan),
     materials: booking.learningMaterials.map(mapStudentPortalMaterial)
   });
 }

@@ -16,6 +16,7 @@ You'll find that LessonFlow focuses on connected workflows rather than isolated 
 | --- | --- | --- |
 | Bookings | Manage your lesson calendar | You'll review requests, confirm appointments, and handle reschedules or cancellations. |
 | Staff and Teacher Assignment | Manage your team | You'll set up teacher accounts, assign them to lessons, and manage your own admin identity. |
+| Lesson Planning | Structure teaching follow-up | You'll create reusable templates, save booking lesson plans, and expose post-lesson summaries in the student portal. |
 | Customers | Maintain student and parent records | You'll update profiles, support portal users, and track communication history. |
 | Invoices | Handle your billing lifecycle | You'll draft and send invoices, track payments, and issue credit notes when needed. |
 | Reports | Review your business health | You'll use financial summaries to make follow-up decisions and track growth trends. |
@@ -33,11 +34,12 @@ If you're new to LessonFlow, we recommend following this sequence to get up to s
 1. [First-Time Setup and Admin Access](02-First-Time-Setup-and-Admin-Access.md)
 2. [Daily Operations and Booking Lifecycle](03-Daily-Operations-and-Booking-Lifecycle.md)
 3. [Staff Management and Teacher Assignment](03a-Staff-Management-and-Teacher-Assignment.md)
-4. [Customers, Communication, and Portal Support](04-Customers-Communication-and-Portal-Support.md)
-5. [Invoicing and Payments](05-Invoicing-and-Payments.md)
-6. [Reports and Follow-Up](07-Reports-and-Follow-Up.md)
-7. [Settings and Configuration](08-Settings-and-Configuration.md)
-8. [Logs and Bug Reporting](09-Logs-and-Bug-Reporting.md)
+4. [Lesson Planning and Templates](03b-Lesson-Planning-and-Templates.md)
+5. [Customers, Communication, and Portal Support](04-Customers-Communication-and-Portal-Support.md)
+6. [Invoicing and Payments](05-Invoicing-and-Payments.md)
+7. [Reports and Follow-Up](07-Reports-and-Follow-Up.md)
+8. [Settings and Configuration](08-Settings-and-Configuration.md)
+9. [Logs and Bug Reporting](09-Logs-and-Bug-Reporting.md)
 
 You'll start with basic access and daily tasks before moving into more advanced areas like billing, configuration, and system diagnostics.
 
@@ -70,4 +72,5 @@ You can find the in-app manual (shown in the screenshot below) grouped into logi
 - [First-Time Setup and Admin Access](02-First-Time-Setup-and-Admin-Access.md)
 - [Daily Operations and Booking Lifecycle](03-Daily-Operations-and-Booking-Lifecycle.md)
 - [Staff Management and Teacher Assignment](03a-Staff-Management-and-Teacher-Assignment.md)
+- [Lesson Planning and Templates](03b-Lesson-Planning-and-Templates.md)
 - [How LessonFlow Works](12-How-LessonFlow-Works.md)

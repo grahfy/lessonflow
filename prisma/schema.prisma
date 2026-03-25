@@ -257,6 +257,7 @@ model Booking {
   invoices              Invoice[]
   invoiceLinks          InvoiceBookingLink[]
   learningMaterials     LearningMaterial[]
+  lessonPlan            LessonPlan?
 
   @@index([startAt, status])
   @@index([customerId])
@@ -319,6 +320,10 @@ model AdminUser {
   invoiceAuditLogs          InvoiceAuditLog[]                  @relation("InvoiceAuditActors")
   portalCredentialAuditLogs CustomerPortalCredentialAuditLog[] @relation("PortalCredentialAuditActors")
   uploadedLearningMaterials LearningMaterial[]                 @relation("LearningMaterialUploadedBy")
+  createdLessonPlanTemplates LessonPlanTemplate[]              @relation("LessonPlanTemplateCreatedBy")
+  updatedLessonPlanTemplates LessonPlanTemplate[]              @relation("LessonPlanTemplateUpdatedBy")
+  createdLessonPlans         LessonPlan[]                      @relation("LessonPlanCreatedBy")
+  updatedLessonPlans         LessonPlan[]                      @relation("LessonPlanUpdatedBy")
 }
 
 // Canonical customer profile derived from booking requests/bookings. Multiple
@@ -445,6 +450,56 @@ model LearningMaterial {
 
   @@index([customerId, bookingId, createdAt])
   @@index([bookingId, createdAt])
+}
+
+// Reusable structured lesson-plan templates that staff can apply to a booking
+// before tailoring the copied plan for one concrete lesson.
+model LessonPlanTemplate {
+  id             String             @id @default(cuid())
+  title          String
+  description    String?            @db.Text
+  lessonFocus    String             @db.Text
+  goals          String             @db.Text
+  activities     String             @db.Text
+  homework       String             @db.Text
+  sharedNotes    String             @db.Text
+  privateNotes   String             @db.Text
+  isArchived     Boolean            @default(false)
+  createdById    String
+  createdBy      AdminUser          @relation("LessonPlanTemplateCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  updatedById    String?
+  updatedBy      AdminUser?         @relation("LessonPlanTemplateUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  lessonPlans    LessonPlan[]
+
+  @@index([isArchived, updatedAt])
+  @@index([createdById, isArchived, updatedAt])
+}
+
+// One structured lesson plan per confirmed booking. Plans optionally remember
+// the template they were copied from, but remain independent snapshots.
+model LessonPlan {
+  id               String              @id @default(cuid())
+  bookingId        String              @unique
+  booking          Booking             @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  sourceTemplateId String?
+  sourceTemplate   LessonPlanTemplate? @relation(fields: [sourceTemplateId], references: [id], onDelete: SetNull)
+  lessonFocus      String              @db.Text
+  goals            String              @db.Text
+  activities       String              @db.Text
+  homework         String              @db.Text
+  sharedNotes      String              @db.Text
+  privateNotes     String              @db.Text
+  createdById      String
+  createdBy        AdminUser           @relation("LessonPlanCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  updatedById      String?
+  updatedBy        AdminUser?          @relation("LessonPlanUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([sourceTemplateId])
+  @@index([updatedAt])
 }
 
 // Email delivery/outbox tracking used by the mail service and reminder jobs to

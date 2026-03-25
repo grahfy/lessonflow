@@ -376,6 +376,39 @@
   line-height: 1.32;
 }
 
+.lesson-plan-summary {
+  margin-top: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.lesson-plan-summary-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.lesson-plan-summary-item {
+  display: grid;
+  gap: 4px;
+}
+
+.lesson-plan-summary-item p {
+  margin: 0;
+  color: #c4d0f6;
+  line-height: 1.36;
+}
+
+.lesson-plan-summary-label {
+  color: #dce6ff;
+  font-size: 0.76rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
 .materials-group {
   margin-top: 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.11);

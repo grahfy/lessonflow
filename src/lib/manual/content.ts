@@ -94,7 +94,7 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
   createManualScreenshot(
     "booking-detail-dialog-notes-and-actions",
     "Booking detail dialog actions",
-    "Booking detail shows edit, move, notify, materials, and billing actions."
+    "Booking detail shows edit, move, notify, lesson-plan, materials, and billing actions."
   ),
   createManualScreenshot(
     "booking-create-invoice-dialog",
@@ -125,6 +125,16 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
     "teacher-profile-editor-basics",
     "Teacher profile editor basics tab",
     "The Basics tab keeps identity, sign-in, and active status controls together."
+  ),
+  createManualScreenshot(
+    "lesson-plan-library-page",
+    "Lesson-plan library page",
+    "The lesson-plan library combines template search, ownership metadata, and the structured template editor."
+  ),
+  createManualScreenshot(
+    "booking-lesson-plan-tab",
+    "Booking lesson-plan tab",
+    "The booking lesson-plan tab lets staff start from scratch or apply one template before saving the booking snapshot."
   ),
   createManualScreenshot(
     "customer-directory-list",
@@ -254,7 +264,12 @@ export const MANUAL_SCREENSHOTS: ManualScreenshot[] = [
   createManualScreenshot(
     "student-portal-page",
     "Student portal dashboard page",
-    "The student portal dashboard shows appointments, requests, and quick access to learning materials."
+    "The student portal dashboard shows appointments, requests, post-lesson plan summaries, and quick access to learning materials."
+  ),
+  createManualScreenshot(
+    "student-portal-lesson-plan-summary",
+    "Student portal lesson-plan summary",
+    "Previous lessons can show the shared lesson-plan summary fields saved by staff after the lesson."
   ),
   createManualScreenshot(
     "student-portal-materials-view",
@@ -344,6 +359,20 @@ export const MANUAL_SECTION_MANIFEST: ManualSectionManifest[] = [
       "teachers-directory-list",
       "teacher-profile-editor-basics",
       "booking-assigned-teacher-dialog"
+    ]
+  },
+  {
+    id: "lesson-planning-templates",
+    title: "Lesson Planning and Templates",
+    summary: "Reference guide to reusable lesson-plan templates, booking-level lesson plans, and the student-facing summary rules.",
+    group: "operations",
+    audience: "all_admins",
+    sourcePath: "Documentation/03b-Lesson-Planning-and-Templates.md",
+    relatedRoutes: ["/admin/lesson-plans", "/admin/bookings", "/student/portal"],
+    screenshotIds: [
+      "lesson-plan-library-page",
+      "booking-lesson-plan-tab",
+      "student-portal-lesson-plan-summary"
     ]
   },
   {

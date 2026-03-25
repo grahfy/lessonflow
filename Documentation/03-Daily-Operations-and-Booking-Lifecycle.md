@@ -95,7 +95,7 @@ This means a <code>datetime-local</code> value such as <code>12:00</code> is tre
 
 ## Booking Editing and Movement
 
-Confirmed bookings can be edited to update lesson details, customer information, notes, invoice linkage, and address data. Rescheduling is performed through the lesson-move flow and should only be done after the intended replacement time is confirmed.
+Confirmed bookings can be edited to update lesson details, customer information, notes, lesson-plan content, invoice linkage, and address data. Rescheduling is performed through the lesson-move flow and should only be done after the intended replacement time is confirmed.
 
 Before moving a lesson, confirm:
 
@@ -130,6 +130,7 @@ Booking records serve as gateways into other administrative domains:
 | Booking-side action | Destination workflow |
 | --- | --- |
 | Manage assigned teacher / staff ownership | [Staff Management and Teacher Assignment](03a-Staff-Management-and-Teacher-Assignment.md) |
+| Create or edit the booking lesson plan | [Lesson Planning and Templates](03b-Lesson-Planning-and-Templates.md) |
 | Open Customer | [Customers, Communication, and Portal Support](04-Customers-Communication-and-Portal-Support.md) |
 | Invoice / Billing | [Invoicing and Payments](05-Invoicing-and-Payments.md) |
 | Reminder or custom email actions | [Learning Materials and Notifications](06-Learning-Materials-and-Notifications.md) |
@@ -148,6 +149,7 @@ At the end of a normal operating period, administrators should confirm:
 
 - [Customers, Communication, and Portal Support](04-Customers-Communication-and-Portal-Support.md)
 - [Staff Management and Teacher Assignment](03a-Staff-Management-and-Teacher-Assignment.md)
+- [Lesson Planning and Templates](03b-Lesson-Planning-and-Templates.md)
 - [Invoicing and Payments](05-Invoicing-and-Payments.md)
 - [Learning Materials and Notifications](06-Learning-Materials-and-Notifications.md)
 - [Logs and Bug Reporting](09-Logs-and-Bug-Reporting.md)

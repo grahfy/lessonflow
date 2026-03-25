@@ -34,6 +34,14 @@ export async function GET(request: NextRequest) {
           orderBy: {
             createdAt: "desc"
           }
+        },
+        lessonPlan: {
+          select: {
+            lessonFocus: true,
+            goals: true,
+            homework: true,
+            sharedNotes: true
+          }
         }
       },
       orderBy: {
@@ -66,12 +74,22 @@ export async function GET(request: NextRequest) {
   // Split into upcoming/previous here so all student-facing clients can reuse the same route shape.
   const upcoming = bookings
     .filter((booking) => booking.startAt >= now && booking.status !== "cancelled")
-    .map(mapStudentPortalBooking);
+    .map((booking) =>
+      mapStudentPortalBooking({
+        ...booking,
+        lessonPlan: null
+      })
+    );
 
   const previous = bookings
     .filter((booking) => booking.startAt < now || booking.status === "cancelled")
     .sort((a, b) => b.startAt.getTime() - a.startAt.getTime())
-    .map(mapStudentPortalBooking);
+    .map((booking) =>
+      mapStudentPortalBooking({
+        ...booking,
+        lessonPlan: booking.startAt < now ? booking.lessonPlan : null
+      })
+    );
 
   const payload = studentPortalPayloadSchema.parse({
     student: {

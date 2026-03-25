@@ -24,3 +24,7 @@ export function canManagePrimaryTeacherCustomer(actor: AdminPermissionActor, pri
 export function canManageStaffAccount(actor: AdminPermissionActor, targetId: string): boolean {
   return isOwner(actor) || actor.id === targetId;
 }
+
+export function canManageLessonPlanTemplate(actor: AdminPermissionActor, createdById?: string | null): boolean {
+  return isOwner(actor) || (!!createdById && createdById === actor.id);
+}

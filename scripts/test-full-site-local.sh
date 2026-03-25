@@ -62,8 +62,8 @@ while [[ $# -gt 0 ]]; do
       echo "Options:"
       echo "  --skip-install       Skip \`npm ci\` dependency installation"
       echo "  --skip-tests         Skip \`npm test\` automated tests"
-      echo "  --seed              Clear the dev DB and seed generic fake admin/customer/invoice data"
-      echo "  --seed-docs-demo    Clear the dev DB and seed the deterministic docs/demo dataset"
+      echo "  --seed              Clear the dev DB and seed generic fake admin/customer/invoice/lesson-plan data"
+      echo "  --seed-docs-demo    Clear the dev DB and seed the deterministic docs/demo dataset including lesson planning"
       echo "  --seed-count <n>    Number of fake customers to seed for --seed (default: 50)"
       echo "  --long-history-count <n>      Number of seeded emails for each long-history customer"
       echo "  --long-history-customers <n>  Number of first seeded customers that receive long email histories"
@@ -214,6 +214,7 @@ run_seed_mode() {
     fi
     DATABASE_URL="${DB_URL}" npx tsx scripts/seed-fake-data.ts "${SEED_ARGS[@]}"
     DATABASE_URL="${DB_URL}" npx tsx scripts/seed-invoice-presets.ts
+    DATABASE_URL="${DB_URL}" npx tsx scripts/seed-lesson-planning.ts --profile fake
     
     log "Default admin account:"
     log "  URL: http://${HOST}:${PORT}/admin/login"
@@ -233,6 +234,7 @@ run_seed_mode() {
     export DOCS_SCREENSHOTS_ADMIN_PASSWORD="$DOCS_DEMO_ADMIN_PASSWORD"
     export DOCS_SCREENSHOTS_STUDENT_PASSWORD="$DOCS_DEMO_STUDENT_PASSWORD"
     DATABASE_URL="${DB_URL}" npm run docs:screenshots:seed >/dev/null
+    DATABASE_URL="${DB_URL}" npx tsx scripts/seed-lesson-planning.ts --profile docs-demo >/dev/null
 
     CHECKLIST_PATH="Documentation/assets/SCREENSHOT_SEED_CHECKLIST.md"
     STUDENT_NAME="$(sed -n 's/^- Student login name: `\(.*\)`/\1/p' "$CHECKLIST_PATH" | head -n 1)"

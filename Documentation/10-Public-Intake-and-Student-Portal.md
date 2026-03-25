@@ -55,6 +55,7 @@ The portal provides the following student-facing actions:
 
 - viewing upcoming appointments
 - viewing previous appointments
+- reviewing post-lesson plan summaries for previous lessons where shared content exists
 - requesting a lesson
 - cancelling an eligible future booking
 - accessing learning materials
@@ -83,6 +84,7 @@ From an admin perspective, the most important interpretation rules are:
 | Public contact enquiry | Support or sales intake requiring response |
 | Student portal request | Pending request originating from an existing student context |
 | Student portal cancellation | A meaningful historical event, not a disappearance of the record |
+| Lesson plan summary visible in portal | Shared post-lesson content was saved to a previous booking plan; private teaching notes remain internal |
 | Public geoblocking rejection | Intake policy blocked the submission before ordinary field-validation handling |
 | “No materials yet” | Potentially normal state if nothing has been uploaded |
 
@@ -90,5 +92,6 @@ From an admin perspective, the most important interpretation rules are:
 
 - [Daily Operations and Booking Lifecycle](03-Daily-Operations-and-Booking-Lifecycle.md)
 - [Customers, Communication, and Portal Support](04-Customers-Communication-and-Portal-Support.md)
+- [Lesson Planning and Templates](03b-Lesson-Planning-and-Templates.md)
 - [Learning Materials and Notifications](06-Learning-Materials-and-Notifications.md)
 - [Troubleshooting and Quick Reference](13-Troubleshooting-and-Quick-Reference.md)

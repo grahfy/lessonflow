@@ -257,6 +257,20 @@ describe("admin-email-panel-layout", () => {
           onUpload: noop,
           onDelete: noop,
           uploadFormRef: rootRef
+        },
+        lessonPlanDialogProps: {
+          lessonPlan: null,
+          draft: null,
+          loading: false,
+          saving: false,
+          templates: [],
+          templatesLoading: false,
+          templateSelection: "",
+          onTemplateSelectionChange: noop,
+          onCreateFromScratch: noop,
+          onApplyTemplate: noop,
+          onDraftChange: noop,
+          onSave: noop
         }
       })
     );

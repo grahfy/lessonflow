@@ -1070,6 +1070,126 @@
   min-height: 320px;
 }
 
+.lesson-plan-library {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.lesson-plan-library-sidebar,
+.lesson-plan-library-editor,
+.booking-lesson-plan-empty-card,
+.booking-lesson-plan-editor-card {
+  display: grid;
+  gap: 14px;
+}
+
+.lesson-plan-library-sidebar-head,
+.lesson-plan-library-editor-head,
+.booking-lesson-plan-empty-head,
+.booking-lesson-plan-editor-head,
+.booking-lesson-plan-editor-actions,
+.lesson-plan-template-editor-actions {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.lesson-plan-library-sidebar-head,
+.lesson-plan-library-editor-head,
+.booking-lesson-plan-empty-head,
+.booking-lesson-plan-editor-head {
+  flex-wrap: wrap;
+}
+
+.lesson-plan-library-search {
+  margin-bottom: 0;
+}
+
+.lesson-plan-template-list {
+  display: grid;
+  gap: 10px;
+}
+
+.lesson-plan-template-list-item {
+  width: 100%;
+  text-align: left;
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  padding: 12px;
+  cursor: pointer;
+}
+
+.lesson-plan-template-list-item.is-active {
+  border-color: rgba(122, 188, 255, 0.55);
+  box-shadow: 0 0 0 1px rgba(122, 188, 255, 0.24) inset;
+  background: rgba(64, 113, 196, 0.14);
+}
+
+.lesson-plan-template-list-item-title {
+  font-weight: 700;
+  color: var(--ink-0);
+}
+
+.lesson-plan-template-list-item-meta,
+.lesson-plan-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink-1);
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.lesson-plan-library-editor-title {
+  margin: 4px 0 0;
+}
+
+.lesson-plan-library-editor-summary {
+  max-width: 72ch;
+  margin: 6px 0 0;
+}
+
+.lesson-plan-template-meta-grid,
+.lesson-plan-template-fields,
+.booking-lesson-plan-fields {
+  display: grid;
+  gap: 12px;
+}
+
+.lesson-plan-template-editor-actions,
+.booking-lesson-plan-editor-actions {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 12px;
+  flex-wrap: wrap;
+}
+
+.booking-lesson-plan-template-apply {
+  display: grid;
+  gap: 10px;
+}
+
+.booking-lesson-plan-panel .field {
+  min-width: 0;
+}
+
+@media (max-width: 1024px) {
+  .lesson-plan-library {
+    grid-template-columns: 1fr;
+  }
+}
+
 .field textarea.admin-email-signature-textarea {
   min-height: 180px;
 }
