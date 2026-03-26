@@ -1747,17 +1747,13 @@ update_prisma() {
 
     run_step "Generating Prisma client" npm exec --no -- prisma generate
 
-    local schema_updated=false
-
     if [[ "${DB_PUSH}" == true ]]; then
         backup_database_before_schema_change
         log_info "Pushing database schema (db push)..."
         npm exec --no -- prisma db push --accept-data-loss
-        schema_updated=true
     elif [[ "${SKIP_MIGRATE}" == false ]]; then
         backup_database_before_schema_change
         run_migrations
-        schema_updated=true
     else
         log_info "Skipping database migrations"
     fi
@@ -1765,20 +1761,6 @@ update_prisma() {
     local seed_database_url="${DATABASE_URL:-}"
     if [[ -z "${seed_database_url}" ]] && [[ -f ".env" ]]; then
         seed_database_url="$(read_env_file_value ".env" "DATABASE_URL" || true)"
-    fi
-    local seed_site_url="${NEXT_PUBLIC_SITE_URL:-}"
-    if [[ -z "${seed_site_url}" ]] && [[ -f ".env" ]]; then
-        seed_site_url="$(read_env_file_value ".env" "NEXT_PUBLIC_SITE_URL" || true)"
-    fi
-
-    if [[ "${schema_updated}" == true ]]; then
-        if [[ -n "${seed_database_url}" ]]; then
-            run_step "Backfilling local legacy staff assignments" \
-                env DATABASE_URL="${seed_database_url}" NEXT_PUBLIC_SITE_URL="${seed_site_url}" \
-                npx tsx scripts/backfill-legacy-staff-assignments.ts
-        else
-            log_warn "DATABASE_URL not found before local legacy staff assignment backfill. Skipping backfill."
-        fi
     fi
 
     # Seed whitelabel defaults for CMS and templates
