@@ -1758,18 +1758,6 @@ update_prisma() {
         log_info "Skipping database migrations"
     fi
 
-    local seed_database_url="${DATABASE_URL:-}"
-    if [[ -z "${seed_database_url}" ]] && [[ -f ".env" ]]; then
-        seed_database_url="$(read_env_file_value ".env" "DATABASE_URL" || true)"
-    fi
-
-    # Seed whitelabel defaults for CMS and templates
-    if [[ -n "${seed_database_url}" ]]; then
-        run_step "Seeding whitelabel defaults" env DATABASE_URL="${seed_database_url}" npx tsx scripts/seed-whitelabel-defaults.ts
-    else
-        log_warn "DATABASE_URL not found in process env or .env before seeding."
-        run_step "Seeding whitelabel defaults" npx tsx scripts/seed-whitelabel-defaults.ts
-    fi
 }
 
 # Installs Nginx in a minimal mode through the shared package setup helper.

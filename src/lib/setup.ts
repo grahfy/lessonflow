@@ -1203,6 +1203,51 @@ export async function createInitialAdmin(input: SetupInitializeInput) {
       }
     });
 
+    // Seed default invoice template so PDF generation works immediately.
+    const existingInvoiceTemplate = await tx.invoiceTemplate.findFirst({ where: { isDefault: true } });
+    if (!existingInvoiceTemplate) {
+      await tx.invoiceTemplate.create({
+        data: {
+          isDefault: true,
+          logoUrl: "/images/company-logo-invoice.png",
+          accentColor: "#2247d8",
+          footerText: "Thank you for your business. Payment is due within 14 days.",
+          headerInfo: ""
+        }
+      });
+    }
+
+    // Seed default email templates so notification workflows work
+    // out of the box. Admins can customise these via Settings.
+    const emailTemplateDefaults = [
+      {
+        key: "customer_booking_reminder",
+        subject: "Lesson Reminder: {{lessonTime}}",
+        body: `<p>Hi {{customerName}},</p><p>This is a reminder for your upcoming lesson at {{lessonTime}}.</p><p>We look forward to seeing you then!</p>`
+      },
+      {
+        key: "customer_booking_status",
+        subject: "Booking Status Update: {{status}}",
+        body: `<p>Hi {{customerName}},</p><p>Your booking for {{lessonTime}} has been updated to: <strong>{{status}}</strong>.</p>`
+      },
+      {
+        key: "customer_invoice",
+        subject: "Invoice {{invoiceNumber}} from {{brandName}}",
+        body: `<p>Hi {{customerName}},</p><p>Please find your invoice {{invoiceNumber}} attached for the amount of {{totalAmount}}.</p><p>Due date: {{dueDate}}</p>`
+      }
+    ];
+    for (const t of emailTemplateDefaults) {
+      await tx.emailTemplate.upsert({
+        where: { templateKey: t.key },
+        update: {},
+        create: {
+          templateKey: t.key,
+          subject: t.subject,
+          htmlBody: t.body
+        }
+      });
+    }
+
     // Seed example lesson-plan templates so the template library is
     // ready to use immediately. skipDuplicates makes this idempotent.
     await tx.lessonPlanTemplate.createMany({
