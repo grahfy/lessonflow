@@ -6,6 +6,7 @@ import { type ReactElement, FormEvent, useCallback, useEffect, useState } from "
 
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import styles from "@/components/student-portal.module.css";
+import type { StudentPortalLessonPlanField } from "@/lib/lesson-plan-contract";
 import {
   parseStudentPortalPayload,
   type StudentPortalBooking,
@@ -471,28 +472,28 @@ function BookingList(input: BookingListProps) {
             <div className={styles["lesson-plan-summary"]}>
               <strong className={styles["materials-section-title"]}>Lesson plan summary</strong>
               <div className={styles["lesson-plan-summary-grid"]}>
-                {booking.lessonPlanSummary.lessonFocus ? (
+                {booking.lessonPlanSummary.lessonFocus.text ? (
                   <div className={styles["lesson-plan-summary-item"]}>
                     <span className={styles["lesson-plan-summary-label"]}>Lesson focus</span>
-                    <p>{booking.lessonPlanSummary.lessonFocus}</p>
+                    <p>{renderLessonPlanFieldContent(booking.lessonPlanSummary.lessonFocus)}</p>
                   </div>
                 ) : null}
-                {booking.lessonPlanSummary.goals ? (
+                {booking.lessonPlanSummary.goals.text ? (
                   <div className={styles["lesson-plan-summary-item"]}>
                     <span className={styles["lesson-plan-summary-label"]}>Goals</span>
-                    <p>{booking.lessonPlanSummary.goals}</p>
+                    <p>{renderLessonPlanFieldContent(booking.lessonPlanSummary.goals)}</p>
                   </div>
                 ) : null}
-                {booking.lessonPlanSummary.homework ? (
+                {booking.lessonPlanSummary.homework.text ? (
                   <div className={styles["lesson-plan-summary-item"]}>
                     <span className={styles["lesson-plan-summary-label"]}>Homework</span>
-                    <p>{booking.lessonPlanSummary.homework}</p>
+                    <p>{renderLessonPlanFieldContent(booking.lessonPlanSummary.homework)}</p>
                   </div>
                 ) : null}
-                {booking.lessonPlanSummary.sharedNotes ? (
+                {booking.lessonPlanSummary.sharedNotes.text ? (
                   <div className={styles["lesson-plan-summary-item"]}>
                     <span className={styles["lesson-plan-summary-label"]}>Shared notes</span>
-                    <p>{booking.lessonPlanSummary.sharedNotes}</p>
+                    <p>{renderLessonPlanFieldContent(booking.lessonPlanSummary.sharedNotes)}</p>
                   </div>
                 ) : null}
               </div>
@@ -636,4 +637,40 @@ function defaultStartAtLocalValue(): string {
  */
 function toIsoFromLocal(value: string): string | null {
   return dateTimeLocalToIso(value);
+}
+
+function renderLessonPlanFieldContent(field: StudentPortalLessonPlanField) {
+  if (!field.materialLinks.length) {
+    return field.text;
+  }
+
+  const nodes: Array<string | ReactElement> = [];
+  let cursor = 0;
+
+  for (const link of field.materialLinks) {
+    if (link.startOffset > cursor) {
+      nodes.push(field.text.slice(cursor, link.startOffset));
+    }
+
+    nodes.push(
+      <a
+        key={`${link.materialId}-${link.startOffset}-${link.endOffset}`}
+        className={styles["lesson-plan-inline-link"]}
+        href={link.previewUrl}
+        target="_blank"
+        rel="noreferrer"
+        title={link.materialTitle}
+      >
+        {field.text.slice(link.startOffset, link.endOffset)}
+      </a>
+    );
+
+    cursor = link.endOffset;
+  }
+
+  if (cursor < field.text.length) {
+    nodes.push(field.text.slice(cursor));
+  }
+
+  return nodes;
 }

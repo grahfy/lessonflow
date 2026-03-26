@@ -47,7 +47,12 @@ import { useAdminSession } from "@/lib/admin/use-admin-session";
 import { usePresets } from "@/lib/admin/use-presets";
 import { useTeachers } from "@/lib/admin/use-teachers";
 import { buildManualBookingPayload } from "@/lib/admin/manual-booking-payload";
-import { buildEmptyLessonPlanFieldValues, type BookingLessonPlanInput } from "@/lib/lesson-plan-contract";
+import {
+  buildDefaultLessonPlanSections,
+  type LessonPlanSection,
+  type LessonPlanSectionsInput,
+  type LessonPlanTemplateV2State
+} from "@/lib/lesson-plan-contract";
 import { durationMinutesToBookingPayload, durationMinutesToChoiceValue, getPersistedDurationMinutes } from "@/lib/lesson-duration-utils";
 import { formatCurrency } from "@/lib/invoices/currency";
 import { type BookingInvoiceCandidateSummary, type BookingInvoiceResolveResponse } from "@/lib/invoices/schema";
@@ -181,7 +186,7 @@ export function AdminBookingsClient() {
   const [dialogForm, setDialogForm] = useState<BookingDialogForm | null>(null);
   const [dialogMatchDismissed, setDialogMatchDismissed] = useState(false);
   const [invoiceCandidates, setInvoiceCandidates] = useState<BookingInvoiceCandidateSummary[]>([]);
-  const [lessonPlanDraft, setLessonPlanDraft] = useState<BookingLessonPlanInput | null>(null);
+  const [lessonPlanDraft, setLessonPlanDraft] = useState<LessonPlanSectionsInput | null>(null);
   const [lessonPlanTemplateSelection, setLessonPlanTemplateSelection] = useState("");
 
   // Manual Booking State
@@ -515,13 +520,11 @@ export function AdminBookingsClient() {
 
     setLessonPlanTemplateSelection(lessonPlan.sourceTemplateId || "");
     setLessonPlanDraft({
+      sections: lessonPlan.sections,
+      status: lessonPlan.status,
       sourceTemplateId: lessonPlan.sourceTemplateId,
-      lessonFocus: lessonPlan.lessonFocus,
-      goals: lessonPlan.goals,
-      activities: lessonPlan.activities,
-      homework: lessonPlan.homework,
-      sharedNotes: lessonPlan.sharedNotes,
-      privateNotes: lessonPlan.privateNotes
+      seriesId: lessonPlan.seriesId,
+      seriesSequence: lessonPlan.seriesSequence
     });
   }, [lessonPlan]);
 
@@ -748,8 +751,11 @@ export function AdminBookingsClient() {
 
   function createScratchLessonPlanDraft() {
     setLessonPlanDraft({
+      sections: buildDefaultLessonPlanSections(),
+      status: "in_progress",
       sourceTemplateId: null,
-      ...buildEmptyLessonPlanFieldValues()
+      seriesId: null,
+      seriesSequence: null
     });
   }
 
@@ -772,14 +778,16 @@ export function AdminBookingsClient() {
       }
     }
 
+    // Access V2 sections from the template (API now returns them).
+    const tplSections = (template as unknown as { sections?: LessonPlanSection[] }).sections;
     setLessonPlanDraft({
+      sections: tplSections && tplSections.length > 0
+        ? tplSections.map((s) => ({ ...s, content: { ...s.content, content: [...(s.content.content ?? [])] } }))
+        : buildDefaultLessonPlanSections(),
+      status: "in_progress",
       sourceTemplateId: template.id,
-      lessonFocus: template.lessonFocus,
-      goals: template.goals,
-      activities: template.activities,
-      homework: template.homework,
-      sharedNotes: template.sharedNotes,
-      privateNotes: template.privateNotes
+      seriesId: null,
+      seriesSequence: null
     });
     setNotice(lessonPlan ? `Template "${template.title}" copied into this booking draft. Save to keep it.` : `Template "${template.title}" copied into this booking.`);
   }
@@ -825,15 +833,21 @@ export function AdminBookingsClient() {
     }
 
     setLessonPlanDraft({
+      sections: saved.sections,
+      status: saved.status,
       sourceTemplateId: saved.sourceTemplateId,
-      lessonFocus: saved.lessonFocus,
-      goals: saved.goals,
-      activities: saved.activities,
-      homework: saved.homework,
-      sharedNotes: saved.sharedNotes,
-      privateNotes: saved.privateNotes
+      seriesId: saved.seriesId,
+      seriesSequence: saved.seriesSequence
     });
     setNotice(lessonPlan ? "Lesson plan saved." : "Lesson plan created.");
+  }
+
+  function updateLessonPlanDraftSections(sections: LessonPlanSection[]) {
+    setLessonPlanDraft((prev) => prev ? { ...prev, sections } : prev);
+  }
+
+  function updateLessonPlanDraftStatus(status: LessonPlanSectionsInput["status"]) {
+    setLessonPlanDraft((prev) => prev ? { ...prev, status } : prev);
   }
 
   /** logic for resolving manual booking with potential duplicates. */
@@ -1160,14 +1174,16 @@ export function AdminBookingsClient() {
             draft: lessonPlanDraft,
             loading: lessonPlanLoading,
             saving: lessonPlanSaving,
-            templates: lessonPlanTemplates,
+            templates: lessonPlanTemplates as unknown as LessonPlanTemplateV2State[],
             templatesLoading: lessonPlanTemplatesLoading,
+            materials: materialsList.map((m) => ({ id: m.id, title: m.title, description: m.description })),
             templateSelection: lessonPlanTemplateSelection,
             onTemplateSelectionChange: setLessonPlanTemplateSelection,
             onCreateFromScratch: createScratchLessonPlanDraft,
             onApplyTemplate: applySelectedLessonPlanTemplate,
             onClearLessonPlan: clearLessonPlanDraft,
-            onDraftChange: (patch) => setLessonPlanDraft((prev) => (prev ? { ...prev, ...patch } : prev)),
+            onDraftSectionsChange: updateLessonPlanDraftSections,
+            onDraftStatusChange: updateLessonPlanDraftStatus,
             onSave: saveLessonPlan
           }}
         />

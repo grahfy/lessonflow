@@ -3,18 +3,19 @@
 import { useCallback, useState } from "react";
 
 import { useSafeFetch } from "@/lib/admin/use-safe-fetch";
-import type { BookingLessonPlanInput, LessonPlanState } from "@/lib/lesson-plan-contract";
+import type { LessonPlanSectionsInput, LessonPlanV2State } from "@/lib/lesson-plan-contract";
 
 type BookingLessonPlanResponse = {
-  lessonPlan?: LessonPlanState | null;
+  lessonPlan?: LessonPlanV2State | null;
 };
 
 /**
  * Loads and saves the single lesson plan attached to one booking dialog.
+ * V2: Uses section-based TipTap JSON payloads.
  */
 export function useBookingLessonPlan(options: { onAuthError?: () => void; onError?: (message: string) => void } = {}) {
   const { onAuthError, onError } = options;
-  const [lessonPlan, setLessonPlan] = useState<LessonPlanState | null>(null);
+  const [lessonPlan, setLessonPlan] = useState<LessonPlanV2State | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const { safeFetch, handleApiError } = useSafeFetch({ onAuthError, onError });
@@ -42,7 +43,7 @@ export function useBookingLessonPlan(options: { onAuthError?: () => void; onErro
     }
   }, [safeFetch, handleApiError]);
 
-  const save = useCallback(async (bookingId: string, payload: BookingLessonPlanInput) => {
+  const save = useCallback(async (bookingId: string, payload: LessonPlanSectionsInput) => {
     setSaving(true);
     try {
       const response = await safeFetch(`/api/admin/bookings/${bookingId}/lesson-plan`, {

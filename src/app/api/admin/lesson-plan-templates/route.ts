@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { lessonPlanTemplateInputSchema } from "@/lib/lesson-plan-contract";
-import { createLessonPlanTemplate, listLessonPlanTemplates } from "@/lib/lesson-plans";
+import { createLessonPlanTemplate, listLessonPlanTemplatesV2 } from "@/lib/lesson-plans";
 
 function formatFieldErrors(issues: Array<{ path: Array<string | number>; message: string }>) {
   return Object.fromEntries(
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const templates = await listLessonPlanTemplates();
+  const templates = await listLessonPlanTemplatesV2();
   return NextResponse.json({
     ok: true,
     templates

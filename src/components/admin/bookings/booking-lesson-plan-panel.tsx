@@ -4,7 +4,13 @@ import { LessonPlanStructuredFields } from "@/components/admin/lesson-plans/less
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AdminField } from "@/components/admin/ui/admin-form";
 import { Tooltip } from "@/components/admin/ui/tooltip";
-import type { BookingLessonPlanInput, LessonPlanState, LessonPlanTemplateState } from "@/lib/lesson-plan-contract";
+import type { LearningMaterialRow } from "@/lib/admin/types";
+import type {
+  BookingLessonPlanInput,
+  LessonPlanMaterialLinkInput,
+  LessonPlanState,
+  LessonPlanTemplateState
+} from "@/lib/lesson-plan-contract";
 
 interface BookingLessonPlanPanelProps {
   lessonPlan: LessonPlanState | null;
@@ -12,12 +18,15 @@ interface BookingLessonPlanPanelProps {
   loading: boolean;
   templates: LessonPlanTemplateState[];
   templatesLoading: boolean;
+  materials: LearningMaterialRow[];
   templateSelection: string;
   canManageLessonPlan: boolean;
   onTemplateSelectionChange: (value: string) => void;
   onCreateFromScratch: () => void;
   onApplyTemplate: () => void;
   onDraftChange: (patch: Partial<BookingLessonPlanInput>) => void;
+  onAddMaterialLink: (link: LessonPlanMaterialLinkInput) => void;
+  onRemoveMaterialLink: (link: LessonPlanMaterialLinkInput) => void;
 }
 
 /**
@@ -29,12 +38,15 @@ export function BookingLessonPlanPanel({
   loading,
   templates,
   templatesLoading,
+  materials,
   templateSelection,
   canManageLessonPlan,
   onTemplateSelectionChange,
   onCreateFromScratch,
   onApplyTemplate,
-  onDraftChange
+  onDraftChange,
+  onAddMaterialLink,
+  onRemoveMaterialLink
 }: BookingLessonPlanPanelProps) {
   if (loading) {
     return (
@@ -55,7 +67,7 @@ export function BookingLessonPlanPanel({
             </p>
           </div>
 
-          <div className="booking-lesson-plan-start-layout">
+          <div className="booking-lesson-plan-card-stack booking-lesson-plan-start-stack">
             <section className="lesson-plan-editor-section booking-lesson-plan-start-card">
               <div className="booking-lesson-plan-empty-head">
                 <div>
@@ -128,111 +140,120 @@ export function BookingLessonPlanPanel({
   return (
     <div className="customer-tab-panel booking-lesson-plan-panel">
       <AdminCard ghost className="booking-lesson-plan-editor-card">
-        <div className="booking-lesson-plan-editor-layout">
-          <div className="booking-lesson-plan-editor-main">
-            <section className="lesson-plan-editor-section">
-              <div className="booking-lesson-plan-editor-head">
-                <div>
-                  <h3 className="manual-section-title">Booking Lesson Plan</h3>
-                  <p className="helper-text">
-                    Keep the lesson structure and take-home work clear enough to reuse at the next follow-up.
-                  </p>
-                </div>
+        <div className="booking-lesson-plan-card-stack booking-lesson-plan-editor-stack">
+          <section className="lesson-plan-editor-section booking-lesson-plan-primary-card">
+            <div className="booking-lesson-plan-editor-head">
+              <div>
+                <p className="admin-inline-field">Lesson Worksheet</p>
+                <h3 className="manual-section-title">Booking Lesson Plan</h3>
+                <p className="helper-text">
+                  Keep the lesson structure and take-home work clear enough to reuse at the next follow-up.
+                </p>
               </div>
+              {lessonPlan?.sourceTemplateTitle || draft.sourceTemplateId ? (
+                <span className="lesson-plan-badge">
+                  {lessonPlan?.sourceTemplateTitle ? `From template: ${lessonPlan.sourceTemplateTitle}` : "Template copy"}
+                </span>
+              ) : (
+                <span className="lesson-plan-badge">Scratch plan</span>
+              )}
+            </div>
 
-              <LessonPlanStructuredFields
-                value={draft}
-                disabled={!canManageLessonPlan}
-                className="booking-lesson-plan-fields"
-                fields={["lessonFocus", "goals", "activities", "homework"]}
-                onChange={onDraftChange}
-              />
-            </section>
-          </div>
+            <LessonPlanStructuredFields
+              value={draft}
+              disabled={!canManageLessonPlan}
+              className="booking-lesson-plan-fields"
+              fields={["lessonFocus", "goals", "activities", "homework"]}
+              materialLinking={{
+                materials,
+                links: draft.materialLinks,
+                onAddLink: onAddMaterialLink,
+                onRemoveLink: onRemoveMaterialLink
+              }}
+              onChange={onDraftChange}
+            />
+          </section>
 
-          <aside className="booking-lesson-plan-editor-side">
-            <section className="lesson-plan-editor-section booking-lesson-plan-summary-card">
-              <div className="booking-lesson-plan-editor-head">
-                <div>
-                  <p className="admin-inline-field">Portal Visibility</p>
-                  <p className="helper-text">
-                    Students only see Lesson Focus, Goals, Homework, and Shared Notes after the lesson has happened.
-                  </p>
-                  <p className="helper-text">
-                    Template changes never update existing booking plans automatically. This booking keeps its own snapshot.
-                  </p>
-                </div>
-                {lessonPlan?.sourceTemplateTitle || draft.sourceTemplateId ? (
-                  <span className="lesson-plan-badge">
-                    {lessonPlan?.sourceTemplateTitle ? `From template: ${lessonPlan.sourceTemplateTitle}` : "Template copy"}
-                  </span>
-                ) : (
-                  <span className="lesson-plan-badge">Scratch plan</span>
-                )}
+          <section className="lesson-plan-editor-section booking-lesson-plan-secondary-card booking-lesson-plan-notes-card">
+            <div className="booking-lesson-plan-editor-head">
+              <div>
+                <p className="admin-inline-field">Notes and Follow-Up</p>
+                <p className="helper-text">
+                  Shared notes appear in the portal later. Private notes stay internal.
+                </p>
               </div>
-            </section>
+            </div>
+            <LessonPlanStructuredFields
+              value={draft}
+              disabled={!canManageLessonPlan}
+              className="booking-lesson-plan-fields booking-lesson-plan-fields-secondary"
+              fields={["sharedNotes", "privateNotes"]}
+              materialLinking={{
+                materials,
+                links: draft.materialLinks,
+                onAddLink: onAddMaterialLink,
+                onRemoveLink: onRemoveMaterialLink
+              }}
+              onChange={onDraftChange}
+            />
+          </section>
 
-            <section className="lesson-plan-editor-section">
-              <div className="booking-lesson-plan-editor-head">
-                <div>
-                  <p className="admin-inline-field">Choose From Template</p>
-                  <p className="helper-text">
-                    Replace this draft with one reusable template, then save the updated snapshot for this booking.
-                  </p>
-                </div>
+          <section className="lesson-plan-editor-section booking-lesson-plan-secondary-card booking-lesson-plan-template-card">
+            <div className="booking-lesson-plan-editor-head">
+              <div>
+                <p className="admin-inline-field">Choose From Template</p>
+                <p className="helper-text">
+                  Replace this draft with one reusable template, then save the updated snapshot for this booking.
+                </p>
               </div>
-              <div className="booking-lesson-plan-template-tools">
-                <AdminField
-                  label="Template"
-                  tooltip="Choose one active lesson-plan template and copy its fields into this booking draft."
-                  fullWidth
+            </div>
+            <div className="booking-lesson-plan-template-tools">
+              <AdminField
+                label="Template"
+                tooltip="Choose one active lesson-plan template and copy its fields into this booking draft."
+                fullWidth
+              >
+                <select
+                  value={templateSelection}
+                  onChange={(event) => onTemplateSelectionChange(event.target.value)}
+                  disabled={!canManageLessonPlan || templatesLoading || templates.length === 0}
                 >
-                  <select
-                    value={templateSelection}
-                    onChange={(event) => onTemplateSelectionChange(event.target.value)}
-                    disabled={!canManageLessonPlan || templatesLoading || templates.length === 0}
+                  <option value="">Select a template</option>
+                  {templates.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.title} · {template.createdByDisplayName}
+                    </option>
+                  ))}
+                </select>
+              </AdminField>
+              <div className="button-row">
+                <Tooltip content="Copy the selected template into this booking draft and replace the current lesson-plan fields.">
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    disabled={!canManageLessonPlan || !templateSelection || templatesLoading}
+                    onClick={onApplyTemplate}
                   >
-                    <option value="">Select a template</option>
-                    {templates.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {template.title} · {template.createdByDisplayName}
-                      </option>
-                    ))}
-                  </select>
-                </AdminField>
-                <div className="button-row">
-                  <Tooltip content="Copy the selected template into this booking draft and replace the current lesson-plan fields.">
-                    <button
-                      className="btn btn-secondary"
-                      type="button"
-                      disabled={!canManageLessonPlan || !templateSelection || templatesLoading}
-                      onClick={onApplyTemplate}
-                    >
-                      Replace With Template
-                    </button>
-                  </Tooltip>
-                </div>
+                    Replace With Template
+                  </button>
+                </Tooltip>
               </div>
-            </section>
+            </div>
+          </section>
 
-            <section className="lesson-plan-editor-section">
-              <div className="booking-lesson-plan-editor-head">
-                <div>
-                  <p className="admin-inline-field">Notes and Follow-Up</p>
-                  <p className="helper-text">
-                    Shared notes appear in the portal later. Private notes stay internal.
-                  </p>
-                </div>
+          <section className="lesson-plan-editor-section booking-lesson-plan-summary-card booking-lesson-plan-visibility-card">
+            <div className="booking-lesson-plan-editor-head">
+              <div>
+                <p className="admin-inline-field">Portal Visibility</p>
+                <p className="helper-text">
+                  Students only see Lesson Focus, Goals, Homework, and Shared Notes after the lesson has happened.
+                </p>
+                <p className="helper-text">
+                  Template changes never update existing booking plans automatically. This booking keeps its own snapshot.
+                </p>
               </div>
-              <LessonPlanStructuredFields
-                value={draft}
-                disabled={!canManageLessonPlan}
-                className="booking-lesson-plan-fields"
-                fields={["sharedNotes", "privateNotes"]}
-                onChange={onDraftChange}
-              />
-            </section>
-          </aside>
+            </div>
+          </section>
         </div>
       </AdminCard>
     </div>

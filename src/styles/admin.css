@@ -1364,10 +1364,10 @@
 .lesson-plan-editor-section {
   display: grid;
   gap: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.03);
-  padding: 14px;
+  padding: 18px;
 }
 
 .lesson-plan-editor-section-head {
@@ -1383,11 +1383,10 @@
 }
 
 .booking-lesson-plan-panel {
-  display: flex;
-  flex-direction: column;
+  display: block;
   min-height: 0;
-  height: 100%;
-  overflow: hidden;
+  flex: 1 1 auto;
+  padding: 4px 8px;
 }
 
 .booking-lesson-plan-empty-intro {
@@ -1395,14 +1394,49 @@
   gap: 6px;
 }
 
-.booking-lesson-plan-start-layout {
+.booking-lesson-plan-card-stack {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
+}
+
+.booking-lesson-plan-start-stack,
+.booking-lesson-plan-editor-stack {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1025px) {
+  .booking-lesson-plan-editor-stack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  /* Primary card (sections editor) spans full width, row 1. */
+  .booking-lesson-plan-primary-card {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  /* Template and visibility cards sit side by side in row 2. */
+  .booking-lesson-plan-template-card {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .booking-lesson-plan-visibility-card {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  /* V1 notes card (kept for transition) */
+  .booking-lesson-plan-notes-card {
+    grid-column: 1 / -1;
+  }
 }
 
 .booking-lesson-plan-start-card {
   align-content: start;
+  border-radius: 16px;
+  padding: 18px;
 }
 
 .booking-lesson-plan-template-apply {
@@ -1415,62 +1449,44 @@
   gap: 10px;
 }
 
-.booking-lesson-plan-editor-layout {
+.booking-lesson-plan-editor-card {
+  align-content: start;
+}
+
+.booking-lesson-plan-primary-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015)),
+    rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.16);
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  padding: 20px;
+}
+
+.booking-lesson-plan-secondary-card,
+.booking-lesson-plan-summary-card {
+  background: rgba(255, 255, 255, 0.025);
+  border-radius: 16px;
+  padding: 18px;
+}
+
+#booking-detail-dialog .booking-lesson-plan-fields,
+#booking-detail-dialog .booking-lesson-plan-fields-secondary {
+  grid-template-rows: none;
+}
+
+#booking-detail-dialog .booking-lesson-plan-fields > .field,
+#booking-detail-dialog .booking-lesson-plan-fields-secondary > .field {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.9fr);
-  gap: 16px;
-  min-height: 100%;
-  height: 100%;
-  align-items: stretch;
+  grid-template-rows: auto auto auto;
+  align-content: start;
 }
 
-.booking-lesson-plan-editor-main {
-  min-height: 0;
-  grid-template-rows: minmax(0, 1fr);
-}
-
-.booking-lesson-plan-editor-main > .lesson-plan-editor-section {
-  min-height: 0;
-  height: 100%;
-  grid-template-rows: auto minmax(0, 1fr);
-}
-
-#booking-detail-dialog .booking-lesson-plan-editor-main .booking-lesson-plan-fields {
-  min-height: 0;
-  height: 100%;
-  grid-template-rows: minmax(0, 0.78fr) repeat(3, minmax(0, 1fr));
-}
-
-#booking-detail-dialog .booking-lesson-plan-editor-main .booking-lesson-plan-fields > .field,
-#booking-detail-dialog .booking-lesson-plan-editor-side .booking-lesson-plan-fields > .field {
-  min-height: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-}
-
-#booking-detail-dialog .booking-lesson-plan-editor-main .booking-lesson-plan-fields > .field textarea,
-#booking-detail-dialog .booking-lesson-plan-editor-side .booking-lesson-plan-fields > .field textarea {
-  min-height: 88px;
-  height: 100%;
-}
-
-.booking-lesson-plan-editor-side {
-  position: sticky;
-  top: 0;
-  min-height: 0;
-  grid-template-rows: auto auto minmax(0, 1fr);
-  align-content: stretch;
-}
-
-.booking-lesson-plan-editor-side > .lesson-plan-editor-section:last-child {
-  min-height: 0;
-  grid-template-rows: auto minmax(0, 1fr);
-}
-
-#booking-detail-dialog .booking-lesson-plan-editor-side .booking-lesson-plan-fields {
-  min-height: 0;
-  height: 100%;
-  grid-template-rows: repeat(2, minmax(0, 1fr));
+#booking-detail-dialog .booking-lesson-plan-fields > .field textarea,
+#booking-detail-dialog .booking-lesson-plan-fields-secondary > .field textarea {
+  min-height: 112px;
+  height: auto;
+  resize: vertical;
 }
 
 .booking-lesson-plan-summary-card .lesson-plan-badge {
@@ -1485,19 +1501,1058 @@
   min-width: 0;
 }
 
+.lesson-plan-linked-field-shell {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+
+.lesson-plan-linked-field-underlay,
+.lesson-plan-linked-field-textarea {
+  grid-area: 1 / 1;
+}
+
+.lesson-plan-linked-field-underlay {
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 10px;
+  z-index: 2;
+}
+
+.lesson-plan-linked-field-mirror {
+  min-height: 112px;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  color: var(--ink-0);
+}
+
+.lesson-plan-linked-field-segment {
+  color: var(--ink-0);
+}
+
+.lesson-plan-linked-field-segment.is-linked {
+  color: #fde047;
+  font-weight: 700;
+  text-decoration-line: underline;
+  text-decoration-color: rgba(253, 224, 71, 0.96);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.22em;
+  text-shadow:
+    0 0 18px rgba(250, 204, 21, 0.14),
+    0 0 1px rgba(250, 204, 21, 0.36);
+}
+
+.lesson-plan-linked-field-textarea {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+  caret-color: var(--ink-0);
+}
+
+.lesson-plan-linked-field-textarea::selection {
+  background: rgba(96, 165, 250, 0.3);
+}
+
+.lesson-plan-inline-links {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.lesson-plan-inline-links-list {
+  display: grid;
+  gap: 8px;
+}
+
+.lesson-plan-inline-link-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.lesson-plan-inline-link-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.lesson-plan-link-context-menu {
+  position: fixed;
+  z-index: 1400;
+  width: min(320px, calc(100vw - 24px));
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(96, 165, 250, 0.34);
+  border-radius: 14px;
+  background:
+    linear-gradient(160deg, rgba(10, 25, 54, 0.97), rgba(11, 19, 37, 0.95)),
+    rgba(11, 19, 37, 0.95);
+  box-shadow:
+    0 18px 34px rgba(2, 8, 23, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+}
+
+.lesson-plan-link-context-menu-head,
+.lesson-plan-link-context-menu-list {
+  display: grid;
+  gap: 6px;
+}
+
+.lesson-plan-link-context-menu-title {
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(239, 246, 255, 0.96);
+}
+
+.lesson-plan-link-context-menu-copy,
+.lesson-plan-link-context-menu-status {
+  font-size: 0.76rem;
+  color: rgba(191, 219, 254, 0.8);
+}
+
+.lesson-plan-link-context-menu-list {
+  max-height: min(42vh, 260px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.lesson-plan-link-context-menu-item,
+.lesson-plan-link-context-menu-static {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ink-0);
+  font: inherit;
+  text-align: left;
+}
+
+.lesson-plan-link-context-menu-item {
+  cursor: pointer;
+}
+
+.lesson-plan-link-context-menu-item:hover:not(:disabled) {
+  border-color: rgba(96, 165, 250, 0.4);
+  background: rgba(59, 130, 246, 0.16);
+}
+
+.lesson-plan-link-context-menu-item.is-current,
+.lesson-plan-link-context-menu-static {
+  border-color: rgba(96, 165, 250, 0.32);
+  background: rgba(59, 130, 246, 0.14);
+}
+
+.lesson-plan-link-context-menu-item.is-danger {
+  border-color: rgba(248, 113, 113, 0.28);
+  background: rgba(127, 29, 29, 0.26);
+  color: #ffe4e6;
+}
+
+.lesson-plan-link-context-menu-item.is-danger:hover:not(:disabled) {
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(153, 27, 27, 0.34);
+}
+
+.lesson-plan-link-context-menu-item:disabled {
+  opacity: 0.72;
+  cursor: default;
+}
+
 @media (max-width: 1024px) {
   .lesson-plan-library {
     grid-template-columns: 1fr;
   }
 
-  .booking-lesson-plan-start-layout,
-  .booking-lesson-plan-editor-layout {
-    grid-template-columns: 1fr;
+  .lesson-plan-inline-link-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 640px) {
+  .lesson-plan-sections-list {
+    gap: 12px;
   }
 
-  .booking-lesson-plan-editor-side {
-    position: static;
+  .lesson-plan-section-header {
+    flex-wrap: wrap;
+    gap: 4px;
   }
+
+  .tiptap-toolbar {
+    gap: 1px;
+    padding: 3px;
+  }
+
+  .tiptap-toolbar-group + .tiptap-toolbar-group {
+    margin-left: 2px;
+    padding-left: 3px;
+  }
+
+  .tiptap-toolbar-btn {
+    width: 26px;
+    height: 26px;
+  }
+
+  .lesson-plan-add-section-form {
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+}
+
+/* ─── TipTap Editor ──────────────────────────────────────── */
+
+.tiptap-editor-shell {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 12px);
+  background: var(--bg-1);
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.tiptap-editor-shell:focus-within {
+  border-color: var(--brand-0);
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.12);
+}
+
+.tiptap-toolbar-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-0);
+  padding: 0 2px;
+}
+
+.tiptap-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  flex: 1;
+  gap: 2px;
+  padding: 4px 4px;
+}
+
+.tiptap-toolbar-group {
+  display: flex;
+  gap: 1px;
+}
+
+.tiptap-toolbar-group + .tiptap-toolbar-group {
+  margin-left: 4px;
+  padding-left: 6px;
+  border-left: 1px solid var(--line);
+}
+
+.tiptap-toolbar-btn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.tiptap-toolbar-btn:hover {
+  background: var(--bg-2);
+  color: var(--ink-0);
+}
+
+.tiptap-toolbar-btn.is-active {
+  background: var(--brand-0);
+  color: #fff;
+  border-color: var(--brand-0);
+}
+
+.tiptap-editor-content {
+  min-height: 72px;
+  padding: 10px 14px;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: var(--ink-0);
+}
+
+.tiptap-editor-content .tiptap {
+  outline: none;
+  min-height: 48px;
+}
+
+.tiptap-editor-content .tiptap > * + * {
+  margin-top: 0.4em;
+}
+
+.tiptap-editor-content .tiptap h2 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-top: 0.8em;
+}
+
+.tiptap-editor-content .tiptap h3 {
+  font-size: 0.94rem;
+  font-weight: 600;
+  margin-top: 0.6em;
+}
+
+.tiptap-editor-content .tiptap ul,
+.tiptap-editor-content .tiptap ol {
+  padding-left: 1.2em;
+}
+
+.tiptap-editor-content .tiptap ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.tiptap-editor-content .tiptap ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.tiptap-editor-content .tiptap ul[data-type="taskList"] li label {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.tiptap-editor-content .tiptap ul[data-type="taskList"] li > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.tiptap-editor-content .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--ink-3);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.tiptap-editor-content .tiptap strong {
+  font-weight: 600;
+}
+
+.tiptap-editor-content .tiptap .tiptap-material-link {
+  text-decoration: underline;
+  text-decoration-color: var(--brand-0);
+  text-underline-offset: 2px;
+  cursor: pointer;
+  color: var(--brand-0);
+}
+
+.tiptap-editor-content .tiptap .tiptap-callout {
+  border-left: 3px solid var(--line);
+  border-radius: 0 8px 8px 0;
+  padding: 8px 12px;
+  margin: 6px 0;
+  background: var(--bg-0);
+  font-size: 0.82rem;
+}
+
+.tiptap-editor-content .tiptap .tiptap-callout-tip {
+  border-left-color: rgb(34, 197, 94);
+  background: rgba(34, 197, 94, 0.06);
+}
+
+.tiptap-editor-content .tiptap .tiptap-callout-warning {
+  border-left-color: rgb(234, 179, 8);
+  background: rgba(234, 179, 8, 0.06);
+}
+
+.tiptap-editor-content .tiptap .tiptap-callout-note {
+  border-left-color: rgb(59, 130, 246);
+  background: rgba(59, 130, 246, 0.06);
+}
+
+/* ─── TipTap Material Picker ─────────────────────────────── */
+
+.tiptap-material-picker {
+  display: inline-flex;
+}
+
+.tiptap-material-picker-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 50;
+  min-width: 220px;
+  max-width: 300px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  padding: 4px;
+  margin-top: 4px;
+}
+
+.tiptap-material-picker-label {
+  font-size: 0.72rem;
+  color: var(--ink-3);
+  padding: 4px 8px 2px;
+}
+
+.tiptap-material-picker-item {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.tiptap-material-picker-item:hover {
+  background: var(--bg-2);
+}
+
+.tiptap-material-picker-item-title {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--ink-0);
+}
+
+.tiptap-material-picker-item-desc {
+  font-size: 0.72rem;
+  color: var(--ink-3);
+}
+
+/* ─── TipTap Slash Menu ──────────────────────────────────── */
+
+.tiptap-slash-menu {
+  position: fixed;
+  z-index: 50;
+  min-width: 220px;
+  max-width: 280px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  padding: 4px;
+}
+
+.tiptap-slash-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink-1);
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.82rem;
+}
+
+.tiptap-slash-menu-item:hover,
+.tiptap-slash-menu-item.is-selected {
+  background: var(--bg-2);
+}
+
+.tiptap-slash-menu-item > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tiptap-slash-menu-item-label {
+  font-weight: 500;
+  color: var(--ink-0);
+}
+
+.tiptap-slash-menu-item-desc {
+  font-size: 0.72rem;
+  color: var(--ink-3);
+}
+
+/* ─── Lesson Plan Section Editor ─────────────────────────── */
+
+.lesson-plan-section-editor {
+  display: grid;
+  gap: 8px;
+}
+
+.lesson-plan-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px;
+}
+
+.lesson-plan-section-title {
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--ink-0);
+  letter-spacing: 0.01em;
+}
+
+.lesson-plan-section-visibility {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  border: none;
+  border-radius: 6px;
+  background: var(--bg-2);
+  color: var(--ink-2);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.lesson-plan-section-visibility:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink-1);
+}
+
+.lesson-plan-section-visibility.is-student-visible {
+  background: rgba(34, 197, 94, 0.12);
+  color: rgb(22, 163, 74);
+}
+
+.lesson-plan-sections-list {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 1025px) {
+  .booking-lesson-plan-panel .lesson-plan-sections-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .booking-lesson-plan-panel .lesson-plan-section-editor {
+    align-self: stretch;
+  }
+
+  .booking-lesson-plan-panel .tiptap-editor-shell {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .booking-lesson-plan-panel .tiptap-editor-content {
+    flex: 1;
+  }
+}
+
+.booking-lesson-plan-panel .lesson-plan-section-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lesson-plan-library-filters {
+  display: grid;
+  gap: 10px;
+  padding: 4px 0 10px;
+}
+
+.lesson-plan-library-filters .field {
+  margin: 0;
+}
+
+.lesson-plan-library-filters label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+  margin-bottom: 3px;
+}
+
+.lesson-plan-add-section-bar {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 4px;
+  grid-column: 1 / -1;
+}
+
+.lesson-plan-add-section-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  max-width: 440px;
+}
+
+.lesson-plan-add-section-form .admin-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+}
+
+.lesson-plan-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.lesson-plan-status-selector {
+  font-size: 0.76rem;
+  font-family: inherit;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-1);
+  color: var(--ink-1);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.lesson-plan-status-selector:focus {
+  border-color: var(--brand-0);
+  outline: none;
+}
+
+.lesson-plan-section-grip {
+  flex-shrink: 0;
+  cursor: grab;
+  opacity: 0.35;
+  transition: opacity 0.15s;
+}
+
+.lesson-plan-section-grip:hover {
+  opacity: 0.8;
+}
+
+.lesson-plan-section-editor:hover .lesson-plan-section-grip {
+  opacity: 0.5;
+}
+
+/* ─── Quick Capture ──────────────────────────────────────── */
+
+.quick-capture-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-1);
+  color: var(--ink-1);
+  font-size: 0.82rem;
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.15s;
+}
+
+.quick-capture-trigger:hover:not(:disabled) {
+  border-color: var(--brand-0);
+  color: var(--ink-0);
+}
+
+.quick-capture-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--brand-0);
+}
+
+.quick-capture-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 16px;
+  pointer-events: none;
+}
+
+.quick-capture-panel {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 420px;
+  max-height: 80vh;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+
+.quick-capture-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-0);
+}
+
+.quick-capture-title {
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.84rem;
+  color: var(--ink-0);
+}
+
+.quick-capture-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.quick-capture-close {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.quick-capture-close:hover {
+  background: var(--bg-2);
+  color: var(--ink-0);
+}
+
+.quick-capture-textarea {
+  flex: 1;
+  min-height: 120px;
+  max-height: 50vh;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  color: var(--ink-0);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+  font-family: inherit;
+}
+
+.quick-capture-textarea::placeholder {
+  color: var(--ink-3);
+}
+
+.quick-capture-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--bg-0);
+}
+
+.quick-capture-status {
+  font-size: 0.72rem;
+  color: var(--ink-3);
+}
+
+@media (max-width: 480px) {
+  .quick-capture-panel {
+    max-width: 100%;
+    border-radius: 14px 14px 0 0;
+  }
+
+  .quick-capture-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .quick-capture-textarea {
+    font-size: 1rem;
+    min-height: 160px;
+  }
+}
+
+/* ─── Lesson Series ──────────────────────────────────────── */
+
+.lesson-series-list {
+  display: grid;
+  gap: 2px;
+}
+
+.lesson-series-list-item {
+  display: grid;
+  gap: 3px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.lesson-series-list-item:hover {
+  background: var(--bg-2);
+}
+
+.lesson-series-list-item.is-active {
+  background: var(--bg-2);
+  border-left: 2px solid var(--brand-0);
+}
+
+.lesson-series-list-item-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lesson-series-list-item-title {
+  font-weight: 500;
+  color: var(--ink-0);
+}
+
+.lesson-series-progress-bar {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--bg-2);
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.lesson-series-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--brand-0);
+  transition: width 0.3s ease;
+}
+
+.lesson-series-detail {
+  display: grid;
+  gap: 16px;
+}
+
+.lesson-series-detail-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 0.78rem;
+  color: var(--ink-2);
+}
+
+.lesson-series-detail-progress {
+  font-weight: 600;
+  color: var(--ink-0);
+}
+
+.lesson-series-timeline {
+  display: grid;
+  gap: 0;
+}
+
+.lesson-series-timeline-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  border-left: 2px solid var(--line);
+  margin-left: 8px;
+  padding-left: 16px;
+  position: relative;
+}
+
+.lesson-series-timeline-marker {
+  position: absolute;
+  left: -9px;
+  top: 8px;
+  background: var(--bg-1);
+}
+
+.timeline-icon-complete {
+  color: rgb(22, 163, 74);
+}
+
+.timeline-icon-progress {
+  color: var(--brand-0);
+}
+
+.timeline-icon-empty {
+  color: var(--ink-3);
+}
+
+.lesson-series-timeline-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lesson-series-timeline-seq {
+  font-weight: 500;
+  font-size: 0.82rem;
+  color: var(--ink-0);
+}
+
+.lesson-series-timeline-status {
+  font-size: 0.72rem;
+  color: var(--ink-2);
+}
+
+.lesson-series-timeline-pending {
+  color: var(--ink-3);
+  font-style: italic;
+}
+
+/* ─── Continuity Sidebar ─────────────────────────────────── */
+
+.continuity-sidebar {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-0);
+  overflow: hidden;
+}
+
+.continuity-sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--ink-1);
+}
+
+.continuity-sidebar-header:hover {
+  background: var(--bg-1);
+}
+
+.continuity-sidebar-title {
+  font-weight: 600;
+  color: var(--ink-0);
+}
+
+.continuity-sidebar-list {
+  display: grid;
+  gap: 1px;
+  background: var(--line);
+}
+
+.continuity-plan-card {
+  background: var(--bg-1);
+  padding: 0;
+}
+
+.continuity-plan-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+}
+
+.continuity-plan-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 0.78rem;
+  color: var(--ink-1);
+}
+
+.continuity-plan-toggle:hover {
+  color: var(--ink-0);
+}
+
+.continuity-plan-date {
+  font-weight: 500;
+  color: var(--ink-0);
+}
+
+.continuity-plan-status-badge {
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(34, 197, 94, 0.12);
+  color: rgb(22, 163, 74);
+}
+
+.continuity-plan-card-body {
+  padding: 6px 10px 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.continuity-plan-section-preview {
+  display: grid;
+  gap: 1px;
+}
+
+.continuity-plan-section-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+
+.continuity-plan-section-text {
+  font-size: 0.76rem;
+  color: var(--ink-2);
+  line-height: 1.4;
+}
+
+.continuity-plan-homework {
+  display: grid;
+  gap: 3px;
+}
+
+.continuity-plan-homework-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76rem;
+  color: var(--ink-1);
+}
+
+.continuity-hw-done {
+  color: rgb(22, 163, 74);
+}
+
+.continuity-hw-pending {
+  color: var(--ink-3);
+}
+
+.continuity-hw-done-text {
+  text-decoration: line-through;
+  color: var(--ink-3);
 }
 
 .field textarea.admin-email-signature-textarea {
@@ -4496,7 +5551,8 @@
 #booking-detail-dialog .booking-materials-panel,
 #customer-dialog .customer-booking-history-panel,
 #customer-dialog .customer-materials-panel {
-  overflow: auto;
+  overflow-y: auto !important;
+  max-height: calc(var(--booking-detail-dialog-height, min(96vh, 1020px)) - 200px);
   padding-right: 4px;
 }
 

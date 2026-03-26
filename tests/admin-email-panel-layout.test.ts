@@ -353,24 +353,22 @@ describe("admin-email-panel-layout", () => {
         lessonPlanDialogProps: {
           lessonPlan: null,
           draft: {
-            lessonFocus: "Focus",
-            goals: "Goals",
-            activities: "Activities",
-            homework: "Homework",
-            sharedNotes: "Shared",
-            privateNotes: "Private",
-            sourceTemplateId: null
+            sections: [{ key: "lessonFocus", title: "Lesson Focus", visibility: "student_visible" as const, content: { type: "doc" as const, content: [] } }],
+            status: "in_progress" as const,
+            sourceTemplateId: null,
           },
           loading: false,
           saving: false,
           templates: [],
           templatesLoading: false,
+          materials: [],
           templateSelection: "",
           onTemplateSelectionChange: noop,
           onCreateFromScratch: noop,
           onApplyTemplate: noop,
           onClearLessonPlan: noop,
-          onDraftChange: noop,
+          onDraftSectionsChange: noop,
+          onDraftStatusChange: noop,
           onSave: noop
         }
       })
@@ -440,24 +438,22 @@ describe("admin-email-panel-layout", () => {
         lessonPlanDialogProps: {
           lessonPlan: null,
           draft: {
-            lessonFocus: "Focus",
-            goals: "Goals",
-            activities: "Activities",
-            homework: "Homework",
-            sharedNotes: "Shared",
-            privateNotes: "Private",
-            sourceTemplateId: null
+            sections: [{ key: "lessonFocus", title: "Lesson Focus", visibility: "student_visible" as const, content: { type: "doc" as const, content: [] } }],
+            status: "in_progress" as const,
+            sourceTemplateId: null,
           },
           loading: false,
           saving: false,
           templates: [],
           templatesLoading: false,
+          materials: [],
           templateSelection: "",
           onTemplateSelectionChange: noop,
           onCreateFromScratch: noop,
           onApplyTemplate: noop,
           onClearLessonPlan: noop,
-          onDraftChange: noop,
+          onDraftSectionsChange: noop,
+          onDraftStatusChange: noop,
           onSave: noop
         }
       })

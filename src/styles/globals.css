@@ -8,6 +8,7 @@
   --ink-0: #ecf2ff;
   --ink-1: #b9c3e6;
   --ink-2: #7f91b2;
+  --ink-3: #566a87;
   --brand-0: #6b8cff;
   --brand-1: #8f72ff;
   --red: #f87171;
@@ -870,9 +871,45 @@ h1 {
   background: linear-gradient(155deg, rgba(192, 62, 87, 0.88), rgba(126, 34, 52, 0.9));
 }
 
-.btn-small {
-  padding: 8px 12px;
+.btn-small,
+.btn-sm {
+  padding: 6px 10px;
   font-size: 0.72rem;
+}
+
+.btn-ghost {
+  color: var(--ink-1);
+  background: none;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--bg-2);
+  color: var(--ink-0);
+  border-color: var(--line);
+}
+
+.admin-input {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 0.84rem;
+  font-family: inherit;
+  color: var(--ink-0);
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.admin-input:focus {
+  border-color: var(--brand-0);
+}
+
+.admin-input::placeholder {
+  color: var(--ink-3);
 }
 
 .ui-tooltip-trigger {

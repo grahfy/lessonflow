@@ -104,9 +104,19 @@ Notes:
 - Admins can confirm deployed commits in the app using the `Latest Updates` popup after login.
 - When the source tree has no `.git` directory, `update.sh` shows a reduced archive-source menu and `deploy.sh --print-deploy-mode` reports `Source mode: archive/copy`.
 - On current 2GB droplets, deploy builds use the low-memory Next.js profile, an auto heap override, and temporary swap when privileged swap access is available.
+- Deploys now reuse shared npm and Next.js build caches under `/var/www/lessonflow/shared/cache/` so repeated releases do not start from a fully cold install/build path.
 - If a stale temporary swap file cannot be removed, `deploy.sh` retries with a sibling swap filename instead of dropping swap management for that build.
 - If `update.sh` reports checkout ownership or archive-source permission problems, fix those first rather than retrying with the same source tree state.
 - Shared env upgrades append blank placeholders for new keys instead of inventing defaults; review those placeholders before treating the deploy as complete.
+
+Optional fast-build mode:
+
+```bash
+sudo MGS_DEPLOY_FAST_BUILD=1 ./deploy/update.sh --branch main
+```
+
+- This forces `NEXT_LOW_MEMORY_BUILD=1` during deploy even on larger hosts.
+- Use it only when CI or another pre-deploy check is already enforcing lint and typecheck, because deploy-time build validation is reduced in exchange for faster builds.
 
 ### Legacy Runtime Migration (One-Time)
 

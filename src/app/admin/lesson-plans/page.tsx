@@ -1,4 +1,4 @@
-import { AdminLessonPlansClient } from "@/components/admin/lesson-plans/lesson-plans-client";
+import { AdminLessonPlansClientV2 } from "@/components/admin/lesson-plans/lesson-plans-client-v2";
 import { requireAdmin } from "@/lib/admin/server-auth";
 
 export const metadata = {
@@ -7,5 +7,5 @@ export const metadata = {
 
 export default async function AdminLessonPlansPage() {
   await requireAdmin();
-  return <AdminLessonPlansClient />;
+  return <AdminLessonPlansClientV2 />;
 }

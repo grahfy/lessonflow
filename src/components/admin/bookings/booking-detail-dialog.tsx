@@ -39,10 +39,15 @@ import { type EmailRecord, type SendEmailResult } from "@/lib/admin/use-email-hi
 import { AU_STATES, type LearningMaterialRow } from "@/lib/admin/types";
 import { toAuState } from "@/lib/admin/utils";
 import { AddressAutocomplete } from "@/components/admin/ui/address-autocomplete";
-import type { BookingLessonPlanInput, LessonPlanState, LessonPlanTemplateState } from "@/lib/lesson-plan-contract";
+import type {
+  LessonPlanSection,
+  LessonPlanSectionsInput,
+  LessonPlanV2State,
+  LessonPlanTemplateV2State
+} from "@/lib/lesson-plan-contract";
 
 import { BookingMaterialsDialog } from "./booking-materials-dialog";
-import { BookingLessonPlanPanel } from "./booking-lesson-plan-panel";
+import { BookingLessonPlanPanelV2 } from "@/components/admin/lesson-plans/booking-lesson-plan-panel-v2";
 import { type BookingDialogForm, type BookingMatchedCustomer } from "./types";
 
 interface BookingDetailDialogProps {
@@ -105,18 +110,20 @@ interface BookingDetailDialogProps {
     uploadFormRef: RefObject<HTMLFormElement | null>;
   };
   lessonPlanDialogProps: {
-    lessonPlan: LessonPlanState | null;
-    draft: BookingLessonPlanInput | null;
+    lessonPlan: LessonPlanV2State | null;
+    draft: LessonPlanSectionsInput | null;
     loading: boolean;
     saving: boolean;
-    templates: LessonPlanTemplateState[];
+    templates: LessonPlanTemplateV2State[];
     templatesLoading: boolean;
+    materials: Array<{ id: string; title: string; description?: string | null }>;
     templateSelection: string;
     onTemplateSelectionChange: (value: string) => void;
     onCreateFromScratch: () => void;
     onApplyTemplate: () => void;
     onClearLessonPlan: () => void;
-    onDraftChange: (patch: Partial<BookingLessonPlanInput>) => void;
+    onDraftSectionsChange: (sections: LessonPlanSection[]) => void;
+    onDraftStatusChange: (status: LessonPlanSectionsInput["status"]) => void;
     onSave: () => void;
   };
 }
@@ -517,18 +524,20 @@ export function BookingDetailDialog({
               />
             </>
         ) : activeTab === 'lesson-plan' ? (
-            <BookingLessonPlanPanel
+            <BookingLessonPlanPanelV2
               lessonPlan={lessonPlanDialogProps.lessonPlan}
               draft={lessonPlanDialogProps.draft}
               loading={lessonPlanDialogProps.loading}
               templates={lessonPlanDialogProps.templates}
               templatesLoading={lessonPlanDialogProps.templatesLoading}
+              materials={lessonPlanDialogProps.materials}
               templateSelection={lessonPlanDialogProps.templateSelection}
               canManageLessonPlan={canManageAppointment}
               onTemplateSelectionChange={lessonPlanDialogProps.onTemplateSelectionChange}
               onCreateFromScratch={lessonPlanDialogProps.onCreateFromScratch}
               onApplyTemplate={lessonPlanDialogProps.onApplyTemplate}
-              onDraftChange={lessonPlanDialogProps.onDraftChange}
+              onDraftSectionsChange={lessonPlanDialogProps.onDraftSectionsChange}
+              onDraftStatusChange={lessonPlanDialogProps.onDraftStatusChange}
             />
           ) : null}
       </div>

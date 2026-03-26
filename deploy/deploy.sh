@@ -46,6 +46,9 @@ DEPLOY_DIR="${DEPLOY_DIR:-/var/www/${APP_NAME}}"
 RELEASES_DIR="${DEPLOY_DIR}/releases"
 SHARED_DIR="${DEPLOY_DIR}/shared"
 CURRENT_LINK="${DEPLOY_DIR}/current"
+DEPLOY_SHARED_CACHE_DIR="${DEPLOY_SHARED_CACHE_DIR:-${SHARED_DIR}/cache}"
+DEPLOY_SHARED_NEXT_CACHE_DIR="${DEPLOY_SHARED_NEXT_CACHE_DIR:-${DEPLOY_SHARED_CACHE_DIR}/next}"
+DEPLOY_SHARED_NPM_CACHE_DIR="${DEPLOY_SHARED_NPM_CACHE_DIR:-${DEPLOY_SHARED_CACHE_DIR}/npm}"
 KEEP_RELEASES=2
 DEFAULT_BUILD_NODE_HEAP_MB="${DEFAULT_BUILD_NODE_HEAP_MB:-6144}"
 LOW_RAM_1GB_AUTO_HEAP_MB="${LOW_RAM_1GB_AUTO_HEAP_MB:-3072}"
@@ -3441,6 +3444,50 @@ cleanup_install_and_build_caches() {
     fi
 }
 
+# Removes release-local caches that are safe to discard after a successful
+# build. Shared caches are preserved so future deploys can reuse them.
+cleanup_release_local_build_artifacts() {
+    local removed=0
+    local path=""
+
+    for path in \
+        "node_modules/.cache"
+    do
+        [[ -e "${path}" ]] || continue
+        remove_path_with_sudo_fallback "${path}" || {
+            log_warn "Failed to remove release-local cache path: ${path}"
+            continue
+        }
+        removed=$((removed + 1))
+        log_info "Removed release-local cache path: ${path}"
+    done
+
+    if (( removed == 0 )); then
+        log_info "No release-local build artifacts removed"
+    fi
+}
+
+# Ensures shared cache directories exist for deploy-time npm and Next.js reuse.
+initialize_shared_deploy_caches() {
+    mkdir -p \
+        "${DEPLOY_SHARED_CACHE_DIR}" \
+        "${DEPLOY_SHARED_NEXT_CACHE_DIR}" \
+        "${DEPLOY_SHARED_NPM_CACHE_DIR}"
+}
+
+# Configures the current release to reuse shared caches instead of forcing
+# every deploy through a completely cold install/build path.
+configure_release_build_caches() {
+    initialize_shared_deploy_caches
+
+    export npm_config_cache="${DEPLOY_SHARED_NPM_CACHE_DIR}"
+    mkdir -p ".next"
+    ln -sfn "${DEPLOY_SHARED_NEXT_CACHE_DIR}" ".next/cache"
+
+    log_info "Using shared npm cache: ${npm_config_cache}"
+    log_info "Linked shared Next.js build cache: .next/cache -> ${DEPLOY_SHARED_NEXT_CACHE_DIR}"
+}
+
 # Detects total configured swap in MB on Linux hosts. Returns empty when the
 # platform does not expose the Linux /proc interface used here.
 detect_total_swap_mb() {
@@ -3636,6 +3683,11 @@ set_node_heap_limit_mb() {
 # RAM usage during `next build`. Lint/type-check still run in CI/local workflows.
 prepare_next_build_environment() {
     export NEXT_TELEMETRY_DISABLED=1
+
+    if [[ "${MGS_DEPLOY_FAST_BUILD:-0}" == "1" ]]; then
+        export NEXT_LOW_MEMORY_BUILD=1
+        log_warn "Enabled deploy fast-build mode via MGS_DEPLOY_FAST_BUILD=1 (skip build lint/type-check)."
+    fi
 
     if [[ "${NEXT_LOW_MEMORY_BUILD:-}" == "1" ]]; then
         log_info "Using existing NEXT_LOW_MEMORY_BUILD=1 override"
@@ -4138,8 +4190,10 @@ fi
 # Create directories if they don't exist
 mkdir -p "${RELEASES_DIR}"
 mkdir -p "${SHARED_DIR}/data"
+mkdir -p "${DEPLOY_SHARED_CACHE_DIR}"
 sync_deploy_tree_ownership
 run_sudo_cmd chmod -R 775 "${SHARED_DIR}/data" 2>/dev/null || true
+run_sudo_cmd chmod -R 775 "${DEPLOY_SHARED_CACHE_DIR}" 2>/dev/null || true
 
 section "Environment File (.env)"
 ensure_shared_env_file "${SOURCE_DIR}/.env.example" || true
@@ -4242,6 +4296,8 @@ if [[ -d "${SHARED_DIR}/data" ]]; then
     log_info "Linked shared data directory"
 fi
 
+configure_release_build_caches
+
 # Install dependencies
 if [[ "${SKIP_DEPS}" == false ]]; then
     run_npm_step_with_cache_repair "Installing production dependencies (npm ci)" npm ci --omit=dev --ignore-scripts
@@ -4249,10 +4305,6 @@ fi
 
 # Consolidate Prisma update (generate client and run migrations)
 update_prisma
-
-# Reclaim package-manager cache before the build phase so the build has more
-# free disk space available on small VPS hosts.
-cleanup_install_and_build_caches
 
 # Build the application
 prepare_next_build_environment
@@ -4297,8 +4349,9 @@ if [[ -f "${SHARED_DIR}/.env" ]]; then
 fi
 
 # Remove transient build caches from the release after assets are copied. The
-# runtime service does not need these caches, and deleting them reduces disk use.
-cleanup_install_and_build_caches
+# runtime service does not need release-local caches, but shared caches are
+# intentionally preserved for future deploy speed.
+cleanup_release_local_build_artifacts
 cleanup_temporary_build_swap
 
 # Update symlink atomically

@@ -1,7 +1,12 @@
 import { z } from "zod";
 import type { Booking, BookingRequest, LearningMaterial } from "@/generated/prisma/client";
 import { nullableOptionalCustomDurationMinutesSchema } from "@/lib/booking-rules";
-import { studentPortalLessonPlanSummarySchema } from "@/lib/lesson-plan-contract";
+import {
+  studentPortalLessonPlanFieldSchema,
+  studentPortalLessonPlanSummarySchema,
+  type LessonPlanMaterialLinkFieldKey
+} from "@/lib/lesson-plan-contract";
+import { sortLessonPlanMaterialLinks } from "@/lib/lesson-plan-material-links";
 
 const studentPortalLessonModeSchema = z.enum(["in_person", "video"]);
 const studentPortalLessonDurationSchema = z.enum(["min30", "min60"]);
@@ -96,6 +101,15 @@ type MaterialMapInput = Pick<
   "id" | "title" | "description" | "materialType" | "mimeType" | "sizeBytes" | "createdAt"
 >;
 
+type LessonPlanMaterialLinkMapInput = {
+  materialId: string;
+  fieldKey: LessonPlanMaterialLinkFieldKey;
+  startOffset: number;
+  endOffset: number;
+  linkedText: string;
+  material: MaterialMapInput;
+};
+
 type BookingMapInput = Pick<
   Booking,
   | "id"
@@ -113,6 +127,7 @@ type BookingMapInput = Pick<
     goals: string;
     homework: string;
     sharedNotes: string;
+    materialLinks: LessonPlanMaterialLinkMapInput[];
   } | null;
   learningMaterials: MaterialMapInput[];
 };
@@ -149,6 +164,7 @@ export function mapStudentPortalLessonPlanSummary(
         goals: string;
         homework: string;
         sharedNotes: string;
+        materialLinks: LessonPlanMaterialLinkMapInput[];
       }
     | null
     | undefined
@@ -164,7 +180,14 @@ export function mapStudentPortalLessonPlanSummary(
     sharedNotes: lessonPlan.sharedNotes || ""
   };
   const hasVisibleContent = Object.values(summary).some((value) => value.trim().length > 0);
-  return hasVisibleContent ? studentPortalLessonPlanSummarySchema.parse(summary) : null;
+  return hasVisibleContent
+    ? studentPortalLessonPlanSummarySchema.parse({
+        lessonFocus: mapStudentPortalLessonPlanField("lessonFocus", summary.lessonFocus, lessonPlan.materialLinks),
+        goals: mapStudentPortalLessonPlanField("goals", summary.goals, lessonPlan.materialLinks),
+        homework: mapStudentPortalLessonPlanField("homework", summary.homework, lessonPlan.materialLinks),
+        sharedNotes: mapStudentPortalLessonPlanField("sharedNotes", summary.sharedNotes, lessonPlan.materialLinks)
+      })
+    : null;
 }
 
 /**
@@ -205,4 +228,28 @@ export function mapStudentPortalPendingRequest(requestRow: PendingRequestMapInpu
  */
 export function parseStudentPortalPayload(input: unknown): StudentPortalPayload {
   return studentPortalPayloadSchema.parse(input);
+}
+
+function mapStudentPortalLessonPlanField(
+  fieldKey: LessonPlanMaterialLinkFieldKey,
+  text: string,
+  links: ReadonlyArray<LessonPlanMaterialLinkMapInput>
+) {
+  const fieldLinks = sortLessonPlanMaterialLinks(
+    links.filter((link) => link.fieldKey === fieldKey)
+  ).map((link) => ({
+    materialId: link.materialId,
+    fieldKey: link.fieldKey,
+    startOffset: link.startOffset,
+    endOffset: link.endOffset,
+    linkedText: link.linkedText,
+    materialTitle: link.material.description || link.material.title,
+    previewUrl: `/api/student/learning-materials/${link.materialId}/download?disposition=inline`,
+    downloadUrl: `/api/student/learning-materials/${link.materialId}/download`
+  }));
+
+  return studentPortalLessonPlanFieldSchema.parse({
+    text,
+    materialLinks: fieldLinks
+  });
 }

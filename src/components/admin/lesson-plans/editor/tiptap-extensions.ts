@@ -1,0 +1,33 @@
+import StarterKit from "@tiptap/starter-kit";
+import TaskList from "@tiptap/extension-task-list";
+import Placeholder from "@tiptap/extension-placeholder";
+import { MaterialLinkMark } from "./nodes/material-link-mark";
+import { ChecklistItemExtension } from "./nodes/checklist-item-extension";
+import { CalloutExtension } from "./nodes/callout-extension";
+
+/**
+ * Standard TipTap extensions for lesson plan sections. Includes paragraph,
+ * headings (h2/h3 only), bold, italic, strike, bullet list, ordered list,
+ * task list (for homework checklists), callouts, material links, and
+ * placeholder text.
+ */
+export function buildLessonPlanExtensions(placeholder?: string) {
+  return [
+    StarterKit.configure({
+      heading: { levels: [2, 3] },
+      codeBlock: false,
+      code: false,
+      horizontalRule: false,
+    }),
+    TaskList,
+    ChecklistItemExtension.configure({
+      nested: false,
+      HTMLAttributes: { class: "lesson-plan-task-item" },
+    }),
+    MaterialLinkMark,
+    CalloutExtension,
+    Placeholder.configure({
+      placeholder: placeholder ?? "Start typing...",
+    }),
+  ];
+}

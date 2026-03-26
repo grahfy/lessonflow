@@ -118,13 +118,13 @@ describe("admin-lesson-plans", () => {
     const listResponse = await listLessonPlanTemplates(adminJsonRequest("http://localhost/api/admin/lesson-plan-templates", token));
     expect(listResponse.status).toBe(200);
     const listBody = (await listResponse.json()) as {
-      templates: Array<{ id: string; description: string; lessonFocus: string }>;
+      templates: Array<{ id: string; description: string; title: string }>;
     };
     expect(listBody.templates).toHaveLength(1);
     expect(listBody.templates[0]).toMatchObject({
       id: createBody.template.id,
       description: "Updated description",
-      lessonFocus: "Posture and fretting"
+      title: "Beginner Guitar Reset"
     });
 
     const archiveResponse = await archiveLessonPlanTemplate(
@@ -259,6 +259,36 @@ describe("admin-lesson-plans", () => {
         updatedById: assignedTeacher.id
       }
     });
+    const material = await prisma.learningMaterial.create({
+      data: {
+        customerId: await prisma.customer.create({
+          data: {
+            fullName: "Lesson Student",
+            normalizedFullName: "lesson student",
+            email: "lesson-student@example.com",
+            phone: "0400111222",
+            normalizedEmail: "lesson-student@example.com",
+            normalizedPhone: "0400111222",
+            lessonMode: "video",
+            skillLevel: "intermediate",
+            houseNumber: "10",
+            streetName: "Hope",
+            streetType: "Street",
+            suburb: "Thornbury",
+            state: "VIC",
+            postcode: "3071"
+          }
+        }).then((customer) => customer.id),
+        bookingId: booking.id,
+        uploadedById: assignedTeacher.id,
+        title: "Chord chart",
+        description: "Switching shapes slowly",
+        materialType: "pdf",
+        storageKey: "tests/chord-chart.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 128
+      }
+    });
 
     const saveResponse = await saveBookingLessonPlan(
       adminJsonRequest(`http://localhost/api/admin/bookings/${booking.id}/lesson-plan`, assignedToken, {
@@ -270,7 +300,16 @@ describe("admin-lesson-plans", () => {
           activities: "Two-chord drill",
           homework: "Daily two-chord drill",
           sharedNotes: "Keep tempo slow",
-          privateNotes: "Watch ring finger"
+          privateNotes: "Watch ring finger",
+          materialLinks: [
+            {
+              fieldKey: "homework",
+              materialId: material.id,
+              startOffset: 6,
+              endOffset: 15,
+              linkedText: "two-chord"
+            }
+          ]
         }
       }),
       { params: Promise.resolve({ id: booking.id }) }
@@ -281,6 +320,11 @@ describe("admin-lesson-plans", () => {
         bookingId: string;
         sourceTemplateId: string | null;
         sourceTemplateTitle: string | null;
+        materialLinks: Array<{
+          materialId: string;
+          fieldKey: string;
+          linkedText: string;
+        }>;
       };
     };
     expect(saveBody.lessonPlan).toMatchObject({
@@ -288,6 +332,13 @@ describe("admin-lesson-plans", () => {
       sourceTemplateId: template.id,
       sourceTemplateTitle: "Picked Template"
     });
+    expect(saveBody.lessonPlan.materialLinks).toEqual([
+      expect.objectContaining({
+        materialId: material.id,
+        fieldKey: "homework",
+        linkedText: "two-chord"
+      })
+    ]);
 
     const loadResponse = await getBookingLessonPlan(
       adminJsonRequest(`http://localhost/api/admin/bookings/${booking.id}/lesson-plan`, assignedToken),
@@ -296,10 +347,17 @@ describe("admin-lesson-plans", () => {
     expect(loadResponse.status).toBe(200);
     const loadBody = (await loadResponse.json()) as {
       lessonPlan: {
-        privateNotes: string;
+        id: string;
+        bookingId: string;
+        status: string;
+        sections: unknown[];
       } | null;
     };
-    expect(loadBody.lessonPlan?.privateNotes).toBe("Watch ring finger");
+    // V2 GET returns section-based state. V1-created plans have null sections
+    // (serialized as empty array) and status defaults to "draft".
+    expect(loadBody.lessonPlan).toBeTruthy();
+    expect(loadBody.lessonPlan?.bookingId).toBe(booking.id);
+    expect(loadBody.lessonPlan?.status).toBe("draft");
 
     const forbiddenResponse = await saveBookingLessonPlan(
       adminJsonRequest(`http://localhost/api/admin/bookings/${booking.id}/lesson-plan`, otherToken, {
@@ -316,6 +374,71 @@ describe("admin-lesson-plans", () => {
       { params: Promise.resolve({ id: booking.id }) }
     );
     expect(forbiddenResponse.status).toBe(403);
+  });
+
+  it("rejects material links that do not belong to the booking", async () => {
+    await ensureOwnerAdmin();
+    const assignedTeacher = await createTeacher("linked-material-teacher@example.com", "Linked Material Teacher");
+    const assignedToken = createSessionToken(assignedTeacher.email);
+
+    const booking = await createAssignedBooking(assignedTeacher.id);
+    const otherBooking = await createAssignedBooking(assignedTeacher.id);
+    const customer = await prisma.customer.create({
+      data: {
+        fullName: "Lesson Student",
+        normalizedFullName: "lesson student",
+        email: "lesson-student@example.com",
+        phone: "0400111222",
+        normalizedEmail: "lesson-student@example.com",
+        normalizedPhone: "0400111222",
+        lessonMode: "video",
+        skillLevel: "intermediate",
+        houseNumber: "10",
+        streetName: "Hope",
+        streetType: "Street",
+        suburb: "Thornbury",
+        state: "VIC",
+        postcode: "3071"
+      }
+    });
+    const material = await prisma.learningMaterial.create({
+      data: {
+        customerId: customer.id,
+        bookingId: otherBooking.id,
+        uploadedById: assignedTeacher.id,
+        title: "Other booking chart",
+        materialType: "pdf",
+        storageKey: "tests/other-booking-chart.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 64
+      }
+    });
+
+    const response = await saveBookingLessonPlan(
+      adminJsonRequest(`http://localhost/api/admin/bookings/${booking.id}/lesson-plan`, assignedToken, {
+        method: "PUT",
+        body: {
+          lessonFocus: "Focus",
+          goals: "Goals",
+          activities: "Activities",
+          homework: "Daily work",
+          sharedNotes: "Shared",
+          privateNotes: "Private",
+          materialLinks: [
+            {
+              fieldKey: "homework",
+              materialId: material.id,
+              startOffset: 0,
+              endOffset: 5,
+              linkedText: "Daily"
+            }
+          ]
+        }
+      }),
+      { params: Promise.resolve({ id: booking.id }) }
+    );
+
+    expect(response.status).toBe(400);
   });
 
   it("clears a saved booking lesson plan for the assigned teacher", async () => {

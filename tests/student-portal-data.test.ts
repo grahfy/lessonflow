@@ -91,6 +91,18 @@ describe("student-portal-data", () => {
         customerId: customer.id
       }
     });
+    const previousMaterial = await prisma.learningMaterial.create({
+      data: {
+        customerId: customer.id,
+        bookingId: previousBooking.id,
+        title: "Chord worksheet",
+        description: "Chord switching worksheet",
+        materialType: "pdf",
+        storageKey: `${customer.id}/${previousBooking.id}/worksheet.pdf`,
+        mimeType: "application/pdf",
+        sizeBytes: 18
+      }
+    });
     await prisma.lessonPlan.create({
       data: {
         bookingId: previousBooking.id,
@@ -100,7 +112,18 @@ describe("student-portal-data", () => {
         homework: "Five clean changes per day",
         sharedNotes: "Relax the strumming arm",
         privateNotes: "Keep an eye on left-hand collapse",
-        createdById: owner.id
+        createdById: owner.id,
+        materialLinks: {
+          create: [
+            {
+              fieldKey: "homework",
+              materialId: previousMaterial.id,
+              startOffset: 5,
+              endOffset: 18,
+              linkedText: "clean changes"
+            }
+          ]
+        }
       }
     });
     await prisma.lessonPlan.create({
@@ -152,10 +175,28 @@ describe("student-portal-data", () => {
     expect(payload.upcoming[0]?.materials[0]?.downloadUrl).toContain(`/api/student/learning-materials/${material.id}/download`);
     expect(payload.upcoming[0]?.lessonPlanSummary).toBeNull();
     expect(payload.previous[0]?.lessonPlanSummary).toMatchObject({
-      lessonFocus: "Chord changes",
-      goals: "Smoother transitions",
-      homework: "Five clean changes per day",
-      sharedNotes: "Relax the strumming arm"
+      lessonFocus: {
+        text: "Chord changes",
+        materialLinks: []
+      },
+      goals: {
+        text: "Smoother transitions",
+        materialLinks: []
+      },
+      homework: {
+        text: "Five clean changes per day",
+        materialLinks: [
+          expect.objectContaining({
+            materialId: previousMaterial.id,
+            linkedText: "clean changes",
+            previewUrl: `/api/student/learning-materials/${previousMaterial.id}/download?disposition=inline`
+          })
+        ]
+      },
+      sharedNotes: {
+        text: "Relax the strumming arm",
+        materialLinks: []
+      }
     });
     expect(JSON.stringify(payload.previous[0]?.lessonPlanSummary || {})).not.toContain("Keep an eye on left-hand collapse");
   });
