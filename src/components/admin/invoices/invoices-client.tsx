@@ -1239,7 +1239,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                 <span className="admin-mobile-label">Actions</span>
                 <Tooltip content="Open this invoice as a PDF in a new tab.">
                   <button
-                    className="btn btn-secondary admin-list-action-btn"
+                    className="btn btn-secondary btn-xs admin-list-action-btn"
                     type="button"
                     onClick={() => window.open(`/api/admin/invoices/${inv.id}/pdf`, '_blank')}
                   >
@@ -1248,7 +1248,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                 </Tooltip>
                 <Tooltip content="Open invoice details for editing and lifecycle actions.">
                   <button
-                    className="btn btn-secondary admin-list-action-btn"
+                    className="btn btn-secondary btn-xs admin-list-action-btn"
                     type="button"
                     onClick={() => openDetail(inv)}
                   >
@@ -1257,7 +1257,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                 </Tooltip>
                 <Tooltip content="Delete this invoice record permanently where allowed.">
                   <button
-                    className="btn btn-danger admin-list-action-btn"
+                    className="btn btn-danger btn-xs admin-list-action-btn"
                     type="button"
                     disabled={busyAction === `delete-${inv.id}`}
                     onClick={async () => {

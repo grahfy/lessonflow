@@ -50,7 +50,7 @@ export function Pagination({
 
         <div className="page-buttons">
           <button
-            className="btn btn-secondary pagination-btn"
+            className="btn btn-secondary btn-xs pagination-btn"
             disabled={currentPage <= 1}
             onClick={() => onPageChange(currentPage - 1)}
           >
@@ -62,7 +62,7 @@ export function Pagination({
           </div>
 
           <button
-            className="btn btn-secondary pagination-btn"
+            className="btn btn-secondary btn-xs pagination-btn"
             disabled={currentPage >= totalPages}
             onClick={() => onPageChange(currentPage + 1)}
           >

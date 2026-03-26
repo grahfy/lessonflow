@@ -231,7 +231,7 @@
 .invoice-line-item.invoice-line-item-editable select {
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.05);
   color: var(--ink-0);
   padding: 6px 8px;
@@ -1544,7 +1544,7 @@
 .report-controls-card select,
 .report-controls-card input {
   min-height: 40px;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
 }
 
 .report-custom-range-field {
@@ -2054,9 +2054,9 @@
 }
 
 .invoice-dialog-preset-select {
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  border-radius: 12px;
-  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--admin-density-control-radius, 14px);
+  padding: 8px 12px;
   background: rgba(15, 23, 42, 0.74);
   color: var(--ink-0);
   font: inherit;

@@ -89,8 +89,8 @@
 }
 
 .manual-section {
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--admin-density-control-radius);
   background: rgba(255, 255, 255, 0.02);
   padding: 10px;
   display: grid;
@@ -185,7 +185,7 @@
 
 .notice {
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 10px;
+  border-radius: var(--admin-density-control-radius);
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.05);
   font-size: 0.85rem;
@@ -225,7 +225,7 @@
 
 .setup-check {
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--admin-density-control-radius);
   background: rgba(255, 255, 255, 0.03);
   padding: 10px 12px;
   display: grid;
@@ -2110,7 +2110,7 @@
   flex: 1;
   min-width: 0;
   padding: 6px 10px;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
 }
 
 .lesson-plan-header-actions {
@@ -2122,11 +2122,11 @@
 }
 
 .lesson-plan-status-selector {
-  font-size: 0.76rem;
+  font-size: 0.8rem;
   font-family: inherit;
-  padding: 4px 10px;
+  padding: 5px 10px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--admin-density-control-radius);
   background: var(--bg-1);
   color: var(--ink-1);
   cursor: pointer;
@@ -2255,7 +2255,7 @@
   border: none;
   background: transparent;
   color: var(--ink-0);
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   line-height: 1.6;
   resize: none;
   outline: none;
@@ -2962,10 +2962,7 @@
   color: #fff;
 }
 
-.customer-portal-copy-btn {
-  padding: 4px 8px;
-  font-size: 0.7rem;
-}
+/* Sizing handled by .btn-xs class on the element */
 
 .customer-portal-actions {
   margin-top: 8px;
@@ -3163,11 +3160,6 @@
   flex-wrap: wrap;
 }
 
-.customer-email-history-meta .status-badge {
-  font-size: 0.7rem;
-  padding: 2px 8px;
-}
-
 .customer-email-history-error {
   color: #ff9ea9;
   font-size: 0.75rem;
@@ -3293,10 +3285,7 @@
   gap: 6px;
 }
 
-.customer-materials-item-actions .btn {
-  padding: 5px 10px;
-  font-size: 0.72rem;
-}
+/* Sizing handled by .btn-sm class on the element */
 
 .customer-materials-audio {
   width: 100%;
@@ -5186,13 +5175,13 @@
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 8px;
-  padding-top: 8px;
+  padding: 8px 4px 0;
   border-top: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .dialog-footer {
   margin-top: 12px;
-  padding-top: 10px;
+  padding: 10px 4px 0;
   border-top: 1px solid var(--line);
   flex-shrink: 0;
 }
@@ -5478,7 +5467,7 @@
 #booking-detail-dialog .field select,
 #booking-detail-dialog .field textarea {
   padding: 7px 10px;
-  border-radius: 10px;
+  border-radius: var(--admin-density-control-radius);
   font-size: 0.84rem;
 }
 
@@ -5677,7 +5666,7 @@
 #customer-dialog .customer-form-grid select,
 #customer-dialog .customer-form-grid textarea {
   padding: 7px 10px;
-  font-size: 0.86rem;
+  font-size: 0.84rem;
 }
 
 #customer-dialog .customer-portal-card {
@@ -6362,8 +6351,6 @@
 
 .admin-list-action-btn {
   min-height: 30px;
-  padding: 5px 9px;
-  font-size: 0.66rem;
   min-width: 0;
   flex: 0 0 auto;
 }
@@ -6404,8 +6391,8 @@
   background: var(--bg-2);
   color: var(--ink-0);
   border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 2px 4px;
+  border-radius: var(--admin-density-control-radius);
+  padding: 5px 10px;
   font-size: 0.8rem;
 }
 
@@ -6416,9 +6403,7 @@
 }
 
 .pagination-btn {
-  padding: 4px 10px;
   min-width: 0;
-  font-size: 0.75rem;
 }
 
 .pagination-page-indicator {
@@ -6463,11 +6448,11 @@
 .syslog-toolbar-search input {
   width: 100%;
   padding: 10px 14px 10px 36px;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: var(--admin-density-control-radius);
+  border: 1px solid var(--line);
   background: rgba(15, 23, 42, 0.82);
   color: var(--ink-0);
-  font-size: 0.88rem;
+  font-size: 0.84rem;
 }
 
 .syslog-toolbar-search input::placeholder {
@@ -6491,11 +6476,11 @@
 
 .syslog-toolbar-field select {
   padding: 10px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: var(--admin-density-control-radius);
+  border: 1px solid var(--line);
   background: rgba(15, 23, 42, 0.82);
   color: var(--ink-0);
-  font-size: 0.88rem;
+  font-size: 0.84rem;
 }
 
 .syslog-toolbar-actions {
@@ -7078,11 +7063,19 @@
     --admin-density-shell-gap: 8px;
     --admin-density-shell-radius: 18px;
     --admin-density-card-padding: 12px;
+    --admin-density-card-radius: 14px;
     --admin-density-toolbar-padding-block: 9px;
     --admin-density-toolbar-padding-inline: 11px;
     --admin-density-control-height: 32px;
-    --admin-density-dialog-padding: 10px;
+    --admin-density-control-radius: 10px;
+    --admin-density-control-padding-block: 5px;
+    --admin-density-control-padding-inline: 10px;
+    --admin-density-dialog-padding: 12px;
     --admin-density-dialog-radius: 16px;
+    --admin-density-dialog-gap: 8px;
+    --admin-density-dialog-head-gap: 8px;
+    --admin-density-status-padding-block: 6px;
+    --admin-density-status-padding-inline: 8px;
     --admin-density-table-row-padding-block: 7px;
     --admin-density-table-row-padding-inline: 10px;
     --admin-density-table-head-padding-block: 8px;

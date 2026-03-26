@@ -873,8 +873,13 @@ h1 {
 
 .btn-small,
 .btn-sm {
-  padding: 6px 10px;
+  padding: 5px 10px;
   font-size: 0.72rem;
+}
+
+.btn-xs {
+  padding: 4px 8px;
+  font-size: 0.66rem;
 }
 
 .btn-ghost {
@@ -1382,8 +1387,8 @@ h1 {
 .field input,
 .field select,
 .field textarea {
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  border-radius: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
   background: rgba(15, 23, 42, 0.74);
   color: var(--ink-0);
   padding: 10px 12px;

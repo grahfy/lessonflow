@@ -87,7 +87,7 @@ export function AdminMaterialsPanel({
                     <div className="customer-materials-item-actions">
                       <Tooltip content="Open material in a new tab.">
                         <button
-                          className="btn btn-secondary"
+                          className="btn btn-secondary btn-sm"
                           type="button"
                           onClick={() =>
                             // RATIONALE: Admins often need the browser's native
@@ -101,7 +101,7 @@ export function AdminMaterialsPanel({
                       </Tooltip>
                       <Tooltip content="Permanently remove this material.">
                         <button
-                          className="btn btn-danger"
+                          className="btn btn-danger btn-sm"
                           type="button"
                           disabled={materialsDeletingId === material.id}
                           onClick={() => void onDelete(material.id)}

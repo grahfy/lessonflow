@@ -135,7 +135,7 @@ export function CustomerTable({
                             {canViewBilling ? (
                                 <Tooltip content="Open this customer's invoice history and billing records.">
                                     <button
-                                        className="btn btn-secondary admin-list-action-btn"
+                                        className="btn btn-secondary btn-xs admin-list-action-btn"
                                         type="button"
                                         onClick={() => onViewInvoices(customer.fullName)}
                                     >
@@ -145,7 +145,7 @@ export function CustomerTable({
                             ) : null}
                             <Tooltip content="Edit this customer's profile, contact details, and portal access.">
                                 <button
-                                    className="btn btn-secondary admin-list-action-btn"
+                                    className="btn btn-secondary btn-xs admin-list-action-btn"
                                     type="button"
                                     onClick={() => onOpenCustomerDialog(customer, true)}
                                 >
@@ -155,7 +155,7 @@ export function CustomerTable({
                             {canManageCustomers ? (
                                 <Tooltip content="Archive or remove this customer record.">
                                     <button
-                                        className="btn btn-danger admin-list-action-btn"
+                                        className="btn btn-danger btn-xs admin-list-action-btn"
                                         type="button"
                                         disabled={deletingCustomerId === customer.id}
                                         onClick={() => onDeleteCustomer(customer)}

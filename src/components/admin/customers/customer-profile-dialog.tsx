@@ -350,7 +350,7 @@ export function CustomerProfileDialog({
                                     </div>
                                     <button 
                                         type="button"
-                                        className="btn btn-secondary customer-portal-copy-btn"
+                                        className="btn btn-secondary btn-xs"
                                         onClick={() =>
                                             // RATIONALE: Revealed credentials are
                                             // short-lived in the UI, so clipboard
