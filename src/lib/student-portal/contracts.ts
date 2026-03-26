@@ -2,11 +2,10 @@ import { z } from "zod";
 import type { Booking, BookingRequest, LearningMaterial } from "@/generated/prisma/client";
 import { nullableOptionalCustomDurationMinutesSchema } from "@/lib/booking-rules";
 import {
-  studentPortalLessonPlanFieldSchema,
-  studentPortalLessonPlanSummarySchema,
-  type LessonPlanMaterialLinkFieldKey
+  lessonPlanSectionSchema,
+  studentPortalLessonPlanV2SummarySchema,
+  type StudentPortalLessonPlanV2Summary
 } from "@/lib/lesson-plan-contract";
-import { sortLessonPlanMaterialLinks } from "@/lib/lesson-plan-material-links";
 
 const studentPortalLessonModeSchema = z.enum(["in_person", "video"]);
 const studentPortalLessonDurationSchema = z.enum(["min30", "min60"]);
@@ -35,7 +34,7 @@ export const studentPortalBookingSchema = z.object({
   startAt: z.string().datetime({ offset: true }),
   endAt: z.string().datetime({ offset: true }),
   notes: z.string().nullable(),
-  lessonPlanSummary: studentPortalLessonPlanSummarySchema.nullable(),
+  lessonPlanSummary: studentPortalLessonPlanV2SummarySchema.nullable(),
   materials: z.array(studentPortalMaterialSchema)
 });
 
@@ -101,15 +100,6 @@ type MaterialMapInput = Pick<
   "id" | "title" | "description" | "materialType" | "mimeType" | "sizeBytes" | "createdAt"
 >;
 
-type LessonPlanMaterialLinkMapInput = {
-  materialId: string;
-  fieldKey: LessonPlanMaterialLinkFieldKey;
-  startOffset: number;
-  endOffset: number;
-  linkedText: string;
-  material: MaterialMapInput;
-};
-
 type BookingMapInput = Pick<
   Booking,
   | "id"
@@ -123,11 +113,8 @@ type BookingMapInput = Pick<
   | "notes"
 > & {
   lessonPlan?: {
-    lessonFocus: string;
-    goals: string;
-    homework: string;
-    sharedNotes: string;
-    materialLinks: LessonPlanMaterialLinkMapInput[];
+    sections: unknown;
+    status: string;
   } | null;
   learningMaterials: MaterialMapInput[];
 };
@@ -156,38 +143,26 @@ export function mapStudentPortalMaterial(material: MaterialMapInput): StudentPor
 
 /**
  * Builds the student-safe lesson-plan summary for one booking.
+ * Filters to student-visible sections only.
  */
 export function mapStudentPortalLessonPlanSummary(
-  lessonPlan:
-    | {
-        lessonFocus: string;
-        goals: string;
-        homework: string;
-        sharedNotes: string;
-        materialLinks: LessonPlanMaterialLinkMapInput[];
-      }
-    | null
-    | undefined
-) {
-  if (!lessonPlan) {
-    return null;
-  }
+  lessonPlan: { sections: unknown; status: string } | null | undefined
+): StudentPortalLessonPlanV2Summary | null {
+  if (!lessonPlan) return null;
 
-  const summary = {
-    lessonFocus: lessonPlan.lessonFocus || "",
-    goals: lessonPlan.goals || "",
-    homework: lessonPlan.homework || "",
-    sharedNotes: lessonPlan.sharedNotes || ""
-  };
-  const hasVisibleContent = Object.values(summary).some((value) => value.trim().length > 0);
-  return hasVisibleContent
-    ? studentPortalLessonPlanSummarySchema.parse({
-        lessonFocus: mapStudentPortalLessonPlanField("lessonFocus", summary.lessonFocus, lessonPlan.materialLinks),
-        goals: mapStudentPortalLessonPlanField("goals", summary.goals, lessonPlan.materialLinks),
-        homework: mapStudentPortalLessonPlanField("homework", summary.homework, lessonPlan.materialLinks),
-        sharedNotes: mapStudentPortalLessonPlanField("sharedNotes", summary.sharedNotes, lessonPlan.materialLinks)
-      })
-    : null;
+  const rawSections = Array.isArray(lessonPlan.sections) ? lessonPlan.sections : [];
+  const parsed = rawSections
+    .map((s) => lessonPlanSectionSchema.safeParse(s))
+    .filter((r) => r.success)
+    .map((r) => r.data)
+    .filter((s) => s.visibility === "student_visible")
+    .filter((s) => s.content.content.length > 0);
+
+  if (parsed.length === 0) return null;
+
+  return studentPortalLessonPlanV2SummarySchema.parse({
+    sections: parsed.map((s) => ({ key: s.key, title: s.title, content: s.content }))
+  });
 }
 
 /**
@@ -230,26 +205,3 @@ export function parseStudentPortalPayload(input: unknown): StudentPortalPayload 
   return studentPortalPayloadSchema.parse(input);
 }
 
-function mapStudentPortalLessonPlanField(
-  fieldKey: LessonPlanMaterialLinkFieldKey,
-  text: string,
-  links: ReadonlyArray<LessonPlanMaterialLinkMapInput>
-) {
-  const fieldLinks = sortLessonPlanMaterialLinks(
-    links.filter((link) => link.fieldKey === fieldKey)
-  ).map((link) => ({
-    materialId: link.materialId,
-    fieldKey: link.fieldKey,
-    startOffset: link.startOffset,
-    endOffset: link.endOffset,
-    linkedText: link.linkedText,
-    materialTitle: link.material.description || link.material.title,
-    previewUrl: `/api/student/learning-materials/${link.materialId}/download?disposition=inline`,
-    downloadUrl: `/api/student/learning-materials/${link.materialId}/download`
-  }));
-
-  return studentPortalLessonPlanFieldSchema.parse({
-    text,
-    materialLinks: fieldLinks
-  });
-}

@@ -56,6 +56,15 @@ async function createAssignedBooking(assignedTeacherId: string) {
   });
 }
 
+const testSections = [
+  { key: "lessonFocus", title: "Lesson Focus", visibility: "student_visible", content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Chord switching" }] }] } },
+  { key: "goals", title: "Goals", visibility: "student_visible", content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Improve transitions" }] }] } },
+  { key: "activities", title: "Activities", visibility: "teacher_only", content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Two-chord drill" }] }] } },
+  { key: "homework", title: "Homework", visibility: "student_visible", content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Daily two-chord drill" }] }] } },
+  { key: "sharedNotes", title: "Shared Notes", visibility: "student_visible", content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Keep tempo slow" }] }] } },
+  { key: "privateNotes", title: "Private Notes", visibility: "teacher_only", content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Watch ring finger" }] }] } },
+];
+
 describe("admin-lesson-plans", () => {
   beforeEach(async () => {
     await prisma.lessonPlan.deleteMany();
@@ -79,12 +88,8 @@ describe("admin-lesson-plans", () => {
         body: {
           title: "Beginner Guitar Reset",
           description: "Warmups and fretboard orientation",
-          lessonFocus: "Posture and open strings",
-          goals: "Relax the picking hand",
-          activities: "Open-string drill",
-          homework: "Five minutes of open-string picking",
-          sharedNotes: "Keep shoulders relaxed",
-          privateNotes: "Watch wrist tension"
+          category: "technique",
+          sections: testSections
         }
       })
     );
@@ -93,9 +98,19 @@ describe("admin-lesson-plans", () => {
       template: {
         id: string;
         title: string;
+        category: string;
+        sections: unknown[];
       };
     };
     expect(createBody.template.title).toBe("Beginner Guitar Reset");
+    expect(createBody.template.category).toBe("technique");
+    expect(createBody.template.sections).toHaveLength(6);
+
+    const updatedSections = testSections.map((s) =>
+      s.key === "lessonFocus"
+        ? { ...s, content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Posture and fretting" }] }] } }
+        : s
+    );
 
     const updateResponse = await updateLessonPlanTemplate(
       adminJsonRequest(`http://localhost/api/admin/lesson-plan-templates/${createBody.template.id}`, token, {
@@ -103,12 +118,8 @@ describe("admin-lesson-plans", () => {
         body: {
           title: "Beginner Guitar Reset",
           description: "Updated description",
-          lessonFocus: "Posture and fretting",
-          goals: "Relax the picking hand",
-          activities: "Open-string drill",
-          homework: "Five minutes of open-string picking",
-          sharedNotes: "Keep shoulders relaxed",
-          privateNotes: "Watch wrist tension"
+          category: "technique",
+          sections: updatedSections
         }
       }),
       { params: Promise.resolve({ id: createBody.template.id }) }
@@ -118,13 +129,14 @@ describe("admin-lesson-plans", () => {
     const listResponse = await listLessonPlanTemplates(adminJsonRequest("http://localhost/api/admin/lesson-plan-templates", token));
     expect(listResponse.status).toBe(200);
     const listBody = (await listResponse.json()) as {
-      templates: Array<{ id: string; description: string; title: string }>;
+      templates: Array<{ id: string; description: string; title: string; category: string }>;
     };
     expect(listBody.templates).toHaveLength(1);
     expect(listBody.templates[0]).toMatchObject({
       id: createBody.template.id,
       description: "Updated description",
-      title: "Beginner Guitar Reset"
+      title: "Beginner Guitar Reset",
+      category: "technique"
     });
 
     const archiveResponse = await archiveLessonPlanTemplate(
@@ -153,12 +165,8 @@ describe("admin-lesson-plans", () => {
         body: {
           title: "Teacher Template",
           description: "",
-          lessonFocus: "Focus",
-          goals: "Goals",
-          activities: "Activities",
-          homework: "Homework",
-          sharedNotes: "Shared",
-          privateNotes: "Private"
+          category: "general",
+          sections: testSections
         }
       })
     );
@@ -170,12 +178,8 @@ describe("admin-lesson-plans", () => {
         body: {
           title: "Teacher Template",
           description: "Illegal update",
-          lessonFocus: "Focus",
-          goals: "Goals",
-          activities: "Activities",
-          homework: "Homework",
-          sharedNotes: "Shared",
-          privateNotes: "Private"
+          category: "general",
+          sections: testSections
         }
       }),
       { params: Promise.resolve({ id: createBody.template.id }) }
@@ -196,16 +200,18 @@ describe("admin-lesson-plans", () => {
         body: {
           title: "Teacher Owned Template",
           description: "",
-          lessonFocus: "Focus",
-          goals: "Goals",
-          activities: "Activities",
-          homework: "Homework",
-          sharedNotes: "Shared",
-          privateNotes: "Private"
+          category: "general",
+          sections: testSections
         }
       })
     );
     const createBody = (await createResponse.json()) as { template: { id: string } };
+
+    const updatedSections = testSections.map((s) =>
+      s.key === "lessonFocus"
+        ? { ...s, content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Updated focus" }] }] } }
+        : s
+    );
 
     const response = await updateLessonPlanTemplate(
       adminJsonRequest(`http://localhost/api/admin/lesson-plan-templates/${createBody.template.id}`, ownerToken, {
@@ -213,12 +219,8 @@ describe("admin-lesson-plans", () => {
         body: {
           title: "Teacher Owned Template",
           description: "Owner update",
-          lessonFocus: "Updated focus",
-          goals: "Goals",
-          activities: "Activities",
-          homework: "Homework",
-          sharedNotes: "Shared",
-          privateNotes: "Private"
+          category: "general",
+          sections: updatedSections
         }
       }),
       { params: Promise.resolve({ id: createBody.template.id }) }
@@ -228,13 +230,12 @@ describe("admin-lesson-plans", () => {
     const body = (await response.json()) as {
       template: {
         description: string;
-        lessonFocus: string;
+        sections: Array<{ key: string; content: { type: string; content: Array<{ content: Array<{ text: string }> }> } }>;
       };
     };
-    expect(body.template).toMatchObject({
-      description: "Owner update",
-      lessonFocus: "Updated focus"
-    });
+    expect(body.template.description).toBe("Owner update");
+    const focusSection = body.template.sections.find((s) => s.key === "lessonFocus");
+    expect(focusSection?.content.content[0]?.content[0]?.text).toBe("Updated focus");
   });
 
   it("saves a booking lesson plan for the assigned teacher and blocks other teachers", async () => {
@@ -249,44 +250,16 @@ describe("admin-lesson-plans", () => {
       data: {
         title: "Picked Template",
         description: null,
-        lessonFocus: "Chord switching",
-        goals: "Improve transitions",
-        activities: "Two-chord drill",
-        homework: "Daily two-chord drill",
-        sharedNotes: "Keep tempo slow",
-        privateNotes: "Watch ring finger",
+        lessonFocus: "",
+        goals: "",
+        activities: "",
+        homework: "",
+        sharedNotes: "",
+        privateNotes: "",
+        sections: JSON.parse(JSON.stringify(testSections)),
+        category: "technique",
         createdById: assignedTeacher.id,
         updatedById: assignedTeacher.id
-      }
-    });
-    const material = await prisma.learningMaterial.create({
-      data: {
-        customerId: await prisma.customer.create({
-          data: {
-            fullName: "Lesson Student",
-            normalizedFullName: "lesson student",
-            email: "lesson-student@example.com",
-            phone: "0400111222",
-            normalizedEmail: "lesson-student@example.com",
-            normalizedPhone: "0400111222",
-            lessonMode: "video",
-            skillLevel: "intermediate",
-            houseNumber: "10",
-            streetName: "Hope",
-            streetType: "Street",
-            suburb: "Thornbury",
-            state: "VIC",
-            postcode: "3071"
-          }
-        }).then((customer) => customer.id),
-        bookingId: booking.id,
-        uploadedById: assignedTeacher.id,
-        title: "Chord chart",
-        description: "Switching shapes slowly",
-        materialType: "pdf",
-        storageKey: "tests/chord-chart.pdf",
-        mimeType: "application/pdf",
-        sizeBytes: 128
       }
     });
 
@@ -295,21 +268,8 @@ describe("admin-lesson-plans", () => {
         method: "PUT",
         body: {
           sourceTemplateId: template.id,
-          lessonFocus: "Chord switching",
-          goals: "Improve transitions",
-          activities: "Two-chord drill",
-          homework: "Daily two-chord drill",
-          sharedNotes: "Keep tempo slow",
-          privateNotes: "Watch ring finger",
-          materialLinks: [
-            {
-              fieldKey: "homework",
-              materialId: material.id,
-              startOffset: 6,
-              endOffset: 15,
-              linkedText: "two-chord"
-            }
-          ]
+          status: "in_progress",
+          sections: testSections
         }
       }),
       { params: Promise.resolve({ id: booking.id }) }
@@ -320,25 +280,17 @@ describe("admin-lesson-plans", () => {
         bookingId: string;
         sourceTemplateId: string | null;
         sourceTemplateTitle: string | null;
-        materialLinks: Array<{
-          materialId: string;
-          fieldKey: string;
-          linkedText: string;
-        }>;
+        status: string;
+        sections: unknown[];
       };
     };
     expect(saveBody.lessonPlan).toMatchObject({
       bookingId: booking.id,
       sourceTemplateId: template.id,
-      sourceTemplateTitle: "Picked Template"
+      sourceTemplateTitle: "Picked Template",
+      status: "in_progress"
     });
-    expect(saveBody.lessonPlan.materialLinks).toEqual([
-      expect.objectContaining({
-        materialId: material.id,
-        fieldKey: "homework",
-        linkedText: "two-chord"
-      })
-    ]);
+    expect(saveBody.lessonPlan.sections).toHaveLength(6);
 
     const loadResponse = await getBookingLessonPlan(
       adminJsonRequest(`http://localhost/api/admin/bookings/${booking.id}/lesson-plan`, assignedToken),
@@ -353,92 +305,22 @@ describe("admin-lesson-plans", () => {
         sections: unknown[];
       } | null;
     };
-    // V2 GET returns section-based state. V1-created plans have null sections
-    // (serialized as empty array) and status defaults to "draft".
     expect(loadBody.lessonPlan).toBeTruthy();
     expect(loadBody.lessonPlan?.bookingId).toBe(booking.id);
-    expect(loadBody.lessonPlan?.status).toBe("draft");
+    expect(loadBody.lessonPlan?.status).toBe("in_progress");
+    expect(loadBody.lessonPlan?.sections).toHaveLength(6);
 
     const forbiddenResponse = await saveBookingLessonPlan(
       adminJsonRequest(`http://localhost/api/admin/bookings/${booking.id}/lesson-plan`, otherToken, {
         method: "PUT",
         body: {
-          lessonFocus: "Illegal edit",
-          goals: "",
-          activities: "",
-          homework: "",
-          sharedNotes: "",
-          privateNotes: ""
+          status: "in_progress",
+          sections: testSections
         }
       }),
       { params: Promise.resolve({ id: booking.id }) }
     );
     expect(forbiddenResponse.status).toBe(403);
-  });
-
-  it("rejects material links that do not belong to the booking", async () => {
-    await ensureOwnerAdmin();
-    const assignedTeacher = await createTeacher("linked-material-teacher@example.com", "Linked Material Teacher");
-    const assignedToken = createSessionToken(assignedTeacher.email);
-
-    const booking = await createAssignedBooking(assignedTeacher.id);
-    const otherBooking = await createAssignedBooking(assignedTeacher.id);
-    const customer = await prisma.customer.create({
-      data: {
-        fullName: "Lesson Student",
-        normalizedFullName: "lesson student",
-        email: "lesson-student@example.com",
-        phone: "0400111222",
-        normalizedEmail: "lesson-student@example.com",
-        normalizedPhone: "0400111222",
-        lessonMode: "video",
-        skillLevel: "intermediate",
-        houseNumber: "10",
-        streetName: "Hope",
-        streetType: "Street",
-        suburb: "Thornbury",
-        state: "VIC",
-        postcode: "3071"
-      }
-    });
-    const material = await prisma.learningMaterial.create({
-      data: {
-        customerId: customer.id,
-        bookingId: otherBooking.id,
-        uploadedById: assignedTeacher.id,
-        title: "Other booking chart",
-        materialType: "pdf",
-        storageKey: "tests/other-booking-chart.pdf",
-        mimeType: "application/pdf",
-        sizeBytes: 64
-      }
-    });
-
-    const response = await saveBookingLessonPlan(
-      adminJsonRequest(`http://localhost/api/admin/bookings/${booking.id}/lesson-plan`, assignedToken, {
-        method: "PUT",
-        body: {
-          lessonFocus: "Focus",
-          goals: "Goals",
-          activities: "Activities",
-          homework: "Daily work",
-          sharedNotes: "Shared",
-          privateNotes: "Private",
-          materialLinks: [
-            {
-              fieldKey: "homework",
-              materialId: material.id,
-              startOffset: 0,
-              endOffset: 5,
-              linkedText: "Daily"
-            }
-          ]
-        }
-      }),
-      { params: Promise.resolve({ id: booking.id }) }
-    );
-
-    expect(response.status).toBe(400);
   });
 
   it("clears a saved booking lesson plan for the assigned teacher", async () => {
@@ -450,12 +332,14 @@ describe("admin-lesson-plans", () => {
     await prisma.lessonPlan.create({
       data: {
         bookingId: booking.id,
-        lessonFocus: "Focus",
-        goals: "Goals",
-        activities: "Activities",
-        homework: "Homework",
-        sharedNotes: "Shared",
-        privateNotes: "Private",
+        status: "in_progress",
+        sections: JSON.parse(JSON.stringify(testSections)),
+        lessonFocus: "",
+        goals: "",
+        activities: "",
+        homework: "",
+        sharedNotes: "",
+        privateNotes: "",
         createdById: assignedTeacher.id,
         updatedById: assignedTeacher.id
       }

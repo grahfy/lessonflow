@@ -31,6 +31,7 @@
 #   --install-cron       Install cron/crond scheduler (if needed) and enable/start service
 #   --install-app-service  Install/update the app systemd unit and enable service
 #   --install-cron-jobs  Install/update managed cron jobs and restart cron (best effort)
+#   --seed-templates     Seed example lesson-plan templates if the library is empty
 #   --no-auto-bootstrap  Disable automatic bootstrap detection for missing host setup
 #   --no-spinner         Disable spinner UI
 #   --no-color           Disable colored output
@@ -79,6 +80,7 @@ INSTALL_PHP_FPM_IF_NEEDED=false
 INSTALL_CRON_IF_NEEDED=false
 INSTALL_APP_SERVICE_IF_NEEDED=false
 INSTALL_CRON_JOBS_IF_NEEDED=false
+SEED_EXAMPLE_TEMPLATES=false
 AUTO_BOOTSTRAP=true
 NO_SPINNER=false
 NO_COLOR=false
@@ -149,6 +151,7 @@ Options:
   --install-cron       [DEPRECATED] Install cron/crond scheduler (systemd timers now used instead)
   --install-app-service  Install/update the app systemd unit and enable service
   --install-cron-jobs  Install/update systemd timer units for scheduled jobs (default: ON)
+  --seed-templates     Seed example lesson-plan templates if the library is empty
   --no-auto-bootstrap  Disable automatic bootstrap detection for missing host setup
   --no-spinner         Disable spinner UI
   --no-color           Disable colored output
@@ -2850,6 +2853,49 @@ sync_manual_docs_into_current_standalone_from_update() {
   log_info "Manual docs synced to ${docs_dst}"
 }
 
+# Offers to seed example lesson-plan templates when the template library is empty.
+# Only prompts when running interactively in a TTY; non-interactive runs skip silently.
+maybe_seed_example_lesson_plan_templates() {
+  local seed_repo_root="${CURRENT_LINK}"
+  local shared_env_path="${SHARED_DIR}/.env"
+  local seed_database_url=""
+  local seed_cmd=""
+
+  if [[ ! -d "${seed_repo_root}" ]]; then
+    seed_repo_root="${REPO_ROOT}"
+  fi
+
+  if [[ -f "${shared_env_path}" ]]; then
+    seed_database_url="$(read_env_file_value_from_update "${shared_env_path}" "DATABASE_URL" || true)"
+  fi
+
+  if [[ -z "${seed_database_url}" ]]; then
+    return 0
+  fi
+
+  seed_cmd="cd '${seed_repo_root}' && npx tsx scripts/seed-example-templates.ts"
+
+  local should_seed=false
+
+  if [[ "${SEED_EXAMPLE_TEMPLATES}" == true ]]; then
+    should_seed=true
+  elif [[ -t 0 ]]; then
+    if prompt_yes_no "Install example lesson-plan templates (if none exist)?" "y"; then
+      should_seed=true
+    else
+      log_info "Skipping example lesson-plan templates."
+    fi
+  fi
+
+  if [[ "${should_seed}" == true ]]; then
+    section "Lesson Plan Templates"
+    log_info "Seeding example lesson-plan templates..."
+    if ! run_deploy_path_cmd env DATABASE_URL="${seed_database_url}" bash -lc "${seed_cmd}"; then
+      log_warn "Example template seeding failed; continuing."
+    fi
+  fi
+}
+
 # Notifies the admin and generates a public announcement file after a successful
 # update. It delegates the logic to a Node.js script that uses the application's
 # mail service and templates.
@@ -2912,6 +2958,7 @@ while [[ $# -gt 0 ]]; do
     --install-cron) INSTALL_CRON_IF_NEEDED=true; shift ;;
     --install-app-service) INSTALL_APP_SERVICE_IF_NEEDED=true; shift ;;
     --install-cron-jobs) INSTALL_CRON_JOBS_IF_NEEDED=true; shift ;;
+    --seed-templates) SEED_EXAMPLE_TEMPLATES=true; shift ;;
     --no-auto-bootstrap) AUTO_BOOTSTRAP=false; shift ;;
     --no-spinner) NO_SPINNER=true; shift ;;
     --no-color) NO_COLOR=true; shift ;;
@@ -3071,6 +3118,7 @@ if [[ "${SKIP_DEPLOY}" == false ]]; then
   maybe_edit_shared_env_before_deploy "${REPO_ROOT}"
   run_deploy
   sync_manual_docs_into_current_standalone_from_update
+  maybe_seed_example_lesson_plan_templates
   notify_updates
 else
   section "Deploy"

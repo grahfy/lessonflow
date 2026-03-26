@@ -51,7 +51,6 @@ import {
   buildDefaultLessonPlanSections,
   type LessonPlanSection,
   type LessonPlanSectionsInput,
-  type LessonPlanTemplateV2State
 } from "@/lib/lesson-plan-contract";
 import { durationMinutesToBookingPayload, durationMinutesToChoiceValue, getPersistedDurationMinutes } from "@/lib/lesson-duration-utils";
 import { formatCurrency } from "@/lib/invoices/currency";
@@ -778,11 +777,9 @@ export function AdminBookingsClient() {
       }
     }
 
-    // Access V2 sections from the template (API now returns them).
-    const tplSections = (template as unknown as { sections?: LessonPlanSection[] }).sections;
     setLessonPlanDraft({
-      sections: tplSections && tplSections.length > 0
-        ? tplSections.map((s) => ({ ...s, content: { ...s.content, content: [...(s.content.content ?? [])] } }))
+      sections: template.sections.length > 0
+        ? template.sections.map((s) => ({ ...s, content: { ...s.content, content: [...(s.content.content ?? [])] } }))
         : buildDefaultLessonPlanSections(),
       status: "in_progress",
       sourceTemplateId: template.id,
@@ -1174,7 +1171,7 @@ export function AdminBookingsClient() {
             draft: lessonPlanDraft,
             loading: lessonPlanLoading,
             saving: lessonPlanSaving,
-            templates: lessonPlanTemplates as unknown as LessonPlanTemplateV2State[],
+            templates: lessonPlanTemplates,
             templatesLoading: lessonPlanTemplatesLoading,
             materials: materialsList.map((m) => ({ id: m.id, title: m.title, description: m.description })),
             templateSelection: lessonPlanTemplateSelection,

@@ -1,19 +1,20 @@
 import { describe, expect, it } from "vitest";
 
 import { resolveLessonPlanTemplateSelection } from "@/lib/admin/lesson-plan-template-selection";
-import type { LessonPlanTemplateState } from "@/lib/lesson-plan-contract";
+import type { LessonPlanTemplateV2State } from "@/lib/lesson-plan-contract";
 
-const templates: LessonPlanTemplateState[] = [
+const templates: LessonPlanTemplateV2State[] = [
   {
     id: "template-2",
     title: "Latest Template",
     description: "",
-    lessonFocus: "",
-    goals: "",
-    activities: "",
-    homework: "",
-    sharedNotes: "",
-    privateNotes: "",
+    category: "general",
+    tags: null,
+    skillLevel: null,
+    instrument: null,
+    sections: [
+      { key: "lessonFocus", title: "Lesson Focus", visibility: "student_visible", content: { type: "doc", content: [] } }
+    ],
     createdById: "admin-1",
     createdByDisplayName: "Owner",
     updatedAt: "2026-03-25T10:00:00.000Z",
@@ -23,12 +24,13 @@ const templates: LessonPlanTemplateState[] = [
     id: "template-1",
     title: "Older Template",
     description: "",
-    lessonFocus: "",
-    goals: "",
-    activities: "",
-    homework: "",
-    sharedNotes: "",
-    privateNotes: "",
+    category: "general",
+    tags: null,
+    skillLevel: null,
+    instrument: null,
+    sections: [
+      { key: "lessonFocus", title: "Lesson Focus", visibility: "student_visible", content: { type: "doc", content: [] } }
+    ],
     createdById: "admin-1",
     createdByDisplayName: "Owner",
     updatedAt: "2026-03-24T10:00:00.000Z",

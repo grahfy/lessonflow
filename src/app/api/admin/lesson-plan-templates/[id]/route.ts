@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { requireAdminFromRequest } from "@/lib/admin-route";
-import { lessonPlanTemplateInputSchema } from "@/lib/lesson-plan-contract";
-import { archiveLessonPlanTemplate, updateLessonPlanTemplate } from "@/lib/lesson-plans";
+import { lessonPlanTemplateV2InputSchema } from "@/lib/lesson-plan-contract";
+import { archiveLessonPlanTemplate, updateLessonPlanTemplateV2 } from "@/lib/lesson-plans";
 
 type Params = {
   params: Promise<{
@@ -27,7 +27,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const parsed = lessonPlanTemplateInputSchema.safeParse(await request.json().catch(() => null));
+    const parsed = lessonPlanTemplateV2InputSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json(
         {
@@ -40,7 +40,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
     const { id } = await params;
-    const template = await updateLessonPlanTemplate(admin, id, parsed.data);
+    const template = await updateLessonPlanTemplateV2(admin, id, parsed.data);
     return NextResponse.json({
       ok: true,
       template

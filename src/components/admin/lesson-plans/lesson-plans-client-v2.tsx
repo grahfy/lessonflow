@@ -14,7 +14,6 @@ import { useLessonPlanTemplates } from "@/lib/admin/use-lesson-plan-templates";
 import {
   buildEmptyLessonPlanTemplateV2Input,
   LESSON_PLAN_TEMPLATE_CATEGORIES,
-  type LessonPlanSection,
   type LessonPlanTemplateV2Input,
   type LessonPlanTemplateV2State,
 } from "@/lib/lesson-plan-contract";
@@ -66,28 +65,6 @@ export function AdminLessonPlansClientV2() {
     void load().finally(() => setHasLoadedOnce(true));
   }, [load]);
 
-  // The V1 hook returns V1 state - we adapt it to V2.
-  // In a full cutover, useLessonPlanTemplates would return V2 types.
-  // For now we cast and use sections if present.
-  const v2Templates: LessonPlanTemplateV2State[] = useMemo(
-    () =>
-      templates.map((t) => ({
-        id: t.id,
-        title: t.title,
-        description: t.description,
-        category: ((t as Record<string, unknown>).category as LessonPlanTemplateV2State["category"]) ?? "general",
-        tags: ((t as Record<string, unknown>).tags as string) ?? null,
-        skillLevel: ((t as Record<string, unknown>).skillLevel as string) ?? null,
-        instrument: ((t as Record<string, unknown>).instrument as string) ?? null,
-        sections: ((t as Record<string, unknown>).sections as LessonPlanSection[]) ?? [],
-        createdById: t.createdById,
-        createdByDisplayName: t.createdByDisplayName,
-        updatedAt: t.updatedAt,
-        isArchived: t.isArchived,
-      })),
-    [templates]
-  );
-
   useEffect(() => {
     if (!hasLoadedOnce) return;
 
@@ -97,7 +74,7 @@ export function AdminLessonPlansClientV2() {
       return;
     }
 
-    const selected = v2Templates.find((t) => t.id === selectedTemplateId);
+    const selected = templates.find((t) => t.id === selectedTemplateId);
     if (selected) {
       setDraft(draftFromTemplate(selected));
       return;
@@ -109,10 +86,10 @@ export function AdminLessonPlansClientV2() {
     }
 
     setDraft(buildEmptyLessonPlanTemplateV2Input());
-  }, [hasLoadedOnce, selectedTemplateId, templates, v2Templates]);
+  }, [hasLoadedOnce, selectedTemplateId, templates]);
 
   const filteredTemplates = useMemo(() => {
-    let result = v2Templates;
+    let result = templates;
 
     if (categoryFilter) {
       result = result.filter((t) => t.category === categoryFilter);
@@ -127,33 +104,20 @@ export function AdminLessonPlansClientV2() {
     }
 
     return result;
-  }, [search, categoryFilter, v2Templates]);
+  }, [search, categoryFilter, templates]);
 
   const selectedTemplate = selectedTemplateId === "new"
     ? null
-    : v2Templates.find((t) => t.id === selectedTemplateId) || null;
+    : templates.find((t) => t.id === selectedTemplateId) || null;
   const canEditSelectedTemplate = !selectedTemplate || admin?.role === "owner" || selectedTemplate.createdById === admin?.id;
 
   async function saveTemplate() {
     setError("");
     setNotice("");
 
-    // For now, call the V1 hooks — a full cutover would use V2 endpoints.
-    // The V1 create/update still works because the schema is additive.
-    const payload = {
-      title: draft.title,
-      description: draft.description,
-      lessonFocus: "",
-      goals: "",
-      activities: "",
-      homework: "",
-      sharedNotes: "",
-      privateNotes: "",
-    };
-
     const nextTemplate = selectedTemplate
-      ? await update(selectedTemplate.id, payload)
-      : await create(payload);
+      ? await update(selectedTemplate.id, draft)
+      : await create(draft);
 
     if (!nextTemplate) return;
 

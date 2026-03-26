@@ -37,30 +37,8 @@ export async function GET(request: NextRequest) {
         },
         lessonPlan: {
           select: {
-            lessonFocus: true,
-            goals: true,
-            homework: true,
-            sharedNotes: true,
-            materialLinks: {
-              include: {
-                material: {
-                  select: {
-                    id: true,
-                    title: true,
-                    description: true,
-                    materialType: true,
-                    mimeType: true,
-                    sizeBytes: true,
-                    createdAt: true
-                  }
-                }
-              },
-              orderBy: [
-                { fieldKey: "asc" },
-                { startOffset: "asc" },
-                { endOffset: "asc" }
-              ]
-            }
+            sections: true,
+            status: true
           }
         }
       },

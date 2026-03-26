@@ -3,17 +3,17 @@
 import { useCallback, useState } from "react";
 
 import { useSafeFetch } from "@/lib/admin/use-safe-fetch";
-import type { LessonPlanTemplateInput, LessonPlanTemplateState } from "@/lib/lesson-plan-contract";
+import type { LessonPlanTemplateV2Input, LessonPlanTemplateV2State } from "@/lib/lesson-plan-contract";
 
 type TemplatesResponse = {
-  templates?: LessonPlanTemplateState[];
+  templates?: LessonPlanTemplateV2State[];
 };
 
 type TemplateResponse = {
-  template?: LessonPlanTemplateState;
+  template?: LessonPlanTemplateV2State;
 };
 
-function sortTemplates(rows: LessonPlanTemplateState[]): LessonPlanTemplateState[] {
+function sortTemplates(rows: LessonPlanTemplateV2State[]): LessonPlanTemplateV2State[] {
   return [...rows].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.title.localeCompare(b.title));
 }
 
@@ -22,7 +22,7 @@ function sortTemplates(rows: LessonPlanTemplateState[]): LessonPlanTemplateState
  */
 export function useLessonPlanTemplates(options: { onAuthError?: () => void; onError?: (message: string) => void } = {}) {
   const { onAuthError, onError } = options;
-  const [templates, setTemplates] = useState<LessonPlanTemplateState[]>([]);
+  const [templates, setTemplates] = useState<LessonPlanTemplateV2State[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const { safeFetch, handleApiError } = useSafeFetch({ onAuthError, onError });
@@ -46,7 +46,7 @@ export function useLessonPlanTemplates(options: { onAuthError?: () => void; onEr
     }
   }, [safeFetch, handleApiError]);
 
-  const create = useCallback(async (payload: LessonPlanTemplateInput) => {
+  const create = useCallback(async (payload: LessonPlanTemplateV2Input) => {
     setSaving(true);
     try {
       const response = await safeFetch("/api/admin/lesson-plan-templates", {
@@ -70,7 +70,7 @@ export function useLessonPlanTemplates(options: { onAuthError?: () => void; onEr
     }
   }, [safeFetch, handleApiError]);
 
-  const update = useCallback(async (id: string, payload: LessonPlanTemplateInput) => {
+  const update = useCallback(async (id: string, payload: LessonPlanTemplateV2Input) => {
     setSaving(true);
     try {
       const response = await safeFetch(`/api/admin/lesson-plan-templates/${id}`, {

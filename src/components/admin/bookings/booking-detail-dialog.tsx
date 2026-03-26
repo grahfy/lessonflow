@@ -190,6 +190,7 @@ export function BookingDetailDialog({
       size="wide"
       bodyClassName="booking-dialog-body-lock"
       lockBodyScrollArea
+      hideHeaderClose
       footer={
         <div className="dialog-footer-row">
           <div className="dialog-footer-left">

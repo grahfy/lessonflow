@@ -15,6 +15,7 @@ interface AdminDialogProps extends PropsWithChildren {
   id?: string;
   bodyClassName?: string;
   lockBodyScrollArea?: boolean;
+  hideHeaderClose?: boolean;
 }
 
 let activeDialogCount = 0;
@@ -74,7 +75,8 @@ export function AdminDialog({
   id,
   bodyClassName,
   lockBodyScrollArea,
-  children 
+  hideHeaderClose,
+  children
 }: AdminDialogProps) {
   const dialogPanelRef = useRef<HTMLDivElement | null>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
@@ -209,9 +211,11 @@ export function AdminDialog({
             <h3 id={titleId}>{title}</h3>
             {description ? <div id={descriptionId} className="dialog-status helper-text">{description}</div> : null}
           </div>
-          <button className="btn btn-secondary" type="button" onClick={onClose}>
-            Close
-          </button>
+          {!hideHeaderClose && (
+            <button className="btn btn-secondary" type="button" onClick={onClose}>
+              Close
+            </button>
+          )}
         </div>
 
         <div

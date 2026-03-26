@@ -1,11 +1,11 @@
-import type { LessonPlanTemplateState } from "@/lib/lesson-plan-contract";
+import type { LessonPlanTemplateV2State } from "@/lib/lesson-plan-contract";
 
 /**
  * Resolves which lesson-plan template should be selected in the library editor.
  */
 export function resolveLessonPlanTemplateSelection(
   selectedTemplateId: string,
-  templates: ReadonlyArray<LessonPlanTemplateState>
+  templates: ReadonlyArray<LessonPlanTemplateV2State>
 ): string {
   if (selectedTemplateId === "new") {
     return "new";

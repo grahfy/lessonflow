@@ -106,35 +106,36 @@ describe("student-portal-data", () => {
     await prisma.lessonPlan.create({
       data: {
         bookingId: previousBooking.id,
-        lessonFocus: "Chord changes",
-        goals: "Smoother transitions",
-        activities: "Two-chord loop",
-        homework: "Five clean changes per day",
-        sharedNotes: "Relax the strumming arm",
-        privateNotes: "Keep an eye on left-hand collapse",
-        createdById: owner.id,
-        materialLinks: {
-          create: [
-            {
-              fieldKey: "homework",
-              materialId: previousMaterial.id,
-              startOffset: 5,
-              endOffset: 18,
-              linkedText: "clean changes"
-            }
-          ]
-        }
+        status: "complete",
+        sections: [
+          { key: "lessonFocus", title: "Lesson Focus", visibility: "student_visible", content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Chord changes" }] }] } },
+          { key: "goals", title: "Goals", visibility: "student_visible", content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Smoother transitions" }] }] } },
+          { key: "homework", title: "Homework", visibility: "student_visible", content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Five clean changes per day" }] }] } },
+          { key: "sharedNotes", title: "Shared Notes", visibility: "student_visible", content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Relax the strumming arm" }] }] } },
+          { key: "privateNotes", title: "Private Notes", visibility: "teacher_only", content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Keep an eye on left-hand collapse" }] }] } },
+        ],
+        lessonFocus: "",
+        goals: "",
+        activities: "",
+        homework: "",
+        sharedNotes: "",
+        privateNotes: "",
+        createdById: owner.id
       }
     });
     await prisma.lessonPlan.create({
       data: {
         bookingId: upcomingBooking.id,
-        lessonFocus: "Future prep",
-        goals: "Keep portal hidden for upcoming lessons",
-        activities: "Prep notes",
-        homework: "Not visible yet",
-        sharedNotes: "Do not show yet",
-        privateNotes: "Private future note",
+        status: "draft",
+        sections: [
+          { key: "lessonFocus", title: "Lesson Focus", visibility: "student_visible", content: { type: "doc", content: [] } },
+        ],
+        lessonFocus: "",
+        goals: "",
+        activities: "",
+        homework: "",
+        sharedNotes: "",
+        privateNotes: "",
         createdById: owner.id
       }
     });
@@ -173,31 +174,14 @@ describe("student-portal-data", () => {
     expect(payload.previous.map((row) => row.id)).toContain(previousBooking.id);
     expect(payload.upcoming[0]?.materials[0]?.id).toBe(material.id);
     expect(payload.upcoming[0]?.materials[0]?.downloadUrl).toContain(`/api/student/learning-materials/${material.id}/download`);
+    // Upcoming lesson plan has only an empty section — should be null.
     expect(payload.upcoming[0]?.lessonPlanSummary).toBeNull();
-    expect(payload.previous[0]?.lessonPlanSummary).toMatchObject({
-      lessonFocus: {
-        text: "Chord changes",
-        materialLinks: []
-      },
-      goals: {
-        text: "Smoother transitions",
-        materialLinks: []
-      },
-      homework: {
-        text: "Five clean changes per day",
-        materialLinks: [
-          expect.objectContaining({
-            materialId: previousMaterial.id,
-            linkedText: "clean changes",
-            previewUrl: `/api/student/learning-materials/${previousMaterial.id}/download?disposition=inline`
-          })
-        ]
-      },
-      sharedNotes: {
-        text: "Relax the strumming arm",
-        materialLinks: []
-      }
-    });
+    // Previous lesson plan should include student-visible sections only.
+    expect(payload.previous[0]?.lessonPlanSummary).toBeTruthy();
+    const sections = payload.previous[0]?.lessonPlanSummary?.sections ?? [];
+    expect(sections).toHaveLength(4);
+    expect(sections.map((s: { key: string }) => s.key)).toEqual(["lessonFocus", "goals", "homework", "sharedNotes"]);
+    // Teacher-only content must not leak to the student portal.
     expect(JSON.stringify(payload.previous[0]?.lessonPlanSummary || {})).not.toContain("Keep an eye on left-hand collapse");
   });
 

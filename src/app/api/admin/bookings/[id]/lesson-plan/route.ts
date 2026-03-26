@@ -4,8 +4,8 @@ import { canManageAssignedTeacher } from "@/lib/admin/permissions";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { prisma } from "@/lib/db";
-import { bookingLessonPlanInputSchema, lessonPlanSectionsInputSchema } from "@/lib/lesson-plan-contract";
-import { deleteBookingLessonPlan, getBookingLessonPlanV2State, upsertBookingLessonPlan, upsertBookingLessonPlanV2 } from "@/lib/lesson-plans";
+import { lessonPlanSectionsInputSchema } from "@/lib/lesson-plan-contract";
+import { deleteBookingLessonPlan, getBookingLessonPlanV2State, upsertBookingLessonPlanV2 } from "@/lib/lesson-plans";
 
 type Params = {
   params: Promise<{
@@ -85,40 +85,16 @@ export async function PUT(request: NextRequest, params: Params) {
       return resolved.response;
     }
 
-    const body = await request.json().catch(() => null);
-
-    // V2 payloads have a `sections` array; V1 payloads have flat text fields.
-    const isV2 = body && Array.isArray(body.sections);
-
-    if (isV2) {
-      const parsed = lessonPlanSectionsInputSchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json(
-          { ok: false, error: "Invalid lesson-plan payload.", fieldErrors: formatFieldErrors(parsed.error.issues) },
-          { status: 400 }
-        );
-      }
-      const lessonPlan = await upsertBookingLessonPlanV2(resolved.admin!, resolved.booking!.id, parsed.data);
-      return NextResponse.json({ ok: true, lessonPlan });
-    }
-
-    const parsed = bookingLessonPlanInputSchema.safeParse(body);
+    const parsed = lessonPlanSectionsInputSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json(
-        {
-          ok: false,
-          error: "Invalid lesson-plan payload.",
-          fieldErrors: formatFieldErrors(parsed.error.issues)
-        },
+        { ok: false, error: "Invalid lesson-plan payload.", fieldErrors: formatFieldErrors(parsed.error.issues) },
         { status: 400 }
       );
     }
 
-    const lessonPlan = await upsertBookingLessonPlan(resolved.admin!, resolved.booking!.id, parsed.data);
-    return NextResponse.json({
-      ok: true,
-      lessonPlan
-    });
+    const lessonPlan = await upsertBookingLessonPlanV2(resolved.admin!, resolved.booking!.id, parsed.data);
+    return NextResponse.json({ ok: true, lessonPlan });
   } catch (error) {
     return jsonUnexpectedError(error, "Unable to save lesson plan.");
   }

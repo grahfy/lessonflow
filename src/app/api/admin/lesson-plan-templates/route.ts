@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { requireAdminFromRequest } from "@/lib/admin-route";
-import { lessonPlanTemplateInputSchema } from "@/lib/lesson-plan-contract";
-import { createLessonPlanTemplate, listLessonPlanTemplatesV2 } from "@/lib/lesson-plans";
+import { lessonPlanTemplateV2InputSchema } from "@/lib/lesson-plan-contract";
+import { createLessonPlanTemplateV2, listLessonPlanTemplatesV2 } from "@/lib/lesson-plans";
 
 function formatFieldErrors(issues: Array<{ path: Array<string | number>; message: string }>) {
   return Object.fromEntries(
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const parsed = lessonPlanTemplateInputSchema.safeParse(await request.json().catch(() => null));
+    const parsed = lessonPlanTemplateV2InputSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json(
         {
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const template = await createLessonPlanTemplate(admin, parsed.data);
+    const template = await createLessonPlanTemplateV2(admin, parsed.data);
     return NextResponse.json({
       ok: true,
       template
