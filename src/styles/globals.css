@@ -1235,7 +1235,7 @@ h1 {
 
 .video-modal-frame {
   position: relative;
-  width: min(96vw, 1040px);
+  width: min(100%, 1040px);
   aspect-ratio: 16 / 9;
   border-radius: 14px;
   overflow: hidden;

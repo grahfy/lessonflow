@@ -1344,6 +1344,8 @@
 }
 
 .modal-content {
+  --modal-shell-padding: 18px;
+  --modal-shell-radius: 24px;
   position: relative;
   max-width: 90vw;
   max-height: 90vh;
@@ -1351,22 +1353,32 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 14px;
+  box-sizing: border-box;
+  padding: calc(var(--modal-shell-padding) + 20px) var(--modal-shell-padding) var(--modal-shell-padding);
+  border-radius: var(--modal-shell-radius);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(8, 11, 22, 0.94)),
+    rgba(5, 8, 20, 0.96);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.38);
+  overflow: hidden;
 }
 
 .modal-image-container {
   position: relative;
-  width: 85vw;
+  width: min(85vw, calc(90vw - (var(--modal-shell-padding) * 2)));
   max-width: 800px;
   aspect-ratio: 16 / 9;
 }
 
 .admin-manual-modal-content {
   max-width: min(1400px, 95vw);
-  width: 95vw;
+  width: min(1400px, 95vw);
 }
 
 .admin-manual-modal-image-container {
-  width: min(1400px, 95vw);
+  width: min(100%, 1400px);
   max-width: none;
   min-height: 0;
   max-height: min(82vh, 920px);
@@ -1400,6 +1412,11 @@
 }
 
 @media (max-width: 900px) {
+  .modal-content {
+    --modal-shell-padding: 14px;
+    --modal-shell-radius: 20px;
+  }
+
   .admin-manual-modal-image-container {
     max-height: min(70vh, 560px);
   }
@@ -1415,8 +1432,9 @@
 
 .modal-close {
   position: absolute;
-  top: -40px;
-  right: 0;
+  top: 14px;
+  right: 14px;
+  z-index: 1;
   width: 32px;
   height: 32px;
   background: rgba(255, 255, 255, 0.1);

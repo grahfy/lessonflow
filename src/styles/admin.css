@@ -739,6 +739,7 @@
   --admin-density-control-padding-block: 7px;
   --admin-density-control-padding-inline: 12px;
   --admin-density-dialog-padding: 18px;
+  --admin-density-dialog-body-padding: 12px;
   --admin-density-dialog-radius: 20px;
   --admin-density-dialog-gap: 10px;
   --admin-density-dialog-head-gap: 12px;
@@ -4967,10 +4968,12 @@
 .dialog-body-scroll {
   flex: 1;
   min-height: 0;
+  padding: 0 var(--admin-density-dialog-body-padding) var(--admin-density-dialog-body-padding);
+  box-sizing: border-box;
 }
 
 .dialog-panel-wide .dialog-body-scroll {
-  padding: 4px 6px;
+  padding-top: 4px;
 }
 
 .dialog-body-scroll-locked {
@@ -5002,6 +5005,8 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  padding: 0 2px 2px;
+  box-sizing: border-box;
 }
 
 #customer-dialog .customer-email-tab-shell {
@@ -7064,6 +7069,7 @@
     --admin-density-control-padding-block: 5px;
     --admin-density-control-padding-inline: 10px;
     --admin-density-dialog-padding: 14px;
+    --admin-density-dialog-body-padding: 10px;
     --admin-density-dialog-radius: 16px;
     --admin-density-dialog-gap: 8px;
     --admin-density-dialog-head-gap: 8px;
@@ -7117,6 +7123,7 @@
     max-height: none;
     min-height: 100dvh;
     padding: 14px;
+    --admin-density-dialog-body-padding: 10px;
     border-radius: 20px;
     overflow: visible;
   }
@@ -7294,6 +7301,7 @@
   .admin-shell {
     padding: 10px;
     gap: 10px;
+    --admin-density-dialog-body-padding: 8px;
     border-radius: 18px;
   }
 
