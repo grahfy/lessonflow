@@ -738,7 +738,7 @@
   --admin-density-control-radius: 14px;
   --admin-density-control-padding-block: 7px;
   --admin-density-control-padding-inline: 12px;
-  --admin-density-dialog-padding: 14px;
+  --admin-density-dialog-padding: 18px;
   --admin-density-dialog-radius: 20px;
   --admin-density-dialog-gap: 10px;
   --admin-density-dialog-head-gap: 12px;
@@ -2592,13 +2592,6 @@
 }
 
 /* Deployment Updates Dialog & History */
-.deploy-updates-dialog {
-  display: flex;
-  flex-direction: column;
-  max-height: 85vh;
-  width: min(1040px, calc(100vw - 24px));
-}
-
 .deploy-updates-tabs {
   display: flex;
   gap: 8px;
@@ -4948,10 +4941,6 @@
   padding: 12px;
 }
 
-.deploy-updates-backdrop {
-  z-index: 400;
-}
-
 .dialog-panel {
   width: min(880px, calc(100vw - 32px));
   max-height: min(88vh, 920px);
@@ -4978,6 +4967,10 @@
 .dialog-body-scroll {
   flex: 1;
   min-height: 0;
+}
+
+.dialog-panel-wide .dialog-body-scroll {
+  padding: 4px 6px;
 }
 
 .dialog-body-scroll-locked {
@@ -6816,7 +6809,7 @@
     --admin-density-control-radius: 12px;
     --admin-density-control-padding-block: 6px;
     --admin-density-control-padding-inline: 10px;
-    --admin-density-dialog-padding: 12px;
+    --admin-density-dialog-padding: 14px;
     --admin-density-dialog-radius: 18px;
     --admin-density-dialog-gap: 8px;
     --admin-density-dialog-head-gap: 10px;
@@ -7070,7 +7063,7 @@
     --admin-density-control-radius: 10px;
     --admin-density-control-padding-block: 5px;
     --admin-density-control-padding-inline: 10px;
-    --admin-density-dialog-padding: 12px;
+    --admin-density-dialog-padding: 14px;
     --admin-density-dialog-radius: 16px;
     --admin-density-dialog-gap: 8px;
     --admin-density-dialog-head-gap: 8px;

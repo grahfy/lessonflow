@@ -2529,16 +2529,6 @@
   }
 }
 
-/* Admin deploy updates popup */
-.deploy-updates-dialog {
-  max-width: min(980px, calc(100vw - 2rem));
-}
-
-.deploy-updates-content {
-  display: grid;
-  gap: 12px;
-}
-
 .deploy-updates-meta-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

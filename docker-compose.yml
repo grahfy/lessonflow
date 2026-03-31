@@ -12,7 +12,7 @@ services:
       - mariadb_data:/var/lib/mysql
       - ./init:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD", "/usr/bin/mariadb-admin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      test: ["CMD", "/usr/bin/mariadb-admin", "ping", "-h", "127.0.0.1", "-u", "root", "-proot"]
       timeout: 10s
       retries: 10
       interval: 10s
@@ -29,7 +29,7 @@ services:
     volumes:
       - mariadb_test_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "/usr/bin/mariadb-admin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      test: ["CMD", "/usr/bin/mariadb-admin", "ping", "-h", "127.0.0.1", "-u", "root", "-proot"]
       timeout: 10s
       retries: 10
       interval: 10s
