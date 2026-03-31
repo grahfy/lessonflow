@@ -20,9 +20,168 @@ NO_START=0
 CLEANUP=0
 TESTS_FAILED=0
 DEV_AND_TEST_SHARE_DB=0
+UNAME_S="$(uname -s)"
+PREFER_HOST_NETWORK=0
+
+if [[ "${LOCAL_MYSQL_NETWORK_MODE:-auto}" == "host" ]]; then
+  PREFER_HOST_NETWORK=1
+elif [[ "${LOCAL_MYSQL_NETWORK_MODE:-auto}" == "auto" && "$UNAME_S" == "Linux" ]]; then
+  # RATIONALE: In some Linux environments Docker's published-port path accepts
+  # TCP but never completes the MariaDB handshake, which blocks Prisma.
+  PREFER_HOST_NETWORK=1
+fi
 
 log() { printf '[local-full-site] %s\n' "$*"; }
 error() { printf '[local-full-site] ERROR: %s\n' "$*" >&2; }
+
+parse_db_url_host_port() {
+  local db_url=$1
+  local host_port
+
+  host_port=$(printf '%s' "$db_url" | sed -E 's#^[a-zA-Z0-9+.-]+://[^@]+@\[?([^]/:]+)\]?:([0-9]+).*$#\1 \2#')
+  if [[ -z "$host_port" || "$host_port" == "$db_url" ]]; then
+    error "Could not parse host/port from database URL: $db_url"
+    return 1
+  fi
+
+  printf '%s\n' "$host_port"
+}
+
+wait_for_db_port() {
+  local label=$1
+  local db_url=$2
+  local max_retries=${3:-45}
+  local parsed host port attempt
+
+  parsed=$(parse_db_url_host_port "$db_url") || return 1
+  read -r host port <<<"$parsed"
+
+  log "Waiting for ${label} host port ${host}:${port}..."
+  for attempt in $(seq 1 "$max_retries"); do
+    if bash -c "cat < /dev/null > /dev/tcp/${host}/${port}" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  error "Timed out waiting for ${label} host port ${host}:${port}"
+  return 1
+}
+
+host_mysql_greeting_available() {
+  local host=$1
+  local port=$2
+
+  NODE_HOST="$host" NODE_PORT="$port" node - <<'EOF' >/dev/null 2>&1
+const net = require("net");
+
+const socket = net.createConnection({
+  host: process.env.NODE_HOST,
+  port: Number(process.env.NODE_PORT),
+});
+socket.setTimeout(2500);
+socket.on("data", () => { socket.end(); process.exit(0); });
+socket.on("timeout", () => { socket.destroy(); process.exit(1); });
+socket.on("error", () => process.exit(1));
+socket.on("close", () => process.exit(1));
+EOF
+}
+
+wait_for_prisma_db() {
+  local label=$1
+  local db_url=$2
+  local max_retries=${3:-45}
+  local command_timeout=${4:-5}
+  local attempt
+
+  log "Waiting for Prisma connectivity to ${label}..."
+  for attempt in $(seq 1 "$max_retries"); do
+    if printf 'SELECT 1;\n' | DATABASE_URL="$db_url" timeout "${command_timeout}s" npx prisma db execute --stdin >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  error "Timed out waiting for Prisma connectivity to ${label}"
+  return 1
+}
+
+run_prisma_migrate_with_optional_fallback() {
+  local label=$1
+  local db_url=$2
+  local allow_db_push_fallback=${3:-0}
+  local status=0
+
+  if DATABASE_URL="$db_url" npx prisma migrate deploy >/dev/null; then
+    return 0
+  fi
+  status=$?
+
+  if [[ "$allow_db_push_fallback" != "1" || "${TEST_DB_PREPARE_ALLOW_DB_PUSH_FALLBACK:-1}" == "0" ]]; then
+    return "$status"
+  fi
+
+  printf '\n' >&2
+  printf 'test:prepare fallback: prisma migrate deploy failed for the test database.\n' >&2
+  printf 'Attempting `prisma db push` for ephemeral test DB bootstrap.\n' >&2
+  printf 'Set TEST_DB_PREPARE_ALLOW_DB_PUSH_FALLBACK=0 to disable this fallback.\n' >&2
+  printf '\n' >&2
+
+  DATABASE_URL="$db_url" npx prisma db push >/dev/null
+}
+
+wait_for_container_mariadb() {
+  local svc=$1
+  local host_port=$2
+  local max_retries=45
+  local retry=0
+  local mariadb_ping_args=(/usr/bin/mariadb-admin ping -u root -proot)
+
+  if [[ "$PREFER_HOST_NETWORK" -eq 1 ]]; then
+    mariadb_ping_args+=(-h 127.0.0.1 -P "$host_port")
+  else
+    mariadb_ping_args+=(-h 127.0.0.1)
+  fi
+
+  if ! docker exec "$svc" "${mariadb_ping_args[@]}" >/dev/null 2>&1; then
+    log "Waiting for ${svc} container-local MariaDB..."
+    while [[ $retry -lt $max_retries ]]; do
+      if docker exec "$svc" "${mariadb_ping_args[@]}" >/dev/null 2>&1; then
+        break
+      fi
+      retry=$((retry + 1))
+      sleep 1
+    done
+
+    if [[ $retry -ge $max_retries ]]; then
+      error "Timeout waiting for $svc to start"
+      return 1
+    fi
+  fi
+
+  log "$svc container-local MariaDB is ready"
+}
+
+run_mariadb_container() {
+  local svc=$1
+  local host_port=$2
+  local db_name=$3
+
+  if [[ "$PREFER_HOST_NETWORK" -eq 1 ]]; then
+    docker run -d --name "$svc" \
+      --network host \
+      -e MYSQL_ROOT_PASSWORD=root \
+      -e MYSQL_DATABASE="$db_name" \
+      -e MYSQL_TCP_PORT="$host_port" \
+      mariadb:latest --port="$host_port" >/dev/null
+  else
+    docker run -d --name "$svc" \
+      -e MYSQL_ROOT_PASSWORD=root \
+      -e MYSQL_DATABASE="$db_name" \
+      -p "${host_port}:3306" \
+      mariadb:latest >/dev/null
+  fi
+}
 
 cleanup() { 
   if [[ "$CLEANUP" -eq 1 ]]; then 
@@ -136,58 +295,55 @@ DOCS_DEMO_STUDENT_PASSWORD="${DOCS_SCREENSHOTS_STUDENT_PASSWORD:-StudentDemo!23}
 # 4. Database Container Management
 start_mariadb_container() {
   local svc=$1
-  local port=$2
+  local host_port=$2
   local db_name=$3
+  local network_mode=""
   
   log "Checking container: $svc..."
   
   if docker ps --format "{{.Names}}" | grep -q "^${svc}$"; then
     log "$svc is already running"
-    return 0
-  fi
-  
-  if docker ps -a --format "{{.Names}}" | grep -q "^${svc}$"; then
+  elif docker ps -a --format "{{.Names}}" | grep -q "^${svc}$"; then
     # RATIONALE: Reusing containers keeps repeated smoke runs fast and avoids
     # wiping a developer's local databases unless they explicitly opt in.
     log "Starting existing $svc container..."
     docker start "$svc" >/dev/null
   else
-    log "Creating and starting container: $svc on port $port"
-    docker run -d --name "$svc" \
-      -e MYSQL_ROOT_PASSWORD=root \
-      -e MYSQL_DATABASE="$db_name" \
-      -p "${port}:3306" \
-      mariadb:latest >/dev/null
+    log "Creating and starting container: $svc on port $host_port"
+    run_mariadb_container "$svc" "$host_port" "$db_name"
+  fi
+
+  if [[ "$PREFER_HOST_NETWORK" -eq 1 ]]; then
+    network_mode=$(docker inspect "$svc" --format '{{.HostConfig.NetworkMode}}' 2>/dev/null || true)
+    if [[ "$network_mode" != "host" ]]; then
+      log "Recreating $svc with Docker host networking because Linux smoke runs require direct MariaDB access for Prisma."
+      log "This replaces the existing local smoke DB container to restore Prisma connectivity."
+      docker rm -f "$svc" >/dev/null
+      run_mariadb_container "$svc" "$host_port" "$db_name"
+    fi
   fi
   
-  log "Waiting for $svc to be ready..."
-  local max_retries=30
-  local retry=0
-  while [[ $retry -lt $max_retries ]]; do
-    if docker exec "$svc" bash -c "cat < /dev/null > /dev/tcp/localhost/3306" >/dev/null 2>&1; then
-      break
-    fi
-    retry=$((retry + 1))
-    sleep 1
-  done
+  wait_for_container_mariadb "$svc" "$host_port" || return 1
 
-  if [[ $retry -ge $max_retries ]]; then
-    error "Timeout waiting for $svc to start"
+  if [[ "$PREFER_HOST_NETWORK" -eq 1 ]] && ! host_mysql_greeting_available "127.0.0.1" "$host_port"; then
+    error "Docker is exposing ${svc} on ${host_port}, but the host is not receiving the MariaDB greeting. Prisma will not be able to connect."
     return 1
   fi
-
-  log "$svc is ready"
 }
 
 start_mariadb_container "lessonflow-dev-mysql" 3306 "mgs_dev" || exit 1
 start_mariadb_container "lessonflow-test-mysql" 3307 "mgs_test" || exit 1
+wait_for_db_port "dev database" "$DB_URL" || exit 1
+wait_for_db_port "test database" "$TEST_DB_URL" || exit 1
+wait_for_prisma_db "dev database" "$DB_URL" || exit 1
+wait_for_prisma_db "test database" "$TEST_DB_URL" || exit 1
 
 # 5. Database Initialization
 log "Running Prisma migrations on test database..."
-DATABASE_URL="${TEST_DB_URL}" npx prisma migrate deploy >/dev/null
+run_prisma_migrate_with_optional_fallback "test database" "$TEST_DB_URL" 1
 
 log "Running Prisma migrations on dev database..."
-DATABASE_URL="${DB_URL}" npx prisma migrate deploy >/dev/null
+run_prisma_migrate_with_optional_fallback "dev database" "$DB_URL"
 
 log "Generating Prisma client..."
 npx prisma generate >/dev/null

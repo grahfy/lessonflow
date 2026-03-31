@@ -124,6 +124,119 @@ function Get-TestDatabaseUrl {
     return $null
 }
 
+function Get-DatabaseUri {
+    param([string]$DatabaseUrl)
+
+    try {
+        return [System.Uri]$DatabaseUrl
+    }
+    catch {
+        throw "Could not parse database URL: $DatabaseUrl"
+    }
+}
+
+function Wait-ForHostPort {
+    param(
+        [string]$Label,
+        [string]$DatabaseUrl,
+        [int]$MaxRetries = 45
+    )
+
+    $uri = Get-DatabaseUri -DatabaseUrl $DatabaseUrl
+    $hostName = $uri.Host
+    $port = $uri.Port
+
+    Log "Waiting for $Label host port ${hostName}:$port..."
+
+    for ($attempt = 1; $attempt -le $MaxRetries; $attempt++) {
+        $tcpClient = $null
+        try {
+            $tcpClient = [System.Net.Sockets.TcpClient]::new()
+            $asyncResult = $tcpClient.BeginConnect($hostName, $port, $null, $null)
+            if ($asyncResult.AsyncWaitHandle.WaitOne(1000)) {
+                $tcpClient.EndConnect($asyncResult)
+                return
+            }
+        } catch {
+            # NOTE: Startup races are expected while Docker publishes the port.
+        } finally {
+            if ($tcpClient) {
+                $tcpClient.Dispose()
+            }
+        }
+
+        Start-Sleep -Seconds 1
+    }
+
+    throw "Timed out waiting for $Label host port ${hostName}:$port"
+}
+
+function Wait-ForPrismaDatabase {
+    param(
+        [string]$Label,
+        [string]$DatabaseUrl,
+        [int]$MaxRetries = 45
+    )
+
+    Log "Waiting for Prisma connectivity to $Label..."
+
+    $previousDatabaseUrl = $env:DATABASE_URL
+    try {
+        $env:DATABASE_URL = $DatabaseUrl
+
+        for ($attempt = 1; $attempt -le $MaxRetries; $attempt++) {
+            try {
+                "SELECT 1;" | npx prisma db execute --stdin *> $null
+                if ($LASTEXITCODE -eq 0) {
+                    return
+                }
+            } catch {
+                # NOTE: Prisma may return P1001 briefly after MySQL first opens the port.
+            }
+
+            Start-Sleep -Seconds 1
+        }
+    } finally {
+        $env:DATABASE_URL = $previousDatabaseUrl
+    }
+
+    throw "Timed out waiting for Prisma connectivity to $Label"
+}
+
+function Invoke-PrismaMigrateWithOptionalFallback {
+    param(
+        [string]$Label,
+        [string]$DatabaseUrl,
+        [switch]$AllowDbPushFallback
+    )
+
+    $previousDatabaseUrl = $env:DATABASE_URL
+    try {
+        $env:DATABASE_URL = $DatabaseUrl
+        npx prisma migrate deploy > $null
+        if ($LASTEXITCODE -eq 0) {
+            return
+        }
+
+        if (-not $AllowDbPushFallback -or $env:TEST_DB_PREPARE_ALLOW_DB_PUSH_FALLBACK -eq "0") {
+            throw "Prisma migrate deploy failed for $Label."
+        }
+
+        Write-Warning ""
+        Write-Warning "test:prepare fallback: prisma migrate deploy failed for the test database."
+        Write-Warning "Attempting `prisma db push` for ephemeral test DB bootstrap."
+        Write-Warning "Set TEST_DB_PREPARE_ALLOW_DB_PUSH_FALLBACK=0 to disable this fallback."
+        Write-Warning ""
+
+        npx prisma db push > $null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Prisma db push fallback failed for $Label."
+        }
+    } finally {
+        $env:DATABASE_URL = $previousDatabaseUrl
+    }
+}
+
 function Start-MariaDBContainer {
     param(
         [string]$ContainerName,
@@ -142,7 +255,6 @@ function Start-MariaDBContainer {
             docker start $ContainerName > $null
         } else {
             Log "Container already running: $ContainerName"
-            return 0
         }
     } else {
         Log "Creating and starting container: $ContainerName on port $HostPort"
@@ -227,15 +339,19 @@ if ($dockerAvailable) {
     Start-MariaDBContainer -ContainerName "lessonflow-test-mysql" -DatabaseName "mgs_test" -HostPort 3307
 }
 
+Wait-ForHostPort -Label "dev database" -DatabaseUrl $DB_URL
+Wait-ForHostPort -Label "test database" -DatabaseUrl $TEST_DB_URL
+Wait-ForPrismaDatabase -Label "dev database" -DatabaseUrl $DB_URL
+Wait-ForPrismaDatabase -Label "test database" -DatabaseUrl $TEST_DB_URL
+
 # Run migrations on test database
 Log "Running Prisma migrations on test database..."
-$env:DATABASE_URL = $TEST_DB_URL
-npx prisma migrate deploy > $null
+Invoke-PrismaMigrateWithOptionalFallback -Label "test database" -DatabaseUrl $TEST_DB_URL -AllowDbPushFallback
 
 # Run migrations on dev database
 Log "Running Prisma migrations on dev database..."
 $env:DATABASE_URL = $DB_URL
-npx prisma migrate deploy > $null
+Invoke-PrismaMigrateWithOptionalFallback -Label "dev database" -DatabaseUrl $DB_URL
 
 # Generate Prisma client
 Log "Generating Prisma client..."
