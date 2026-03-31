@@ -738,8 +738,8 @@
   --admin-density-control-radius: 14px;
   --admin-density-control-padding-block: 7px;
   --admin-density-control-padding-inline: 12px;
-  --admin-density-dialog-padding: 18px;
-  --admin-density-dialog-body-padding: 12px;
+  --admin-density-dialog-padding: 20px;
+  --admin-density-dialog-body-padding: 16px;
   --admin-density-dialog-radius: 20px;
   --admin-density-dialog-gap: 10px;
   --admin-density-dialog-head-gap: 12px;
@@ -4939,7 +4939,7 @@
   background: rgba(2, 6, 23, 0.82);
   display: grid;
   place-items: center;
-  padding: 12px;
+  padding: 16px;
 }
 
 .dialog-panel {
@@ -4956,6 +4956,7 @@
     radial-gradient(150% 150% at 0% 0%, rgba(59, 130, 246, 0.06), transparent 50%);
   box-shadow: 0 24px 64px rgba(2, 8, 23, 0.4);
   padding: var(--admin-density-dialog-padding);
+  box-sizing: border-box;
 }
 
 .admin-shell .dialog-panel {
@@ -4968,12 +4969,12 @@
 .dialog-body-scroll {
   flex: 1;
   min-height: 0;
-  padding: 0 var(--admin-density-dialog-body-padding) var(--admin-density-dialog-body-padding);
+  padding: 6px var(--admin-density-dialog-body-padding) var(--admin-density-dialog-body-padding);
   box-sizing: border-box;
 }
 
 .dialog-panel-wide .dialog-body-scroll {
-  padding-top: 4px;
+  padding-top: 8px;
 }
 
 .dialog-body-scroll-locked {
@@ -5141,7 +5142,7 @@
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 14px;
   background: rgba(15, 23, 42, 0.64);
-  padding: 12px;
+  padding: 14px;
 }
 
 .dialog-col.is-notes {
@@ -5172,14 +5173,14 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 8px;
-  padding: 8px 4px 0;
+  margin-top: 10px;
+  padding: 12px var(--admin-density-dialog-body-padding) 0;
   border-top: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .dialog-footer {
   margin-top: 12px;
-  padding: 10px 4px 0;
+  padding: 14px var(--admin-density-dialog-body-padding) 0;
   border-top: 1px solid var(--line);
   flex-shrink: 0;
 }
@@ -5448,8 +5449,8 @@
 }
 
 #booking-detail-dialog .dialog-col {
-  padding: 10px;
-  gap: 6px;
+  padding: 14px;
+  gap: 8px;
 }
 
 #booking-detail-dialog .field {
@@ -5540,7 +5541,7 @@
 #customer-dialog .customer-materials-panel {
   overflow-y: auto !important;
   max-height: calc(var(--booking-detail-dialog-height, min(96vh, 1020px)) - 200px);
-  padding-right: 4px;
+  padding: 2px 6px 6px 2px;
 }
 
 #booking-detail-dialog .booking-email-panel,
@@ -6814,7 +6815,7 @@
     --admin-density-control-radius: 12px;
     --admin-density-control-padding-block: 6px;
     --admin-density-control-padding-inline: 10px;
-    --admin-density-dialog-padding: 14px;
+    --admin-density-dialog-padding: 16px;
     --admin-density-dialog-radius: 18px;
     --admin-density-dialog-gap: 8px;
     --admin-density-dialog-head-gap: 10px;
@@ -7068,8 +7069,8 @@
     --admin-density-control-radius: 10px;
     --admin-density-control-padding-block: 5px;
     --admin-density-control-padding-inline: 10px;
-    --admin-density-dialog-padding: 14px;
-    --admin-density-dialog-body-padding: 10px;
+    --admin-density-dialog-padding: 16px;
+    --admin-density-dialog-body-padding: 12px;
     --admin-density-dialog-radius: 16px;
     --admin-density-dialog-gap: 8px;
     --admin-density-dialog-head-gap: 8px;
@@ -7123,7 +7124,7 @@
     max-height: none;
     min-height: 100dvh;
     padding: 14px;
-    --admin-density-dialog-body-padding: 10px;
+    --admin-density-dialog-body-padding: 12px;
     border-radius: 20px;
     overflow: visible;
   }
@@ -7176,7 +7177,7 @@
 
   .dialog-backdrop {
     place-items: end center;
-    padding: 10px;
+    padding: 12px;
   }
 
   .dialog-panel,
@@ -7194,14 +7195,14 @@
   }
 
   .dialog-panel {
-    padding: 12px;
+    padding: 14px;
     border-radius: 18px;
   }
 
   .dialog-panel-compact {
     width: min(100vw - 20px, 640px);
     max-height: min(88dvh, 760px);
-    padding: 12px;
+    padding: 14px;
     border-radius: 18px;
   }
 
@@ -7220,7 +7221,7 @@
   }
 
   .dialog-col {
-    padding: 10px;
+    padding: 12px;
   }
 
   .dialog-actions,
@@ -7301,7 +7302,7 @@
   .admin-shell {
     padding: 10px;
     gap: 10px;
-    --admin-density-dialog-body-padding: 8px;
+    --admin-density-dialog-body-padding: 10px;
     border-radius: 18px;
   }
 
