@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer, useCallback } from "react";
+import { useCallback, useMemo, useReducer } from "react";
 import type {
   ChordDiagramData,
   ChordFingering,
@@ -10,6 +10,7 @@ import type {
   FingerValue,
 } from "@/lib/chords/chord-types";
 import { createEmptyChordDiagram, DEFAULT_FRET_COUNT } from "@/lib/chords/chord-types";
+import { detectChordNameFromDiagram, syncDiagramNameWithDetection } from "@/lib/chords/chord-detection";
 
 // ─── Action Types ────────────────────────────────────────────
 
@@ -39,10 +40,10 @@ function chordReducer(state: ChordDiagramData, action: ChordAction): ChordDiagra
       const fingers = [...state.fingering.fingers] as StringTuple<FingerValue>;
       strings[action.stringIndex] = action.fret;
       fingers[action.stringIndex] = action.finger;
-      return {
+      return syncDiagramNameWithDetection({
         ...state,
         fingering: { ...state.fingering, strings, fingers },
-      };
+      });
     }
 
     case "REMOVE_DOT": {
@@ -50,10 +51,10 @@ function chordReducer(state: ChordDiagramData, action: ChordAction): ChordDiagra
       const fingers = [...state.fingering.fingers] as StringTuple<FingerValue>;
       strings[action.stringIndex] = 0;
       fingers[action.stringIndex] = 0;
-      return {
+      return syncDiagramNameWithDetection({
         ...state,
         fingering: { ...state.fingering, strings, fingers },
-      };
+      });
     }
 
     case "SET_STRING_STATE": {
@@ -61,10 +62,10 @@ function chordReducer(state: ChordDiagramData, action: ChordAction): ChordDiagra
       const fingers = [...state.fingering.fingers] as StringTuple<FingerValue>;
       strings[action.stringIndex] = action.state === "muted" ? -1 : 0;
       fingers[action.stringIndex] = 0;
-      return {
+      return syncDiagramNameWithDetection({
         ...state,
         fingering: { ...state.fingering, strings, fingers },
-      };
+      });
     }
 
     case "CYCLE_STRING_STATE": {
@@ -83,26 +84,26 @@ function chordReducer(state: ChordDiagramData, action: ChordAction): ChordDiagra
         strings[action.stringIndex] = 0;
         fingers[action.stringIndex] = 0;
       }
-      return {
+      return syncDiagramNameWithDetection({
         ...state,
         fingering: { ...state.fingering, strings, fingers },
-      };
+      });
     }
 
     case "ADD_BARRE": {
       const barres = [...state.fingering.barres, action.barre];
-      return {
+      return syncDiagramNameWithDetection({
         ...state,
         fingering: { ...state.fingering, barres },
-      };
+      });
     }
 
     case "REMOVE_BARRE": {
       const barres = state.fingering.barres.filter((b) => b.fret !== action.fret);
-      return {
+      return syncDiagramNameWithDetection({
         ...state,
         fingering: { ...state.fingering, barres },
-      };
+      });
     }
 
     case "SET_ROOT":
@@ -121,13 +122,13 @@ function chordReducer(state: ChordDiagramData, action: ChordAction): ChordDiagra
       return { ...state, isLeftHanded: action.isLeftHanded };
 
     case "SET_START_FRET":
-      return {
+      return syncDiagramNameWithDetection({
         ...state,
         fingering: { ...state.fingering, startFret: Math.max(1, Math.min(24, action.startFret)) },
-      };
+      });
 
     case "CLEAR_ALL":
-      return {
+      return syncDiagramNameWithDetection({
         ...state,
         fingering: {
           strings: [0, 0, 0, 0, 0, 0],
@@ -136,13 +137,13 @@ function chordReducer(state: ChordDiagramData, action: ChordAction): ChordDiagra
           startFret: 1,
           fretCount: DEFAULT_FRET_COUNT,
         },
-      };
+      });
 
     case "LOAD_FINGERING":
-      return { ...state, fingering: action.fingering };
+      return syncDiagramNameWithDetection({ ...state, fingering: action.fingering });
 
     case "LOAD_DIAGRAM":
-      return action.diagram;
+      return syncDiagramNameWithDetection(action.diagram);
 
     default:
       return state;
@@ -157,7 +158,12 @@ export interface ChordBuilderState {
 }
 
 export function useChordBuilder(initial?: ChordDiagramData) {
-  const [diagram, dispatch] = useReducer(chordReducer, initial ?? createEmptyChordDiagram());
+  const [diagram, dispatch] = useReducer(
+    chordReducer,
+    initial ?? createEmptyChordDiagram(),
+    syncDiagramNameWithDetection
+  );
+  const detectedChord = useMemo(() => detectChordNameFromDiagram(diagram), [diagram]);
 
   const placeDot = useCallback(
     (stringIndex: number, fret: number, finger: number) =>
@@ -229,6 +235,7 @@ export function useChordBuilder(initial?: ChordDiagramData) {
 
   return {
     diagram,
+    detectedChord,
     placeDot,
     removeDot,
     cycleStringState,

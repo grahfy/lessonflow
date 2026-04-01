@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import type { ChordDiagramData, ChordFingering } from "@/lib/chords/chord-types";
 import { useChordBuilder } from "./use-chord-builder";
 import { ChordBuilderFretboard } from "./chord-builder-fretboard";
 import { ChordBuilderNaming } from "./chord-builder-naming";
 import { ChordBuilderFingerSelector } from "./chord-builder-finger-selector";
 import { ChordBuilderAlternatives } from "./chord-builder-alternatives";
+import { useChordPreview } from "./use-chord-preview";
 import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { formatChordName } from "@/lib/chords/music-theory";
 
@@ -38,6 +39,7 @@ export function ChordBuilder({
 }: ChordBuilderProps) {
   const {
     diagram,
+    detectedChord,
     placeDot,
     removeDot,
     cycleStringState,
@@ -54,6 +56,18 @@ export function ChordBuilder({
 
   const [selectedFinger, setSelectedFinger] = useState(1);
   const [saving, setSaving] = useState(false);
+  const canSubmit = detectedChord !== null;
+  const detectionMessage = canSubmit
+    ? undefined
+    : "This fingering does not match a supported chord yet.";
+  const {
+    canPreview,
+    isLoading: isPreviewLoading,
+    previewError,
+    previewMessage,
+    playBlockPreview,
+    playStrumPreview,
+  } = useChordPreview(diagram, isOpen);
 
   const handlePlaceDot: (s: number, f: number, finger: number) => void = useCallback(
     (stringIndex, fret) => {
@@ -67,19 +81,20 @@ export function ChordBuilder({
   );
 
   const handleSave = useCallback(async () => {
-    if (!onSave) return;
+    if (!onSave || !canSubmit) return;
     setSaving(true);
     try {
       onSave(diagram);
     } finally {
       setSaving(false);
     }
-  }, [onSave, diagram]);
+  }, [canSubmit, onSave, diagram]);
 
   const handleInsert = useCallback(() => {
+    if (!canSubmit) return;
     onInsert?.(diagram);
     onClose();
-  }, [onInsert, diagram, onClose]);
+  }, [canSubmit, onInsert, diagram, onClose]);
 
   const handleAlternativeSelect = useCallback(
     (fingering: ChordFingering) => {
@@ -97,7 +112,7 @@ export function ChordBuilder({
           type="button"
           className="btn btn-primary"
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || !canSubmit}
         >
           {saving ? "Saving..." : "Save to Library"}
         </button>
@@ -107,6 +122,7 @@ export function ChordBuilder({
           type="button"
           className="btn btn-secondary"
           onClick={handleInsert}
+          disabled={!canSubmit}
         >
           Insert
         </button>
@@ -137,12 +153,19 @@ export function ChordBuilder({
             quality={diagram.name.quality}
             bassNote={diagram.name.bassNote}
             displayName={diagram.name.displayName}
+            detectionMessage={detectionMessage}
+            canPreview={canPreview}
+            isPreviewLoading={isPreviewLoading}
+            previewMessage={previewMessage}
+            previewError={previewError}
             isLeftHanded={diagram.isLeftHanded}
             startFret={diagram.fingering.startFret}
             onRootChange={setRoot}
             onQualityChange={setQuality}
             onBassNoteChange={setBassNote}
             onDisplayNameChange={setDisplayName}
+            onPreviewStrum={playStrumPreview}
+            onPreviewBlock={playBlockPreview}
             onLeftHandedChange={setLeftHanded}
             onStartFretChange={setStartFret}
             onClearAll={clearAll}

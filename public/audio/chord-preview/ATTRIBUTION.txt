@@ -1,0 +1,17 @@
+Chord preview guitar samples
+
+Source repository:
+https://github.com/nbrosowsky/tonejs-instruments
+
+Instrument set:
+guitar-acoustic
+
+Source notes from the upstream project:
+- Samples are licensed under CC BY 3.0
+- Upstream sample-source-info lists guitar ac as sourced from the University of Iowa
+
+Relevant upstream files:
+- README.md
+- sample-source-info.txt
+
+Retrieved for local bundling in the admin chord builder so preview playback does not depend on third-party runtime hosting.

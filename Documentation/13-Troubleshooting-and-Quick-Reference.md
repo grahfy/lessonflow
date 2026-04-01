@@ -50,6 +50,17 @@ Relevant checks:
 
 Email issues are often caused by invalid workflow state, incorrect address data, or partial-success conditions rather than a full delivery-system failure.
 
+### Chord Preview Is Silent
+
+The chord builder preview depends on browser audio playback, so silence is not always evidence that the chord data is wrong.
+
+Relevant checks:
+
+- whether the `Strum` or `Play Notes` button was clicked directly, which unlocks browser audio on first use
+- whether the device, browser tab, or system output is muted
+- whether the current chord shape still has sounding strings rather than every string muted
+- whether a temporary “Loading guitar samples...” message appeared before the first preview
+
 ### The Failure Is Unclear
 
 When the category of failure is not obvious, the recommended progression is:

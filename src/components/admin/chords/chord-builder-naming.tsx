@@ -1,5 +1,7 @@
 "use client";
 
+import React from "react";
+
 import { ALL_ROOT_NOTES, CHORD_QUALITIES, QUALITY_DISPLAY_MAP } from "@/lib/chords/music-theory";
 
 interface ChordBuilderNamingProps {
@@ -7,12 +9,19 @@ interface ChordBuilderNamingProps {
   quality: string;
   bassNote?: string;
   displayName?: string;
+  detectionMessage?: string;
+  canPreview: boolean;
+  isPreviewLoading: boolean;
+  previewMessage?: string;
+  previewError?: string;
   isLeftHanded: boolean;
   startFret: number;
   onRootChange: (root: string) => void;
   onQualityChange: (quality: string) => void;
   onBassNoteChange: (bassNote: string | undefined) => void;
   onDisplayNameChange: (displayName: string | undefined) => void;
+  onPreviewStrum: () => void;
+  onPreviewBlock: () => void;
   onLeftHandedChange: (isLeftHanded: boolean) => void;
   onStartFretChange: (startFret: number) => void;
   onClearAll: () => void;
@@ -27,12 +36,19 @@ export function ChordBuilderNaming({
   quality,
   bassNote,
   displayName,
+  detectionMessage,
+  canPreview,
+  isPreviewLoading,
+  previewMessage,
+  previewError,
   isLeftHanded,
   startFret,
   onRootChange,
   onQualityChange,
   onBassNoteChange,
   onDisplayNameChange,
+  onPreviewStrum,
+  onPreviewBlock,
   onLeftHandedChange,
   onStartFretChange,
   onClearAll,
@@ -46,6 +62,7 @@ export function ChordBuilderNaming({
           onChange={(e) => onRootChange(e.target.value)}
           className="chord-builder-select"
         >
+          <option value="">Unresolved</option>
           {ALL_ROOT_NOTES.map((n) => (
             <option key={n} value={n}>{n}</option>
           ))}
@@ -59,6 +76,7 @@ export function ChordBuilderNaming({
           onChange={(e) => onQualityChange(e.target.value)}
           className="chord-builder-select"
         >
+          <option value="">Unresolved</option>
           {CHORD_QUALITIES.map((q) => (
             <option key={q} value={q}>
               {QUALITY_DISPLAY_MAP[q] || q}
@@ -92,6 +110,37 @@ export function ChordBuilderNaming({
           maxLength={30}
         />
       </div>
+
+      {detectionMessage ? (
+        <p className="chord-builder-status">{detectionMessage}</p>
+      ) : null}
+
+      <div className="chord-builder-preview-actions">
+        <button
+          type="button"
+          onClick={onPreviewStrum}
+          className="btn btn-secondary chord-builder-preview-btn"
+          disabled={!canPreview || isPreviewLoading}
+        >
+          Strum
+        </button>
+        <button
+          type="button"
+          onClick={onPreviewBlock}
+          className="btn btn-secondary chord-builder-preview-btn"
+          disabled={!canPreview || isPreviewLoading}
+        >
+          Play Notes
+        </button>
+      </div>
+
+      {previewMessage ? (
+        <p className="chord-builder-preview-status" role="status">{previewMessage}</p>
+      ) : null}
+
+      {previewError ? (
+        <p className="chord-builder-preview-status is-error" role="alert">{previewError}</p>
+      ) : null}
 
       <div className="chord-builder-field">
         <label className="chord-builder-label">Start Fret</label>

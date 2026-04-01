@@ -7461,6 +7461,34 @@
   gap: 3px;
 }
 
+.chord-builder-status {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(248, 113, 113, 0.92);
+}
+
+.chord-builder-preview-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.chord-builder-preview-btn {
+  justify-content: center;
+}
+
+.chord-builder-preview-status {
+  margin: -2px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--admin-text-secondary, rgba(226, 232, 240, 0.7));
+}
+
+.chord-builder-preview-status.is-error {
+  color: rgba(248, 113, 113, 0.92);
+}
+
 .chord-builder-label {
   font-size: 11px;
   font-weight: 600;

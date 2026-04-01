@@ -89,6 +89,7 @@ export function getChordNotes(diagram: ChordDiagramData): StringTuple<string> {
  */
 export function formatChordName(name: { root: string; quality: string; bassNote?: string; displayName?: string }): string {
   if (name.displayName) return name.displayName;
+  if (!name.root || !name.quality) return "";
   const suffix = QUALITY_DISPLAY_MAP[name.quality] ?? name.quality;
   const base = `${name.root}${suffix}`;
   return name.bassNote ? `${base}/${name.bassNote}` : base;
