@@ -87,6 +87,8 @@ Routine update interpretation should include the following rules:
 - archive-source installs do not pull from git and depend on the operator replacing the extracted files before running `update.sh`
 - checkout ownership problems should be fixed before pull attempts rather than bypassed
 - shared environment upgrades append new blank placeholders instead of silently inventing values
+- admin-side runtime config saves now write back to `/var/www/lessonflow/shared/.env`, so that file must stay writable by `www-data`
+- after deploy, `/var/www/lessonflow/current/.env` should resolve back to the shared env symlink rather than remain a release-local copy
 
 ### Release 1.2.0 Upgrade Checks
 

@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
 import bcrypt from "bcryptjs";
@@ -300,6 +301,66 @@ describe.sequential("admin settings save contracts", () => {
       headerInfo: "Line 1\nLine 2",
       footerText: "Pay within 7 days."
     });
+  });
+
+  it("writes admin settings to SHARED_DIR instead of a cwd-local env file", async () => {
+    vi.stubEnv("SYSTEMD_SERVICE_NAME", "invalid service name!");
+
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "mgs-settings-shared-env-"));
+    const sharedDir = path.join(tempRoot, "shared");
+    const appDir = path.join(tempRoot, "app");
+    const sharedEnvPath = path.join(sharedDir, ".env");
+    const localEnvPath = path.join(appDir, ".env");
+    const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(appDir);
+
+    await fs.mkdir(sharedDir, { recursive: true });
+    await fs.mkdir(appDir, { recursive: true });
+    await fs.writeFile(sharedEnvPath, 'NEXT_PUBLIC_BRAND_NAME="Shared Brand"\n', "utf-8");
+    await fs.writeFile(localEnvPath, 'NEXT_PUBLIC_BRAND_NAME="Local Brand"\n', "utf-8");
+    vi.stubEnv("SHARED_DIR", sharedDir);
+
+    try {
+      const admin = await ensureOwnerAdmin();
+      const token = createSessionToken(admin.email);
+
+      const initialResponse = await getSettings(adminRequest("http://localhost/api/admin/settings", token));
+      expect(initialResponse.status).toBe(200);
+
+      const initialBody = (await initialResponse.json()) as {
+        envVars: Array<{ key: string; currentValue: string }>;
+      };
+
+      const envPayload = Object.fromEntries(
+        initialBody.envVars.map((envVar) => [
+          envVar.key,
+          envVar.currentValue === "***SET***" ? "" : envVar.currentValue
+        ])
+      );
+
+      envPayload.NEXT_PUBLIC_BRAND_NAME = "Shared Dir Brand";
+
+      const response = await saveSettings(
+        adminRequest("http://localhost/api/admin/settings", token, {
+          method: "POST",
+          body: {
+            env: envPayload,
+            adminPassword: ""
+          }
+        })
+      );
+
+      expect(response.status).toBe(200);
+
+      const sharedEnvContents = await fs.readFile(sharedEnvPath, "utf-8");
+      const localEnvContents = await fs.readFile(localEnvPath, "utf-8");
+
+      expect(sharedEnvContents).toContain('NEXT_PUBLIC_BRAND_NAME="Shared Dir Brand"');
+      expect(localEnvContents).toContain('NEXT_PUBLIC_BRAND_NAME="Local Brand"');
+      expect(localEnvContents).not.toContain('NEXT_PUBLIC_BRAND_NAME="Shared Dir Brand"');
+    } finally {
+      cwdSpy.mockRestore();
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    }
   });
 
   it("rotates the admin password without persisting plaintext and revokes the previous session", async () => {

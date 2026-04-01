@@ -1277,16 +1277,54 @@ export async function createInitialAdmin(input: SetupInitializeInput) {
   return created;
 }
 
+function resolveEnvAppRoot(cwd: string): string {
+  const normalizedCwd = path.resolve(cwd);
+  const standaloneSuffix = `${path.sep}.next${path.sep}standalone`;
+
+  if (normalizedCwd.endsWith(standaloneSuffix)) {
+    return path.resolve(normalizedCwd, "../..");
+  }
+
+  return normalizedCwd;
+}
+
+function inferSharedEnvPathFromReleaseRoot(root: string): string | null {
+  const normalizedRoot = path.resolve(root);
+  const rootPrefix = path.parse(normalizedRoot).root;
+  const relativeSegments = normalizedRoot
+    .slice(rootPrefix.length)
+    .split(path.sep)
+    .filter(Boolean);
+  const releasesIndex = relativeSegments.lastIndexOf("releases");
+
+  if (releasesIndex === -1 || releasesIndex + 1 >= relativeSegments.length) {
+    return null;
+  }
+
+  const deployRoot = path.join(rootPrefix, ...relativeSegments.slice(0, releasesIndex));
+  return path.join(deployRoot, "shared", ".env");
+}
+
 /**
- * Returns the path to the .env file in the project root.
+ * Returns the writable runtime env path.
+ *
+ * RATIONALE: Production deployments persist runtime config in the shared deploy directory rather
+ * than in an immutable release folder. Local and test environments still fall back to the
+ * project-root `.env`.
  */
-function getEnvFilePath(): string {
-  const cwd = process.cwd();
-  // In standalone mode, Next.js changes cwd to .next/standalone/.
-  // The real .env (symlinked to shared/.env) lives at the release root, two levels up.
-  const root = cwd.endsWith(path.sep + path.join(".next", "standalone"))
-    ? path.resolve(cwd, "../..")
-    : cwd;
+function getEnvFilePath(options?: { cwd?: string; sharedDir?: string }): string {
+  const sharedDir = options?.sharedDir?.trim();
+  if (sharedDir) {
+    return path.resolve(sharedDir, ".env");
+  }
+
+  const root = resolveEnvAppRoot(options?.cwd || process.cwd());
+  const sharedEnvPath = inferSharedEnvPathFromReleaseRoot(root);
+
+  if (sharedEnvPath) {
+    return sharedEnvPath;
+  }
+
   return path.resolve(root, ".env");
 }
 

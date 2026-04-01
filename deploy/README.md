@@ -325,6 +325,17 @@ sudo chmod 600 /var/www/lessonflow/shared/.env
 sudo chown www-data:www-data /var/www/lessonflow/shared/.env
 ```
 
+Runtime config saves from `/admin/settings` and `/api/setup/configure` persist to this shared env file, not to a timestamped release copy.
+
+After any deploy or permission repair, verify:
+
+```bash
+sudo -u www-data test -w /var/www/lessonflow/shared/.env
+readlink -f /var/www/lessonflow/current/.env
+```
+
+The first command should succeed, and the second should resolve to `/var/www/lessonflow/shared/.env`.
+
 ---
 
 ## Application Deployment

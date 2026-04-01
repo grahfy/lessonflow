@@ -1,4 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 import { POST as adminLogin } from "@/app/api/admin/login/route";
@@ -207,6 +211,49 @@ describe("setup-wizard", () => {
     expect(valuesByKey.ADMIN_CUSTOMER_EMAIL_ALERTS_ENABLED).toBe("false");
     expect(valuesByKey.IMAP_HOST).toBe("imap.example.com");
     expect(valuesByKey.IMAP_USER).toBe("setup-owner@example.com");
+  });
+
+  it("writes setup config to shared env when runtime cwd is a release directory", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "mgs-setup-release-env-"));
+    const sharedEnvPath = path.join(tempRoot, "shared", ".env");
+    const releaseDir = path.join(tempRoot, "releases", "20260401214529");
+    const releaseEnvPath = path.join(releaseDir, ".env");
+    const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(releaseDir);
+
+    await fs.mkdir(path.dirname(sharedEnvPath), { recursive: true });
+    await fs.mkdir(releaseDir, { recursive: true });
+    await fs.writeFile(sharedEnvPath, 'NEXT_PUBLIC_BRAND_NAME="Shared Setup Brand"\n', "utf-8");
+    await fs.writeFile(releaseEnvPath, 'NEXT_PUBLIC_BRAND_NAME="Release Setup Brand"\n', "utf-8");
+
+    try {
+      const response = await configureSetupEnv(
+        new Request("http://localhost/api/setup/configure", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json"
+          },
+          body: JSON.stringify({
+            DATABASE_URL: "mysql://setup-user:setup-pass@localhost:3306/lessonflow",
+            NEXT_PUBLIC_SITE_URL: "https://setup.example.com",
+            ADMIN_EMAIL: "owner@melbourneguitar.school",
+            ADMIN_CUSTOMER_EMAIL_ALERTS_PROVIDER: "imap"
+          })
+        })
+      );
+
+      expect(response.status).toBe(200);
+
+      const sharedEnvContents = await fs.readFile(sharedEnvPath, "utf-8");
+      const releaseEnvContents = await fs.readFile(releaseEnvPath, "utf-8");
+
+      expect(sharedEnvContents).toContain('ADMIN_CUSTOMER_EMAIL_ALERTS_PROVIDER="imap"');
+      expect(sharedEnvContents).toContain('NEXT_PUBLIC_SITE_URL="https://setup.example.com"');
+      expect(releaseEnvContents).toContain('NEXT_PUBLIC_BRAND_NAME="Release Setup Brand"');
+      expect(releaseEnvContents).not.toContain('ADMIN_CUSTOMER_EMAIL_ALERTS_PROVIDER="imap"');
+    } finally {
+      cwdSpy.mockRestore();
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    }
   });
 
   it("blocks setup access from public addresses in production before initialization", async () => {
