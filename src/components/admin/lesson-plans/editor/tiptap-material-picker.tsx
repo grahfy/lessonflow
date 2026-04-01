@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Editor } from "@tiptap/react";
+import { useEditorState, type Editor } from "@tiptap/react";
 import { Link2, Link2Off } from "lucide-react";
 
 interface MaterialOption {
@@ -31,9 +31,15 @@ export function TipTapMaterialPicker({
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-
-  const isInLink = editor?.isActive("materialLink") ?? false;
-  const hasSelection = editor ? !editor.state.selection.empty : false;
+  const editorState = useEditorState({
+    editor,
+    selector: ({ editor: currentEditor }) => ({
+      hasSelection: currentEditor ? !currentEditor.state.selection.empty : false,
+      isInLink: currentEditor ? currentEditor.isActive("materialLink") : false,
+    }),
+  });
+  const hasSelection = editorState?.hasSelection ?? false;
+  const isInLink = editorState?.isInLink ?? false;
 
   const handleToggle = useCallback(() => {
     if (!editor) return;
@@ -83,6 +89,16 @@ export function TipTapMaterialPicker({
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    if (!editor || (!hasSelection && !isInLink)) {
+      setIsOpen(false);
+    }
+  }, [editor, hasSelection, isInLink, isOpen]);
 
   if (!editor || materials.length === 0) return null;
 

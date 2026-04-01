@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import path from "node:path";
 import fs from "node:fs";
 
@@ -42,6 +42,43 @@ async function dismissDeployUpdatesModal(page: Page) {
     await modal.getByRole("button", { name: /close|dismiss/i }).click({ force: true }).catch(() => null);
     await modal.waitFor({ state: "hidden", timeout: 3_000 }).catch(() => null);
   }
+}
+
+async function openBookingLessonPlanDialog(page: Page, matcher?: (dialog: Locator) => Promise<boolean>) {
+  await gotoWithRetry(page, "/admin/bookings");
+  await waitForPageSettle(page);
+  await dismissDeployUpdatesModal(page);
+  await page.getByRole("heading", { name: /bookings/i }).first().waitFor({ timeout: 10_000 });
+  await page.waitForTimeout(1_000);
+
+  const calendarButtons = page.locator("button").filter({ hasText: /\d{1,2}:\d{2}/ });
+  const count = await calendarButtons.count();
+
+  for (let i = 0; i < Math.min(count, 8); i++) {
+    await calendarButtons.nth(i).click();
+    const dialog = page.locator("#booking-detail-dialog");
+    await expect(dialog).toBeVisible({ timeout: 8_000 });
+    await dialog.getByRole("button", { name: /lesson plan/i }).click();
+    await page.waitForTimeout(1_500);
+
+    const hasEditor = await dialog.locator(".tiptap-editor-shell").first().isVisible({ timeout: 3_000 }).catch(() => false);
+    if (!hasEditor) {
+      await dialog.getByRole("button", { name: /^close$/i }).first().click();
+      await dialog.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => null);
+      await page.waitForTimeout(300);
+      continue;
+    }
+
+    if (!matcher || await matcher(dialog)) {
+      return dialog;
+    }
+
+    await dialog.getByRole("button", { name: /^close$/i }).first().click();
+    await dialog.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => null);
+    await page.waitForTimeout(300);
+  }
+
+  return null;
 }
 
 // ── Auth setup (runs once) ──────────────────────────────────
@@ -224,6 +261,57 @@ test.describe("admin lesson plans V2", () => {
 
     const scrollHeight = await panel.evaluate((el) => el.scrollHeight);
     expect(scrollHeight).toBeGreaterThan(0);
+  });
+
+  test("typing in a booking lesson-plan section keeps the editor focused", async ({ page }) => {
+    const dialog = await openBookingLessonPlanDialog(page);
+    if (!dialog) {
+      test.skip(true, "No visible booking with a lesson-plan editor.");
+      return;
+    }
+
+    const firstEditor = dialog.locator(".lesson-plan-section-editor").first().locator(".tiptap-editor-content .ProseMirror");
+    await expect(firstEditor).toBeVisible({ timeout: 5_000 });
+
+    await firstEditor.click();
+    await page.keyboard.type("Focus retention check");
+
+    await expect(firstEditor).toBeFocused();
+    await expect(firstEditor).toContainText("Focus retention check");
+  });
+
+  test("selected lesson-plan text can open the material link picker", async ({ page, browserName }) => {
+    const dialog = await openBookingLessonPlanDialog(page, async (candidate) => {
+      const button = candidate.locator(".lesson-plan-section-editor").first().getByRole("button", { name: /link to material/i });
+      return button.isVisible().catch(() => false);
+    });
+    if (!dialog) {
+      test.skip(true, "No visible booking exposed a material-link control.");
+      return;
+    }
+
+    const firstSection = dialog.locator(".lesson-plan-section-editor").first();
+    const editor = firstSection.locator(".tiptap-editor-content .ProseMirror");
+    const linkButton = firstSection.getByRole("button", { name: /link to material/i });
+
+    await expect(editor).toBeVisible({ timeout: 5_000 });
+    await editor.click();
+    await page.keyboard.type("Warmup riff");
+
+    const wordShortcut = browserName === "webkit" ? "Meta+Shift+ArrowLeft" : "Control+Shift+ArrowLeft";
+    await page.keyboard.press(wordShortcut);
+
+    await expect(linkButton).toBeEnabled();
+    await linkButton.click();
+
+    const dropdown = firstSection.locator(".tiptap-material-picker-dropdown");
+    await expect(dropdown).toBeVisible();
+
+    const firstItem = dropdown.locator(".tiptap-material-picker-item").first();
+    await expect(firstItem).toBeVisible();
+    await firstItem.click();
+
+    await expect(editor.locator(".tiptap-material-link")).toContainText("riff");
   });
 
   test("can add and remove a custom section", async ({ page }) => {

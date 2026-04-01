@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import type { Editor } from "@tiptap/react";
+import { useEditorState, type Editor } from "@tiptap/react";
 import {
   Bold,
   Italic,
@@ -109,6 +109,11 @@ const TOOLBAR_GROUPS: ToolbarAction[][] = [
  * Groups: text marks | headings | lists/checklists | undo/redo.
  */
 export function TipTapToolbar({ editor }: TipTapToolbarProps) {
+  useEditorState({
+    editor,
+    selector: ({ transactionNumber }) => transactionNumber,
+  });
+
   if (!editor) return null;
 
   return (
