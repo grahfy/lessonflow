@@ -45,6 +45,25 @@ describe("chord preview note derivation", () => {
     ]);
   });
 
+  it("clamps playback notes to the shipped sample range for very high voicings", () => {
+    const diagram = {
+      ...createEmptyChordDiagram(),
+      fingering: {
+        ...createEmptyChordDiagram().fingering,
+        strings: [-1, -1, -1, -1, -1, 15] as [number, number, number, number, number, number],
+        startFret: 1,
+      },
+    };
+
+    expect(getPlayableChordNotes(diagram)).toEqual([
+      {
+        stringIndex: 5,
+        midi: 74,
+        note: "D5",
+      },
+    ]);
+  });
+
   it("keeps playback order stable even when the diagram is left-handed", () => {
     const rightHanded = {
       ...createEmptyChordDiagram(),

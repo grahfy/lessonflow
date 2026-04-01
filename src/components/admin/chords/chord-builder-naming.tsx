@@ -10,6 +10,7 @@ interface ChordBuilderNamingProps {
   bassNote?: string;
   displayName?: string;
   detectionMessage?: string;
+  voicingLookupMessage?: string;
   canPreview: boolean;
   isPreviewLoading: boolean;
   previewMessage?: string;
@@ -37,6 +38,7 @@ export function ChordBuilderNaming({
   bassNote,
   displayName,
   detectionMessage,
+  voicingLookupMessage,
   canPreview,
   isPreviewLoading,
   previewMessage,
@@ -113,6 +115,10 @@ export function ChordBuilderNaming({
 
       {detectionMessage ? (
         <p className="chord-builder-status">{detectionMessage}</p>
+      ) : null}
+
+      {voicingLookupMessage ? (
+        <p className="chord-builder-preview-status is-warning" role="status">{voicingLookupMessage}</p>
       ) : null}
 
       <div className="chord-builder-preview-actions">

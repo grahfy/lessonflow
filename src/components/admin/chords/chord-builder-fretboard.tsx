@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import type { ChordDiagramData, BarreIndicator } from "@/lib/chords/chord-types";
 import { getChordNotes, formatChordName } from "@/lib/chords/music-theory";
 
@@ -10,7 +10,8 @@ interface ChordBuilderFretboardProps {
   onPlaceDot: (stringIndex: number, fret: number, finger: number) => void;
   onRemoveDot: (stringIndex: number) => void;
   onCycleStringState: (stringIndex: number) => void;
-  onAddBarre: (barre: BarreIndicator) => void;
+  onAddBarre: (barre: BarreIndicator, finger: number) => void;
+  onRemoveBarre: (fret: number) => void;
 }
 
 /**
@@ -25,6 +26,7 @@ export function ChordBuilderFretboard({
   onRemoveDot,
   onCycleStringState,
   onAddBarre,
+  onRemoveBarre,
 }: ChordBuilderFretboardProps) {
   const { fingering, isLeftHanded } = diagram;
   const { strings: fretValues, fingers, barres, startFret, fretCount } = fingering;
@@ -116,29 +118,27 @@ export function ChordBuilderFretboard({
   const handleMouseUp = useCallback(
     (e: React.MouseEvent) => {
       if (!dragState) return;
+      if (selectedFinger === 0) {
+        setDragState(null);
+        return;
+      }
       const pos = posToStringFret(e.clientX, e.clientY);
       if (pos && pos.fretIdx === dragState.fret && pos.stringIdx !== dragState.fromString) {
         const from = stringOrder[dragState.fromString];
         const to = stringOrder[pos.stringIdx];
-        onAddBarre({
-          fret: dragState.fret,
-          fromString: Math.min(from, to),
-          toString: Math.max(from, to),
-        });
-        // Place dots on all barre strings
-        const minS = Math.min(dragState.fromString, pos.stringIdx);
-        const maxS = Math.max(dragState.fromString, pos.stringIdx);
-        for (let s = minS; s <= maxS; s++) {
-          const actual = stringOrder[s];
-          if (fretValues[actual] <= 0) {
-            onPlaceDot(actual, dragState.fret, selectedFinger);
-          }
-        }
+        onAddBarre(
+          {
+            fret: dragState.fret,
+            fromString: Math.min(from, to),
+            toString: Math.max(from, to),
+          },
+          selectedFinger
+        );
       }
       setDragState(null);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [dragState, stringOrder, fretValues, selectedFinger, onPlaceDot, onAddBarre]
+    [dragState, stringOrder, selectedFinger, onAddBarre]
   );
 
   const notes = getChordNotes(diagram);
@@ -257,6 +257,26 @@ export function ChordBuilderFretboard({
             height={dotRadius * 2}
             rx={dotRadius}
             fill="#1a1a2e"
+            role="button"
+            tabIndex={0}
+            aria-label={`Remove barre on fret ${barre.fret}`}
+            style={{ cursor: "pointer" }}
+            onMouseDown={(event) => {
+              event.stopPropagation();
+            }}
+            onMouseUp={(event) => {
+              event.stopPropagation();
+            }}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRemoveBarre(barre.fret);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onRemoveBarre(barre.fret);
+              }
+            }}
           />
         );
       })}

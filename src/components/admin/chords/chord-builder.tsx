@@ -2,6 +2,7 @@
 
 import React, { useCallback, useState } from "react";
 import type { ChordDiagramData, ChordFingering } from "@/lib/chords/chord-types";
+import { lookupChordVoicings } from "@/lib/chords/chord-lookup";
 import { useChordBuilder } from "./use-chord-builder";
 import { ChordBuilderFretboard } from "./chord-builder-fretboard";
 import { ChordBuilderNaming } from "./chord-builder-naming";
@@ -44,6 +45,7 @@ export function ChordBuilder({
     removeDot,
     cycleStringState,
     addBarre,
+    removeBarre,
     setRoot,
     setQuality,
     setBassNote,
@@ -68,6 +70,7 @@ export function ChordBuilder({
     playBlockPreview,
     playStrumPreview,
   } = useChordPreview(diagram, isOpen);
+  const [voicingLookupMessage, setVoicingLookupMessage] = useState("");
 
   const handlePlaceDot: (s: number, f: number, finger: number) => void = useCallback(
     (stringIndex, fret) => {
@@ -78,6 +81,50 @@ export function ChordBuilder({
       }
     },
     [selectedFinger, placeDot, removeDot]
+  );
+
+  const loadFirstMatchingVoicing = useCallback(
+    (root: string, quality: string, bassNote?: string) => {
+      if (!root || !quality) {
+        setVoicingLookupMessage("");
+        return;
+      }
+
+      const voicings = lookupChordVoicings(root, quality, bassNote);
+      if (voicings.length === 0) {
+        const chordLabel = formatChordName({ root, quality, bassNote }) || "the selected chord";
+        setVoicingLookupMessage(`No bundled voicing found for ${chordLabel}.`);
+        return;
+      }
+
+      setVoicingLookupMessage("");
+      loadFingering(voicings[0]);
+    },
+    [loadFingering]
+  );
+
+  const handleRootChange = useCallback(
+    (root: string) => {
+      setRoot(root);
+      loadFirstMatchingVoicing(root, diagram.name.quality, diagram.name.bassNote);
+    },
+    [diagram.name.bassNote, diagram.name.quality, loadFirstMatchingVoicing, setRoot]
+  );
+
+  const handleQualityChange = useCallback(
+    (quality: string) => {
+      setQuality(quality);
+      loadFirstMatchingVoicing(diagram.name.root, quality, diagram.name.bassNote);
+    },
+    [diagram.name.bassNote, diagram.name.root, loadFirstMatchingVoicing, setQuality]
+  );
+
+  const handleBassNoteChange = useCallback(
+    (bassNote: string | undefined) => {
+      setBassNote(bassNote);
+      loadFirstMatchingVoicing(diagram.name.root, diagram.name.quality, bassNote);
+    },
+    [diagram.name.quality, diagram.name.root, loadFirstMatchingVoicing, setBassNote]
   );
 
   const handleSave = useCallback(async () => {
@@ -98,6 +145,7 @@ export function ChordBuilder({
 
   const handleAlternativeSelect = useCallback(
     (fingering: ChordFingering) => {
+      setVoicingLookupMessage("");
       loadFingering(fingering);
     },
     [loadFingering]
@@ -154,15 +202,16 @@ export function ChordBuilder({
             bassNote={diagram.name.bassNote}
             displayName={diagram.name.displayName}
             detectionMessage={detectionMessage}
+            voicingLookupMessage={voicingLookupMessage}
             canPreview={canPreview}
             isPreviewLoading={isPreviewLoading}
             previewMessage={previewMessage}
             previewError={previewError}
             isLeftHanded={diagram.isLeftHanded}
             startFret={diagram.fingering.startFret}
-            onRootChange={setRoot}
-            onQualityChange={setQuality}
-            onBassNoteChange={setBassNote}
+            onRootChange={handleRootChange}
+            onQualityChange={handleQualityChange}
+            onBassNoteChange={handleBassNoteChange}
             onDisplayNameChange={setDisplayName}
             onPreviewStrum={playStrumPreview}
             onPreviewBlock={playBlockPreview}
@@ -185,6 +234,7 @@ export function ChordBuilder({
             onRemoveDot={removeDot}
             onCycleStringState={cycleStringState}
             onAddBarre={addBarre}
+            onRemoveBarre={removeBarre}
           />
         </div>
 

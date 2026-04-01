@@ -7,6 +7,12 @@ import type { ChordDiagramData } from "@/lib/chords/chord-types";
 import { getPlayableChordNotes } from "@/lib/chords/chord-preview";
 
 type PreviewMode = "strum" | "block";
+interface PreviewPlaybackEvent {
+  durationSeconds: number;
+  note: string;
+  timeOffsetSeconds: number;
+  velocity: number;
+}
 
 const CHORD_PREVIEW_BASE_URL = "/audio/chord-preview/guitar-acoustic/";
 const CHORD_PREVIEW_SAMPLE_FILES = [
@@ -48,6 +54,7 @@ const CHORD_PREVIEW_SAMPLE_FILES = [
 ] as const;
 
 const STRUM_STEP_SECONDS = 0.075;
+const BLOCK_STEP_SECONDS = 0.012;
 const BLOCK_DURATION_SECONDS = 1.6;
 const STRUM_DURATION_SECONDS = 1.45;
 
@@ -106,6 +113,26 @@ function getPreviewErrorMessage(error: unknown): string {
 }
 
 /**
+ * Builds a per-string playback plan so duplicate pitches can still retrigger
+ * as separate strings in block and strum previews.
+ */
+export function buildChordPreviewPlaybackPlan(
+  notes: Array<{ note: string }>,
+  mode: PreviewMode
+): PreviewPlaybackEvent[] {
+  const stepSeconds = mode === "block" ? BLOCK_STEP_SECONDS : STRUM_STEP_SECONDS;
+  const durationSeconds = mode === "block" ? BLOCK_DURATION_SECONDS : STRUM_DURATION_SECONDS;
+  const velocity = mode === "block" ? 0.82 : 0.78;
+
+  return notes.map((note, index) => ({
+    durationSeconds,
+    note: note.note,
+    timeOffsetSeconds: index * stepSeconds,
+    velocity,
+  }));
+}
+
+/**
  * Provides button-driven audio preview state and playback handlers for the
  * admin chord builder.
  */
@@ -147,22 +174,13 @@ export function useChordPreview(diagram: ChordDiagramData, isOpen: boolean) {
         const now = Tone.now() + 0.02;
         sampler.releaseAll(now);
 
-        if (mode === "block") {
-          sampler.triggerAttackRelease(
-            playableNotes.map((note) => note.note),
-            BLOCK_DURATION_SECONDS,
-            now,
-            0.82
-          );
-          return;
-        }
-
-        playableNotes.forEach((note, index) => {
+        const playbackPlan = buildChordPreviewPlaybackPlan(playableNotes, mode);
+        playbackPlan.forEach((note) => {
           sampler.triggerAttackRelease(
             note.note,
-            STRUM_DURATION_SECONDS,
-            now + index * STRUM_STEP_SECONDS,
-            0.78
+            note.durationSeconds,
+            now + note.timeOffsetSeconds,
+            note.velocity
           );
         });
       } catch (error: unknown) {

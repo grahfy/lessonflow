@@ -19,7 +19,7 @@ type ChordAction =
   | { type: "REMOVE_DOT"; stringIndex: number }
   | { type: "SET_STRING_STATE"; stringIndex: number; state: "open" | "muted" }
   | { type: "CYCLE_STRING_STATE"; stringIndex: number }
-  | { type: "ADD_BARRE"; barre: BarreIndicator }
+  | { type: "ADD_BARRE"; barre: BarreIndicator; finger: number }
   | { type: "REMOVE_BARRE"; fret: number }
   | { type: "SET_ROOT"; root: string }
   | { type: "SET_QUALITY"; quality: string }
@@ -30,6 +30,55 @@ type ChordAction =
   | { type: "CLEAR_ALL" }
   | { type: "LOAD_FINGERING"; fingering: ChordFingering }
   | { type: "LOAD_DIAGRAM"; diagram: ChordDiagramData };
+
+function normalizeBarre(barre: BarreIndicator): BarreIndicator {
+  return {
+    fret: barre.fret,
+    fromString: Math.min(barre.fromString, barre.toString),
+    toString: Math.max(barre.fromString, barre.toString),
+  };
+}
+
+/**
+ * Applies a barre to the current fingering so the sounding strings match the
+ * visual barre indicator.
+ */
+export function applyBarreToFingering(
+  fingering: ChordFingering,
+  barre: BarreIndicator,
+  finger: number
+): ChordFingering {
+  const normalizedBarre = normalizeBarre(barre);
+  const strings = [...fingering.strings] as StringTuple<StringFretValue>;
+  const fingers = [...fingering.fingers] as StringTuple<FingerValue>;
+
+  for (let stringIndex = normalizedBarre.fromString; stringIndex <= normalizedBarre.toString; stringIndex += 1) {
+    if (strings[stringIndex] <= 0 || strings[stringIndex] < normalizedBarre.fret) {
+      strings[stringIndex] = normalizedBarre.fret;
+    }
+
+    if (strings[stringIndex] === normalizedBarre.fret) {
+      fingers[stringIndex] = finger;
+    }
+  }
+
+  return {
+    ...fingering,
+    strings,
+    fingers,
+    barres: [...fingering.barres.filter((existing) => existing.fret !== normalizedBarre.fret), normalizedBarre],
+  };
+}
+
+/**
+ * Removes a barre overlay while preserving the underlying fretted strings.
+ */
+export function removeBarreFromFingering(fingering: ChordFingering, fret: number): ChordFingering {
+  return {
+    ...fingering,
+    barres: fingering.barres.filter((barre) => barre.fret !== fret),
+  };
+}
 
 // ─── Reducer ─────────────────────────────────────────────────
 
@@ -91,18 +140,16 @@ function chordReducer(state: ChordDiagramData, action: ChordAction): ChordDiagra
     }
 
     case "ADD_BARRE": {
-      const barres = [...state.fingering.barres, action.barre];
       return syncDiagramNameWithDetection({
         ...state,
-        fingering: { ...state.fingering, barres },
+        fingering: applyBarreToFingering(state.fingering, action.barre, action.finger),
       });
     }
 
     case "REMOVE_BARRE": {
-      const barres = state.fingering.barres.filter((b) => b.fret !== action.fret);
       return syncDiagramNameWithDetection({
         ...state,
-        fingering: { ...state.fingering, barres },
+        fingering: removeBarreFromFingering(state.fingering, action.fret),
       });
     }
 
@@ -182,7 +229,7 @@ export function useChordBuilder(initial?: ChordDiagramData) {
   );
 
   const addBarre = useCallback(
-    (barre: BarreIndicator) => dispatch({ type: "ADD_BARRE", barre }),
+    (barre: BarreIndicator, finger: number) => dispatch({ type: "ADD_BARRE", barre, finger }),
     []
   );
 

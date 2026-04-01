@@ -7493,6 +7493,10 @@
   color: rgba(248, 113, 113, 0.92);
 }
 
+.chord-builder-preview-status.is-warning {
+  color: rgba(253, 224, 71, 0.92);
+}
+
 .chord-builder-label {
   font-size: 11px;
   font-weight: 600;

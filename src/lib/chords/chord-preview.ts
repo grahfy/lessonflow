@@ -16,11 +16,17 @@ const SHARP_NOTE_NAMES = [
 ] as const;
 
 const STANDARD_GUITAR_OPEN_STRING_MIDI = [40, 45, 50, 55, 59, 64] as const;
+const GUITAR_PREVIEW_SAMPLE_MIN_MIDI = 40; // E2
+const GUITAR_PREVIEW_SAMPLE_MAX_MIDI = 74; // D5
 
 export interface PlayableChordNote {
   stringIndex: number;
   midi: number;
   note: string;
+}
+
+function clampPreviewMidi(midi: number): number {
+  return Math.min(Math.max(midi, GUITAR_PREVIEW_SAMPLE_MIN_MIDI), GUITAR_PREVIEW_SAMPLE_MAX_MIDI);
 }
 
 /**
@@ -45,7 +51,7 @@ export function getPlayableChordNotes(diagram: ChordDiagramData): PlayableChordN
     }
 
     const absoluteFret = fret > 0 ? fret + diagram.fingering.startFret - 1 : 0;
-    const midi = STANDARD_GUITAR_OPEN_STRING_MIDI[stringIndex] + absoluteFret;
+    const midi = clampPreviewMidi(STANDARD_GUITAR_OPEN_STRING_MIDI[stringIndex] + absoluteFret);
 
     return [{
       stringIndex,
