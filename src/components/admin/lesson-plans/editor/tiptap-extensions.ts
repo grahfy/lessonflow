@@ -4,6 +4,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import { MaterialLinkMark } from "./nodes/material-link-mark";
 import { ChecklistItemExtension } from "./nodes/checklist-item-extension";
 import { CalloutExtension } from "./nodes/callout-extension";
+import { ChordDiagramExtension } from "./nodes/chord-diagram-extension";
 
 /**
  * Standard TipTap extensions for lesson plan sections. Includes paragraph,
@@ -29,5 +30,6 @@ export function buildLessonPlanExtensions(placeholder?: string) {
     Placeholder.configure({
       placeholder: placeholder ?? "Start typing...",
     }),
+    ChordDiagramExtension,
   ];
 }

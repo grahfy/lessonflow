@@ -37,6 +37,7 @@
     "@tiptap/pm": "^3.20.5",
     "@tiptap/react": "^3.20.5",
     "@tiptap/starter-kit": "^3.20.5",
+    "@tombatossals/chords-db": "^0.5.1",
     "@types/papaparse": "^5.5.2",
     "bcryptjs": "^3.0.2",
     "date-fns": "^4.1.0",

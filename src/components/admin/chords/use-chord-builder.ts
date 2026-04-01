@@ -1,0 +1,247 @@
+"use client";
+
+import { useReducer, useCallback } from "react";
+import type {
+  ChordDiagramData,
+  ChordFingering,
+  BarreIndicator,
+  StringTuple,
+  StringFretValue,
+  FingerValue,
+} from "@/lib/chords/chord-types";
+import { createEmptyChordDiagram, DEFAULT_FRET_COUNT } from "@/lib/chords/chord-types";
+
+// ─── Action Types ────────────────────────────────────────────
+
+type ChordAction =
+  | { type: "PLACE_DOT"; stringIndex: number; fret: number; finger: number }
+  | { type: "REMOVE_DOT"; stringIndex: number }
+  | { type: "SET_STRING_STATE"; stringIndex: number; state: "open" | "muted" }
+  | { type: "CYCLE_STRING_STATE"; stringIndex: number }
+  | { type: "ADD_BARRE"; barre: BarreIndicator }
+  | { type: "REMOVE_BARRE"; fret: number }
+  | { type: "SET_ROOT"; root: string }
+  | { type: "SET_QUALITY"; quality: string }
+  | { type: "SET_BASS_NOTE"; bassNote: string | undefined }
+  | { type: "SET_DISPLAY_NAME"; displayName: string | undefined }
+  | { type: "SET_LEFT_HANDED"; isLeftHanded: boolean }
+  | { type: "SET_START_FRET"; startFret: number }
+  | { type: "CLEAR_ALL" }
+  | { type: "LOAD_FINGERING"; fingering: ChordFingering }
+  | { type: "LOAD_DIAGRAM"; diagram: ChordDiagramData };
+
+// ─── Reducer ─────────────────────────────────────────────────
+
+function chordReducer(state: ChordDiagramData, action: ChordAction): ChordDiagramData {
+  switch (action.type) {
+    case "PLACE_DOT": {
+      const strings = [...state.fingering.strings] as StringTuple<StringFretValue>;
+      const fingers = [...state.fingering.fingers] as StringTuple<FingerValue>;
+      strings[action.stringIndex] = action.fret;
+      fingers[action.stringIndex] = action.finger;
+      return {
+        ...state,
+        fingering: { ...state.fingering, strings, fingers },
+      };
+    }
+
+    case "REMOVE_DOT": {
+      const strings = [...state.fingering.strings] as StringTuple<StringFretValue>;
+      const fingers = [...state.fingering.fingers] as StringTuple<FingerValue>;
+      strings[action.stringIndex] = 0;
+      fingers[action.stringIndex] = 0;
+      return {
+        ...state,
+        fingering: { ...state.fingering, strings, fingers },
+      };
+    }
+
+    case "SET_STRING_STATE": {
+      const strings = [...state.fingering.strings] as StringTuple<StringFretValue>;
+      const fingers = [...state.fingering.fingers] as StringTuple<FingerValue>;
+      strings[action.stringIndex] = action.state === "muted" ? -1 : 0;
+      fingers[action.stringIndex] = 0;
+      return {
+        ...state,
+        fingering: { ...state.fingering, strings, fingers },
+      };
+    }
+
+    case "CYCLE_STRING_STATE": {
+      const current = state.fingering.strings[action.stringIndex];
+      const strings = [...state.fingering.strings] as StringTuple<StringFretValue>;
+      const fingers = [...state.fingering.fingers] as StringTuple<FingerValue>;
+      // Cycle: open(0) → muted(-1) → open(0) (for strings with no fret placed)
+      // For fretted strings: remove the dot → open
+      if (current > 0) {
+        strings[action.stringIndex] = 0;
+        fingers[action.stringIndex] = 0;
+      } else if (current === 0) {
+        strings[action.stringIndex] = -1;
+        fingers[action.stringIndex] = 0;
+      } else {
+        strings[action.stringIndex] = 0;
+        fingers[action.stringIndex] = 0;
+      }
+      return {
+        ...state,
+        fingering: { ...state.fingering, strings, fingers },
+      };
+    }
+
+    case "ADD_BARRE": {
+      const barres = [...state.fingering.barres, action.barre];
+      return {
+        ...state,
+        fingering: { ...state.fingering, barres },
+      };
+    }
+
+    case "REMOVE_BARRE": {
+      const barres = state.fingering.barres.filter((b) => b.fret !== action.fret);
+      return {
+        ...state,
+        fingering: { ...state.fingering, barres },
+      };
+    }
+
+    case "SET_ROOT":
+      return { ...state, name: { ...state.name, root: action.root } };
+
+    case "SET_QUALITY":
+      return { ...state, name: { ...state.name, quality: action.quality } };
+
+    case "SET_BASS_NOTE":
+      return { ...state, name: { ...state.name, bassNote: action.bassNote } };
+
+    case "SET_DISPLAY_NAME":
+      return { ...state, name: { ...state.name, displayName: action.displayName } };
+
+    case "SET_LEFT_HANDED":
+      return { ...state, isLeftHanded: action.isLeftHanded };
+
+    case "SET_START_FRET":
+      return {
+        ...state,
+        fingering: { ...state.fingering, startFret: Math.max(1, Math.min(24, action.startFret)) },
+      };
+
+    case "CLEAR_ALL":
+      return {
+        ...state,
+        fingering: {
+          strings: [0, 0, 0, 0, 0, 0],
+          fingers: [0, 0, 0, 0, 0, 0],
+          barres: [],
+          startFret: 1,
+          fretCount: DEFAULT_FRET_COUNT,
+        },
+      };
+
+    case "LOAD_FINGERING":
+      return { ...state, fingering: action.fingering };
+
+    case "LOAD_DIAGRAM":
+      return action.diagram;
+
+    default:
+      return state;
+  }
+}
+
+// ─── Hook ────────────────────────────────────────────────────
+
+export interface ChordBuilderState {
+  diagram: ChordDiagramData;
+  selectedFinger: number;
+}
+
+export function useChordBuilder(initial?: ChordDiagramData) {
+  const [diagram, dispatch] = useReducer(chordReducer, initial ?? createEmptyChordDiagram());
+
+  const placeDot = useCallback(
+    (stringIndex: number, fret: number, finger: number) =>
+      dispatch({ type: "PLACE_DOT", stringIndex, fret, finger }),
+    []
+  );
+
+  const removeDot = useCallback(
+    (stringIndex: number) => dispatch({ type: "REMOVE_DOT", stringIndex }),
+    []
+  );
+
+  const cycleStringState = useCallback(
+    (stringIndex: number) => dispatch({ type: "CYCLE_STRING_STATE", stringIndex }),
+    []
+  );
+
+  const addBarre = useCallback(
+    (barre: BarreIndicator) => dispatch({ type: "ADD_BARRE", barre }),
+    []
+  );
+
+  const removeBarre = useCallback(
+    (fret: number) => dispatch({ type: "REMOVE_BARRE", fret }),
+    []
+  );
+
+  const setRoot = useCallback(
+    (root: string) => dispatch({ type: "SET_ROOT", root }),
+    []
+  );
+
+  const setQuality = useCallback(
+    (quality: string) => dispatch({ type: "SET_QUALITY", quality }),
+    []
+  );
+
+  const setBassNote = useCallback(
+    (bassNote: string | undefined) => dispatch({ type: "SET_BASS_NOTE", bassNote }),
+    []
+  );
+
+  const setDisplayName = useCallback(
+    (displayName: string | undefined) => dispatch({ type: "SET_DISPLAY_NAME", displayName }),
+    []
+  );
+
+  const setLeftHanded = useCallback(
+    (isLeftHanded: boolean) => dispatch({ type: "SET_LEFT_HANDED", isLeftHanded }),
+    []
+  );
+
+  const setStartFret = useCallback(
+    (startFret: number) => dispatch({ type: "SET_START_FRET", startFret }),
+    []
+  );
+
+  const clearAll = useCallback(() => dispatch({ type: "CLEAR_ALL" }), []);
+
+  const loadFingering = useCallback(
+    (fingering: ChordFingering) => dispatch({ type: "LOAD_FINGERING", fingering }),
+    []
+  );
+
+  const loadDiagram = useCallback(
+    (d: ChordDiagramData) => dispatch({ type: "LOAD_DIAGRAM", diagram: d }),
+    []
+  );
+
+  return {
+    diagram,
+    placeDot,
+    removeDot,
+    cycleStringState,
+    addBarre,
+    removeBarre,
+    setRoot,
+    setQuality,
+    setBassNote,
+    setDisplayName,
+    setLeftHanded,
+    setStartFret,
+    clearAll,
+    loadFingering,
+    loadDiagram,
+  };
+}

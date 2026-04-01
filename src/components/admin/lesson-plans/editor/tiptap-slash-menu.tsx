@@ -17,6 +17,7 @@ import {
   MessageSquareQuote,
   AlertTriangle,
   Lightbulb,
+  Guitar,
   type LucideIcon,
 } from "lucide-react";
 
@@ -84,6 +85,15 @@ const SLASH_ITEMS: SlashMenuItem[] = [
     icon: MessageSquareQuote,
     keywords: ["note", "info", "callout"],
     action: (e) => e.chain().focus().toggleCallout({ calloutType: "note" }).run(),
+  },
+  {
+    label: "Chord Diagram",
+    description: "Insert a chord diagram",
+    icon: Guitar,
+    keywords: ["chord", "guitar", "diagram", "fretboard"],
+    action: () => {
+      window.dispatchEvent(new CustomEvent("tiptap:insert-chord"));
+    },
   },
 ];
 

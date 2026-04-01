@@ -1,6 +1,8 @@
 "use client";
 
 import type { StudentPortalLessonPlanV2Section } from "@/lib/lesson-plan-contract";
+import { renderChordSvg } from "@/lib/chords/chord-svg";
+import type { ChordDiagramData } from "@/lib/chords/chord-types";
 
 interface LessonPlanViewerProps {
   sections: StudentPortalLessonPlanV2Section[];
@@ -108,6 +110,25 @@ function renderNode(node: TipTapNode, key: number): React.ReactNode {
         <div key={key} className={`lp-viewer-callout lp-viewer-callout-${calloutType}`}>
           {content ? content.map((c, i) => renderNode(c, i)) : null}
         </div>
+      );
+    }
+
+    case "chordDiagram": {
+      const chordData = attrs.chordData as ChordDiagramData | null;
+      if (!chordData) return null;
+      const svg = renderChordSvg(chordData, {
+        width: 160,
+        height: 220,
+        showTitle: true,
+        showNoteNames: true,
+        showFingerNumbers: true,
+      });
+      return (
+        <div
+          key={key}
+          className="lp-viewer-chord-diagram"
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
       );
     }
 

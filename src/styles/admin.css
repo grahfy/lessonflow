@@ -7413,3 +7413,486 @@
     padding-inline: 10px;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Chord Builder
+   ═══════════════════════════════════════════════════════════════ */
+
+.chord-builder-layout {
+  display: grid;
+  grid-template-columns: 200px 1fr 200px;
+  gap: 20px;
+  min-height: 380px;
+}
+
+.chord-builder-panel-left {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chord-builder-panel-center {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.chord-builder-panel-right {
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+.chord-builder-fretboard {
+  width: 100%;
+  max-width: 260px;
+  height: auto;
+}
+
+/* Naming panel */
+.chord-builder-naming {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chord-builder-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.chord-builder-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--admin-text-secondary, rgba(226, 232, 240, 0.7));
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.chord-builder-select,
+.chord-builder-input {
+  padding: 6px 8px;
+  font-size: 13px;
+  border: 1px solid var(--admin-card-border, rgba(148, 163, 184, 0.14));
+  border-radius: 6px;
+  background: var(--admin-card-bg, rgba(15, 23, 42, 0.6));
+  color: var(--admin-text-primary, rgba(248, 250, 252, 0.96));
+}
+
+.chord-builder-select:focus,
+.chord-builder-input:focus {
+  outline: none;
+  border-color: rgba(96, 165, 250, 0.4);
+}
+
+/* Stepper */
+.chord-builder-stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chord-builder-stepper-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--admin-card-border, rgba(148, 163, 184, 0.14));
+  border-radius: 6px;
+  background: var(--admin-card-bg, rgba(15, 23, 42, 0.6));
+  color: var(--admin-text-primary, rgba(248, 250, 252, 0.96));
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.chord-builder-stepper-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.chord-builder-stepper-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--admin-text-primary, rgba(248, 250, 252, 0.96));
+  min-width: 24px;
+  text-align: center;
+}
+
+/* Checkbox */
+.chord-builder-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--admin-text-secondary, rgba(226, 232, 240, 0.7));
+  cursor: pointer;
+}
+
+.chord-builder-clear-btn {
+  padding: 6px 10px;
+  font-size: 12px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.1);
+  color: rgba(252, 165, 165, 0.9);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.chord-builder-clear-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+/* Finger selector */
+.chord-builder-finger-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chord-builder-finger-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.chord-builder-finger-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--admin-card-border, rgba(148, 163, 184, 0.14));
+  border-radius: 6px;
+  background: var(--admin-card-bg, rgba(15, 23, 42, 0.6));
+  color: var(--admin-text-primary, rgba(248, 250, 252, 0.96));
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.chord-builder-finger-btn.is-active {
+  background: var(--admin-btn-primary-bg);
+  border-color: var(--admin-btn-primary-border);
+  color: var(--admin-btn-primary-ink);
+}
+
+/* Alternatives panel */
+.chord-builder-alternatives {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chord-builder-alternatives-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.chord-builder-alternative-btn {
+  padding: 4px;
+  border: 1px solid var(--admin-card-border, rgba(148, 163, 184, 0.14));
+  border-radius: 6px;
+  background: var(--admin-card-bg, rgba(15, 23, 42, 0.6));
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.chord-builder-alternative-btn:hover {
+  border-color: rgba(96, 165, 250, 0.4);
+  background: rgba(30, 64, 175, 0.15);
+}
+
+.chord-builder-alternative-btn svg {
+  width: 100%;
+  height: auto;
+}
+
+.chord-builder-no-alternatives {
+  font-size: 12px;
+  color: var(--admin-text-secondary, rgba(226, 232, 240, 0.5));
+  font-style: italic;
+}
+
+/* Footer */
+.chord-builder-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.admin-chords-primary-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-chords-panel {
+  min-height: 0;
+}
+
+.admin-chords-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-chords-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-chords-filter-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-chords-filter-btn {
+  width: auto;
+  min-width: 44px;
+  padding-inline: 10px;
+}
+
+.admin-chords-state,
+.admin-chords-subtle-state {
+  margin: 0;
+  padding: 18px 2px;
+  color: var(--admin-text-secondary, rgba(226, 232, 240, 0.74));
+}
+
+.admin-chords-subtle-state {
+  padding-bottom: 0;
+}
+
+.admin-chord-chart-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chord-chart-card {
+  cursor: default;
+}
+
+.chord-chart-card:hover {
+  border-color: var(--admin-card-border, rgba(148, 163, 184, 0.14));
+  background: var(--admin-card-bg, rgba(15, 23, 42, 0.6));
+}
+
+.chord-chart-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.chord-chart-card-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.chord-chart-card-copy h3,
+.chord-chart-card-copy p {
+  margin: 0;
+}
+
+.chord-chart-card-copy h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--admin-text-primary, rgba(248, 250, 252, 0.96));
+}
+
+.chord-chart-card-copy p {
+  font-size: 0.86rem;
+  color: var(--admin-text-secondary, rgba(226, 232, 240, 0.76));
+}
+
+.chord-chart-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* Chord library grid */
+.chord-library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.chord-card {
+  padding: 12px;
+  border: 1px solid var(--admin-card-border, rgba(148, 163, 184, 0.14));
+  border-radius: 8px;
+  background: var(--admin-card-bg, rgba(15, 23, 42, 0.6));
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.chord-card:hover {
+  border-color: rgba(96, 165, 250, 0.3);
+  background: rgba(30, 64, 175, 0.1);
+}
+
+.chord-card svg {
+  width: 100%;
+  height: auto;
+}
+
+.chord-card-name {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--admin-text-primary, rgba(248, 250, 252, 0.96));
+}
+
+.chord-card-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  justify-content: center;
+}
+
+/* Chord chart editor */
+.chord-chart-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.chord-chart-item {
+  position: relative;
+  padding: 8px;
+  border: 1px solid var(--admin-card-border, rgba(148, 163, 184, 0.14));
+  border-radius: 6px;
+  background: var(--admin-card-bg, rgba(15, 23, 42, 0.6));
+}
+
+.chord-chart-item-annotation {
+  margin-top: 4px;
+}
+
+.chord-chart-item-annotation input {
+  width: 100%;
+  padding: 3px 6px;
+  font-size: 11px;
+  border: 1px solid var(--admin-card-border, rgba(148, 163, 184, 0.14));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--admin-text-primary, rgba(248, 250, 252, 0.96));
+}
+
+.chord-chart-item-caption {
+  margin-top: 2px;
+  text-align: center;
+  font-size: 10px;
+  color: var(--admin-text-secondary, rgba(226, 232, 240, 0.72));
+}
+
+/* Chord diagram inline in TipTap editor */
+.chord-diagram-nodeview {
+  display: inline-block;
+  margin: 8px 0;
+}
+
+.chord-diagram-inline {
+  position: relative;
+  display: inline-block;
+  border: 1px solid var(--admin-card-border, rgba(148, 163, 184, 0.14));
+  border-radius: 8px;
+  padding: 4px;
+  background: rgba(15, 23, 42, 0.3);
+  transition: border-color 0.15s;
+}
+
+.chord-diagram-inline:hover {
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
+.chord-diagram-inline svg {
+  display: block;
+  max-width: 160px;
+  height: auto;
+}
+
+.chord-diagram-actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: none;
+  gap: 2px;
+}
+
+.chord-diagram-inline:hover .chord-diagram-actions {
+  display: flex;
+}
+
+.chord-diagram-action-btn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.9);
+  color: rgba(226, 232, 240, 0.9);
+  cursor: pointer;
+}
+
+.chord-diagram-action-btn:hover {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.chord-diagram-empty {
+  padding: 12px;
+  font-size: 12px;
+  color: rgba(226, 232, 240, 0.5);
+  font-style: italic;
+}
+
+/* Student portal chord diagram */
+.lp-viewer-chord-diagram {
+  display: inline-block;
+  margin: 8px 0;
+}
+
+.lp-viewer-chord-diagram svg {
+  display: block;
+  max-width: 160px;
+  height: auto;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .chord-builder-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+  }
+
+  .chord-builder-panel-right {
+    max-height: 200px;
+  }
+
+  .chord-builder-alternatives-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .chord-chart-card-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .chord-chart-card-actions {
+    justify-content: flex-start;
+  }
+}

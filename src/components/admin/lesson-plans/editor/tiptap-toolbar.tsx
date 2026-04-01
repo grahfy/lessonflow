@@ -12,6 +12,7 @@ import {
   ListOrdered,
   ListChecks,
   MessageSquareQuote,
+  Guitar,
   Undo,
   Redo,
 } from "lucide-react";
@@ -88,6 +89,13 @@ const TOOLBAR_GROUPS: ToolbarAction[][] = [
       label: "Callout",
       action: (e) => e.chain().focus().toggleCallout({ calloutType: "note" }).run(),
       isActive: (e) => e.isActive("callout"),
+    },
+    {
+      icon: Guitar,
+      label: "Chord Diagram",
+      action: () => {
+        window.dispatchEvent(new CustomEvent("tiptap:insert-chord"));
+      },
     },
   ],
   [

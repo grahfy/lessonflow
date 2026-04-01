@@ -363,6 +363,8 @@ model AdminUser {
   updatedLessonPlans         LessonPlan[]                       @relation("LessonPlanUpdatedBy")
   lessonSeries               LessonSeries[]                     @relation("LessonSeriesTeacher")
   createdSeriesTemplates     LessonSeriesTemplate[]             @relation("LessonSeriesTemplateCreatedBy")
+  createdChords              Chord[]                            @relation("ChordCreatedBy")
+  createdChordCharts         ChordChart[]                       @relation("ChordChartCreatedBy")
 }
 
 // Canonical customer profile derived from booking requests/bookings. Multiple
@@ -920,6 +922,60 @@ model DeployCommit {
   createdAt      DateTime     @default(now())
 
   @@index([deployUpdateId])
+}
+
+// Saved chord voicings created by admin users for the chord library.
+// The `diagram` JSON field stores a ChordDiagramData object with
+// fingerings, barres, tuning, and left-handed flag.
+model Chord {
+  id          String           @id @default(cuid())
+  name        String
+  root        String
+  quality     String
+  diagram     Json
+  isArchived  Boolean          @default(false)
+  createdById String
+  createdBy   AdminUser        @relation("ChordCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  chartLinks  ChordChartItem[]
+
+  @@index([isArchived, name])
+  @@index([root, quality, isArchived])
+  @@index([createdById])
+}
+
+// A named collection of chord diagrams for display/print as a chord sheet.
+// Designed for working out songs — title holds the song name, items hold
+// the chords in order with optional section annotations.
+model ChordChart {
+  id          String           @id @default(cuid())
+  title       String
+  description String?          @db.Text
+  isArchived  Boolean          @default(false)
+  createdById String
+  createdBy   AdminUser        @relation("ChordChartCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  items       ChordChartItem[]
+
+  @@index([isArchived, updatedAt])
+  @@index([createdById])
+}
+
+// Join table linking chords to charts with ordering and optional annotations.
+model ChordChartItem {
+  id         String     @id @default(cuid())
+  chartId    String
+  chart      ChordChart @relation(fields: [chartId], references: [id], onDelete: Cascade)
+  chordId    String
+  chord      Chord      @relation(fields: [chordId], references: [id], onDelete: Cascade)
+  sortOrder  Int        @default(0)
+  annotation String?
+
+  @@unique([chartId, chordId])
+  @@index([chartId, sortOrder])
+  @@index([chordId])
 }
 
 // Application system logs for diagnostic and troubleshooting purposes.
