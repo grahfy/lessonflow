@@ -692,6 +692,10 @@
   padding-right: 2px;
 }
 
+.admin-layout-content.is-scrollable > * {
+  flex-shrink: 0;
+}
+
 .admin-settings-sticky-stack {
   position: sticky;
   top: 0;

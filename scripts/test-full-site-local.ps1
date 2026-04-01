@@ -420,6 +420,11 @@ if ($SEED_MODE -eq "docs-demo") {
     }
 }
 
+if ($SEED_MODE -ne "none") {
+    Log "Importing bundled chord library..."
+    npm run chords:seed > $null
+}
+
 if (-not $SkipTests) {
     Log "Running automated tests..."
     $env:DATABASE_URL = $TEST_DB_URL

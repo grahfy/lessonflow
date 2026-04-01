@@ -2910,6 +2910,36 @@ maybe_seed_example_lesson_plan_templates() {
   fi
 }
 
+# Ensures the bundled chord library has been imported into the database after
+# a successful deploy. The underlying seed script is idempotent, so rerunning
+# this on later updates only fills gaps introduced by newer bundled voicings.
+ensure_seeded_chord_library() {
+  local seed_repo_root="${CURRENT_LINK}"
+  local shared_env_path="${SHARED_DIR}/.env"
+  local seed_database_url=""
+  local seed_cmd=""
+
+  if [[ ! -d "${seed_repo_root}" ]]; then
+    seed_repo_root="${REPO_ROOT}"
+  fi
+
+  if [[ -f "${shared_env_path}" ]]; then
+    seed_database_url="$(read_env_file_value_from_update "${shared_env_path}" "DATABASE_URL" || true)"
+  fi
+
+  if [[ -z "${seed_database_url}" ]]; then
+    return 0
+  fi
+
+  seed_cmd="cd '${seed_repo_root}' && npm run chords:seed"
+
+  section "Chord Library"
+  log_info "Ensuring bundled chord voicings are present in the chord library..."
+  if ! run_deploy_path_cmd env DATABASE_URL="${seed_database_url}" bash -lc "${seed_cmd}"; then
+    log_warn "Chord library seeding failed; continuing."
+  fi
+}
+
 # Notifies the admin and generates a public announcement file after a successful
 # update. It delegates the logic to a Node.js script that uses the application's
 # mail service and templates.
@@ -3132,6 +3162,7 @@ if [[ "${SKIP_DEPLOY}" == false ]]; then
   maybe_edit_shared_env_before_deploy "${REPO_ROOT}"
   run_deploy
   sync_manual_docs_into_current_standalone_from_update
+  ensure_seeded_chord_library
   maybe_seed_example_lesson_plan_templates
   notify_updates
 else

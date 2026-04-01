@@ -10,6 +10,7 @@
 
 import type { ChordFingering, StringTuple, StringFretValue, FingerValue } from "./chord-types";
 import { DEFAULT_FRET_COUNT } from "./chord-types";
+import { CHORD_QUALITIES } from "./music-theory";
 
 // The chords-db package uses "Csharp"/"Fsharp" for sharp keys.
 const KEY_MAP: Record<string, string> = {
@@ -43,6 +44,12 @@ interface ChordsDbData {
   chords: Record<string, ChordsDbChord[]>;
 }
 
+export interface LookupChordVoicingEntry {
+  root: string;
+  quality: string;
+  fingering: ChordFingering;
+}
+
 let cachedDb: ChordsDbData | null = null;
 
 function getDb(): ChordsDbData {
@@ -51,6 +58,16 @@ function getDb(): ChordsDbData {
     cachedDb = require("@tombatossals/chords-db/lib/guitar.json") as ChordsDbData;
   }
   return cachedDb;
+}
+
+function getDbSuffixForChord(root: string, quality: string, bassNote?: string): string | null {
+  if (bassNote) {
+    if (quality === "major") return `/${bassNote}`;
+    if (quality === "minor") return `m/${bassNote}`;
+    return null;
+  }
+
+  return quality;
 }
 
 /**
@@ -89,6 +106,8 @@ function positionToFingering(pos: ChordsDbPosition): ChordFingering {
  * @returns Array of ChordFingering options
  */
 export function lookupChordVoicings(root: string, quality: string, bassNote?: string): ChordFingering[] {
+  if (!root || !quality) return [];
+
   const db = getDb();
   const key = KEY_MAP[root];
   if (!key) return [];
@@ -96,16 +115,51 @@ export function lookupChordVoicings(root: string, quality: string, bassNote?: st
   const chords = db.chords[key];
   if (!chords) return [];
 
-  let targetSuffix = quality;
-  if (bassNote) {
-    const prefix = quality === "minor" ? "m" : "";
-    targetSuffix = `${prefix}/${bassNote}`;
-  }
+  const targetSuffix = getDbSuffixForChord(root, quality, bassNote);
+  if (!targetSuffix) return [];
 
   const match = chords.find((c) => c.suffix === targetSuffix);
   if (!match) return [];
 
   return match.positions.map(positionToFingering);
+}
+
+/**
+ * Returns the quality names that are both supported by the app and present in
+ * the bundled chords dataset.
+ */
+export function getImportableChordQualities(): string[] {
+  const availableSuffixes = new Set(getDb().suffixes);
+  return CHORD_QUALITIES.filter((quality) => availableSuffixes.has(quality));
+}
+
+/**
+ * Enumerates every importable chord voicing from the bundled dataset for the
+ * app's supported quality vocabulary.
+ */
+export function listImportableChordVoicings(): LookupChordVoicingEntry[] {
+  const db = getDb();
+  const qualities = getImportableChordQualities();
+  const entries: LookupChordVoicingEntry[] = [];
+
+  for (const root of db.keys) {
+    const chords = db.chords[root] ?? [];
+
+    for (const quality of qualities) {
+      const chord = chords.find((candidate) => candidate.suffix === quality);
+      if (!chord) continue;
+
+      for (const position of chord.positions) {
+        entries.push({
+          root,
+          quality,
+          fingering: positionToFingering(position),
+        });
+      }
+    }
+  }
+
+  return entries;
 }
 
 /**

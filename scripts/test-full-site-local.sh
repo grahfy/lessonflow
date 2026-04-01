@@ -407,6 +407,9 @@ run_seed_mode() {
       log "  Password: ${DOCS_DEMO_STUDENT_PASSWORD}"
     fi
   fi
+
+  log "Importing bundled chord library..."
+  DATABASE_URL="${DB_URL}" npm run chords:seed >/dev/null
 }
 
 run_seed_mode

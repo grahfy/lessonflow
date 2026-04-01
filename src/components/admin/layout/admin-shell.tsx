@@ -1,6 +1,7 @@
 "use client";
 
-import type { CSSProperties, PropsWithChildren } from "react";
+import { useEffect, useRef, type CSSProperties, type PropsWithChildren } from "react";
+import { usePathname } from "next/navigation";
 
 import { AdminHeader } from "@/components/admin-header";
 import { AdminBuildInfoFooter } from "@/components/admin/layout/admin-build-info-footer";
@@ -19,11 +20,43 @@ interface AdminShellProps extends PropsWithChildren {
   className?: string;
 }
 
+interface ScrollResetTarget {
+  scrollTop: number;
+  scrollTo?: (options: { top?: number; left?: number; behavior?: "auto" | "smooth" }) => void;
+}
+
+interface AdminShellContentRoot extends Partial<ScrollResetTarget> {
+  querySelector: (selector: string) => ScrollResetTarget | null;
+}
+
+export function findAdminScrollResetTarget(root: AdminShellContentRoot | null): ScrollResetTarget | null {
+  if (!root) {
+    return null;
+  }
+
+  return root.querySelector(".admin-layout-content.is-scrollable")
+    ?? (typeof root.scrollTop === "number" ? root as ScrollResetTarget : null);
+}
+
+export function resetAdminScrollPosition(target: ScrollResetTarget | null) {
+  if (!target) {
+    return;
+  }
+
+  if (typeof target.scrollTo === "function") {
+    target.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    return;
+  }
+
+  target.scrollTop = 0;
+}
+
 /**
  * Standard shell for all admin pages.
  * Centralizes layout, header, and common UI elements like errors and notices.
  */
 export function AdminShell({ title, error, notice, loading, style, className, children }: AdminShellProps) {
+  const pathname = usePathname();
   const session = useAdminSession({
     onAuthError: () => window.location.assign("/admin/login")
   });
@@ -31,6 +64,11 @@ export function AdminShell({ title, error, notice, loading, style, className, ch
     adminId: session.admin?.id,
     enabled: session.admin?.role === "owner"
   });
+  const contentRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    resetAdminScrollPosition(findAdminScrollResetTarget(contentRef.current));
+  }, [pathname]);
 
   return (
     <AdminSessionProvider value={session}>
@@ -47,7 +85,7 @@ export function AdminShell({ title, error, notice, loading, style, className, ch
           <AdminNoticeStack error={error} notice={notice} loading={loading} />
         </div>
 
-        <main className="admin-shell-content" aria-busy={loading || undefined}>
+        <main ref={contentRef} className="admin-shell-content" aria-busy={loading || undefined}>
           {children}
         </main>
         <CustomerEmailAlertToast

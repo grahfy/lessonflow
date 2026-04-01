@@ -16,6 +16,7 @@
     "test": "npm run test:prepare && node ./scripts/run-vitest-with-test-db.cjs run",
     "test:watch": "npm run test:prepare && node ./scripts/run-vitest-with-test-db.cjs",
     "test:e2e": "playwright test",
+    "chords:seed": "npx tsx ./scripts/seed-chord-library.ts",
     "docs:screenshots:seed": "npx tsx ./scripts/seed-docs-screenshots.ts",
     "docs:screenshots": "playwright test tests/e2e/docs-screenshots.spec.ts",
     "docs:screenshots:sync": "node ./scripts/sync-manual-screenshots.cjs",
