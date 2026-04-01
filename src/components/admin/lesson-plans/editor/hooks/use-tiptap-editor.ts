@@ -31,9 +31,11 @@ export function useTipTapEditor({
     []
   );
 
+  const initialContentRef = useRef(content);
+
   const editor = useEditor({
     extensions: buildLessonPlanExtensions(placeholder),
-    content: content ?? undefined,
+    content: initialContentRef.current ?? undefined,
     editable,
     onUpdate: handleUpdate,
     // Suppress SSR mismatch by not rendering until mounted.

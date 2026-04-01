@@ -95,7 +95,10 @@ export function TipTapMaterialPicker({
         title={isInLink ? "Remove material link" : "Link to material"}
         aria-label={isInLink ? "Remove material link" : "Link to material"}
         disabled={!isInLink && !hasSelection}
-        onClick={handleToggle}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          handleToggle();
+        }}
       >
         {isInLink ? <Link2Off size={16} /> : <Link2 size={16} />}
       </button>
