@@ -23,6 +23,7 @@ describe("invoice template render", () => {
       discountKind: null,
       discountValue: null,
       discountCents: 0,
+      paymentDetailsSource: "custom",
       currency: "USD",
       customerId: null,
       bookingId: null,

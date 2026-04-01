@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db";
 import { getInvoiceAgingBucket, getInvoiceOverdueDays } from "@/lib/invoices/aging";
 import { describeGroupedLessonLine, findActiveInvoiceLinksForBookingIds } from "@/lib/invoices/booking-links";
 import { getDefaultInvoiceTaxModeForCurrencyValue } from "@/lib/invoices/gst-policy";
+import { withResolvedInvoicePaymentDetails } from "@/lib/invoices/payment-details";
 import { createCustomerInvoiceSchema, listInvoicesQuerySchema } from "@/lib/invoices/schema";
 import { createInvoiceRecord, getDefaultDueAt } from "@/lib/invoices/persistence";
 import { customerSnapshotFromCustomer } from "@/lib/invoices/snapshots";
@@ -220,7 +221,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   return NextResponse.json({
     invoices: invoices.map((invoice) => ({
-      ...invoice,
+      ...withResolvedInvoicePaymentDetails(invoice),
       overdueDays: getInvoiceOverdueDays(invoice.dueAt),
       agingBucket: getInvoiceAgingBucket({
         dueAt: invoice.dueAt,
@@ -438,5 +439,5 @@ export async function POST(request: NextRequest, { params }: Params) {
     })
   );
 
-  return NextResponse.json({ invoice }, { status: 201 });
+  return NextResponse.json({ invoice: withResolvedInvoicePaymentDetails(invoice) }, { status: 201 });
 }

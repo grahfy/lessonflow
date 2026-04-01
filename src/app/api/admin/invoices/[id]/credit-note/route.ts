@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isOwnerAdmin } from "@/lib/admin-auth";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { prisma } from "@/lib/db";
+import { withResolvedInvoicePaymentDetails } from "@/lib/invoices/payment-details";
 import { createCreditNoteSchema } from "@/lib/invoices/schema";
 import { generateNextCreditNoteNumber } from "@/lib/invoices/numbering";
 
@@ -101,6 +102,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         bankBsb: original.bankBsb,
         bankAccountName: original.bankAccountName,
         bankAccountNumber: original.bankAccountNumber,
+        paymentDetailsSource: original.paymentDetailsSource,
         subtotalCents: -Math.abs(original.subtotalCents),
         gstCents: -Math.abs(original.gstCents),
         totalCents: -Math.abs(original.totalCents),
@@ -165,5 +167,5 @@ export async function POST(request: NextRequest, { params }: Params) {
     return created;
   });
 
-  return NextResponse.json({ invoice: creditNote }, { status: 201 });
+  return NextResponse.json({ invoice: withResolvedInvoicePaymentDetails(creditNote) }, { status: 201 });
 }

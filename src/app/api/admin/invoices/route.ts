@@ -15,6 +15,7 @@ import { prisma } from "@/lib/db";
 import { getInvoiceAgingBucket, getInvoiceOverdueDays } from "@/lib/invoices/aging";
 import { findActiveInvoiceLinksForBookingIds } from "@/lib/invoices/booking-links";
 import { createInvoiceSchema, listInvoicesQuerySchema } from "@/lib/invoices/schema";
+import { withResolvedInvoicePaymentDetails } from "@/lib/invoices/payment-details";
 import { createInvoiceRecord } from "@/lib/invoices/persistence";
 import { InvoiceLineItemDraft } from "@/lib/invoices/types";
 
@@ -143,7 +144,7 @@ export async function GET(request: NextRequest) {
     // Enriched Response (Add dynamic fields like overdueDays)
     return NextResponse.json({
       invoices: invoices.map((invoice) => ({
-        ...invoice,
+        ...withResolvedInvoicePaymentDetails(invoice),
         overdueDays: getInvoiceOverdueDays(invoice.dueAt),
         agingBucket: getInvoiceAgingBucket({
           dueAt: invoice.dueAt,
@@ -265,7 +266,7 @@ export async function POST(request: NextRequest) {
       })
     );
 
-    return NextResponse.json({ invoice }, { status: 201 });
+    return NextResponse.json({ invoice: withResolvedInvoicePaymentDetails(invoice) }, { status: 201 });
   } catch (error) {
     return jsonUnexpectedError(error, "Unable to create invoice.");
   }

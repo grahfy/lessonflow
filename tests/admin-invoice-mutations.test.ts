@@ -1,13 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 import { POST as createCreditNote } from "@/app/api/admin/invoices/[id]/credit-note/route";
+import { GET as getInvoice } from "@/app/api/admin/invoices/[id]/route";
 import { DELETE, PATCH } from "@/app/api/admin/invoices/[id]/route";
 import { GET as getInvoicePdf } from "@/app/api/admin/invoices/[id]/pdf/route";
 import { POST as sendInvoice } from "@/app/api/admin/invoices/[id]/send/route";
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 import * as invoiceEvents from "@/lib/invoice-events";
+import { renderInvoiceHtml } from "@/lib/invoices/template";
 
 function adminRequest(url: string, method: "POST" | "PATCH" | "DELETE" | "GET", token: string, body?: Record<string, unknown>) {
   return new NextRequest(url, {
@@ -77,6 +79,10 @@ describe("admin-invoice-mutations", () => {
     await prisma.bookingSeries.deleteMany();
     await prisma.bookingRequest.deleteMany();
     await prisma.customer.deleteMany();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("sends invoice email and records outbound email row", async () => {
@@ -259,13 +265,69 @@ describe("admin-invoice-mutations", () => {
     });
   });
 
-  it("updates saved payment details used by the invoice pdf", async () => {
+  it("uses current system payment details for system-managed invoices", async () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);
     const invoice = await seedInvoice(admin.id, "MGS-2026-9914");
 
+    vi.stubEnv("INVOICE_BANK_NAME", "Westpac");
+    vi.stubEnv("INVOICE_BANK_BSB", "033-123");
+    vi.stubEnv("INVOICE_BANK_ACCOUNT_NAME", "Melbourne Guitar School System");
+    vi.stubEnv("INVOICE_BANK_ACCOUNT_NUMBER", "99990000");
+
+    const getReq = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}`, "GET", token);
+    const getRes = await getInvoice(getReq, { params: Promise.resolve({ id: invoice.id }) });
+    expect(getRes.status).toBe(200);
+
+    const body = (await getRes.json()) as {
+      invoice: {
+        paymentDetailsSource: string;
+        bankName: string;
+        bankBsb: string;
+        bankAccountName: string;
+        bankAccountNumber: string;
+      };
+    };
+    expect(body.invoice).toMatchObject({
+      paymentDetailsSource: "system",
+      bankName: "Westpac",
+      bankBsb: "033-123",
+      bankAccountName: "Melbourne Guitar School System",
+      bankAccountNumber: "99990000"
+    });
+
+    const pdfReq = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}/pdf`, "GET", token);
+    const pdfRes = await getInvoicePdf(pdfReq, { params: Promise.resolve({ id: invoice.id }) });
+    expect(pdfRes.status).toBe(200);
+    expect(pdfRes.headers.get("content-type")).toContain("application/pdf");
+
+    const reloaded = await prisma.invoice.findUniqueOrThrow({
+      where: { id: invoice.id },
+      include: { lineItems: true }
+    });
+    expect(reloaded).toMatchObject({
+      paymentDetailsSource: "system",
+      bankName: "ANZ",
+      bankBsb: "013001",
+      bankAccountName: "Melbourne Guitar School",
+      bankAccountNumber: "12345678"
+    });
+
+    const html = renderInvoiceHtml(reloaded);
+    expect(html).toContain("Bank: Westpac");
+    expect(html).toContain("BSB: 033-123");
+    expect(html).toContain("Account Name: Melbourne Guitar School System");
+    expect(html).toContain("Account Number: 99990000");
+  });
+
+  it("preserves custom payment details when an invoice opts out of system sync", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+    const invoice = await seedInvoice(admin.id, "MGS-2026-9915");
+
     const editReq = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}`, "PATCH", token, {
       action: "edit",
+      paymentDetailsSource: "custom",
       bankName: "Commonwealth Bank",
       bankBsb: "063-162",
       bankAccountName: "Melbourne Guitar School Pty Ltd",
@@ -274,8 +336,18 @@ describe("admin-invoice-mutations", () => {
     const editRes = await PATCH(editReq, { params: Promise.resolve({ id: invoice.id }) });
     expect(editRes.status).toBe(200);
 
-    const body = (await editRes.json()) as {
+    vi.stubEnv("INVOICE_BANK_NAME", "System Bank");
+    vi.stubEnv("INVOICE_BANK_BSB", "000-111");
+    vi.stubEnv("INVOICE_BANK_ACCOUNT_NAME", "System Account");
+    vi.stubEnv("INVOICE_BANK_ACCOUNT_NUMBER", "11112222");
+
+    const getReq = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}`, "GET", token);
+    const getRes = await getInvoice(getReq, { params: Promise.resolve({ id: invoice.id }) });
+    expect(getRes.status).toBe(200);
+
+    const body = (await getRes.json()) as {
       invoice: {
+        paymentDetailsSource: string;
         bankName: string;
         bankBsb: string;
         bankAccountName: string;
@@ -283,24 +355,28 @@ describe("admin-invoice-mutations", () => {
       };
     };
     expect(body.invoice).toMatchObject({
+      paymentDetailsSource: "custom",
       bankName: "Commonwealth Bank",
       bankBsb: "063-162",
       bankAccountName: "Melbourne Guitar School Pty Ltd",
       bankAccountNumber: "87654321"
     });
 
-    const pdfReq = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}/pdf`, "GET", token);
-    const pdfRes = await getInvoicePdf(pdfReq, { params: Promise.resolve({ id: invoice.id }) });
-    expect(pdfRes.status).toBe(200);
-    expect(pdfRes.headers.get("content-type")).toContain("application/pdf");
-
-    const reloaded = await prisma.invoice.findUniqueOrThrow({ where: { id: invoice.id } });
+    const reloaded = await prisma.invoice.findUniqueOrThrow({
+      where: { id: invoice.id },
+      include: { lineItems: true }
+    });
     expect(reloaded).toMatchObject({
+      paymentDetailsSource: "custom",
       bankName: "Commonwealth Bank",
       bankBsb: "063-162",
       bankAccountName: "Melbourne Guitar School Pty Ltd",
       bankAccountNumber: "87654321"
     });
+
+    const html = renderInvoiceHtml(reloaded);
+    expect(html).toContain("Bank: Commonwealth Bank");
+    expect(html).not.toContain("Bank: System Bank");
   });
 
   it("rejects invalid invoice transitions and keeps status unchanged", async () => {

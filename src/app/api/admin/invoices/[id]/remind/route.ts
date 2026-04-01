@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { getInvoiceReminderPolicy, getNotificationSettingsState } from "@/lib/email/notification-settings";
 import { sendCustomerInvoiceReminderEmail } from "@/lib/invoice-events";
 import { getInvoiceOverdueDays } from "@/lib/invoices/aging";
+import { withResolvedInvoicePaymentDetails } from "@/lib/invoices/payment-details";
 import { buildInvoiceReminderPersistence, getInvoiceReminderEligibility } from "@/lib/invoices/reminders";
 import { logError } from "@/lib/observability";
 
@@ -113,12 +114,12 @@ export async function POST(request: NextRequest, { params }: Params) {
       if (deliveryResult.status === "failed") {
         return NextResponse.json(
           {
-            invoice: updated,
             overdueDays,
             stage: manualStage,
             partial: true,
             warning: "Reminder metadata was saved, but the customer email could not be delivered.",
-            deliveryStatus: deliveryResult.status
+            deliveryStatus: deliveryResult.status,
+            invoice: withResolvedInvoicePaymentDetails(updated)
           },
           { status: 202 }
         );
@@ -127,19 +128,19 @@ export async function POST(request: NextRequest, { params }: Params) {
       if (deliveryResult.status === "queued_no_smtp") {
         return NextResponse.json(
           {
-            invoice: updated,
             overdueDays,
             stage: manualStage,
             partial: true,
             warning: "Reminder metadata was saved, but no live email provider is configured for customer delivery.",
-            deliveryStatus: deliveryResult.status
+            deliveryStatus: deliveryResult.status,
+            invoice: withResolvedInvoicePaymentDetails(updated)
           },
           { status: 202 }
         );
       }
 
       return NextResponse.json({
-        invoice: updated,
+        invoice: withResolvedInvoicePaymentDetails(updated),
         overdueDays,
         stage: manualStage,
         message: "Reminder sent.",
@@ -149,7 +150,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       logError("invoice.reminder_notification_failed", error, { invoiceId: invoice.id, actorId: admin.id });
       return NextResponse.json(
         {
-          invoice: updated,
+          invoice: withResolvedInvoicePaymentDetails(updated),
           overdueDays,
           stage: manualStage,
           partial: true,

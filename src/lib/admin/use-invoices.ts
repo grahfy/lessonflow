@@ -29,6 +29,7 @@ export interface InvoiceRow {
     invoiceNumber: string;
     documentType: "invoice" | "credit_note";
     status: InvoiceStatus;
+    paymentDetailsSource: "system" | "custom";
     issuedAt: string;
     dueAt: string;
     overdueDays: number | null;

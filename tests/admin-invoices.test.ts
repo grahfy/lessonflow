@@ -173,6 +173,7 @@ describe("admin-invoices", () => {
         status: string;
         bookingId: string;
         currency: string;
+        paymentDetailsSource: string;
         lineItems: Array<{ description: string }>;
       };
     };
@@ -180,6 +181,7 @@ describe("admin-invoices", () => {
     expect(body.invoice.bookingId).toBe(booking.id);
     expect(body.invoice.lineItems.length).toBe(4);
     expect(body.invoice.currency).toBe("CAD");
+    expect(body.invoice.paymentDetailsSource).toBe("system");
   });
 
   it("resolves existing linked invoice from booking endpoint via invoice booking link", async () => {

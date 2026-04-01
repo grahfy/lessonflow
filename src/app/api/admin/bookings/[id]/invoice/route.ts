@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { findActiveInvoiceLinksForBookingIds } from "@/lib/invoices/booking-links";
 import { getDefaultInvoiceTaxModeForCurrencyValue } from "@/lib/invoices/gst-policy";
 import { type BookingInvoiceCandidateSummary, type BookingInvoiceResolveResponse, createBookingInvoiceSchema } from "@/lib/invoices/schema";
+import { withResolvedInvoicePaymentDetails } from "@/lib/invoices/payment-details";
 import { getDefaultDueAt, createInvoiceRecord } from "@/lib/invoices/persistence";
 import { customerSnapshotFromBooking } from "@/lib/invoices/snapshots";
 import { InvoiceLineItemDraft } from "@/lib/invoices/types";
@@ -286,7 +287,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       })
     );
 
-    return NextResponse.json({ invoice }, { status: 201 });
+    return NextResponse.json({ invoice: withResolvedInvoicePaymentDetails(invoice) }, { status: 201 });
   } catch (error) {
     return jsonUnexpectedError(error, "Unable to create invoice.");
   }

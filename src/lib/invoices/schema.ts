@@ -5,6 +5,7 @@ import { z } from "zod";
  */
 export const invoiceTaxModeSchema = z.enum(["taxable", "gst_free"]);
 export const invoiceDiscountKindSchema = z.enum(["amount", "percent"]);
+export const invoicePaymentDetailsSourceSchema = z.enum(["system", "custom"]);
 export const invoiceCurrencySchema = z
   .string()
   .trim()
@@ -161,6 +162,7 @@ export const updateInvoiceSchema = z
     customerEmail: z.string().trim().email().max(200).optional(),
     customerPhone: z.string().trim().min(6).max(40).optional(),
     customerAddress: z.string().trim().min(3).max(260).optional(),
+    paymentDetailsSource: invoicePaymentDetailsSourceSchema.optional(),
     bankName: z.string().trim().max(120).optional(),
     bankBsb: z.string().trim().max(32).optional(),
     bankAccountName: z.string().trim().max(120).optional(),
@@ -183,6 +185,7 @@ export const updateInvoiceSchema = z
       !data.customerEmail &&
       !data.customerPhone &&
       !data.customerAddress &&
+      data.paymentDetailsSource === undefined &&
       data.bankName === undefined &&
       data.bankBsb === undefined &&
       data.bankAccountName === undefined &&

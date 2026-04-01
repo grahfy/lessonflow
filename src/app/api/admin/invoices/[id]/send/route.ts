@@ -5,6 +5,7 @@ import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
 import { sendCustomerInvoiceEmail } from "@/lib/invoice-events";
+import { withResolvedInvoicePaymentDetails } from "@/lib/invoices/payment-details";
 import { logError } from "@/lib/observability";
 
 type Params = {
@@ -75,7 +76,7 @@ export async function POST(request: NextRequest, { params }: Params) {
             partial: true,
             warning: "Invoice was marked as sent, but the customer email could not be delivered.",
             deliveryStatus: deliveryResult.status,
-            invoice: updated
+            invoice: withResolvedInvoicePaymentDetails(updated)
           },
           { status: 202 }
         );
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest, { params }: Params) {
             partial: true,
             warning: "Invoice was marked as sent, but no live email provider is configured for customer delivery.",
             deliveryStatus: deliveryResult.status,
-            invoice: updated
+            invoice: withResolvedInvoicePaymentDetails(updated)
           },
           { status: 202 }
         );
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         ok: true,
         message: "Invoice sent.",
         deliveryStatus: deliveryResult.status,
-        invoice: updated
+        invoice: withResolvedInvoicePaymentDetails(updated)
       });
     } catch (error) {
       logError("invoice.send_notification_failed", error, { invoiceId: invoice.id, actorId: admin.id });
@@ -108,7 +109,7 @@ export async function POST(request: NextRequest, { params }: Params) {
           partial: true,
           warning: "Invoice was marked as sent, but the customer email could not be delivered.",
           deliveryStatus: "failed",
-          invoice: updated
+          invoice: withResolvedInvoicePaymentDetails(updated)
         },
         { status: 202 }
       );

@@ -25,6 +25,7 @@ import {
 } from "@/lib/branding";
 import { formatCurrency } from "@/lib/invoices/currency";
 import { getInvoiceTaxName } from "@/lib/invoices/gst-policy";
+import { withResolvedInvoicePaymentDetails } from "@/lib/invoices/payment-details";
 import fs from "fs/promises";
 import path from "path";
 
@@ -82,6 +83,7 @@ function formatDate(date: Date): string {
  * @returns promise resolving to a PDF Buffer
  */
 export async function renderInvoicePdf(invoice: InvoiceTemplateRecord, templateConfig?: InvoiceTemplate | null): Promise<Buffer> {
+  const resolvedInvoice = withResolvedInvoicePaymentDetails(invoice);
   const document = await PDFDocument.create();
   const page = document.addPage([595.28, 841.89]); // A4 Size in points
   const { width, height } = page.getSize();
@@ -93,7 +95,7 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord, templateC
   const logoUrl = templateConfig?.logoUrl || INVOICE_LOGO_URL;
   const footerText = templateConfig?.footerText || "";
   const headerInfo = templateConfig?.headerInfo || "";
-  const currency = invoice.currency;
+  const currency = resolvedInvoice.currency;
   const taxLabel = getInvoiceTaxName(currency);
 
   // Background - Fill entire page with white
@@ -160,16 +162,16 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord, templateC
     });
   };
 
-  const isCreditNote = invoice.documentType === "credit_note";
+  const isCreditNote = resolvedInvoice.documentType === "credit_note";
   const title = isCreditNote ? "CREDIT NOTE" : "INVOICE";
   drawRightText(title, 42, false, height - 100, rgb(0.1, 0.1, 0.1));
 
   y = height - 140;
-  const sellerName = invoice.sellerBusinessName || PUBLIC_BRAND_NAME;
+  const sellerName = resolvedInvoice.sellerBusinessName || PUBLIC_BRAND_NAME;
   drawRightText(sellerName, 11, true, y);
   y -= 14;
-  if (invoice.sellerAbn && invoice.sellerAbn.trim() !== "") {
-    drawRightText(`ABN: ${invoice.sellerAbn}`, 10, false, y);
+  if (resolvedInvoice.sellerAbn && resolvedInvoice.sellerAbn.trim() !== "") {
+    drawRightText(`ABN: ${resolvedInvoice.sellerAbn}`, 10, false, y);
     y -= 14;
   }
 
@@ -189,8 +191,8 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord, templateC
     y -= 10;
     drawRightText(`Mobile: ${CONTACT_PHONE}`, 10, false, y);
     y -= 14;
-    if (invoice.sellerEmail) {
-      drawRightText(`${PUBLIC_BRAND_NAME} <${invoice.sellerEmail}>`, 10, false, y);
+    if (resolvedInvoice.sellerEmail) {
+      drawRightText(`${PUBLIC_BRAND_NAME} <${resolvedInvoice.sellerEmail}>`, 10, false, y);
       y -= 14;
     }
     drawRightText("www.melbourneguitarschool.com.au", 10, false, y);
@@ -209,13 +211,13 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord, templateC
 
   const labelY = y + 55;
   page.drawText("BILL TO", { x: leftMargin + 10, y: labelY, size: 9, font, color: rgb(0.6, 0.6, 0.6) });
-  page.drawText(invoice.customerName, { x: leftMargin + 10, y: labelY - 15, size: 11, font: boldFont });
-  page.drawText(invoice.customerEmail, { x: leftMargin + 10, y: labelY - 35, size: 10, font });
-  if (invoice.customerPhone) {
-    page.drawText(invoice.customerPhone, { x: leftMargin + 10, y: labelY - 50, size: 10, font });
+  page.drawText(resolvedInvoice.customerName, { x: leftMargin + 10, y: labelY - 15, size: 11, font: boldFont });
+  page.drawText(resolvedInvoice.customerEmail, { x: leftMargin + 10, y: labelY - 35, size: 10, font });
+  if (resolvedInvoice.customerPhone) {
+    page.drawText(resolvedInvoice.customerPhone, { x: leftMargin + 10, y: labelY - 50, size: 10, font });
   }
-  if (invoice.customerAddress) {
-    page.drawText(invoice.customerAddress, { x: leftMargin + 10, y: labelY - 65, size: 10, font });
+  if (resolvedInvoice.customerAddress) {
+    page.drawText(resolvedInvoice.customerAddress, { x: leftMargin + 10, y: labelY - 65, size: 10, font });
   }
 
   const metaX = rightMargin - 220;
@@ -227,10 +229,10 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord, templateC
     page.drawText(value, { x: metaX + 90, y: currentY, size: 10, font: f });
   };
 
-  drawMeta(isCreditNote ? "Credit Note #:" : "Invoice Number:", invoice.invoiceNumber, labelY);
-  drawMeta(isCreditNote ? "Credit Note Date:" : "Invoice Date:", formatDate(invoice.issuedAt), labelY - 15);
-  drawMeta(isCreditNote ? "Expiry Date:" : "Payment Due:", formatDate(invoice.dueAt), labelY - 30);
-  drawMeta(isCreditNote ? `Credit Amount (${currency}):` : `Amount Due (${currency}):`, formatCurrency(invoice.totalCents, currency), labelY - 45, true);
+  drawMeta(isCreditNote ? "Credit Note #:" : "Invoice Number:", resolvedInvoice.invoiceNumber, labelY);
+  drawMeta(isCreditNote ? "Credit Note Date:" : "Invoice Date:", formatDate(resolvedInvoice.issuedAt), labelY - 15);
+  drawMeta(isCreditNote ? "Expiry Date:" : "Payment Due:", formatDate(resolvedInvoice.dueAt), labelY - 30);
+  drawMeta(isCreditNote ? `Credit Amount (${currency}):` : `Amount Due (${currency}):`, formatCurrency(resolvedInvoice.totalCents, currency), labelY - 45, true);
 
   // --- TABLE SECTION ---
   y -= 40;
@@ -252,7 +254,7 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord, templateC
   y -= tableHeaderHeight + 15;
 
   // Render Line Items
-  for (const lineItem of invoice.lineItems.sort((a, b) => a.sortOrder - b.sortOrder)) {
+  for (const lineItem of resolvedInvoice.lineItems.sort((a, b) => a.sortOrder - b.sortOrder)) {
     page.drawText(lineItem.description, { x: 50, y, size: 10, font });
     page.drawText(lineItem.quantity.toString(), { x: 315, y, size: 10, font });
     page.drawText(formatCurrency(lineItem.unitPriceCents, currency), { x: 420, y, size: 10, font });
@@ -285,33 +287,33 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord, templateC
     page.drawText(value, { x: rightMargin - 10 - valWidth, y: currentY, size: 10, font: f });
   };
 
-  if (invoice.discountCents !== 0) {
-    drawTotal("Invoice Discount:", formatCurrency(-invoice.discountCents, currency), y);
+  if (resolvedInvoice.discountCents !== 0) {
+    drawTotal("Invoice Discount:", formatCurrency(-resolvedInvoice.discountCents, currency), y);
     y -= 15;
   }
-  drawTotal(`${taxLabel}:`, formatCurrency(invoice.gstCents, currency), y);
+  drawTotal(`${taxLabel}:`, formatCurrency(resolvedInvoice.gstCents, currency), y);
   y -= 15;
-  drawTotal("Total:", formatCurrency(invoice.totalCents, currency), y);
+  drawTotal("Total:", formatCurrency(resolvedInvoice.totalCents, currency), y);
   y -= 30;
-  drawTotal(isCreditNote ? `Credit Amount (${currency}):` : `Amount Due (${currency}):`, formatCurrency(invoice.totalCents, currency), y, true);
+  drawTotal(isCreditNote ? `Credit Amount (${currency}):` : `Amount Due (${currency}):`, formatCurrency(resolvedInvoice.totalCents, currency), y, true);
 
   // --- PAYMENT DETAILS ---
   y -= 60;
   page.drawText("Payment Details", { x: 40, y, size: 11, font: boldFont });
   y -= 18;
-  page.drawText(`Bank: ${invoice.bankName}`, { x: 40, y, size: 10, font });
+  page.drawText(`Bank: ${resolvedInvoice.bankName}`, { x: 40, y, size: 10, font });
   y -= 14;
-  page.drawText(`BSB: ${invoice.bankBsb}`, { x: 40, y, size: 10, font });
+  page.drawText(`BSB: ${resolvedInvoice.bankBsb}`, { x: 40, y, size: 10, font });
   y -= 14;
-  page.drawText(`Account Name: ${invoice.bankAccountName}`, { x: 40, y, size: 10, font });
+  page.drawText(`Account Name: ${resolvedInvoice.bankAccountName}`, { x: 40, y, size: 10, font });
   y -= 14;
-  page.drawText(`Account Number: ${invoice.bankAccountNumber}`, { x: 40, y, size: 10, font });
+  page.drawText(`Account Number: ${resolvedInvoice.bankAccountNumber}`, { x: 40, y, size: 10, font });
 
-  if (invoice.notes) {
+  if (resolvedInvoice.notes) {
     y -= 30;
     page.drawText("Notes", { x: 40, y, size: 11, font: boldFont });
     y -= 18;
-    const lines = invoice.notes.split("\n");
+    const lines = resolvedInvoice.notes.split("\n");
     for (const line of lines) {
       page.drawText(line, { x: 40, y, size: 10, font });
       y -= 14;

@@ -143,6 +143,7 @@ export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
       bankBsb: sellerSnapshot.bankBsb,
       bankAccountName: sellerSnapshot.bankAccountName,
       bankAccountNumber: sellerSnapshot.bankAccountNumber,
+      paymentDetailsSource: "system",
       
       // CALCULATED TOTALS
       subtotalCents: calculation.totals.subtotalCents,

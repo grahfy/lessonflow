@@ -84,6 +84,11 @@ enum InvoiceDiscountKind {
   percent
 }
 
+enum InvoicePaymentDetailsSource {
+  system
+  custom
+}
+
 enum InvoiceAuditAction {
   created
   edited
@@ -702,6 +707,7 @@ model Invoice {
   bankBsb            String
   bankAccountName    String
   bankAccountNumber  String
+  paymentDetailsSource InvoicePaymentDetailsSource @default(system)
   subtotalCents      Int
   gstCents           Int
   totalCents         Int

@@ -189,6 +189,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
   const [editingProductPresetId, setEditingProductPresetId] = useState("");
   const [editingCustomerFirstName, setEditingCustomerFirstName] = useState("");
   const [editingCustomerLastName, setEditingCustomerLastName] = useState("");
+  const [editingPaymentDetailsSource, setEditingPaymentDetailsSource] = useState<InvoiceRow["paymentDetailsSource"]>("system");
   const [editingBankName, setEditingBankName] = useState("");
   const [editingBankBsb, setEditingBankBsb] = useState("");
   const [editingBankAccountName, setEditingBankAccountName] = useState("");
@@ -298,6 +299,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
     setEditingCurrency(getInvoiceCurrency(invoice.currency));
     setEditingCustomerFirstName(invoice.customerFirstName || invoice.customerName.split(' ')[0]);
     setEditingCustomerLastName(invoice.customerLastName || invoice.customerName.split(' ').slice(1).join(' '));
+    setEditingPaymentDetailsSource(invoice.paymentDetailsSource);
     setEditingBankName(invoice.bankName || "");
     setEditingBankBsb(invoice.bankBsb || "");
     setEditingBankAccountName(invoice.bankAccountName || "");
@@ -829,10 +831,15 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
       customerFirstName: editingCustomerFirstName,
       customerLastName: editingCustomerLastName,
       customerName: `${editingCustomerFirstName} ${editingCustomerLastName}`.trim(),
-      bankName: editingBankName,
-      bankBsb: editingBankBsb,
-      bankAccountName: editingBankAccountName,
-      bankAccountNumber: editingBankAccountNumber,
+      paymentDetailsSource: editingPaymentDetailsSource,
+      ...(editingPaymentDetailsSource === "custom"
+        ? {
+            bankName: editingBankName,
+            bankBsb: editingBankBsb,
+            bankAccountName: editingBankAccountName,
+            bankAccountNumber: editingBankAccountNumber
+          }
+        : {}),
       currency: resolvedEditingCurrency,
       discountKind: editingDiscountKind,
       discountValue: parseDiscountValueForCurrency(editingDiscountKind, editingDiscountValueInput, resolvedEditingCurrency),
@@ -1011,6 +1018,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
   const canEditSelectedInvoice = selectedInvoice
     ? selectedInvoice.status === "draft" || selectedInvoice.status === "sent"
     : false;
+  const isUsingSystemPaymentDetails = editingPaymentDetailsSource === "system";
   const selectedInvoiceDisplayStatus = selectedInvoice ? getDisplayStatus(selectedInvoice, overdueOnly) : null;
 
   /**
@@ -1421,31 +1429,48 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                 <h3 className="manual-section-title">Payment Details</h3>
                 <AdminCard ghost className="invoice-dialog-section">
                   <AdminForm className="dialog-form-grid">
+                    <AdminField label="Payment Source" tooltip="Choose whether this invoice follows the current system payment settings or stores custom payment instructions." fullWidth>
+                      <select
+                        value={editingPaymentDetailsSource}
+                        disabled={!canEditSelectedInvoice}
+                        onChange={(e) => setEditingPaymentDetailsSource(e.target.value as InvoiceRow["paymentDetailsSource"])}
+                      >
+                        <option value="system">Use system payment details</option>
+                        <option value="custom">Custom payment details</option>
+                      </select>
+                    </AdminField>
+                    <div className="field full">
+                      <p className="helper-text">
+                        {isUsingSystemPaymentDetails
+                          ? "These payment details come from Admin Settings and will update automatically when the system values change."
+                          : "These payment details are saved on this invoice only and will override the system defaults."}
+                      </p>
+                    </div>
                     <AdminField label="Bank Name" tooltip="Bank shown in the PDF payment instructions.">
                       <input
                         value={editingBankName}
-                        disabled={!canEditSelectedInvoice}
+                        disabled={!canEditSelectedInvoice || isUsingSystemPaymentDetails}
                         onChange={(e) => setEditingBankName(e.target.value)}
                       />
                     </AdminField>
                     <AdminField label="BSB" tooltip="BSB shown in the PDF payment instructions.">
                       <input
                         value={editingBankBsb}
-                        disabled={!canEditSelectedInvoice}
+                        disabled={!canEditSelectedInvoice || isUsingSystemPaymentDetails}
                         onChange={(e) => setEditingBankBsb(e.target.value)}
                       />
                     </AdminField>
                     <AdminField label="Account Name" tooltip="Account name shown in the PDF payment instructions.">
                       <input
                         value={editingBankAccountName}
-                        disabled={!canEditSelectedInvoice}
+                        disabled={!canEditSelectedInvoice || isUsingSystemPaymentDetails}
                         onChange={(e) => setEditingBankAccountName(e.target.value)}
                       />
                     </AdminField>
                     <AdminField label="Account Number" tooltip="Account number shown in the PDF payment instructions.">
                       <input
                         value={editingBankAccountNumber}
-                        disabled={!canEditSelectedInvoice}
+                        disabled={!canEditSelectedInvoice || isUsingSystemPaymentDetails}
                         onChange={(e) => setEditingBankAccountNumber(e.target.value)}
                       />
                     </AdminField>

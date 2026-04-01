@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { applyInvoiceTaxMode, calculateInvoiceTotals } from "@/lib/invoices/calculate";
 import { findActiveInvoiceLinksForBookingIds } from "@/lib/invoices/booking-links";
 import { getDefaultInvoiceTaxModeForCurrencyValue } from "@/lib/invoices/gst-policy";
+import { resolveInvoicePaymentDetails, withResolvedInvoicePaymentDetails } from "@/lib/invoices/payment-details";
 import { updateInvoiceSchema } from "@/lib/invoices/schema";
 import { allowedStatusesForAction, canApplyInvoiceAction, type InvoiceLifecycleAction, type InvoiceLifecycleStatus } from "@/lib/invoices/transitions";
 import { getInvoiceCurrency } from "@/lib/invoices/tax-profile";
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
   }
 
-  return NextResponse.json({ invoice });
+  return NextResponse.json({ invoice: withResolvedInvoicePaymentDetails(invoice) });
 }
 
 /**
@@ -146,7 +147,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         }
       }
     });
-    return NextResponse.json({ invoice: restored });
+    return NextResponse.json({ invoice: withResolvedInvoicePaymentDetails(restored) });
   }
 
   if (parsed.data.action === "edit" && (existing.status === "paid" || existing.status === "void")) {
@@ -199,7 +200,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         }
       }
     });
-    return NextResponse.json({ invoice: paid });
+    return NextResponse.json({ invoice: withResolvedInvoicePaymentDetails(paid) });
   }
 
   if (parsed.data.action === "mark_unpaid") {
@@ -225,7 +226,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         }
       }
     });
-    return NextResponse.json({ invoice: unpaid });
+    return NextResponse.json({ invoice: withResolvedInvoicePaymentDetails(unpaid) });
   }
 
   if (parsed.data.action === "void") {
@@ -250,7 +251,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         }
       }
     });
-    return NextResponse.json({ invoice: voided });
+    return NextResponse.json({ invoice: withResolvedInvoicePaymentDetails(voided) });
   }
 
   const lineItemsProvided = Boolean(parsed.data.lineItems?.length);
@@ -271,6 +272,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   const currency = getInvoiceCurrency(parsed.data.currency ?? existing.currency);
   const resolvedTaxMode = parsed.data.taxMode ?? existing.taxMode ?? getDefaultInvoiceTaxModeForCurrencyValue(currency);
+  const resolvedPaymentDetailsSource = parsed.data.paymentDetailsSource ?? existing.paymentDetailsSource;
+  const effectiveExistingPaymentDetails = resolveInvoicePaymentDetails(existing);
   const normalizedLines = parsed.data.taxMode
     ? applyInvoiceTaxMode(baseLineDrafts, resolvedTaxMode)
     : baseLineDrafts;
@@ -315,10 +318,19 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         customerEmail: parsed.data.customerEmail ?? existing.customerEmail,
         customerPhone: parsed.data.customerPhone ?? existing.customerPhone,
         customerAddress: parsed.data.customerAddress ?? existing.customerAddress,
-        bankName: parsed.data.bankName ?? existing.bankName,
-        bankBsb: parsed.data.bankBsb ?? existing.bankBsb,
-        bankAccountName: parsed.data.bankAccountName ?? existing.bankAccountName,
-        bankAccountNumber: parsed.data.bankAccountNumber ?? existing.bankAccountNumber,
+        paymentDetailsSource: resolvedPaymentDetailsSource,
+        bankName: resolvedPaymentDetailsSource === "custom"
+          ? parsed.data.bankName ?? effectiveExistingPaymentDetails.bankName
+          : existing.bankName,
+        bankBsb: resolvedPaymentDetailsSource === "custom"
+          ? parsed.data.bankBsb ?? effectiveExistingPaymentDetails.bankBsb
+          : existing.bankBsb,
+        bankAccountName: resolvedPaymentDetailsSource === "custom"
+          ? parsed.data.bankAccountName ?? effectiveExistingPaymentDetails.bankAccountName
+          : existing.bankAccountName,
+        bankAccountNumber: resolvedPaymentDetailsSource === "custom"
+          ? parsed.data.bankAccountNumber ?? effectiveExistingPaymentDetails.bankAccountNumber
+          : existing.bankAccountNumber,
         currency,
         taxMode: resolvedTaxMode,
         discountKind: parsed.data.discountKind === undefined ? existing.discountKind : parsed.data.discountKind,
@@ -348,7 +360,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     });
   });
 
-  return NextResponse.json({ invoice: updated });
+  return NextResponse.json({ invoice: withResolvedInvoicePaymentDetails(updated) });
 }
 
 /**

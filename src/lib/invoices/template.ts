@@ -7,6 +7,7 @@ import {
 } from "@/lib/branding";
 import { formatCurrency } from "@/lib/invoices/currency";
 import { getInvoiceTaxName } from "@/lib/invoices/gst-policy";
+import { withResolvedInvoicePaymentDetails } from "@/lib/invoices/payment-details";
 import { APP_TIMEZONE } from "@/lib/time";
 
 /**
@@ -63,16 +64,17 @@ export type InvoiceTemplateRecord = Invoice & {
  * Renders invoice HTML for customer email preview and optional browser print view.
  */
 export function renderInvoiceHtml(invoice: InvoiceTemplateRecord, templateConfig?: InvoiceTemplate | null): string {
-  const heading = invoice.documentType === "credit_note" ? "Credit Note" : "Tax Invoice";
-  const statusLabel = invoice.documentType === "credit_note" ? "credit note" : "invoice";
-  const currency = invoice.currency;
+  const resolvedInvoice = withResolvedInvoicePaymentDetails(invoice);
+  const heading = resolvedInvoice.documentType === "credit_note" ? "Credit Note" : "Tax Invoice";
+  const statusLabel = resolvedInvoice.documentType === "credit_note" ? "credit note" : "invoice";
+  const currency = resolvedInvoice.currency;
   const taxLabel = getInvoiceTaxName(currency);
   const accentColor = templateConfig?.accentColor || "#2247d8";
   const logoUrl = templateConfig?.logoUrl || INVOICE_LOGO_URL;
   const footerText = templateConfig?.footerText || "";
   const headerInfo = templateConfig?.headerInfo || "";
 
-  const rows = invoice.lineItems
+  const rows = resolvedInvoice.lineItems
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map(
       (lineItem) => `
@@ -91,8 +93,8 @@ export function renderInvoiceHtml(invoice: InvoiceTemplateRecord, templateConfig
     .join("");
 
   const paidMarker =
-    invoice.status === "paid"
-      ? `<p style="color:#065f46;font-weight:700;">PAID ${invoice.paidAt ? `on ${formatInvoiceDate(invoice.paidAt)}` : ""}</p>`
+    resolvedInvoice.status === "paid"
+      ? `<p style="color:#065f46;font-weight:700;">PAID ${resolvedInvoice.paidAt ? `on ${formatInvoiceDate(resolvedInvoice.paidAt)}` : ""}</p>`
       : "";
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
@@ -104,30 +106,30 @@ export function renderInvoiceHtml(invoice: InvoiceTemplateRecord, templateConfig
         <div>
           <img src="${escapeHtml(fullLogoUrl)}" alt="${escapeHtml(PUBLIC_BRAND_NAME)}" style="width:200px;height:auto;object-fit:contain;" />
           <h1 style="margin:10px 0 6px; color:${accentColor};">${heading}</h1>
-          <p style="margin:0;"><strong>${escapeHtml(invoice.sellerBusinessName)}</strong></p>
-          <p style="margin:0;">ABN: ${escapeHtml(invoice.sellerAbn || "Not provided")}</p>
+          <p style="margin:0;"><strong>${escapeHtml(resolvedInvoice.sellerBusinessName)}</strong></p>
+          <p style="margin:0;">ABN: ${escapeHtml(resolvedInvoice.sellerAbn || "Not provided")}</p>
           ${headerInfo ? `<div style="margin-top:4px; font-size:0.9rem; color:#475569;">${headerInfo.split('\n').map(line => `<p style="margin:0;">${escapeHtml(line)}</p>`).join('')}</div>` : `
             <p style="margin:0;">${escapeHtml(CONTACT_ADDRESS)}</p>
             <p style="margin:0;">Australia</p>
             <p style="margin:0;">Mobile: ${escapeHtml(CONTACT_PHONE)}</p>
           `}
-          ${invoice.sellerEmail ? `<p style="margin:0;">Email: ${escapeHtml(invoice.sellerEmail)}</p>` : ""}
+          ${resolvedInvoice.sellerEmail ? `<p style="margin:0;">Email: ${escapeHtml(resolvedInvoice.sellerEmail)}</p>` : ""}
         </div>
         <div style="text-align:right;">
-          <p style="margin:0;"><strong>${escapeHtml(statusLabel)} #${escapeHtml(invoice.invoiceNumber)}</strong></p>
-          <p style="margin:0;">Issued: ${formatInvoiceDate(invoice.issuedAt)}</p>
-          <p style="margin:0;">Due: ${formatInvoiceDate(invoice.dueAt)}</p>
-          <p style="margin:0;">Status: ${escapeHtml(invoice.status)}</p>
+          <p style="margin:0;"><strong>${escapeHtml(statusLabel)} #${escapeHtml(resolvedInvoice.invoiceNumber)}</strong></p>
+          <p style="margin:0;">Issued: ${formatInvoiceDate(resolvedInvoice.issuedAt)}</p>
+          <p style="margin:0;">Due: ${formatInvoiceDate(resolvedInvoice.dueAt)}</p>
+          <p style="margin:0;">Status: ${escapeHtml(resolvedInvoice.status)}</p>
           ${paidMarker}
         </div>
       </header>
 
       <section style="margin-top:18px; border-top:1px solid #e2e8f0; padding-top:12px;">
         <h2 style="margin:0 0 8px; font-size:1rem; color:${accentColor};">Bill To</h2>
-        <p style="margin:0;"><strong>${escapeHtml(invoice.customerName)}</strong></p>
-        <p style="margin:0;">${escapeHtml(invoice.customerEmail)}</p>
-        <p style="margin:0;">${escapeHtml(invoice.customerPhone)}</p>
-        <p style="margin:0;">${escapeHtml(invoice.customerAddress)}</p>
+        <p style="margin:0;"><strong>${escapeHtml(resolvedInvoice.customerName)}</strong></p>
+        <p style="margin:0;">${escapeHtml(resolvedInvoice.customerEmail)}</p>
+        <p style="margin:0;">${escapeHtml(resolvedInvoice.customerPhone)}</p>
+        <p style="margin:0;">${escapeHtml(resolvedInvoice.customerAddress)}</p>
       </section>
 
       <table style="width:100%; border-collapse:collapse; margin-top:16px;">
@@ -144,21 +146,21 @@ export function renderInvoiceHtml(invoice: InvoiceTemplateRecord, templateConfig
       </table>
 
       <section style="margin-top:16px; text-align:right;">
-        <p style="margin:2px 0;">Subtotal: ${formatCurrency(invoice.subtotalCents, currency)}</p>
-        ${invoice.discountCents !== 0 ? `<p style="margin:2px 0;">Invoice Discount: ${formatCurrency(-invoice.discountCents, currency)}</p>` : ""}
-        <p style="margin:2px 0;">${escapeHtml(taxLabel)}: ${formatCurrency(invoice.gstCents, currency)}</p>
-        <p style="margin:2px 0; font-weight:700; color:${accentColor}; font-size:1.1rem;">Total: ${formatCurrency(invoice.totalCents, currency)}</p>
+        <p style="margin:2px 0;">Subtotal: ${formatCurrency(resolvedInvoice.subtotalCents, currency)}</p>
+        ${resolvedInvoice.discountCents !== 0 ? `<p style="margin:2px 0;">Invoice Discount: ${formatCurrency(-resolvedInvoice.discountCents, currency)}</p>` : ""}
+        <p style="margin:2px 0;">${escapeHtml(taxLabel)}: ${formatCurrency(resolvedInvoice.gstCents, currency)}</p>
+        <p style="margin:2px 0; font-weight:700; color:${accentColor}; font-size:1.1rem;">Total: ${formatCurrency(resolvedInvoice.totalCents, currency)}</p>
       </section>
 
       <section style="margin-top:18px; border-top:1px solid #e2e8f0; padding-top:12px;">
         <h2 style="margin:0 0 8px; font-size:1rem; color:${accentColor};">Payment Details</h2>
-        <p style="margin:0;">Bank: ${escapeHtml(invoice.bankName)}</p>
-        <p style="margin:0;">BSB: ${escapeHtml(invoice.bankBsb)}</p>
-        <p style="margin:0;">Account Name: ${escapeHtml(invoice.bankAccountName)}</p>
-        <p style="margin:0;">Account Number: ${escapeHtml(invoice.bankAccountNumber)}</p>
+        <p style="margin:0;">Bank: ${escapeHtml(resolvedInvoice.bankName)}</p>
+        <p style="margin:0;">BSB: ${escapeHtml(resolvedInvoice.bankBsb)}</p>
+        <p style="margin:0;">Account Name: ${escapeHtml(resolvedInvoice.bankAccountName)}</p>
+        <p style="margin:0;">Account Number: ${escapeHtml(resolvedInvoice.bankAccountNumber)}</p>
       </section>
 
-      ${invoice.notes ? `<section style="margin-top:14px;"><h2 style="margin:0 0 8px; font-size:1rem; color:${accentColor};">Notes</h2><p style="margin:0;">${escapeHtml(invoice.notes)}</p></section>` : ""}
+      ${resolvedInvoice.notes ? `<section style="margin-top:14px;"><h2 style="margin:0 0 8px; font-size:1rem; color:${accentColor};">Notes</h2><p style="margin:0;">${escapeHtml(resolvedInvoice.notes)}</p></section>` : ""}
       
       ${footerText ? `<footer style="margin-top:24px; padding-top:12px; border-top:1px solid #e2e8f0; font-size:0.8rem; color:#64748b; text-align:center;">${escapeHtml(footerText)}</footer>` : ""}
     </section>
