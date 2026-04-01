@@ -82,7 +82,7 @@ export function ChordBuilderNaming({
       </div>
 
       <div className="chord-builder-field">
-        <label className="chord-builder-label">Display</label>
+        <label className="chord-builder-label">Change Chord Name</label>
         <input
           type="text"
           value={displayName ?? ""}

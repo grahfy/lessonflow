@@ -153,8 +153,26 @@ export function ChordBuilderFretboard({
       onMouseUp={handleMouseUp}
       style={{ cursor: "pointer", userSelect: "none", maxWidth: 260 }}
     >
+      <defs>
+        <linearGradient id="chord-builder-fretboard-bg" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#ffffff" />
+          <stop offset="100%" stopColor="#e5e7eb" />
+        </linearGradient>
+      </defs>
+
+      <rect
+        x={margin.left - 18}
+        y={margin.top - 18}
+        width={gridW + 36}
+        height={gridH + 50}
+        rx={18}
+        fill="url(#chord-builder-fretboard-bg)"
+        stroke="#cbd5e1"
+        strokeWidth={1}
+      />
+
       {/* Title */}
-      <text x={w / 2} y={24} textAnchor="middle" fontSize={18} fontWeight="bold" fill="#1a1a2e">
+      <text x={w / 2} y={24} textAnchor="middle" fontSize={18} fontWeight="bold" fill="#fde047">
         {title}
       </text>
 
