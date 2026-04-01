@@ -1,5 +1,6 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditorState, type Editor } from "@tiptap/react";
 import { Link2, Link2Off } from "lucide-react";
@@ -13,6 +14,11 @@ interface MaterialOption {
 interface TipTapMaterialPickerProps {
   editor: Editor | null;
   materials: MaterialOption[];
+}
+
+interface DropdownPosition {
+  top: number;
+  left: number;
 }
 
 /**
@@ -29,6 +35,7 @@ export function TipTapMaterialPicker({
   materials,
 }: TipTapMaterialPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState<DropdownPosition | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const editorState = useEditorState({
@@ -63,6 +70,29 @@ export function TipTapMaterialPicker({
     [editor]
   );
 
+  const syncDropdownPosition = useCallback(() => {
+    const button = buttonRef.current;
+    if (!button) {
+      setDropdownPosition(null);
+      return;
+    }
+
+    const rect = button.getBoundingClientRect();
+    const viewportPadding = 8;
+    const estimatedWidth = 300;
+    const estimatedHeight = 280;
+    const placeBelow = rect.bottom + 4 + estimatedHeight <= window.innerHeight || rect.top < estimatedHeight;
+    const nextLeft = Math.min(
+      Math.max(viewportPadding, rect.left),
+      Math.max(viewportPadding, window.innerWidth - estimatedWidth - viewportPadding)
+    );
+    const nextTop = placeBelow
+      ? rect.bottom + 4
+      : Math.max(viewportPadding, rect.top - estimatedHeight - 4);
+
+    setDropdownPosition({ top: nextTop, left: nextLeft });
+  }, []);
+
   // Close on click outside.
   useEffect(() => {
     if (!isOpen) return;
@@ -95,15 +125,28 @@ export function TipTapMaterialPicker({
       return;
     }
 
+    syncDropdownPosition();
+
+    const handleViewportChange = () => {
+      syncDropdownPosition();
+    };
+
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+
     if (!editor || (!hasSelection && !isInLink)) {
       setIsOpen(false);
     }
-  }, [editor, hasSelection, isInLink, isOpen]);
+    return () => {
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
+    };
+  }, [editor, hasSelection, isInLink, isOpen, syncDropdownPosition]);
 
   if (!editor || materials.length === 0) return null;
 
   return (
-    <div className="tiptap-material-picker" style={{ position: "relative" }}>
+    <div className="tiptap-material-picker">
       <button
         ref={buttonRef}
         type="button"
@@ -119,27 +162,34 @@ export function TipTapMaterialPicker({
         {isInLink ? <Link2Off size={16} /> : <Link2 size={16} />}
       </button>
 
-      {isOpen && (
-        <div ref={dropdownRef} className="tiptap-material-picker-dropdown">
-          <p className="tiptap-material-picker-label">Link selection to:</p>
-          {materials.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              className="tiptap-material-picker-item"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                handleSelectMaterial(m.id);
-              }}
+      {isOpen && dropdownPosition && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={dropdownRef}
+              className="tiptap-material-picker-dropdown"
+              style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
             >
-              <span className="tiptap-material-picker-item-title">{m.title}</span>
-              {m.description && (
-                <span className="tiptap-material-picker-item-desc">{m.description}</span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
+              <p className="tiptap-material-picker-label">Link selection to:</p>
+              {materials.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  className="tiptap-material-picker-item"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleSelectMaterial(m.id);
+                  }}
+                >
+                  <span className="tiptap-material-picker-item-title">{m.title}</span>
+                  {m.description && (
+                    <span className="tiptap-material-picker-item-desc">{m.description}</span>
+                  )}
+                </button>
+              ))}
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }

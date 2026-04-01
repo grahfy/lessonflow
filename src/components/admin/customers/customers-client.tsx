@@ -97,7 +97,11 @@ export function AdminCustomersClient() {
   // Materials State (Filtering uploads to specific bookings)
   const [materialsBookingId, setMaterialsBookingId] = useState("");
 
-  const dialogPresence = usePresenceExit();
+  const {
+    isMounted: isDialogMounted,
+    show: showDialog,
+    hide: hideDialog
+  } = usePresenceExit();
   const dialogRootRef = useRef<HTMLDivElement | null>(null);
   const materialsUploadFormRef = useRef<HTMLFormElement | null>(null);
   const alertCustomerIds = useMemo(
@@ -206,24 +210,24 @@ export function AdminCustomersClient() {
       }
     }
 
-    dialogPresence.show();
+    showDialog();
     if (dialogRootRef.current) {
       animateIn(dialogRootRef.current);
     }
-  }, [currentAdmin, dialogPresence, loadEmailHistory, loadMaterials, singleTeacherOptionId]);
+  }, [currentAdmin, loadEmailHistory, loadMaterials, showDialog, singleTeacherOptionId]);
 
   const closeCustomerDialog = useCallback(async () => {
     if (dialogRootRef.current) {
       await animateOut(dialogRootRef.current);
     }
-    dialogPresence.hide();
+    hideDialog();
     setSelectedCustomer(null);
     setIsEditing(false);
     setCustomerForm(emptyCustomerForm());
     setMaterialsBookingId("");
     // Clear URL segments to maintain clean routing
     router.replace(customersBasePath, { scroll: false });
-  }, [customersBasePath, dialogPresence, router]);
+  }, [customersBasePath, hideDialog, router]);
 
   // -- EFFECTS --
 
@@ -445,9 +449,9 @@ export function AdminCustomersClient() {
   return (
     <AdminShell 
       title="Customers" 
-      error={error && !dialogPresence.isMounted ? error : undefined}
-      notice={notice && !dialogPresence.isMounted ? notice : undefined}
-      loading={isCustomersWorkspaceLoading && !dialogPresence.isMounted}
+      error={error && !isDialogMounted ? error : undefined}
+      notice={notice && !isDialogMounted ? notice : undefined}
+      loading={isCustomersWorkspaceLoading && !isDialogMounted}
       className="admin-shell-customers"
     >
       <div className="admin-layout-content">
@@ -622,7 +626,7 @@ export function AdminCustomersClient() {
         RATIONALE: We use a deferred mounting strategy to ensure animations are 
         smooth and data cleanup occurs on exit.
       */}
-      {dialogPresence.isMounted && (
+      {isDialogMounted && (
         <CustomerDialogWrapper
           dialogRootRef={dialogRootRef}
           selectedCustomer={selectedCustomer}

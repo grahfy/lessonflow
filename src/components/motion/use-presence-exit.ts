@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { EXIT_WATCHDOG_MS, prefersReducedMotion } from "@/components/motion/tween-orchestrator";
 
@@ -66,10 +66,10 @@ export function usePresenceExit(options: PresenceOptions = {}) {
     };
   }, [clearTimer]);
 
-  return {
+  return useMemo(() => ({
     isMounted,
     isVisible,
     show,
     hide
-  };
+  }), [hide, isMounted, isVisible, show]);
 }

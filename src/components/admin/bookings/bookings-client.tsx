@@ -205,8 +205,16 @@ export function AdminBookingsClient() {
   const [emailComposerSubject, setEmailComposerSubject] = useState("");
   const [emailComposerMessage, setEmailComposerMessage] = useState("");
 
-  const dialogPresence = usePresenceExit();
-  const manualDialogPresence = usePresenceExit();
+  const {
+    isMounted: isDialogMounted,
+    show: showDialog,
+    hide: hideDialog
+  } = usePresenceExit();
+  const {
+    isMounted: isManualDialogMounted,
+    show: showManualDialog,
+    hide: hideManualDialog
+  } = usePresenceExit();
 
   const dialogRootRef = useRef<HTMLDivElement | null>(null);
   const manualDialogRootRef = useRef<HTMLDivElement | null>(null);
@@ -367,10 +375,10 @@ export function AdminBookingsClient() {
   }, [loadLessonPricing]);
 
   useEffect(() => {
-    if (manualDialogPresence.isMounted && !manualDurationChoice && configuredDurationChoices[0]) {
+    if (isManualDialogMounted && !manualDurationChoice && configuredDurationChoices[0]) {
       setManualDurationChoice(configuredDurationChoices[0].value);
     }
-  }, [configuredDurationChoices, manualDialogPresence.isMounted, manualDurationChoice]);
+  }, [configuredDurationChoices, isManualDialogMounted, manualDurationChoice]);
 
   /** Navigation utility for changing calendar views. */
   const navigate = useCallback((newView: CalendarView, newDate: string) => {
@@ -470,9 +478,9 @@ export function AdminBookingsClient() {
       void loadBookingLessonPlan(event.id);
     }
 
-    dialogPresence.show();
+    showDialog();
     if (dialogRootRef.current) animateIn(dialogRootRef.current);
-  }, [currentAdmin, dialogPresence, loadBookingLessonPlan, loadCustomers, loadEmailHistory, loadLessonPlanTemplates, loadMaterials, resetBookingLessonPlan, singleTeacherOptionId]);
+  }, [currentAdmin, loadBookingLessonPlan, loadCustomers, loadEmailHistory, loadLessonPlanTemplates, loadMaterials, resetBookingLessonPlan, showDialog, singleTeacherOptionId]);
 
   useEffect(() => {
     if (!deepLinkedBookingId || !shouldOpenDeepLinkedBooking) {
@@ -501,7 +509,7 @@ export function AdminBookingsClient() {
 
   const closeDialog = useCallback(() => {
     const root = dialogRootRef.current;
-    dialogPresence.hide(() => {
+    hideDialog(() => {
       setSelectedKey(null);
       setDialogForm(null);
       setInvoiceCandidates([]);
@@ -510,7 +518,7 @@ export function AdminBookingsClient() {
       resetBookingLessonPlan();
     });
     void animateOut(root).catch(() => undefined);
-  }, [dialogPresence, resetBookingLessonPlan]);
+  }, [hideDialog, resetBookingLessonPlan]);
 
   useEffect(() => {
     if (!lessonPlan) {
@@ -575,15 +583,15 @@ export function AdminBookingsClient() {
     setNotice("");
     void loadCustomers();
     void loadLessonPricing();
-    manualDialogPresence.show();
+    showManualDialog();
     if (manualDialogRootRef.current) animateIn(manualDialogRootRef.current);
-  }, [configuredDurationChoices, loadCustomers, loadLessonPricing, manualDialogPresence]);
+  }, [configuredDurationChoices, loadCustomers, loadLessonPricing, showManualDialog]);
 
   const closeManualDialog = useCallback(() => {
     const root = manualDialogRootRef.current;
-    manualDialogPresence.hide();
+    hideManualDialog();
     void animateOut(root).catch(() => undefined);
-  }, [manualDialogPresence]);
+  }, [hideManualDialog]);
 
 
   const applyCustomerToManual = useCallback((customer: BookingMatchedCustomer) => {
@@ -1076,7 +1084,7 @@ export function AdminBookingsClient() {
         </AdminCard>
       </div>
 
-      {dialogPresence.isMounted && (
+      {isDialogMounted && (
         <BookingDetailDialog
           isOpen={true}
           onClose={closeDialog}
@@ -1271,7 +1279,7 @@ export function AdminBookingsClient() {
         </AdminDialog>
       )}
 
-      {manualDialogPresence.isMounted && (
+      {isManualDialogMounted && (
         <ManualBookingDialog
           isOpen={true}
           onClose={closeManualDialog}

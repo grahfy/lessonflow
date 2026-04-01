@@ -80,11 +80,16 @@ export function AdminDialog({
 }: AdminDialogProps) {
   const dialogPanelRef = useRef<HTMLDivElement | null>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
   const generatedTitleId = useId();
   const generatedDescriptionId = useId();
   const titleId = id ? `${id}-title` : generatedTitleId;
   const descriptionId = description ? (id ? `${id}-description` : generatedDescriptionId) : undefined;
   const resolvedSize = size || "default";
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -121,10 +126,19 @@ export function AdminDialog({
       initialTarget.focus();
     });
 
+    return () => {
+      window.cancelAnimationFrame(focusFirstElement);
+      previouslyFocusedElementRef.current?.focus();
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
     const onKeyDown = (event: KeyboardEvent) => {
       const panel = dialogPanelRef.current;
       if (event.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -169,11 +183,9 @@ export function AdminDialog({
 
     document.addEventListener("keydown", onKeyDown);
     return () => {
-      window.cancelAnimationFrame(focusFirstElement);
       document.removeEventListener("keydown", onKeyDown);
-      previouslyFocusedElementRef.current?.focus();
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
