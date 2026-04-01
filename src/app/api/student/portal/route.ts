@@ -73,20 +73,14 @@ export async function GET(request: NextRequest) {
   const upcoming = bookings
     .filter((booking) => booking.startAt >= now && booking.status !== "cancelled")
     .map((booking) =>
-      mapStudentPortalBooking({
-        ...booking,
-        lessonPlan: null
-      })
+      mapStudentPortalBooking(booking)
     );
 
   const previous = bookings
     .filter((booking) => booking.startAt < now || booking.status === "cancelled")
     .sort((a, b) => b.startAt.getTime() - a.startAt.getTime())
     .map((booking) =>
-      mapStudentPortalBooking({
-        ...booking,
-        lessonPlan: booking.startAt < now ? booking.lessonPlan : null
-      })
+      mapStudentPortalBooking(booking)
     );
 
   const payload = studentPortalPayloadSchema.parse({

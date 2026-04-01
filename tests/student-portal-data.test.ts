@@ -174,7 +174,7 @@ describe("student-portal-data", () => {
     expect(payload.previous.map((row) => row.id)).toContain(previousBooking.id);
     expect(payload.upcoming[0]?.materials[0]?.id).toBe(material.id);
     expect(payload.upcoming[0]?.materials[0]?.downloadUrl).toContain(`/api/student/learning-materials/${material.id}/download`);
-    // Upcoming lesson plan has only an empty section — should be null.
+    // Upcoming lesson plan has only an empty section — maps to null after content filtering.
     expect(payload.upcoming[0]?.lessonPlanSummary).toBeNull();
     // Previous lesson plan should include student-visible sections only.
     expect(payload.previous[0]?.lessonPlanSummary).toBeTruthy();
@@ -183,6 +183,80 @@ describe("student-portal-data", () => {
     expect(sections.map((s: { key: string }) => s.key)).toEqual(["lessonFocus", "goals", "homework", "sharedNotes"]);
     // Teacher-only content must not leak to the student portal.
     expect(JSON.stringify(payload.previous[0]?.lessonPlanSummary || {})).not.toContain("Keep an eye on left-hand collapse");
+  });
+
+  it("shows lesson plan summary on upcoming bookings when sections have content", async () => {
+    const owner = await ensureOwnerAdmin();
+    const customer = await prisma.customer.create({
+      data: customerSnapshotFromInput({
+        name: "Preview Student",
+        email: "preview@example.com",
+        phone: "0400111222",
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        unitNumber: undefined,
+        houseNumber: "5",
+        streetName: "Hill",
+        streetType: "Road",
+        suburb: "Carlton",
+        state: "VIC",
+        postcode: "3053"
+      })
+    });
+    const upcomingBooking = await prisma.booking.create({
+      data: {
+        name: customer.fullName,
+        email: customer.email,
+        phone: customer.phone,
+        address: "5 Hill Road, Carlton VIC 3053",
+        houseNumber: "5",
+        streetName: "Hill",
+        streetType: "Road",
+        suburb: "Carlton",
+        state: "VIC",
+        postcode: "3053",
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min60",
+        startAt: new Date("2026-12-15T09:00:00.000Z"),
+        endAt: new Date("2026-12-15T10:00:00.000Z"),
+        timezone: "Australia/Melbourne",
+        customerId: customer.id
+      }
+    });
+    await prisma.lessonPlan.create({
+      data: {
+        bookingId: upcomingBooking.id,
+        status: "in_progress",
+        sections: [
+          { key: "lessonFocus", title: "Lesson Focus", visibility: "student_visible", content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Open chords" }] }] } },
+          { key: "homework", title: "Homework", visibility: "student_visible", content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Practice G to C transitions" }] }] } },
+          { key: "privateNotes", title: "Private Notes", visibility: "teacher_only", content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Student struggles with barre chords" }] }] } },
+        ],
+        lessonFocus: "",
+        goals: "",
+        activities: "",
+        homework: "",
+        sharedNotes: "",
+        privateNotes: "",
+        createdById: owner.id
+      }
+    });
+
+    const cookie = `${getStudentSessionCookieName()}=${createStudentSessionToken(customer.id)}`;
+    const response = await studentPortal(
+      new NextRequest("http://localhost/api/student/portal", { headers: { cookie } })
+    );
+    expect(response.status).toBe(200);
+    const payload = studentPortalPayloadSchema.parse(await response.json());
+
+    expect(payload.upcoming).toHaveLength(1);
+    expect(payload.upcoming[0]?.lessonPlanSummary).toBeTruthy();
+    const sections = payload.upcoming[0]?.lessonPlanSummary?.sections ?? [];
+    expect(sections).toHaveLength(2);
+    expect(sections.map((s: { key: string }) => s.key)).toEqual(["lessonFocus", "homework"]);
+    // Teacher-only content must not leak.
+    expect(JSON.stringify(payload.upcoming[0]?.lessonPlanSummary || {})).not.toContain("Student struggles with barre chords");
   });
 
   it("streams owned learning material downloads", async () => {
