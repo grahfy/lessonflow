@@ -1281,7 +1281,13 @@ export async function createInitialAdmin(input: SetupInitializeInput) {
  * Returns the path to the .env file in the project root.
  */
 function getEnvFilePath(): string {
-  return path.resolve(process.cwd(), ".env");
+  const cwd = process.cwd();
+  // In standalone mode, Next.js changes cwd to .next/standalone/.
+  // The real .env (symlinked to shared/.env) lives at the release root, two levels up.
+  const root = cwd.endsWith(path.sep + path.join(".next", "standalone"))
+    ? path.resolve(cwd, "../..")
+    : cwd;
+  return path.resolve(root, ".env");
 }
 
 /**
