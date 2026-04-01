@@ -4933,18 +4933,19 @@
 }
 
 .dialog-backdrop {
+  --dialog-frame-gap: 16px;
   position: fixed;
   inset: 0;
   z-index: 200;
   background: rgba(2, 6, 23, 0.82);
   display: grid;
   place-items: center;
-  padding: 16px;
+  padding: var(--dialog-frame-gap);
 }
 
 .dialog-panel {
-  width: min(880px, calc(100vw - 32px));
-  max-height: min(88vh, 920px);
+  width: min(880px, calc(100vw - (var(--dialog-frame-gap) * 2)));
+  max-height: min(88vh, calc(100dvh - (var(--dialog-frame-gap) * 2)), 920px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -4989,8 +4990,8 @@
 
 #customer-dialog {
   --admin-communication-shell-height: min(68vh, 760px);
-  width: min(1380px, calc(100vw - 24px));
-  max-height: min(96vh, 1020px);
+  width: min(1380px, calc(100vw - (var(--dialog-frame-gap) * 2)));
+  max-height: min(96vh, calc(100dvh - (var(--dialog-frame-gap) * 2)), 1020px);
 }
 
 #customer-dialog .customer-dialog-body-lock {
@@ -5023,8 +5024,9 @@
 
 #booking-detail-dialog {
   --admin-communication-shell-height: min(68vh, 760px);
-  --booking-detail-dialog-height: min(96vh, 1020px);
-  width: min(1380px, calc(100vw - 24px));
+  --booking-dialog-inner-gap: 14px;
+  --booking-detail-dialog-height: min(96vh, calc(100dvh - (var(--dialog-frame-gap) * 2)), 1020px);
+  width: min(1380px, calc(100vw - (var(--dialog-frame-gap) * 2)));
   min-height: var(--booking-detail-dialog-height);
   height: var(--booking-detail-dialog-height);
   max-height: var(--booking-detail-dialog-height);
@@ -5035,6 +5037,8 @@
   flex-direction: column;
   min-height: 0;
   height: 100%;
+  padding: 4px 0 0;
+  box-sizing: border-box;
 }
 
 #booking-detail-dialog .dialog-body-scroll {
@@ -5051,8 +5055,8 @@
 }
 
 .dialog-panel-wide {
-  width: min(1380px, calc(100vw - 24px));
-  max-height: min(96vh, 1020px);
+  width: min(1380px, calc(100vw - (var(--dialog-frame-gap) * 2)));
+  max-height: min(96vh, calc(100dvh - (var(--dialog-frame-gap) * 2)), 1020px);
 }
 
 .dialog-head {
@@ -5541,12 +5545,34 @@
 #customer-dialog .customer-materials-panel {
   overflow-y: auto !important;
   max-height: calc(var(--booking-detail-dialog-height, min(96vh, 1020px)) - 200px);
+}
+
+#booking-detail-dialog .booking-appointment-panel,
+#booking-detail-dialog .booking-lesson-plan-panel,
+#booking-detail-dialog .booking-materials-panel {
+  padding: var(--booking-dialog-inner-gap);
+  box-sizing: border-box;
+}
+
+#customer-dialog .customer-booking-history-panel,
+#customer-dialog .customer-materials-panel {
   padding: 2px 6px 6px 2px;
 }
 
 #booking-detail-dialog .booking-email-panel,
 #customer-dialog .customer-email-panel {
   overflow: hidden;
+}
+
+#booking-detail-dialog .dialog-tabs {
+  margin-bottom: 0;
+  padding: 0 var(--booking-dialog-inner-gap) var(--booking-dialog-inner-gap);
+}
+
+#booking-detail-dialog .booking-email-panel,
+#booking-detail-dialog .booking-lesson-plan-panel {
+  padding: 0 var(--booking-dialog-inner-gap) var(--booking-dialog-inner-gap);
+  box-sizing: border-box;
 }
 
 #customer-dialog .customer-email-tab-shell > .admin-email-panel-shell {
@@ -5726,6 +5752,10 @@
 }
 
 @media (max-width: 960px) {
+  #booking-detail-dialog {
+    --booking-dialog-inner-gap: 10px;
+  }
+
   #booking-detail-dialog .dialog-tabs-left {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     max-width: none;
@@ -6909,11 +6939,12 @@
   }
 
   .dialog-backdrop {
-    padding: 10px;
+    --dialog-frame-gap: 20px;
+    padding: var(--dialog-frame-gap);
   }
 
   .dialog-panel {
-    width: min(860px, calc(100vw - 28px));
+    width: min(860px, calc(100vw - (var(--dialog-frame-gap) * 2)));
     max-height: min(86vh, 860px);
   }
 
@@ -6921,8 +6952,8 @@
   .booking-dialog-panel,
   #customer-dialog,
   #booking-detail-dialog {
-    width: min(1320px, calc(100vw - 24px));
-    max-height: min(91vh, 940px);
+    width: min(1320px, calc(100vw - (var(--dialog-frame-gap) * 2)));
+    max-height: min(91vh, calc(100dvh - (var(--dialog-frame-gap) * 2)), 940px);
   }
 
   #customer-dialog,
@@ -6931,7 +6962,7 @@
   }
 
   #booking-detail-dialog {
-    --booking-detail-dialog-height: min(91vh, 940px);
+    --booking-detail-dialog-height: min(91vh, calc(100dvh - (var(--dialog-frame-gap) * 2)), 940px);
   }
 
   .booking-dialog-scroll {
@@ -7176,8 +7207,9 @@
   }
 
   .dialog-backdrop {
+    --dialog-frame-gap: 16px;
     place-items: end center;
-    padding: 12px;
+    padding: var(--dialog-frame-gap);
   }
 
   .dialog-panel,
@@ -7185,8 +7217,8 @@
   .booking-dialog-panel,
   #customer-dialog,
   #booking-detail-dialog {
-    width: min(100vw - 20px, 1380px);
-    max-height: min(92dvh, 980px);
+    width: min(calc(100vw - (var(--dialog-frame-gap) * 2)), 1380px);
+    max-height: min(92dvh, calc(100dvh - (var(--dialog-frame-gap) * 2)), 980px);
   }
 
   #booking-detail-dialog {
@@ -7299,6 +7331,10 @@
 }
 
 @media (max-width: 640px) {
+  #booking-detail-dialog {
+    --booking-dialog-inner-gap: 8px;
+  }
+
   .admin-shell {
     padding: 10px;
     gap: 10px;
@@ -7320,7 +7356,8 @@
   }
 
   .dialog-backdrop {
-    padding: 6px;
+    --dialog-frame-gap: 8px;
+    padding: var(--dialog-frame-gap);
   }
 
   .dialog-panel,
@@ -7329,8 +7366,8 @@
   .booking-dialog-panel,
   #customer-dialog,
   #booking-detail-dialog {
-    width: calc(100vw - 12px);
-    max-height: min(94dvh, 920px);
+    width: calc(100vw - (var(--dialog-frame-gap) * 2));
+    max-height: min(94dvh, calc(100dvh - (var(--dialog-frame-gap) * 2)), 920px);
     border-radius: 16px;
   }
 
