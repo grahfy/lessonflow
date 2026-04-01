@@ -2117,54 +2117,74 @@ auto_enable_bootstrap_defaults_deploy() {
     fi
 
     if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
-        SETUP_PACKAGES=true
-        changed=true
-        enabled_flags+=( "setup-packages(node/npm)" )
+        if [[ "${SETUP_PACKAGES}" != true ]]; then
+            SETUP_PACKAGES=true
+            changed=true
+            enabled_flags+=( "setup-packages(node/npm)" )
+        fi
     fi
 
     if ! mysql_cli_bin >/dev/null 2>&1; then
-        SETUP_PACKAGES=true
-        changed=true
-        enabled_flags+=( "setup-packages(mysql-client)" )
+        if [[ "${SETUP_PACKAGES}" != true ]]; then
+            SETUP_PACKAGES=true
+            changed=true
+            enabled_flags+=( "setup-packages(mysql-client)" )
+        fi
     fi
 
     if ! command -v nginx >/dev/null 2>&1; then
-        INSTALL_NGINX_IF_NEEDED=true
-        changed=true
-        enabled_flags+=( "install-nginx" )
+        if [[ "${INSTALL_NGINX_IF_NEEDED}" != true ]]; then
+            INSTALL_NGINX_IF_NEEDED=true
+            changed=true
+            enabled_flags+=( "install-nginx" )
+        fi
     fi
 
     if ! command -v crontab >/dev/null 2>&1; then
-        INSTALL_CRON_IF_NEEDED=true
-        changed=true
-        enabled_flags+=( "install-cron" )
-    fi
-
-    if command -v systemctl >/dev/null 2>&1; then
-        if ! systemctl list-unit-files --type=service 2>/dev/null | grep -q "^${APP_NAME}\\.service"; then
-            INSTALL_APP_SERVICE_IF_NEEDED=true
-            changed=true
-            enabled_flags+=( "install-app-service" )
-        fi
-
-        if ! cron_scheduler_service_name >/dev/null 2>&1; then
+        if [[ "${INSTALL_CRON_IF_NEEDED}" != true ]]; then
             INSTALL_CRON_IF_NEEDED=true
             changed=true
             enabled_flags+=( "install-cron" )
         fi
     fi
 
+    if command -v systemctl >/dev/null 2>&1; then
+        if ! systemctl list-unit-files --type=service 2>/dev/null | grep -q "^${APP_NAME}\\.service"; then
+            if [[ "${INSTALL_APP_SERVICE_IF_NEEDED}" != true ]]; then
+                INSTALL_APP_SERVICE_IF_NEEDED=true
+                changed=true
+                enabled_flags+=( "install-app-service" )
+            fi
+        fi
+
+        if ! cron_scheduler_service_name >/dev/null 2>&1; then
+            if [[ "${INSTALL_CRON_IF_NEEDED}" != true ]]; then
+                INSTALL_CRON_IF_NEEDED=true
+                changed=true
+                enabled_flags+=( "install-cron" )
+            fi
+        fi
+    fi
+
     if [[ ! -d "${DEPLOY_DIR}" || ! -L "${CURRENT_LINK}" ]]; then
-        INSTALL_APP_SERVICE_IF_NEEDED=true
-        INSTALL_CRON_JOBS_IF_NEEDED=true
-        changed=true
-        enabled_flags+=( "install-app-service" "install-cron-jobs" )
+        if [[ "${INSTALL_APP_SERVICE_IF_NEEDED}" != true ]]; then
+            INSTALL_APP_SERVICE_IF_NEEDED=true
+            changed=true
+            enabled_flags+=( "install-app-service" )
+        fi
+        if [[ "${INSTALL_CRON_JOBS_IF_NEEDED}" != true ]]; then
+            INSTALL_CRON_JOBS_IF_NEEDED=true
+            changed=true
+            enabled_flags+=( "install-cron-jobs" )
+        fi
     fi
 
     if ! managed_cron_block_present_in_root; then
-        INSTALL_CRON_JOBS_IF_NEEDED=true
-        changed=true
-        enabled_flags+=( "install-cron-jobs" )
+        if [[ "${INSTALL_CRON_JOBS_IF_NEEDED}" != true ]]; then
+            INSTALL_CRON_JOBS_IF_NEEDED=true
+            changed=true
+            enabled_flags+=( "install-cron-jobs" )
+        fi
     fi
 
     if [[ "${changed}" == true ]]; then

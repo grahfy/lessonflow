@@ -1488,22 +1488,28 @@ auto_enable_bootstrap_defaults_from_update() {
   if ! command -v nginx >/dev/null 2>&1; then
     # RATIONALE: Updates still need nginx wiring on hosts that never completed
     # the original bootstrap, otherwise the app can deploy but stay unreachable.
-    INSTALL_NGINX_IF_NEEDED=true
-    changed=true
-    enabled_flags+=( "install-nginx" )
+    if [[ "${INSTALL_NGINX_IF_NEEDED}" != true ]]; then
+      INSTALL_NGINX_IF_NEEDED=true
+      changed=true
+      enabled_flags+=( "install-nginx" )
+    fi
   fi
 
   if ! command -v crontab >/dev/null 2>&1; then
-    INSTALL_CRON_IF_NEEDED=true
-    changed=true
-    enabled_flags+=( "install-cron" )
+    if [[ "${INSTALL_CRON_IF_NEEDED}" != true ]]; then
+      INSTALL_CRON_IF_NEEDED=true
+      changed=true
+      enabled_flags+=( "install-cron" )
+    fi
   fi
 
   if command -v systemctl >/dev/null 2>&1; then
     if ! systemctl list-unit-files --type=service 2>/dev/null | grep -q "^${APP_NAME}\\.service"; then
-      INSTALL_APP_SERVICE_IF_NEEDED=true
-      changed=true
-      enabled_flags+=( "install-app-service" )
+      if [[ "${INSTALL_APP_SERVICE_IF_NEEDED}" != true ]]; then
+        INSTALL_APP_SERVICE_IF_NEEDED=true
+        changed=true
+        enabled_flags+=( "install-app-service" )
+      fi
     fi
     
     # RATIONALE: We no longer auto-enable INSTALL_CRON_IF_NEEDED because cron is 
@@ -1513,19 +1519,27 @@ auto_enable_bootstrap_defaults_from_update() {
   if [[ ! -d "${DEPLOY_DIR}" || ! -L "${CURRENT_LINK}" ]]; then
     # NOTE: Missing deploy/current structure usually means first-run setup or
     # partial host drift, so updates promote the service/timer repair path too.
-    INSTALL_APP_SERVICE_IF_NEEDED=true
-    INSTALL_CRON_JOBS_IF_NEEDED=true
-    changed=true
-    enabled_flags+=( "install-app-service" "install-cron-jobs" )
+    if [[ "${INSTALL_APP_SERVICE_IF_NEEDED}" != true ]]; then
+      INSTALL_APP_SERVICE_IF_NEEDED=true
+      changed=true
+      enabled_flags+=( "install-app-service" )
+    fi
+    if [[ "${INSTALL_CRON_JOBS_IF_NEEDED}" != true ]]; then
+      INSTALL_CRON_JOBS_IF_NEEDED=true
+      changed=true
+      enabled_flags+=( "install-cron-jobs" )
+    fi
   fi
 
   # Auto-enable cron jobs (timers) installation if neither timers nor legacy cron block is present.
   if ! managed_systemd_timers_present_from_update && ! managed_cron_block_present_from_update; then
     # NOTE: This keeps update.sh capable of repairing older hosts that never
     # finished the migration from cron entries to managed systemd timers.
-    INSTALL_CRON_JOBS_IF_NEEDED=true
-    changed=true
-    enabled_flags+=( "install-cron-jobs" )
+    if [[ "${INSTALL_CRON_JOBS_IF_NEEDED}" != true ]]; then
+      INSTALL_CRON_JOBS_IF_NEEDED=true
+      changed=true
+      enabled_flags+=( "install-cron-jobs" )
+    fi
   fi
 
   if [[ "${changed}" == true ]]; then
