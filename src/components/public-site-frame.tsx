@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { PropsWithChildren, useEffect } from "react";
 
+import { PublicCookieConsentBanner } from "@/components/public-cookie-consent-banner";
 import { SiteShell } from "@/components/site-shell";
 import { primePublicHeroImages } from "@/lib/public-hero-preload";
 import { publicRouteOrder } from "@/lib/site-data";
@@ -78,5 +79,10 @@ export function PublicSiteFrame({ brandName, children }: PublicSiteFrameProps) {
   }
 
   const footerCopy = PUBLIC_FOOTER_COPY[pathname] || PUBLIC_FOOTER_COPY["/"];
-  return <SiteShell brandName={brandName} footerCopy={footerCopy}>{children}</SiteShell>;
+  return (
+    <SiteShell brandName={brandName} footerCopy={footerCopy}>
+      {children}
+      <PublicCookieConsentBanner />
+    </SiteShell>
+  );
 }
