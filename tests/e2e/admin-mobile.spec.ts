@@ -290,8 +290,10 @@ test.describe("admin mobile responsiveness", () => {
     const navPanel = page.locator("#admin-header-menu-panel");
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
     await expect(navPanel).toHaveClass(/is-open/);
-    await expect(navPanel.getByText(/^sections$/i)).toBeVisible();
-    await expect(navPanel.getByText(/^actions$/i)).toBeVisible();
+    await expect(navPanel.getByText(/^business$/i)).toBeVisible();
+    await expect(navPanel.getByText(/^education$/i)).toBeVisible();
+    await expect(navPanel.getByText(/^system$/i)).toBeVisible();
+    await expect(navPanel.getByText(/^utilities$/i)).toBeVisible();
     
     const updatesBtn = navPanel.getByRole("button", { name: /updates/i });
     const signOutBtn = navPanel.getByRole("button", { name: /sign out/i });
@@ -322,8 +324,10 @@ test.describe("admin intermediate-width header responsiveness", () => {
     await menuToggle.evaluate((button) => (button as HTMLButtonElement).click());
     await expect(menuToggle).toHaveAttribute("aria-expanded", "true");
     await expect(navPanel).toHaveClass(/is-open/);
-    await expect(navPanel.getByText(/^sections$/i)).toBeVisible();
-    await expect(navPanel.getByText(/^actions$/i)).toBeVisible();
+    await expect(navPanel.getByText(/^business$/i)).toBeVisible();
+    await expect(navPanel.getByText(/^education$/i)).toBeVisible();
+    await expect(navPanel.getByText(/^system$/i)).toBeVisible();
+    await expect(navPanel.getByText(/^utilities$/i)).toBeVisible();
     await expect(navPanel.getByRole("button", { name: /updates/i })).toBeVisible();
     await expect(navPanel.getByRole("button", { name: /sign out/i })).toBeVisible();
     await expect(navPanel.getByRole("button", { name: /settings/i })).toBeVisible();

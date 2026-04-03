@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AdminDeployUpdatesButton } from "@/components/admin-deploy-updates-button";
 import { invalidateCustomerEmailAlertsSessionCache } from "@/lib/admin/customer-email-alerts";
-import { ADMIN_NAV_ITEMS } from "@/lib/admin/config";
+import { getActiveAdminNavGroup, getVisibleAdminNavGroups } from "@/lib/admin/config";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import type { AdminSessionSummary } from "@/lib/admin/use-admin-session";
 
@@ -23,15 +23,8 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const adminRoleLabel = admin?.role === "owner" ? "Owner" : "Teacher";
-  const visibleNavItems = ADMIN_NAV_ITEMS.filter((item) => {
-    if (!item.roles) {
-      return true;
-    }
-    if (adminLoading || !admin) {
-      return false;
-    }
-    return item.roles.includes(admin.role);
-  });
+  const visibleNavGroups = getVisibleAdminNavGroups(adminLoading ? null : admin?.role);
+  const activeGroupKey = getActiveAdminNavGroup(pathname, visibleNavGroups);
 
   useEffect(() => {
     // NOTE: Close the mobile menu on route change so stale open state does not
@@ -86,31 +79,45 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
       </div>
 
       <div id="admin-header-menu-panel" className={`admin-header-nav ${menuOpen ? "is-open" : ""}`}>
-        <div className="admin-header-nav-sections">
-          <p className="admin-header-group-label">Sections</p>
-          <nav className="admin-header-nav-primary" aria-label="Admin sections">
-            {visibleNavItems.map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
-              return (
-                <Tooltip key={item.href} content={item.tooltip}>
-                  <button
-                    className={`btn ${isActive ? "btn-primary" : "btn-secondary"}`}
-                    type="button"
-                    aria-current={isActive ? "page" : undefined}
-                    // RATIONALE: Buttons route through the App Router while
-                    // preserving the admin shell instead of forcing full reloads.
-                    onClick={() => router.push(item.href)}
-                  >
-                    {item.label}
-                  </button>
-                </Tooltip>
-              );
-            })}
-          </nav>
+        <div className="admin-header-nav-sections" aria-label="Admin sections">
+          {visibleNavGroups.map((group) => {
+            const isGroupActive = activeGroupKey === group.key;
+            return (
+              <section
+                key={group.key}
+                className={`admin-header-nav-group ${isGroupActive ? "is-active" : ""}`}
+                aria-label={group.label}
+              >
+                <div className="admin-header-group-heading">
+                  <p className="admin-header-group-label">{group.label}</p>
+                  <p className="admin-header-group-description">{group.description}</p>
+                </div>
+                <nav className="admin-header-nav-primary" aria-label={`${group.label} sections`}>
+                  {group.items.map((item) => {
+                    const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                    return (
+                      <Tooltip key={item.href} content={item.tooltip}>
+                        <button
+                          className={`btn ${isActive ? "btn-primary" : "btn-secondary"}`}
+                          type="button"
+                          aria-current={isActive ? "page" : undefined}
+                          // RATIONALE: Buttons route through the App Router while
+                          // preserving the admin shell instead of forcing full reloads.
+                          onClick={() => router.push(item.href)}
+                        >
+                          {item.label}
+                        </button>
+                      </Tooltip>
+                    );
+                  })}
+                </nav>
+              </section>
+            );
+          })}
         </div>
 
         <div className="admin-header-nav-actions">
-          <p className="admin-header-group-label">Actions</p>
+          <p className="admin-header-group-label">Utilities</p>
           <div className="admin-header-quick-actions">
             {admin?.role === "owner" ? <AdminDeployUpdatesButton /> : null}
             <Tooltip content="Sign out of the admin console.">

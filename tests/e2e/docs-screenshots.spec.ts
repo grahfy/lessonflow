@@ -405,12 +405,12 @@ async function captureCustomerScreenshots(page: import("@playwright/test").Page)
 
 async function captureBookingScreenshots(page: import("@playwright/test").Page) {
   await gotoWithRetry(page, "/admin/bookings");
-  await page.getByRole("button", { name: /new booking/i }).first().waitFor({ timeout: 10_000 });
+  await page.getByRole("button", { name: /add manual booking/i }).first().waitFor({ timeout: 10_000 });
   await waitForPageSettle(page);
   await stabilizePage(page);
   await saveShot(page, "booking-calendar-week-view.png");
 
-  await page.getByRole("button", { name: /new booking/i }).click();
+  await page.getByRole("button", { name: /add manual booking/i }).click();
   const manualDialog = page
     .locator(".dialog-panel.dialog-panel-wide")
     .filter({ has: page.getByRole("heading", { name: /add manual booking/i }) })
