@@ -64,9 +64,12 @@ function makeResolvedDiagram(): ChordDiagramData {
 describe("chord-builder selector voicing sync", () => {
   let container: HTMLDivElement;
   let root: ReturnType<typeof createRoot>;
+  const reactActEnvironment = globalThis as typeof globalThis & {
+    IS_REACT_ACT_ENVIRONMENT?: boolean;
+  };
 
   beforeEach(() => {
-    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true;
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);

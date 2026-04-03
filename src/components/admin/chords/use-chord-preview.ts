@@ -7,6 +7,8 @@ import type { ChordDiagramData } from "@/lib/chords/chord-types";
 import { getPlayableChordNotes } from "@/lib/chords/chord-preview";
 
 type PreviewMode = "strum" | "block";
+type ToneModuleLike = Pick<typeof import("tone"), "Sampler">;
+
 interface PreviewPlaybackEvent {
   durationSeconds: number;
   note: string;
@@ -15,7 +17,11 @@ interface PreviewPlaybackEvent {
 }
 
 const CHORD_PREVIEW_BASE_URL = "/audio/chord-preview/guitar-acoustic/";
-const CHORD_PREVIEW_SAMPLE_FILES = [
+const CHORD_PREVIEW_SAMPLER_NOT_READY_ERROR = "Guitar preview samples are still loading. Please try again.";
+
+export const CHORD_PREVIEW_SAMPLE_FILES = [
+  "D2.mp3",
+  "Ds2.mp3",
   "E2.mp3",
   "F2.mp3",
   "Fs2.mp3",
@@ -66,10 +72,26 @@ function getSampleNoteName(fileName: string): string {
   return stem.replace(/^([A-G])s(\d)$/, "$1#$2");
 }
 
-function getChordPreviewSampleMap(): Record<string, string> {
+export function getChordPreviewSampleMap(): Record<string, string> {
   return Object.fromEntries(
     CHORD_PREVIEW_SAMPLE_FILES.map((fileName) => [getSampleNoteName(fileName), fileName])
   );
+}
+
+function getChordPreviewLoadErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return `Failed to load guitar preview samples. ${error.message}`;
+  }
+
+  return "Failed to load guitar preview samples.";
+}
+
+function ensureChordPreviewSamplerReady(sampler: Sampler): Sampler {
+  if (!sampler.loaded) {
+    throw new Error(CHORD_PREVIEW_SAMPLER_NOT_READY_ERROR);
+  }
+
+  return sampler;
 }
 
 function getToneModule(): Promise<typeof import("tone")> {
@@ -80,32 +102,76 @@ function getToneModule(): Promise<typeof import("tone")> {
   return toneModulePromise;
 }
 
-async function getChordPreviewSampler(): Promise<Sampler> {
+export async function createChordPreviewSampler(Tone: ToneModuleLike): Promise<Sampler> {
+  return await new Promise<Sampler>((resolve, reject) => {
+    let didSettle = false;
+    let sampler: Sampler | null = null;
+
+    const rejectLoad = (error: unknown) => {
+      if (didSettle) {
+        return;
+      }
+
+      didSettle = true;
+      reject(new Error(getChordPreviewLoadErrorMessage(error)));
+    };
+
+    const resolveLoad = () => {
+      if (didSettle || !sampler) {
+        return;
+      }
+
+      try {
+        didSettle = true;
+        resolve(ensureChordPreviewSamplerReady(sampler));
+      } catch (error: unknown) {
+        reject(error);
+      }
+    };
+
+    sampler = new Tone.Sampler({
+      urls: getChordPreviewSampleMap(),
+      baseUrl: CHORD_PREVIEW_BASE_URL,
+      attack: 0.01,
+      release: 1.8,
+      onload: resolveLoad,
+      onerror: rejectLoad,
+    }).toDestination();
+
+    sampler.volume.value = -10;
+
+    if (sampler.loaded) {
+      resolveLoad();
+    }
+  });
+}
+
+export async function loadChordPreviewSamplerWithTone(Tone: ToneModuleLike): Promise<Sampler> {
   if (!samplerPromise) {
-    samplerPromise = (async () => {
-      const Tone = await getToneModule();
-      const sampler = new Tone.Sampler({
-        urls: getChordPreviewSampleMap(),
-        baseUrl: CHORD_PREVIEW_BASE_URL,
-        attack: 0.01,
-        release: 1.8,
-      }).toDestination();
-
-      sampler.volume.value = -10;
-
-      await Tone.loaded();
-      return sampler;
-    })().catch((error: unknown) => {
+    samplerPromise = createChordPreviewSampler(Tone).catch((error: unknown) => {
       samplerPromise = null;
       throw error;
     });
   }
 
-  return samplerPromise;
+  return await samplerPromise;
+}
+
+export function resetChordPreviewSamplerCache(): void {
+  samplerPromise = null;
+}
+
+async function getChordPreviewSampler(): Promise<Sampler> {
+  const Tone = await getToneModule();
+  return await loadChordPreviewSamplerWithTone(Tone);
 }
 
 function getPreviewErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) {
+    if (error.message.includes("buffer is either not set or not loaded")) {
+      return CHORD_PREVIEW_SAMPLER_NOT_READY_ERROR;
+    }
+
     return error.message;
   }
 
@@ -167,7 +233,7 @@ export function useChordPreview(diagram: ChordDiagramData, isOpen: boolean) {
         const Tone = await getToneModule();
         await Tone.start();
 
-        const sampler = await getChordPreviewSampler();
+        const sampler = ensureChordPreviewSamplerReady(await getChordPreviewSampler());
         samplerRef.current = sampler;
         setHasLoadedSamples(true);
 
