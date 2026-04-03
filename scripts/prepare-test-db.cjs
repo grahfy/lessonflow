@@ -50,17 +50,40 @@ const prismaEnv = {
   DATABASE_URL: testDatabaseUrl
 };
 
+function resolveNpxBinary() {
+  if (process.platform === "win32") {
+    return "npx.cmd";
+  }
+
+  const npmExecPath = process.env.npm_execpath || "";
+  if (npmExecPath.endsWith("/npm-cli.js")) {
+    return process.execPath;
+  }
+
+  return "npx";
+}
+
+function buildNpxArgs(commandArgs) {
+  if (process.platform === "win32") {
+    return commandArgs;
+  }
+
+  const npmExecPath = process.env.npm_execpath || "";
+  if (npmExecPath.endsWith("/npm-cli.js")) {
+    return [npmExecPath, ...commandArgs];
+  }
+
+  return commandArgs;
+}
+
 /**
  * Runs a Prisma CLI command with the test DB URL injected.
  * Returns the spawn result for status/error handling.
  */
 function runPrisma(args) {
-  const isWin = process.platform === "win32";
-  const npmCmd = isWin ? "npx.cmd" : "npx";
-  return spawnSync(npmCmd, ["prisma", ...args], {
+  return spawnSync(resolveNpxBinary(), buildNpxArgs(["prisma", ...args]), {
     stdio: "inherit",
-    env: prismaEnv,
-    shell: true
+    env: prismaEnv
   });
 }
 

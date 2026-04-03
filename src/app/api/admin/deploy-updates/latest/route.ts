@@ -55,7 +55,10 @@ export async function GET(request: NextRequest) {
     // Fallback to JSON file
     const latestJson = await readLatestDeployUpdate();
     if (!latestJson) {
-      return NextResponse.json({ error: "No deployment update metadata available yet." }, { status: 404 });
+      return new NextResponse(null, {
+        status: 204,
+        headers: { "cache-control": "no-store" }
+      });
     }
 
     return NextResponse.json(latestJson, {

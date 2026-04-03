@@ -109,10 +109,9 @@ export function AdminDeployUpdatesButton() {
       const response = await safeFetch("/api/admin/deploy-updates/latest", { cache: "no-store" });
       const body = await readJsonSafe<ApiResponse>(response);
 
-      if (response.status === 404) {
+      if (response.status === 204 || response.status === 404) {
         setUpdate(null);
         if (options?.forceOpen) {
-          setError(body?.error || "No deployment update metadata available yet.");
           setOpen(true);
         }
         return;
@@ -248,44 +247,48 @@ export function AdminDeployUpdatesButton() {
 
           <AdminNoticeStack error={error || undefined} loading={loading} loadingLabel="Loading deployment metadata..." />
 
-          {activeTab === "latest" && update ? (
-            <>
-              <p className="helper-text dialog-status">
-                Applied {formatDateTime(update.appliedAt)} · branch <strong>{update.branch}</strong> · release <strong>{update.release || "-"}</strong>
-              </p>
-              <div className="deploy-updates-meta-grid">
-                <div className="deploy-updates-meta-card">
-                  <p className="deploy-updates-meta-label">Current commit</p>
-                  <p className="deploy-updates-meta-value"><code>{update.shortCommit}</code></p>
+          {activeTab === "latest" ? (
+            update ? (
+              <>
+                <p className="helper-text dialog-status">
+                  Applied {formatDateTime(update.appliedAt)} · branch <strong>{update.branch}</strong> · release <strong>{update.release || "-"}</strong>
+                </p>
+                <div className="deploy-updates-meta-grid">
+                  <div className="deploy-updates-meta-card">
+                    <p className="deploy-updates-meta-label">Current commit</p>
+                    <p className="deploy-updates-meta-value"><code>{update.shortCommit}</code></p>
+                  </div>
+                  <div className="deploy-updates-meta-card">
+                    <p className="deploy-updates-meta-label">Previous commit</p>
+                    <p className="deploy-updates-meta-value"><code>{update.previousCommit ? update.previousCommit.slice(0, 7) : "-"}</code></p>
+                  </div>
+                  <div className="deploy-updates-meta-card">
+                    <p className="deploy-updates-meta-label">Included changes</p>
+                    <p className="deploy-updates-meta-value">{commitCountLabel(update.commits)}</p>
+                  </div>
                 </div>
-                <div className="deploy-updates-meta-card">
-                  <p className="deploy-updates-meta-label">Previous commit</p>
-                  <p className="deploy-updates-meta-value"><code>{update.previousCommit ? update.previousCommit.slice(0, 7) : "-"}</code></p>
-                </div>
-                <div className="deploy-updates-meta-card">
-                  <p className="deploy-updates-meta-label">Included changes</p>
-                  <p className="deploy-updates-meta-value">{commitCountLabel(update.commits)}</p>
-                </div>
-              </div>
 
-              <div className="deploy-updates-list">
-                {(update.commits || []).length ? (
-                  update.commits.map((commit) => (
-                    <article key={commit.hash} className="deploy-updates-item">
-                      <div className="deploy-updates-item-head">
-                        <strong>{commit.subject}</strong>
-                        <span>
-                          <code>{commit.shortHash}</code> · {commit.authorName} · {formatDateTime(commit.authoredAt)}
-                        </span>
-                      </div>
-                      {commit.body ? <pre className="deploy-updates-body">{commit.body}</pre> : null}
-                    </article>
-                  ))
-                ) : (
-                  <p className="helper-text">No commit details were recorded for this deploy.</p>
-                )}
-              </div>
-            </>
+                <div className="deploy-updates-list">
+                  {(update.commits || []).length ? (
+                    update.commits.map((commit) => (
+                      <article key={commit.hash} className="deploy-updates-item">
+                        <div className="deploy-updates-item-head">
+                          <strong>{commit.subject}</strong>
+                          <span>
+                            <code>{commit.shortHash}</code> · {commit.authorName} · {formatDateTime(commit.authoredAt)}
+                          </span>
+                        </div>
+                        {commit.body ? <pre className="deploy-updates-body">{commit.body}</pre> : null}
+                      </article>
+                    ))
+                  ) : (
+                    <p className="helper-text">No commit details were recorded for this deploy.</p>
+                  )}
+                </div>
+              </>
+            ) : (
+              <p className="helper-text">No deployment update metadata has been recorded yet.</p>
+            )
           ) : null}
 
           {activeTab === "history" ? (

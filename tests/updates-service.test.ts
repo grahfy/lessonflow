@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { getUpdateStatus, getPendingCommits } from "@/lib/services/updates-service";
-import { exec } from "node:child_process";
+import { execFile } from "node:child_process";
 
-// Mock child_process.exec
+// Mock child_process.execFile
 vi.mock("node:child_process", () => ({
-  exec: vi.fn()
+  execFile: vi.fn()
 }));
 
-// Mock util.promisify to return the exec mock directly
+// Mock util.promisify to return the execFile mock directly
 vi.mock("node:util", () => ({
   promisify: vi.fn((fn) => fn)
 }));
@@ -15,13 +15,13 @@ vi.mock("node:util", () => ({
 describe("updates-service", () => {
   describe("getUpdateStatus", () => {
     it("returns updateAvailable: true when remote has new commits", async () => {
-      // Mock git rev-parse HEAD (local) and git rev-parse origin/main (remote)
-      (exec as any).mockImplementation((cmd: string) => {
-        if (cmd.includes("rev-parse HEAD")) {
+      (execFile as any).mockImplementation((_file: string, args: string[]) => {
+        const command = args.join(" ");
+        if (command.includes("rev-parse HEAD")) {
           return Promise.resolve({ stdout: "local-sha\n" });
-        } else if (cmd.includes("rev-parse origin/main")) {
+        } else if (command.includes("rev-parse origin/main")) {
           return Promise.resolve({ stdout: "remote-sha\n" });
-        } else if (cmd.includes("fetch")) {
+        } else if (command.includes("fetch origin main")) {
           return Promise.resolve({ stdout: "" });
         }
         return Promise.resolve({ stdout: "" });
@@ -34,12 +34,13 @@ describe("updates-service", () => {
     });
 
     it("returns updateAvailable: false when local and remote SHAs match", async () => {
-      (exec as any).mockImplementation((cmd: string) => {
-        if (cmd.includes("rev-parse HEAD")) {
+      (execFile as any).mockImplementation((_file: string, args: string[]) => {
+        const command = args.join(" ");
+        if (command.includes("rev-parse HEAD")) {
           return Promise.resolve({ stdout: "same-sha\n" });
-        } else if (cmd.includes("rev-parse origin/main")) {
+        } else if (command.includes("rev-parse origin/main")) {
           return Promise.resolve({ stdout: "same-sha\n" });
-        } else if (cmd.includes("fetch")) {
+        } else if (command.includes("fetch origin main")) {
           return Promise.resolve({ stdout: "" });
         }
         return Promise.resolve({ stdout: "" });
@@ -57,8 +58,8 @@ describe("updates-service", () => {
         "hash2|Author Two|2026-03-09|Message two"
       ].join("\n");
 
-      (exec as any).mockImplementation((cmd: string) => {
-        if (cmd.includes("log")) {
+      (execFile as any).mockImplementation((_file: string, args: string[]) => {
+        if (args.includes("log")) {
           return Promise.resolve({ stdout: mockLogOutput + "\n" });
         }
         return Promise.resolve({ stdout: "" });
@@ -72,6 +73,11 @@ describe("updates-service", () => {
         date: "2026-03-10",
         message: "Message one"
       });
+    });
+
+    it("returns an empty list when local and remote match", async () => {
+      const commits = await getPendingCommits("same-sha", "same-sha");
+      expect(commits).toEqual([]);
     });
   });
 });

@@ -19,11 +19,15 @@
  * to the `.git` directory and execution privileges for `git`.
  */
 
-import { exec } from "node:child_process";
+import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { getUpdatesGitRepoPath } from "@/lib/env";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
+
+async function runGit(args: string[], cwd: string): Promise<{ stdout: string; stderr: string }> {
+  return execFileAsync("git", args, { cwd, env: process.env });
+}
 
 /** Represents the differential state between local and remote codebases. */
 export interface UpdateStatus {
@@ -64,7 +68,7 @@ export async function getUpdateStatus(forceFetch = false): Promise<UpdateStatus>
 
     // 1. Fetch latest metadata from remote (non-destructive)
     try {
-      await execAsync("git fetch origin main", { cwd: repoPath });
+      await runGit(["fetch", "origin", "main"], repoPath);
     } catch (fetchError) {
       console.error(`Update check failed: git fetch failed in ${repoPath}.`, (fetchError as Error).message);
       return {
@@ -76,11 +80,11 @@ export async function getUpdateStatus(forceFetch = false): Promise<UpdateStatus>
     }
 
     // 2. Get local HEAD SHA
-    const { stdout: localShaRaw } = await execAsync("git rev-parse HEAD", { cwd: repoPath });
+    const { stdout: localShaRaw } = await runGit(["rev-parse", "HEAD"], repoPath);
     const localSha = localShaRaw.trim();
 
     // 3. Get remote origin/main SHA
-    const { stdout: remoteShaRaw } = await execAsync("git rev-parse origin/main", { cwd: repoPath });
+    const { stdout: remoteShaRaw } = await runGit(["rev-parse", "origin/main"], repoPath);
     const remoteSha = remoteShaRaw.trim();
 
     const status: UpdateStatus = {
@@ -117,9 +121,11 @@ export async function getPendingCommits(localSha: string, remoteSha: string): Pr
 
   try {
     const repoPath = getUpdatesGitRepoPath();
-    // List commits from localSha to remoteSha using a custom pipe-delimited format for easy parsing.
     const format = "%H|%an|%ad|%s";
-    const { stdout } = await execAsync(`git log ${localSha}..${remoteSha} --pretty=format:"${format}" --date=short`, { cwd: repoPath });
+    const { stdout } = await runGit(
+      ["log", `${localSha}..${remoteSha}`, `--pretty=format:${format}`, "--date=short"],
+      repoPath
+    );
     
     if (!stdout.trim()) return [];
 

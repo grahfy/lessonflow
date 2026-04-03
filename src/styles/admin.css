@@ -3425,76 +3425,96 @@
     "overview toolbar"
     "nav nav";
   align-items: start;
-  gap: 14px 16px;
+  gap: 18px 18px;
+  overflow: hidden;
 }
 
 .admin-header-overview {
   grid-area: overview;
   display: grid;
-  gap: 10px;
+  gap: 14px;
   min-width: 0;
 }
 
 .admin-header-title-group {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 
 .admin-console-kicker {
   margin: 0;
-  color: var(--ink-2);
-  font-size: 0.68rem;
+  color: #93c5fd;
+  font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 
 .admin-console-title {
   margin: 0;
-  font-size: clamp(1.2rem, 2vw, 1.56rem);
-  letter-spacing: -0.02em;
-  line-height: 1.08;
+  font-size: clamp(1.34rem, 2.4vw, 1.9rem);
+  letter-spacing: -0.032em;
+  line-height: 0.98;
   color: #f8fafc;
+  text-wrap: balance;
 }
 
 .admin-console-subtitle {
   margin: 0;
-  max-width: 62ch;
+  max-width: 68ch;
+  color: rgba(226, 232, 240, 0.82);
 }
 
 .admin-header-session {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.6), rgba(15, 23, 42, 0.42)),
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.12), transparent 46%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .admin-header-session-label {
   color: var(--ink-2);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.admin-header-session-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .admin-header-session-name,
 .admin-header-session-role {
   display: inline-flex;
   align-items: center;
-  min-height: 30px;
-  padding: 0 10px;
-  border: 1px solid rgba(148, 163, 184, 0.16);
+  min-height: 31px;
+  padding: 0 11px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.035);
   color: #e2e8f0;
-  font-size: 0.78rem;
-  letter-spacing: 0.03em;
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
 }
 
 .admin-header-session-role {
-  border-color: rgba(96, 165, 250, 0.24);
-  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(96, 165, 250, 0.28);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.18), rgba(30, 64, 175, 0.14));
   color: #dbeafe;
 }
 
@@ -3507,67 +3527,120 @@
 }
 
 .admin-header-nav {
-  display: contents;
+  grid-area: nav;
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding-top: 14px;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
 }
 
 .admin-header-nav-sections {
-  grid-area: nav;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
-  padding-top: 10px;
-  border-top: 1px solid rgba(148, 163, 184, 0.12);
 }
 
 .admin-header-nav-group {
   display: grid;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.025);
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.018)),
+    radial-gradient(circle at top left, rgba(148, 163, 184, 0.08), transparent 46%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 10px 24px rgba(2, 8, 23, 0.12);
   min-width: 0;
 }
 
 .admin-header-nav-group.is-active {
-  border-color: rgba(96, 165, 250, 0.32);
-  background: rgba(37, 99, 235, 0.08);
-  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.08);
+  border-color: rgba(96, 165, 250, 0.34);
+  background:
+    linear-gradient(180deg, rgba(37, 99, 235, 0.12), rgba(15, 23, 42, 0.18)),
+    radial-gradient(circle at top left, rgba(96, 165, 250, 0.16), transparent 52%);
+  box-shadow:
+    inset 0 0 0 1px rgba(96, 165, 250, 0.1),
+    0 14px 28px rgba(2, 8, 23, 0.14);
 }
 
 .admin-header-group-heading {
   display: grid;
-  gap: 0;
+  gap: 4px;
 }
 
 .admin-header-group-label {
   display: block;
   margin: 0;
-  color: var(--ink-2);
+  color: #cbd5e1;
   font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .admin-header-group-description {
-  display: none;
+  display: block;
+  margin: 0;
+  color: rgba(148, 163, 184, 0.88);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  max-width: 34ch;
 }
 
 .admin-header-nav-primary {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
   align-items: flex-start;
 }
 
+.admin-header-nav-button {
+  min-height: 34px;
+}
+
+.admin-header-nav-button.btn-secondary {
+  background: linear-gradient(145deg, rgba(20, 29, 47, 0.92), rgba(15, 23, 42, 0.82));
+  border-color: rgba(148, 163, 184, 0.18);
+  color: rgba(226, 232, 240, 0.88);
+  box-shadow:
+    0 6px 14px rgba(2, 8, 23, 0.14),
+    0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+
+.admin-header-nav-button.btn-secondary:hover {
+  border-color: rgba(96, 165, 250, 0.26);
+  background: linear-gradient(145deg, rgba(26, 36, 58, 0.96), rgba(18, 29, 50, 0.88));
+  color: #f8fafc;
+}
+
+.admin-header-nav-button.is-featured.btn-secondary {
+  border-color: rgba(96, 165, 250, 0.24);
+}
+
+.admin-header-nav-button.is-active {
+  box-shadow:
+    0 10px 22px rgba(29, 78, 216, 0.24),
+    0 1px 0 rgba(255, 255, 255, 0.08) inset;
+}
+
 .admin-header-nav-actions {
-  grid-area: toolbar;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.admin-header-utility-copy {
   display: grid;
-  gap: 6px;
-  justify-items: end;
-  align-content: start;
+  gap: 4px;
 }
 
 .admin-header-quick-actions {
@@ -3575,6 +3648,11 @@
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+  margin-left: auto;
+}
+
+.admin-header-utility-button {
+  opacity: 0.94;
 }
 
 .admin-header-menu-toggle {

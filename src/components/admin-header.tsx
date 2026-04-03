@@ -58,8 +58,10 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
         {admin ? (
           <div className="admin-header-session" aria-label={`Signed in as ${admin.displayName} (${adminRoleLabel})`}>
             <span className="admin-header-session-label">Signed in as</span>
-            <span className="admin-header-session-name">{admin.displayName}</span>
-            <span className="admin-header-session-role">{adminRoleLabel}</span>
+            <div className="admin-header-session-chips">
+              <span className="admin-header-session-name">{admin.displayName}</span>
+              <span className="admin-header-session-role">{adminRoleLabel}</span>
+            </div>
           </div>
         ) : null}
       </div>
@@ -78,7 +80,7 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
         </Tooltip>
       </div>
 
-      <div id="admin-header-menu-panel" className={`admin-header-nav ${menuOpen ? "is-open" : ""}`}>
+      <div id="admin-header-menu-panel" className={`admin-header-nav ${menuOpen ? "is-open" : ""}`.trim()}>
         <div className="admin-header-nav-sections" aria-label="Admin sections">
           {visibleNavGroups.map((group) => {
             const isGroupActive = activeGroupKey === group.key;
@@ -98,7 +100,7 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
                     return (
                       <Tooltip key={item.href} content={item.tooltip}>
                         <button
-                          className={`btn ${isActive ? "btn-primary" : "btn-secondary"}`}
+                          className={`btn admin-header-nav-button ${item.featured ? "is-featured" : ""} ${isActive ? "btn-primary is-active" : "btn-secondary"}`.trim()}
                           type="button"
                           aria-current={isActive ? "page" : undefined}
                           // RATIONALE: Buttons route through the App Router while
@@ -117,12 +119,15 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
         </div>
 
         <div className="admin-header-nav-actions">
-          <p className="admin-header-group-label">Utilities</p>
+          <div className="admin-header-utility-copy">
+            <p className="admin-header-group-label">Utilities</p>
+            <p className="admin-header-group-description">Secondary platform actions for updates and session control.</p>
+          </div>
           <div className="admin-header-quick-actions">
             {admin?.role === "owner" ? <AdminDeployUpdatesButton /> : null}
             <Tooltip content="Sign out of the admin console.">
               <button
-                className="btn btn-secondary"
+                className="btn btn-secondary admin-header-utility-button"
                 type="button"
                 data-motion-item="admin-logout"
                 onClick={() => void logout()}
