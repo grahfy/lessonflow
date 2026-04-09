@@ -149,17 +149,13 @@ list_admins() {
   (
     cd "${APP_DIR}"
     npx tsx --input-type=module <<'NODE'
-import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import PrismaGenerated from "./src/generated/prisma/client.ts";
+import { createPrismaMariaDbAdapter, getRequiredDatabaseUrl } from "./src/lib/prisma-mariadb.ts";
 
 (async () => {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new Error("DATABASE_URL is not set");
-  }
-
-  const adapter = new PrismaMariaDb(connectionString);
-  const prisma = new PrismaGenerated.PrismaClient({ adapter });
+  const prisma = new PrismaGenerated.PrismaClient({
+    adapter: createPrismaMariaDbAdapter(getRequiredDatabaseUrl())
+  });
 
   try {
     // RATIONALE: Listing only safe metadata helps operators identify the target
@@ -244,17 +240,13 @@ reset_password() {
     cd "${APP_DIR}"
     ADMIN_EMAIL_TO_RESET="${TARGET_ADMIN_EMAIL}" NEW_ADMIN_PASSWORD="${NEW_PASSWORD_INPUT}" npx tsx --input-type=module <<'NODE'
 import bcrypt from "bcryptjs";
-import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import PrismaGenerated from "./src/generated/prisma/client.ts";
+import { createPrismaMariaDbAdapter, getRequiredDatabaseUrl } from "./src/lib/prisma-mariadb.ts";
 
 (async () => {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new Error("DATABASE_URL is not set");
-  }
-
-    const adapter = new PrismaMariaDb(connectionString);
-    const prisma = new PrismaGenerated.PrismaClient({ adapter });
+    const prisma = new PrismaGenerated.PrismaClient({
+      adapter: createPrismaMariaDbAdapter(getRequiredDatabaseUrl())
+    });
 
   try {
     const email = String(process.env.ADMIN_EMAIL_TO_RESET || "").trim().toLowerCase();

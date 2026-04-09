@@ -27,7 +27,7 @@
 #   --help            Show usage
 #
 # Prerequisites (unless --setup-packages):
-#   - Node.js 20+ installed
+#   - Node.js 20.19+, 22.12+, or 24+ installed
 #   - MySQL database configured
 #   - .env.example present in the repo (script bootstraps shared/.env if missing)
 #   - Nginx and systemd configured
@@ -1648,9 +1648,10 @@ run_migrations() {
 }
 
 # Resolves the Prisma CLI package spec to install when devDependencies are
-# omitted in production deploys. This enforces Prisma major version 7 while
-# honoring the repo's configured prisma version/range when present.
+# omitted in production deploys. This prefers the repo's exact configured
+# Prisma version and otherwise falls back to the current supported baseline.
 resolve_prisma_cli_install_spec() {
+    local fallback_version="7.7.0"
     local configured_version=""
     local detected_major=""
 
@@ -1668,23 +1669,23 @@ resolve_prisma_cli_install_spec() {
     ' 2>/dev/null || true)"
 
     if [[ -z "${configured_version}" ]]; then
-        echo "prisma@^7"
+        echo "prisma@${fallback_version}"
         return 0
     fi
 
     detected_major="$(printf '%s' "${configured_version}" | sed -E 's/^[^0-9]*([0-9]+).*/\1/')"
     if [[ ! "${detected_major}" =~ ^[0-9]+$ ]]; then
-        echo "prisma@^7"
+        echo "prisma@${fallback_version}"
         return 0
     fi
 
     if [[ "${detected_major}" != "7" ]]; then
-        log_warn "Configured prisma version '${configured_version}' is not major 7; enforcing prisma@^7 in deploy."
-        echo "prisma@^7"
+        log_warn "Configured prisma version '${configured_version}' is not major 7; enforcing prisma@${fallback_version} in deploy."
+        echo "prisma@${fallback_version}"
         return 0
     fi
 
-    echo "prisma@${configured_version}"
+        echo "prisma@${configured_version}"
 }
 
 # Updates Prisma state: generates client and applies migrations or schema push.

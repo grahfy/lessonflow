@@ -3,7 +3,7 @@
 # LessonFlow - Package Installation Script
 # =============================================================================
 # Automatically detects OS and installs required packages:
-#   - Node.js 20 LTS
+#   - Node.js 20.19+ LTS (or 22.12+ / 24+)
 #   - MySQL/MariaDB
 #   - Nginx
 #   - Certbot (for SSL)
@@ -262,19 +262,24 @@ install_nodejs() {
         return
     fi
     
-    # Check if Node.js 20+ is already installed. The app and deploy scripts
-    # assume modern Node features/Next.js support, so older versions are upgraded.
+    # Check if a Prisma 7-compatible Node.js runtime is already installed.
+    # Prisma 7.7 requires Node.js 20.19+, 22.12+, or 24+.
     if command -v node &> /dev/null; then
-        local node_version=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
-        if [[ $node_version -ge 20 ]]; then
-            log_info "Node.js $(node -v) already installed (version 20+)"
+        local node_major
+        local node_minor
+        node_major=$(node -p "process.versions.node.split('.')[0]")
+        node_minor=$(node -p "process.versions.node.split('.')[1]")
+        if [[ "${node_major}" -ge 24 ]] \
+            || [[ "${node_major}" -eq 22 && "${node_minor}" -ge 12 ]] \
+            || [[ "${node_major}" -eq 20 && "${node_minor}" -ge 19 ]]; then
+            log_info "Node.js $(node -v) already installed (Prisma-compatible version)"
             return
         else
-            log_warn "Node.js $(node -v) installed but version < 20, upgrading..."
+            log_warn "Node.js $(node -v) installed but below Prisma 7.7 minimum, upgrading..."
         fi
     fi
     
-    log_step "Installing Node.js 20 LTS..."
+    log_step "Installing Node.js 20 LTS (20.19+ baseline)..."
     
     case "$OS_FAMILY" in
         debian)
@@ -613,8 +618,8 @@ print_summary() {
     echo "Package Manager: ${PKG_MANAGER}"
     echo ""
     echo "Installed Components:"
-    [[ "$SKIP_NODE" != true ]] && echo "  [x] Node.js 20 LTS"
-    [[ "$SKIP_NODE" == true ]] && echo "  [ ] Node.js 20 LTS (skipped)"
+    [[ "$SKIP_NODE" != true ]] && echo "  [x] Node.js 20.19+ LTS"
+    [[ "$SKIP_NODE" == true ]] && echo "  [ ] Node.js 20.19+ LTS (skipped)"
     [[ "$SKIP_DB" != true ]] && echo "  [x] MySQL/MariaDB"
     [[ "$SKIP_DB" == true ]] && echo "  [ ] MySQL/MariaDB (skipped)"
     [[ "$SKIP_NGINX" != true ]] && echo "  [x] Nginx"

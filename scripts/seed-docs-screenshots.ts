@@ -3,8 +3,8 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import bcrypt from "bcryptjs";
-import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import { PrismaClient } from "../src/generated/prisma/client";
+import { createPrismaMariaDbAdapter, getRequiredDatabaseUrl } from "../src/lib/prisma-mariadb";
 
 const projectRoot = process.cwd();
 const checklistPath = path.join(projectRoot, "Documentation", "assets", "SCREENSHOT_SEED_CHECKLIST.md");
@@ -15,13 +15,9 @@ const DEFAULT_LESSON_PRICING = [
   { durationMinutes: 120, priceCents: 17000, isActive: true, sortOrder: 2 }
 ];
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  throw new Error("DATABASE_URL environment variable is not set");
-}
-
-const adapter = new PrismaMariaDb(connectionString);
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient({
+  adapter: createPrismaMariaDbAdapter(getRequiredDatabaseUrl())
+});
 
 /** Normalizes names into the same search form used by the live app. */
 function normalizeName(value: any) {

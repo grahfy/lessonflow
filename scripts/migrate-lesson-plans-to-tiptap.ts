@@ -1,13 +1,8 @@
 import { Prisma, PrismaClient } from "../src/generated/prisma/client";
-import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import dotenv from "dotenv";
+import { createPrismaMariaDbAdapter, getRequiredDatabaseUrl } from "../src/lib/prisma-mariadb";
 
 dotenv.config();
-
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  throw new Error("DATABASE_URL environment variable is not set");
-}
 
 /**
  * Converts a plain text string into a TipTap ProseMirror JSON document.
@@ -168,8 +163,9 @@ const SECTION_DEFS: ReadonlyArray<{
 ];
 
 async function migrate() {
-  const adapter = new PrismaMariaDb(connectionString!);
-  const prisma = new PrismaClient({ adapter });
+  const prisma = new PrismaClient({
+    adapter: createPrismaMariaDbAdapter(getRequiredDatabaseUrl())
+  });
 
   try {
     console.log("Starting lesson plan TipTap migration...\n");

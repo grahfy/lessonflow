@@ -16,35 +16,9 @@ if (!testDatabaseUrl) {
 
 const args = process.argv.slice(2);
 
-function resolveNpxBinary() {
-  if (process.platform === "win32") {
-    return "npx.cmd";
-  }
-
-  const npmExecPath = process.env.npm_execpath || "";
-  if (npmExecPath.endsWith("/npm-cli.js")) {
-    return process.execPath;
-  }
-
-  return "npx";
-}
-
-function buildNpxArgs(commandArgs) {
-  if (process.platform === "win32") {
-    return commandArgs;
-  }
-
-  const npmExecPath = process.env.npm_execpath || "";
-  if (npmExecPath.endsWith("/npm-cli.js")) {
-    return [npmExecPath, ...commandArgs];
-  }
-
-  return commandArgs;
-}
-
 // Vitest/test helpers usually read DATABASE_URL, so map the explicit test URL to
 // that variable only for the child process instead of mutating the parent shell.
-const result = spawnSync(resolveNpxBinary(), buildNpxArgs(["vitest", ...args]), {
+const result = spawnSync(process.platform === "win32" ? "npx.cmd" : "npx", ["vitest", ...args], {
   stdio: "inherit",
   env: {
     ...process.env,

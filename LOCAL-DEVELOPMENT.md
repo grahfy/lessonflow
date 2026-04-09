@@ -6,7 +6,7 @@ This guide covers setting up the Melbourne Guitar School (LessonFlow) applicatio
 
 ### Node.js
 
-- **Version**: Node.js 20.x LTS or newer
+- **Version**: Node.js 20.19+, 22.12+, or 24+
 - Check your version: `node --version`
 - Recommend using [nvm](https://github.com/nvm-sh/nvm) (Linux/macOS) or [nvm-windows](https://github.com/coreybutler/nvm-windows) to manage Node versions
 

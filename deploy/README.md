@@ -47,7 +47,7 @@ sudo ./deploy/setup-packages.sh
 ```
 
 This installs:
-- Node.js 20 LTS
+- Node.js 20.19+ LTS
 - MySQL/MariaDB
 - Nginx
 - Certbot (for SSL)
@@ -143,7 +143,7 @@ If you prefer to install packages manually or need more control:
 # Update system
 sudo apt update && sudo apt upgrade -y
 
-# Install Node.js 20
+# Install Node.js 20 LTS (20.19+)
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
 
@@ -167,7 +167,7 @@ sudo apt install -y build-essential python3
 # Update system
 sudo dnf upgrade -y  # or 'yum' on older systems
 
-# Install Node.js 20
+# Install Node.js 20 LTS (20.19+)
 curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
 sudo dnf install -y nodejs
 
@@ -195,7 +195,7 @@ sudo dnf group install -y "Development Tools"
 sudo zypper refresh
 sudo zypper update -y
 
-# Install Node.js 20
+# Install Node.js 20 LTS (20.19+)
 sudo zypper install -y nodejs20 nodejs20-npm
 sudo ln -sf /usr/bin/node20 /usr/bin/node
 sudo ln -sf /usr/bin/npm20 /usr/bin/npm

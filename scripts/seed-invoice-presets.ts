@@ -1,13 +1,9 @@
-import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import { PrismaClient } from "../src/generated/prisma/client";
+import { createPrismaMariaDbAdapter, getRequiredDatabaseUrl } from "../src/lib/prisma-mariadb";
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  throw new Error("DATABASE_URL environment variable is not set");
-}
-
-const adapter = new PrismaMariaDb(connectionString);
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient({
+  adapter: createPrismaMariaDbAdapter(getRequiredDatabaseUrl())
+});
 
 const PRESETS = [
   {

@@ -1379,7 +1379,7 @@ function inferSharedEnvPathFromReleaseRoot(root: string): string | null {
  * project-root `.env`.
  */
 function getEnvFilePath(options?: { cwd?: string; sharedDir?: string }): string {
-  const sharedDir = options?.sharedDir?.trim();
+  const sharedDir = options?.sharedDir?.trim() || process.env.SHARED_DIR?.trim();
   if (sharedDir) {
     return path.resolve(sharedDir, ".env");
   }
