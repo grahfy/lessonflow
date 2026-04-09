@@ -34,6 +34,7 @@ export const studentPortalBookingSchema = z.object({
   startAt: z.string().datetime({ offset: true }),
   endAt: z.string().datetime({ offset: true }),
   notes: z.string().nullable(),
+  notesContent: z.record(z.unknown()).nullable(),
   lessonPlanSummary: studentPortalLessonPlanV2SummarySchema.nullable(),
   materials: z.array(studentPortalMaterialSchema)
 });
@@ -111,6 +112,7 @@ type BookingMapInput = Pick<
   | "startAt"
   | "endAt"
   | "notes"
+  | "notesContent"
 > & {
   lessonPlan?: {
     sections: unknown;
@@ -179,6 +181,7 @@ export function mapStudentPortalBooking(booking: BookingMapInput): StudentPortal
     startAt: booking.startAt.toISOString(),
     endAt: booking.endAt.toISOString(),
     notes: booking.notes,
+    notesContent: booking.notesContent ?? null,
     lessonPlanSummary: mapStudentPortalLessonPlanSummary(booking.lessonPlan),
     materials: booking.learningMaterials.map(mapStudentPortalMaterial)
   });

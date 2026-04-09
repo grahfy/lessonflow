@@ -43,6 +43,7 @@ describe("student-portal-contracts", () => {
       startAt: new Date("2026-04-01T08:00:00.000Z"),
       endAt: new Date("2026-04-01T09:00:00.000Z"),
       notes: "Focus on rhythm consistency.",
+      notesContent: null,
       learningMaterials: [
         {
           id: "mat_1",

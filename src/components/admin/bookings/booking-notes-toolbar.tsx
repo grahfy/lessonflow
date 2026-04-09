@@ -10,15 +10,13 @@ import {
   Heading3,
   List,
   ListOrdered,
-  ListChecks,
   MessageSquareQuote,
-  Guitar,
   ImagePlus,
   Undo,
   Redo,
 } from "lucide-react";
 
-interface TipTapToolbarProps {
+interface BookingNotesToolbarProps {
   editor: Editor | null;
   onImageUpload?: (file: File) => void;
 }
@@ -78,12 +76,6 @@ const TOOLBAR_GROUPS: ToolbarAction[][] = [
       action: (e) => e.chain().focus().toggleOrderedList().run(),
       isActive: (e) => e.isActive("orderedList"),
     },
-    {
-      icon: ListChecks,
-      label: "Checklist",
-      action: (e) => e.chain().focus().toggleTaskList().run(),
-      isActive: (e) => e.isActive("taskList"),
-    },
   ],
   [
     {
@@ -91,13 +83,6 @@ const TOOLBAR_GROUPS: ToolbarAction[][] = [
       label: "Callout",
       action: (e) => e.chain().focus().toggleCallout({ calloutType: "note" }).run(),
       isActive: (e) => e.isActive("callout"),
-    },
-    {
-      icon: Guitar,
-      label: "Chord Diagram",
-      action: () => {
-        window.dispatchEvent(new CustomEvent("tiptap:insert-chord"));
-      },
     },
   ],
   [
@@ -115,10 +100,11 @@ const TOOLBAR_GROUPS: ToolbarAction[][] = [
 ];
 
 /**
- * Compact formatting toolbar for a lesson plan TipTap editor section.
- * Groups: text marks | headings | lists/checklists | undo/redo.
+ * Formatting toolbar for booking notes TipTap editor.
+ * Same structure as the lesson plan toolbar but with an image upload
+ * button instead of chord diagrams and material links.
  */
-export function TipTapToolbar({ editor, onImageUpload }: TipTapToolbarProps) {
+export function BookingNotesToolbar({ editor, onImageUpload }: BookingNotesToolbarProps) {
   useEditorState({
     editor,
     selector: ({ transactionNumber }) => transactionNumber,
@@ -136,6 +122,7 @@ export function TipTapToolbar({ editor, onImageUpload }: TipTapToolbarProps) {
       if (file && onImageUpload) {
         onImageUpload(file);
       }
+      // Reset so the same file can be re-selected.
       e.target.value = "";
     },
     [onImageUpload]

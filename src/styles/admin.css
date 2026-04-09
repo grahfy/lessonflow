@@ -5714,6 +5714,31 @@
   min-height: 100px;
 }
 
+.booking-notes-editor .tiptap-editor-shell {
+  min-height: 120px;
+}
+
+.booking-notes-editor .tiptap-editor-content {
+  min-height: 80px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.booking-notes-editor .tiptap-editor-content .booking-notes-image {
+  max-width: 100%;
+  border-radius: 6px;
+  margin: 8px 0;
+}
+
+.booking-notes-editor .helper-text {
+  margin-top: 4px;
+  font-size: var(--text-sm, 13px);
+}
+
+.booking-notes-editor .text-danger {
+  color: var(--danger, #ef4444);
+}
+
 #booking-detail-dialog .dialog-col {
   padding: 10px;
   gap: 6px;
@@ -8188,6 +8213,28 @@
   display: block;
   max-width: 160px;
   height: auto;
+}
+
+/* Inline images in TipTap content (lesson plans + booking notes) */
+.lp-viewer-image {
+  max-width: 100%;
+  border-radius: 6px;
+  margin: 8px 0;
+  display: block;
+}
+
+/* Booking notes viewer (student portal, read-only rich content) */
+.booking-notes-viewer {
+  margin-top: 4px;
+}
+
+.booking-notes-viewer .lp-viewer-p {
+  margin: 4px 0;
+  line-height: 1.45;
+}
+
+.booking-notes-viewer .lp-viewer-heading {
+  margin: 8px 0 4px;
 }
 
 /* Responsive */

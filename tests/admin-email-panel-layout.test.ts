@@ -92,6 +92,7 @@ const bookingEvent: BookingEvent = {
 
 const bookingDialogForm: BookingDialogForm = {
   notes: "",
+  notesContent: null,
   startAtLocal: "2026-03-19T21:00",
   firstName: "Ava",
   lastName: "Student",

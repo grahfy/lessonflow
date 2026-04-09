@@ -56,6 +56,8 @@ import { durationMinutesToBookingPayload, durationMinutesToChoiceValue, getPersi
 import { formatCurrency } from "@/lib/invoices/currency";
 import { type BookingInvoiceCandidateSummary, type BookingInvoiceResolveResponse } from "@/lib/invoices/schema";
 import { toDateKey, toDateTimeLocalValue } from "@/lib/time";
+import { plainTextToTiptapJson } from "@/lib/tiptap-utils";
+import type { JSONContent } from "@tiptap/react";
 
 import { BookingDetailDialog } from "./booking-detail-dialog";
 import { ManualBookingDialog } from "./manual-booking-dialog";
@@ -418,8 +420,18 @@ export function AdminBookingsClient() {
   const openDialog = useCallback((event: AdminCalendarEvent) => {
     setSelectedKey(event.id);
     const row = event.row as BookingRowData;
+    // Resolve rich notes: prefer notesContent (TipTap JSON), fall back to
+    // converting plain-text notes for existing bookings that predate the editor.
+    const resolvedNotesContent: JSONContent | null =
+      row.notesContent && typeof row.notesContent === "object"
+        ? (row.notesContent as JSONContent)
+        : typeof row.notes === "string" && row.notes.trim()
+          ? plainTextToTiptapJson(row.notes)
+          : null;
+
     setDialogForm({
       notes: typeof row.notes === "string" ? row.notes : "",
+      notesContent: resolvedNotesContent,
       startAtLocal: toDateTimeLocalValue(event.startAt),
       firstName: typeof row.firstName === "string" ? row.firstName : "",
       lastName: typeof row.lastName === "string" ? row.lastName : "",

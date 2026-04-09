@@ -26,6 +26,8 @@ interface BookingLessonPlanPanelV2Props {
   templateSelection: string;
   canManageLessonPlan: boolean;
   materials?: MaterialOption[];
+  /** Booking ID for image uploads in lesson plan sections. */
+  bookingId?: string | null;
   onTemplateSelectionChange: (value: string) => void;
   onCreateFromScratch: () => void;
   onApplyTemplate: () => void;
@@ -46,6 +48,7 @@ export function BookingLessonPlanPanelV2({
   templateSelection,
   canManageLessonPlan,
   materials,
+  bookingId,
   onTemplateSelectionChange,
   onCreateFromScratch,
   onApplyTemplate,
@@ -171,6 +174,7 @@ export function BookingLessonPlanPanelV2({
               sections={draft.sections}
               disabled={!canManageLessonPlan}
               materials={materials}
+              bookingId={bookingId}
               onChange={onDraftSectionsChange}
             />
           </section>

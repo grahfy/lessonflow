@@ -1,9 +1,12 @@
+import type { JSONContent } from "@tiptap/react";
+
 export type BookingRowData = Record<string, unknown> & {
   customerId?: string | null;
   customerName?: string | null;
   assignedTeacherId?: string | null;
   assignedTeacherName?: string | null;
   notes?: string | null;
+  notesContent?: JSONContent | null;
   firstName?: string | null;
   lastName?: string | null;
   email?: string | null;
@@ -23,6 +26,7 @@ export type BookingRowData = Record<string, unknown> & {
 
 export type BookingDialogForm = {
   notes: string;
+  notesContent: JSONContent | null;
   startAtLocal: string;
   firstName: string;
   lastName: string;

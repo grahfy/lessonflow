@@ -19,7 +19,9 @@ import { sendCustomerBookingMovedEmail, sendCustomerBookingStatusEmail } from "@
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
+import { Prisma } from "@/generated/prisma/client";
 import { getActiveLessonPricingMap } from "@/lib/lesson-pricing";
+import { tiptapJsonToPlainText } from "@/lib/tiptap-utils";
 
 type Params = {
   params: Promise<{
@@ -45,7 +47,8 @@ const editSchema = z.object({
   lessonDuration: lessonDurationSchema.optional(),
   customDurationMinutes: nullableOptionalCustomDurationMinutesSchema,
   assignedTeacherId: z.string().trim().min(1).nullable().optional(),
-  notes: z.string().trim().max(1000).nullable().optional()
+  notes: z.string().trim().nullable().optional(),
+  notesContent: z.record(z.unknown()).nullable().optional()
 });
 
 /**
@@ -223,7 +226,18 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         state: nextState,
         postcode: nextPostcode
       });
-      const nextNotes = parsed.data.notes === null ? null : parsed.data.notes ?? existing.notes;
+      // When notesContent (TipTap JSON) is provided, derive plain-text notes from it.
+      // This keeps the text column in sync for search, email snippets, and backward compat.
+      const nextNotesContent =
+        parsed.data.notesContent === null
+          ? null
+          : parsed.data.notesContent ?? existing.notesContent;
+      const nextNotes =
+        nextNotesContent != null
+          ? tiptapJsonToPlainText(nextNotesContent) || null
+          : parsed.data.notes === null
+            ? null
+            : parsed.data.notes ?? existing.notes;
       const hasMandatory =
         !!nextName.trim() &&
         !!nextEmail.trim() &&
@@ -268,6 +282,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             endAt: getBookingEnd(existing.startAt, nextDuration, nextCustomDurationMinutes),
             ...(isOwner(admin) ? { assignedTeacherId: nextAssignedTeacherId } : {}),
             notes: nextNotes,
+            notesContent:
+              nextNotesContent === null
+                ? Prisma.JsonNull
+                : nextNotesContent != null
+                  ? (nextNotesContent as Prisma.InputJsonValue)
+                  : undefined,
             modifiedById: admin.id
           }
         });

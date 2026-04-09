@@ -277,6 +277,7 @@ model Booking {
   endAt                 DateTime
   timezone              String
   notes                 String?               @db.Text
+  notesContent          Json?
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
   cancelledAt           DateTime?
@@ -295,6 +296,7 @@ model Booking {
   invoiceLinks          InvoiceBookingLink[]
   learningMaterials     LearningMaterial[]
   lessonPlan            LessonPlan?
+  noteImages            BookingNoteImage[]
 
   @@index([startAt, status])
   @@index([customerId])
@@ -314,6 +316,20 @@ model BookingAuditLog {
   createdAt DateTime    @default(now())
 
   @@index([createdAt])
+  @@index([bookingId])
+}
+
+// Images uploaded inline into booking notes (TipTap rich text).
+// Tracked for serving via auth-guarded endpoints and storage cleanup.
+model BookingNoteImage {
+  id         String   @id @default(cuid())
+  bookingId  String
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  storageKey String
+  mimeType   String
+  sizeBytes  Int
+  createdAt  DateTime @default(now())
+
   @@index([bookingId])
 }
 

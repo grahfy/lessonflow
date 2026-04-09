@@ -21,6 +21,7 @@ import { requireAdminFromRequest } from "@/lib/admin-route";
 import { prisma } from "@/lib/db";
 import { getActiveLessonPricingMap } from "@/lib/lesson-pricing";
 import { ensurePortalCredentialForCustomer } from "@/lib/student-portal/credentials";
+import { tiptapJsonToPlainText } from "@/lib/tiptap-utils";
 
 /**
  * Enhanced schema for manual bookings created by an admin.
@@ -423,7 +424,8 @@ export async function POST(request: NextRequest) {
             startAt: start,
             endAt: getBookingEnd(start, parsed.data.lessonDuration, parsed.data.customDurationMinutes),
             timezone: APP_TIMEZONE,
-            notes: parsed.data.notes,
+            notes: parsed.data.notesContent ? tiptapJsonToPlainText(parsed.data.notesContent) || parsed.data.notes : parsed.data.notes,
+            notesContent: parsed.data.notesContent ? (parsed.data.notesContent as Prisma.InputJsonValue) : undefined,
             seriesId: series.id,
             assignedTeacherId: requestedAssignedTeacherId,
             customerId,
@@ -454,7 +456,8 @@ export async function POST(request: NextRequest) {
             startAt,
             endAt: getBookingEnd(startAt, parsed.data.lessonDuration, parsed.data.customDurationMinutes),
             timezone: APP_TIMEZONE,
-            notes: parsed.data.notes,
+            notes: parsed.data.notesContent ? tiptapJsonToPlainText(parsed.data.notesContent) || parsed.data.notes : parsed.data.notes,
+            notesContent: parsed.data.notesContent ? (parsed.data.notesContent as Prisma.InputJsonValue) : undefined,
             assignedTeacherId: requestedAssignedTeacherId,
             customerId,
             modifiedById: admin.id

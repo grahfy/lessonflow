@@ -1,5 +1,6 @@
 import StarterKit from "@tiptap/starter-kit";
 import TaskList from "@tiptap/extension-task-list";
+import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import { MaterialLinkMark } from "./nodes/material-link-mark";
 import { ChecklistItemExtension } from "./nodes/checklist-item-extension";
@@ -27,6 +28,11 @@ export function buildLessonPlanExtensions(placeholder?: string) {
     }),
     MaterialLinkMark,
     CalloutExtension,
+    Image.configure({
+      inline: false,
+      allowBase64: false,
+      HTMLAttributes: { class: "lesson-plan-image" },
+    }),
     Placeholder.configure({
       placeholder: placeholder ?? "Start typing...",
     }),

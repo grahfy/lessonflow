@@ -19,6 +19,8 @@ interface LessonPlanSectionsEditorProps {
   className?: string;
   /** Available learning materials for inline linking in section editors. */
   materials?: MaterialOption[];
+  /** Booking ID for image uploads. When provided, enables image upload in section editors. */
+  bookingId?: string | null;
   onChange: (sections: LessonPlanSection[]) => void;
 }
 
@@ -32,6 +34,7 @@ export function LessonPlanSectionsEditor({
   disabled = false,
   className,
   materials,
+  bookingId,
   onChange,
 }: LessonPlanSectionsEditorProps) {
   const [addingSection, setAddingSection] = useState(false);
@@ -150,6 +153,7 @@ export function LessonPlanSectionsEditor({
             placeholder={`${section.title}...`}
             editable={!disabled}
             materials={materials}
+            bookingId={bookingId}
             onUpdate={(json) => handleSectionContentChange(index, json)}
           />
         </div>

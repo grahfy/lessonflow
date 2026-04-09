@@ -6,6 +6,7 @@ import { type ReactElement, FormEvent, useCallback, useEffect, useState } from "
 
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import styles from "@/components/student-portal.module.css";
+import { BookingNotesViewer } from "@/components/student-portal/booking-notes-viewer";
 import { LessonPlanViewer } from "@/components/student-portal/lesson-plan-viewer";
 import {
   parseStudentPortalPayload,
@@ -461,7 +462,15 @@ function BookingList(input: BookingListProps) {
             </div>
           ) : null}
 
-          {booking.notes ? (
+          {booking.notesContent ? (
+            <details className={styles["booking-details"]} open>
+              <summary>Lesson notes</summary>
+              <BookingNotesViewer
+                notesContent={booking.notesContent}
+                bookingId={booking.id}
+              />
+            </details>
+          ) : booking.notes ? (
             <details className={styles["booking-details"]}>
               <summary>Lesson notes</summary>
               <p>{booking.notes}</p>
@@ -471,7 +480,7 @@ function BookingList(input: BookingListProps) {
           {booking.lessonPlanSummary ? (
             <div className={styles["lesson-plan-summary"]}>
               <strong className={styles["materials-section-title"]}>Lesson plan summary</strong>
-              <LessonPlanViewer sections={booking.lessonPlanSummary.sections} />
+              <LessonPlanViewer sections={booking.lessonPlanSummary.sections} bookingId={booking.id} />
             </div>
           ) : null}
 

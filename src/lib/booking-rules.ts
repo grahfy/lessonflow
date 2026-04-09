@@ -115,7 +115,8 @@ const bookingRequestFields = z.object({
   lessonDuration: lessonDurationSchema,
   customDurationMinutes: optionalCustomDurationMinutesSchema,
   requestedStartAt: isoDateParser,
-  notes: z.string().trim().max(1000).optional(),
+  notes: z.string().trim().optional(),
+  notesContent: z.record(z.unknown()).nullable().optional(),
   isRecurring: z.boolean().default(false),
   recurrenceEndAt: isoDateParser.optional()
 });

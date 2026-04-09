@@ -48,6 +48,8 @@ import type {
 
 import { BookingMaterialsDialog } from "./booking-materials-dialog";
 import { BookingLessonPlanPanelV2 } from "@/components/admin/lesson-plans/booking-lesson-plan-panel-v2";
+import { TipTapEditor } from "@/components/admin/lesson-plans/editor/tiptap-editor";
+import { buildBookingNotesExtensions } from "./booking-notes-extensions";
 import { type BookingDialogForm, type BookingMatchedCustomer } from "./types";
 
 interface BookingDetailDialogProps {
@@ -445,8 +447,16 @@ export function BookingDetailDialog({
               {/* SECTION: NOTES & DOMAIN ACTIONS */}
               <div className="dialog-col is-notes">
                 <h3 className="manual-section-title">Notes & Actions</h3>
-                <AdminField label="Lesson notes" tooltip="Internal notes about the student's progress or goals.">
-                  <textarea className="dialog-notes booking-notes-area" value={dialogForm.notes} onChange={(e) => updateForm({ notes: e.target.value })} />
+                <AdminField label="Lesson notes" tooltip="Internal notes about the student's progress or goals. Visible to the student in their portal.">
+                  <div className="booking-notes-editor">
+                    <TipTapEditor
+                      content={dialogForm.notesContent}
+                      onUpdate={(json) => updateForm({ notesContent: json })}
+                      extensions={buildBookingNotesExtensions()}
+                      bookingId={event.entityType === "booking" ? event.id : null}
+                      minimal
+                    />
+                  </div>
                 </AdminField>
                 <div className="button-row booking-notes-actions">
                   <Tooltip content="Reschedule the lesson to a new start time.">
@@ -534,6 +544,7 @@ export function BookingDetailDialog({
               materials={lessonPlanDialogProps.materials}
               templateSelection={lessonPlanDialogProps.templateSelection}
               canManageLessonPlan={canManageAppointment}
+              bookingId={event.entityType === "booking" ? event.id : null}
               onTemplateSelectionChange={lessonPlanDialogProps.onTemplateSelectionChange}
               onCreateFromScratch={lessonPlanDialogProps.onCreateFromScratch}
               onApplyTemplate={lessonPlanDialogProps.onApplyTemplate}
