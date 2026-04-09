@@ -5,7 +5,9 @@ import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { verifyCaptchaSubmission } from "@/lib/captcha";
 import { prisma } from "@/lib/db";
-import { createMaterialStorageDriver } from "@/lib/student-portal/material-storage";
+import { logError } from "@/lib/observability";
+import { createMaterialStorageDriver, getMaterialStorageDriverName } from "@/lib/student-portal/material-storage";
+import { getLocalMaterialStorageRoot } from "@/lib/student-portal/material-storage.local";
 import {
   buildLearningMaterialStorageKey,
   classifyLearningMaterialFile,
@@ -210,13 +212,32 @@ export async function POST(request: NextRequest, { params }: Params) {
       extension: classification.extension
     });
 
+    const storageDriverName = getMaterialStorageDriverName();
     const storage = createMaterialStorageDriver();
     const buffer = Buffer.from(await file.arrayBuffer());
-    await storage.put({
-      storageKey,
-      buffer,
-      mimeType: classification.mimeType
-    });
+    try {
+      await storage.put({
+        storageKey,
+        buffer,
+        mimeType: classification.mimeType
+      });
+    } catch (error) {
+      logError("learning_material.storage_put_failed", error, {
+        customerId: customer.id,
+        bookingId: linkedBookingId,
+        storageDriver: storageDriverName,
+        storageKey,
+        storageRoot: storageDriverName === "local" ? getLocalMaterialStorageRoot() : null
+      });
+
+      return NextResponse.json(
+        {
+          error: "Unable to store learning material file. Check the configured storage path and permissions.",
+          code: "LEARNING_MATERIAL_STORAGE_FAILED"
+        },
+        { status: 500 }
+      );
+    }
 
     try {
       const material = await prisma.learningMaterial.create({

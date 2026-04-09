@@ -2,12 +2,14 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import { resolveConfiguredStorageRoot } from "@/lib/runtime-paths";
+
 type StoredStaffPhoto = {
   buffer: Buffer;
   mimeType: string;
 };
 
-const DEFAULT_LOCAL_ROOT = path.resolve(process.cwd(), ".data/admin-staff-photos");
+const DEFAULT_LOCAL_ROOT = ".data/admin-staff-photos";
 const ALLOWED_IMAGE_TYPES = new Map<string, string>([
   ["image/jpeg", "jpg"],
   ["image/png", "png"],
@@ -16,7 +18,7 @@ const ALLOWED_IMAGE_TYPES = new Map<string, string>([
 ]);
 
 function getStorageRoot(): string {
-  return DEFAULT_LOCAL_ROOT;
+  return resolveConfiguredStorageRoot(undefined, DEFAULT_LOCAL_ROOT);
 }
 
 function resolveLocalPath(storageKey: string): string {

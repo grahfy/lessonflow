@@ -1,7 +1,9 @@
 import fs from "node:fs/promises";
-import { beforeEach, describe, expect, it } from "vitest";
+import os from "node:os";
+import path from "node:path";
 import { NextRequest } from "next/server";
 import bcrypt from "bcryptjs";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GET, POST } from "@/app/api/admin/customers/[id]/learning-materials/route";
 import { DELETE } from "@/app/api/admin/learning-materials/[id]/route";
@@ -219,6 +221,51 @@ describe("admin-learning-materials", () => {
     // Verify retrieval
     const dbMaterial = await prisma.learningMaterial.findUnique({ where: { id: material.id } });
     expect(dbMaterial?.materialType).toBe("image");
+  });
+
+  it("stores uploaded learning materials under the app root when cwd points at standalone output", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "mgs-material-standalone-root-"));
+    const releaseDir = path.join(tempRoot, "releases", "20260410120000");
+    const standaloneDir = path.join(releaseDir, ".next", "standalone");
+    await fs.mkdir(standaloneDir, { recursive: true });
+
+    const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(standaloneDir);
+    vi.stubEnv("LEARNING_MATERIALS_LOCAL_ROOT", ".data/learning-materials");
+
+    try {
+      const admin = await ensureOwnerAdmin();
+      const token = createSessionToken(admin.email);
+      const cookie = `${getSessionCookieName()}=${token}`;
+
+      const customer = await createCustomer("Standalone Student", "standalone@example.com", "0400777888", "3070");
+
+      const uploadForm = new FormData();
+      uploadForm.set(
+        "file",
+        new File([Buffer.from("standalone-pdf")], "lesson.pdf", {
+          type: "application/pdf"
+        })
+      );
+
+      const uploadRequest = new NextRequest(`http://localhost/api/admin/customers/${customer.id}/learning-materials`, {
+        method: "POST",
+        body: uploadForm,
+        headers: { cookie }
+      });
+      const uploadResponse = await POST(uploadRequest, {
+        params: Promise.resolve({ id: customer.id })
+      });
+      expect(uploadResponse.status).toBe(201);
+
+      const expectedRoot = path.join(releaseDir, ".data", "learning-materials");
+      const storedEntries = await fs.readdir(path.join(expectedRoot, customer.id), { recursive: true });
+      expect(storedEntries.length).toBeGreaterThan(0);
+
+      await expect(fs.access(path.join(standaloneDir, ".data", "learning-materials", customer.id))).rejects.toThrow();
+    } finally {
+      cwdSpy.mockRestore();
+      vi.unstubAllEnvs();
+    }
   });
 
   it("does not expose another teacher's booking-linked materials to the customer's primary teacher", async () => {

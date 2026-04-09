@@ -332,9 +332,13 @@ After any deploy or permission repair, verify:
 ```bash
 sudo -u www-data test -w /var/www/lessonflow/shared/.env
 readlink -f /var/www/lessonflow/current/.env
+sudo -u www-data test -w /var/www/lessonflow/data/learning-materials
 ```
 
 The first command should succeed, and the second should resolve to `/var/www/lessonflow/shared/.env`.
+The third command should also succeed.
+
+Use an absolute `LEARNING_MATERIALS_LOCAL_ROOT` in production. Relative roots are acceptable for local development, but in standalone deployments they resolve from the runtime app directory and can end up inside the current release tree instead of persistent shared storage.
 
 ---
 

@@ -15,6 +15,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import { resolveConfiguredStorageRoot } from "@/lib/runtime-paths";
 import type {
   DeleteMaterialInput,
   GetMaterialInput,
@@ -23,17 +24,13 @@ import type {
   PutMaterialInput
 } from "@/lib/student-portal/material-storage";
 
-const DEFAULT_LOCAL_ROOT = path.resolve(process.cwd(), ".data/learning-materials");
+const DEFAULT_LOCAL_ROOT = ".data/learning-materials";
 
 /**
  * Resolves the root directory used for local learning-material persistence.
  */
-function getLocalStorageRoot(): string {
-  const configured = process.env.LEARNING_MATERIALS_LOCAL_ROOT?.trim();
-  if (!configured) {
-    return DEFAULT_LOCAL_ROOT;
-  }
-  return path.resolve(configured);
+export function getLocalMaterialStorageRoot(): string {
+  return resolveConfiguredStorageRoot(process.env.LEARNING_MATERIALS_LOCAL_ROOT, DEFAULT_LOCAL_ROOT);
 }
 
 /**
@@ -45,7 +42,7 @@ function resolveLocalPath(storageKey: string): string {
   if (normalized.startsWith("..")) {
     throw new Error("Invalid storage key path.");
   }
-  return path.join(getLocalStorageRoot(), normalized);
+  return path.join(getLocalMaterialStorageRoot(), normalized);
 }
 
 /**

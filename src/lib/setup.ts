@@ -38,6 +38,7 @@ import { AppError } from "@/lib/errors";
 import { DEFAULT_GEOBLOCKING_SETTINGS_ID } from "@/lib/geoblocking-settings";
 import { geoblockingSettingsInputSchema } from "@/lib/geoblocking-settings-contract";
 import { logError } from "@/lib/observability";
+import { isRelativeConfiguredPath, resolveConfiguredStorageRoot, resolveRuntimeAppRoot } from "@/lib/runtime-paths";
 import { getMaterialStorageDriverName } from "@/lib/student-portal/material-storage";
 
 /**
@@ -677,7 +678,7 @@ export type AdminSettingsSaveResult =
       error?: string;
     };
 
-const DEFAULT_LOCAL_MATERIAL_ROOT = path.resolve(process.cwd(), ".data/learning-materials");
+const DEFAULT_LOCAL_MATERIAL_ROOT = ".data/learning-materials";
 
 /**
  * Returns true when the value is clearly a default/example placeholder.
@@ -718,11 +719,7 @@ function hasStrongSecret(value: string, minLength: number): boolean {
  * Resolves the configured local learning-material root directory.
  */
 function getLocalMaterialRoot(): string {
-  const configured = process.env.LEARNING_MATERIALS_LOCAL_ROOT?.trim();
-  if (!configured) {
-    return DEFAULT_LOCAL_MATERIAL_ROOT;
-  }
-  return path.resolve(configured);
+  return resolveConfiguredStorageRoot(process.env.LEARNING_MATERIALS_LOCAL_ROOT, DEFAULT_LOCAL_MATERIAL_ROOT);
 }
 
 /**
@@ -986,15 +983,20 @@ export async function evaluateSetupChecks(): Promise<SetupCheck[]> {
     });
   } else {
     const localStorageWritable = await canWriteLocalMaterialRoot();
+    const configuredMaterialRoot = process.env.LEARNING_MATERIALS_LOCAL_ROOT?.trim();
+    const resolvedMaterialRoot = getLocalMaterialRoot();
+    const materialRootIsRelative = isRelativeConfiguredPath(configuredMaterialRoot);
     checks.push({
       id: "materials-storage-driver",
       title: "Learning material storage",
       status: localStorageWritable ? (isProduction ? "warn" : "pass") : "fail",
       detail: localStorageWritable
         ? isProduction
-          ? "Local storage is writable. Ensure your hosting keeps this directory persistent and backed up."
+          ? materialRootIsRelative
+            ? `Local storage is writable at ${resolvedMaterialRoot}, but the configured path is relative. Use an absolute shared path in production so uploads stay outside the current release.`
+            : `Local storage is writable at ${resolvedMaterialRoot}. Ensure your hosting keeps this directory persistent and backed up.`
           : "Local storage root is writable."
-        : "Local storage root is not writable. Fix LEARNING_MATERIALS_LOCAL_ROOT permissions."
+        : `Local storage root is not writable at ${resolvedMaterialRoot}. Fix LEARNING_MATERIALS_LOCAL_ROOT permissions.`
     });
   }
 
@@ -1343,17 +1345,6 @@ export async function createInitialAdmin(input: SetupInitializeInput) {
   return created;
 }
 
-function resolveEnvAppRoot(cwd: string): string {
-  const normalizedCwd = path.resolve(cwd);
-  const standaloneSuffix = `${path.sep}.next${path.sep}standalone`;
-
-  if (normalizedCwd.endsWith(standaloneSuffix)) {
-    return path.resolve(normalizedCwd, "../..");
-  }
-
-  return normalizedCwd;
-}
-
 function inferSharedEnvPathFromReleaseRoot(root: string): string | null {
   const normalizedRoot = path.resolve(root);
   const rootPrefix = path.parse(normalizedRoot).root;
@@ -1384,7 +1375,7 @@ function getEnvFilePath(options?: { cwd?: string; sharedDir?: string }): string 
     return path.resolve(sharedDir, ".env");
   }
 
-  const root = resolveEnvAppRoot(options?.cwd || process.cwd());
+  const root = resolveRuntimeAppRoot(options?.cwd || process.cwd());
   const sharedEnvPath = inferSharedEnvPathFromReleaseRoot(root);
 
   if (sharedEnvPath) {
