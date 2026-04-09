@@ -1947,13 +1947,13 @@ refresh_tui_remote_update_cache() {
   # Never prompt for credentials from inside the TUI refresh loop.
   # Run git commands from the resolved git root for consistent results.
   if command -v timeout >/dev/null 2>&1; then
-    if ! run_source_git_cmd_for_update_with_prompt_guard_timeout 8s "${git_root}" fetch --quiet --no-tags "${REMOTE_NAME}" "${BRANCH}" >/dev/null 2>&1; then
+    if ! run_source_git_cmd_for_update_with_prompt_guard_timeout 8s "${git_root}" fetch --quiet --no-tags "${REMOTE_NAME}" "+refs/heads/${BRANCH}:refs/remotes/${REMOTE_NAME}/${BRANCH}" >/dev/null 2>&1; then
       TUI_REMOTE_UPDATE_STATUS="error"
       TUI_REMOTE_UPDATE_ERROR="remote check failed or timed out"
       return 0
     fi
   else
-    if ! run_source_git_cmd_for_update_with_prompt_guard "${git_root}" fetch --quiet --no-tags "${REMOTE_NAME}" "${BRANCH}" >/dev/null 2>&1; then
+    if ! run_source_git_cmd_for_update_with_prompt_guard "${git_root}" fetch --quiet --no-tags "${REMOTE_NAME}" "+refs/heads/${BRANCH}:refs/remotes/${REMOTE_NAME}/${BRANCH}" >/dev/null 2>&1; then
       TUI_REMOTE_UPDATE_STATUS="error"
       TUI_REMOTE_UPDATE_ERROR="remote check failed"
       return 0
@@ -2146,7 +2146,7 @@ run_tui_script_update_and_reload() {
   local after_commit=""
   before_commit="$(run_source_git_cmd_for_update "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || true)"
 
-  run_step "Fetching ${REMOTE_NAME}/${BRANCH}" run_source_git_cmd_for_update "${REPO_ROOT}" fetch "${REMOTE_NAME}" "${BRANCH}" || return 0
+  run_step "Fetching ${REMOTE_NAME}/${BRANCH}" run_source_git_cmd_for_update "${REPO_ROOT}" fetch "${REMOTE_NAME}" "+refs/heads/${BRANCH}:refs/remotes/${REMOTE_NAME}/${BRANCH}" || return 0
 
   if [[ "$(current_branch_name)" != "${BRANCH}" ]]; then
     run_step "Checking out ${BRANCH}" run_source_git_cmd_for_update "${REPO_ROOT}" checkout "${BRANCH}" || return 0
@@ -3235,7 +3235,7 @@ if [[ "${SOURCE_MODE}" == "git" ]]; then
     local_before_pull_commit="$(run_source_git_cmd_for_update "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || true)"
     # Fetch/pull stays in the persistent repo clone; deploy.sh then rsyncs a clean
     # release directory so runtime symlink switches remain atomic.
-    run_step "Fetching ${REMOTE_NAME}/${BRANCH}" run_source_git_cmd_for_update "${REPO_ROOT}" fetch "${REMOTE_NAME}" "${BRANCH}"
+    run_step "Fetching ${REMOTE_NAME}/${BRANCH}" run_source_git_cmd_for_update "${REPO_ROOT}" fetch "${REMOTE_NAME}" "+refs/heads/${BRANCH}:refs/remotes/${REMOTE_NAME}/${BRANCH}"
 
     if [[ "$(current_branch_name)" != "${BRANCH}" ]]; then
       run_step "Checking out ${BRANCH}" run_source_git_cmd_for_update "${REPO_ROOT}" checkout "${BRANCH}"
