@@ -49,7 +49,7 @@ import type {
 import { BookingMaterialsDialog } from "./booking-materials-dialog";
 import { BookingLessonPlanPanelV2 } from "@/components/admin/lesson-plans/booking-lesson-plan-panel-v2";
 import { TipTapEditor } from "@/components/admin/lesson-plans/editor/tiptap-editor";
-import { buildBookingNotesExtensions } from "./booking-notes-extensions";
+import { bookingNotesExtensions } from "./booking-notes-extensions";
 import { type BookingDialogForm, type BookingMatchedCustomer } from "./types";
 
 interface BookingDetailDialogProps {
@@ -452,7 +452,7 @@ export function BookingDetailDialog({
                     <TipTapEditor
                       content={dialogForm.notesContent}
                       onUpdate={(json) => updateForm({ notesContent: json })}
-                      extensions={buildBookingNotesExtensions()}
+                      extensions={bookingNotesExtensions}
                       bookingId={event.entityType === "booking" ? event.id : null}
                       minimal
                     />
