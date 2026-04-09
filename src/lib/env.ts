@@ -137,9 +137,9 @@ export function getUpdatesGitRepoPath(): string {
 /**
  * Returns the OS user that should run web-triggered deploys.
  *
- * RATIONALE: Browser-triggered updates must execute as the deployment user,
- * not the app runtime user (`www-data`), so release creation and git access
- * follow the same permission model as manual deploys.
+ * RATIONALE: Browser-triggered updates use this account for source-git fetch
+ * and merge operations even when the host-side runner itself executes with
+ * higher privileges for swap management and service restarts.
  */
 export function getUpdatesDeployUser(): string {
   return (process.env.UPDATES_DEPLOY_USER || "").trim();

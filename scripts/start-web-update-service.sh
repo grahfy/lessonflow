@@ -14,4 +14,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="${UPDATES_GIT_REPO_PATH:-${APP_ROOT}}"
 
+# RATIONALE: The systemd unit may run as root so swap/systemctl operations can
+# succeed on low-memory hosts, while git writes stay pinned to the configured
+# deploy user to avoid root-owned checkout state.
+export MGS_SOURCE_GIT_USER="${MGS_SOURCE_GIT_USER:-${UPDATES_DEPLOY_USER:-}}"
+export MGS_SUDO_USER="${MGS_SUDO_USER:-${UPDATES_DEPLOY_USER:-}}"
+
 exec /usr/bin/env bash "${SCRIPT_DIR}/trigger-update.sh" "${REPO_ROOT}"

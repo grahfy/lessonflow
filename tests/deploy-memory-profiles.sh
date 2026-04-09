@@ -42,6 +42,28 @@ assert_not_contains() {
   fi
 }
 
+assert_order() {
+  local actual="$1"
+  local first="$2"
+  local second="$3"
+  local message="$4"
+  local first_line=""
+  local second_line=""
+
+  first_line="$(printf '%s\n' "${actual}" | grep -nF "${first}" | head -n 1 | cut -d: -f1)"
+  second_line="$(printf '%s\n' "${actual}" | grep -nF "${second}" | head -n 1 | cut -d: -f1)"
+
+  if [[ -z "${first_line}" || -z "${second_line}" || "${first_line}" -ge "${second_line}" ]]; then
+    echo "${message}"
+    echo "Expected order:"
+    echo "  1. ${first}"
+    echo "  2. ${second}"
+    echo "Actual:"
+    printf '%s\n' "${actual}"
+    exit 1
+  fi
+}
+
 run_next_config_probe() {
   local low_memory_flag="$1"
 
@@ -114,6 +136,14 @@ run_deploy_next_build_probe() {
     prepare_next_build_environment
     printf '%s|%s' \"\${NEXT_LOW_MEMORY_BUILD:-}\" \"\${NODE_OPTIONS:-}\"
   "
+}
+
+run_deploy_dependency_install_sequence_probe() {
+  awk '
+    /# Install dependencies/ { in_block=1 }
+    /# Consolidate Prisma update/ { in_block=0 }
+    in_block { print }
+  ' "${REPO_ROOT}/deploy/deploy.sh"
 }
 
 run_deploy_swap_probe() {
@@ -246,6 +276,8 @@ assert_equals "$(run_next_config_probe 1)" '{"webpackMemoryOptimizations":true,"
 assert_equals "$(run_update_heap_probe)" "--max-old-space-size=3072" "update.sh should apply the 2GB auto heap override"
 assert_equals "$(run_deploy_heap_probe)" "--max-old-space-size=3072" "deploy.sh should apply the 2GB auto heap override"
 assert_equals "$(run_deploy_next_build_probe)" "1|--max-old-space-size=2048" "deploy.sh should use the conservative 2GB Next.js low-memory build heap cap"
+install_sequence_probe="$(run_deploy_dependency_install_sequence_probe)"
+assert_order "${install_sequence_probe}" "ensure_temporary_build_swap" 'run_npm_step_with_cache_repair "Installing production dependencies (npm ci)" npm ci --omit=dev --ignore-scripts' "deploy.sh should enable low-memory swap protection before npm ci"
 swap_probe_output="$(run_deploy_swap_probe)"
 assert_contains "${swap_probe_output}" "reach ~2048MB total swap" "deploy.sh should target 2048MB total swap for the 2GB low-memory branch"
 assert_contains "${swap_probe_output}" "ACTIVE=true CREATED=true EXISTS=true" "deploy.sh should mark the temporary swap file active for the 2GB low-memory branch"

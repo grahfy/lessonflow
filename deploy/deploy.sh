@@ -428,8 +428,9 @@ print_banner() {
 }
 
 # Renders the host-side systemd unit used by the browser-triggered update flow.
-# We keep it separate from the main app unit because the runner must execute as
-# the deploy user rather than the runtime user (`www-data`).
+# We keep it separate from the main app unit because the runner needs host-level
+# privileges for deploy operations, while source-git writes stay pinned to the
+# configured deploy user instead of the runtime user (`www-data`).
 render_web_update_service_template() {
     local template_path="$1"
     local output_path="$2"
@@ -4291,6 +4292,9 @@ configure_release_build_caches
 
 # Install dependencies
 if [[ "${SKIP_DEPS}" == false ]]; then
+    # RATIONALE: Production dependency installation can OOM on 1GB/2GB hosts
+    # before the later build-phase swap setup would otherwise kick in.
+    ensure_temporary_build_swap
     run_npm_step_with_cache_repair "Installing production dependencies (npm ci)" npm ci --omit=dev --ignore-scripts
 fi
 

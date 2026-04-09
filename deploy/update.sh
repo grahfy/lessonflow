@@ -284,6 +284,105 @@ auto_size_tui_panel_width() {
   UPDATE_TUI_PANEL_WIDTH="${target_width}"
 }
 
+resolve_source_git_user_for_update() {
+  local repo_root="$1"
+  local repo_owner=""
+  local candidate=""
+
+  if [[ -n "${MGS_SOURCE_GIT_USER:-}" ]]; then
+    printf '%s\n' "${MGS_SOURCE_GIT_USER}"
+    return 0
+  fi
+
+  if [[ ${EUID} -ne 0 ]]; then
+    return 1
+  fi
+
+  repo_owner="$(stat -c '%U' "${repo_root}" 2>/dev/null || true)"
+
+  for candidate in "${MGS_SUDO_USER:-}" "${SUDO_USER:-}" "${repo_owner}"; do
+    if [[ -n "${candidate}" && "${candidate}" != "root" && "${candidate}" != "UNKNOWN" ]]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+run_source_git_cmd_for_update() {
+  local repo_root="$1"
+  shift
+
+  local source_git_user=""
+  local current_user=""
+  source_git_user="$(resolve_source_git_user_for_update "${repo_root}" || true)"
+  current_user="$(id -un 2>/dev/null || true)"
+
+  if [[ -n "${source_git_user}" && "${source_git_user}" != "${current_user}" ]]; then
+    if command -v runuser >/dev/null 2>&1; then
+      runuser -u "${source_git_user}" -- git -C "${repo_root}" "$@"
+      return
+    fi
+    if command -v sudo >/dev/null 2>&1; then
+      sudo -u "${source_git_user}" git -C "${repo_root}" "$@"
+      return
+    fi
+    log_warn "Could not switch git update actions to ${source_git_user}; continuing as ${current_user:-current user}."
+  fi
+
+  git -C "${repo_root}" "$@"
+}
+
+run_source_git_cmd_for_update_with_prompt_guard() {
+  local repo_root="$1"
+  shift
+
+  local source_git_user=""
+  local current_user=""
+  source_git_user="$(resolve_source_git_user_for_update "${repo_root}" || true)"
+  current_user="$(id -un 2>/dev/null || true)"
+
+  if [[ -n "${source_git_user}" && "${source_git_user}" != "${current_user}" ]]; then
+    if command -v runuser >/dev/null 2>&1; then
+      runuser -u "${source_git_user}" -- env GIT_TERMINAL_PROMPT=0 git -C "${repo_root}" "$@"
+      return
+    fi
+    if command -v sudo >/dev/null 2>&1; then
+      sudo -u "${source_git_user}" env GIT_TERMINAL_PROMPT=0 git -C "${repo_root}" "$@"
+      return
+    fi
+    log_warn "Could not switch guarded git update actions to ${source_git_user}; continuing as ${current_user:-current user}."
+  fi
+
+  env GIT_TERMINAL_PROMPT=0 git -C "${repo_root}" "$@"
+}
+
+run_source_git_cmd_for_update_with_prompt_guard_timeout() {
+  local timeout_seconds="$1"
+  local repo_root="$2"
+  shift 2
+
+  local source_git_user=""
+  local current_user=""
+  source_git_user="$(resolve_source_git_user_for_update "${repo_root}" || true)"
+  current_user="$(id -un 2>/dev/null || true)"
+
+  if [[ -n "${source_git_user}" && "${source_git_user}" != "${current_user}" ]]; then
+    if command -v runuser >/dev/null 2>&1; then
+      timeout "${timeout_seconds}" runuser -u "${source_git_user}" -- env GIT_TERMINAL_PROMPT=0 git -C "${repo_root}" "$@"
+      return
+    fi
+    if command -v sudo >/dev/null 2>&1; then
+      timeout "${timeout_seconds}" sudo -u "${source_git_user}" env GIT_TERMINAL_PROMPT=0 git -C "${repo_root}" "$@"
+      return
+    fi
+    log_warn "Could not switch timed git update actions to ${source_git_user}; continuing as ${current_user:-current user}."
+  fi
+
+  timeout "${timeout_seconds}" env GIT_TERMINAL_PROMPT=0 git -C "${repo_root}" "$@"
+}
+
 # Returns the application version from package.json (or "unknown" if unreadable).
 get_app_version() {
   local package_json="${SCRIPT_DIR}/../package.json"
@@ -1848,13 +1947,13 @@ refresh_tui_remote_update_cache() {
   # Never prompt for credentials from inside the TUI refresh loop.
   # Run git commands from the resolved git root for consistent results.
   if command -v timeout >/dev/null 2>&1; then
-    if ! timeout 8s env GIT_TERMINAL_PROMPT=0 git -C "${git_root}" fetch --quiet --no-tags "${REMOTE_NAME}" "${BRANCH}" >/dev/null 2>&1; then
+    if ! run_source_git_cmd_for_update_with_prompt_guard_timeout 8s "${git_root}" fetch --quiet --no-tags "${REMOTE_NAME}" "${BRANCH}" >/dev/null 2>&1; then
       TUI_REMOTE_UPDATE_STATUS="error"
       TUI_REMOTE_UPDATE_ERROR="remote check failed or timed out"
       return 0
     fi
   else
-    if ! env GIT_TERMINAL_PROMPT=0 git -C "${git_root}" fetch --quiet --no-tags "${REMOTE_NAME}" "${BRANCH}" >/dev/null 2>&1; then
+    if ! run_source_git_cmd_for_update_with_prompt_guard "${git_root}" fetch --quiet --no-tags "${REMOTE_NAME}" "${BRANCH}" >/dev/null 2>&1; then
       TUI_REMOTE_UPDATE_STATUS="error"
       TUI_REMOTE_UPDATE_ERROR="remote check failed"
       return 0
@@ -1862,7 +1961,7 @@ refresh_tui_remote_update_cache() {
   fi
 
   remote_ref="refs/remotes/${REMOTE_NAME}/${BRANCH}"
-  remote_commit="$(git -C "${git_root}" rev-parse --verify "${remote_ref}" 2>/dev/null || true)"
+  remote_commit="$(run_source_git_cmd_for_update "${git_root}" rev-parse --verify "${remote_ref}" 2>/dev/null || true)"
   if [[ -z "${remote_commit}" ]]; then
     TUI_REMOTE_UPDATE_STATUS="error"
     TUI_REMOTE_UPDATE_ERROR="missing remote ref ${REMOTE_NAME}/${BRANCH}"
@@ -1870,16 +1969,16 @@ refresh_tui_remote_update_cache() {
   fi
 
   local_ref="${BRANCH}"
-  local_commit="$(git -C "${git_root}" rev-parse --verify "${local_ref}" 2>/dev/null || true)"
+  local_commit="$(run_source_git_cmd_for_update "${git_root}" rev-parse --verify "${local_ref}" 2>/dev/null || true)"
   if [[ -z "${local_commit}" ]]; then
-    local_commit="$(git -C "${git_root}" rev-parse --verify HEAD 2>/dev/null || true)"
+    local_commit="$(run_source_git_cmd_for_update "${git_root}" rev-parse --verify HEAD 2>/dev/null || true)"
   fi
 
-  TUI_REMOTE_UPDATE_REMOTE_SHORT="$(git -C "${git_root}" rev-parse --short "${remote_commit}" 2>/dev/null || printf '%s' "${remote_commit:0:12}")"
-  TUI_REMOTE_UPDATE_REMOTE_SUBJECT="$(git -C "${git_root}" log -1 --format=%s "${remote_ref}" 2>/dev/null || true)"
+  TUI_REMOTE_UPDATE_REMOTE_SHORT="$(run_source_git_cmd_for_update "${git_root}" rev-parse --short "${remote_commit}" 2>/dev/null || printf '%s' "${remote_commit:0:12}")"
+  TUI_REMOTE_UPDATE_REMOTE_SUBJECT="$(run_source_git_cmd_for_update "${git_root}" log -1 --format=%s "${remote_ref}" 2>/dev/null || true)"
 
   if [[ -n "${local_commit}" ]]; then
-    TUI_REMOTE_UPDATE_LOCAL_SHORT="$(git -C "${git_root}" rev-parse --short "${local_commit}" 2>/dev/null || printf '%s' "${local_commit:0:12}")"
+    TUI_REMOTE_UPDATE_LOCAL_SHORT="$(run_source_git_cmd_for_update "${git_root}" rev-parse --short "${local_commit}" 2>/dev/null || printf '%s' "${local_commit:0:12}")"
   fi
 
   if [[ -n "${local_commit}" && "${local_commit}" == "${remote_commit}" ]]; then
@@ -2045,17 +2144,17 @@ run_tui_script_update_and_reload() {
 
   local before_commit=""
   local after_commit=""
-  before_commit="$(git rev-parse --short=12 HEAD 2>/dev/null || true)"
+  before_commit="$(run_source_git_cmd_for_update "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || true)"
 
-  run_step "Fetching ${REMOTE_NAME}/${BRANCH}" run_deploy_path_cmd git fetch "${REMOTE_NAME}" "${BRANCH}" || return 0
+  run_step "Fetching ${REMOTE_NAME}/${BRANCH}" run_source_git_cmd_for_update "${REPO_ROOT}" fetch "${REMOTE_NAME}" "${BRANCH}" || return 0
 
   if [[ "$(current_branch_name)" != "${BRANCH}" ]]; then
-    run_step "Checking out ${BRANCH}" run_deploy_path_cmd git checkout "${BRANCH}" || return 0
+    run_step "Checking out ${BRANCH}" run_source_git_cmd_for_update "${REPO_ROOT}" checkout "${BRANCH}" || return 0
   fi
 
-  run_step "Merging latest ${REMOTE_NAME}/${BRANCH}" run_deploy_path_cmd git merge --ff-only "${REMOTE_NAME}/${BRANCH}" || return 0
-  after_commit="$(git rev-parse --short=12 HEAD 2>/dev/null || true)"
-  log_info "Repository commit: $(git rev-parse --short HEAD)"
+  run_step "Merging latest ${REMOTE_NAME}/${BRANCH}" run_source_git_cmd_for_update "${REPO_ROOT}" merge --ff-only "${REMOTE_NAME}/${BRANCH}" || return 0
+  after_commit="$(run_source_git_cmd_for_update "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || true)"
+  log_info "Repository commit: $(run_source_git_cmd_for_update "${REPO_ROOT}" rev-parse --short HEAD)"
   maybe_restart_after_self_update "${before_commit}" "${after_commit}"
   log_info "No script update applied."
 }
@@ -2258,7 +2357,7 @@ cleanup_local_install_and_build_caches() {
 # Returns 0 if the git working tree has tracked or staged changes.
 git_worktree_dirty() {
   [[ "${SOURCE_MODE}" == "git" ]] || return 1
-  ! git -C "${REPO_ROOT}" diff --quiet || ! git -C "${REPO_ROOT}" diff --cached --quiet
+  ! run_source_git_cmd_for_update "${REPO_ROOT}" diff --quiet || ! run_source_git_cmd_for_update "${REPO_ROOT}" diff --cached --quiet
 }
 
 git_source_has_unwritable_tracked_paths() {
@@ -2270,7 +2369,7 @@ git_source_has_unwritable_tracked_paths() {
       printf '%s\n' "${tracked_path}"
       return 0
     fi
-  done < <(git -C "${REPO_ROOT}" ls-files -z)
+  done < <(run_source_git_cmd_for_update "${REPO_ROOT}" ls-files -z)
 
   return 1
 }
@@ -2291,7 +2390,7 @@ verify_git_source_access_for_update() {
 # Returns the current git branch name or empty string if HEAD is detached.
 current_branch_name() {
   [[ "${SOURCE_MODE}" == "git" ]] || return 0
-  git -C "${REPO_ROOT}" branch --show-current 2>/dev/null || true
+  run_source_git_cmd_for_update "${REPO_ROOT}" branch --show-current 2>/dev/null || true
 }
 
 archive_source_requires_permission_fix() {
@@ -3128,24 +3227,24 @@ if [[ "${SOURCE_MODE}" == "git" ]]; then
 
   if [[ "${ALLOW_DIRTY}" != true ]] && git_worktree_dirty; then
     log_error "Working tree is dirty. Commit/stash changes or rerun with --allow-dirty."
-    git -C "${REPO_ROOT}" status --short
+    run_source_git_cmd_for_update "${REPO_ROOT}" status --short
     exit 1
   fi
 
   if [[ "${SKIP_PULL}" == false ]]; then
-    local_before_pull_commit="$(git -C "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || true)"
+    local_before_pull_commit="$(run_source_git_cmd_for_update "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || true)"
     # Fetch/pull stays in the persistent repo clone; deploy.sh then rsyncs a clean
     # release directory so runtime symlink switches remain atomic.
-    run_step "Fetching ${REMOTE_NAME}/${BRANCH}" run_deploy_path_cmd git -C "${REPO_ROOT}" fetch "${REMOTE_NAME}" "${BRANCH}"
+    run_step "Fetching ${REMOTE_NAME}/${BRANCH}" run_source_git_cmd_for_update "${REPO_ROOT}" fetch "${REMOTE_NAME}" "${BRANCH}"
 
     if [[ "$(current_branch_name)" != "${BRANCH}" ]]; then
-      run_step "Checking out ${BRANCH}" run_deploy_path_cmd git -C "${REPO_ROOT}" checkout "${BRANCH}"
+      run_step "Checking out ${BRANCH}" run_source_git_cmd_for_update "${REPO_ROOT}" checkout "${BRANCH}"
     fi
 
     # Use ff-only to avoid accidental merge commits on production clones.
-    run_step "Merging latest ${REMOTE_NAME}/${BRANCH}" run_deploy_path_cmd git -C "${REPO_ROOT}" merge --ff-only "${REMOTE_NAME}/${BRANCH}"
-    local_after_pull_commit="$(git -C "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || true)"
-    log_info "Updated to commit $(git -C "${REPO_ROOT}" rev-parse --short HEAD)"
+    run_step "Merging latest ${REMOTE_NAME}/${BRANCH}" run_source_git_cmd_for_update "${REPO_ROOT}" merge --ff-only "${REMOTE_NAME}/${BRANCH}"
+    local_after_pull_commit="$(run_source_git_cmd_for_update "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || true)"
+    log_info "Updated to commit $(run_source_git_cmd_for_update "${REPO_ROOT}" rev-parse --short HEAD)"
     maybe_restart_after_self_update "${local_before_pull_commit}" "${local_after_pull_commit}"
   else
     log_info "Skipping git pull"

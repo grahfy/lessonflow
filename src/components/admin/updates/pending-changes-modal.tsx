@@ -118,7 +118,7 @@ export function PendingChangesModal({
             </p>
           ) : (
             <p className="deploy-updates-runner-note">
-              Deployment will run as the configured deploy user via the dedicated systemd web-update service.
+              The host runner handles privileged deploy steps, while source-git updates stay pinned to the configured deploy user.
             </p>
           )}
         </div>

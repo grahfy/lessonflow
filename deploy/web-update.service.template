@@ -8,10 +8,12 @@ ConditionPathExists=/var/www/{{APP_NAME}}/current/scripts/start-web-update-servi
 
 [Service]
 Type=oneshot
-User={{DEPLOY_USER}}
-Group=www-data
+User=root
+Group=root
 WorkingDirectory=/var/www/{{APP_NAME}}/current
 EnvironmentFile=-/var/www/{{APP_NAME}}/shared/.env
+Environment=MGS_SOURCE_GIT_USER={{DEPLOY_USER}}
+Environment=MGS_SUDO_USER={{DEPLOY_USER}}
 ExecStart=/usr/bin/env bash /var/www/{{APP_NAME}}/current/scripts/start-web-update-service.sh
 StandardOutput=journal
 StandardError=journal

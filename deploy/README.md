@@ -365,6 +365,7 @@ sudo ./deploy/update.sh --interactive
 
 Notes:
 - The deploy script auto-applies `NODE_OPTIONS=--max-old-space-size=3072` on ~1GB and ~2GB RAM hosts unless you already set a heap limit.
+- On ~1GB and ~2GB RAM hosts, deploy-time low-memory protection now starts before `npm ci --omit=dev`, so production dependency installation gets the same early swap/headroom path as the later build.
 - On ~2GB RAM hosts, the Next.js build step now uses `experimental.webpackMemoryOptimizations`, caps its low-memory heap at `2048` MB, and temporarily targets `2048` MB total swap while keeping the existing low-memory build path.
 - If a previous deploy leaves behind an inaccessible temporary swap file, the deploy script now retries with a fresh sibling swap filename instead of abandoning temporary swap creation for the build.
 - Browser-triggered or other non-root deploy runs now skip temporary swap management cleanly when the deploy user lacks privileged swap access, instead of failing on stale swap-file cleanup.
@@ -406,7 +407,8 @@ sudo chmod 0440 /etc/sudoers.d/lessonflow-web-update
 ./deploy/update.sh --branch main
 ```
 
-The dedicated runner executes the deploy flow as `UPDATES_DEPLOY_USER`; the app runtime user is only allowed to start that specific systemd unit.
+The dedicated runner now starts as a root-owned systemd unit so low-memory deploy safeguards, swap management, and service restarts still work during browser-triggered updates.
+Git fetch/merge operations are still pinned to `UPDATES_DEPLOY_USER` so the persistent source checkout does not drift into root-owned state.
 
 ### 3. Install Nginx Configuration
 
