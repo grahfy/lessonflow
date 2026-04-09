@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const redirectMock = vi.fn((path: string) => {
   throw new Error(`REDIRECT:${path}`);
 });
-const isSetupCompleteMock = vi.fn();
+const getSetupCompletionStateMock = vi.fn();
 const getCurrentAdminMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
@@ -18,7 +18,7 @@ vi.mock("next/link", () => ({
 }));
 
 vi.mock("@/lib/setup", () => ({
-  isSetupComplete: isSetupCompleteMock
+  getSetupCompletionState: getSetupCompletionStateMock
 }));
 
 vi.mock("@/lib/admin-auth", () => ({
@@ -41,7 +41,7 @@ describe("admin-index-page", () => {
   });
 
   it("redirects to setup when the application is not configured", async () => {
-    isSetupCompleteMock.mockResolvedValue(false);
+    getSetupCompletionStateMock.mockResolvedValue({ status: "incomplete", adminCount: 0 });
 
     const { default: AdminIndexPage } = await import("@/app/admin/page");
 
@@ -50,7 +50,7 @@ describe("admin-index-page", () => {
   });
 
   it("redirects signed-out visitors straight to the admin login page", async () => {
-    isSetupCompleteMock.mockResolvedValue(true);
+    getSetupCompletionStateMock.mockResolvedValue({ status: "complete", adminCount: 1 });
     getCurrentAdminMock.mockResolvedValue(null);
 
     const { default: AdminIndexPage } = await import("@/app/admin/page");
@@ -58,8 +58,21 @@ describe("admin-index-page", () => {
     await expect(AdminIndexPage()).rejects.toThrow("REDIRECT:/admin/login");
   });
 
+  it("redirects to the admin login page when the database is temporarily unavailable", async () => {
+    getSetupCompletionStateMock.mockResolvedValue({
+      status: "unavailable",
+      errorCode: "DB_UNAVAILABLE",
+      message: "The admin service cannot reach the database right now. Restore database connectivity and try again."
+    });
+
+    const { default: AdminIndexPage } = await import("@/app/admin/page");
+
+    await expect(AdminIndexPage()).rejects.toThrow("REDIRECT:/admin/login");
+    expect(getCurrentAdminMock).not.toHaveBeenCalled();
+  });
+
   it("renders a grouped admin dashboard for authenticated admins", async () => {
-    isSetupCompleteMock.mockResolvedValue(true);
+    getSetupCompletionStateMock.mockResolvedValue({ status: "complete", adminCount: 1 });
     getCurrentAdminMock.mockResolvedValue({ id: "admin_1", role: "owner" });
 
     const { default: AdminIndexPage } = await import("@/app/admin/page");

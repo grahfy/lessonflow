@@ -12,7 +12,9 @@
  */
 
 import { NextRequest } from "next/server";
+
 import { getAdminFromToken, getSessionCookieName, isOwnerAdmin } from "@/lib/admin-auth";
+import { createDatabaseUnavailableError, isDatabaseUnavailableError } from "@/lib/database-errors";
 
 /**
  * Validates the administrative session of an incoming Request.
@@ -22,7 +24,18 @@ import { getAdminFromToken, getSessionCookieName, isOwnerAdmin } from "@/lib/adm
  */
 export async function requireAdminFromRequest(request: NextRequest) {
   const token = request.cookies.get(getSessionCookieName())?.value;
-  return getAdminFromToken(token);
+  try {
+    return await getAdminFromToken(token);
+  } catch (error) {
+    // RATIONALE: Session lookup is still a DB-backed operation. When the
+    // database is down, admin APIs should surface a recoverable maintenance
+    // state instead of silently converting the outage into a generic 500/HTML
+    // response.
+    if (isDatabaseUnavailableError(error)) {
+      throw createDatabaseUnavailableError();
+    }
+    throw error;
+  }
 }
 
 /**

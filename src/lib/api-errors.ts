@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createDatabaseUnavailableError, isDatabaseUnavailableError } from "@/lib/database-errors";
 import { AppError, ValidationError } from "./errors";
 import { logError } from "./observability";
 
@@ -12,7 +13,12 @@ export function jsonUnexpectedError(error: unknown, fallback: string) {
   let code = "INTERNAL_ERROR";
   let details: unknown = undefined;
 
-  if (error instanceof AppError) {
+  if (isDatabaseUnavailableError(error)) {
+    const normalized = error instanceof AppError ? error : createDatabaseUnavailableError();
+    message = normalized.message;
+    status = normalized.status;
+    code = normalized.code;
+  } else if (error instanceof AppError) {
     message = error.message;
     status = error.status;
     code = error.code;

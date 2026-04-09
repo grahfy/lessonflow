@@ -4,7 +4,7 @@ import { createSessionToken, getSessionCookieName, verifyAdminPassword } from "@
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { verifyCaptchaGuard } from "@/lib/captcha";
 import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
-import { isSetupComplete } from "@/lib/setup";
+import { getSetupCompletionState } from "@/lib/setup";
 
 /**
  * Admin login endpoint.
@@ -34,8 +34,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const setupComplete = await isSetupComplete();
-    if (!setupComplete) {
+    const setupState = await getSetupCompletionState();
+    if (setupState.status === "unavailable") {
+      return NextResponse.json(
+        {
+          error: setupState.message,
+          code: setupState.errorCode
+        },
+        { status: 503 }
+      );
+    }
+
+    if (setupState.status === "incomplete") {
       return NextResponse.json(
         {
           error: "Setup is not complete. Open /setup to initialize the application.",

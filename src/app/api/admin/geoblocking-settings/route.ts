@@ -19,20 +19,24 @@ function formatFieldErrors(fieldErrors: Record<string, string[] | undefined>) {
 }
 
 export async function GET(request: NextRequest) {
-  const admin = await requireAdminFromRequest(request);
-  if (!admin) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  }
-  if (!isOwnerAdmin(admin)) {
-    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-  }
+  try {
+    const admin = await requireAdminFromRequest(request);
+    if (!admin) {
+      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    }
+    if (!isOwnerAdmin(admin)) {
+      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+    }
 
-  const settings = await getGeoblockingSettings();
+    const settings = await getGeoblockingSettings();
 
-  return NextResponse.json({
-    ok: true,
-    geoblockingSettings: serializeGeoblockingSettings(settings)
-  });
+    return NextResponse.json({
+      ok: true,
+      geoblockingSettings: serializeGeoblockingSettings(settings)
+    });
+  } catch (error) {
+    return jsonUnexpectedError(error, "Failed to load geoblocking settings.");
+  }
 }
 
 export async function POST(request: NextRequest) {

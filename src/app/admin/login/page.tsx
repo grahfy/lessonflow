@@ -1,18 +1,23 @@
+import React from "react";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { AdminDatabaseUnavailableState } from "@/components/admin/admin-database-unavailable-state";
 import { AdminLoginForm } from "@/components/admin-login-form";
 import { AdminAuthShell } from "@/components/admin-auth-shell";
-import { isSetupComplete } from "@/lib/setup";
+import { getSetupCompletionState } from "@/lib/setup";
 
 export const metadata: Metadata = {
   title: "Booking Console Login"
 };
 
 export default async function AdminLoginPage() {
-  const setupComplete = await isSetupComplete();
-  if (!setupComplete) {
+  const setupState = await getSetupCompletionState();
+  if (setupState.status === "incomplete") {
     redirect("/setup");
+  }
+  if (setupState.status === "unavailable") {
+    return <AdminDatabaseUnavailableState />;
   }
 
   return (

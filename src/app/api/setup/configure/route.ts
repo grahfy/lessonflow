@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSetupAccessDeniedMessage, isSetupAccessAllowed } from "@/lib/setup-access";
-import { isSetupComplete, saveEnvConfig } from "@/lib/setup";
+import { getSetupCompletionState, saveEnvConfig } from "@/lib/setup";
 
 /**
  * Saves env var configuration from the setup UI.
@@ -19,7 +19,19 @@ export async function POST(request: Request) {
       );
     }
 
-    if (await isSetupComplete()) {
+    const setupState = await getSetupCompletionState();
+    if (setupState.status === "unavailable") {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: setupState.message,
+          code: setupState.errorCode
+        },
+        { status: 503 }
+      );
+    }
+
+    if (setupState.status === "complete") {
       return NextResponse.json(
         {
           ok: false,

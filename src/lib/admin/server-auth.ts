@@ -1,16 +1,20 @@
 import { redirect } from "next/navigation";
 
 import { getCurrentAdmin, isOwnerAdmin } from "@/lib/admin-auth";
-import { isSetupComplete } from "@/lib/setup";
+import { getSetupCompletionState } from "@/lib/setup";
 
 /**
  * Server-side auth check for admin routes.
  * Redirects to /setup if not configured, or /admin/login if not authenticated.
  */
 export async function requireAdmin(): Promise<boolean> {
-    const setupComplete = await isSetupComplete();
-    if (!setupComplete) {
+    const setupState = await getSetupCompletionState();
+    if (setupState.status === "incomplete") {
         redirect("/setup");
+        return false;
+    }
+    if (setupState.status === "unavailable") {
+        redirect("/admin/login");
         return false;
     }
 
@@ -27,9 +31,13 @@ export async function requireAdmin(): Promise<boolean> {
  * Server-side auth check for owner-only admin routes.
  */
 export async function requireOwner(): Promise<boolean> {
-    const setupComplete = await isSetupComplete();
-    if (!setupComplete) {
+    const setupState = await getSetupCompletionState();
+    if (setupState.status === "incomplete") {
         redirect("/setup");
+        return false;
+    }
+    if (setupState.status === "unavailable") {
+        redirect("/admin/login");
         return false;
     }
 

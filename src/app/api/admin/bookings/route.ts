@@ -13,6 +13,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { bookingColor, bookingRequestColor, getRecencyCutoff } from "@/lib/admin-calendar-events";
 import { canManagePrimaryTeacherCustomer } from "@/lib/admin/permissions";
 import { ensureCustomerPrimaryTeacher, resolveAssignedTeacherId } from "@/lib/admin/teacher-assignment";
+import { jsonUnexpectedError } from "@/lib/api-errors";
 import { adminManualBookingSchema, formatBookingAddress, generateRecurringStartDates, getBookingEnd, getDurationMinutes } from "@/lib/booking-rules";
 import { customerSnapshotFromInput, normalizeEmail, normalizePhone } from "@/lib/customer-match";
 import { getCalendarRange } from "@/lib/calendar-range";
@@ -103,12 +104,12 @@ async function updateCustomerFromBooking(db: DbClient, id: string, input: Manual
  * 5. Maps both entities into a unified "event" structure for the Radix/FullCalendar UI.
  */
 export async function GET(request: NextRequest) {
-  const admin = await requireAdminFromRequest(request);
-  if (!admin) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
+    const admin = await requireAdminFromRequest(request);
+    if (!admin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const viewRaw = request.nextUrl.searchParams.get("view") || "week";
     const date = request.nextUrl.searchParams.get("date") || undefined;
     const view = viewRaw === "day" || viewRaw === "month" || viewRaw === "year" ? viewRaw : "week";
@@ -213,10 +214,7 @@ export async function GET(request: NextRequest) {
       recencyCutoff: recencyCutoff.toISOString()
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to load admin booking data." },
-      { status: 500 }
-    );
+    return jsonUnexpectedError(error, "Unable to load admin booking data.");
   }
 }
 
@@ -236,12 +234,12 @@ export async function GET(request: NextRequest) {
  *    - Else: Create a single booking row.
  */
 export async function POST(request: NextRequest) {
-  const admin = await requireAdminFromRequest(request);
-  if (!admin) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
+    const admin = await requireAdminFromRequest(request);
+    if (!admin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json().catch(() => null);
     const parsed = manualBookingSchema.safeParse(body);
     if (!parsed.success) {
@@ -472,6 +470,9 @@ export async function POST(request: NextRequest) {
         : message === "Selected customer does not exist." || message === "Invalid recurrence range."
           ? 400
           : 500;
+    if (status === 500) {
+      return jsonUnexpectedError(error, "Unable to create booking.");
+    }
     return NextResponse.json({ error: message }, { status });
   }
 

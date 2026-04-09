@@ -19,19 +19,23 @@ function formatFieldErrors(fieldErrors: Record<string, string[] | undefined>) {
 }
 
 export async function GET(request: NextRequest) {
-  const admin = await requireAdminFromRequest(request);
-  if (!admin) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  }
-  if (!isOwnerAdmin(admin)) {
-    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-  }
+  try {
+    const admin = await requireAdminFromRequest(request);
+    if (!admin) {
+      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    }
+    if (!isOwnerAdmin(admin)) {
+      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+    }
 
-  const settings = await getNotificationSettings();
-  return NextResponse.json({
-    ok: true,
-    notificationSettings: serializeNotificationSettings(settings)
-  });
+    const settings = await getNotificationSettings();
+    return NextResponse.json({
+      ok: true,
+      notificationSettings: serializeNotificationSettings(settings)
+    });
+  } catch (error) {
+    return jsonUnexpectedError(error, "Failed to load notification settings.");
+  }
 }
 
 export async function POST(request: NextRequest) {

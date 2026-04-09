@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createSessionToken, getSessionCookieName } from "@/lib/admin-auth";
 import { getSetupAccessDeniedMessage, isSetupAccessAllowed } from "@/lib/setup-access";
-import { createInitialAdmin, getSetupReadiness, setupInitializeSchema } from "@/lib/setup";
+import { createInitialAdmin, getSetupCompletionState, getSetupReadiness, setupInitializeSchema } from "@/lib/setup";
 
 /**
  * Creates the first admin account after requirement checks pass.
@@ -18,7 +18,18 @@ export async function POST(request: Request) {
     );
   }
 
-  const readiness = await getSetupReadiness();
+  const setupState = await getSetupCompletionState();
+  if (setupState.status === "unavailable") {
+    return NextResponse.json(
+      {
+        error: setupState.message,
+        code: setupState.errorCode,
+      },
+      { status: 503 }
+    );
+  }
+
+  const readiness = await getSetupReadiness(setupState);
   if (readiness.completed) {
     return NextResponse.json({ error: "Setup is already complete." }, { status: 409 });
   }

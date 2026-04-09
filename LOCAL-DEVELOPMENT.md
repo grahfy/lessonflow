@@ -205,6 +205,26 @@ npm run dev
 
 This removes stale `.next` output, which can occasionally leave the dev server in a bad routing state after larger App Router changes.
 
+### Admin Login Shows "Admin service unavailable"
+
+If `/admin/login` shows an admin maintenance message instead of the sign-in form, the app could not reach the database while checking setup state. In local development this usually means the MariaDB container is stopped or `DATABASE_URL` is pointing at the wrong host/port.
+
+Recommended checks:
+
+```bash
+docker-compose ps
+docker-compose up -d
+docker-compose logs lessonflow-dev-mysql
+```
+
+Then confirm the configured DB target in `.env` still matches the local MariaDB container:
+
+```bash
+DATABASE_URL="mysql://root:root@127.0.0.1:3306/mgs_dev"
+```
+
+Once the database is reachable again, refresh `/admin/login`.
+
 ---
 
 **Optional: Seed Fake Data**

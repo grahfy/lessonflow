@@ -27,11 +27,17 @@ import bcrypt from "bcryptjs";
 import { parse as parseDotenv } from "dotenv";
 import { z } from "zod";
 
+import {
+  DATABASE_UNAVAILABLE_CODE as SETUP_DB_UNAVAILABLE_CODE,
+  DATABASE_UNAVAILABLE_MESSAGE as SETUP_DB_UNAVAILABLE_MESSAGE,
+} from "@/lib/database-errors";
 import { prisma } from "@/lib/db";
 import { isGmailConfigured } from "@/lib/email/gmail-service";
 import { getAdminCustomerEmailAlertsProvider, getOwnerEmail, isAdminCustomerEmailAlertsEnabled, isImapConfigured } from "@/lib/env";
+import { AppError } from "@/lib/errors";
 import { DEFAULT_GEOBLOCKING_SETTINGS_ID } from "@/lib/geoblocking-settings";
 import { geoblockingSettingsInputSchema } from "@/lib/geoblocking-settings-contract";
+import { logError } from "@/lib/observability";
 import { getMaterialStorageDriverName } from "@/lib/student-portal/material-storage";
 
 /**
@@ -60,6 +66,33 @@ export type SetupReadiness = {
   passCount: number;
   canInitialize: boolean;
 };
+
+/**
+ * Stable machine-readable code for admin/setup flows when Prisma cannot reach
+ * the configured database.
+ */
+/**
+ * Typed result for the first-read setup check used by admin and setup
+ * entrypoints.
+ *
+ * RATIONALE: The old boolean-only `isSetupComplete()` helper could not
+ * distinguish between "no admin exists yet" and "the database is down", so
+ * callers incorrectly treated hard infrastructure failures as setup state.
+ */
+export type SetupCompletionState =
+  | {
+      status: "complete";
+      adminCount: number;
+    }
+  | {
+      status: "incomplete";
+      adminCount: number;
+    }
+  | {
+      status: "unavailable";
+      errorCode: typeof SETUP_DB_UNAVAILABLE_CODE;
+      message: string;
+    };
 
 /**
  * Environment variable definitions for setup configuration.
@@ -707,11 +740,37 @@ async function canWriteLocalMaterialRoot(): Promise<boolean> {
 }
 
 /**
- * Returns true once at least one admin account exists.
+ * Resolves the current setup completion state without throwing on transient or
+ * infrastructure-level database failures.
+ */
+export async function getSetupCompletionState(): Promise<SetupCompletionState> {
+  try {
+    const adminCount = await prisma.adminUser.count();
+    return adminCount > 0
+      ? { status: "complete", adminCount }
+      : { status: "incomplete", adminCount };
+  } catch (error) {
+    // RATIONALE: Admin entrypoints need a stable, user-safe failure mode for
+    // database outages instead of letting the error boundary mask the real
+    // infrastructure issue behind a generic "Something went wrong" screen.
+    logError("setup.completion_state_failed", error, {
+      code: SETUP_DB_UNAVAILABLE_CODE,
+    });
+
+    return {
+      status: "unavailable",
+      errorCode: SETUP_DB_UNAVAILABLE_CODE,
+      message: SETUP_DB_UNAVAILABLE_MESSAGE,
+    };
+  }
+}
+
+/**
+ * Backwards-compatible boolean setup check for legacy callers that do not yet
+ * consume the richer completion state.
  */
 export async function isSetupComplete(): Promise<boolean> {
-  const adminCount = await prisma.adminUser.count();
-  return adminCount > 0;
+  return (await getSetupCompletionState()).status === "complete";
 }
 
 /**
@@ -945,20 +1004,27 @@ export async function evaluateSetupChecks(): Promise<SetupCheck[]> {
 /**
  * Computes setup completion and requirement-check summary for setup UI/API usage.
  */
-export async function getSetupReadiness(): Promise<SetupReadiness> {
-  const [completed, checks] = await Promise.all([isSetupComplete(), evaluateSetupChecks()]);
+export async function getSetupReadiness(
+  setupCompletionState?: SetupCompletionState
+): Promise<SetupReadiness> {
+  const completionState = setupCompletionState ?? await getSetupCompletionState();
+  if (completionState.status === "unavailable") {
+    throw new AppError(completionState.message, completionState.errorCode, 503);
+  }
+
+  const checks = await evaluateSetupChecks();
 
   const failCount = checks.filter((entry) => entry.status === "fail").length;
   const warnCount = checks.filter((entry) => entry.status === "warn").length;
   const passCount = checks.filter((entry) => entry.status === "pass").length;
 
   return {
-    completed,
+    completed: completionState.status === "complete",
     checks,
     failCount,
     warnCount,
     passCount,
-    canInitialize: !completed && failCount === 0
+    canInitialize: completionState.status !== "complete" && failCount === 0
   };
 }
 

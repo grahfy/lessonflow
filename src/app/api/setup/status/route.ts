@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSetupAccessDeniedMessage, isSetupAccessAllowed } from "@/lib/setup-access";
-import { getSetupReadiness, isSetupComplete } from "@/lib/setup";
+import { getSetupCompletionState, getSetupReadiness } from "@/lib/setup";
 
 /**
  * Returns first-run setup completion state and production-readiness checks.
@@ -19,7 +19,20 @@ export async function GET(request: Request) {
     );
   }
 
-  if (await isSetupComplete()) {
+  const setupState = await getSetupCompletionState();
+  if (setupState.status === "unavailable") {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: setupState.message,
+        code: setupState.errorCode,
+        completed: false
+      },
+      { status: 503 }
+    );
+  }
+
+  if (setupState.status === "complete") {
     return NextResponse.json(
       {
         ok: false,
@@ -31,7 +44,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const readiness = await getSetupReadiness();
+  const readiness = await getSetupReadiness(setupState);
   return NextResponse.json({
     ok: true,
     readiness

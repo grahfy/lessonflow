@@ -16,19 +16,23 @@ function formatFieldErrors(issues: Array<{ path: Array<string | number>; message
 }
 
 export async function GET(request: NextRequest) {
-  const admin = await requireAdminFromRequest(request);
-  if (!admin) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  }
-  if (!isOwnerAdmin(admin)) {
-    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-  }
+  try {
+    const admin = await requireAdminFromRequest(request);
+    if (!admin) {
+      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    }
+    if (!isOwnerAdmin(admin)) {
+      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+    }
 
-  const lessonPricingSettings = await getLessonPricingSettingsState();
-  return NextResponse.json({
-    ok: true,
-    lessonPricingSettings
-  });
+    const lessonPricingSettings = await getLessonPricingSettingsState();
+    return NextResponse.json({
+      ok: true,
+      lessonPricingSettings
+    });
+  } catch (error) {
+    return jsonUnexpectedError(error, "Failed to load lesson pricing settings.");
+  }
 }
 
 export async function POST(request: NextRequest) {

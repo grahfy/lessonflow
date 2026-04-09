@@ -13,18 +13,22 @@ const updateTemplateSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const admin = await requireAdminFromRequest(request);
-  if (!admin) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  }
-  if (!isOwnerAdmin(admin)) {
-    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-  }
+  try {
+    const admin = await requireAdminFromRequest(request);
+    if (!admin) {
+      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    }
+    if (!isOwnerAdmin(admin)) {
+      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+    }
 
-  const template = await prisma.invoiceTemplate.findFirst({
-    where: { isDefault: true }
-  });
-  return NextResponse.json({ ok: true, template });
+    const template = await prisma.invoiceTemplate.findFirst({
+      where: { isDefault: true }
+    });
+    return NextResponse.json({ ok: true, template });
+  } catch (error) {
+    return jsonUnexpectedError(error, "Failed to load invoice template.");
+  }
 }
 
 export async function POST(request: NextRequest) {

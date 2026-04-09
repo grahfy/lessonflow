@@ -6,7 +6,7 @@ import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { getCurrentAdmin } from "@/lib/admin-auth";
 import { getVisibleAdminNavGroups } from "@/lib/admin/config";
-import { isSetupComplete } from "@/lib/setup";
+import { getSetupCompletionState } from "@/lib/setup";
 
 export const metadata = {
   title: "Booking Console Home"
@@ -17,9 +17,12 @@ export const metadata = {
  * system areas for faster orientation before drilling into a section.
  */
 export default async function AdminIndexPage() {
-  const setupComplete = await isSetupComplete();
-  if (!setupComplete) {
+  const setupState = await getSetupCompletionState();
+  if (setupState.status === "incomplete") {
     redirect("/setup");
+  }
+  if (setupState.status === "unavailable") {
+    redirect("/admin/login");
   }
 
   const admin = await getCurrentAdmin();

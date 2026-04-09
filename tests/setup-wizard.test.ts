@@ -12,6 +12,7 @@ import { POST as initializeSetup } from "@/app/api/setup/initialize/route";
 import { GET as getSetupStatus } from "@/app/api/setup/status/route";
 import { getSessionCookieName } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
+import * as setupModule from "@/lib/setup";
 
 type MutableEnv = Record<string, string | undefined>;
 
@@ -61,6 +62,7 @@ describe("setup-wizard", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     env.ADMIN_EMAIL = originalAdminEmail;
     env.LEARNING_MATERIALS_STORAGE_DRIVER = originalStorageDriver;
     env.NODE_ENV = originalNodeEnv;
@@ -109,6 +111,46 @@ describe("setup-wizard", () => {
     expect(loginResponse.status).toBe(409);
     const loginBody = (await loginResponse.json()) as { code?: string };
     expect(loginBody.code).toBe("SETUP_REQUIRED");
+  });
+
+  it("returns 503 from setup status when the database probe cannot run", async () => {
+    vi.spyOn(setupModule, "getSetupCompletionState").mockResolvedValue({
+      status: "unavailable",
+      errorCode: "DB_UNAVAILABLE",
+      message: "The admin service cannot reach the database right now. Restore database connectivity and try again."
+    });
+
+    const response = await getSetupStatus(new Request("http://localhost/api/setup/status"));
+    expect(response.status).toBe(503);
+
+    const body = (await response.json()) as { code?: string; completed?: boolean };
+    expect(body.code).toBe("DB_UNAVAILABLE");
+    expect(body.completed).toBe(false);
+  });
+
+  it("returns 503 from admin login when setup state cannot be read from the database", async () => {
+    vi.spyOn(setupModule, "getSetupCompletionState").mockResolvedValue({
+      status: "unavailable",
+      errorCode: "DB_UNAVAILABLE",
+      message: "The admin service cannot reach the database right now. Restore database connectivity and try again."
+    });
+
+    const response = await adminLogin(
+      new NextRequest("http://localhost/api/admin/login", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          email: "owner@melbourneguitar.school",
+          password: "StrongPass!234"
+        })
+      })
+    );
+
+    expect(response.status).toBe(503);
+    const body = (await response.json()) as { code?: string };
+    expect(body.code).toBe("DB_UNAVAILABLE");
   });
 
   it("allows setup env endpoints before setup completes and blocks them after initialization", async () => {
@@ -226,18 +268,30 @@ describe("setup-wizard", () => {
     await fs.writeFile(releaseEnvPath, 'NEXT_PUBLIC_BRAND_NAME="Release Setup Brand"\n', "utf-8");
 
     try {
+      const envResponse = await getSetupEnv(new Request("http://localhost/api/setup/env"));
+      expect(envResponse.status).toBe(200);
+      const envBody = (await envResponse.json()) as {
+        envVars: Array<{ key: string; currentValue: string }>;
+      };
+      const payload = Object.fromEntries(
+        envBody.envVars.map((envVar) => [envVar.key, envVar.currentValue === "***SET***" ? "" : envVar.currentValue])
+      );
+
+      payload.DATABASE_URL = "mysql://setup-user:setup-pass@localhost:3306/lessonflow";
+      payload.NEXT_PUBLIC_SITE_URL = "https://setup.example.com";
+      payload.ADMIN_EMAIL = "owner@melbourneguitar.school";
+      payload.ADMIN_CUSTOMER_EMAIL_ALERTS_PROVIDER = "imap";
+      payload.NEXT_PUBLIC_BRAND_NAME = "Shared Setup Brand";
+      payload.NEXT_PUBLIC_PRIMARY_SUBJECT = "Guitar";
+      payload.NEXT_PUBLIC_PRIMARY_LOCATION = "Northcote";
+
       const response = await configureSetupEnv(
         new Request("http://localhost/api/setup/configure", {
           method: "POST",
           headers: {
             "content-type": "application/json"
           },
-          body: JSON.stringify({
-            DATABASE_URL: "mysql://setup-user:setup-pass@localhost:3306/lessonflow",
-            NEXT_PUBLIC_SITE_URL: "https://setup.example.com",
-            ADMIN_EMAIL: "owner@melbourneguitar.school",
-            ADMIN_CUSTOMER_EMAIL_ALERTS_PROVIDER: "imap"
-          })
+          body: JSON.stringify(payload)
         })
       );
 
