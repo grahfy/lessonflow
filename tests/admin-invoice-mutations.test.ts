@@ -265,6 +265,33 @@ describe("admin-invoice-mutations", () => {
     });
   });
 
+  it("persists invoice notes longer than the legacy varchar limit", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+    const invoice = await seedInvoice(admin.id, "MGS-2026-9916");
+    const longNotes = "Invoice covers multiple lesson topics and follow-up practice tasks. ".repeat(6).trim();
+
+    const editReq = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}`, "PATCH", token, {
+      action: "edit",
+      notes: longNotes
+    });
+    const editRes = await PATCH(editReq, { params: Promise.resolve({ id: invoice.id }) });
+    expect(editRes.status).toBe(200);
+
+    const body = (await editRes.json()) as {
+      invoice: {
+        notes: string | null;
+      };
+    };
+    expect(body.invoice.notes).toBe(longNotes);
+    expect(longNotes.length).toBeGreaterThan(191);
+
+    const reloaded = await prisma.invoice.findUniqueOrThrow({
+      where: { id: invoice.id }
+    });
+    expect(reloaded.notes).toBe(longNotes);
+  });
+
   it("uses current system payment details for system-managed invoices", async () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);

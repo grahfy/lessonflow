@@ -85,6 +85,47 @@ describe("admin-booking-mutations", () => {
     expect(updated.endAt.toISOString()).toBe("2026-06-01T11:30:00.000Z");
   });
 
+  it("persists confirmed booking notes longer than the legacy varchar limit", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+    const longNotes = "Practice alternate picking and chord transitions. ".repeat(6).trim();
+
+    const booking = await prisma.booking.create({
+      data: {
+        name: "Long Notes Student",
+        email: "long.notes.student@example.com",
+        phone: "0400-000-014",
+        address: "66 Street",
+        houseNumber: "66",
+        streetName: "Street",
+        streetType: "Rd",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070",
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        lessonDuration: "min60",
+        startAt: new Date("2026-06-01T09:00:00.000Z"),
+        endAt: new Date("2026-06-01T10:00:00.000Z"),
+        timezone: "Australia/Melbourne",
+        modifiedById: admin.id
+      }
+    });
+
+    const editReq = adminRequest("http://localhost/api/admin/bookings/id_1", {
+      action: "edit",
+      notes: longNotes
+    }, token);
+    const editRes = await patchBooking(editReq, { params: Promise.resolve({ id: booking.id }) });
+    expect(editRes.status).toBe(200);
+
+    const updated = await prisma.booking.findUniqueOrThrow({
+      where: { id: booking.id }
+    });
+    expect(updated.notes).toBe(longNotes);
+    expect(longNotes.length).toBeGreaterThan(191);
+  });
+
   it("accepts blank custom duration when editing a preset confirmed booking", async () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);
@@ -323,6 +364,45 @@ describe("admin-booking-mutations", () => {
     });
     expect(updated.lessonDuration).toBe("min30");
     expect(updated.customDurationMinutes).toBeNull();
+  });
+
+  it("persists booking request notes longer than the legacy varchar limit", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+    const longNotes = "Student requested extra focus on timing, rhythm, and finger independence. ".repeat(5).trim();
+
+    const requestRow = await prisma.bookingRequest.create({
+      data: {
+        name: "Long Request Notes",
+        email: "long.request.notes@example.com",
+        phone: "0400-000-015",
+        address: "11 Street",
+        houseNumber: "11",
+        streetName: "Street",
+        streetType: "Ave",
+        suburb: "Brunswick",
+        state: "VIC",
+        postcode: "3056",
+        lessonMode: "video",
+        skillLevel: "intermediate",
+        lessonDuration: "min60",
+        requestedStartAt: new Date("2026-06-04T09:00:00.000Z"),
+        status: "pending"
+      }
+    });
+
+    const editReq = adminRequest("http://localhost/api/admin/booking-requests/id_1", {
+      action: "edit",
+      notes: longNotes
+    }, token);
+    const editRes = await patchBookingRequest(editReq, { params: Promise.resolve({ id: requestRow.id }) });
+    expect(editRes.status).toBe(200);
+
+    const updated = await prisma.bookingRequest.findUniqueOrThrow({
+      where: { id: requestRow.id }
+    });
+    expect(updated.notes).toBe(longNotes);
+    expect(longNotes.length).toBeGreaterThan(191);
   });
 
   it("returns partial success when request cancellation persists but notification delivery fails", async () => {

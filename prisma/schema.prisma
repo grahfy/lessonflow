@@ -194,7 +194,7 @@ model BookingRequest {
   lessonDuration        LessonDuration
   customDurationMinutes Int?
   requestedStartAt      DateTime
-  notes                 String?
+  notes                 String?               @db.Text
   isRecurring           Boolean              @default(false)
   recurrenceEndAt       DateTime?
   createdAt             DateTime             @default(now())
@@ -276,7 +276,7 @@ model Booking {
   startAt               DateTime
   endAt                 DateTime
   timezone              String
-  notes                 String?
+  notes                 String?               @db.Text
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
   cancelledAt           DateTime?
@@ -713,7 +713,7 @@ model Invoice {
   subtotalCents      Int
   gstCents           Int
   totalCents         Int
-  notes              String?
+  notes              String?                 @db.Text
   issuedAt           DateTime
   dueAt              DateTime
   sentAt             DateTime?
