@@ -32,6 +32,7 @@ The manual is written as a reference work for owners, administrators, and techni
 ## Technical Owner Reference
 
 - [Technical Owner Runbook: Installation, Updates, and Deploy Scripts](digitalocean-admin-operations.md)
+- [Prisma MariaDB Adapter Recovery and Upgrade Note](prisma-mariadb-adapter-recovery-and-upgrade.md)
 
 ## Release Material
 

@@ -222,6 +222,7 @@ export function AdminDeployUpdatesButton() {
         title="Deployment Updates"
         size="wide"
         id="deploy-updates-dialog"
+        bodyClassName="deploy-updates-dialog-body"
       >
         <div className="deploy-updates-content">
           <div className="deploy-updates-tabs" role="tablist" aria-label="Deployment update views">

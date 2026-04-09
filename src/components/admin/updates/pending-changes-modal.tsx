@@ -62,6 +62,7 @@ export function PendingChangesModal({
       title="Available Repository Updates"
       size="wide"
       id="pending-updates-dialog"
+      bodyClassName="deploy-updates-dialog-body"
       footer={(
         <div className="dialog-footer-row dialog-footer-row-end">
           {!confirming ? (
