@@ -185,6 +185,31 @@ test.describe("admin updates notification", () => {
     await expect(deployUpdatesDialog).toContainText("No deployment update metadata has been recorded yet.");
     await expect(deployUpdatesDialog).not.toContainText(/Unable to load latest updates/i);
 
+    const dialogBody = deployUpdatesDialog.locator(".dialog-body-scroll");
+    const bodyPadding = await dialogBody.evaluate((node) => {
+      const styles = window.getComputedStyle(node);
+      return {
+        paddingLeft: Number.parseFloat(styles.paddingLeft),
+        paddingRight: Number.parseFloat(styles.paddingRight)
+      };
+    });
+
+    expect(bodyPadding.paddingLeft, "Deployment updates dialog body should keep left padding.").toBeGreaterThan(0);
+    expect(bodyPadding.paddingRight, "Deployment updates dialog body should keep right padding.").toBeGreaterThan(0);
+
+    const contentInset = await deployUpdatesDialog.locator(".deploy-updates-content").evaluate((node) => {
+      const contentRect = node.getBoundingClientRect();
+      const dialogRect = node.closest("[role='dialog']")?.getBoundingClientRect();
+
+      return {
+        leftInset: dialogRect ? contentRect.left - dialogRect.left : 0,
+        rightInset: dialogRect ? dialogRect.right - contentRect.right : 0
+      };
+    });
+
+    expect(contentInset.leftInset, "Deployment updates content should be inset from the left edge.").toBeGreaterThan(10);
+    expect(contentInset.rightInset, "Deployment updates content should be inset from the right edge.").toBeGreaterThan(10);
+
     await deployUpdatesDialog.getByRole("tab", { name: /^history$/i }).click();
     await expect(deployUpdatesDialog).toContainText("No deployment history found.");
   });

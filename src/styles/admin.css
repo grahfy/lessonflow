@@ -2633,6 +2633,19 @@
   box-sizing: border-box;
 }
 
+.deploy-history-dialog-body {
+  padding: 8px var(--admin-density-dialog-body-padding) var(--admin-density-dialog-body-padding);
+  overflow: hidden;
+}
+
+.deploy-history-dialog-body .deploy-updates-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+  box-sizing: border-box;
+}
+
 .tab-link {
   appearance: none;
   background: transparent;
