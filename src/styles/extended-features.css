@@ -456,12 +456,17 @@
   }
 
   .admin-header-overview {
+    grid-template-columns: 1fr;
     gap: 10px;
   }
 
   .admin-header-toolbar {
     justify-content: flex-start;
     width: 100%;
+  }
+
+  .admin-header-session {
+    justify-self: start;
   }
 
   .admin-header-nav {
@@ -551,6 +556,14 @@
   .admin-header-toolbar {
     justify-content: flex-start;
     width: 100%;
+  }
+
+  .admin-header-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-header-session {
+    justify-self: start;
   }
 
   .admin-header-nav {

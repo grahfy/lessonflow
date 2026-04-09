@@ -3465,6 +3465,8 @@
 .admin-header-overview {
   grid-area: overview;
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: 14px;
   min-width: 0;
 }
@@ -3503,6 +3505,8 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
+  justify-self: end;
+  align-self: start;
   gap: 10px;
   width: fit-content;
   max-width: 100%;
@@ -3700,11 +3704,14 @@
 .admin-home-hero {
   display: grid;
   gap: 16px;
+  justify-items: center;
+  text-align: center;
 }
 
 .admin-home-hero-copy {
   display: grid;
   gap: 8px;
+  justify-items: center;
 }
 
 .admin-home-title {
@@ -3729,6 +3736,7 @@
 .admin-home-card {
   display: grid;
   gap: 18px;
+  justify-items: center;
   min-width: 0;
 }
 
@@ -3755,6 +3763,8 @@
 .admin-home-card-links {
   display: grid;
   gap: 8px;
+  justify-items: center;
+  text-align: center;
 }
 
 .admin-home-card-kicker,
@@ -3789,6 +3799,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  justify-content: center;
 }
 
 .admin-home-card-link {
