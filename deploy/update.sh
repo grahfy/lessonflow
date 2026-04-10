@@ -1356,6 +1356,23 @@ validate_systemd_unit_file_from_update() {
   fi
 }
 
+show_app_service_failure_diagnostics_from_update() {
+  if ! command -v systemctl >/dev/null 2>&1; then
+    return 0
+  fi
+
+  log_warn "lessonflow.service status:"
+  run_server_setup_cmd systemctl status "${APP_NAME}" --no-pager || true
+
+  if command -v journalctl >/dev/null 2>&1; then
+    log_warn "Recent lessonflow.service logs:"
+    run_server_setup_cmd journalctl -u "${APP_NAME}" -n 50 --no-pager || true
+  fi
+
+  log_warn "Effective lessonflow.service unit:"
+  run_server_setup_cmd systemctl cat "${APP_NAME}" || true
+}
+
 # Installs or updates the app's systemd unit from deploy/<app>.service and
 # enables it. If a current release exists, the helper also attempts to start it.
 install_app_systemd_service_from_update() {
@@ -1412,6 +1429,7 @@ install_app_systemd_service_from_update() {
       log_info "Systemd service ready: ${APP_NAME}"
     else
       log_warn "Systemd service installed but not started cleanly (check journalctl -u ${APP_NAME} and any override drop-ins)."
+      show_app_service_failure_diagnostics_from_update
     fi
   else
     log_info "Current release not present yet; service installed/enabled but not started."
