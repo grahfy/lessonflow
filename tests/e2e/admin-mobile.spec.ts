@@ -1,59 +1,9 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
-const defaultAdminEmail = "admin@example.com";
-const defaultAdminPassword = "admin123";
-const adminEmail = process.env.DOCS_SCREENSHOTS_ADMIN_EMAIL || defaultAdminEmail;
-const adminPassword = process.env.DOCS_SCREENSHOTS_ADMIN_PASSWORD || defaultAdminPassword;
+import { loginAdminViaApi } from "./auth-helpers";
 
-async function createCaptchaPayload(page: Page): Promise<{ captchaToken: string; captchaAnswer: string }> {
-  const captchaResponse = await page.request.get("/api/captcha");
-  expect(captchaResponse.ok(), "Captcha endpoint should succeed for admin mobile e2e login.").toBeTruthy();
-
-  const captcha = (await captchaResponse.json()) as {
-    token?: string;
-    imageDataUrl?: string;
-  } | null;
-
-  const token = String(captcha?.token || "").trim();
-  const imageDataUrl = String(captcha?.imageDataUrl || "");
-  expect(token, "Captcha response should include a token for admin mobile e2e login.").not.toBe("");
-  expect(imageDataUrl.startsWith("data:image/svg+xml;base64,"), "Captcha should be returned as an SVG data URL.").toBeTruthy();
-
-  const svg = Buffer.from(imageDataUrl.split(",")[1] || "", "base64").toString("utf8");
-  const answer = Array.from(svg.matchAll(/<text[^>]*>([^<]+)<\/text>/g))
-    .map((match) => match[1])
-    .join("")
-    .trim();
-
-  expect(answer, "Captcha SVG should expose a readable answer for admin mobile e2e login.").not.toBe("");
-
-  return {
-    captchaToken: token,
-    captchaAnswer: answer
-  };
-}
-
-/** Authenticates through the real admin API to avoid brittle form interactions in setup. */
-async function loginAdmin(page: Page, email: string, password: string): Promise<void> {
-  await page.goto("/admin/login", { waitUntil: "domcontentloaded" });
-  const captchaPayload = await createCaptchaPayload(page);
-  const forwardedIp = `198.51.100.${Math.floor(Math.random() * 200) + 1}`;
-
-  const response = await page.request.post("/api/admin/login", {
-    headers: {
-      "x-forwarded-for": forwardedIp
-    },
-    data: {
-      email,
-      password,
-      website: "",
-      ...captchaPayload
-    }
-  });
-
-  const body = await response.text();
-  expect(response.ok(), `Admin login via API should succeed for mobile e2e checks. Received ${response.status()} with body: ${body}`).toBeTruthy();
-}
+const adminEmail = process.env.DOCS_SCREENSHOTS_ADMIN_EMAIL || "admin@example.com";
+const adminPassword = process.env.DOCS_SCREENSHOTS_ADMIN_PASSWORD || "admin123";
 
 /** Fails when the current page layout exceeds the mobile viewport width. */
 async function assertNoHorizontalOverflow(page: Page, label: string): Promise<void> {
@@ -183,7 +133,11 @@ test.describe("admin mobile responsiveness", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test("admin routes and key dialogs remain usable on mobile", async ({ page }) => {
-    await loginAdmin(page, adminEmail, adminPassword);
+    await loginAdminViaApi(page, {
+      email: adminEmail,
+      password: adminPassword,
+      forwardedIp: `198.51.100.${Math.floor(Math.random() * 200) + 1}`
+    });
 
     const routes: Array<{ path: string; heading: RegExp }> = [
       { path: "/admin/bookings", heading: /bookings/i },
@@ -307,7 +261,11 @@ test.describe("admin intermediate-width header responsiveness", () => {
   test.use({ viewport: { width: 1100, height: 844 } });
 
   test("owner header collapses to the shared menu before awkward multi-row wrapping", async ({ page }) => {
-    await loginAdmin(page, adminEmail, adminPassword);
+    await loginAdminViaApi(page, {
+      email: adminEmail,
+      password: adminPassword,
+      forwardedIp: `198.51.100.${Math.floor(Math.random() * 200) + 1}`
+    });
     await page.goto("/admin/system-logs", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { name: /system logs/i }).waitFor({ timeout: 12_000 });
     await page.waitForLoadState("networkidle");
@@ -368,7 +326,11 @@ test.describe("admin compact 1080p desktop density", () => {
   test.use({ viewport: { width: 1920, height: 1080 } });
 
   test("admin routes and major dialogs stay compact and within 1080p viewport", async ({ page }) => {
-    await loginAdmin(page, adminEmail, adminPassword);
+    await loginAdminViaApi(page, {
+      email: adminEmail,
+      password: adminPassword,
+      forwardedIp: `198.51.100.${Math.floor(Math.random() * 200) + 1}`
+    });
 
     const routes: Array<{ path: string; heading: RegExp }> = [
       { path: "/admin/bookings", heading: /bookings/i },

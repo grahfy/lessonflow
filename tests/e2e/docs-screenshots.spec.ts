@@ -3,12 +3,14 @@ import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
+import {
+  defaultAdminEmail,
+  defaultAdminPassword,
+  loginAdminViaApi,
+  loginStudentViaApi
+} from "./auth-helpers";
+
 const outputDir = path.resolve(process.cwd(), "Documentation/assets");
-const defaultAdminEmail = "owner@example.com";
-const defaultAdminPassword = "DocsDemoAdmin!23";
-const defaultStudentName = "Alex Student";
-const defaultStudentPostcode = "3000";
-const defaultStudentPassword = "StudentDemo!23";
 const seenDeployCommitStorageKey = "mgs_admin_seen_deploy_commit";
 
 const pendingUpdateCommits = [
@@ -213,59 +215,14 @@ async function gotoWithRetry(page: import("@playwright/test").Page, urlPath: str
   }
 }
 
-/**
- * Solves the test captcha by reading the generated SVG text directly from the
- * app's API response instead of attempting OCR in Playwright.
- */
-async function createCaptchaPayload(request: import("@playwright/test").APIRequestContext) {
-  const captchaResponse = await request.get("/api/captcha");
-  if (!captchaResponse.ok()) {
-    return null;
-  }
-
-  const captcha = (await captchaResponse.json()) as {
-    token?: string;
-    imageDataUrl?: string;
-  } | null;
-
-  const token = String(captcha?.token || "").trim();
-  const imageDataUrl = String(captcha?.imageDataUrl || "");
-  if (!token || !imageDataUrl.startsWith("data:image/svg+xml;base64,")) {
-    return null;
-  }
-
-  const svg = Buffer.from(imageDataUrl.split(",")[1] || "", "base64").toString("utf8");
-  const answer = Array.from(svg.matchAll(/<text[^>]*>([^<]+)<\/text>/g))
-    .map((match) => match[1])
-    .join("")
-    .trim();
-
-  if (!answer) {
-    return null;
-  }
-
-  return { captchaToken: token, captchaAnswer: answer };
-}
-
 /** Logs in through the real admin API when docs screenshot credentials exist. */
 async function loginAdmin(page: import("@playwright/test").Page): Promise<boolean> {
   const email = process.env.DOCS_SCREENSHOTS_ADMIN_EMAIL || defaultAdminEmail;
   const password = process.env.DOCS_SCREENSHOTS_ADMIN_PASSWORD || defaultAdminPassword;
 
-  const captchaPayload = await createCaptchaPayload(page.request);
-  if (!captchaPayload) {
-    return false;
-  }
-
-  const loginResponse = await page.request.post("/api/admin/login", {
-    data: {
-      email,
-      password,
-      website: "",
-      ...captchaPayload
-    }
-  });
-  if (!loginResponse.ok()) {
+  try {
+    await loginAdminViaApi(page, { email, password });
+  } catch {
     return false;
   }
 
@@ -279,25 +236,9 @@ async function loginAdmin(page: import("@playwright/test").Page): Promise<boolea
 
 /** Captures the student portal dashboard and materials library using demo credentials. */
 async function captureStudentPortal(page: import("@playwright/test").Page): Promise<boolean> {
-  const fullName = process.env.DOCS_SCREENSHOTS_STUDENT_FULL_NAME || defaultStudentName;
-  const postcode = process.env.DOCS_SCREENSHOTS_STUDENT_POSTCODE || defaultStudentPostcode;
-  const password = process.env.DOCS_SCREENSHOTS_STUDENT_PASSWORD || defaultStudentPassword;
-
-  const captchaPayload = await createCaptchaPayload(page.request);
-  if (!captchaPayload) {
-    return false;
-  }
-
-  const loginResponse = await page.request.post("/api/student/login", {
-    data: {
-      fullName,
-      postcode,
-      password,
-      website: "",
-      ...captchaPayload
-    }
-  });
-  if (!loginResponse.ok()) {
+  try {
+    await loginStudentViaApi(page);
+  } catch {
     return false;
   }
 

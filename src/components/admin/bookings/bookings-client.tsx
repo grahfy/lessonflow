@@ -589,7 +589,7 @@ export function AdminBookingsClient() {
 
     showDialog();
     if (dialogRootRef.current) animateIn(dialogRootRef.current);
-  }, [currentAdmin, loadBookingLessonPlan, loadEmailHistory, loadLessonPlanTemplates, loadMaterials, resetBookingLessonPlan, showDialog, singleTeacherOptionId]);
+  }, [currentAdmin, loadBookingLessonPlan, loadEmailHistory, loadLessonPlanTemplates, loadMaterials, resetBookingLessonPlan, showDialog, singleTeacherOptionId, updateDialogForm]);
 
   useEffect(() => {
     if (!deepLinkedBookingId || !shouldOpenDeepLinkedBooking) {
@@ -628,7 +628,7 @@ export function AdminBookingsClient() {
       resetBookingLessonPlan();
     });
     void animateOut(root).catch(() => undefined);
-  }, [hideDialog, resetBookingLessonPlan]);
+  }, [hideDialog, resetBookingLessonPlan, updateDialogForm]);
 
   useEffect(() => {
     if (!lessonPlan) {
@@ -754,23 +754,24 @@ export function AdminBookingsClient() {
   }, []);
 
   const applyMatchedCustomerToDialog = useCallback((customer: BookingMatchedCustomer) => {
-    if (!customer || !dialogForm) return;
+    const currentDialogForm = dialogFormRef.current;
+    if (!customer || !currentDialogForm) return;
     const fullNameParts = String(customer.fullName || "").trim().split(/\s+/).filter(Boolean);
     const firstNameFallback = fullNameParts[0] || "";
     const lastNameFallback = fullNameParts.slice(1).join(" ");
 
     const patch: Record<string, string> = {
-      firstName: dialogForm.firstName?.trim() ? dialogForm.firstName : (customer.firstName || firstNameFallback),
-      lastName: dialogForm.lastName?.trim() ? dialogForm.lastName : (customer.lastName || lastNameFallback),
-      email: dialogForm.email?.trim() ? dialogForm.email : (customer.email || ""),
-      phone: dialogForm.phone?.trim() ? dialogForm.phone : (customer.phone || ""),
-      unitNumber: dialogForm.unitNumber?.trim() ? dialogForm.unitNumber : (customer.unitNumber || ""),
-      houseNumber: dialogForm.houseNumber?.trim() ? dialogForm.houseNumber : (customer.houseNumber || ""),
-      streetName: dialogForm.streetName?.trim() ? dialogForm.streetName : (customer.streetName || ""),
-      streetType: dialogForm.streetType?.trim() ? dialogForm.streetType : (customer.streetType || "Street"),
-      suburb: dialogForm.suburb?.trim() ? dialogForm.suburb : (customer.suburb || ""),
-      state: dialogForm.state?.trim() ? dialogForm.state : (customer.state || "VIC"),
-      postcode: dialogForm.postcode?.trim() ? dialogForm.postcode : (customer.postcode || "")
+      firstName: currentDialogForm.firstName?.trim() ? currentDialogForm.firstName : (customer.firstName || firstNameFallback),
+      lastName: currentDialogForm.lastName?.trim() ? currentDialogForm.lastName : (customer.lastName || lastNameFallback),
+      email: currentDialogForm.email?.trim() ? currentDialogForm.email : (customer.email || ""),
+      phone: currentDialogForm.phone?.trim() ? currentDialogForm.phone : (customer.phone || ""),
+      unitNumber: currentDialogForm.unitNumber?.trim() ? currentDialogForm.unitNumber : (customer.unitNumber || ""),
+      houseNumber: currentDialogForm.houseNumber?.trim() ? currentDialogForm.houseNumber : (customer.houseNumber || ""),
+      streetName: currentDialogForm.streetName?.trim() ? currentDialogForm.streetName : (customer.streetName || ""),
+      streetType: currentDialogForm.streetType?.trim() ? currentDialogForm.streetType : (customer.streetType || "Street"),
+      suburb: currentDialogForm.suburb?.trim() ? currentDialogForm.suburb : (customer.suburb || ""),
+      state: currentDialogForm.state?.trim() ? currentDialogForm.state : (customer.state || "VIC"),
+      postcode: currentDialogForm.postcode?.trim() ? currentDialogForm.postcode : (customer.postcode || "")
     };
 
     updateDialogForm((current) => {

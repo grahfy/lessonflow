@@ -52,7 +52,7 @@ export async function enqueueStorageCleanupTasks(input: {
 
   const now = new Date();
   const ids: string[] = [];
-  const db = input.db as any;
+  const db = input.db;
 
   for (const task of tasks) {
     const queued = await db.storageCleanupTask.upsert({
@@ -85,7 +85,7 @@ export async function processStorageCleanupTasks(input: {
   const now = new Date();
   const maxTasks = input.maxTasks ?? 25;
   const driver = createMaterialStorageDriver();
-  const db = input.db as any;
+  const db = input.db;
 
   const tasks = await db.storageCleanupTask.findMany({
     where: input.taskIds?.length

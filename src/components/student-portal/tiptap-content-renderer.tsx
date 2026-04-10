@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 import { renderChordSvg } from "@/lib/chords/chord-svg";
 import type { ChordDiagramData } from "@/lib/chords/chord-types";
 
@@ -126,6 +128,9 @@ export function renderNode(
 
     case "image": {
       let src = attrs.src as string;
+      const alt = (attrs.alt as string) || "";
+      const width = typeof attrs.width === "number" && attrs.width > 0 ? attrs.width : 1200;
+      const height = typeof attrs.height === "number" && attrs.height > 0 ? attrs.height : 800;
       // Rewrite admin image URLs to student-accessible endpoints.
       if (options?.bookingId && src) {
         const adminPattern = /\/api\/admin\/bookings\/[^/]+\/notes-image\/([^/]+)/;
@@ -135,11 +140,15 @@ export function renderNode(
         }
       }
       return (
-        <img
+        <Image
           key={key}
           src={src}
-          alt={(attrs.alt as string) || ""}
+          alt={alt}
+          width={width}
+          height={height}
+          unoptimized
           className="lp-viewer-image"
+          style={{ width: "100%", height: "auto" }}
         />
       );
     }
