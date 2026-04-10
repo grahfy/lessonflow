@@ -412,7 +412,7 @@ sudo chmod 0440 /etc/sudoers.d/lessonflow-web-update
 ```
 
 The dedicated runner now starts as a root-owned systemd unit so low-memory deploy safeguards, swap management, and service restarts still work during browser-triggered updates.
-Git fetch/merge operations are still pinned to `UPDATES_DEPLOY_USER` so the persistent source checkout does not drift into root-owned state.
+Git fetch/merge operations are pinned to `UPDATES_DEPLOY_USER` so the persistent source checkout does not drift into root-owned state. Manual root-shell runs of `./deploy/update.sh` now honor the same shared-env setting.
 
 ### 3. Install Nginx Configuration
 

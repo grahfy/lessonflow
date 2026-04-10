@@ -106,6 +106,7 @@ TUI_REMOTE_UPDATE_REMOTE_SHORT=""
 TUI_REMOTE_UPDATE_REMOTE_SUBJECT=""
 TUI_REMOTE_UPDATE_LOCAL_SHORT=""
 TUI_REMOTE_UPDATE_ERROR=""
+ANNOUNCED_SOURCE_GIT_USER=""
 
 # ANSI color palette shared with deploy.sh for consistent terminal UX.
 RED='\033[0;31m'
@@ -298,6 +299,12 @@ resolve_source_git_user_for_update() {
     return 1
   fi
 
+  candidate="$(read_updates_deploy_user_from_shared_env_for_update || true)"
+  if [[ -n "${candidate}" && "${candidate}" != "root" && "${candidate}" != "UNKNOWN" ]]; then
+    printf '%s\n' "${candidate}"
+    return 0
+  fi
+
   repo_owner="$(stat -c '%U' "${repo_root}" 2>/dev/null || true)"
 
   for candidate in "${MGS_SUDO_USER:-}" "${SUDO_USER:-}" "${repo_owner}"; do
@@ -308,6 +315,28 @@ resolve_source_git_user_for_update() {
   done
 
   return 1
+}
+
+announce_source_git_user_for_update() {
+  local repo_root="$1"
+  local source_git_user=""
+  local current_user=""
+  local log_key=""
+
+  source_git_user="$(resolve_source_git_user_for_update "${repo_root}" || true)"
+  current_user="$(id -un 2>/dev/null || true)"
+
+  if [[ -z "${source_git_user}" || "${source_git_user}" == "${current_user}" ]]; then
+    return 0
+  fi
+
+  log_key="${repo_root}:${source_git_user}:${current_user}"
+  if [[ "${ANNOUNCED_SOURCE_GIT_USER}" == "${log_key}" ]]; then
+    return 0
+  fi
+
+  log_info "Git update actions will run as ${source_git_user} (current user: ${current_user:-unknown})."
+  ANNOUNCED_SOURCE_GIT_USER="${log_key}"
 }
 
 run_source_git_cmd_for_update() {
@@ -857,6 +886,13 @@ read_env_file_value_from_update() {
   fi
 
   printf '%s\n' "${value}"
+}
+
+read_updates_deploy_user_from_shared_env_for_update() {
+  local shared_env_path="${SHARED_DIR}/.env"
+
+  [[ -f "${shared_env_path}" ]] || return 1
+  read_env_file_value_from_update "${shared_env_path}" "UPDATES_DEPLOY_USER"
 }
 
 # Ensures /var/www/.../shared/.env exists, copying the repo .env.example on
@@ -2144,6 +2180,7 @@ run_tui_script_update_and_reload() {
 
   local before_commit=""
   local after_commit=""
+  announce_source_git_user_for_update "${REPO_ROOT}"
   before_commit="$(run_source_git_cmd_for_update "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || true)"
 
   run_step "Fetching ${REMOTE_NAME}/${BRANCH}" run_source_git_cmd_for_update "${REPO_ROOT}" fetch "${REMOTE_NAME}" "+refs/heads/${BRANCH}:refs/remotes/${REMOTE_NAME}/${BRANCH}" || return 0
@@ -3223,6 +3260,7 @@ fi
 if [[ "${SOURCE_MODE}" == "git" ]]; then
   section "Git Update"
   log_info "Repository branch: $(current_branch_name)"
+  announce_source_git_user_for_update "${REPO_ROOT}"
   verify_git_source_access_for_update
 
   if [[ "${ALLOW_DIRTY}" != true ]] && git_worktree_dirty; then
