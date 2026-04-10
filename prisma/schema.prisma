@@ -119,6 +119,11 @@ enum AdminRole {
   teacher
 }
 
+enum StorageCleanupScope {
+  booking_note_image
+  booking_request_note_image
+}
+
 enum UnknownCountryMode {
   allow
   block
@@ -195,6 +200,7 @@ model BookingRequest {
   customDurationMinutes Int?
   requestedStartAt      DateTime
   notes                 String?               @db.Text
+  notesContent          Json?
   isRecurring           Boolean              @default(false)
   recurrenceEndAt       DateTime?
   createdAt             DateTime             @default(now())
@@ -205,11 +211,27 @@ model BookingRequest {
   assignedTeacher       AdminUser?           @relation("BookingRequestAssignedTeacher", fields: [assignedTeacherId], references: [id], onDelete: SetNull)
   customerId            String?
   customer              Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  noteImages            BookingRequestNoteImage[]
   bookings              Booking[]
 
   @@index([requestedStartAt, status])
   @@index([customerId])
   @@index([assignedTeacherId])
+}
+
+// Images uploaded inline into booking-request notes before approval.
+// Approval copies them to booking-scoped note images so confirmed bookings do
+// not depend on request-only media routes.
+model BookingRequestNoteImage {
+  id               String         @id @default(cuid())
+  bookingRequestId String
+  bookingRequest   BookingRequest @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade)
+  storageKey       String
+  mimeType         String
+  sizeBytes        Int
+  createdAt        DateTime       @default(now())
+
+  @@index([bookingRequestId])
 }
 
 // Recurring booking template metadata used to generate/track multiple concrete
@@ -690,6 +712,23 @@ model OutboundEmail {
   source     String   @default("app")
   error      String?  @db.Text
   createdAt  DateTime @default(now())
+}
+
+// Durable cleanup queue for storage objects whose metadata was already removed
+// or whose rollback delete failed. Job routes retry until the blob is gone.
+model StorageCleanupTask {
+  id            String              @id @default(cuid())
+  storageKey    String              @unique
+  scope         StorageCleanupScope
+  entityId      String
+  attemptCount  Int                 @default(0)
+  lastError     String?             @db.Text
+  nextAttemptAt DateTime            @default(now())
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([nextAttemptAt, createdAt])
+  @@index([scope, entityId])
 }
 
 // Invoice and credit note domain model. Customer-facing invoice data is

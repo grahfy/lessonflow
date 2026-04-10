@@ -1400,6 +1400,7 @@ h1 {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   color: var(--ink-1);
   font-size: 0.75rem;
@@ -1621,6 +1622,7 @@ h1 {
 
 .error-boundary-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-top: 4px;
 }
@@ -1648,5 +1650,31 @@ h1 {
 
   .cookie-consent-actions .btn {
     flex: 1 1 140px;
+  }
+
+  .error-boundary,
+  .not-found-page {
+    min-height: 50vh;
+    padding: 40px 18px;
+  }
+
+  .error-boundary-actions {
+    width: 100%;
+  }
+
+  .error-boundary-actions .btn,
+  .not-found-page .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .error-boundary h1,
+  .not-found-page h1 {
+    font-size: 1.4rem;
+  }
+
+  .error-boundary-actions {
+    flex-direction: column;
   }
 }

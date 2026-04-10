@@ -21,7 +21,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format, parseISO, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, addYears, subYears } from "date-fns";
 import { AlertCircle, CalendarRange, Clock3, UserRound } from "lucide-react";
@@ -62,7 +62,12 @@ import type { JSONContent } from "@tiptap/react";
 import { BookingDetailDialog } from "./booking-detail-dialog";
 import { ManualBookingDialog } from "./manual-booking-dialog";
 
-import { type BookingDialogForm, type BookingMatchedCustomer, type BookingRowData } from "./types";
+import {
+  type BookingCustomerLookupState,
+  type BookingDialogForm,
+  type BookingMatchedCustomer,
+  type BookingRowData
+} from "./types";
 
 import { 
   type ManualStep, 
@@ -80,11 +85,6 @@ function countLabel(count: number, singular: string, plural = `${singular}s`): s
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
-/** Normalization for email matching. */
-function normalizeEmailForMatch(value: string | null | undefined): string {
-  return (value || "").trim().toLowerCase();
-}
-
 /** Normalization for phone matching (strips non-digits, handles AU prefix). */
 function normalizePhoneForMatch(value: string | null | undefined): string {
   const digits = (value || "").replace(/\D/g, "");
@@ -97,31 +97,10 @@ function normalizePhoneForMatch(value: string | null | undefined): string {
   return digits;
 }
 
-/**
- * Heuristic Matching Logic
- * 
- * RATIONALE: We often get booking requests with slightly different names or 
- * contact details. Matching by normalized phone OR email allows the system to 
- * suggest linking records, preventing data silos and duplicate profiles.
- */
-function findHeuristicCustomerMatch(customers: BookingMatchedCustomer[], email: string | null | undefined, phone: string | null | undefined) {
-  const normalizedEmail = normalizeEmailForMatch(email);
-  const normalizedPhone = normalizePhoneForMatch(phone);
-  if (!normalizedEmail && !normalizedPhone) {
-    return null;
-  }
-
-  return (
-    customers.find((customer) => {
-      const customerEmail = normalizeEmailForMatch(customer.email);
-      const customerPhone = normalizePhoneForMatch(customer.phone);
-      return (
-        (normalizedEmail && customerEmail && normalizedEmail === customerEmail) ||
-        (normalizedPhone && customerPhone && normalizedPhone === customerPhone)
-      );
-    }) || null
-  );
-}
+type BookingCustomerLookupResponse = {
+  status: "linked" | "exact_match" | "possible_match" | "no_match";
+  customers: BookingMatchedCustomer[];
+};
 
 function getEmailHistoryTargetForEvent(event: EventWithRow | null): EmailHistoryTarget | null {
   if (!event) {
@@ -186,6 +165,10 @@ export function AdminBookingsClient() {
   const [activeTab, setActiveTab] = useState<"appointment" | "emails" | "materials" | "lesson-plan">("appointment");
   const [dialogForm, setDialogForm] = useState<BookingDialogForm | null>(null);
   const [dialogMatchDismissed, setDialogMatchDismissed] = useState(false);
+  const [customerLookup, setCustomerLookup] = useState<BookingCustomerLookupState>({
+    status: "idle",
+    customers: [],
+  });
   const [invoiceCandidates, setInvoiceCandidates] = useState<BookingInvoiceCandidateSummary[]>([]);
   const [lessonPlanDraft, setLessonPlanDraft] = useState<LessonPlanSectionsInput | null>(null);
   const [lessonPlanTemplateSelection, setLessonPlanTemplateSelection] = useState("");
@@ -221,6 +204,17 @@ export function AdminBookingsClient() {
   const dialogRootRef = useRef<HTMLDivElement | null>(null);
   const manualDialogRootRef = useRef<HTMLDivElement | null>(null);
   const handledDeepLinkedBookingIdRef = useRef<string | null>(null);
+  const customerLookupRequestRef = useRef(0);
+  const customerLookupSignatureRef = useRef("");
+  const dialogFormRef = useRef<BookingDialogForm | null>(null);
+
+  const updateDialogForm = useCallback((next: SetStateAction<BookingDialogForm | null>) => {
+    setDialogForm((current) => {
+      const resolved = typeof next === "function" ? next(current) : next;
+      dialogFormRef.current = resolved;
+      return resolved;
+    });
+  }, []);
 
   const materialsUploadFormRef = useRef<HTMLFormElement | null>(null);
   const manualFormRef = useRef<HTMLFormElement | null>(null);
@@ -342,20 +336,18 @@ export function AdminBookingsClient() {
   }, [currentAdmin, selectedEvent]);
   const canApproveSelectedRequest = Boolean(currentAdmin?.role === "owner" && selectedEvent?.entityType === "booking_request");
   
-  // LOGIC: Resolve customer relationships
-  const linkedCustomer = useMemo(() => {
-    const customerId = selectedEvent?.row?.customerId;
-    if (!customerId) return null;
-    return customerOptions.find((customer) => customer.id === customerId) || null;
-  }, [selectedEvent, customerOptions]);
-
-  const heuristicCustomer = useMemo(() => {
-    if (!dialogForm || linkedCustomer) return linkedCustomer;
-    return findHeuristicCustomerMatch(customerOptions, dialogForm.email, dialogForm.phone);
-  }, [dialogForm, linkedCustomer, customerOptions]);
-
-  const hasHeuristicMatch = Boolean(!linkedCustomer && heuristicCustomer);
-  const matchedDialogCustomer = linkedCustomer || (!dialogMatchDismissed ? heuristicCustomer : null);
+  const matchedDialogCustomer = useMemo(() => {
+    if (customerLookup.customers.length === 0) {
+      return null;
+    }
+    if (customerLookup.status === "linked") {
+      return customerLookup.customers[0] || null;
+    }
+    if (dialogMatchDismissed) {
+      return null;
+    }
+    return customerLookup.customers[0] || null;
+  }, [customerLookup, dialogMatchDismissed]);
 
   // Sync data with view/date parameters
   useEffect(() => {
@@ -375,6 +367,111 @@ export function AdminBookingsClient() {
   useEffect(() => {
     void loadLessonPricing();
   }, [loadLessonPricing]);
+
+  useEffect(() => {
+    if (!dialogForm) {
+      customerLookupSignatureRef.current = "";
+      return;
+    }
+
+    const nextSignature = [
+      dialogForm.linkedCustomerId,
+      dialogForm.firstName.trim(),
+      dialogForm.lastName.trim(),
+      dialogForm.email.trim(),
+      dialogForm.phone.trim(),
+      dialogForm.postcode.trim(),
+    ].join("|");
+
+    if (!customerLookupSignatureRef.current) {
+      customerLookupSignatureRef.current = nextSignature;
+      return;
+    }
+
+    if (customerLookupSignatureRef.current !== nextSignature) {
+      customerLookupSignatureRef.current = nextSignature;
+      setDialogMatchDismissed(false);
+    }
+  }, [dialogForm]);
+
+  useEffect(() => {
+    if (!selectedEvent || selectedEvent.entityType !== "booking_request" || !dialogForm) {
+      setCustomerLookup({ status: "idle", customers: [] });
+      return;
+    }
+
+    const hasLookupInput = Boolean(
+      dialogForm.linkedCustomerId ||
+      dialogForm.email.trim() ||
+      dialogForm.phone.trim() ||
+      dialogForm.firstName.trim() ||
+      dialogForm.lastName.trim()
+    );
+
+    if (!hasLookupInput) {
+      setCustomerLookup({ status: "idle", customers: [] });
+      return;
+    }
+
+    const requestId = customerLookupRequestRef.current + 1;
+    customerLookupRequestRef.current = requestId;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      setCustomerLookup((previous) => ({
+        status: "loading",
+        customers: previous.customers,
+      }));
+
+      const params = new URLSearchParams();
+      if (dialogForm.linkedCustomerId) params.set("customerId", dialogForm.linkedCustomerId);
+      if (dialogForm.firstName.trim()) params.set("firstName", dialogForm.firstName.trim());
+      if (dialogForm.lastName.trim()) params.set("lastName", dialogForm.lastName.trim());
+      if (dialogForm.email.trim()) params.set("email", dialogForm.email.trim());
+      if (dialogForm.phone.trim()) params.set("phone", dialogForm.phone.trim());
+      if (dialogForm.postcode.trim()) params.set("postcode", dialogForm.postcode.trim());
+
+      try {
+        const response = await fetch(`/api/admin/customers/match?${params.toString()}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+
+        if (response.status === 401) {
+          onAuthError();
+          return;
+        }
+
+        if (!response.ok) {
+          const payload = await response.json().catch(() => null);
+          throw new Error(payload?.error || "Unable to search customers.");
+        }
+
+        const payload = (await response.json()) as BookingCustomerLookupResponse;
+        if (customerLookupRequestRef.current !== requestId) {
+          return;
+        }
+
+        setCustomerLookup({
+          status: payload.status,
+          customers: payload.customers,
+        });
+      } catch (error) {
+        if (controller.signal.aborted || customerLookupRequestRef.current !== requestId) {
+          return;
+        }
+        setCustomerLookup({
+          status: "error",
+          customers: [],
+          message: error instanceof Error ? error.message : "Unable to search customers.",
+        });
+      }
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [dialogForm, onAuthError, selectedEvent]);
 
   useEffect(() => {
     if (isManualDialogMounted && !manualDurationChoice && configuredDurationChoices[0]) {
@@ -429,9 +526,10 @@ export function AdminBookingsClient() {
           ? plainTextToTiptapJson(row.notes)
           : null;
 
-    setDialogForm({
+    updateDialogForm({
       notes: typeof row.notes === "string" ? row.notes : "",
       notesContent: resolvedNotesContent,
+      linkedCustomerId: typeof row.customerId === "string" ? row.customerId : "",
       startAtLocal: toDateTimeLocalValue(event.startAt),
       firstName: typeof row.firstName === "string" ? row.firstName : "",
       lastName: typeof row.lastName === "string" ? row.lastName : "",
@@ -467,13 +565,12 @@ export function AdminBookingsClient() {
     });
     setActiveTab("appointment");
     setDialogMatchDismissed(false);
+    setCustomerLookup({ status: "idle", customers: [] });
     setLessonPlanDraft(null);
     setLessonPlanTemplateSelection("");
     setError("");
     setNotice("");
     resetBookingLessonPlan();
-
-    void loadCustomers();
 
     const emailTarget = getEmailHistoryTargetForEvent(event as EventWithRow);
     if (emailTarget) {
@@ -492,7 +589,7 @@ export function AdminBookingsClient() {
 
     showDialog();
     if (dialogRootRef.current) animateIn(dialogRootRef.current);
-  }, [currentAdmin, loadBookingLessonPlan, loadCustomers, loadEmailHistory, loadLessonPlanTemplates, loadMaterials, resetBookingLessonPlan, showDialog, singleTeacherOptionId]);
+  }, [currentAdmin, loadBookingLessonPlan, loadEmailHistory, loadLessonPlanTemplates, loadMaterials, resetBookingLessonPlan, showDialog, singleTeacherOptionId]);
 
   useEffect(() => {
     if (!deepLinkedBookingId || !shouldOpenDeepLinkedBooking) {
@@ -523,7 +620,8 @@ export function AdminBookingsClient() {
     const root = dialogRootRef.current;
     hideDialog(() => {
       setSelectedKey(null);
-      setDialogForm(null);
+      updateDialogForm(null);
+      setCustomerLookup({ status: "idle", customers: [] });
       setInvoiceCandidates([]);
       setLessonPlanDraft(null);
       setLessonPlanTemplateSelection("");
@@ -675,13 +773,20 @@ export function AdminBookingsClient() {
       postcode: dialogForm.postcode?.trim() ? dialogForm.postcode : (customer.postcode || "")
     };
 
-    setDialogForm({
-      ...dialogForm,
-      ...patch
+    updateDialogForm((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        linkedCustomerId: customer.id,
+        ...patch,
+      };
     });
     setDialogMatchDismissed(false);
-    setNotice("Filled missing booking details from matched customer.");
-  }, [dialogForm]);
+    setNotice("Linked this request to the existing customer profile.");
+  }, [updateDialogForm]);
 
   const openMatchedCustomer = useCallback(async () => {
     if (!matchedDialogCustomer?.id) return;
@@ -693,23 +798,30 @@ export function AdminBookingsClient() {
   
   async function saveBooking() {
     const event = events.find(e => e.id === selectedKey);
-    if (!selectedKey || !dialogForm || !event) return;
-    const nextDurationMinutes = Number.parseInt(dialogForm.durationChoice, 10);
+    const currentDialogForm = dialogFormRef.current;
+    if (!selectedKey || !currentDialogForm || !event) return;
+    const nextDurationMinutes = Number.parseInt(currentDialogForm.durationChoice, 10);
     if (!Number.isInteger(nextDurationMinutes)) {
       setError("Select a configured lesson duration before saving.");
       return;
     }
-    if (!configuredDurationValues.has(nextDurationMinutes)) {
+    if (configuredDurationValues.size > 0 && !configuredDurationValues.has(nextDurationMinutes)) {
       setError("This booking uses a duration that is not configured in Lesson Info / Prices. Add that duration in settings or choose a configured duration before saving.");
       return;
     }
 
     const normalizedDuration = durationMinutesToBookingPayload(nextDurationMinutes);
     setBusyAction("save");
-    const result = await updateBookingApi(selectedKey, event.entityType, "edit", {
-      ...dialogForm,
+    const payload: Record<string, unknown> = {
+      ...currentDialogForm,
       lessonDuration: normalizedDuration.lessonDuration,
       customDurationMinutes: normalizedDuration.customDurationMinutes
+    };
+    if (event.entityType === "booking_request") {
+      payload.customerId = currentDialogForm.linkedCustomerId || null;
+    }
+    const result = await updateBookingApi(selectedKey, event.entityType, "edit", {
+      ...payload
     });
     setBusyAction(null);
     if (result.ok) {
@@ -1103,7 +1215,7 @@ export function AdminBookingsClient() {
           rootRef={dialogRootRef}
           event={selectedEvent}
           dialogForm={dialogForm}
-          setDialogForm={setDialogForm}
+      setDialogForm={updateDialogForm}
           busyAction={busyAction}
           onSave={saveBooking}
           onDelete={deleteBooking}
@@ -1113,7 +1225,10 @@ export function AdminBookingsClient() {
           canInvoice={currentAdmin?.role === "owner"}
           teacherOptions={teacherOptions}
           lessonDurationOptions={configuredDurationChoices}
-          durationIsConfigured={configuredDurationValues.has(Number.parseInt(dialogForm?.durationChoice || "", 10))}
+          durationIsConfigured={
+            configuredDurationValues.size === 0 ||
+            configuredDurationValues.has(Number.parseInt(dialogForm?.durationChoice || "", 10))
+          }
           onMove={() => {
             const event = events.find(e => e.id === selectedKey);
             if (event) {
@@ -1123,8 +1238,8 @@ export function AdminBookingsClient() {
           }}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
+          customerLookup={customerLookup}
           matchedCustomer={matchedDialogCustomer}
-          hasHeuristicMatch={hasHeuristicMatch && !dialogMatchDismissed}
           onApplyMatchedCustomer={() => matchedDialogCustomer && applyMatchedCustomerToDialog(matchedDialogCustomer)}
           onOpenMatchedCustomer={() => void openMatchedCustomer()}
           onOpenInvoice={async () => {

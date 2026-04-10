@@ -153,7 +153,7 @@ export function LessonPlanSectionsEditor({
             placeholder={`${section.title}...`}
             editable={!disabled}
             materials={materials}
-            bookingId={bookingId}
+            imageUploadTarget={bookingId ? { entityType: "booking", id: bookingId } : null}
             onUpdate={(json) => handleSectionContentChange(index, json)}
           />
         </div>

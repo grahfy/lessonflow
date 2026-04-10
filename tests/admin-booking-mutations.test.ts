@@ -7,6 +7,9 @@ import { prisma } from "@/lib/db";
 import { PATCH as patchBooking } from "@/app/api/admin/bookings/[id]/route";
 import { PATCH as patchBookingRequest } from "@/app/api/admin/booking-requests/[id]/route";
 import { DELETE as deleteBookingRequest } from "@/app/api/admin/booking-requests/[id]/route";
+import { buildBookingRequestNoteImageStorageKey } from "@/lib/note-images";
+import { createMaterialStorageDriver } from "@/lib/student-portal/material-storage";
+import * as materialStorageModule from "@/lib/student-portal/material-storage";
 
 // These tests call route handlers directly (without spinning up Next.js) so they
 // can assert booking/request mutation semantics against a real Prisma DB.
@@ -25,6 +28,7 @@ describe("admin-booking-mutations", () => {
   beforeEach(async () => {
     // Clear dependent tables in child-to-parent order to keep each scenario
     // focused on the mutation under test rather than leftover relational state.
+    await (prisma as any).storageCleanupTask.deleteMany();
     await prisma.bookingAuditLog.deleteMany();
     await prisma.booking.deleteMany();
     await prisma.bookingSeries.deleteMany();
@@ -493,5 +497,137 @@ describe("admin-booking-mutations", () => {
 
     const deleted = await prisma.bookingRequest.findUnique({ where: { id: requestRow.id } });
     expect(deleted).toBeNull();
+  });
+
+  it("deletes booking-request note image storage when removing a non-approved request", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const requestRow = await prisma.bookingRequest.create({
+      data: {
+        name: "Delete Me With Images",
+        email: "deleteme-images@example.com",
+        phone: "0400-000-098",
+        address: "12 Street",
+        houseNumber: "12",
+        streetName: "Street",
+        streetType: "St",
+        suburb: "Coburg",
+        state: "VIC",
+        postcode: "3058",
+        lessonMode: "video",
+        skillLevel: "beginner",
+        lessonDuration: "min30",
+        requestedStartAt: new Date("2026-06-10T09:00:00.000Z"),
+        status: "cancelled"
+      }
+    });
+
+    const imageId = "delete-request-image";
+    const storageKey = buildBookingRequestNoteImageStorageKey(requestRow.id, imageId, "png");
+    const storage = createMaterialStorageDriver();
+    await storage.put({
+      storageKey,
+      buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+      mimeType: "image/png",
+    });
+
+    await prisma.bookingRequestNoteImage.create({
+      data: {
+        id: imageId,
+        bookingRequestId: requestRow.id,
+        storageKey,
+        mimeType: "image/png",
+        sizeBytes: 4,
+      },
+    });
+
+    const request = new NextRequest(`http://localhost/api/admin/booking-requests/${requestRow.id}`, {
+      method: "DELETE",
+      headers: {
+        cookie: `${getSessionCookieName()}=${token}`
+      }
+    });
+    const response = await deleteBookingRequest(request, { params: Promise.resolve({ id: requestRow.id }) });
+    expect(response.status).toBe(200);
+
+    await expect(storage.get({ storageKey })).rejects.toThrow();
+    expect(await prisma.bookingRequest.findUnique({ where: { id: requestRow.id } })).toBeNull();
+  });
+
+  it("queues booking-request blob cleanup when request deletion cannot remove storage immediately", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const requestRow = await prisma.bookingRequest.create({
+      data: {
+        name: "Delete Me Queued",
+        email: "deleteme-queued@example.com",
+        phone: "0400-000-097",
+        address: "12 Street",
+        houseNumber: "12",
+        streetName: "Street",
+        streetType: "St",
+        suburb: "Coburg",
+        state: "VIC",
+        postcode: "3058",
+        lessonMode: "video",
+        skillLevel: "beginner",
+        lessonDuration: "min30",
+        requestedStartAt: new Date("2026-06-10T09:00:00.000Z"),
+        status: "cancelled"
+      }
+    });
+
+    const imageId = "queued-request-image";
+    const storageKey = buildBookingRequestNoteImageStorageKey(requestRow.id, imageId, "png");
+    const realDriver = createMaterialStorageDriver();
+    await realDriver.put({
+      storageKey,
+      buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+      mimeType: "image/png",
+    });
+
+    await prisma.bookingRequestNoteImage.create({
+      data: {
+        id: imageId,
+        bookingRequestId: requestRow.id,
+        storageKey,
+        mimeType: "image/png",
+        sizeBytes: 4,
+      },
+    });
+
+    const deleteSpy = vi.spyOn(materialStorageModule, "createMaterialStorageDriver").mockReturnValue({
+      put: realDriver.put.bind(realDriver),
+      get: realDriver.get.bind(realDriver),
+      delete: async (input) => {
+        if (input.storageKey === storageKey) {
+          throw new Error("storage offline");
+        }
+        return realDriver.delete(input);
+      },
+    });
+
+    const request = new NextRequest(`http://localhost/api/admin/booking-requests/${requestRow.id}`, {
+      method: "DELETE",
+      headers: {
+        cookie: `${getSessionCookieName()}=${token}`
+      }
+    });
+    const response = await deleteBookingRequest(request, { params: Promise.resolve({ id: requestRow.id }) });
+    expect(response.status).toBe(200);
+
+    expect(await prisma.bookingRequest.findUnique({ where: { id: requestRow.id } })).toBeNull();
+    const queued = await (prisma as any).storageCleanupTask.findUniqueOrThrow({
+      where: { storageKey },
+    });
+    expect(queued.scope).toBe("booking_request_note_image");
+    expect(queued.entityId).toBe(requestRow.id);
+    expect(queued.attemptCount).toBe(1);
+    expect(queued.lastError).toContain("storage offline");
+
+    deleteSpy.mockRestore();
+    await realDriver.delete({ storageKey }).catch(() => undefined);
   });
 });

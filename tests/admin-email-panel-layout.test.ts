@@ -93,6 +93,7 @@ const bookingEvent: BookingEvent = {
 const bookingDialogForm: BookingDialogForm = {
   notes: "",
   notesContent: null,
+  linkedCustomerId: "",
   startAtLocal: "2026-03-19T21:00",
   firstName: "Ava",
   lastName: "Student",
@@ -324,8 +325,8 @@ describe("admin-email-panel-layout", () => {
         durationIsConfigured: true,
         activeTab: "emails",
         setActiveTab: noop,
+        customerLookup: { status: "idle", customers: [] },
         matchedCustomer: null,
-        hasHeuristicMatch: false,
         onApplyMatchedCustomer: noop,
         onOpenMatchedCustomer: noop,
         onDismissMatchedCustomer: noop,
@@ -409,8 +410,8 @@ describe("admin-email-panel-layout", () => {
         durationIsConfigured: true,
         activeTab: "lesson-plan",
         setActiveTab: noop,
+        customerLookup: { status: "linked", customers: [customer] },
         matchedCustomer: customer,
-        hasHeuristicMatch: false,
         onApplyMatchedCustomer: noop,
         onOpenMatchedCustomer: noop,
         onDismissMatchedCustomer: noop,
@@ -464,5 +465,85 @@ describe("admin-email-panel-layout", () => {
     expect(markup).toContain("Clear Lesson Plan");
     expect(markup).toContain("Create Lesson Plan");
     expect(markup).toContain("Open Customer");
+  });
+
+  it("shows explicit booking-request customer lookup status messaging", () => {
+    const requestEvent: BookingEvent = {
+      ...bookingEvent,
+      id: "request-1",
+      entityType: "booking_request",
+      status: "pending",
+    };
+
+    const markup = renderMarkup(
+      createElement(BookingDetailDialog, {
+        isOpen: true,
+        onClose: noop,
+        rootRef,
+        event: requestEvent,
+        dialogForm: bookingDialogForm,
+        setDialogForm: noop,
+        busyAction: null,
+        onSave: noop,
+        onDelete: noop,
+        onMove: noop,
+        canManageAppointment: true,
+        canApproveRequest: true,
+        canEditTeacherAssignment: true,
+        canInvoice: false,
+        teacherOptions: [],
+        lessonDurationOptions: [],
+        durationIsConfigured: true,
+        activeTab: "appointment",
+        setActiveTab: noop,
+        customerLookup: { status: "no_match", customers: [] },
+        matchedCustomer: null,
+        onApplyMatchedCustomer: noop,
+        onOpenMatchedCustomer: noop,
+        onDismissMatchedCustomer: noop,
+        emailHistory,
+        emailHistoryWarning: null,
+        loadingEmailHistory: false,
+        sendingEmail: false,
+        syncingEmail: false,
+        emailSubject: "",
+        setEmailSubject: noop,
+        emailMessage: "",
+        setEmailMessage: noop,
+        onSendEmail: asyncNoop,
+        onSyncEmail: noop,
+        onPerformAction: noop,
+        onOpenInvoice: noop,
+        materialsDialogProps: {
+          materialsList: [],
+          materialsLoading: false,
+          materialsUploading: false,
+          materialsDeletingId: null,
+          onUpload: noop,
+          onDelete: noop,
+          uploadFormRef: rootRef
+        },
+        lessonPlanDialogProps: {
+          lessonPlan: null,
+          draft: null,
+          loading: false,
+          saving: false,
+          templates: [],
+          templatesLoading: false,
+          materials: [],
+          templateSelection: "",
+          onTemplateSelectionChange: noop,
+          onCreateFromScratch: noop,
+          onApplyTemplate: noop,
+          onClearLessonPlan: noop,
+          onDraftSectionsChange: noop,
+          onDraftStatusChange: noop,
+          onSave: noop
+        }
+      })
+    );
+
+    expect(markup).toContain("No existing customer found for these details.");
+    expect(markup).not.toContain("Use Existing Customer");
   });
 });

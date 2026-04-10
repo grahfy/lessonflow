@@ -46,7 +46,7 @@ export function getBranding(): BrandingConfig {
     CONTACT_ADDRESS: process.env.NEXT_PUBLIC_CONTACT_ADDRESS || "Rear 66/68 High St, Northcote VIC 3070",
     LOGO_URL: process.env.NEXT_PUBLIC_LOGO_URL || "/images/mgs-logo.webp",
     INVOICE_LOGO_URL: process.env.NEXT_PUBLIC_INVOICE_LOGO_URL || "/images/company-logo-invoice.png",
-    FAVICON_URL: process.env.NEXT_PUBLIC_FAVICON_URL || "/favicon.ico",
+    FAVICON_URL: process.env.NEXT_PUBLIC_FAVICON_URL || "/icon.png",
     DEFAULT_CURRENCY: getDefaultCurrency(),
   };
 }
@@ -59,7 +59,7 @@ export const CONTACT_PHONE = process.env.NEXT_PUBLIC_CONTACT_PHONE || "0401 489 
 export const CONTACT_ADDRESS = process.env.NEXT_PUBLIC_CONTACT_ADDRESS || "Rear 66/68 High St, Northcote VIC 3070";
 export const LOGO_URL = process.env.NEXT_PUBLIC_LOGO_URL || "/images/mgs-logo.webp";
 export const INVOICE_LOGO_URL = process.env.NEXT_PUBLIC_INVOICE_LOGO_URL || "/images/company-logo-invoice.png";
-export const FAVICON_URL = process.env.NEXT_PUBLIC_FAVICON_URL || "/favicon.ico";
+export const FAVICON_URL = process.env.NEXT_PUBLIC_FAVICON_URL || "/icon.png";
 export const DEFAULT_CURRENCY = getDefaultCurrency();
 
 export const POWERED_BY_PLATFORM_COPY = `Powered by ${PLATFORM_NAME}`;

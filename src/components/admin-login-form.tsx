@@ -86,7 +86,7 @@ export function AdminLoginForm() {
     // Use a full navigation so the first admin page/data requests always include the newly set
     // httpOnly session cookie.
     invalidateCustomerEmailAlertsSessionCache();
-    window.location.assign("/admin/bookings");
+    window.location.assign("/admin");
   }
 
   return (

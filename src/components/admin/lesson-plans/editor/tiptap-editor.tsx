@@ -19,6 +19,11 @@ interface MaterialOption {
   description?: string | null;
 }
 
+type NoteImageUploadTarget = {
+  entityType: "booking" | "booking_request";
+  id: string;
+};
+
 interface TipTapEditorProps {
   content: JSONContent | null;
   placeholder?: string;
@@ -33,8 +38,8 @@ interface TipTapEditorProps {
   toolbarSlot?: React.ReactNode;
   /** When true, hides the chord picker and slash menu (for non-lesson-plan contexts). */
   minimal?: boolean;
-  /** Booking ID for image uploads. When provided, shows an image upload button in the toolbar. */
-  bookingId?: string | null;
+  /** Entity target for note image uploads. When provided, shows upload affordances. */
+  imageUploadTarget?: NoteImageUploadTarget | null;
 }
 
 /**
@@ -52,12 +57,15 @@ export function TipTapEditor({
   extensions: customExtensions,
   toolbarSlot,
   minimal = false,
-  bookingId,
+  imageUploadTarget,
 }: TipTapEditorProps) {
   const editor = useTipTapEditor({ content, placeholder, editable, onUpdate, extensions: customExtensions });
   const [chordPickerOpen, setChordPickerOpen] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+  const uploadEndpoint = imageUploadTarget
+    ? `/api/admin/${imageUploadTarget.entityType === "booking" ? "bookings" : "booking-requests"}/${imageUploadTarget.id}/notes-image`
+    : null;
 
   // Listen for chord insertion events from the slash menu and toolbar.
   useEffect(() => {
@@ -77,7 +85,7 @@ export function TipTapEditor({
 
   const handleImageUpload = useCallback(
     async (file: File) => {
-      if (!bookingId || !editor) return;
+      if (!uploadEndpoint || !editor) return;
 
       if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
         setImageUploadError("Only JPEG, PNG, GIF, and WebP images are allowed.");
@@ -95,7 +103,7 @@ export function TipTapEditor({
         const formData = new FormData();
         formData.append("file", file);
 
-        const res = await fetch(`/api/admin/bookings/${bookingId}/notes-image`, {
+        const res = await fetch(uploadEndpoint, {
           method: "POST",
           body: formData,
         });
@@ -116,8 +124,31 @@ export function TipTapEditor({
         setImageUploading(false);
       }
     },
-    [bookingId, editor]
+    [editor, uploadEndpoint]
   );
+
+  useEffect(() => {
+    if (!editor || !editable || !uploadEndpoint) {
+      return;
+    }
+
+    const handlePaste = (event: ClipboardEvent) => {
+      const file = Array.from(event.clipboardData?.items ?? [])
+        .find((item) => item.kind === "file" && ALLOWED_IMAGE_TYPES.has(item.type))
+        ?.getAsFile();
+
+      if (!file) {
+        return;
+      }
+
+      event.preventDefault();
+      void handleImageUpload(file);
+    };
+
+    const dom = editor.view.dom;
+    dom.addEventListener("paste", handlePaste);
+    return () => dom.removeEventListener("paste", handlePaste);
+  }, [editable, editor, handleImageUpload, uploadEndpoint]);
 
   return (
     <div className={`tiptap-editor-shell${className ? ` ${className}` : ""}`}>
@@ -127,7 +158,8 @@ export function TipTapEditor({
             <>
               <TipTapToolbar
                 editor={editor}
-                onImageUpload={bookingId ? handleImageUpload : undefined}
+                onImageUpload={uploadEndpoint ? handleImageUpload : undefined}
+                showImageUpload={Boolean(uploadEndpoint)}
               />
               {materials && materials.length > 0 && (
                 <TipTapMaterialPicker editor={editor} materials={materials} />

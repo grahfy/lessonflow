@@ -601,7 +601,7 @@ export const CONFIGURABLE_ENV_VARS: ConfigurableEnvVarDefinition[] = [
     key: "NEXT_PUBLIC_FAVICON_URL",
     title: "Favicon URL",
     description: "URL to your site favicon.",
-    placeholder: "/favicon.ico",
+    placeholder: "/icon.png",
     isRequired: false,
     isSecret: false,
     validation: () => null

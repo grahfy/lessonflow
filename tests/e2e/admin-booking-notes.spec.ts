@@ -1,8 +1,8 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
 
-const adminEmail = "admin@example.com";
-const adminPassword = "admin123";
+import { bootstrapAdminStorageState, seedBookingNotesFixturesForE2E } from "./helpers/admin-auth";
+
 const authFile = path.join(__dirname, ".auth-booking-notes.json");
 
 // ── Shared helpers ──────────────────────────────────────────
@@ -23,18 +23,6 @@ async function waitForPageSettle(page: Page): Promise<void> {
   await page.waitForLoadState("networkidle", { timeout: 8_000 }).catch(() => null);
 }
 
-async function createCaptchaPayload(request: APIRequestContext) {
-  const captchaResponse = await request.get("/api/captcha");
-  expect(captchaResponse.ok()).toBeTruthy();
-  const captcha = (await captchaResponse.json()) as { token?: string; imageDataUrl?: string } | null;
-  const token = String(captcha?.token || "").trim();
-  const imageDataUrl = String(captcha?.imageDataUrl || "");
-  const svg = Buffer.from(imageDataUrl.split(",")[1] || "", "base64").toString("utf8");
-  const answer = Array.from(svg.matchAll(/<text[^>]*>([^<]+)<\/text>/g))
-    .map((m) => m[1]).join("").trim();
-  return { captchaToken: token, captchaAnswer: answer };
-}
-
 async function dismissDeployUpdatesModal(page: Page) {
   const modal = page.getByRole("dialog", { name: /deployment updates/i });
   if (await modal.isVisible({ timeout: 2_000 }).catch(() => false)) {
@@ -43,22 +31,67 @@ async function dismissDeployUpdatesModal(page: Page) {
   }
 }
 
+async function closeBookingDialog(page: Page) {
+  const dialog = page.locator("#booking-detail-dialog");
+  if (await dialog.isVisible({ timeout: 1_000 }).catch(() => false)) {
+    await dialog.getByRole("button", { name: /^close$/i }).click({ force: true });
+    await dialog.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => null);
+  }
+}
+
+async function openCalendarDialog(
+  page: Page,
+  title: "Edit Booking" | "Booking Request",
+  expectedEmail?: string
+) {
+  const calendarButtons = page.locator(".calendar-event");
+  const count = await calendarButtons.count();
+  if (count === 0) {
+    test.skip(true, "No calendar items available to test with.");
+    return null;
+  }
+
+  const dialog = page.locator("#booking-detail-dialog");
+  for (let index = 0; index < count; index += 1) {
+    await calendarButtons.nth(index).click();
+    const heading = dialog.getByRole("heading", { name: title });
+    const matched = await heading.isVisible({ timeout: 2_000 }).catch(() => false);
+    if (matched) {
+      if (expectedEmail) {
+        const inputValues = await dialog.locator("input").evaluateAll((nodes) =>
+          nodes.map((node) => (node as HTMLInputElement).value)
+        );
+        if (!inputValues.includes(expectedEmail)) {
+          await closeBookingDialog(page);
+          continue;
+        }
+      }
+      return dialog;
+    }
+    await closeBookingDialog(page);
+  }
+
+  test.skip(true, `No ${title.toLowerCase()} item available in the current calendar view.`);
+  return null;
+}
+
+const PNG_BYTES = Buffer.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+  0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+  0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
+  0xde, 0x00, 0x00, 0x00, 0x0c, 0x49, 0x44, 0x41,
+  0x54, 0x08, 0xd7, 0x63, 0xf8, 0xcf, 0xc0, 0x00,
+  0x00, 0x00, 0x02, 0x00, 0x01, 0xe2, 0x21, 0xbc,
+  0x33, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e,
+  0x44, 0xae, 0x42, 0x60, 0x82,
+]);
+
 // ── Auth setup ──────────────────────────────────────────────
 
 test("authenticate admin", async ({ page }) => {
-  const captchaPayload = await createCaptchaPayload(page.request);
-  const email = process.env.DOCS_SCREENSHOTS_ADMIN_EMAIL || adminEmail;
-  const password = process.env.DOCS_SCREENSHOTS_ADMIN_PASSWORD || adminPassword;
-
-  await page.goto("/admin/login", { waitUntil: "domcontentloaded" });
-  const response = await page.request.post("/api/admin/login", {
-    data: { email, password, website: "", ...captchaPayload },
-  });
-  expect(response.ok(), `Login failed: ${response.status()}`).toBeTruthy();
-
-  await gotoWithRetry(page, "/admin/bookings");
-  await expect(page.getByRole("heading", { name: /bookings/i }).first()).toBeVisible({ timeout: 10_000 });
-  await page.context().storageState({ path: authFile });
+  await bootstrapAdminStorageState(page, authFile);
+  seedBookingNotesFixturesForE2E();
 });
 
 // ── Booking notes editor tests ──────────────────────────────
@@ -76,17 +109,10 @@ test.describe("booking notes rich editor", () => {
     await page.getByRole("heading", { name: /bookings/i }).first().waitFor({ timeout: 10_000 });
     await page.waitForTimeout(1_000);
 
-    // Click the first booking event on the calendar.
-    const calendarButtons = page.locator("button").filter({ hasText: /\d{1,2}:\d{2}/ });
-    const count = await calendarButtons.count();
-    if (count === 0) {
-      test.skip(true, "No bookings on the calendar to test with.");
+    const dialog = await openCalendarDialog(page, "Edit Booking", "e2e-booking-notes-booking@example.com");
+    if (!dialog) {
       return;
     }
-
-    await calendarButtons.first().click();
-    const dialog = page.locator("#booking-detail-dialog");
-    await expect(dialog).toBeVisible({ timeout: 8_000 });
 
     // The notes section should contain a TipTap editor (not a plain textarea).
     const notesSection = dialog.locator(".dialog-col.is-notes");
@@ -148,17 +174,10 @@ test.describe("booking notes rich editor", () => {
     }
     await page.waitForTimeout(2_000);
 
-    // Find and click a booking event.
-    const calendarButtons = page.locator("button").filter({ hasText: /\d{1,2}:\d{2}/ });
-    const count = await calendarButtons.count();
-    if (count === 0) {
-      test.skip(true, "No bookings on the calendar to test with.");
+    const dialog = await openCalendarDialog(page, "Edit Booking", "e2e-booking-notes-booking@example.com");
+    if (!dialog) {
       return;
     }
-
-    await calendarButtons.first().click();
-    const dialog = page.locator("#booking-detail-dialog");
-    await expect(dialog).toBeVisible({ timeout: 8_000 });
 
     // Wait for dialog to fully settle (data loads, TipTap mounts).
     await page.waitForTimeout(3_000);
@@ -188,5 +207,90 @@ test.describe("booking notes rich editor", () => {
 
     // Take screenshot showing text in the editor.
     await page.screenshot({ path: "booking-notes-formatted-text.png", fullPage: false });
+  });
+
+  test("pending booking requests support note-image upload and save persistence", async ({ page }) => {
+    await gotoWithRetry(page, "/admin/bookings");
+    await waitForPageSettle(page);
+    await dismissDeployUpdatesModal(page);
+
+    const dialog = await openCalendarDialog(page, "Booking Request", "e2e-booking-notes-request@example.com");
+    if (!dialog) {
+      return;
+    }
+
+    const contentArea = dialog.locator(".booking-notes-editor [contenteditable='true']").first();
+    await expect(contentArea).toBeVisible({ timeout: 10_000 });
+    await contentArea.click({ force: true });
+    await page.keyboard.type("Pending request notes should persist.");
+
+    const fileInput = dialog.locator(".booking-notes-editor input[type='file']").first();
+    await fileInput.setInputFiles({
+      name: "request-note.png",
+      mimeType: "image/png",
+      buffer: PNG_BYTES,
+    });
+
+    await expect(dialog.locator(".booking-notes-editor img.booking-notes-image")).toHaveCount(1, { timeout: 10_000 });
+    await dialog.getByRole("button", { name: /save changes/i }).click();
+    await expect(contentArea).toContainText("Pending request notes should persist.", { timeout: 10_000 });
+    await waitForPageSettle(page);
+    await page.waitForTimeout(1_500);
+
+    await closeBookingDialog(page);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await waitForPageSettle(page);
+    await dismissDeployUpdatesModal(page);
+
+    const reopenedDialog = await openCalendarDialog(page, "Booking Request", "e2e-booking-notes-request@example.com");
+    if (!reopenedDialog) {
+      return;
+    }
+    await expect(reopenedDialog.locator(".booking-notes-editor [contenteditable='true']")).toContainText(
+      "Pending request notes should persist.",
+      { timeout: 10_000 }
+    );
+    await expect(reopenedDialog.locator(".booking-notes-editor img.booking-notes-image")).toHaveCount(1, { timeout: 10_000 });
+  });
+
+  test("confirmed bookings remove note images after editor cleanup and save", async ({ page }) => {
+    await gotoWithRetry(page, "/admin/bookings");
+    await waitForPageSettle(page);
+    await dismissDeployUpdatesModal(page);
+
+    const dialog = await openCalendarDialog(page, "Edit Booking", "e2e-booking-notes-booking@example.com");
+    if (!dialog) {
+      return;
+    }
+
+    const contentArea = dialog.locator(".booking-notes-editor [contenteditable='true']").first();
+    await expect(contentArea).toBeVisible({ timeout: 10_000 });
+    await contentArea.click({ force: true });
+    await page.keyboard.type("Image cleanup verification.");
+
+    const fileInput = dialog.locator(".booking-notes-editor input[type='file']").first();
+    await fileInput.setInputFiles({
+      name: "booking-note.png",
+      mimeType: "image/png",
+      buffer: PNG_BYTES,
+    });
+
+    await expect(dialog.locator(".booking-notes-editor img.booking-notes-image")).toHaveCount(1, { timeout: 10_000 });
+    await dialog.getByRole("button", { name: /save changes/i }).click();
+    await expect(contentArea).toContainText("Image cleanup verification.", { timeout: 10_000 });
+
+    await contentArea.click({ force: true });
+    await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+    await page.keyboard.press("Backspace");
+    await dialog.getByRole("button", { name: /save changes/i }).click();
+    await expect(dialog.locator(".booking-notes-editor img.booking-notes-image")).toHaveCount(0, { timeout: 10_000 });
+
+    await closeBookingDialog(page);
+
+    const reopenedDialog = await openCalendarDialog(page, "Edit Booking", "e2e-booking-notes-booking@example.com");
+    if (!reopenedDialog) {
+      return;
+    }
+    await expect(reopenedDialog.locator(".booking-notes-editor img.booking-notes-image")).toHaveCount(0, { timeout: 10_000 });
   });
 });

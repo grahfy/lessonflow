@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
+import { NextRequest, NextResponse } from "next/server";
 
 import { canManageAssignedTeacher } from "@/lib/admin/permissions";
 import { requireAdminFromRequest } from "@/lib/admin-route";
@@ -7,8 +7,8 @@ import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
 import {
   MAX_NOTE_IMAGE_SIZE,
-  buildBookingNoteImageStorageKey,
-  buildBookingNoteImageUrl,
+  buildBookingRequestNoteImageStorageKey,
+  buildBookingRequestNoteImageUrl,
   createNoteImageRecordWithRollback,
   resolveNoteImageExtension,
   storeNoteImageFile,
@@ -18,11 +18,6 @@ type Params = {
   params: Promise<{ id: string }>;
 };
 
-/**
- * Upload an image for embedding in booking notes (TipTap rich text).
- * Stores the image via the material storage driver and returns a URL
- * that the editor inserts as an `<img>` node.
- */
 export async function POST(request: NextRequest, { params }: Params) {
   try {
     const admin = await requireAdminFromRequest(request);
@@ -31,13 +26,17 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     const { id } = await params;
-    const booking = await prisma.booking.findUnique({ where: { id } });
-    if (!booking) {
-      return NextResponse.json({ error: "Booking not found." }, { status: 404 });
+    const bookingRequest = await prisma.bookingRequest.findUnique({ where: { id } });
+    if (!bookingRequest) {
+      return NextResponse.json({ error: "Booking request not found." }, { status: 404 });
     }
 
-    if (!canManageAssignedTeacher(admin, booking.assignedTeacherId)) {
+    if (!canManageAssignedTeacher(admin, bookingRequest.assignedTeacherId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    if (bookingRequest.status !== "pending") {
+      return NextResponse.json({ error: "Only pending requests can accept note images." }, { status: 400 });
     }
 
     const form = await request.formData().catch(() => null);
@@ -54,8 +53,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Image must be between 1 byte and 5 MB." }, { status: 400 });
     }
 
-    const ext = resolveNoteImageExtension(file.type);
-    if (!ext) {
+    const extension = resolveNoteImageExtension(file.type);
+    if (!extension) {
       return NextResponse.json(
         { error: "Only JPEG, PNG, GIF, and WebP images are allowed." },
         { status: 400 }
@@ -63,32 +62,31 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     const imageId = randomUUID();
-    const storageKey = buildBookingNoteImageStorageKey(id, imageId, ext);
-
+    const storageKey = buildBookingRequestNoteImageStorageKey(id, imageId, extension);
     await storeNoteImageFile({ file, storageKey });
 
     const record = await createNoteImageRecordWithRollback({
       db: prisma,
       storageKey,
-      scope: "booking_note_image",
+      scope: "booking_request_note_image",
       entityId: id,
       createRecord: () =>
-        prisma.bookingNoteImage.create({
+        prisma.bookingRequestNoteImage.create({
           data: {
             id: imageId,
-            bookingId: id,
+            bookingRequestId: id,
             storageKey,
             mimeType: file.type,
             sizeBytes: file.size,
-          },
+          }
         }),
     });
 
     return NextResponse.json({
       id: record.id,
-      url: buildBookingNoteImageUrl(id, record.id),
+      url: buildBookingRequestNoteImageUrl(id, record.id),
     });
   } catch (error) {
-    return jsonUnexpectedError(error, "Unable to upload booking note image.");
+    return jsonUnexpectedError(error, "Unable to upload booking request note image.");
   }
 }

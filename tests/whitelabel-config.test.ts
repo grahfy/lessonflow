@@ -11,18 +11,21 @@ describe("Whitelabel Configuration", () => {
     expect(branding.getBranding().PUBLIC_BRAND_NAME).toBe("Melbourne Guitar School");
     expect(branding.getBranding().PRIMARY_SUBJECT).toBe("Guitar");
     expect(branding.getBranding().PRIMARY_LOCATION).toBe("Northcote");
+    expect(branding.getBranding().FAVICON_URL).toBe("/icon.png");
   });
 
   it("should reflect custom branding from environment variables through runtime getters", () => {
     vi.stubEnv("NEXT_PUBLIC_BRAND_NAME", "Sydney Piano Studio");
     vi.stubEnv("NEXT_PUBLIC_PRIMARY_SUBJECT", "Piano");
     vi.stubEnv("NEXT_PUBLIC_PRIMARY_LOCATION", "Sydney");
+    vi.stubEnv("NEXT_PUBLIC_FAVICON_URL", "/images/piano-favicon.png");
 
     const customBranding = branding.getBranding();
 
     expect(customBranding.PUBLIC_BRAND_NAME).toBe("Sydney Piano Studio");
     expect(customBranding.PRIMARY_SUBJECT).toBe("Piano");
     expect(customBranding.PRIMARY_LOCATION).toBe("Sydney");
+    expect(customBranding.FAVICON_URL).toBe("/images/piano-favicon.png");
     expect(branding.getSubjectLabel(customBranding.PRIMARY_SUBJECT)).toBe("Piano");
   });
 

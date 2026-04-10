@@ -15,6 +15,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 16px;
   background: linear-gradient(140deg, rgba(107, 140, 255, 0.15), rgba(143, 114, 255, 0.15));
   border-color: rgba(143, 114, 255, 0.4);
@@ -110,6 +111,7 @@
 
 .portal-header-action-button {
   min-width: 86px;
+  max-width: 100%;
   padding: 7px 11px;
   font-size: 0.82rem;
 }
@@ -184,6 +186,7 @@
 .actions-submit-button {
   width: 236px;
   min-width: 236px;
+  max-width: 100%;
 }
 
 .actions-side {
@@ -742,6 +745,20 @@
 }
 
 @media (max-width: 760px) {
+  .system-announcement-banner {
+    align-items: stretch;
+  }
+
+  .system-announcement-content {
+    display: grid;
+    gap: 8px;
+  }
+
+  .system-announcement-list {
+    flex-direction: column;
+    gap: 6px;
+  }
+
   .actions-grid {
     grid-template-columns: 1fr;
   }
@@ -857,7 +874,7 @@
     grid-column: 1 / -1;
     width: 100%;
     margin-left: 0;
-    justify-content: flex-end;
+    justify-content: flex-start;
   }
 
   .materials-header {
@@ -890,6 +907,10 @@
   }
 
   .portal-header-action-button {
+    width: 100%;
+  }
+
+  .system-announcement-banner .btn {
     width: 100%;
   }
 

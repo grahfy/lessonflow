@@ -31,7 +31,7 @@ The Branding tab defines the public identity of the school or studio.
 | `NEXT_PUBLIC_PRIMARY_LOCATION` | Public-facing location reference |
 | `NEXT_PUBLIC_LOGO_URL` | Main logo |
 | `NEXT_PUBLIC_INVOICE_LOGO_URL` | Logo used in invoice presentation |
-| `NEXT_PUBLIC_FAVICON_URL` | Site favicon |
+| `NEXT_PUBLIC_FAVICON_URL` | Site favicon (defaults to `/icon.png`) |
 | `NEXT_PUBLIC_CONTACT_PHONE` | Public phone contact |
 | `NEXT_PUBLIC_CONTACT_ADDRESS` | Public address display |
 

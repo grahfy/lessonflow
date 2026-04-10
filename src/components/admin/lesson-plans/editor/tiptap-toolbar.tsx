@@ -21,6 +21,7 @@ import {
 interface TipTapToolbarProps {
   editor: Editor | null;
   onImageUpload?: (file: File) => void;
+  showImageUpload?: boolean;
 }
 
 interface ToolbarAction {
@@ -118,7 +119,7 @@ const TOOLBAR_GROUPS: ToolbarAction[][] = [
  * Compact formatting toolbar for a lesson plan TipTap editor section.
  * Groups: text marks | headings | lists/checklists | undo/redo.
  */
-export function TipTapToolbar({ editor, onImageUpload }: TipTapToolbarProps) {
+export function TipTapToolbar({ editor, onImageUpload, showImageUpload = Boolean(onImageUpload) }: TipTapToolbarProps) {
   useEditorState({
     editor,
     selector: ({ transactionNumber }) => transactionNumber,
@@ -152,7 +153,7 @@ export function TipTapToolbar({ editor, onImageUpload }: TipTapToolbarProps) {
           ))}
         </div>
       ))}
-      {onImageUpload && (
+      {showImageUpload && onImageUpload && (
         <div className="tiptap-toolbar-group">
           <button
             type="button"

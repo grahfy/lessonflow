@@ -23,7 +23,7 @@
 
 "use client";
 
-import { RefObject } from "react";
+import { Dispatch, RefObject, SetStateAction } from "react";
 
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AdminDialog } from "@/components/admin/ui/admin-dialog";
@@ -50,7 +50,11 @@ import { BookingMaterialsDialog } from "./booking-materials-dialog";
 import { BookingLessonPlanPanelV2 } from "@/components/admin/lesson-plans/booking-lesson-plan-panel-v2";
 import { TipTapEditor } from "@/components/admin/lesson-plans/editor/tiptap-editor";
 import { bookingNotesExtensions } from "./booking-notes-extensions";
-import { type BookingDialogForm, type BookingMatchedCustomer } from "./types";
+import {
+  type BookingCustomerLookupState,
+  type BookingDialogForm,
+  type BookingMatchedCustomer
+} from "./types";
 
 interface BookingDetailDialogProps {
   isOpen: boolean;
@@ -59,7 +63,7 @@ interface BookingDetailDialogProps {
   event: BookingEvent | null;
   /** Current state of the editing form, extracted from the event entity. */
   dialogForm: BookingDialogForm | null;
-  setDialogForm: (form: BookingDialogForm) => void;
+  setDialogForm: Dispatch<SetStateAction<BookingDialogForm | null>>;
   /** Tracks which button (Save/Approve/Invoice) is currently requesting. */
   busyAction: string | null;
   onSave: () => void;
@@ -78,8 +82,8 @@ interface BookingDetailDialogProps {
   setActiveTab: (tab: "appointment" | "emails" | "materials" | "lesson-plan") => void;
 
   // CRM Integration
+  customerLookup: BookingCustomerLookupState;
   matchedCustomer: BookingMatchedCustomer | null;
-  hasHeuristicMatch: boolean;
   onApplyMatchedCustomer: () => void;
   onOpenMatchedCustomer: () => void | Promise<void>;
   onDismissMatchedCustomer: () => void;
@@ -153,8 +157,8 @@ export function BookingDetailDialog({
   durationIsConfigured,
   activeTab,
   setActiveTab,
+  customerLookup,
   matchedCustomer,
-  hasHeuristicMatch,
   onApplyMatchedCustomer,
   onOpenMatchedCustomer,
   onDismissMatchedCustomer,
@@ -177,7 +181,8 @@ export function BookingDetailDialog({
   if (!event || !dialogForm) return null;
 
   /** Local helper for atomic form updates. */
-  const updateForm = (patch: Partial<BookingDialogForm>) => setDialogForm({ ...dialogForm, ...patch });
+  const updateForm = (patch: Partial<BookingDialogForm>) =>
+    setDialogForm((current) => (current ? { ...current, ...patch } : current));
   const tabBodyClassName = "booking-dialog-layout booking-tab-panel";
 
   return (
@@ -313,29 +318,61 @@ export function BookingDetailDialog({
               <div className="dialog-col">
                 <div className="dialog-section-heading">
                   <h3 className="manual-section-title">Customer Details</h3>
-                  {matchedCustomer ? (
+                  {customerLookup.status === "loading" ? (
                     <span className="helper-text">
-                      {hasHeuristicMatch ? "Possible customer match found." : "Booking is linked to an existing customer."}
+                      Searching customer database...
+                    </span>
+                  ) : customerLookup.status === "linked" ? (
+                    <span className="helper-text">
+                      Booking request is linked to an existing customer.
+                    </span>
+                  ) : customerLookup.status === "exact_match" ? (
+                    <span className="helper-text">
+                      Existing customer found in the database.
+                    </span>
+                  ) : customerLookup.status === "possible_match" ? (
+                    <span className="helper-text">
+                      Possible customer match found in the database.
+                    </span>
+                  ) : customerLookup.status === "no_match" ? (
+                    <span className="helper-text">
+                      No existing customer found for these details.
+                    </span>
+                  ) : customerLookup.status === "error" ? (
+                    <span className="helper-text">
+                      {customerLookup.message || "Customer lookup is currently unavailable."}
                     </span>
                   ) : null}
                 </div>
                 
-                {/* RATIONALE: Prompting the admin to link a request to a profile 
-                    early ensures data deduplication. */}
-                {hasHeuristicMatch && matchedCustomer && (
+                {matchedCustomer && (customerLookup.status === "linked" || customerLookup.status === "exact_match" || customerLookup.status === "possible_match") && (
                   <AdminCard
                     ghost
-                    className="booking-customer-match-card booking-customer-match-card-heuristic"
+                    className={`booking-customer-match-card${customerLookup.status === "possible_match" ? " booking-customer-match-card-heuristic" : ""}`}
                   >
+                    <div className="booking-customer-match-summary">
+                      <strong>{matchedCustomer.fullName}</strong>
+                      <span>{matchedCustomer.email}</span>
+                      <span>{matchedCustomer.phone}</span>
+                    </div>
                     <div className="button-row">
-                      <button type="button" className="btn btn-secondary" onClick={onApplyMatchedCustomer}>
-                        Use Matched Customer
-                      </button>
-                      <Tooltip content="Ignore the suggested profile match and keep this booking as standalone details.">
-                        <button type="button" className="btn btn-secondary" onClick={onDismissMatchedCustomer}>
-                          Keep Booking-Only Details
+                      {customerLookup.status !== "linked" ? (
+                        <button type="button" className="btn btn-secondary" onClick={onApplyMatchedCustomer}>
+                          Use Existing Customer
+                        </button>
+                      ) : null}
+                      <Tooltip content="Open the matched customer profile in the customer directory.">
+                        <button type="button" className="btn btn-secondary" onClick={onOpenMatchedCustomer}>
+                          Open Customer
                         </button>
                       </Tooltip>
+                      {customerLookup.status !== "linked" ? (
+                        <Tooltip content="Ignore the suggested profile match and keep this request as standalone details.">
+                          <button type="button" className="btn btn-secondary" onClick={onDismissMatchedCustomer}>
+                            Keep Booking-Only Details
+                          </button>
+                        </Tooltip>
+                      ) : null}
                     </div>
                   </AdminCard>
                 )}
@@ -453,8 +490,11 @@ export function BookingDetailDialog({
                       content={dialogForm.notesContent}
                       onUpdate={(json) => updateForm({ notesContent: json })}
                       extensions={bookingNotesExtensions}
-                      bookingId={event.entityType === "booking" ? event.id : null}
-                      minimal
+                      imageUploadTarget={
+                        event.entityType === "booking"
+                          ? { entityType: "booking", id: event.id }
+                          : { entityType: "booking_request", id: event.id }
+                      }
                     />
                   </div>
                 </AdminField>

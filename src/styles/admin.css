@@ -753,11 +753,11 @@
   --admin-density-control-radius: 14px;
   --admin-density-control-padding-block: 7px;
   --admin-density-control-padding-inline: 12px;
-  --admin-density-dialog-padding: 20px;
-  --admin-density-dialog-body-padding: 16px;
+  --admin-density-dialog-padding: 24px;
+  --admin-density-dialog-body-padding: 20px;
   --admin-density-dialog-radius: 20px;
-  --admin-density-dialog-gap: 10px;
-  --admin-density-dialog-head-gap: 12px;
+  --admin-density-dialog-gap: 12px;
+  --admin-density-dialog-head-gap: 16px;
   --admin-density-status-padding-block: 8px;
   --admin-density-status-padding-inline: 10px;
   --admin-density-table-row-padding-block: 10px;
@@ -3582,6 +3582,7 @@
 .admin-header-nav-group {
   display: grid;
   gap: 12px;
+  justify-items: center;
   padding: 14px;
   border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 18px;
@@ -3592,6 +3593,11 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.035),
     0 10px 24px rgba(2, 8, 23, 0.12);
   min-width: 0;
+  text-align: center;
+  --admin-header-button-glow: rgba(96, 165, 250, 0.28);
+  --admin-header-button-border-strong: rgba(96, 165, 250, 0.28);
+  --admin-header-button-top-light: rgba(191, 219, 254, 0.22);
+  --admin-header-button-sheen: rgba(255, 255, 255, 0.1);
 }
 
 .admin-header-nav-group.is-active {
@@ -3604,9 +3610,28 @@
     0 14px 28px rgba(2, 8, 23, 0.14);
 }
 
+.admin-header-nav-group-business {
+  --admin-header-button-glow: rgba(59, 130, 246, 0.34);
+  --admin-header-button-border-strong: rgba(96, 165, 250, 0.34);
+  --admin-header-button-top-light: rgba(147, 197, 253, 0.22);
+}
+
+.admin-header-nav-group-education {
+  --admin-header-button-glow: rgba(34, 197, 94, 0.28);
+  --admin-header-button-border-strong: rgba(74, 222, 128, 0.3);
+  --admin-header-button-top-light: rgba(134, 239, 172, 0.2);
+}
+
+.admin-header-nav-group-system {
+  --admin-header-button-glow: rgba(148, 163, 184, 0.24);
+  --admin-header-button-border-strong: rgba(148, 163, 184, 0.28);
+  --admin-header-button-top-light: rgba(226, 232, 240, 0.14);
+}
+
 .admin-header-group-heading {
   display: grid;
   gap: 4px;
+  justify-items: center;
 }
 
 .admin-header-group-label {
@@ -3625,33 +3650,58 @@
   color: rgba(148, 163, 184, 0.88);
   font-size: 0.8rem;
   line-height: 1.4;
-  max-width: 34ch;
+  max-width: 30ch;
 }
 
 .admin-header-nav-primary {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: center;
 }
 
 .admin-header-nav-button {
+  position: relative;
   min-height: 34px;
+  overflow: visible;
+  transform: translateY(0);
+  transform-style: preserve-3d;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    color 180ms ease;
+  will-change: transform;
+  cursor: pointer;
 }
 
 .admin-header-nav-button.btn-secondary {
-  background: linear-gradient(145deg, rgba(20, 29, 47, 0.92), rgba(15, 23, 42, 0.82));
-  border-color: rgba(148, 163, 184, 0.18);
+  background:
+    linear-gradient(180deg, var(--admin-header-button-top-light), transparent 38%),
+    linear-gradient(180deg, rgba(12, 18, 33, 0.96), rgba(17, 26, 46, 0.9));
+  border-color: rgba(148, 163, 184, 0.2);
   color: rgba(226, 232, 240, 0.88);
   box-shadow:
-    0 6px 14px rgba(2, 8, 23, 0.14),
-    0 1px 0 rgba(255, 255, 255, 0.04) inset;
+    0 12px 18px rgba(2, 8, 23, 0.2),
+    0 4px 0 rgba(8, 12, 24, 0.8),
+    0 1px 0 var(--admin-header-button-sheen) inset,
+    0 -1px 0 rgba(15, 23, 42, 0.65) inset;
 }
 
 .admin-header-nav-button.btn-secondary:hover {
-  border-color: rgba(96, 165, 250, 0.26);
-  background: linear-gradient(145deg, rgba(26, 36, 58, 0.96), rgba(18, 29, 50, 0.88));
+  transform: translateY(-3px);
+  border-color: var(--admin-header-button-border-strong);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 42%),
+    linear-gradient(180deg, rgba(18, 27, 47, 0.98), rgba(25, 37, 65, 0.92));
   color: #f8fafc;
+  box-shadow:
+    0 18px 26px rgba(2, 8, 23, 0.22),
+    0 6px 0 rgba(8, 12, 24, 0.78),
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+    0 0 20px var(--admin-header-button-glow);
 }
 
 .admin-header-nav-button.is-featured.btn-secondary {
@@ -3659,9 +3709,40 @@
 }
 
 .admin-header-nav-button.is-active {
+  transform: translateY(-1px);
   box-shadow:
-    0 10px 22px rgba(29, 78, 216, 0.24),
-    0 1px 0 rgba(255, 255, 255, 0.08) inset;
+    0 16px 26px color-mix(in srgb, var(--admin-header-button-glow) 80%, rgba(2, 8, 23, 0.12)),
+    0 4px 0 rgba(15, 23, 42, 0.72),
+    0 1px 0 rgba(255, 255, 255, 0.1) inset;
+}
+
+.admin-header-nav-button.btn-primary {
+  border-color: var(--admin-header-button-border-strong);
+  box-shadow:
+    0 16px 24px color-mix(in srgb, var(--admin-header-button-glow) 72%, rgba(2, 8, 23, 0.16)),
+    0 4px 0 rgba(15, 23, 42, 0.72),
+    0 1px 0 rgba(255, 255, 255, 0.1) inset;
+}
+
+.admin-header-nav-button.btn-primary:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 20px 30px color-mix(in srgb, var(--admin-header-button-glow) 88%, rgba(2, 8, 23, 0.08)),
+    0 6px 0 rgba(15, 23, 42, 0.68),
+    0 1px 0 rgba(255, 255, 255, 0.12) inset;
+}
+
+.admin-header-nav-button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--admin-header-button-border-strong) 92%, white 8%);
+  outline-offset: 2px;
+}
+
+.admin-header-nav-button:active {
+  transform: translateY(2px);
+  box-shadow:
+    0 8px 14px rgba(2, 8, 23, 0.2),
+    0 1px 0 rgba(8, 12, 24, 0.82),
+    0 1px 0 rgba(255, 255, 255, 0.05) inset;
 }
 
 .admin-header-nav-actions {
@@ -3683,9 +3764,20 @@
 .admin-header-quick-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   justify-content: flex-end;
   margin-left: auto;
+}
+
+.admin-header-quick-actions .btn {
+  min-height: 30px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  box-shadow:
+    0 5px 10px rgba(2, 8, 23, 0.14),
+    0 1px 0 rgba(255, 255, 255, 0.04) inset;
 }
 
 .admin-header-utility-button {
@@ -5195,7 +5287,7 @@
 }
 
 .dialog-backdrop {
-  --dialog-frame-gap: 16px;
+  --dialog-frame-gap: 20px;
   position: fixed;
   inset: 0;
   z-index: 200;
@@ -5232,7 +5324,7 @@
 .dialog-body-scroll {
   flex: 1;
   min-height: 0;
-  padding: 6px var(--admin-density-dialog-body-padding) var(--admin-density-dialog-body-padding);
+  padding: 10px var(--admin-density-dialog-body-padding) var(--admin-density-dialog-body-padding);
   box-sizing: border-box;
 }
 
@@ -5286,7 +5378,7 @@
 
 #booking-detail-dialog {
   --admin-communication-shell-height: min(68vh, 760px);
-  --booking-dialog-inner-gap: 10px;
+  --booking-dialog-inner-gap: 18px;
   --booking-detail-dialog-height: min(94vh, calc(100dvh - (var(--dialog-frame-gap) * 2)), 940px);
   width: min(1380px, calc(100vw - (var(--dialog-frame-gap) * 2)));
   min-height: var(--booking-detail-dialog-height);
@@ -5403,12 +5495,12 @@
 
 .dialog-col {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   align-content: start;
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 14px;
   background: rgba(15, 23, 42, 0.64);
-  padding: 14px;
+  padding: 18px;
 }
 
 .dialog-col.is-notes {
@@ -5438,15 +5530,15 @@
 .dialog-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
-  padding: 12px var(--admin-density-dialog-body-padding) 0;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 14px var(--admin-density-dialog-body-padding) 0;
   border-top: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .dialog-footer {
   margin-top: 12px;
-  padding: 14px var(--admin-density-dialog-body-padding) 0;
+  padding: 16px var(--admin-density-dialog-body-padding) 0;
   border-top: 1px solid var(--line);
   flex-shrink: 0;
 }
@@ -5715,12 +5807,12 @@
 }
 
 .booking-notes-editor .tiptap-editor-shell {
-  min-height: 120px;
+  min-height: 180px;
 }
 
 .booking-notes-editor .tiptap-editor-content {
-  min-height: 80px;
-  max-height: 300px;
+  min-height: 120px;
+  max-height: none;
   overflow-y: auto;
 }
 
@@ -5740,25 +5832,25 @@
 }
 
 #booking-detail-dialog .dialog-col {
-  padding: 10px;
-  gap: 6px;
+  padding: 18px;
+  gap: 12px;
 }
 
 #booking-detail-dialog .field {
-  gap: 2px;
+  gap: 6px;
 }
 
 #booking-detail-dialog .field label {
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   margin-bottom: 0;
 }
 
 #booking-detail-dialog .field input,
 #booking-detail-dialog .field select,
 #booking-detail-dialog .field textarea {
-  padding: 6px 9px;
+  padding: 10px 12px;
   border-radius: var(--admin-density-control-radius);
-  font-size: 0.82rem;
+  font-size: 0.86rem;
 }
 
 #booking-detail-dialog .dialog-col.is-notes {
@@ -5766,6 +5858,15 @@
   flex-direction: column;
   align-items: stretch;
   height: 100%;
+}
+
+#booking-detail-dialog .booking-appointment-panel {
+  align-items: stretch;
+  grid-template-columns: minmax(0, 1.04fr) minmax(320px, 0.96fr);
+}
+
+#booking-detail-dialog .booking-appointment-panel > .dialog-col {
+  min-height: 100%;
 }
 
 #booking-detail-dialog .booking-email-composer-card,
@@ -5791,6 +5892,25 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+}
+
+#booking-detail-dialog .booking-notes-editor {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#booking-detail-dialog .booking-notes-editor .tiptap-editor-shell {
+  flex: 1;
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+}
+
+#booking-detail-dialog .booking-notes-editor .tiptap-editor-content {
+  flex: 1;
   min-height: 0;
 }
 
@@ -6024,7 +6144,8 @@
   display: flex;
   flex-wrap: nowrap;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: auto;
+  padding-top: 14px;
   flex-shrink: 0;
 }
 
@@ -6036,19 +6157,13 @@
 }
 
 #booking-detail-dialog .dialog-footer {
-  margin-top: 6px;
-  padding-top: 6px;
-}
-
-.booking-notes-actions {
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 16px;
+  margin-top: 12px;
+  padding-top: 12px;
 }
 
 @media (max-width: 960px) {
   #booking-detail-dialog {
-    --booking-dialog-inner-gap: 10px;
+    --booking-dialog-inner-gap: 14px;
   }
 
   #booking-detail-dialog .dialog-tabs-left {
@@ -7641,7 +7756,7 @@
 
 @media (max-width: 640px) {
   #booking-detail-dialog {
-    --booking-dialog-inner-gap: 8px;
+    --booking-dialog-inner-gap: 12px;
   }
 
   .admin-shell {

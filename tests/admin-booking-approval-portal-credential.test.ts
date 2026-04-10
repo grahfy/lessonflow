@@ -5,6 +5,8 @@ import { PATCH } from "@/app/api/admin/booking-requests/[id]/route";
 import * as bookingEvents from "@/lib/booking-events";
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
+import { buildBookingRequestNoteImageUrl } from "@/lib/note-images";
+import { createMaterialStorageDriver } from "@/lib/student-portal/material-storage";
 
 function adminPatch(id: string, token: string, body: Record<string, unknown>) {
   return new NextRequest(`http://localhost/api/admin/booking-requests/${id}`, {
@@ -48,6 +50,7 @@ describe("admin-booking-approval-portal-credential", () => {
   beforeEach(async () => {
     // RATIONALE: Approval can fan out into bookings, emails, audit logs, and
     // portal credentials, so the cleanup order mirrors those dependencies.
+    await prisma.bookingRequestNoteImage.deleteMany();
     await prisma.learningMaterial.deleteMany();
     await prisma.customerPortalCredentialAuditLog.deleteMany();
     await prisma.customerPortalCredential.deleteMany();
@@ -332,5 +335,115 @@ describe("admin-booking-approval-portal-credential", () => {
       where: { id: requestRow.id }
     });
     expect(approvedRequest.status).toBe("approved");
+  });
+
+  it("copies request rich notes and images into approved bookings", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const requestRow = await prisma.bookingRequest.create({
+      data: baseRequestData({
+        notes: "Worked on chord transitions",
+        notesContent: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "Worked on chord transitions" }],
+            },
+            {
+              type: "image",
+              attrs: {
+                src: buildBookingRequestNoteImageUrl("REQUEST_ID", "request-image-1"),
+                alt: "Reference",
+              },
+            },
+          ],
+        },
+      })
+    });
+
+    await prisma.bookingRequest.update({
+      where: { id: requestRow.id },
+      data: {
+        notesContent: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "Worked on chord transitions" }],
+            },
+            {
+              type: "image",
+              attrs: {
+                src: buildBookingRequestNoteImageUrl(requestRow.id, "request-image-1"),
+                alt: "Reference",
+              },
+            },
+          ],
+        },
+      }
+    });
+
+    const driver = createMaterialStorageDriver();
+    await driver.put({
+      storageKey: "booking-requests/request-copy-test/notes/request-image-1.png",
+      buffer: Buffer.from([
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+        0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
+        0xde, 0x00, 0x00, 0x00, 0x0c, 0x49, 0x44, 0x41,
+        0x54, 0x08, 0xd7, 0x63, 0xf8, 0xcf, 0xc0, 0x00,
+        0x00, 0x00, 0x02, 0x00, 0x01, 0xe2, 0x21, 0xbc,
+        0x33, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e,
+        0x44, 0xae, 0x42, 0x60, 0x82,
+      ]),
+      mimeType: "image/png",
+    });
+
+    await prisma.bookingRequestNoteImage.create({
+      data: {
+        id: "request-image-1",
+        bookingRequestId: requestRow.id,
+        storageKey: "booking-requests/request-copy-test/notes/request-image-1.png",
+        mimeType: "image/png",
+        sizeBytes: 68,
+      }
+    });
+
+    const response = await PATCH(
+      adminPatch(requestRow.id, token, { action: "approve" }),
+      { params: Promise.resolve({ id: requestRow.id }) }
+    );
+    expect(response.status).toBe(202);
+
+    const booking = await prisma.booking.findFirstOrThrow({
+      where: { requestId: requestRow.id }
+    });
+    expect(booking.notes).toContain("Worked on chord transitions");
+    expect(booking.notesContent).toBeTruthy();
+
+    const noteImages = await prisma.bookingNoteImage.findMany({
+      where: { bookingId: booking.id }
+    });
+    expect(noteImages).toHaveLength(1);
+
+    const requestImages = await prisma.bookingRequestNoteImage.findMany({
+      where: { bookingRequestId: requestRow.id }
+    });
+    expect(requestImages).toHaveLength(1);
+    await expect(
+      driver.get({ storageKey: "booking-requests/request-copy-test/notes/request-image-1.png" })
+    ).resolves.toEqual(
+      expect.objectContaining({
+        buffer: expect.any(Buffer),
+      })
+    );
+
+    const storedDoc = booking.notesContent as { content?: Array<{ attrs?: { src?: string } }> };
+    const imageNode = storedDoc.content?.find((node) => node.attrs?.src);
+    expect(imageNode?.attrs?.src).toContain(`/api/admin/bookings/${booking.id}/notes-image/`);
+    expect(imageNode?.attrs?.src).not.toContain(`/api/admin/booking-requests/${requestRow.id}/notes-image/`);
   });
 });

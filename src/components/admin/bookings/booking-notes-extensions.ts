@@ -1,12 +1,14 @@
 import StarterKit from "@tiptap/starter-kit";
+import TaskList from "@tiptap/extension-task-list";
 import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
+import { ChordDiagramExtension } from "@/components/admin/lesson-plans/editor/nodes/chord-diagram-extension";
 import { CalloutExtension } from "@/components/admin/lesson-plans/editor/nodes/callout-extension";
+import { ChecklistItemExtension } from "@/components/admin/lesson-plans/editor/nodes/checklist-item-extension";
 
 /**
- * TipTap extensions for booking notes. Simpler than lesson plans:
- * no chord diagrams, task lists, or material links — just rich text,
- * headings, lists, callouts, and inline images.
+ * TipTap extensions for booking notes. These mirror the rich note affordances
+ * admins expect in lesson plans, except for material-link embeds.
  *
  * Exported as a stable singleton so the reference identity doesn't change
  * between renders — TipTap's useEditor re-initialises the editor when the
@@ -19,6 +21,11 @@ export const bookingNotesExtensions = [
     code: false,
     horizontalRule: false,
   }),
+  TaskList,
+  ChecklistItemExtension.configure({
+    nested: false,
+    HTMLAttributes: { class: "lesson-plan-task-item" },
+  }),
   CalloutExtension,
   Image.configure({
     inline: false,
@@ -30,4 +37,5 @@ export const bookingNotesExtensions = [
   Placeholder.configure({
     placeholder: "Add notes about this lesson...",
   }),
+  ChordDiagramExtension,
 ];

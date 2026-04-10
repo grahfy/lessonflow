@@ -21,6 +21,8 @@ import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
 import { getActiveLessonPricingMap } from "@/lib/lesson-pricing";
+import { reconcileBookingNoteImages } from "@/lib/note-images";
+import { enqueueStorageCleanupTasks, processStorageCleanupTasks } from "@/lib/storage-cleanup";
 import { tiptapJsonToPlainText } from "@/lib/tiptap-utils";
 
 type Params = {
@@ -258,7 +260,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         );
       }
 
-      await prisma.$transaction(async (tx) => {
+      const cleanupTaskIds = await prisma.$transaction(async (tx) => {
+        const staleNoteImageStorageKeys = await reconcileBookingNoteImages({
+          tx,
+          bookingId: id,
+          notesContent: nextNotesContent,
+        });
+
         await tx.booking.update({
           where: { id },
           data: {
@@ -298,7 +306,23 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             action: "edited"
           }
         });
+
+        return enqueueStorageCleanupTasks({
+          db: tx,
+          tasks: staleNoteImageStorageKeys.map((storageKey) => ({
+            storageKey,
+            scope: "booking_note_image",
+            entityId: id,
+          })),
+        });
       });
+
+      await processStorageCleanupTasks({
+        db: prisma,
+        taskIds: cleanupTaskIds,
+        maxTasks: cleanupTaskIds.length || 25,
+      });
+
       return NextResponse.json({ ok: true });
     }
 

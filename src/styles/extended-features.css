@@ -315,6 +315,7 @@
     border-radius: 20px;
     display: grid;
     gap: 10px;
+    align-items: start;
     background: var(--panel-strong);
     backdrop-filter: none;
   }
@@ -325,6 +326,7 @@
   }
 
   .site-nav {
+    width: 100%;
     justify-content: flex-start;
   }
 
@@ -1020,13 +1022,34 @@
     padding: 10px;
   }
 
+  .site-header {
+    padding: 12px;
+  }
+
+  .brand {
+    min-width: 0;
+  }
+
+  .brand-text {
+    font-size: 0.84rem;
+    letter-spacing: 0.05em;
+  }
+
   .site-nav {
-    gap: 4px;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
   }
 
   .site-nav a {
-    font-size: 0.7rem;
-    padding: 7px 10px;
+    min-height: 42px;
+    justify-content: center;
+    text-align: center;
+    white-space: normal;
+    line-height: 1.2;
+    font-size: 0.72rem;
+    padding: 8px 10px;
   }
 
   .panel-copy {
@@ -1051,6 +1074,9 @@
   }
 
   .site-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
     font-size: 0.66rem;
   }
 
@@ -1107,6 +1133,10 @@
 
   .student-login-credentials-row {
     grid-template-columns: 1fr;
+  }
+
+  .student-login-legal-links {
+    gap: 8px;
   }
 
   /* Admin login page mobile improvements */
@@ -1324,12 +1354,14 @@
   }
 
   .site-nav {
-    gap: 2px;
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 
   .site-nav a {
-    font-size: 0.65rem;
-    padding: 6px 8px;
+    min-height: 40px;
+    font-size: 0.68rem;
+    padding: 7px 10px;
   }
 
   .panel-copy {
@@ -1373,6 +1405,14 @@
 
   .helper-text {
     font-size: 0.75rem;
+  }
+
+  .captcha-controls-row {
+    grid-template-columns: 1fr;
+  }
+
+  .captcha-controls-row .btn {
+    width: 100%;
   }
 
   .panel-visual {

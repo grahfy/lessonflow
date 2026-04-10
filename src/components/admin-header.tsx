@@ -87,7 +87,7 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
             return (
               <section
                 key={group.key}
-                className={`admin-header-nav-group ${isGroupActive ? "is-active" : ""}`}
+                className={`admin-header-nav-group admin-header-nav-group-${group.key} ${isGroupActive ? "is-active" : ""}`}
                 aria-label={group.label}
               >
                 <div className="admin-header-group-heading">

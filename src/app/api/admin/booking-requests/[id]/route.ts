@@ -1,6 +1,6 @@
 import { APP_TIMEZONE } from "@/lib/time";
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@/generated/prisma/client";
+import { Prisma, type BookingRequestStatus } from "@/generated/prisma/client";
 import { z } from "zod";
 
 import { canManageAssignedTeacher, isOwner } from "@/lib/admin/permissions";
@@ -23,8 +23,17 @@ import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
 import { getStudentPortalLoginUrl } from "@/lib/env";
+import {
+  copyBookingRequestNotesToBooking,
+  deleteStoredNoteImages,
+  listBookingRequestNoteImageStorageKeys,
+  reconcileBookingRequestNoteImages,
+} from "@/lib/note-images";
 import { logError } from "@/lib/observability";
+import type { StorageCleanupTaskInput } from "@/lib/storage-cleanup";
+import { enqueueStorageCleanupTasks, processStorageCleanupTasks } from "@/lib/storage-cleanup";
 import { ensurePortalCredentialForCustomer } from "@/lib/student-portal/credentials";
+import { tiptapJsonToPlainText } from "@/lib/tiptap-utils";
 
 type Params = {
   params: Promise<{
@@ -49,7 +58,9 @@ const requestEditSchema = z.object({
   customDurationMinutes: nullableOptionalCustomDurationMinutesSchema,
   assignedTeacherId: z.string().trim().min(1).nullable().optional(),
   requestedStartAt: z.string().datetime({ offset: true }).optional(),
-  notes: z.string().trim().max(1000).nullable().optional(),
+  customerId: z.string().trim().min(1).nullable().optional(),
+  notes: z.string().trim().nullable().optional(),
+  notesContent: z.record(z.unknown()).nullable().optional(),
   isRecurring: z.boolean().optional(),
   recurrenceEndAt: z.string().datetime({ offset: true }).nullable().optional()
 });
@@ -185,148 +196,182 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
       // Approval spans customer resolution, booking creation, request status update, and portal
       // credential ensure. Keeping this transactional prevents partially approved states.
-      const approvalResult = await prisma.$transaction(async (tx) => {
-        const customerId = await resolveCustomerIdForApproval({
-          tx,
-          bookingRequest
-        });
-        if (!customerId) {
-          throw new Error("Unable to resolve customer before approval.");
-        }
+      const clonedCleanupTasks: StorageCleanupTaskInput[] = [];
+      let approvalResult: {
+        updated: {
+          email: string;
+          name: string;
+          status: BookingRequestStatus;
+          requestedStartAt: Date;
+        };
+        generatedPassword: string | null;
+      } | null = null;
 
-        if (bookingRequest.isRecurring && bookingRequest.recurrenceEndAt) {
-          // Recurring approvals create a series plus one booking row per generated start date.
-          const series = await tx.bookingSeries.create({
+      try {
+        approvalResult = await prisma.$transaction(async (tx) => {
+          const customerId = await resolveCustomerIdForApproval({
+            tx,
+            bookingRequest
+          });
+          if (!customerId) {
+            throw new Error("Unable to resolve customer before approval.");
+          }
+
+          const createBookingFromRequest = async (startAt: Date, seriesId?: string | null) => {
+            const createdBooking = await tx.booking.create({
+              data: {
+                firstName: bookingRequest.firstName,
+                lastName: bookingRequest.lastName,
+                name: bookingRequest.name,
+                email: bookingRequest.email,
+                phone: bookingRequest.phone,
+                address: bookingRequest.address,
+                unitNumber: bookingRequest.unitNumber,
+                houseNumber: bookingRequest.houseNumber,
+                streetName: bookingRequest.streetName,
+                streetType: bookingRequest.streetType,
+                suburb: bookingRequest.suburb,
+                state: bookingRequest.state,
+                postcode: bookingRequest.postcode,
+                lessonMode: bookingRequest.lessonMode,
+                skillLevel: bookingRequest.skillLevel,
+                lessonDuration: bookingRequest.lessonDuration,
+                customDurationMinutes: bookingRequest.customDurationMinutes,
+                startAt,
+                endAt: getBookingEnd(startAt, bookingRequest.lessonDuration, bookingRequest.customDurationMinutes),
+                timezone: APP_TIMEZONE,
+                requestId: bookingRequest.id,
+                seriesId: seriesId ?? null,
+                assignedTeacherId: requestedAssignedTeacherId,
+                customerId,
+                modifiedById: admin.id,
+                notes: bookingRequest.notes,
+                notesContent:
+                  bookingRequest.notesContent === null
+                    ? undefined
+                    : (bookingRequest.notesContent as Prisma.InputJsonValue),
+              }
+            });
+
+            const copyResult = await copyBookingRequestNotesToBooking({
+              tx,
+              requestId: bookingRequest.id,
+              bookingId: createdBooking.id,
+              notesContent: bookingRequest.notesContent,
+            });
+            clonedCleanupTasks.push(...copyResult.createdCleanupTasks);
+
+            if (copyResult.notesContent !== (bookingRequest.notesContent as Prisma.InputJsonValue | null)) {
+              return tx.booking.update({
+                where: { id: createdBooking.id },
+                data: {
+                  notesContent: copyResult.notesContent === null ? Prisma.DbNull : copyResult.notesContent,
+                }
+              });
+            }
+
+            return createdBooking;
+          };
+
+          if (bookingRequest.isRecurring && bookingRequest.recurrenceEndAt) {
+            // Recurring approvals create a series plus one booking row per generated start date.
+            const series = await tx.bookingSeries.create({
+              data: {
+                firstName: bookingRequest.firstName,
+                lastName: bookingRequest.lastName,
+                name: bookingRequest.name,
+                email: bookingRequest.email,
+                phone: bookingRequest.phone,
+                address: bookingRequest.address,
+                unitNumber: bookingRequest.unitNumber,
+                houseNumber: bookingRequest.houseNumber,
+                streetName: bookingRequest.streetName,
+                streetType: bookingRequest.streetType,
+                suburb: bookingRequest.suburb,
+                state: bookingRequest.state,
+                postcode: bookingRequest.postcode,
+                lessonMode: bookingRequest.lessonMode,
+                skillLevel: bookingRequest.skillLevel,
+                lessonDuration: bookingRequest.lessonDuration,
+                customDurationMinutes: bookingRequest.customDurationMinutes,
+                dayOfWeek: bookingRequest.requestedStartAt.getDay(),
+                startTimeLocal: localTime(bookingRequest.requestedStartAt),
+                startDate: bookingRequest.requestedStartAt,
+                recurrenceEndAt: bookingRequest.recurrenceEndAt,
+                timezone: APP_TIMEZONE,
+                assignedTeacherId: requestedAssignedTeacherId,
+                customerId
+              }
+            });
+
+            const starts = generateRecurringStartDates({
+              startAt: bookingRequest.requestedStartAt,
+              recurrenceEndAt: bookingRequest.recurrenceEndAt
+            });
+
+            // NOTE: The request remains the provenance link for every generated
+            // booking row so later admin investigation can trace the series back
+            // to the original request details and approval action.
+            for (const startAt of starts) {
+              await createBookingFromRequest(startAt, series.id);
+            }
+          } else {
+            await createBookingFromRequest(bookingRequest.requestedStartAt);
+          }
+
+          const updated = await tx.bookingRequest.update({
+            where: { id },
             data: {
-              firstName: bookingRequest.firstName,
-              lastName: bookingRequest.lastName,
-              name: bookingRequest.name,
-              email: bookingRequest.email,
-              phone: bookingRequest.phone,
-              address: bookingRequest.address,
-              unitNumber: bookingRequest.unitNumber,
-              houseNumber: bookingRequest.houseNumber,
-              streetName: bookingRequest.streetName,
-              streetType: bookingRequest.streetType,
-              suburb: bookingRequest.suburb,
-              state: bookingRequest.state,
-              postcode: bookingRequest.postcode,
-              lessonMode: bookingRequest.lessonMode,
-              skillLevel: bookingRequest.skillLevel,
-              lessonDuration: bookingRequest.lessonDuration,
-              customDurationMinutes: bookingRequest.customDurationMinutes,
-              dayOfWeek: bookingRequest.requestedStartAt.getDay(),
-              startTimeLocal: localTime(bookingRequest.requestedStartAt),
-              startDate: bookingRequest.requestedStartAt,
-              recurrenceEndAt: bookingRequest.recurrenceEndAt,
-              timezone: APP_TIMEZONE,
+              status: "approved",
+              approvedById: admin.id,
               assignedTeacherId: requestedAssignedTeacherId,
               customerId
             }
           });
 
-          const starts = generateRecurringStartDates({
-            startAt: bookingRequest.requestedStartAt,
-            recurrenceEndAt: bookingRequest.recurrenceEndAt
+          await ensureCustomerPrimaryTeacher({
+            db: tx,
+            customerId,
+            assignedTeacherId: requestedAssignedTeacherId
           });
 
-          // NOTE: The request remains the provenance link for every generated
-          // booking row so later admin investigation can trace the series back
-          // to the original request details and approval action.
-          await tx.booking.createMany({
-            data: starts.map((startAt) => ({
-              firstName: bookingRequest.firstName,
-              lastName: bookingRequest.lastName,
-              name: bookingRequest.name,
-              email: bookingRequest.email,
-              phone: bookingRequest.phone,
-              address: bookingRequest.address,
-              unitNumber: bookingRequest.unitNumber,
-              houseNumber: bookingRequest.houseNumber,
-              streetName: bookingRequest.streetName,
-              streetType: bookingRequest.streetType,
-              suburb: bookingRequest.suburb,
-              state: bookingRequest.state,
-              postcode: bookingRequest.postcode,
-              lessonMode: bookingRequest.lessonMode,
-              skillLevel: bookingRequest.skillLevel,
-              lessonDuration: bookingRequest.lessonDuration,
-              customDurationMinutes: bookingRequest.customDurationMinutes,
-              startAt,
-              endAt: getBookingEnd(startAt, bookingRequest.lessonDuration, bookingRequest.customDurationMinutes),
-              timezone: APP_TIMEZONE,
-              requestId: bookingRequest.id,
-              seriesId: series.id,
-              assignedTeacherId: requestedAssignedTeacherId,
-              customerId,
-              modifiedById: admin.id
-            }))
+          // Ensure portal credentials before the approval email so first-time approved students can
+          // log in immediately from the email payload.
+          const credentialResult = await ensurePortalCredentialForCustomer({
+            customerId,
+            actorId: admin.id,
+            tx,
+            details: `Portal credential ensured during booking request approval (${id}).`
           });
-        } else {
-          await tx.booking.create({
-            data: {
-              firstName: bookingRequest.firstName,
-              lastName: bookingRequest.lastName,
-              name: bookingRequest.name,
-              email: bookingRequest.email,
-              phone: bookingRequest.phone,
-              address: bookingRequest.address,
-              unitNumber: bookingRequest.unitNumber,
-              houseNumber: bookingRequest.houseNumber,
-              streetName: bookingRequest.streetName,
-              streetType: bookingRequest.streetType,
-              suburb: bookingRequest.suburb,
-              state: bookingRequest.state,
-              postcode: bookingRequest.postcode,
-              lessonMode: bookingRequest.lessonMode,
-              skillLevel: bookingRequest.skillLevel,
-              lessonDuration: bookingRequest.lessonDuration,
-              customDurationMinutes: bookingRequest.customDurationMinutes,
-              startAt: bookingRequest.requestedStartAt,
-              endAt: getBookingEnd(
-                bookingRequest.requestedStartAt,
-                bookingRequest.lessonDuration,
-                bookingRequest.customDurationMinutes
-              ),
-              timezone: APP_TIMEZONE,
-              requestId: bookingRequest.id,
-              assignedTeacherId: requestedAssignedTeacherId,
-              customerId,
-              modifiedById: admin.id
-            }
+
+          return {
+            updated,
+            generatedPassword: credentialResult.generatedPassword
+          };
+        });
+      } catch (error) {
+        const cloneCleanupResult = await deleteStoredNoteImages(clonedCleanupTasks.map((task) => task.storageKey))
+          .then(() => "deleted" as const)
+          .catch(async (cleanupError) => {
+            logError("booking_request.note_image_clone_cleanup_failed", cleanupError, {
+              requestId: id,
+              storageKeyCount: clonedCleanupTasks.length,
+            });
+
+            await enqueueStorageCleanupTasks({
+              db: prisma,
+              tasks: clonedCleanupTasks,
+            }).catch(() => undefined);
+
+            return "queued" as const;
           });
-        }
+        void cloneCleanupResult;
+        throw error;
+      }
 
-        const updated = await tx.bookingRequest.update({
-          where: { id },
-          data: {
-            status: "approved",
-            approvedById: admin.id,
-            assignedTeacherId: requestedAssignedTeacherId,
-            customerId
-          }
-        });
-
-        await ensureCustomerPrimaryTeacher({
-          db: tx,
-          customerId,
-          assignedTeacherId: requestedAssignedTeacherId
-        });
-
-        // Ensure portal credentials before the approval email so first-time approved students can
-        // log in immediately from the email payload.
-        const credentialResult = await ensurePortalCredentialForCustomer({
-          customerId,
-          actorId: admin.id,
-          tx,
-          details: `Portal credential ensured during booking request approval (${id}).`
-        });
-
-        return {
-          updated,
-          generatedPassword: credentialResult.generatedPassword
-        };
-      });
+      if (!approvalResult) {
+        throw new Error("Booking request approval did not complete.");
+      }
 
       // Send customer email after transaction commit to avoid sending approvals that failed to persist.
       // Audit log entry is recorded by the event wrapper.
@@ -552,6 +597,18 @@ export async function PATCH(request: NextRequest, { params }: Params) {
               fallbackTeacherId: parsed.data.assignedTeacherId === null ? null : bookingRequest.assignedTeacherId
             });
 
+      if (parsed.data.customerId !== undefined && parsed.data.customerId !== null) {
+        const existingCustomer = await prisma.customer.findFirst({
+          where: {
+            id: parsed.data.customerId,
+            isArchived: false
+          }
+        });
+        if (!existingCustomer) {
+          return NextResponse.json({ error: "Customer not found." }, { status: 404 });
+        }
+      }
+
       // As with booking edits, compute the full next-state payload server-side for consistency and
       // to preserve required fields during partial updates.
       const nextUnitNumber =
@@ -601,43 +658,83 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         );
       }
 
-      await prisma.bookingRequest.update({
-        where: { id },
-        data: {
-          name: nextName,
-          email: nextEmail,
-          phone: nextPhone,
-          address: nextAddress,
-          unitNumber: nextUnitNumber,
-          houseNumber: nextHouseNumber,
-          streetName: nextStreetName,
-          streetType: nextStreetType,
-          suburb: nextSuburb,
-          state: nextState,
-          postcode: nextPostcode,
-          lessonMode: parsed.data.lessonMode ?? bookingRequest.lessonMode,
-          skillLevel: parsed.data.skillLevel ?? bookingRequest.skillLevel,
-          lessonDuration: parsed.data.lessonDuration ?? bookingRequest.lessonDuration,
-          customDurationMinutes:
-            parsed.data.customDurationMinutes === undefined
-              ? bookingRequest.customDurationMinutes
-              : parsed.data.customDurationMinutes,
-          ...(isOwner(admin) ? { assignedTeacherId: nextAssignedTeacherId } : {}),
-          requestedStartAt: parsed.data.requestedStartAt ? new Date(parsed.data.requestedStartAt) : bookingRequest.requestedStartAt,
-          notes:
-            parsed.data.notes === undefined
-              ? bookingRequest.notes
-              : parsed.data.notes === null
-                ? null
-                : parsed.data.notes,
-          isRecurring: parsed.data.isRecurring ?? bookingRequest.isRecurring,
-          recurrenceEndAt:
-            parsed.data.recurrenceEndAt === undefined
-              ? bookingRequest.recurrenceEndAt
-              : parsed.data.recurrenceEndAt === null
-                ? null
-                : new Date(parsed.data.recurrenceEndAt)
-        }
+      const nextNotesContent =
+        parsed.data.notesContent === undefined
+          ? bookingRequest.notesContent
+          : parsed.data.notesContent === null
+            ? Prisma.DbNull
+            : (parsed.data.notesContent as Prisma.InputJsonValue);
+      const nextNotes =
+        parsed.data.notesContent !== undefined
+          ? nextNotesContent === Prisma.DbNull
+            ? null
+            : tiptapJsonToPlainText(nextNotesContent)
+          : parsed.data.notes === undefined
+            ? bookingRequest.notes
+            : parsed.data.notes === null
+              ? null
+              : parsed.data.notes;
+
+      const cleanupTaskIds = await prisma.$transaction(async (tx) => {
+        const staleNoteImageStorageKeys = await reconcileBookingRequestNoteImages({
+          tx,
+          requestId: id,
+          notesContent: nextNotesContent,
+        });
+
+        await tx.bookingRequest.update({
+          where: { id },
+          data: {
+            name: nextName,
+            email: nextEmail,
+            phone: nextPhone,
+            address: nextAddress,
+            unitNumber: nextUnitNumber,
+            houseNumber: nextHouseNumber,
+            streetName: nextStreetName,
+            streetType: nextStreetType,
+            suburb: nextSuburb,
+            state: nextState,
+            postcode: nextPostcode,
+            lessonMode: parsed.data.lessonMode ?? bookingRequest.lessonMode,
+            skillLevel: parsed.data.skillLevel ?? bookingRequest.skillLevel,
+            lessonDuration: parsed.data.lessonDuration ?? bookingRequest.lessonDuration,
+            customDurationMinutes:
+              parsed.data.customDurationMinutes === undefined
+                ? bookingRequest.customDurationMinutes
+                : parsed.data.customDurationMinutes,
+            ...(isOwner(admin) ? { assignedTeacherId: nextAssignedTeacherId } : {}),
+            requestedStartAt: parsed.data.requestedStartAt ? new Date(parsed.data.requestedStartAt) : bookingRequest.requestedStartAt,
+            customerId:
+              parsed.data.customerId === undefined
+                ? bookingRequest.customerId
+                : parsed.data.customerId,
+            notes: nextNotes,
+            notesContent: nextNotesContent === null ? undefined : nextNotesContent,
+            isRecurring: parsed.data.isRecurring ?? bookingRequest.isRecurring,
+            recurrenceEndAt:
+              parsed.data.recurrenceEndAt === undefined
+                ? bookingRequest.recurrenceEndAt
+                : parsed.data.recurrenceEndAt === null
+                  ? null
+                  : new Date(parsed.data.recurrenceEndAt)
+          }
+        });
+
+        return enqueueStorageCleanupTasks({
+          db: tx,
+          tasks: staleNoteImageStorageKeys.map((storageKey) => ({
+            storageKey,
+            scope: "booking_request_note_image",
+            entityId: id,
+          })),
+        });
+      });
+
+      await processStorageCleanupTasks({
+        db: prisma,
+        taskIds: cleanupTaskIds,
+        maxTasks: cleanupTaskIds.length || 25,
       });
 
       return NextResponse.json({ ok: true });
@@ -690,8 +787,30 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       );
     }
 
-    await prisma.bookingRequest.delete({
-      where: { id }
+    const cleanupTaskIds = await prisma.$transaction(async (tx) => {
+      const noteImageStorageKeys = await listBookingRequestNoteImageStorageKeys({
+        db: tx,
+        requestId: id,
+      });
+
+      await tx.bookingRequest.delete({
+        where: { id }
+      });
+
+      return enqueueStorageCleanupTasks({
+        db: tx,
+        tasks: noteImageStorageKeys.map((storageKey) => ({
+          storageKey,
+          scope: "booking_request_note_image",
+          entityId: id,
+        })),
+      });
+    });
+
+    await processStorageCleanupTasks({
+      db: prisma,
+      taskIds: cleanupTaskIds,
+      maxTasks: cleanupTaskIds.length || 25,
     });
 
     return NextResponse.json({ ok: true });

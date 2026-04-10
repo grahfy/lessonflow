@@ -27,6 +27,7 @@ export type BookingRowData = Record<string, unknown> & {
 export type BookingDialogForm = {
   notes: string;
   notesContent: JSONContent | null;
+  linkedCustomerId: string;
   startAtLocal: string;
   firstName: string;
   lastName: string;
@@ -63,4 +64,10 @@ export type BookingMatchedCustomer = {
   skillLevel?: string | null;
   lessonMode?: string | null;
   primaryTeacherId?: string | null;
+};
+
+export type BookingCustomerLookupState = {
+  status: "idle" | "loading" | "linked" | "exact_match" | "possible_match" | "no_match" | "error";
+  customers: BookingMatchedCustomer[];
+  message?: string;
 };
