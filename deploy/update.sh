@@ -1348,6 +1348,28 @@ render_app_service_template_from_update() {
     "${template_path}" > "${output_path}"
 }
 
+app_service_unit_needs_refresh_from_update() {
+  local service_file="$(app_systemd_dir_from_update)/${APP_NAME}.service"
+  local service_source="${SCRIPT_DIR}/app.service.template"
+  local tmp_service_dir=""
+  local tmp_service=""
+
+  [[ -f "${service_file}" ]] || return 0
+  [[ -f "${service_source}" ]] || return 1
+
+  tmp_service_dir="$(mktemp -d)"
+  tmp_service="${tmp_service_dir}/${APP_NAME}.service"
+  render_app_service_template_from_update "${service_source}" "${tmp_service}"
+
+  if cmp -s "${tmp_service}" "${service_file}"; then
+    rm -rf "${tmp_service_dir}"
+    return 1
+  fi
+
+  rm -rf "${tmp_service_dir}"
+  return 0
+}
+
 validate_systemd_unit_file_from_update() {
   local unit_path="$1"
 
@@ -3384,6 +3406,12 @@ fi
 detect_previous_deploy_defaults_from_host
 auto_enable_bootstrap_defaults_from_update
 run_host_bootstrap_from_update || true
+if [[ "${AUTO_BOOTSTRAP}" == true ]] && app_service_unit_needs_refresh_from_update; then
+  if [[ "${INSTALL_APP_SERVICE_IF_NEEDED}" != true ]]; then
+    INSTALL_APP_SERVICE_IF_NEEDED=true
+    log_info "Auto-bootstrap enabled install-app-service because the existing systemd unit is stale."
+  fi
+fi
 
 if [[ "${DB_PUSH}" == true ]]; then
   SKIP_MIGRATE=true

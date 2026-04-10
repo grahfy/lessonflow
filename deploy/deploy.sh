@@ -498,6 +498,28 @@ render_app_service_template() {
         "${template_path}" > "${output_path}"
 }
 
+app_service_unit_needs_refresh() {
+    local service_file="$(app_systemd_dir)/${APP_NAME}.service"
+    local service_source="${SCRIPT_DIR}/app.service.template"
+    local tmp_service_dir=""
+    local tmp_service=""
+
+    [[ -f "${service_file}" ]] || return 0
+    [[ -f "${service_source}" ]] || return 1
+
+    tmp_service_dir="$(mktemp -d)"
+    tmp_service="${tmp_service_dir}/${APP_NAME}.service"
+    render_app_service_template "${service_source}" "${tmp_service}"
+
+    if cmp -s "${tmp_service}" "${service_file}"; then
+        rm -rf "${tmp_service_dir}"
+        return 1
+    fi
+
+    rm -rf "${tmp_service_dir}"
+    return 0
+}
+
 run_host_bootstrap() {
     local env_template_path="$1"
 
@@ -4291,6 +4313,12 @@ log_info "Source mode: $(source_mode_label)"
 log_info "Source detail: ${SOURCE_MODE_DETAIL}"
 warn_if_archive_source_needs_permission_fix
 run_host_bootstrap "${SOURCE_DIR}/.env.example" || true
+if [[ "${AUTO_BOOTSTRAP}" == true ]] && app_service_unit_needs_refresh; then
+    if [[ "${INSTALL_APP_SERVICE_IF_NEEDED}" != true ]]; then
+        INSTALL_APP_SERVICE_IF_NEEDED=true
+        log_info "Auto-bootstrap enabled install-app-service because the existing systemd unit is stale."
+    fi
+fi
 
 # Track deployed git commit metadata so the admin UI can show "latest updates"
 # after a successful deploy. This is best-effort and skipped for non-git source
