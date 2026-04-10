@@ -54,6 +54,7 @@ ORIGINAL_ARGS=( "$@" )
 # branch later for git-backed installs; archive installs simply deploy the
 # current source tree.
 APP_NAME="lessonflow"
+RUNTIME_USER="www-data"
 DEPLOY_DIR="${DEPLOY_DIR:-/var/www/${APP_NAME}}"
 SHARED_DIR="${DEPLOY_DIR}/shared"
 CURRENT_LINK="${DEPLOY_DIR}/current"
@@ -107,6 +108,7 @@ TUI_REMOTE_UPDATE_REMOTE_SUBJECT=""
 TUI_REMOTE_UPDATE_LOCAL_SHORT=""
 TUI_REMOTE_UPDATE_ERROR=""
 ANNOUNCED_SOURCE_GIT_USER=""
+SOURCE_GIT_USER_ERROR=""
 
 # ANSI color palette shared with deploy.sh for consistent terminal UX.
 RED='\033[0;31m'
@@ -285,6 +287,10 @@ auto_size_tui_panel_width() {
   UPDATE_TUI_PANEL_WIDTH="${target_width}"
 }
 
+is_effective_root_for_update() {
+  [[ ${EUID} -eq 0 || "${LESSONFLOW_TEST_ASSUME_ROOT:-0}" == "1" ]]
+}
+
 resolve_source_git_user_for_update() {
   local repo_root="$1"
   local repo_owner=""
@@ -295,7 +301,7 @@ resolve_source_git_user_for_update() {
     return 0
   fi
 
-  if [[ ${EUID} -ne 0 ]]; then
+  if ! is_effective_root_for_update; then
     return 1
   fi
 
@@ -317,6 +323,17 @@ resolve_source_git_user_for_update() {
   return 1
 }
 
+validate_source_git_user_for_update() {
+  local user_name="$1"
+
+  [[ -n "${user_name}" ]] || return 0
+  if ! getent passwd "${user_name}" >/dev/null 2>&1; then
+    SOURCE_GIT_USER_ERROR="Configured deploy user '${user_name}' does not exist or is invalid."
+    return 1
+  fi
+  return 0
+}
+
 announce_source_git_user_for_update() {
   local repo_root="$1"
   local source_git_user=""
@@ -325,6 +342,7 @@ announce_source_git_user_for_update() {
 
   source_git_user="$(resolve_source_git_user_for_update "${repo_root}" || true)"
   current_user="$(id -un 2>/dev/null || true)"
+  validate_source_git_user_for_update "${source_git_user}" || return 0
 
   if [[ -z "${source_git_user}" || "${source_git_user}" == "${current_user}" ]]; then
     return 0
@@ -347,6 +365,7 @@ run_source_git_cmd_for_update() {
   local current_user=""
   source_git_user="$(resolve_source_git_user_for_update "${repo_root}" || true)"
   current_user="$(id -un 2>/dev/null || true)"
+  validate_source_git_user_for_update "${source_git_user}" || return 126
 
   if [[ -n "${source_git_user}" && "${source_git_user}" != "${current_user}" ]]; then
     if command -v runuser >/dev/null 2>&1; then
@@ -371,6 +390,7 @@ run_source_git_cmd_for_update_with_prompt_guard() {
   local current_user=""
   source_git_user="$(resolve_source_git_user_for_update "${repo_root}" || true)"
   current_user="$(id -un 2>/dev/null || true)"
+  validate_source_git_user_for_update "${source_git_user}" || return 126
 
   if [[ -n "${source_git_user}" && "${source_git_user}" != "${current_user}" ]]; then
     if command -v runuser >/dev/null 2>&1; then
@@ -396,6 +416,7 @@ run_source_git_cmd_for_update_with_prompt_guard_timeout() {
   local current_user=""
   source_git_user="$(resolve_source_git_user_for_update "${repo_root}" || true)"
   current_user="$(id -un 2>/dev/null || true)"
+  validate_source_git_user_for_update "${source_git_user}" || return 126
 
   if [[ -n "${source_git_user}" && "${source_git_user}" != "${current_user}" ]]; then
     if command -v runuser >/dev/null 2>&1; then
@@ -895,6 +916,29 @@ read_updates_deploy_user_from_shared_env_for_update() {
   read_env_file_value_from_update "${shared_env_path}" "UPDATES_DEPLOY_USER"
 }
 
+run_host_bootstrap_from_update() {
+  if [[ "${AUTO_BOOTSTRAP}" != true ]]; then
+    return 0
+  fi
+
+  if [[ ! -x "${SCRIPT_DIR}/bootstrap-host.sh" ]]; then
+    log_warn "Host bootstrap helper not found or not executable: ${SCRIPT_DIR}/bootstrap-host.sh"
+    return 0
+  fi
+
+  section "Host Bootstrap"
+  APP_NAME="${APP_NAME}" \
+  RUNTIME_USER="${RUNTIME_USER}" \
+  DEPLOY_DIR="${DEPLOY_DIR}" \
+  SHARED_DIR="${SHARED_DIR}" \
+  REPO_ROOT="${REPO_ROOT}" \
+  ENV_TEMPLATE_PATH="${REPO_ROOT}/.env.example" \
+  SOURCE_MODE="${SOURCE_MODE}" \
+  DEPLOY_SUDOERS_TEMPLATE="${SCRIPT_DIR}/sudoers.template" \
+  WEB_UPDATE_SUDOERS_TEMPLATE="${SCRIPT_DIR}/web-update-trigger.sudoers.template" \
+  run_step "Repairing host deploy wiring" "${SCRIPT_DIR}/bootstrap-host.sh"
+}
+
 # Ensures /var/www/.../shared/.env exists, copying the repo .env.example on
 # first-run servers so operators have a file to review before deployment.
 extract_env_assignment_key() {
@@ -1280,11 +1324,44 @@ ensure_cron_installed_from_update() {
   return 0
 }
 
+render_app_service_template_from_update() {
+  local template_path="$1"
+  local output_path="$2"
+  local brand_name="${NEXT_PUBLIC_BRAND_NAME:-LessonFlow}"
+  local git_repo_path=""
+  local read_write_paths="/var/www/${APP_NAME}"
+  local shared_env_path="${SHARED_DIR}/.env"
+
+  if [[ -f "${shared_env_path}" ]]; then
+    git_repo_path="$(read_env_file_value_from_update "${shared_env_path}" "UPDATES_GIT_REPO_PATH" || true)"
+  fi
+  if [[ -z "${git_repo_path}" && "${SOURCE_MODE}" == "git" ]]; then
+    git_repo_path="${REPO_ROOT}"
+  fi
+  if [[ -n "${git_repo_path}" ]]; then
+    read_write_paths="${read_write_paths} ${git_repo_path}"
+  fi
+
+  sed -e "s/{{APP_NAME}}/${APP_NAME}/g" \
+    -e "s/{{BRAND_NAME}}/${brand_name}/g" \
+    -e "s#{{READ_WRITE_PATHS}}#${read_write_paths}#g" \
+    "${template_path}" > "${output_path}"
+}
+
+validate_systemd_unit_file_from_update() {
+  local unit_path="$1"
+
+  if command -v systemd-analyze >/dev/null 2>&1; then
+    run_server_setup_cmd systemd-analyze verify "${unit_path}" >/dev/null
+  fi
+}
+
 # Installs or updates the app's systemd unit from deploy/<app>.service and
 # enables it. If a current release exists, the helper also attempts to start it.
 install_app_systemd_service_from_update() {
   local service_file="/etc/systemd/system/${APP_NAME}.service"
-  local service_source="${SCRIPT_DIR}/${APP_NAME}.service"
+  local service_source="${SCRIPT_DIR}/app.service.template"
+  local tmp_service=""
 
   section "App Systemd Service Install"
 
@@ -1298,25 +1375,41 @@ install_app_systemd_service_from_update() {
     return 1
   fi
 
+  tmp_service="$(mktemp)"
+  render_app_service_template_from_update "${service_source}" "${tmp_service}"
+  if ! validate_systemd_unit_file_from_update "${tmp_service}"; then
+    log_error "Systemd unit validation failed for ${APP_NAME}.service"
+    log_error "Check service sandboxing and any override drop-ins under /etc/systemd/system/${APP_NAME}.service.d/"
+    rm -f "${tmp_service}"
+    return 1
+  fi
+
   if [[ ! -f "${service_file}" ]]; then
     log_info "Installing systemd service..."
-    run_server_setup_cmd cp "${service_source}" "${service_file}" || return 1
+    run_server_setup_cmd cp "${tmp_service}" "${service_file}" || {
+      rm -f "${tmp_service}"
+      return 1
+    }
     run_server_setup_cmd systemctl daemon-reload || return 1
-  elif ! cmp -s "${service_source}" "${service_file}"; then
+  elif ! cmp -s "${tmp_service}" "${service_file}"; then
     log_info "Updating systemd service..."
-    run_server_setup_cmd cp "${service_source}" "${service_file}" || return 1
+    run_server_setup_cmd cp "${tmp_service}" "${service_file}" || {
+      rm -f "${tmp_service}"
+      return 1
+    }
     run_server_setup_cmd systemctl daemon-reload || return 1
   else
     log_info "Systemd service already up to date"
   fi
+  rm -f "${tmp_service}"
 
   run_server_setup_cmd systemctl enable "${APP_NAME}" >/dev/null 2>&1 || true
 
   if [[ -L "${CURRENT_LINK}" || -d "${CURRENT_LINK}" ]]; then
-    if run_server_setup_cmd systemctl start "${APP_NAME}" >/dev/null 2>&1; then
+    if run_server_setup_cmd systemctl restart "${APP_NAME}" >/dev/null 2>&1; then
       log_info "Systemd service ready: ${APP_NAME}"
     else
-      log_warn "Systemd service installed but not started (check current release/env): ${APP_NAME}"
+      log_warn "Systemd service installed but not started cleanly (check journalctl -u ${APP_NAME} and any override drop-ins)."
     fi
   else
     log_info "Current release not present yet; service installed/enabled but not started."
@@ -1472,6 +1565,11 @@ install_systemd_timers_from_update() {
     else
       log_warn "Failed to restart timer: ${timer_name}.timer"
     fi
+    if run_server_setup_cmd systemctl is-enabled "${timer_name}.timer" >/dev/null 2>&1; then
+      log_info "Timer verified enabled: ${timer_name}.timer"
+    else
+      log_warn "Timer is not enabled after install: ${timer_name}.timer"
+    fi
   done
 
   # Remove legacy cron entries to avoid duplicate job execution
@@ -1557,9 +1655,7 @@ ensure_managed_cron_jobs_installed_from_update() {
 
   # Check if systemctl is available
   if ! command -v systemctl >/dev/null 2>&1; then
-    log_warn "systemctl not available; falling back to traditional cron"
-    install_or_update_managed_crontab_jobs_from_update || return 1
-    restart_cron_scheduler_if_present_from_update
+    log_warn "systemctl not available; skipping timer install because systemd timers are the supported scheduler path."
     return 0
   fi
 
@@ -1627,14 +1723,6 @@ auto_enable_bootstrap_defaults_from_update() {
       INSTALL_NGINX_IF_NEEDED=true
       changed=true
       enabled_flags+=( "install-nginx" )
-    fi
-  fi
-
-  if ! command -v crontab >/dev/null 2>&1; then
-    if [[ "${INSTALL_CRON_IF_NEEDED}" != true ]]; then
-      INSTALL_CRON_IF_NEEDED=true
-      changed=true
-      enabled_flags+=( "install-cron" )
     fi
   fi
 
@@ -2394,7 +2482,32 @@ cleanup_local_install_and_build_caches() {
 # Returns 0 if the git working tree has tracked or staged changes.
 git_worktree_dirty() {
   [[ "${SOURCE_MODE}" == "git" ]] || return 1
-  ! run_source_git_cmd_for_update "${REPO_ROOT}" diff --quiet || ! run_source_git_cmd_for_update "${REPO_ROOT}" diff --cached --quiet
+  local worktree_status=0
+  local staged_status=0
+
+  run_source_git_cmd_for_update "${REPO_ROOT}" diff --quiet
+  worktree_status=$?
+  if (( worktree_status > 1 )); then
+    if [[ -n "${SOURCE_GIT_USER_ERROR}" ]]; then
+      log_error "${SOURCE_GIT_USER_ERROR}"
+    else
+      log_error "Unable to inspect git worktree state for ${REPO_ROOT}."
+    fi
+    exit 1
+  fi
+
+  run_source_git_cmd_for_update "${REPO_ROOT}" diff --cached --quiet
+  staged_status=$?
+  if (( staged_status > 1 )); then
+    if [[ -n "${SOURCE_GIT_USER_ERROR}" ]]; then
+      log_error "${SOURCE_GIT_USER_ERROR}"
+    else
+      log_error "Unable to inspect staged git state for ${REPO_ROOT}."
+    fi
+    exit 1
+  fi
+
+  (( worktree_status != 0 || staged_status != 0 ))
 }
 
 git_source_has_unwritable_tracked_paths() {
@@ -2413,6 +2526,13 @@ git_source_has_unwritable_tracked_paths() {
 
 verify_git_source_access_for_update() {
   [[ "${SOURCE_MODE}" == "git" ]] || return 0
+
+  local configured_git_user=""
+  configured_git_user="$(resolve_source_git_user_for_update "${REPO_ROOT}" || true)"
+  if ! validate_source_git_user_for_update "${configured_git_user}"; then
+    log_error "${SOURCE_GIT_USER_ERROR}"
+    exit 1
+  fi
 
   local first_unwritable_path=""
   if first_unwritable_path="$(git_source_has_unwritable_tracked_paths)"; then
@@ -3197,6 +3317,7 @@ fi
 
 detect_previous_deploy_defaults_from_host
 auto_enable_bootstrap_defaults_from_update
+run_host_bootstrap_from_update || true
 
 if [[ "${DB_PUSH}" == true ]]; then
   SKIP_MIGRATE=true
@@ -3245,7 +3366,7 @@ if [[ "${SKIP_DEPLOY}" == true ]]; then
   if [[ "${INSTALL_CRON_IF_NEEDED}" == true ]]; then
     log_warn "--install-cron is deprecated: systemd timers are now used instead."
     log_warn "The cron/crond package is no longer required for scheduled jobs."
-    log_warn "Use --install-cron-jobs to install systemd timers (default behavior)."
+    log_warn "Use --install-cron-jobs to install LessonFlow systemd timers (default behavior)."
   fi
 
   if [[ "${INSTALL_APP_SERVICE_IF_NEEDED}" == true ]]; then

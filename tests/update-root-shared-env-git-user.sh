@@ -4,16 +4,6 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${REPO_ROOT}"
 
-if ! command -v sudo >/dev/null 2>&1; then
-  echo "SKIPPED: sudo is not installed, so the root-only update.sh path cannot be exercised here."
-  exit 0
-fi
-
-if ! sudo -n true >/dev/null 2>&1; then
-  echo "SKIPPED: passwordless sudo is unavailable, so the root-only update.sh path cannot be exercised here."
-  exit 0
-fi
-
 TEST_ROOT="$(mktemp -d)"
 trap 'rm -rf "${TEST_ROOT}"' EXIT
 
@@ -58,9 +48,35 @@ if [[ "$1" == "--" ]]; then
 fi
 exec "$@"
 EOF
+cat > "${FAKEBIN_DIR}/sudo" <<'EOF'
+#!/bin/bash
+set -euo pipefail
+if [[ "${1:-}" == "-n" ]]; then
+  shift
+fi
+if [[ "${1:-}" == "true" ]]; then
+  exit 0
+fi
+if [[ "${1:-}" == "-u" ]]; then
+  shift 2
+fi
+exec "$@"
+EOF
+cat > "${FAKEBIN_DIR}/getent" <<'EOF'
+#!/bin/bash
+set -euo pipefail
+if [[ "${1:-}" == "passwd" && "${2:-}" == "deploy-owner" ]]; then
+  printf 'deploy-owner:x:2001:2001::/home/deploy-owner:/bin/bash\n'
+  exit 0
+fi
+exec /usr/bin/getent "$@"
+EOF
 chmod +x "${FAKEBIN_DIR}/runuser"
+chmod +x "${FAKEBIN_DIR}/sudo"
+chmod +x "${FAKEBIN_DIR}/getent"
 
-sudo -n env \
+env \
+  LESSONFLOW_TEST_ASSUME_ROOT=1 \
   PATH="${FAKEBIN_DIR}:${PATH}" \
   RUNUSER_LOG="${RUNUSER_LOG}" \
   DEPLOY_DIR="${DEPLOY_TARGET_DIR}" \
@@ -73,14 +89,14 @@ if ! grep -Fq "Git update actions will run as deploy-owner" "${OUTPUT_LOG}"; the
   exit 1
 fi
 
-if ! grep -Fq "runuser -u deploy-owner -- git -C ${WORKTREE_DIR} fetch origin +refs/heads/main:refs/remotes/origin/main" "${RUNUSER_LOG}"; then
+if ! grep -Fq -- "-u deploy-owner -- git -C ${WORKTREE_DIR} fetch origin +refs/heads/main:refs/remotes/origin/main" "${RUNUSER_LOG}"; then
   echo "Expected root-run update.sh to fetch via runuser using UPDATES_DEPLOY_USER"
   cat "${OUTPUT_LOG}"
   cat "${RUNUSER_LOG}"
   exit 1
 fi
 
-if ! grep -Fq "runuser -u deploy-owner -- git -C ${WORKTREE_DIR} merge --ff-only origin/main" "${RUNUSER_LOG}"; then
+if ! grep -Fq -- "-u deploy-owner -- git -C ${WORKTREE_DIR} merge --ff-only origin/main" "${RUNUSER_LOG}"; then
   echo "Expected root-run update.sh to merge via runuser using UPDATES_DEPLOY_USER"
   cat "${OUTPUT_LOG}"
   cat "${RUNUSER_LOG}"

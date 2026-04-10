@@ -39,11 +39,11 @@ StandardError=journal
 SyslogIdentifier=lessonflow
 
 # Security hardening
-# ReadWritePaths re-opens only the app deploy tree because ProtectSystem=strict
-# would otherwise make the filesystem read-only for runtime uploads/log needs.
+# ReadWritePaths re-opens the app deploy tree and persistent git checkout used
+# by update.sh when git maintenance is pinned to the deploy user.
 NoNewPrivileges=false
-ProtectSystem=strict
-ProtectHome=true
+ProtectSystem=full
+ProtectHome=false
 ReadWritePaths=/var/www/lessonflow /opt/melbourne-guitar-school
 PrivateTmp=true
 

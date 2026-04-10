@@ -32,11 +32,10 @@ StandardError=journal
 SyslogIdentifier={{APP_NAME}}
 
 # Security hardening
-NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=true
-# Note: Add additional paths here if the app needs write access to a git repo for updates
-ReadWritePaths=/var/www/{{APP_NAME}}
+NoNewPrivileges=false
+ProtectSystem=full
+ProtectHome=false
+ReadWritePaths={{READ_WRITE_PATHS}}
 PrivateTmp=true
 
 # Resource limits

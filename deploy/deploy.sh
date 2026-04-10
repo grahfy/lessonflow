@@ -42,6 +42,7 @@ ORIGINAL_ARGS=( "$@" )
 
 # Configuration
 APP_NAME="lessonflow"
+RUNTIME_USER="www-data"
 DEPLOY_DIR="${DEPLOY_DIR:-/var/www/${APP_NAME}}"
 RELEASES_DIR="${DEPLOY_DIR}/releases"
 SHARED_DIR="${DEPLOY_DIR}/shared"
@@ -276,9 +277,13 @@ detect_tty_capabilities() {
 # width on very wide terminals. This lets the deploy menu adapt to SSH windows
 # and split panes without manually editing script constants.
 
+is_effective_root_for_deploy() {
+    [[ ${EUID} -eq 0 || "${LESSONFLOW_TEST_ASSUME_ROOT:-0}" == "1" ]]
+}
+
 # Run a command with sudo if we are not root and sudo is available.
 run_sudo_cmd() {
-    if [[ ${EUID} -eq 0 ]]; then
+    if is_effective_root_for_deploy; then
         "$@"
     elif [[ -n "${MGS_SUDO_PASSWORD:-}" ]]; then
         printf '%s\n' "$MGS_SUDO_PASSWORD" | sudo -S -p '' "$@"
@@ -293,7 +298,7 @@ run_sudo_cmd() {
 # relying on an interactive sudo prompt. Browser-triggered updates run without a
 # TTY, so they must degrade cleanly when root access is unavailable.
 has_privileged_swap_access() {
-    if [[ ${EUID} -eq 0 ]]; then
+    if is_effective_root_for_deploy; then
         return 0
     fi
 
@@ -319,7 +324,7 @@ resolve_source_git_user() {
         return 0
     fi
 
-    if [[ ${EUID} -ne 0 ]]; then
+    if ! is_effective_root_for_deploy; then
         return 1
     fi
 
@@ -335,6 +340,17 @@ resolve_source_git_user() {
     return 1
 }
 
+validate_source_git_user() {
+    local user_name="$1"
+
+    [[ -n "${user_name}" ]] || return 0
+    if ! getent passwd "${user_name}" >/dev/null 2>&1; then
+        log_error "Configured deploy user '${user_name}' does not exist or is invalid."
+        return 1
+    fi
+    return 0
+}
+
 run_source_git_cmd() {
     local repo_root="$1"
     shift
@@ -343,6 +359,7 @@ run_source_git_cmd() {
     local current_user=""
     source_git_user="$(resolve_source_git_user "${repo_root}" || true)"
     current_user="$(id -un 2>/dev/null || true)"
+    validate_source_git_user "${source_git_user}" || return 126
 
     if [[ -n "${source_git_user}" && "${source_git_user}" != "${current_user}" ]]; then
         if command -v runuser >/dev/null 2>&1; then
@@ -455,6 +472,63 @@ render_web_update_service_template() {
         -e "s/{{APP_NAME}}/${APP_NAME}/g" \
         -e "s/{{DEPLOY_USER}}/${deploy_user}/g" \
         "${template_path}" > "${output_path}"
+}
+
+render_app_service_template() {
+    local template_path="$1"
+    local output_path="$2"
+    local brand_name="${NEXT_PUBLIC_BRAND_NAME:-LessonFlow}"
+    local git_repo_path=""
+    local read_write_paths="/var/www/${APP_NAME}"
+    local shared_env_path="${SHARED_DIR}/.env"
+
+    if [[ -f "${shared_env_path}" ]]; then
+        git_repo_path="$(read_env_file_value "${shared_env_path}" "UPDATES_GIT_REPO_PATH" || true)"
+    fi
+    if [[ -z "${git_repo_path}" && "${SOURCE_MODE:-unknown}" == "git" ]]; then
+        git_repo_path="${SOURCE_DIR}"
+    fi
+    if [[ -n "${git_repo_path}" ]]; then
+        read_write_paths="${read_write_paths} ${git_repo_path}"
+    fi
+
+    sed -e "s/{{APP_NAME}}/${APP_NAME}/g" \
+        -e "s/{{BRAND_NAME}}/${brand_name}/g" \
+        -e "s#{{READ_WRITE_PATHS}}#${read_write_paths}#g" \
+        "${template_path}" > "${output_path}"
+}
+
+run_host_bootstrap() {
+    local env_template_path="$1"
+
+    if [[ "${AUTO_BOOTSTRAP}" != true ]]; then
+        return 0
+    fi
+
+    if [[ ! -x "${SCRIPT_DIR}/bootstrap-host.sh" ]]; then
+        log_warn "Host bootstrap helper not found or not executable: ${SCRIPT_DIR}/bootstrap-host.sh"
+        return 0
+    fi
+
+    section "Host Bootstrap"
+    APP_NAME="${APP_NAME}" \
+    RUNTIME_USER="${RUNTIME_USER}" \
+    DEPLOY_DIR="${DEPLOY_DIR}" \
+    SHARED_DIR="${SHARED_DIR}" \
+    REPO_ROOT="${SOURCE_DIR}" \
+    ENV_TEMPLATE_PATH="${env_template_path}" \
+    SOURCE_MODE="${SOURCE_MODE}" \
+    DEPLOY_SUDOERS_TEMPLATE="${SCRIPT_DIR}/sudoers.template" \
+    WEB_UPDATE_SUDOERS_TEMPLATE="${SCRIPT_DIR}/web-update-trigger.sudoers.template" \
+    run_step "Repairing host deploy wiring" "${SCRIPT_DIR}/bootstrap-host.sh"
+}
+
+validate_systemd_unit_file() {
+    local unit_path="$1"
+
+    if command -v systemd-analyze >/dev/null 2>&1; then
+        run_sudo_cmd systemd-analyze verify "${unit_path}" >/dev/null
+    fi
 }
 
 # Extracts all useful server_name tokens from an nginx site config. This is used
@@ -2020,8 +2094,6 @@ ensure_cron_installed_from_deploy() {
 install_app_systemd_service_from_deploy() {
     local service_file="/etc/systemd/system/${APP_NAME}.service"
     local service_source="${SCRIPT_DIR}/app.service.template"
-    local static_service_source="${SCRIPT_DIR}/${APP_NAME}.service"
-    local brand_name="${NEXT_PUBLIC_BRAND_NAME:-LessonFlow}"
 
     section "App Systemd Service Install"
 
@@ -2033,18 +2105,18 @@ install_app_systemd_service_from_deploy() {
 
     local tmp_service
     tmp_service="$(mktemp)"
-    if [[ -f "${static_service_source}" ]]; then
-        cp "${static_service_source}" "${tmp_service}"
-    else
-        if [[ ! -f "${service_source}" ]]; then
-            log_error "Service template not found: ${service_source}"
-            rm -f "${tmp_service}"
-            return 1
-        fi
+    if [[ ! -f "${service_source}" ]]; then
+        log_error "Service template not found: ${service_source}"
+        rm -f "${tmp_service}"
+        return 1
+    fi
 
-        sed -e "s/{{APP_NAME}}/${APP_NAME}/g" \
-            -e "s/{{BRAND_NAME}}/${brand_name}/g" \
-            "${service_source}" > "${tmp_service}"
+    render_app_service_template "${service_source}" "${tmp_service}"
+    if ! validate_systemd_unit_file "${tmp_service}"; then
+        log_error "Systemd unit validation failed for ${APP_NAME}.service"
+        log_error "Check service sandboxing and any override drop-ins under /etc/systemd/system/${APP_NAME}.service.d/"
+        rm -f "${tmp_service}"
+        return 1
     fi
 
     if [[ ! -f "${service_file}" ]] || ! cmp -s "${tmp_service}" "${service_file}"; then
@@ -2059,10 +2131,10 @@ install_app_systemd_service_from_deploy() {
     run_sudo_cmd systemctl enable "${APP_NAME}" >/dev/null 2>&1 || true
 
     if [[ -L "${CURRENT_LINK}" || -d "${CURRENT_LINK}" ]]; then
-        if run_sudo_cmd systemctl start "${APP_NAME}" >/dev/null 2>&1; then
+        if run_sudo_cmd systemctl restart "${APP_NAME}" >/dev/null 2>&1; then
             log_info "Systemd service ready: ${APP_NAME}"
         else
-            log_warn "Systemd service installed but not started (check current release/env): ${APP_NAME}"
+            log_warn "Systemd service installed but not started cleanly (check journalctl -u ${APP_NAME} and any override drop-ins)."
         fi
     else
         log_info "Current release not present yet; service installed/enabled but not started."
@@ -2081,9 +2153,7 @@ ensure_managed_cron_jobs_installed_from_deploy() {
 
     # Check if systemctl is available
     if ! command -v systemctl >/dev/null 2>&1; then
-        log_warn "systemctl not available; falling back to traditional cron"
-        install_or_update_managed_crontab_jobs
-        restart_cron_scheduler_if_present
+        log_warn "systemctl not available; skipping timer install because systemd timers are the supported scheduler path."
         return 0
     fi
 
@@ -2142,28 +2212,12 @@ auto_enable_bootstrap_defaults_deploy() {
         fi
     fi
 
-    if ! command -v crontab >/dev/null 2>&1; then
-        if [[ "${INSTALL_CRON_IF_NEEDED}" != true ]]; then
-            INSTALL_CRON_IF_NEEDED=true
-            changed=true
-            enabled_flags+=( "install-cron" )
-        fi
-    fi
-
     if command -v systemctl >/dev/null 2>&1; then
         if ! systemctl list-unit-files --type=service 2>/dev/null | grep -q "^${APP_NAME}\\.service"; then
             if [[ "${INSTALL_APP_SERVICE_IF_NEEDED}" != true ]]; then
                 INSTALL_APP_SERVICE_IF_NEEDED=true
                 changed=true
                 enabled_flags+=( "install-app-service" )
-            fi
-        fi
-
-        if ! cron_scheduler_service_name >/dev/null 2>&1; then
-            if [[ "${INSTALL_CRON_IF_NEEDED}" != true ]]; then
-                INSTALL_CRON_IF_NEEDED=true
-                changed=true
-                enabled_flags+=( "install-cron" )
             fi
         fi
     fi
@@ -3052,6 +3106,11 @@ install_systemd_timers_from_deploy() {
             log_info "Restarted timer: ${timer_name}.timer"
         else
             log_warn "Failed to restart timer: ${timer_name}.timer"
+        fi
+        if run_sudo_cmd systemctl is-enabled "${timer_name}.timer" >/dev/null 2>&1; then
+            log_info "Timer verified enabled: ${timer_name}.timer"
+        else
+            log_warn "Timer is not enabled after install: ${timer_name}.timer"
         fi
     done
 
@@ -4165,6 +4224,7 @@ log_info "Source directory: ${SOURCE_DIR}"
 log_info "Source mode: $(source_mode_label)"
 log_info "Source detail: ${SOURCE_MODE_DETAIL}"
 warn_if_archive_source_needs_permission_fix
+run_host_bootstrap "${SOURCE_DIR}/.env.example" || true
 
 # Track deployed git commit metadata so the admin UI can show "latest updates"
 # after a successful deploy. This is best-effort and skipped for non-git source
@@ -4204,7 +4264,7 @@ fi
 if [[ "${INSTALL_CRON_IF_NEEDED}" == true ]]; then
     log_warn "--install-cron is deprecated: systemd timers are now used instead."
     log_warn "The cron/crond package is no longer required for scheduled jobs."
-    log_warn "Use --install-cron-jobs to install systemd timers (default behavior)."
+    log_warn "Use --install-cron-jobs to install LessonFlow systemd timers (default behavior)."
 fi
 
 if [[ "${INSTALL_APP_SERVICE_IF_NEEDED}" == true ]]; then

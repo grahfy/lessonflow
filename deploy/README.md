@@ -300,8 +300,9 @@ GMAIL_REFRESH_TOKEN=""
 GMAIL_USER_EMAIL="admin@example.com"
 
 # Browser-triggered updates
+# These are auto-seeded by deploy/update bootstrap on first install or repair.
 UPDATES_GIT_REPO_PATH="/opt/melbourne-guitar-school"
-UPDATES_DEPLOY_USER="deploy"
+UPDATES_DEPLOY_USER="grahf"
 
 # Learning Materials Storage
 LEARNING_MATERIALS_STORAGE_DRIVER="local"
@@ -320,10 +321,7 @@ INVOICE_DEFAULT_TAX_MODE="gst_free"
 INVOICE_CREDIT_NOTE_PREFIX="MGSCN"
 ```
 
-```bash
-sudo chmod 600 /var/www/lessonflow/shared/.env
-sudo chown www-data:www-data /var/www/lessonflow/shared/.env
-```
+The first-install / repair bootstrap now creates `/var/www/lessonflow/shared/.env` from `.env.example`, fills the deploy/update keys above, and restores runtime ownership so `www-data` can keep saving settings.
 
 Runtime config saves from `/admin/settings` and `/api/setup/configure` persist to this shared env file, not to a timestamped release copy.
 
@@ -376,6 +374,7 @@ Notes:
 - The deploy script prunes old Node/npm temp files in `/tmp`, `/var/tmp`, and npm cache temp before builds to reduce ENOSPC failures.
 - Use `--no-spinner --no-color` for CI/log-only environments.
 - `deploy/update.sh` wraps `git fetch/pull` + `deploy.sh` for git checkouts, or runs a reduced deploy-only archive mode when the source tree has no `.git` directory.
+- First root-led deploy/update runs now repair host wiring automatically: shared env, deploy user, repo ownership, sudoers, app service, and systemd timers.
 - `deploy/deploy.sh --print-deploy-mode` reports whether the host is already using the supported release-directory layout or still looks legacy/in-place.
 - Both scripts now expose `Dependencies` and `Cron jobs sync` as first-class TUI main-menu options.
 - `deploy.sh` / `update.sh` self-update at startup via `git pull` (when applicable), show detailed commit changes, wait for a keypress in TTY mode, and restart back to the main menu if the script code changed.
@@ -383,36 +382,34 @@ Notes:
 - `deploy/deploy.sh` (and therefore `deploy/update.sh`) now re-syncs the repo Nginx site config on every deploy, runs `nginx -t`, and restarts Nginx after a successful deploy.
 - `deploy/deploy.sh` now writes deploy commit metadata to shared data so admins can view post-deploy commit notes in the in-app `Latest Updates` popup.
 - `deploy/deploy.sh` now auto-retries schema backup dumps with tablespace compatibility handling and only continues when a valid SQL dump file is produced.
-- Managed cron bootstrap now defers job installation until a runnable `current/deploy/cron.sh` exists, avoiding first-run "runner not found" noise.
+- Managed systemd timer bootstrap now defers installation until a runnable `current/deploy/cron.sh` exists, avoiding first-run "runner not found" noise.
 - Keep production Nginx changes in `deploy/nginx.conf` / `deploy/nginx-http.conf`; local edits under `/etc/nginx/sites-available/` will be overwritten by the next deploy/update.
 - Admin/student login endpoints are rate-limited strictly, but general `/admin` and `/api/admin` console traffic now uses a higher limit to avoid intermittent operator-facing `503` errors during normal use.
 
 ### 2. Install Systemd Service
 
-```bash
-sudo cp deploy/lessonflow.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable lessonflow
-sudo systemctl start lessonflow
-```
+`deploy.sh` / `update.sh` now install and validate the managed `lessonflow.service` unit automatically when app-service bootstrap is enabled or missing. The installed unit is rendered from `deploy/app.service.template` using the detected git checkout path so the service sandbox matches the host layout.
 
 ### 2b. Enable Browser-Triggered Updates
 
 The admin update button now starts a dedicated host-side systemd runner. It no longer accepts sudo credentials in the browser.
 
-```bash
-# Allow the runtime user to start the dedicated web-update service
-sudo cp deploy/web-update-trigger.sudoers.template /etc/sudoers.d/lessonflow-web-update
-sudo sed -i 's/<APP_RUNTIME_USER>/www-data/g' /etc/sudoers.d/lessonflow-web-update
-sudo chmod 0440 /etc/sudoers.d/lessonflow-web-update
-
-# Run a deploy/update after setting UPDATES_DEPLOY_USER in shared/.env
-# so deploy.sh installs /etc/systemd/system/lessonflow-web-update.service
-./deploy/update.sh --branch main
-```
+The first-install / repair bootstrap now installs the required sudoers files automatically:
+- the deploy-user sudoers policy for host-side deploy actions
+- the `lessonflow-web-update` trigger sudoers policy for `www-data`
 
 The dedicated runner now starts as a root-owned systemd unit so low-memory deploy safeguards, swap management, and service restarts still work during browser-triggered updates.
 Git fetch/merge operations are pinned to `UPDATES_DEPLOY_USER` so the persistent source checkout does not drift into root-owned state. Manual root-shell runs of `./deploy/update.sh` now honor the same shared-env setting.
+
+### 2c. Scheduled Jobs Use Systemd Timers
+
+LessonFlow uses systemd timers, not cron/crond, as the supported scheduler path in production. Deploy/update bootstrap installs and enables the timer/service pairs automatically when `systemctl` is available.
+
+Check the timer suite with:
+
+```bash
+sudo systemctl list-timers --all | grep lessonflow
+```
 
 ### 3. Install Nginx Configuration
 

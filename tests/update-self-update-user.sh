@@ -43,7 +43,17 @@ if [[ "$1" == "--" ]]; then
 fi
 exec "$@"
 EOF
+cat > "${FAKEBIN_DIR}/getent" <<'EOF'
+#!/bin/bash
+set -euo pipefail
+if [[ "${1:-}" == "passwd" && "${2:-}" == "deploy-owner" ]]; then
+  printf 'deploy-owner:x:2001:2001::/home/deploy-owner:/bin/bash\n'
+  exit 0
+fi
+exec /usr/bin/getent "$@"
+EOF
 chmod +x "${FAKEBIN_DIR}/runuser"
+chmod +x "${FAKEBIN_DIR}/getent"
 
 (
   cd "${WORKTREE_DIR}"
