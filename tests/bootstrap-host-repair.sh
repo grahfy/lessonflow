@@ -29,6 +29,7 @@ UPDATES_DEPLOY_USER=""
 EOF
 cat > "${DEPLOY_TARGET_DIR}/shared/.env" <<'EOF'
 UPDATES_DEPLOY_USER="deploy"
+UPDATES_GIT_REPO_PATH="/opt/lessonflow"
 EOF
 
 (
@@ -120,7 +121,7 @@ if ! grep -Fq 'UPDATES_DEPLOY_USER="deploy"' "${DEPLOY_TARGET_DIR}/shared/.env";
 fi
 
 if ! grep -Fq "UPDATES_GIT_REPO_PATH=\"${WORKTREE_DIR}\"" "${DEPLOY_TARGET_DIR}/shared/.env"; then
-  echo "Expected shared env to seed repo path"
+  echo "Expected bootstrap to rewrite the shared env repo path to the current checkout"
   cat "${OUTPUT_LOG}"
   cat "${DEPLOY_TARGET_DIR}/shared/.env"
   exit 1

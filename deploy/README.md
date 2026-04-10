@@ -301,7 +301,7 @@ GMAIL_USER_EMAIL="admin@example.com"
 
 # Browser-triggered updates
 # These are auto-seeded by deploy/update bootstrap on first install or repair.
-UPDATES_GIT_REPO_PATH="/opt/melbourne-guitar-school"
+UPDATES_GIT_REPO_PATH="/opt/lessonflow"
 UPDATES_DEPLOY_USER="grahf"
 
 # Learning Materials Storage
@@ -374,7 +374,7 @@ Notes:
 - The deploy script prunes old Node/npm temp files in `/tmp`, `/var/tmp`, and npm cache temp before builds to reduce ENOSPC failures.
 - Use `--no-spinner --no-color` for CI/log-only environments.
 - `deploy/update.sh` wraps `git fetch/pull` + `deploy.sh` for git checkouts, or runs a reduced deploy-only archive mode when the source tree has no `.git` directory.
-- First root-led deploy/update runs now repair host wiring automatically: shared env, deploy user, repo ownership, sudoers, app service, and systemd timers.
+- First root-led deploy/update runs now repair host wiring automatically: shared env, deploy user, repo ownership, sudoers, app service, and systemd timers. When run from a valid git checkout, bootstrap adopts that current checkout as `UPDATES_GIT_REPO_PATH`.
 - `deploy/deploy.sh --print-deploy-mode` reports whether the host is already using the supported release-directory layout or still looks legacy/in-place.
 - Both scripts now expose `Dependencies` and `Cron jobs sync` as first-class TUI main-menu options.
 - `deploy.sh` / `update.sh` self-update at startup via `git pull` (when applicable), show detailed commit changes, wait for a keypress in TTY mode, and restart back to the main menu if the script code changed.

@@ -177,7 +177,10 @@ main() {
     desired_repo_path="$(read_env_value "${shared_env_path}" "UPDATES_GIT_REPO_PATH" || true)"
   fi
 
-  if [[ -z "${desired_repo_path}" && -n "${REPO_ROOT}" && -d "${REPO_ROOT}" ]]; then
+  if [[ "${SOURCE_MODE}" == "git" && -n "${REPO_ROOT}" && -d "${REPO_ROOT}/.git" ]]; then
+    desired_repo_path="${REPO_ROOT}"
+    log_info "Adopting current checkout as persistent git repo: ${desired_repo_path}"
+  elif [[ -z "${desired_repo_path}" && -n "${REPO_ROOT}" && -d "${REPO_ROOT}" ]]; then
     desired_repo_path="${REPO_ROOT}"
   fi
 
