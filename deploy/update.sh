@@ -1362,6 +1362,7 @@ install_app_systemd_service_from_update() {
   local service_file="/etc/systemd/system/${APP_NAME}.service"
   local service_source="${SCRIPT_DIR}/app.service.template"
   local tmp_service=""
+  local tmp_service_dir=""
 
   section "App Systemd Service Install"
 
@@ -1375,33 +1376,34 @@ install_app_systemd_service_from_update() {
     return 1
   fi
 
-  tmp_service="$(mktemp)"
+  tmp_service_dir="$(mktemp -d)"
+  tmp_service="${tmp_service_dir}/${APP_NAME}.service"
   render_app_service_template_from_update "${service_source}" "${tmp_service}"
   if ! validate_systemd_unit_file_from_update "${tmp_service}"; then
     log_error "Systemd unit validation failed for ${APP_NAME}.service"
     log_error "Check service sandboxing and any override drop-ins under /etc/systemd/system/${APP_NAME}.service.d/"
-    rm -f "${tmp_service}"
+    rm -rf "${tmp_service_dir}"
     return 1
   fi
 
   if [[ ! -f "${service_file}" ]]; then
     log_info "Installing systemd service..."
     run_server_setup_cmd cp "${tmp_service}" "${service_file}" || {
-      rm -f "${tmp_service}"
+      rm -rf "${tmp_service_dir}"
       return 1
     }
     run_server_setup_cmd systemctl daemon-reload || return 1
   elif ! cmp -s "${tmp_service}" "${service_file}"; then
     log_info "Updating systemd service..."
     run_server_setup_cmd cp "${tmp_service}" "${service_file}" || {
-      rm -f "${tmp_service}"
+      rm -rf "${tmp_service_dir}"
       return 1
     }
     run_server_setup_cmd systemctl daemon-reload || return 1
   else
     log_info "Systemd service already up to date"
   fi
-  rm -f "${tmp_service}"
+  rm -rf "${tmp_service_dir}"
 
   run_server_setup_cmd systemctl enable "${APP_NAME}" >/dev/null 2>&1 || true
 

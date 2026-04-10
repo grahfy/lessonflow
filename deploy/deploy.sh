@@ -2094,6 +2094,7 @@ ensure_cron_installed_from_deploy() {
 install_app_systemd_service_from_deploy() {
     local service_file="/etc/systemd/system/${APP_NAME}.service"
     local service_source="${SCRIPT_DIR}/app.service.template"
+    local tmp_service_dir=""
 
     section "App Systemd Service Install"
 
@@ -2104,10 +2105,11 @@ install_app_systemd_service_from_deploy() {
     fi
 
     local tmp_service
-    tmp_service="$(mktemp)"
+    tmp_service_dir="$(mktemp -d)"
+    tmp_service="${tmp_service_dir}/${APP_NAME}.service"
     if [[ ! -f "${service_source}" ]]; then
         log_error "Service template not found: ${service_source}"
-        rm -f "${tmp_service}"
+        rm -rf "${tmp_service_dir}"
         return 1
     fi
 
@@ -2115,7 +2117,7 @@ install_app_systemd_service_from_deploy() {
     if ! validate_systemd_unit_file "${tmp_service}"; then
         log_error "Systemd unit validation failed for ${APP_NAME}.service"
         log_error "Check service sandboxing and any override drop-ins under /etc/systemd/system/${APP_NAME}.service.d/"
-        rm -f "${tmp_service}"
+        rm -rf "${tmp_service_dir}"
         return 1
     fi
 
@@ -2126,7 +2128,7 @@ install_app_systemd_service_from_deploy() {
     else
         log_info "Systemd service already up to date"
     fi
-    rm -f "${tmp_service}"
+    rm -rf "${tmp_service_dir}"
 
     run_sudo_cmd systemctl enable "${APP_NAME}" >/dev/null 2>&1 || true
 
@@ -4231,7 +4233,7 @@ run_host_bootstrap "${SOURCE_DIR}/.env.example" || true
 # deployments.
 if [[ "${SOURCE_MODE}" == "git" ]]; then
     DEPLOY_GIT_REPO_ROOT="${SOURCE_DIR}"
-    DEPLOY_TARGET_COMMIT_HASH="$(git -C "${SOURCE_DIR}" rev-parse "${BRANCH}" 2>/dev/null || true)"
+    DEPLOY_TARGET_COMMIT_HASH="$(run_source_git_cmd "${SOURCE_DIR}" rev-parse "${BRANCH}" 2>/dev/null || true)"
     if [[ -L "${CURRENT_LINK}" && -f "${CURRENT_LINK}/.deploy-version" ]]; then
         DEPLOY_PREVIOUS_COMMIT_HASH="$(tr -d '[:space:]' < "${CURRENT_LINK}/.deploy-version" 2>/dev/null || true)"
     fi
@@ -4296,7 +4298,7 @@ log_info "Created release directory: ${NEW_RELEASE_DIR}"
 # Clone/copy repository from the resolved source dir (not the caller's cwd).
 if [[ "${SOURCE_MODE}" == "git" ]]; then
     # Running from git repository
-    git -C "${SOURCE_DIR}" archive --format=tar "${BRANCH}" | tar -x -C "${NEW_RELEASE_DIR}"
+    run_source_git_cmd "${SOURCE_DIR}" archive --format=tar "${BRANCH}" | tar -x -C "${NEW_RELEASE_DIR}"
 else
     # Copy current directory
     rsync -a --exclude='node_modules' --exclude='.next' --exclude='.git' \
