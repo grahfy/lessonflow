@@ -531,13 +531,23 @@ validate_systemd_unit_file() {
     fi
 }
 
+app_systemd_dir() {
+    printf '%s\n' "${LESSONFLOW_SYSTEMD_DIR:-/etc/systemd/system}"
+}
+
 show_app_service_failure_diagnostics() {
+    local status_output="${1:-}"
+
     if ! command -v systemctl >/dev/null 2>&1; then
         return 0
     fi
 
     log_warn "lessonflow.service status:"
-    run_sudo_cmd systemctl status "${APP_NAME}" --no-pager || true
+    if [[ -n "${status_output}" ]]; then
+        printf '%s\n' "${status_output}"
+    else
+        run_sudo_cmd systemctl status "${APP_NAME}" --no-pager || true
+    fi
 
     if command -v journalctl >/dev/null 2>&1; then
         log_warn "Recent lessonflow.service logs:"
@@ -546,6 +556,36 @@ show_app_service_failure_diagnostics() {
 
     log_warn "Effective lessonflow.service unit:"
     run_sudo_cmd systemctl cat "${APP_NAME}" || true
+}
+
+try_auto_repair_app_service_namespace_failure() {
+    local status_output="$1"
+    local systemd_dir=""
+    local override_dir=""
+    local override_file=""
+    local disabled_file=""
+
+    [[ "${status_output}" == *"226/NAMESPACE"* ]] || return 1
+    systemd_dir="$(app_systemd_dir)"
+    override_dir="${systemd_dir}/${APP_NAME}.service.d"
+    override_file="${override_dir}/override.conf"
+    [[ -f "${override_file}" ]] || return 1
+
+    disabled_file="${override_file}.disabled"
+    if [[ -e "${disabled_file}" ]]; then
+        disabled_file="${override_file}.disabled.$(date +%s)"
+    fi
+
+    log_warn "Detected lessonflow.service namespace failure with override.conf; disabling ${override_file} and retrying."
+    run_sudo_cmd mv "${override_file}" "${disabled_file}" || return 1
+    run_sudo_cmd systemctl daemon-reload || return 1
+
+    if run_sudo_cmd systemctl restart "${APP_NAME}" >/dev/null 2>&1; then
+        log_info "lessonflow.service recovered after disabling override.conf"
+        return 0
+    fi
+
+    return 1
 }
 
 # Extracts all useful server_name tokens from an nginx site config. This is used
@@ -2109,7 +2149,7 @@ ensure_cron_installed_from_deploy() {
 # Installs or updates the app's systemd unit using the repository template in
 # deploy/. This allows first-time server bootstrap before a full deploy.
 install_app_systemd_service_from_deploy() {
-    local service_file="/etc/systemd/system/${APP_NAME}.service"
+    local service_file="$(app_systemd_dir)/${APP_NAME}.service"
     local service_source="${SCRIPT_DIR}/app.service.template"
     local tmp_service_dir=""
 
@@ -2153,8 +2193,14 @@ install_app_systemd_service_from_deploy() {
         if run_sudo_cmd systemctl restart "${APP_NAME}" >/dev/null 2>&1; then
             log_info "Systemd service ready: ${APP_NAME}"
         else
+            local status_output=""
+            status_output="$(run_sudo_cmd systemctl status "${APP_NAME}" --no-pager 2>&1 || true)"
+            if try_auto_repair_app_service_namespace_failure "${status_output}"; then
+                log_info "Systemd service ready: ${APP_NAME}"
+                return 0
+            fi
             log_warn "Systemd service installed but not started cleanly (check journalctl -u ${APP_NAME} and any override drop-ins)."
-            show_app_service_failure_diagnostics
+            show_app_service_failure_diagnostics "${status_output}"
         fi
     else
         log_info "Current release not present yet; service installed/enabled but not started."

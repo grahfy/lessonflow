@@ -1356,13 +1356,23 @@ validate_systemd_unit_file_from_update() {
   fi
 }
 
+app_systemd_dir_from_update() {
+  printf '%s\n' "${LESSONFLOW_SYSTEMD_DIR:-/etc/systemd/system}"
+}
+
 show_app_service_failure_diagnostics_from_update() {
+  local status_output="${1:-}"
+
   if ! command -v systemctl >/dev/null 2>&1; then
     return 0
   fi
 
   log_warn "lessonflow.service status:"
-  run_server_setup_cmd systemctl status "${APP_NAME}" --no-pager || true
+  if [[ -n "${status_output}" ]]; then
+    printf '%s\n' "${status_output}"
+  else
+    run_server_setup_cmd systemctl status "${APP_NAME}" --no-pager || true
+  fi
 
   if command -v journalctl >/dev/null 2>&1; then
     log_warn "Recent lessonflow.service logs:"
@@ -1373,10 +1383,40 @@ show_app_service_failure_diagnostics_from_update() {
   run_server_setup_cmd systemctl cat "${APP_NAME}" || true
 }
 
+try_auto_repair_app_service_namespace_failure_from_update() {
+  local status_output="$1"
+  local systemd_dir=""
+  local override_dir=""
+  local override_file=""
+  local disabled_file=""
+
+  [[ "${status_output}" == *"226/NAMESPACE"* ]] || return 1
+  systemd_dir="$(app_systemd_dir_from_update)"
+  override_dir="${systemd_dir}/${APP_NAME}.service.d"
+  override_file="${override_dir}/override.conf"
+  [[ -f "${override_file}" ]] || return 1
+
+  disabled_file="${override_file}.disabled"
+  if [[ -e "${disabled_file}" ]]; then
+    disabled_file="${override_file}.disabled.$(date +%s)"
+  fi
+
+  log_warn "Detected lessonflow.service namespace failure with override.conf; disabling ${override_file} and retrying."
+  run_server_setup_cmd mv "${override_file}" "${disabled_file}" || return 1
+  run_server_setup_cmd systemctl daemon-reload || return 1
+
+  if run_server_setup_cmd systemctl restart "${APP_NAME}" >/dev/null 2>&1; then
+    log_info "lessonflow.service recovered after disabling override.conf"
+    return 0
+  fi
+
+  return 1
+}
+
 # Installs or updates the app's systemd unit from deploy/<app>.service and
 # enables it. If a current release exists, the helper also attempts to start it.
 install_app_systemd_service_from_update() {
-  local service_file="/etc/systemd/system/${APP_NAME}.service"
+  local service_file="$(app_systemd_dir_from_update)/${APP_NAME}.service"
   local service_source="${SCRIPT_DIR}/app.service.template"
   local tmp_service=""
   local tmp_service_dir=""
@@ -1428,8 +1468,14 @@ install_app_systemd_service_from_update() {
     if run_server_setup_cmd systemctl restart "${APP_NAME}" >/dev/null 2>&1; then
       log_info "Systemd service ready: ${APP_NAME}"
     else
+      local status_output=""
+      status_output="$(run_server_setup_cmd systemctl status "${APP_NAME}" --no-pager 2>&1 || true)"
+      if try_auto_repair_app_service_namespace_failure_from_update "${status_output}"; then
+        log_info "Systemd service ready: ${APP_NAME}"
+        return 0
+      fi
       log_warn "Systemd service installed but not started cleanly (check journalctl -u ${APP_NAME} and any override drop-ins)."
-      show_app_service_failure_diagnostics_from_update
+      show_app_service_failure_diagnostics_from_update "${status_output}"
     fi
   else
     log_info "Current release not present yet; service installed/enabled but not started."
