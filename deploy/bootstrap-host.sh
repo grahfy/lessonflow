@@ -202,11 +202,11 @@ main() {
     log_info "Repairing repository ownership for ${desired_repo_path} -> ${deploy_user}"
     run_root_cmd chown -R "${deploy_user}:${deploy_user}" "${desired_repo_path}"
     
-    # Configure safe.directory for the deploy user to avoid dubious ownership errors
-    run_root_cmd runuser -u "${deploy_user}" -- git config --global --add safe.directory "${desired_repo_path}" 2>/dev/null || true
-    run_root_cmd sudo -u "${deploy_user}" git config --global --add safe.directory "${desired_repo_path}" 2>/dev/null || true
+    # Configure safe.directory as root (works for all users after ownership fix)
+    run_root_cmd git config --global --add safe.directory "${desired_repo_path}" 2>/dev/null || true
     
-    if ! run_as_user "${deploy_user}" git -C "${desired_repo_path}" status --short >/dev/null 2>&1; then
+    # Test git access as deploy user (using runuser which doesn't need sudo password)
+    if ! run_root_cmd runuser -u "${deploy_user}" -m -- git -C "${desired_repo_path}" status --short >/dev/null 2>&1; then
       log_error "Unable to run git as deploy user '${deploy_user}' in ${desired_repo_path}."
       return 1
     fi
