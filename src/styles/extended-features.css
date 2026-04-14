@@ -3529,7 +3529,7 @@
 
 .analytics-period-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -3555,6 +3555,9 @@
 }
 
 /* Per-period accent colors on top bar */
+.analytics-period-card.accent-lime::before {
+  background: linear-gradient(90deg, #84cc16, rgba(132, 204, 22, 0.3));
+}
 .analytics-period-card.accent-teal::before {
   background: linear-gradient(90deg, #2dd4bf, rgba(45, 212, 191, 0.3));
 }
@@ -3569,6 +3572,11 @@
 }
 
 /* Subtle radial glow matching the accent */
+.analytics-period-card.accent-lime {
+  background:
+    radial-gradient(120% 120% at 20% 10%, rgba(132, 204, 22, 0.08), transparent 56%),
+    linear-gradient(155deg, rgba(8, 22, 32, 0.94), rgba(12, 28, 38, 0.82));
+}
 .analytics-period-card.accent-teal {
   background:
     radial-gradient(120% 120% at 20% 10%, rgba(45, 212, 191, 0.08), transparent 56%),

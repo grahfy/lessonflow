@@ -1,10 +1,10 @@
-# LessonFlow - Analytics Daily Rollup Service
+# LessonFlow - Analytics Rollup Service
 # Install: sudo cp deploy/lessonflow-analytics-rollup.service /etc/systemd/system/
 # Enable:  sudo systemctl enable lessonflow-analytics-rollup
 # Start:   sudo systemctl start lessonflow-analytics-rollup
 
 [Unit]
-Description=LessonFlow Analytics Daily Rollup
+Description=LessonFlow Analytics Rollup
 Documentation=https://gitlab.com/grahfmusic/lessonflow
 After=network.target lessonflow.service
 Wants=lessonflow.service

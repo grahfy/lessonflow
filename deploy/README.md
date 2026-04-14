@@ -538,6 +538,8 @@ LessonFlow uses **systemd timers** for scheduled jobs (preferred over cron for p
 | `lessonflow-admin-reports-monthly.timer` | `lessonflow-admin-reports-monthly.service` | 1st of month at 8:15 AM | Monthly admin reports |
 | `lessonflow-admin-reports-yearly.timer` | `lessonflow-admin-reports-yearly.service` | January 1st at 8:30 AM | Yearly admin reports |
 | `lessonflow-gmail-sync.timer` | `lessonflow-gmail-sync.service` | Every 2 minutes | Gmail synchronization |
+| `lessonflow-analytics-rollup.timer` | `lessonflow-analytics-rollup.service` | Hourly | Analytics rollup |
+| `lessonflow-analytics-purge.timer` | `lessonflow-analytics-purge.service` | Sunday at 3:00 AM | Analytics raw-event purge |
 
 All times are in server timezone (UTC 20:00 = 6:00 PM AEDT).
 
@@ -618,6 +620,12 @@ Managed cron entries (legacy fallback):
 
 # Gmail sync every 2 minutes
 */2 * * * * /var/www/lessonflow/current/deploy/cron.sh gmail-sync
+
+# Analytics rollup every hour
+0 * * * * /var/www/lessonflow/current/deploy/cron.sh analytics-rollup
+
+# Analytics raw-event purge every Sunday at 3:00 AM
+0 3 * * 0 /var/www/lessonflow/current/deploy/cron.sh analytics-purge
 ```
 
 **Note:** The deploy script automatically installs systemd timers by default. Traditional cron is only used as a fallback when systemd is not available.

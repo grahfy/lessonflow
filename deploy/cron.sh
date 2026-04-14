@@ -14,6 +14,8 @@
 #   15 8 1 * * /var/www/lessonflow/current/deploy/cron.sh admin-reports-monthly
 #   30 8 1 1 * /var/www/lessonflow/current/deploy/cron.sh admin-reports-yearly
 #   0 2 * * * /var/www/lessonflow/current/deploy/cron.sh generate-sitemap
+#   0 * * * * /var/www/lessonflow/current/deploy/cron.sh analytics-rollup
+#   0 3 * * 0 /var/www/lessonflow/current/deploy/cron.sh analytics-purge
 # =============================================================================
 
 set -euo pipefail

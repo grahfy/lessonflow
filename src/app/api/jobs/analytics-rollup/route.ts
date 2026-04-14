@@ -1,8 +1,8 @@
 /**
- * Scheduled Job: Analytics Daily Rollup
+ * Scheduled Job: Analytics Rollup
  *
  * Aggregates the previous day's raw PageView records into pre-computed
- * PageViewDaily summary rows. Designed to run daily at ~02:00 via
+ * PageViewDaily summary rows. Designed to run hourly via
  * systemd timer hitting this endpoint with the x-cron-secret header.
  *
  * DESIGN RATIONALE:

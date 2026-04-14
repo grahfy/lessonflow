@@ -7,7 +7,7 @@
  * and parallel query execution via Promise.all.
  *
  * DESIGN RATIONALE:
- * 1. Dual-Source Queries: Recent periods (daily/weekly) query the raw
+ * 1. Dual-Source Queries: Recent periods (hourly/daily/weekly) query the raw
  *    PageView table; longer periods (monthly/yearly) query the
  *    pre-aggregated PageViewDaily table for performance.
  * 2. Zero-Fill Bucketing: Every time bucket in a trend line has a data
@@ -20,15 +20,18 @@ import {
   eachDayOfInterval,
   eachMonthOfInterval,
   endOfDay,
+  endOfHour,
   endOfMonth,
   endOfWeek,
   endOfYear,
   format,
   startOfDay,
+  startOfHour,
   startOfMonth,
   startOfWeek,
   startOfYear,
   subDays,
+  subHours,
   subMonths,
   subWeeks,
   subYears
@@ -36,7 +39,7 @@ import {
 
 import { prisma } from "@/lib/db";
 
-export type AnalyticsPeriodKey = "daily" | "weekly" | "monthly" | "yearly";
+export type AnalyticsPeriodKey = "hourly" | "daily" | "weekly" | "monthly" | "yearly";
 
 export type AnalyticsTrendPoint = {
   key: string;
@@ -81,6 +84,22 @@ type PeriodBounds = {
 };
 
 function periodBounds(period: AnalyticsPeriodKey, now: Date): PeriodBounds {
+  if (period === "hourly") {
+    const start = startOfHour(now);
+    const end = endOfHour(now);
+    const previousStart = startOfHour(subHours(start, 1));
+    const previousEnd = endOfHour(previousStart);
+    return {
+      key: period,
+      label: `This hour (${format(start, "h a")})`,
+      start,
+      end,
+      previousLabel: `Previous hour (${format(previousStart, "h a")})`,
+      previousStart,
+      previousEnd
+    };
+  }
+
   if (period === "daily") {
     const start = startOfDay(now);
     const end = endOfDay(now);
@@ -179,9 +198,10 @@ async function buildPeriodSummary(bounds: PeriodBounds): Promise<PeriodSummary> 
 
 // --- Trend Bucketing ---
 
-type TrendGrain = "day" | "week" | "month" | "year";
+type TrendGrain = "hour" | "day" | "week" | "month" | "year";
 
 function bucketDateKey(date: Date, grain: TrendGrain): string {
+  if (grain === "hour") return format(startOfHour(date), "yyyy-MM-dd-HH");
   if (grain === "day") return format(startOfDay(date), "yyyy-MM-dd");
   if (grain === "week") return format(startOfWeek(date, { weekStartsOn: 1 }), "yyyy-MM-dd");
   if (grain === "month") return format(startOfMonth(date), "yyyy-MM-01");
@@ -191,6 +211,17 @@ function bucketDateKey(date: Date, grain: TrendGrain): string {
 type TrendBucket = { key: string; label: string; start: Date; end: Date };
 
 function buildTrendBuckets(grain: TrendGrain, now: Date): TrendBucket[] {
+  if (grain === "hour") {
+    const currentHourStart = startOfHour(now);
+    const hours = Array.from({ length: 24 }, (_, i) => startOfHour(subHours(currentHourStart, 23 - i)));
+    return hours.map((hour) => ({
+      key: bucketDateKey(hour, "hour"),
+      label: format(hour, "ha"),
+      start: hour,
+      end: endOfHour(hour)
+    }));
+  }
+
   if (grain === "day") {
     const start = startOfDay(subDays(now, 13));
     const end = endOfDay(now);
@@ -323,10 +354,12 @@ export async function getAnalyticsDashboard(now: Date = new Date()): Promise<Ana
   const monthBounds = periodBounds("monthly", now);
 
   const [
+    hourlySummary,
     dailySummary,
     weeklySummary,
     monthlySummary,
     yearlySummary,
+    hourlyTrend,
     dailyTrend,
     weeklyTrend,
     monthlyTrend,
@@ -336,10 +369,12 @@ export async function getAnalyticsDashboard(now: Date = new Date()): Promise<Ana
     topCountries,
     deviceBreakdown
   ] = await Promise.all([
+    buildPeriodSummary(periodBounds("hourly", now)),
     buildPeriodSummary(periodBounds("daily", now)),
     buildPeriodSummary(periodBounds("weekly", now)),
     buildPeriodSummary(periodBounds("monthly", now)),
     buildPeriodSummary(periodBounds("yearly", now)),
+    buildViewsTrend("hour", now),
     buildViewsTrend("day", now),
     buildViewsTrend("week", now),
     buildViewsTrend("month", now),
@@ -353,12 +388,14 @@ export async function getAnalyticsDashboard(now: Date = new Date()): Promise<Ana
   return {
     generatedAt: now.toISOString(),
     periods: {
+      hourly: hourlySummary,
       daily: dailySummary,
       weekly: weeklySummary,
       monthly: monthlySummary,
       yearly: yearlySummary
     },
     trends: {
+      hourly: hourlyTrend,
       daily: dailyTrend,
       weekly: weeklyTrend,
       monthly: monthlyTrend,

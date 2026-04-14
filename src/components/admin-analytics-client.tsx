@@ -61,6 +61,7 @@ function deltaClass(value: number): string {
 }
 
 function periodTitle(key: AnalyticsPeriodKey): string {
+  if (key === "hourly") return "Hourly";
   if (key === "daily") return "Daily";
   if (key === "weekly") return "Weekly";
   if (key === "monthly") return "Monthly";
@@ -68,6 +69,7 @@ function periodTitle(key: AnalyticsPeriodKey): string {
 }
 
 function periodShortLabel(key: AnalyticsPeriodKey): string {
+  if (key === "hourly") return "This hour";
   if (key === "daily") return "Today";
   if (key === "weekly") return "This week";
   if (key === "monthly") return "This month";
@@ -75,6 +77,7 @@ function periodShortLabel(key: AnalyticsPeriodKey): string {
 }
 
 function trendTitle(key: AnalyticsPeriodKey): string {
+  if (key === "hourly") return "Hourly trend (last 24 hours)";
   if (key === "daily") return "Daily trend (last 14 days)";
   if (key === "weekly") return "Weekly trend (last 8 weeks)";
   if (key === "monthly") return "Monthly trend (last 12 months)";
@@ -311,6 +314,7 @@ function RankedBarList({ items, label }: { items: RankedItem[]; label: string })
 // --- Period Summary Card ---
 
 const PERIOD_ACCENT: Record<AnalyticsPeriodKey, string> = {
+  hourly: "accent-lime",
   daily: "accent-teal",
   weekly: "accent-cyan",
   monthly: "accent-violet",
@@ -411,8 +415,9 @@ export function AdminAnalyticsClient(): ReactElement {
             </div>
             <div className="admin-workspace-actions analytics-toolbar-actions">
               <div className="analytics-toolbar-controls">
-                <Tooltip content="Switch the trend chart between daily, weekly, monthly, and yearly views.">
+                <Tooltip content="Switch the trend chart between hourly, daily, weekly, monthly, and yearly views.">
                   <select value={activeTrend} onChange={(e) => setActiveTrend(e.target.value as AnalyticsPeriodKey)} className="analytics-toolbar-select">
+                    <option value="hourly">Hourly</option>
                     <option value="daily">Daily</option>
                     <option value="weekly">Weekly</option>
                     <option value="monthly">Monthly</option>
@@ -442,6 +447,7 @@ export function AdminAnalyticsClient(): ReactElement {
           <>
             {/* Period summary cards */}
             <div className="analytics-period-grid">
+              <PeriodCard period={dashboard.periods.hourly} />
               <PeriodCard period={dashboard.periods.daily} />
               <PeriodCard period={dashboard.periods.weekly} />
               <PeriodCard period={dashboard.periods.monthly} />

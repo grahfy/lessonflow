@@ -1620,6 +1620,8 @@ install_or_update_managed_crontab_jobs_from_update() {
     echo "15 8 1 * * ${cron_runner} admin-reports-monthly"
     echo "30 8 1 1 * ${cron_runner} admin-reports-yearly"
     echo "*/2 * * * * ${cron_runner} gmail-sync"
+    echo "0 * * * * ${cron_runner} analytics-rollup"
+    echo "0 3 * * 0 ${cron_runner} analytics-purge"
     printf '%s\n' "${end_marker}"
     echo
   } > "${tmp_file}"
