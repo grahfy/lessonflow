@@ -201,6 +201,15 @@ main() {
   if [[ -n "${desired_repo_path}" && -d "${desired_repo_path}/.git" ]]; then
     log_info "Repairing repository ownership for ${desired_repo_path} -> ${deploy_user}"
     run_root_cmd chown -R "${deploy_user}:${deploy_user}" "${desired_repo_path}"
+    
+    # Configure safe.directory for the deploy user to avoid dubious ownership errors
+    run_root_cmd runuser -u "${deploy_user}" -- git config --global --add safe.directory "${desired_repo_path}" 2>/dev/null || true
+    run_root_cmd sudo -u "${deploy_user}" git config --global --add safe.directory "${desired_repo_path}" 2>/dev/null || true
+    
+    if ! run_as_user "${deploy_user}" git -C "${desired_repo_path}" status --short >/dev/null 2>&1; then
+      log_error "Unable to run git as deploy user '${deploy_user}' in ${desired_repo_path}."
+      return 1
+    fi
   fi
 
   if [[ -f "${shared_env_path}" ]]; then
@@ -224,13 +233,6 @@ main() {
     render_sudoers_template "${WEB_UPDATE_SUDOERS_TEMPLATE}" "${tmp_sudoers}" "APP_RUNTIME_USER" "${RUNTIME_USER}"
     install_sudoers_file "${tmp_sudoers}" "${web_update_sudoers_target}"
     rm -f "${tmp_sudoers}"
-  fi
-
-  if [[ -n "${desired_repo_path}" && -d "${desired_repo_path}/.git" ]]; then
-    if ! run_as_user "${deploy_user}" git -C "${desired_repo_path}" status --short >/dev/null 2>&1; then
-      log_error "Unable to run git as deploy user '${deploy_user}' in ${desired_repo_path}."
-      return 1
-    fi
   fi
 
   log_info "Host bootstrap complete for deploy user ${deploy_user}"
