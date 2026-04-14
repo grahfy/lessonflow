@@ -1660,6 +1660,8 @@ install_systemd_timers_from_update() {
     "lessonflow-admin-reports-monthly"
     "lessonflow-admin-reports-yearly"
     "lessonflow-gmail-sync"
+    "lessonflow-analytics-rollup"
+    "lessonflow-analytics-purge"
   )
 
   # Copy service and timer unit files to systemd directory

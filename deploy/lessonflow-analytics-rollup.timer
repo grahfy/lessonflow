@@ -1,0 +1,19 @@
+# LessonFlow - Analytics Daily Rollup Timer
+# Install: sudo cp deploy/lessonflow-analytics-rollup.timer /etc/systemd/system/
+# Enable:  sudo systemctl enable lessonflow-analytics-rollup.timer
+# Status:  systemctl list-timers lessonflow-analytics-rollup.timer
+
+[Unit]
+Description=Run Analytics Daily Rollup at 2:00 AM daily
+Documentation=https://gitlab.com/grahfmusic/lessonflow
+
+[Timer]
+# Run daily at 2:00 AM to aggregate the previous day's raw page views
+OnCalendar=*-*-* 02:00:00
+# If the timer was missed (e.g., server was down), run it when the system comes back up
+Persistent=true
+# Add a small random delay to avoid thundering herd
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

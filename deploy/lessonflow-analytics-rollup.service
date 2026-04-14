@@ -1,0 +1,37 @@
+# LessonFlow - Analytics Daily Rollup Service
+# Install: sudo cp deploy/lessonflow-analytics-rollup.service /etc/systemd/system/
+# Enable:  sudo systemctl enable lessonflow-analytics-rollup
+# Start:   sudo systemctl start lessonflow-analytics-rollup
+
+[Unit]
+Description=LessonFlow Analytics Daily Rollup
+Documentation=https://gitlab.com/grahfmusic/lessonflow
+After=network.target lessonflow.service
+Wants=lessonflow.service
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/lessonflow/current
+
+# Load environment from shared .env
+EnvironmentFile=/var/www/lessonflow/shared/.env
+
+# Execute the cron runner script for analytics-rollup
+ExecStart=/var/www/lessonflow/current/deploy/cron.sh analytics-rollup
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lessonflow-analytics-rollup
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/lessonflow /var/log/lessonflow
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

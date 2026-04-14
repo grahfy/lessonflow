@@ -123,9 +123,15 @@ case "${JOB_TYPE}" in
     purge-logs)
         ENDPOINT="/api/jobs/purge-logs"
         ;;
+    analytics-rollup)
+        ENDPOINT="/api/jobs/analytics-rollup"
+        ;;
+    analytics-purge)
+        ENDPOINT="/api/jobs/analytics-purge"
+        ;;
     *)
         log "ERROR: Unknown job type: ${JOB_TYPE}"
-        echo "Usage: $0 {daily-bookings-digest|invoice-reminders|admin-reports-daily|admin-reports-weekly|admin-reports-monthly|admin-reports-yearly|generate-sitemap|gmail-sync|purge-logs}"
+        echo "Usage: $0 {daily-bookings-digest|invoice-reminders|admin-reports-daily|admin-reports-weekly|admin-reports-monthly|admin-reports-yearly|generate-sitemap|gmail-sync|purge-logs|analytics-rollup|analytics-purge}"
         exit 1
         ;;
 esac

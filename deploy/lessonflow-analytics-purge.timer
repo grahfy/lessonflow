@@ -1,0 +1,19 @@
+# LessonFlow - Analytics Data Purge Timer
+# Install: sudo cp deploy/lessonflow-analytics-purge.timer /etc/systemd/system/
+# Enable:  sudo systemctl enable lessonflow-analytics-purge.timer
+# Status:  systemctl list-timers lessonflow-analytics-purge.timer
+
+[Unit]
+Description=Run Analytics Data Purge weekly on Sunday at 3:00 AM
+Documentation=https://gitlab.com/grahfmusic/lessonflow
+
+[Timer]
+# Run weekly on Sunday at 3:00 AM to purge raw PageView records older than 90 days
+OnCalendar=Sun *-*-* 03:00:00
+# If the timer was missed (e.g., server was down), run it when the system comes back up
+Persistent=true
+# Add a small random delay to avoid thundering herd
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target
