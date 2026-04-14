@@ -6,7 +6,7 @@
 #
 # Options:
 #   --skip-migrate    Skip database migrations
-#   --skip-deps       Skip npm install
+#   --skip-deps       Skip npm install (Prisma may still bootstrap if needed)
 #   --skip-cron       Skip managed cron jobs sync
 #   --branch BRANCH   Git branch to deploy (default: main)
 #   --rollback        Rollback to previous release
@@ -144,7 +144,7 @@ Behavior:
 
 Options:
   --skip-migrate    Skip database migrations
-  --skip-deps       Skip npm install
+  --skip-deps       Skip npm install (Prisma may still bootstrap if needed)
   --skip-cron       Skip managed cron jobs sync
   --skip-pull       Skip internal git poll/update (self-update)
   --branch BRANCH   Git branch to deploy (default: main)
@@ -1925,6 +1925,18 @@ resolve_prisma_cli_install_spec() {
         echo "prisma@${configured_version}"
 }
 
+prisma_cli_is_available() {
+    if command -v prisma >/dev/null 2>&1; then
+        return 0
+    fi
+
+    if [[ -x "node_modules/.bin/prisma" ]]; then
+        return 0
+    fi
+
+    return 1
+}
+
 # Updates Prisma state: generates client and applies migrations or schema push.
 # Consolidates all Prisma ORM operations for deployment and manual maintenance.
 # Skips generation/migrations if no changes are detected since previous deploy.
@@ -1976,11 +1988,16 @@ update_prisma() {
         return 0
     fi
 
-    # Ensure Prisma CLI is available before trying to use it
-    if ! npm list prisma >/dev/null 2>&1 && [[ ! -d "node_modules/prisma" ]]; then
+    # Ensure Prisma CLI is available before trying to use it. We avoid the
+    # expensive `npm list` probe so the fast path stays cheap when skip-deps is
+    # requested and Prisma already exists on PATH or in the release tree.
+    if ! prisma_cli_is_available; then
         local prisma_cli_spec=""
         prisma_cli_spec="$(resolve_prisma_cli_install_spec)"
-        run_npm_step_with_cache_repair "Installing Prisma CLI (${prisma_cli_spec})" npm install --no-save --package-lock=false --ignore-scripts "${prisma_cli_spec}"
+        log_info "Prisma CLI missing; bootstrapping ${prisma_cli_spec} with the shared npm cache."
+        run_npm_step_with_cache_repair "Installing Prisma CLI (${prisma_cli_spec})" npm install --no-save --package-lock=false --ignore-scripts --prefer-offline --no-audit --no-fund "${prisma_cli_spec}"
+    else
+        log_info "Prisma CLI already available; skipping Prisma bootstrap."
     fi
 
     run_step "Generating Prisma client" npm exec --no -- prisma generate
@@ -2770,7 +2787,7 @@ print_deploy_tui_menu() {
     echo -e "${BOLD}${BLUE}  Main Options${NC}"
     print_tui_panel_rule "${DEPLOY_TUI_PANEL_WIDTH}"
     print_tui_option_pair "1" "Branch" "${BRANCH}" "Git branch to package into the release and deploy." \
-        "2" "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")" "ON runs npm install. OFF skips it (faster, riskier)."
+        "2" "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")" "ON runs npm install. OFF skips app deps; Prisma may still bootstrap."
     print_tui_option_pair "3" "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")" "ON syncs managed cron jobs. OFF skips cron sync." \
         "4" "Database mode" "$(deploy_migration_mode_label)" "Cycle DB mode: migrate / skip / prisma db push."
     print_tui_option_pair "5" "Package setup" "$(bool_word "${SETUP_PACKAGES}")" "Run setup-packages.sh before deploy (Node/Nginx/system)." \

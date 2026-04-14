@@ -14,7 +14,7 @@
 #   --remote REMOTE      Git remote to pull from (default: origin)
 #   --skip-pull          Skip git fetch/pull and run deploy only
 #   --skip-deploy        Skip deployment after updating git
-#   --skip-deps          Pass through to deploy.sh (skip npm install)
+#   --skip-deps          Pass through to deploy.sh (skip npm install; Prisma may still bootstrap if needed)
 #   --skip-cron          Pass through to deploy.sh (skip managed cron jobs sync)
 #   --skip-migrate       Pass through to deploy.sh (skip database migrations)
 #   --db-push            Pass through to deploy.sh (use prisma db push)
@@ -30,7 +30,7 @@
 #   --install-cron       Install cron/crond scheduler (if needed) and enable/start service
 #   --install-app-service  Install/update the app systemd unit and enable service
 #   --install-cron-jobs  Install/update managed cron jobs and restart cron (best effort)
-#   --seed-templates     Seed example lesson-plan templates if the library is empty
+#   --seed-templates     Deprecated; example lesson-plan templates are auto-seeded after deploy
 #   --no-auto-bootstrap  Disable automatic bootstrap detection for missing host setup
 #   --no-spinner         Disable spinner UI
 #   --no-color           Disable colored output
@@ -141,7 +141,7 @@ Options:
   --remote REMOTE      Git remote to pull from (default: origin)
   --skip-pull          Skip git fetch/pull and run deploy only
   --skip-deploy        Skip deployment after updating git
-  --skip-deps          Pass through to deploy.sh (skip npm install)
+  --skip-deps          Pass through to deploy.sh (skip npm install; Prisma may still bootstrap if needed)
   --skip-cron          Pass through to deploy.sh (skip managed cron jobs sync)
   --skip-migrate       Pass through to deploy.sh (skip database migrations)
   --db-push            Pass through to deploy.sh (use prisma db push)
@@ -157,7 +157,7 @@ Options:
   --install-cron       [DEPRECATED] Install cron/crond scheduler (systemd timers now used instead)
   --install-app-service  Install/update the app systemd unit and enable service
   --install-cron-jobs  Install/update systemd timer units for scheduled jobs (default: ON)
-  --seed-templates     Seed example lesson-plan templates if the library is empty
+  --seed-templates     Deprecated; example lesson-plan templates are auto-seeded after deploy
   --no-auto-bootstrap  Disable automatic bootstrap detection for missing host setup
   --no-spinner         Disable spinner UI
   --no-color           Disable colored output
@@ -2317,7 +2317,7 @@ print_update_tui_menu() {
     print_tui_panel_rule "${UPDATE_TUI_PANEL_WIDTH}"
     print_tui_option_pair "1" "Run deploy" "$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")" "ON deploys the current source tree; OFF only runs helper actions." \
       "2" "Sudo deploy mode" "$(update_sudo_mode_label)" "Cycle deploy invocation: auto / force sudo / no-sudo."
-    print_tui_option_pair "3" "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")" "ON runs npm install in deploy.sh. OFF passes --skip-deps." \
+    print_tui_option_pair "3" "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")" "ON runs npm install in deploy.sh. OFF skips app deps; Prisma may still bootstrap." \
       "4" "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")" "ON lets deploy.sh sync managed cron jobs."
     print_tui_option_pair "5" "Spinner UI" "$(spinner_ui_word)" "Animated progress spinner for deploy steps." \
       "6" "Edit shared .env" "Open editor" "Create shared .env if missing, then edit."
@@ -2345,7 +2345,7 @@ print_update_tui_menu() {
       "4" "Run deploy after pull" "$(bool_word "$(toggle_bool "${SKIP_DEPLOY}")")" "ON runs deploy.sh after update; OFF only updates repo."
     print_tui_option_pair "5" "Allow dirty worktree" "$(bool_word "${ALLOW_DIRTY}")" "ON allows update/deploy with local tracked changes." \
       "6" "Sudo deploy mode" "$(update_sudo_mode_label)" "Cycle deploy invocation: auto / force sudo / no-sudo."
-    print_tui_option_pair "7" "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")" "ON runs npm install in deploy.sh. OFF passes --skip-deps." \
+    print_tui_option_pair "7" "Dependencies" "$(bool_word "$(toggle_bool "${SKIP_DEPS}")")" "ON runs npm install in deploy.sh. OFF skips app deps; Prisma may still bootstrap." \
       "8" "Cron jobs sync" "$(bool_word "$(toggle_bool "${SKIP_CRON_SETUP}")")" "ON lets deploy.sh sync managed cron jobs."
     print_tui_option_pair "9" "Spinner UI" "$(spinner_ui_word)" "Animated progress spinner for update/deploy steps." \
       "10" "Edit shared .env" "Open editor" "Create shared .env if missing, then edit."
@@ -3282,8 +3282,9 @@ sync_manual_docs_into_current_standalone_from_update() {
   log_info "Manual docs synced to ${docs_dst}"
 }
 
-# Offers to seed example lesson-plan templates when the template library is empty.
-# Only prompts when running interactively in a TTY; non-interactive runs skip silently.
+# Automatically seeds the bundled example lesson-plan templates when the
+# template library is empty. The seed script is idempotent, so it can also be
+# re-run safely when templates already exist.
 maybe_seed_example_lesson_plan_templates() {
   local seed_repo_root="${CURRENT_LINK}"
   local shared_env_path="${SHARED_DIR}/.env"
@@ -3302,26 +3303,17 @@ maybe_seed_example_lesson_plan_templates() {
     return 0
   fi
 
-  seed_cmd="cd '${seed_repo_root}' && npx tsx scripts/seed-example-templates.ts"
-
-  local should_seed=false
-
-  if [[ "${SEED_EXAMPLE_TEMPLATES}" == true ]]; then
-    should_seed=true
-  elif [[ -t 0 ]]; then
-    if prompt_yes_no "Install example lesson-plan templates (if none exist)?" "y"; then
-      should_seed=true
-    else
-      log_info "Skipping example lesson-plan templates."
-    fi
+  if [[ ! -f "${seed_repo_root}/scripts/seed-example-templates.ts" ]]; then
+    log_warn "Example lesson-plan template seed script not found at ${seed_repo_root}/scripts/seed-example-templates.ts"
+    return 0
   fi
 
-  if [[ "${should_seed}" == true ]]; then
-    section "Lesson Plan Templates"
-    log_info "Seeding example lesson-plan templates..."
-    if ! run_deploy_path_cmd env DATABASE_URL="${seed_database_url}" bash -lc "${seed_cmd}"; then
-      log_warn "Example template seeding failed; continuing."
-    fi
+  seed_cmd="cd '${seed_repo_root}' && npx tsx scripts/seed-example-templates.ts"
+
+  section "Lesson Plan Templates"
+  log_info "Ensuring example lesson-plan templates are installed..."
+  if ! run_deploy_path_cmd env DATABASE_URL="${seed_database_url}" bash -lc "${seed_cmd}"; then
+    log_warn "Example template seeding failed; continuing."
   fi
 }
 

@@ -103,6 +103,8 @@ Notes:
 - The one-time migration helper now hands off to `deploy/update.sh` with automatic `git fetch/pull` (no `--skip-pull`) so the latest deploy logic is used.
 - Admins can confirm deployed commits in the app using the `Latest Updates` popup after login.
 - When the source tree has no `.git` directory, `update.sh` shows a reduced archive-source menu and `deploy.sh --print-deploy-mode` reports `Source mode: archive/copy`.
+- Example lesson-plan templates are now auto-seeded after deploy when the library is empty, so the post-deploy prompt is no longer needed.
+- `--skip-deps` skips the full app dependency install, but Prisma schema work can still bootstrap `prisma@7.7.0` when the CLI is missing so `prisma generate` / migrations can complete.
 - On current 2GB droplets, deploy builds use the low-memory Next.js profile, an auto heap override, and temporary swap when privileged swap access is available.
 - Deploys now reuse shared npm and Next.js build caches under `/var/www/lessonflow/shared/cache/` so repeated releases do not start from a fully cold install/build path.
 - If a stale temporary swap file cannot be removed, `deploy.sh` retries with a sibling swap filename instead of dropping swap management for that build.
