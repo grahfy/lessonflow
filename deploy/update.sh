@@ -6,7 +6,6 @@
 # source tree, then runs the deployment script. Designed for server-side source
 # directories such as a persistent git clone (for example ~/lessonflow) or an
 # extracted release archive managed outside /var/www/lessonflow.
-# [TEST COMMIT: 2026-03-11 v3 - additional fake commit]
 #
 # Usage: ./deploy/update.sh [options]
 #
@@ -121,6 +120,10 @@ BOLD='\033[1m'
 BLINK='\033[5m'
 DIM='\033[2m'
 NC='\033[0m'
+
+disable_color_output() {
+  RED='' GREEN='' YELLOW='' BLUE='' CYAN='' MAGENTA='' BOLD='' BLINK='' DIM='' NC=''
+}
 
 # Prints a concise usage block suitable for operators and automation logs.
 show_usage() {
@@ -253,7 +256,7 @@ detect_tty_capabilities() {
   fi
 
   if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then
-    RED='' GREEN='' YELLOW='' BLUE='' CYAN='' MAGENTA='' BOLD='' BLINK='' DIM='' NC=''
+    disable_color_output
   fi
 }
 
@@ -917,6 +920,8 @@ read_updates_deploy_user_from_shared_env_for_update() {
 }
 
 run_host_bootstrap_from_update() {
+  local env_template_path="${REPO_ROOT}/.env.example"
+
   if [[ "${AUTO_BOOTSTRAP}" != true ]]; then
     return 0
   fi
@@ -932,7 +937,7 @@ run_host_bootstrap_from_update() {
   DEPLOY_DIR="${DEPLOY_DIR}" \
   SHARED_DIR="${SHARED_DIR}" \
   REPO_ROOT="${REPO_ROOT}" \
-  ENV_TEMPLATE_PATH="${REPO_ROOT}/.env.example" \
+  ENV_TEMPLATE_PATH="${env_template_path}" \
   SOURCE_MODE="${SOURCE_MODE}" \
   DEPLOY_SUDOERS_TEMPLATE="${SCRIPT_DIR}/sudoers.template" \
   WEB_UPDATE_SUDOERS_TEMPLATE="${SCRIPT_DIR}/web-update-trigger.sudoers.template" \
@@ -951,6 +956,7 @@ shared_env_has_key_from_update() {
   local env_file="$1"
   local key="$2"
 
+  # shellcheck disable=SC2016
   run_shared_env_cmd env SHARED_ENV_PATH="${env_file}" SHARED_ENV_KEY="${key}" sh -c '
     pattern="^[[:space:]]*(export[[:space:]]+)?${SHARED_ENV_KEY}[[:space:]]*="
     grep -Eq "$pattern" "$SHARED_ENV_PATH" >/dev/null 2>&1
@@ -961,6 +967,7 @@ append_blank_env_key_from_update() {
   local env_file="$1"
   local key="$2"
 
+  # shellcheck disable=SC2016
   run_shared_env_cmd env SHARED_ENV_PATH="${env_file}" SHARED_ENV_KEY="${key}" sh -c '
     printf "%s\n" "${SHARED_ENV_KEY}=\"\"" >> "$SHARED_ENV_PATH"
   '
@@ -1254,12 +1261,11 @@ ensure_cron_installed_from_update() {
   local os_id=""
   local pkg_manager=""
   local cron_pkg=""
-  local existing_service_name=""
 
   section "Cron Scheduler Install"
 
   if command -v crontab >/dev/null 2>&1; then
-    if existing_service_name="$(cron_scheduler_service_name_from_update 2>/dev/null)"; then
+    if cron_scheduler_service_name_from_update >/dev/null 2>&1; then
       log_info "crontab already installed"
       ensure_cron_scheduler_running_enabled_from_update
       return 0
@@ -1353,11 +1359,12 @@ render_app_service_template_from_update() {
 }
 
 app_service_unit_needs_refresh_from_update() {
-  local service_file="$(app_systemd_dir_from_update)/${APP_NAME}.service"
+  local service_file=""
   local service_source="${SCRIPT_DIR}/app.service.template"
   local tmp_service_dir=""
   local tmp_service=""
 
+  service_file="$(app_systemd_dir_from_update)/${APP_NAME}.service"
   [[ -f "${service_file}" ]] || return 0
   [[ -f "${service_source}" ]] || return 1
 
@@ -1472,11 +1479,12 @@ try_auto_repair_app_service_namespace_failure_from_update() {
 # Installs or updates the app's systemd unit from deploy/<app>.service and
 # enables it. If a current release exists, the helper also attempts to start it.
 install_app_systemd_service_from_update() {
-  local service_file="$(app_systemd_dir_from_update)/${APP_NAME}.service"
+  local service_file=""
   local service_source="${SCRIPT_DIR}/app.service.template"
   local tmp_service=""
   local tmp_service_dir=""
 
+  service_file="$(app_systemd_dir_from_update)/${APP_NAME}.service"
   section "App Systemd Service Install"
 
   if ! command -v systemctl >/dev/null 2>&1; then
@@ -2243,6 +2251,11 @@ print_tui_remote_update_alert() {
   local local_part=""
 
   refresh_tui_remote_update_cache
+
+  if [[ "${TUI_REMOTE_UPDATE_STATUS}" == "error" && -n "${TUI_REMOTE_UPDATE_ERROR}" ]]; then
+    echo -e "  ${DIM}Remote check skipped: ${TUI_REMOTE_UPDATE_ERROR}${NC}"
+    return 0
+  fi
 
   [[ "${TUI_REMOTE_UPDATE_STATUS}" == "update-available" ]] || return 0
 
@@ -3356,12 +3369,23 @@ notify_updates() {
   log_info "Update notifications complete"
 }
 
+require_option_value() {
+  local option="$1"
+  local value="${2-}"
+
+  if [[ -z "${value}" || "${value}" == --* ]]; then
+    log_error "${option} requires a value."
+    show_usage
+    exit 1
+  fi
+}
+
 # Parse CLI arguments before interactive setup/validation.
 ARG_COUNT=$#
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --branch) BRANCH="$2"; shift 2 ;;
-    --remote) REMOTE_NAME="$2"; shift 2 ;;
+    --branch) require_option_value "$1" "${2-}"; BRANCH="$2"; shift 2 ;;
+    --remote) require_option_value "$1" "${2-}"; REMOTE_NAME="$2"; shift 2 ;;
     --skip-pull) SKIP_PULL=true; shift ;;
     --skip-deploy) SKIP_DEPLOY=true; shift ;;
     --skip-deps) SKIP_DEPS=true; shift ;;
@@ -3369,8 +3393,8 @@ while [[ $# -gt 0 ]]; do
     --skip-migrate) SKIP_MIGRATE=true; shift ;;
     --db-push) DB_PUSH=true; shift ;;
     --ssl) SSL_SETUP=true; CLI_SSL_FLAG_SET=true; shift ;;
-    --domain) SSL_DOMAIN="$2"; CLI_SSL_DOMAIN_SET=true; shift 2 ;;
-    --email) SSL_EMAIL="$2"; CLI_SSL_EMAIL_SET=true; shift 2 ;;
+    --domain) require_option_value "$1" "${2-}"; SSL_DOMAIN="$2"; CLI_SSL_DOMAIN_SET=true; shift 2 ;;
+    --email) require_option_value "$1" "${2-}"; SSL_EMAIL="$2"; CLI_SSL_EMAIL_SET=true; shift 2 ;;
     --allow-dirty) ALLOW_DIRTY=true; shift ;;
     --sudo-deploy) FORCE_SUDO_DEPLOY=true; shift ;;
     --no-sudo-deploy) FORCE_NO_SUDO_DEPLOY=true; shift ;;
@@ -3383,7 +3407,7 @@ while [[ $# -gt 0 ]]; do
     --seed-templates) SEED_EXAMPLE_TEMPLATES=true; shift ;;
     --no-auto-bootstrap) AUTO_BOOTSTRAP=false; shift ;;
     --no-spinner) NO_SPINNER=true; shift ;;
-    --no-color) NO_COLOR=true; shift ;;
+    --no-color) NO_COLOR=true; disable_color_output; shift ;;
     --help|-h) show_usage; exit 0 ;;
     *) log_error "Unknown argument: $1"; exit 1 ;;
   esac
@@ -3512,10 +3536,17 @@ if [[ "${SOURCE_MODE}" == "git" ]]; then
   announce_source_git_user_for_update "${REPO_ROOT}"
   verify_git_source_access_for_update
 
-  if [[ "${ALLOW_DIRTY}" != true ]] && git_worktree_dirty; then
-    log_error "Working tree is dirty. Commit/stash changes or rerun with --allow-dirty."
-    run_source_git_cmd_for_update "${REPO_ROOT}" status --short
-    exit 1
+  if git_worktree_dirty; then
+    if [[ "${ALLOW_DIRTY}" != true && "${SKIP_PULL}" == false ]]; then
+      log_error "Working tree is dirty. Commit/stash changes or rerun with --allow-dirty."
+      run_source_git_cmd_for_update "${REPO_ROOT}" status --short
+      exit 1
+    fi
+
+    if [[ "${SKIP_PULL}" == true && "${SKIP_DEPLOY}" == false ]]; then
+      log_warn "Working tree is dirty, but --skip-pull was requested."
+      log_warn "Git deploys use git archive for ${BRANCH}, so uncommitted changes will not be included."
+    fi
   fi
 
   if [[ "${SKIP_PULL}" == false ]]; then

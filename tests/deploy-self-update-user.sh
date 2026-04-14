@@ -45,6 +45,17 @@ exec "$@"
 EOF
 chmod +x "${FAKEBIN_DIR}/runuser"
 
+cat > "${FAKEBIN_DIR}/getent" <<'EOF'
+#!/bin/bash
+set -euo pipefail
+if [[ "${1:-}" == "passwd" && "${2:-}" == "deploy-owner" ]]; then
+  echo "deploy-owner:x:1001:1001:Deploy Owner:/tmp:/bin/bash"
+  exit 0
+fi
+exec /usr/bin/getent "$@"
+EOF
+chmod +x "${FAKEBIN_DIR}/getent"
+
 set +e
 (
   cd "${WORKTREE_DIR}"

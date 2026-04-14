@@ -126,6 +126,10 @@ BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m' # No Color
 
+disable_color_output() {
+    RED='' GREEN='' YELLOW='' BLUE='' CYAN='' MAGENTA='' BOLD='' DIM='' NC=''
+}
+
 # Helper functions
 # Print usage information for CLI and automation contexts.
 show_usage() {
@@ -269,7 +273,7 @@ detect_tty_capabilities() {
     fi
 
     if [[ "${NO_COLOR}" == true || ! -t 1 ]]; then
-        RED='' GREEN='' YELLOW='' BLUE='' CYAN='' MAGENTA='' BOLD='' DIM='' NC=''
+        disable_color_output
     fi
 }
 
@@ -503,11 +507,12 @@ render_app_service_template() {
 }
 
 app_service_unit_needs_refresh() {
-    local service_file="$(app_systemd_dir)/${APP_NAME}.service"
+    local service_file=""
     local service_source="${SCRIPT_DIR}/app.service.template"
     local tmp_service_dir=""
     local tmp_service=""
 
+    service_file="$(app_systemd_dir)/${APP_NAME}.service"
     [[ -f "${service_file}" ]] || return 0
     [[ -f "${service_source}" ]] || return 1
 
@@ -938,7 +943,7 @@ detect_previous_deploy_defaults_from_host() {
         SSL_DOMAIN="${NGINX_RENDER_CANONICAL_DOMAIN}"
     fi
 
-    if [[ -z "${SSL_EMAIL}" && -r "/etc/letsencrypt/cli.ini" ]]; then
+    if [[ "${CLI_SSL_EMAIL_SET}" != true && -z "${SSL_EMAIL}" && -r "/etc/letsencrypt/cli.ini" ]]; then
         SSL_EMAIL="$(awk -F'=' '
             /^[[:space:]]*email[[:space:]]*=/ {
                 v=$2
@@ -949,7 +954,7 @@ detect_previous_deploy_defaults_from_host() {
         ' /etc/letsencrypt/cli.ini 2>/dev/null || true)"
     fi
 
-    if [[ -z "${SSL_EMAIL}" ]]; then
+    if [[ "${CLI_SSL_EMAIL_SET}" != true && -z "${SSL_EMAIL}" ]]; then
         SSL_EMAIL="$(read_ssl_email_from_shared_env || true)"
     fi
 }
@@ -1307,6 +1312,34 @@ read_env_file_value() {
     fi
 
     printf '%s\n' "${value}"
+}
+
+export_env_file_assignments() {
+    local env_file="$1"
+    local line=""
+    local key=""
+    local value=""
+
+    if [[ ! -f "${env_file}" ]]; then
+        return 1
+    fi
+
+    while IFS= read -r line || [[ -n "${line}" ]]; do
+        key="$(extract_env_assignment_key "${line}")"
+        [[ -n "${key}" ]] || continue
+
+        value="${line#*=}"
+        value="${value#"${value%%[![:space:]]*}"}"
+        value="${value%"${value##*[![:space:]]}"}"
+
+        if [[ ${#value} -ge 2 && "${value:0:1}" == '"' && "${value: -1}" == '"' ]]; then
+            value="${value:1:${#value}-2}"
+        elif [[ ${#value} -ge 2 && "${value:0:1}" == "'" && "${value: -1}" == "'" ]]; then
+            value="${value:1:${#value}-2}"
+        fi
+
+        export "${key}=${value}"
+    done < "${env_file}"
 }
 
 # Parses a mysql:// DATABASE_URL into shell variables used for local bootstrap.
@@ -2131,12 +2164,11 @@ ensure_cron_installed_from_deploy() {
     local os_id=""
     local pkg_manager=""
     local cron_pkg=""
-    local existing_service_name=""
 
     section "Cron Scheduler Install"
 
     if command -v crontab >/dev/null 2>&1; then
-        if existing_service_name="$(cron_scheduler_service_name 2>/dev/null)"; then
+        if cron_scheduler_service_name >/dev/null 2>&1; then
             log_info "crontab already installed"
             ensure_cron_scheduler_running_enabled
             return 0
@@ -2205,10 +2237,11 @@ ensure_cron_installed_from_deploy() {
 # Installs or updates the app's systemd unit using the repository template in
 # deploy/. This allows first-time server bootstrap before a full deploy.
 install_app_systemd_service_from_deploy() {
-    local service_file="$(app_systemd_dir)/${APP_NAME}.service"
+    local service_file=""
     local service_source="${SCRIPT_DIR}/app.service.template"
     local tmp_service_dir=""
 
+    service_file="$(app_systemd_dir)/${APP_NAME}.service"
     section "App Systemd Service Install"
 
 
@@ -2659,7 +2692,7 @@ detect_deploy_mode() {
         return 0
     fi
 
-    latest_release="$(ls -1dt "${RELEASES_DIR}"/* 2>/dev/null | head -n 1 || true)"
+    latest_release="$(latest_release_path || true)"
     if [[ -n "${latest_release}" ]]; then
         DEPLOY_MODE="release-bootstrap"
         DEPLOY_MODE_DETAIL="Release directories exist; current will be linked or repaired during deploy."
@@ -3011,6 +3044,25 @@ current_release_name() {
     return 1
 }
 
+list_release_names_newest_first() {
+    if [[ ! -d "${RELEASES_DIR}" ]]; then
+        return 0
+    fi
+
+    find "${RELEASES_DIR}" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %f\n' 2>/dev/null \
+        | sort -rn \
+        | sed 's/^[^ ]* //'
+}
+
+latest_release_path() {
+    local latest_release=""
+
+    latest_release="$(list_release_names_newest_first | head -n 1)"
+    [[ -n "${latest_release}" ]] || return 1
+
+    printf '%s/%s\n' "${RELEASES_DIR}" "${latest_release}"
+}
+
 cleanup_old_releases() {
     if [[ ! -d "${RELEASES_DIR}" ]]; then
         return 0
@@ -3039,7 +3091,7 @@ cleanup_old_releases() {
         remove_path_with_sudo_fallback "${RELEASES_DIR:?}/${release}"
         removed=$((removed + 1))
         log_info "Removed old release: ${release}"
-    done < <(ls -1t "${RELEASES_DIR}" 2>/dev/null || true)
+    done < <(list_release_names_newest_first)
 
     if (( removed == 0 )); then
         log_info "No old releases removed"
@@ -3621,19 +3673,16 @@ cleanup_install_and_build_caches() {
 # build. Shared caches are preserved so future deploys can reuse them.
 cleanup_release_local_build_artifacts() {
     local removed=0
-    local path=""
+    local path="node_modules/.cache"
 
-    for path in \
-        "node_modules/.cache"
-    do
-        [[ -e "${path}" ]] || continue
-        remove_path_with_sudo_fallback "${path}" || {
+    if [[ -e "${path}" ]]; then
+        if ! remove_path_with_sudo_fallback "${path}"; then
             log_warn "Failed to remove release-local cache path: ${path}"
-            continue
-        }
+            return 0
+        fi
         removed=$((removed + 1))
         log_info "Removed release-local cache path: ${path}"
-    done
+    fi
 
     if (( removed == 0 )); then
         log_info "No release-local build artifacts removed"
@@ -3985,17 +4034,28 @@ cleanup_incomplete_release_on_exit() {
 
 trap cleanup_incomplete_release_on_exit EXIT
 
+require_option_value() {
+    local option="$1"
+    local value="${2-}"
+
+    if [[ -z "${value}" || "${value}" == --* ]]; then
+        log_error "${option} requires a value."
+        show_usage
+        exit 1
+    fi
+}
+
 # Parse arguments
 ARG_COUNT=$#
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --branch) BRANCH="$2"; shift 2 ;;
+        --branch) require_option_value "$1" "${2-}"; BRANCH="$2"; shift 2 ;;
         --ssl) SSL_SETUP=true; CLI_SSL_FLAG_SET=true; shift ;;
-        --domain) SSL_DOMAIN="$2"; CLI_SSL_DOMAIN_SET=true; shift 2 ;;
-        --email) SSL_EMAIL="$2"; CLI_SSL_EMAIL_SET=true; shift 2 ;;
+        --domain) require_option_value "$1" "${2-}"; SSL_DOMAIN="$2"; CLI_SSL_DOMAIN_SET=true; shift 2 ;;
+        --email) require_option_value "$1" "${2-}"; SSL_EMAIL="$2"; CLI_SSL_EMAIL_SET=true; shift 2 ;;
         --interactive) INTERACTIVE=true; shift ;;
         --no-spinner) NO_SPINNER=true; shift ;;
-        --no-color) NO_COLOR=true; shift ;;
+        --no-color) NO_COLOR=true; disable_color_output; shift ;;
         --skip-deps) SKIP_DEPS=true; shift ;;
         --skip-cron) SKIP_CRON_SETUP=true; shift ;;
         --skip-migrate) SKIP_MIGRATE=true; shift ;;
@@ -4081,12 +4141,15 @@ check_legacy_migration() {
     if [[ -f "${legacy_service_file}" && ! -f "${target_service_file}" ]]; then
         if [[ -f "${SCRIPT_DIR}/lessonflow.service" ]]; then
             log_info "Installing lessonflow service unit from deploy/lessonflow.service"
-            cp "${SCRIPT_DIR}/lessonflow.service" "${target_service_file}"
+            run_sudo_cmd cp "${SCRIPT_DIR}/lessonflow.service" "${target_service_file}"
         else
             log_info "Converting legacy service unit to lessonflow naming"
+            tmp_file="$(mktemp)"
             sed \
                 -e "s/melbourne-guitar-school/lessonflow/g" \
-                "${legacy_service_file}" > "${target_service_file}"
+                "${legacy_service_file}" > "${tmp_file}"
+            run_sudo_cmd cp "${tmp_file}" "${target_service_file}"
+            rm -f "${tmp_file}"
         fi
         if command -v systemctl >/dev/null 2>&1; then
             run_sudo_cmd systemctl daemon-reload >/dev/null 2>&1 || true
@@ -4095,25 +4158,28 @@ check_legacy_migration() {
 
     if [[ -f "${legacy_nginx_avail}" && ! -f "${target_nginx_avail}" ]]; then
         log_info "Converting nginx site ${legacy_name} -> ${APP_NAME}"
+        tmp_file="$(mktemp)"
         sed \
             -e "s/melbourne_guitar_school/lessonflow/g" \
             -e "s#/var/www/melbourne-guitar-school#/var/www/lessonflow#g" \
             -e "s/melbourne-guitar-school/lessonflow/g" \
-            "${legacy_nginx_avail}" > "${target_nginx_avail}"
+            "${legacy_nginx_avail}" > "${tmp_file}"
+        run_sudo_cmd cp "${tmp_file}" "${target_nginx_avail}"
+        rm -f "${tmp_file}"
     fi
 
     if [[ -f "${target_nginx_avail}" ]]; then
-        ln -sfn "${target_nginx_avail}" "${target_nginx_enabled}"
+        run_sudo_cmd ln -sfn "${target_nginx_avail}" "${target_nginx_enabled}"
     fi
 
     if [[ -L "${legacy_nginx_enabled}" ]]; then
         log_info "Removing legacy nginx symlink: ${legacy_nginx_enabled}"
-        rm -f "${legacy_nginx_enabled}"
+        run_sudo_cmd rm -f "${legacy_nginx_enabled}"
     fi
 
     if [[ -f "${legacy_nginx_avail}" ]]; then
         log_info "Removing legacy nginx site file: ${legacy_nginx_avail}"
-        rm -f "${legacy_nginx_avail}"
+        run_sudo_cmd rm -f "${legacy_nginx_avail}"
     fi
 
     if command -v crontab >/dev/null 2>&1; then
@@ -4132,7 +4198,7 @@ check_legacy_migration() {
     fi
 
     if [[ -f "${target_nginx_avail}" ]] && command -v nginx >/dev/null 2>&1; then
-        if ! nginx -t >/dev/null 2>&1; then
+        if ! run_sudo_cmd nginx -t >/dev/null 2>&1; then
             log_error "Nginx config test failed after legacy migration conversion."
             exit 1
         fi
@@ -4171,7 +4237,7 @@ repair_current_symlink_drift() {
                 return 0
             fi
 
-            latest_release="$(ls -1dt "${RELEASES_DIR}"/* 2>/dev/null | head -n 1 || true)"
+            latest_release="$(latest_release_path || true)"
             if [[ -n "${latest_release}" ]]; then
                 log_warn "Legacy symlink target missing. Relinking current to latest release: ${latest_release}"
                 ln -sfn "${latest_release}" "${current_link}"
@@ -4183,7 +4249,7 @@ repair_current_symlink_drift() {
         fi
 
         if [[ -z "${resolved_target}" ]]; then
-            latest_release="$(ls -1dt "${RELEASES_DIR}"/* 2>/dev/null | head -n 1 || true)"
+            latest_release="$(latest_release_path || true)"
             if [[ -n "${latest_release}" ]]; then
                 log_warn "Current symlink is broken; relinking to latest release: ${latest_release}"
                 ln -sfn "${latest_release}" "${current_link}"
@@ -4202,7 +4268,7 @@ repair_current_symlink_drift() {
         return 0
     fi
 
-    latest_release="$(ls -1dt "${RELEASES_DIR}"/* 2>/dev/null | head -n 1 || true)"
+    latest_release="$(latest_release_path || true)"
     if [[ -n "${latest_release}" ]]; then
         log_warn "Current symlink missing; linking to latest release: ${latest_release}"
         ln -sfn "${latest_release}" "${current_link}"
@@ -4255,7 +4321,7 @@ if [[ "${UPDATE_PRISMA_ONLY}" == true ]]; then
     # We may need shared env if migrations are to be run
     ensure_shared_env_file "${SOURCE_DIR}/.env.example" || true
     if [[ -f "${SHARED_DIR}/.env" ]]; then
-        export $(grep -v '^#' "${SHARED_DIR}/.env" | xargs)
+        export_env_file_assignments "${SHARED_DIR}/.env"
     fi
     update_prisma
     exit 0
@@ -4272,15 +4338,16 @@ rollback() {
         exit 1
     fi
     
-    # List releases sorted by date
-    local releases=($(ls -1t "${RELEASES_DIR}"))
+    local releases=()
+    mapfile -t releases < <(list_release_names_newest_first)
     
     if [[ ${#releases[@]} -lt 2 ]]; then
         log_error "No previous release available for rollback"
         exit 1
     fi
     
-    local current_release=$(readlink "${CURRENT_LINK}" | xargs basename)
+    local current_release=""
+    current_release="$(current_release_name 2>/dev/null || true)"
     local previous_release=""
     
     # Find the release before current

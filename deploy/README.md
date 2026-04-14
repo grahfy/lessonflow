@@ -80,7 +80,7 @@ After running the script, continue with [Database Setup](#database-setup).
 For day-to-day releases on a configured droplet:
 
 ```bash
-cd /var/www/lessonflow/current
+cd /opt/lessonflow  # or the UPDATES_GIT_REPO_PATH value from /var/www/lessonflow/shared/.env
 sudo ./deploy/update.sh --branch main
 ```
 
@@ -781,7 +781,7 @@ sudo ./deploy/deploy.sh --branch main --ssl --domain example.com
 
 ### Zero-Downtime Deploys
 
-The deployment script keeps the last 5 releases. If something goes wrong:
+The deployment script keeps the last 2 releases by default. If something goes wrong:
 
 ```bash
 sudo ./deploy/deploy.sh --rollback
