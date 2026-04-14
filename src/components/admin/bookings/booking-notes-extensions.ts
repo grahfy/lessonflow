@@ -1,6 +1,6 @@
 import StarterKit from "@tiptap/starter-kit";
 import TaskList from "@tiptap/extension-task-list";
-import Image from "@tiptap/extension-image";
+import { BookingImageExtension } from "@/components/admin/lesson-plans/editor/nodes/booking-image-extension";
 import Placeholder from "@tiptap/extension-placeholder";
 import { ChordDiagramExtension } from "@/components/admin/lesson-plans/editor/nodes/chord-diagram-extension";
 import { CalloutExtension } from "@/components/admin/lesson-plans/editor/nodes/callout-extension";
@@ -27,7 +27,7 @@ export const bookingNotesExtensions = [
     HTMLAttributes: { class: "lesson-plan-task-item" },
   }),
   CalloutExtension,
-  Image.configure({
+  BookingImageExtension.configure({
     inline: false,
     allowBase64: false,
     HTMLAttributes: {

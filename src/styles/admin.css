@@ -5803,14 +5803,14 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  height: 100%;
+  flex: 1 1 0%;
   padding: 0;
   box-sizing: border-box;
 }
 
 #booking-detail-dialog .dialog-body-scroll {
   min-height: 0;
-  height: 100%;
+  flex: 1 1 0%;
 }
 
 .booking-dialog-panel {
@@ -5903,9 +5903,7 @@
 
 #booking-detail-dialog .booking-dialog-layout {
   flex: 1;
-  min-height: var(--admin-communication-shell-height, min(68vh, 760px));
-  height: 100%;
-  max-height: none;
+  min-height: 0;
   overflow: hidden;
   padding-right: 0;
 }
@@ -6239,6 +6237,64 @@
   margin: 8px 0;
 }
 
+/* Image nodeview — hover-visible delete button */
+.booking-image-nodeview {
+  display: block;
+  margin: 8px 0;
+}
+
+.booking-image-wrapper {
+  position: relative;
+  display: inline-block;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.booking-image-wrapper:hover {
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
+.booking-image-wrapper .booking-notes-image {
+  display: block;
+  max-width: 100%;
+  border-radius: 6px;
+  margin: 0;
+}
+
+.booking-image-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: none;
+  gap: 2px;
+}
+
+.booking-image-wrapper:hover .booking-image-actions {
+  display: flex;
+}
+
+.booking-image-action-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.9);
+  color: rgba(226, 232, 240, 0.9);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.booking-image-action-btn:hover {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
 .booking-notes-editor .helper-text {
   margin-top: 4px;
   font-size: var(--text-sm, 13px);
@@ -6291,10 +6347,9 @@
   display: grid;
   flex: 1 1 auto;
   min-height: 0;
-  height: 100%;
-  align-items: stretch;
-  align-content: stretch;
-  grid-template-rows: minmax(0, 1fr);
+  align-items: start;
+  align-content: start;
+  grid-template-rows: auto;
   grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
 }
 
@@ -6617,18 +6672,6 @@
   }
 }
 
-@media (min-width: 1200px) {
-  #booking-detail-dialog .booking-appointment-panel .dialog-form-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-  }
-}
-
-@media (min-width: 1300px) {
-  #booking-detail-dialog .booking-appointment-panel .dialog-form-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
 
 @media (max-width: 640px) {
   #booking-detail-dialog .dialog-tabs-left {
@@ -8132,7 +8175,6 @@
 
   #booking-detail-dialog {
     min-height: auto;
-    height: auto;
   }
 
   .dialog-panel {
