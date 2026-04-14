@@ -47,6 +47,43 @@ export type BookingDialogForm = {
   customDurationMinutes: string;
 };
 
+// Drop blank optional fields so the server-side Zod `min`/`email`/regex checks
+// on the edit schema don't reject untouched values the form always carries as strings.
+export function sanitizeBookingEditPayload(form: BookingDialogForm): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const optionalStringKeys: Array<keyof BookingDialogForm> = [
+    "firstName",
+    "lastName",
+    "email",
+    "phone",
+    "houseNumber",
+    "streetName",
+    "streetType",
+    "suburb",
+    "state",
+    "postcode",
+    "lessonMode",
+    "skillLevel",
+    "assignedTeacherId",
+    "notes"
+  ];
+  for (const key of optionalStringKeys) {
+    const raw = form[key];
+    if (typeof raw === "string") {
+      const trimmed = raw.trim();
+      if (trimmed.length > 0) {
+        out[key] = trimmed;
+      }
+    }
+  }
+  const unit = form.unitNumber?.trim() ?? "";
+  out.unitNumber = unit.length > 0 ? unit : null;
+  if (form.notesContent !== undefined) {
+    out.notesContent = form.notesContent;
+  }
+  return out;
+}
+
 export type BookingMatchedCustomer = {
   id: string;
   fullName: string;

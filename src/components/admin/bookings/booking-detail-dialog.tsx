@@ -204,6 +204,27 @@ export function BookingDetailDialog({
             <Tooltip content="Close this booking dialog without applying new changes.">
               <button className="btn btn-secondary" onClick={onClose}>Close</button>
             </Tooltip>
+            {activeTab === 'appointment' ? (
+              <>
+                <Tooltip content="Reschedule the lesson to a new start time.">
+                  <button className="btn btn-secondary" disabled={!!busyAction || !canManageAppointment} onClick={onMove}>
+                    Move Lesson Time
+                  </button>
+                </Tooltip>
+                {event.entityType === "booking" && canInvoice ? (
+                  <Tooltip content="Create or open a draft invoice linked to this booking.">
+                    <button className="btn btn-secondary" disabled={busyAction === "invoice"} onClick={onOpenInvoice}>
+                      {busyAction === "invoice" ? "Creating Invoice..." : "Invoice / Billing"}
+                    </button>
+                  </Tooltip>
+                ) : null}
+                <Tooltip content="Cancel this booking. This action will notify the student.">
+                  <button className="btn btn-danger" disabled={!!busyAction || !canManageAppointment} onClick={onDelete}>
+                    {event.entityType === "booking_request" ? "Delete / Reject Request" : "Cancel Booking"}
+                  </button>
+                </Tooltip>
+              </>
+            ) : null}
           </div>
           <div className="dialog-footer-right">
             {matchedCustomer ? (
@@ -498,26 +519,6 @@ export function BookingDetailDialog({
                     />
                   </div>
                 </AdminField>
-                <div className="button-row booking-notes-actions">
-                  <Tooltip content="Reschedule the lesson to a new start time.">
-                    <button className="btn btn-secondary" disabled={!canManageAppointment} onClick={onMove}>Move Lesson Time</button>
-                  </Tooltip>
-
-                  {/* RATIONALE: Invoicing is only available once a Request is converted to a Booking. */}
-                  {event.entityType === "booking" && canInvoice && (
-                    <Tooltip content="Create or open a draft invoice linked to this booking.">
-                      <button className="btn btn-secondary" disabled={busyAction === "invoice"} onClick={onOpenInvoice}>
-                        {busyAction === "invoice" ? "Creating Invoice..." : "Invoice / Billing"}
-                      </button>
-                    </Tooltip>
-                  )}
-
-                  <Tooltip content="Cancel this booking. This action will notify the student.">
-                    <button className="btn btn-danger" disabled={!!busyAction || !canManageAppointment} onClick={onDelete}>
-                      {event.entityType === "booking_request" ? "Delete / Reject Request" : "Cancel Booking"}
-                    </button>
-                  </Tooltip>
-                </div>
               </div>
             </div>
           ) : activeTab === 'emails' ? (

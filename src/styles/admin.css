@@ -6249,7 +6249,7 @@
 }
 
 #booking-detail-dialog .dialog-col {
-  padding: 14px;
+  padding: 12px 16px;
   gap: 8px;
 }
 
@@ -6258,16 +6258,22 @@
 }
 
 #booking-detail-dialog .field label {
-  font-size: 0.76rem;
+  font-size: 0.80rem;
   margin-bottom: 0;
 }
 
 #booking-detail-dialog .field input,
 #booking-detail-dialog .field select,
 #booking-detail-dialog .field textarea {
-  padding: 8px 9px;
+  padding: 8px 10px;
   border-radius: var(--admin-density-control-radius);
-  font-size: 0.84rem;
+  font-size: 0.86rem;
+}
+
+#booking-detail-dialog .booking-section-title {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--admin-border-muted, rgba(255, 255, 255, 0.08));
 }
 
 #booking-detail-dialog .admin-address-search-row {
@@ -6289,7 +6295,7 @@
   align-items: stretch;
   align-content: stretch;
   grid-template-rows: minmax(0, 1fr);
-  grid-template-columns: minmax(0, 1.04fr) minmax(320px, 0.96fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
 }
 
 #booking-detail-dialog .booking-appointment-panel > .dialog-col {

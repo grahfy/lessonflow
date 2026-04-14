@@ -63,6 +63,7 @@ import { BookingDetailDialog } from "./booking-detail-dialog";
 import { ManualBookingDialog } from "./manual-booking-dialog";
 
 import {
+  sanitizeBookingEditPayload,
   type BookingCustomerLookupState,
   type BookingDialogForm,
   type BookingMatchedCustomer,
@@ -814,12 +815,13 @@ export function AdminBookingsClient() {
     const normalizedDuration = durationMinutesToBookingPayload(nextDurationMinutes);
     setBusyAction("save");
     const payload: Record<string, unknown> = {
-      ...currentDialogForm,
+      ...sanitizeBookingEditPayload(currentDialogForm),
       lessonDuration: normalizedDuration.lessonDuration,
       customDurationMinutes: normalizedDuration.customDurationMinutes
     };
     if (event.entityType === "booking_request") {
       payload.customerId = currentDialogForm.linkedCustomerId || null;
+      payload.startAtLocal = currentDialogForm.startAtLocal;
     }
     const result = await updateBookingApi(selectedKey, event.entityType, "edit", {
       ...payload
