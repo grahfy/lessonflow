@@ -108,6 +108,8 @@ TUI_REMOTE_UPDATE_LOCAL_SHORT=""
 TUI_REMOTE_UPDATE_ERROR=""
 ANNOUNCED_SOURCE_GIT_USER=""
 SOURCE_GIT_USER_ERROR=""
+UPDATE_INTERRUPT_CAUGHT=false
+UPDATE_INTERRUPT_SIGNAL=""
 
 # ANSI color palette shared with deploy.sh for consistent terminal UX.
 RED='\033[0;31m'
@@ -2512,6 +2514,66 @@ run_step() {
   rm -f "${log_file}"
   return 1
 }
+
+collect_process_children() {
+  local parent_pid="$1"
+
+  if command -v pgrep >/dev/null 2>&1; then
+    pgrep -P "${parent_pid}" 2>/dev/null || true
+    return 0
+  fi
+
+  ps -eo pid=,ppid= 2>/dev/null | awk -v parent="${parent_pid}" '$2 == parent { print $1 }' || true
+}
+
+terminate_process_descendants() {
+  local parent_pid="$1"
+  local signal="${2:-TERM}"
+  local child_pid=""
+  local child_pids=()
+
+  mapfile -t child_pids < <(collect_process_children "${parent_pid}")
+
+  for child_pid in "${child_pids[@]}"; do
+    terminate_process_descendants "${child_pid}" "${signal}"
+    kill -s "${signal}" "${child_pid}" 2>/dev/null || true
+  done
+}
+
+cleanup_update_children() {
+  terminate_process_descendants "$$" TERM
+  sleep 0.2
+  terminate_process_descendants "$$" KILL
+}
+
+handle_interrupt_signal() {
+  local signal_name="$1"
+
+  if [[ "${UPDATE_INTERRUPT_CAUGHT}" == true ]]; then
+    return 0
+  fi
+
+  UPDATE_INTERRUPT_CAUGHT=true
+  UPDATE_INTERRUPT_SIGNAL="${signal_name}"
+  trap - INT TERM HUP
+  log_warn "Received ${signal_name}; stopping update workflow and terminating child processes..."
+  stop_spinner "fail"
+  cleanup_update_children
+  exit 130
+}
+
+cleanup_update_on_exit() {
+  local exit_code=$?
+
+  trap - EXIT
+  cleanup_update_children
+  exit "${exit_code}"
+}
+
+trap 'handle_interrupt_signal INT' INT
+trap 'handle_interrupt_signal TERM' TERM
+trap 'handle_interrupt_signal HUP' HUP
+trap cleanup_update_on_exit EXIT
 
 # Detects total system RAM in MB using Linux or macOS system interfaces. The
 # update wrapper uses this to mirror deploy.sh's build-memory safety behavior
