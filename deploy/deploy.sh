@@ -586,24 +586,52 @@ try_auto_repair_app_service_namespace_failure() {
     local override_dir=""
     local override_file=""
     local disabled_file=""
+    local compat_file=""
+    local tmp_compat_file=""
 
     [[ "${status_output}" == *"226/NAMESPACE"* ]] || return 1
     systemd_dir="$(app_systemd_dir)"
     override_dir="${systemd_dir}/${APP_NAME}.service.d"
     override_file="${override_dir}/override.conf"
-    [[ -f "${override_file}" ]] || return 1
 
-    disabled_file="${override_file}.disabled"
-    if [[ -e "${disabled_file}" ]]; then
-        disabled_file="${override_file}.disabled.$(date +%s)"
+    if [[ -f "${override_file}" ]]; then
+        disabled_file="${override_file}.disabled"
+        if [[ -e "${disabled_file}" ]]; then
+            disabled_file="${override_file}.disabled.$(date +%s)"
+        fi
+
+        log_warn "Detected lessonflow.service namespace failure with override.conf; disabling ${override_file} and retrying."
+        run_sudo_cmd mv "${override_file}" "${disabled_file}" || return 1
+        run_sudo_cmd systemctl daemon-reload || return 1
+
+        if run_sudo_cmd systemctl restart "${APP_NAME}" >/dev/null 2>&1; then
+            log_info "lessonflow.service recovered after disabling override.conf"
+            return 0
+        fi
     fi
 
-    log_warn "Detected lessonflow.service namespace failure with override.conf; disabling ${override_file} and retrying."
-    run_sudo_cmd mv "${override_file}" "${disabled_file}" || return 1
+    compat_file="${override_dir}/namespace-compat.conf"
+    if [[ -f "${compat_file}" ]]; then
+        return 1
+    fi
+
+    log_warn "Detected lessonflow.service namespace failure; installing ${compat_file} and retrying with reduced systemd sandboxing."
+    run_sudo_cmd mkdir -p "${override_dir}" || return 1
+    tmp_compat_file="$(mktemp)"
+    printf '%s\n' \
+        '[Service]' \
+        'ProtectSystem=false' \
+        'PrivateTmp=false' \
+        'ReadWritePaths=' > "${tmp_compat_file}"
+    run_sudo_cmd cp "${tmp_compat_file}" "${compat_file}" || {
+        rm -f "${tmp_compat_file}"
+        return 1
+    }
+    rm -f "${tmp_compat_file}"
     run_sudo_cmd systemctl daemon-reload || return 1
 
     if run_sudo_cmd systemctl restart "${APP_NAME}" >/dev/null 2>&1; then
-        log_info "lessonflow.service recovered after disabling override.conf"
+        log_info "lessonflow.service recovered after installing namespace compatibility drop-in"
         return 0
     fi
 
@@ -4514,7 +4542,7 @@ sync_deploy_tree_ownership
 run_sudo_cmd chmod -R 755 "${NEW_RELEASE_DIR}" 2>/dev/null || true
 
 # Ensure systemd service is installed
-SERVICE_FILE="/etc/systemd/system/${APP_NAME}.service"
+SERVICE_FILE="$(app_systemd_dir)/${APP_NAME}.service"
 SERVICE_SOURCE="${NEW_RELEASE_DIR}/deploy/${APP_NAME}.service"
 SERVICE_SOURCE_IS_TEMP=false
 if [[ ! -f "${SERVICE_SOURCE}" ]]; then
@@ -4629,7 +4657,13 @@ fi
 # healthy so proxy errors during startup are less likely.
 # Restart the service
 log_info "Restarting service..."
-run_step "Restarting systemd service (${APP_NAME})" run_sudo_cmd systemctl restart "${APP_NAME}"
+if ! run_step "Restarting systemd service (${APP_NAME})" run_sudo_cmd systemctl restart "${APP_NAME}"; then
+    status_output="$(run_sudo_cmd systemctl status "${APP_NAME}" --no-pager 2>&1 || true)"
+    if ! try_auto_repair_app_service_namespace_failure "${status_output}"; then
+        show_app_service_failure_diagnostics "${status_output}"
+        exit 1
+    fi
+fi
 
 # Wait for service to start
 run_step "Waiting for service warm-up" sleep 5
