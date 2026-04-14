@@ -1489,6 +1489,7 @@
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
   padding:
     max(24px, env(safe-area-inset-top, 0px))
     max(24px, env(safe-area-inset-right, 0px))

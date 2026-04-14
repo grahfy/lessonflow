@@ -5701,6 +5701,7 @@
   inset: 0;
   z-index: 200;
   background: rgba(2, 6, 23, 0.82);
+  backdrop-filter: blur(8px);
   display: grid;
   place-items: center;
   padding:
@@ -6806,6 +6807,7 @@
 .dialog-backdrop.is-secondary {
   z-index: 210;
   background: rgba(5, 9, 24, 0.6);
+  backdrop-filter: blur(6px);
   padding:
     max(24px, env(safe-area-inset-top, 0px))
     max(24px, env(safe-area-inset-right, 0px))
