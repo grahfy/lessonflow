@@ -5902,6 +5902,8 @@
 }
 
 #booking-detail-dialog .booking-dialog-layout {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -6347,14 +6349,15 @@
   display: grid;
   flex: 1 1 auto;
   min-height: 0;
-  align-items: start;
-  align-content: start;
-  grid-template-rows: auto;
+  align-items: stretch;
+  align-content: stretch;
+  grid-template-rows: minmax(0, 1fr);
   grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
 }
 
 #booking-detail-dialog .booking-appointment-panel > .dialog-col {
   min-height: 0;
+  overflow-y: auto;
 }
 
 #booking-detail-dialog .booking-email-composer-card,
