@@ -485,10 +485,14 @@ render_app_service_template() {
     if [[ -f "${shared_env_path}" ]]; then
         git_repo_path="$(read_env_file_value "${shared_env_path}" "UPDATES_GIT_REPO_PATH" || true)"
     fi
+    if [[ -n "${git_repo_path}" && ! -d "${git_repo_path}" ]]; then
+        log_warn "Ignoring UPDATES_GIT_REPO_PATH for service sandbox because path does not exist: ${git_repo_path}"
+        git_repo_path=""
+    fi
     if [[ -z "${git_repo_path}" && "${SOURCE_MODE:-unknown}" == "git" ]]; then
         git_repo_path="${SOURCE_DIR}"
     fi
-    if [[ -n "${git_repo_path}" ]]; then
+    if [[ -n "${git_repo_path}" && -d "${git_repo_path}" ]]; then
         read_write_paths="${read_write_paths} ${git_repo_path}"
     fi
 
@@ -603,6 +607,7 @@ try_auto_repair_app_service_namespace_failure() {
         log_warn "Detected lessonflow.service namespace failure with override.conf; disabling ${override_file} and retrying."
         run_sudo_cmd mv "${override_file}" "${disabled_file}" || return 1
         run_sudo_cmd systemctl daemon-reload || return 1
+        run_sudo_cmd systemctl reset-failed "${APP_NAME}" >/dev/null 2>&1 || true
 
         if run_sudo_cmd systemctl restart "${APP_NAME}" >/dev/null 2>&1; then
             log_info "lessonflow.service recovered after disabling override.conf"
@@ -629,6 +634,7 @@ try_auto_repair_app_service_namespace_failure() {
     }
     rm -f "${tmp_compat_file}"
     run_sudo_cmd systemctl daemon-reload || return 1
+    run_sudo_cmd systemctl reset-failed "${APP_NAME}" >/dev/null 2>&1 || true
 
     if run_sudo_cmd systemctl restart "${APP_NAME}" >/dev/null 2>&1; then
         log_info "lessonflow.service recovered after installing namespace compatibility drop-in"

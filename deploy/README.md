@@ -699,7 +699,7 @@ cd /var/www/lessonflow/current
 sudo -u www-data node .next/standalone/server.js
 ```
 
-If `systemctl status lessonflow` reports `status=226/NAMESPACE`, the host could not create the filesystem namespace requested by the unit sandboxing. `deploy.sh` and `update.sh` first disable a stale `/etc/systemd/system/lessonflow.service.d/override.conf` when present; otherwise they install `/etc/systemd/system/lessonflow.service.d/namespace-compat.conf` and retry with reduced systemd sandboxing.
+If `systemctl status lessonflow` reports `status=226/NAMESPACE`, the host could not create the filesystem namespace requested by the unit sandboxing. `deploy.sh` and `update.sh` first disable a stale `/etc/systemd/system/lessonflow.service.d/override.conf` when present; otherwise they install `/etc/systemd/system/lessonflow.service.d/namespace-compat.conf` and retry with reduced systemd sandboxing. If logs mention a missing path such as `/opt/melbourne-guitar-school`, check `UPDATES_GIT_REPO_PATH` in `/var/www/lessonflow/shared/.env`; the deploy scripts ignore missing repo paths when rendering new service units.
 
 ### Database Connection Issues
 

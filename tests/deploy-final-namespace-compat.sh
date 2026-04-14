@@ -166,6 +166,13 @@ if ! grep -Fq "lessonflow.service recovered after installing namespace compatibi
   exit 1
 fi
 
+if ! grep -Fq "reset-failed lessonflow" "${SYSTEMCTL_LOG}"; then
+  echo "Expected final deploy namespace repair to reset failed service state before retrying"
+  cat "${OUTPUT_LOG}"
+  cat "${SYSTEMCTL_LOG}"
+  exit 1
+fi
+
 if ! grep -Fq "restart lessonflow" "${SYSTEMCTL_LOG}" || ! grep -Fq "restart nginx" "${SYSTEMCTL_LOG}"; then
   echo "Expected app recovery and nginx restart"
   cat "${OUTPUT_LOG}"

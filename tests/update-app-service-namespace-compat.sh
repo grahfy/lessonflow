@@ -27,7 +27,7 @@ cp package.json package-lock.json "${WORKTREE_DIR}/"
 mkdir -p "${WORKTREE_DIR}/deploy"
 cp deploy/update.sh deploy/deploy.sh deploy/app.service.template "${WORKTREE_DIR}/deploy/"
 cat > "${DEPLOY_TARGET_DIR}/shared/.env" <<EOF
-UPDATES_GIT_REPO_PATH="${WORKTREE_DIR}"
+UPDATES_GIT_REPO_PATH="/opt/melbourne-guitar-school"
 EOF
 
 (
@@ -116,6 +116,26 @@ if ! grep -Fq "ProtectSystem=false" "${COMPAT_FILE}" || ! grep -Fq "PrivateTmp=f
   echo "Expected compatibility drop-in to relax namespace sandboxing"
   cat "${OUTPUT_LOG}"
   cat "${COMPAT_FILE}"
+  exit 1
+fi
+
+if ! grep -Fq "ReadWritePaths=/var/www/lessonflow ${WORKTREE_DIR}" "${SYSTEMD_DIR}/lessonflow.service"; then
+  echo "Expected stale UPDATES_GIT_REPO_PATH to be replaced with the current checkout path"
+  cat "${OUTPUT_LOG}"
+  cat "${SYSTEMD_DIR}/lessonflow.service"
+  exit 1
+fi
+
+if ! grep -Fq "Ignoring UPDATES_GIT_REPO_PATH for service sandbox because path does not exist: /opt/melbourne-guitar-school" "${OUTPUT_LOG}"; then
+  echo "Expected stale UPDATES_GIT_REPO_PATH warning"
+  cat "${OUTPUT_LOG}"
+  exit 1
+fi
+
+if ! grep -Fq "reset-failed lessonflow" "${SYSTEMCTL_LOG}"; then
+  echo "Expected namespace repair to reset failed service state before retrying"
+  cat "${OUTPUT_LOG}"
+  cat "${SYSTEMCTL_LOG}"
   exit 1
 fi
 
