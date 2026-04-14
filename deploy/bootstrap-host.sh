@@ -85,14 +85,11 @@ write_env_value() {
   local env_file="$1"
   local key="$2"
   local value="$3"
-  local escaped_value=""
-
-  escaped_value="$(printf '%s' "${value}" | sed -e 's/[\/&]/\\&/g')"
 
   if grep -Eq "^[[:space:]]*(export[[:space:]]+)?${key}[[:space:]]*=" "${env_file}" 2>/dev/null; then
-    run_root_cmd sed -i -E "s|^[[:space:]]*(export[[:space:]]+)?${key}[[:space:]]*=.*$|${key}=\"${escaped_value}\"|" "${env_file}"
+    run_root_cmd sed -i -E "s|^[[:space:]]*(export[[:space:]]+)?${key}[[:space:]]*=.*$|${key}=\"${value}\"|" "${env_file}"
   else
-    run_root_cmd sh -c "printf '%s\\n' '${key}=\"${value}\"' >> '${env_file}'"
+    echo "${key}=\"${value}\"" >> "${env_file}"
   fi
 }
 
