@@ -385,6 +385,28 @@ run_source_git_cmd_for_update() {
   git -C "${repo_root}" "$@"
 }
 
+configure_git_safe_directory() {
+  local repo_root="$1"
+  local source_git_user=""
+  local current_user=""
+  source_git_user="$(resolve_source_git_user_for_update "${repo_root}" || true)"
+  current_user="$(id -un 2>/dev/null || true)"
+  validate_source_git_user_for_update "${source_git_user}" || return 1
+
+  if [[ -n "${source_git_user}" && "${source_git_user}" != "${current_user}" ]]; then
+    if command -v runuser >/dev/null 2>&1; then
+      runuser -u "${source_git_user}" -- git config --global --add safe.directory "${repo_root}" 2>/dev/null || true
+      return
+    fi
+    if command -v sudo >/dev/null 2>&1; then
+      sudo -u "${source_git_user}" git config --global --add safe.directory "${repo_root}" 2>/dev/null || true
+      return
+    fi
+  fi
+
+  git config --global --add safe.directory "${repo_root}" 2>/dev/null || true
+}
+
 run_source_git_cmd_for_update_with_prompt_guard() {
   local repo_root="$1"
   shift
@@ -3535,6 +3557,7 @@ if [[ "${SOURCE_MODE}" == "git" ]]; then
   log_info "Repository branch: $(current_branch_name)"
   announce_source_git_user_for_update "${REPO_ROOT}"
   verify_git_source_access_for_update
+  configure_git_safe_directory "${REPO_ROOT}"
 
   if git_worktree_dirty; then
     if [[ "${ALLOW_DIRTY}" != true && "${SKIP_PULL}" == false ]]; then

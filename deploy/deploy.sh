@@ -332,6 +332,12 @@ resolve_source_git_user() {
         return 1
     fi
 
+    candidate="$(read_deploy_user_from_shared_env || true)"
+    if [[ -n "${candidate}" && "${candidate}" != "root" && "${candidate}" != "UNKNOWN" ]]; then
+        printf '%s\n' "${candidate}"
+        return 0
+    fi
+
     repo_owner="$(stat -c '%U' "${repo_root}" 2>/dev/null || true)"
 
     for candidate in "${MGS_SUDO_USER:-}" "${SUDO_USER:-}" "${repo_owner}"; do
@@ -342,6 +348,13 @@ resolve_source_git_user() {
     done
 
     return 1
+}
+
+read_deploy_user_from_shared_env() {
+    local shared_env_path="${SHARED_DIR}/.env"
+
+    [[ -f "${shared_env_path}" ]] || return 1
+    read_env_file_value "${shared_env_path}" "UPDATES_DEPLOY_USER"
 }
 
 validate_source_git_user() {
@@ -367,16 +380,19 @@ run_source_git_cmd() {
 
     if [[ -n "${source_git_user}" && "${source_git_user}" != "${current_user}" ]]; then
         if command -v runuser >/dev/null 2>&1; then
+            runuser -u "${source_git_user}" -- git config --global --add safe.directory "${repo_root}" 2>/dev/null || true
             runuser -u "${source_git_user}" -- git -C "${repo_root}" "$@"
             return
         fi
         if command -v sudo >/dev/null 2>&1; then
+            sudo -u "${source_git_user}" git config --global --add safe.directory "${repo_root}" 2>/dev/null || true
             sudo -u "${source_git_user}" git -C "${repo_root}" "$@"
             return
         fi
         log_warn "Could not switch git self-update to ${source_git_user}; continuing as ${current_user:-current user}."
     fi
 
+    git config --global --add safe.directory "${repo_root}" 2>/dev/null || true
     git -C "${repo_root}" "$@"
 }
 
@@ -1942,7 +1958,7 @@ update_prisma() {
 
         if [[ "${needs_update}" == false && -n "${diff_range}" ]]; then
             # Check if Prisma schema artifacts or package metadata changed.
-            if ! git -C "${DEPLOY_GIT_REPO_ROOT}" diff --quiet "${diff_range}" -- prisma/ package.json package-lock.json; then
+            if ! run_source_git_cmd "${DEPLOY_GIT_REPO_ROOT}" diff --quiet "${diff_range}" -- prisma/ package.json package-lock.json; then
                 log_info "Changes detected in prisma/, package.json, or package-lock.json; update required."
                 needs_update=true
             fi
@@ -3528,7 +3544,8 @@ maybe_self_update_and_restart() {
         return 0
     fi
 
-    if [[ -n "$(git -C "${repo_root}" status --porcelain --untracked-files=no 2>/dev/null)" ]]; then
+    run_source_git_cmd "${repo_root}" config --global --add safe.directory "${repo_root}" 2>/dev/null || true
+    if [[ -n "$(run_source_git_cmd "${repo_root}" status --porcelain --untracked-files=no 2>/dev/null)" ]]; then
         log_warn "Source repository has local modifications; skipping early git pull in deploy.sh"
         return 0
     fi
@@ -3536,8 +3553,12 @@ maybe_self_update_and_restart() {
     local before_commit=""
     local after_commit=""
     local current_branch=""
-    before_commit="$(git -C "${repo_root}" rev-parse --short=12 HEAD 2>/dev/null || true)"
-    current_branch="$(git -C "${repo_root}" symbolic-ref --short HEAD 2>/dev/null || true)"
+
+    run_source_git_cmd "${repo_root}" config --global --add safe.directory "${repo_root}" 2>/dev/null || true
+    before_commit="$(run_source_git_cmd "${repo_root}" rev-parse --short=12 HEAD 2>/dev/null || true)"
+    current_branch="$(run_source_git_cmd "${repo_root}" symbolic-ref --short HEAD 2>/dev/null || true)"
+
+    run_source_git_cmd "${repo_root}" config --global --add safe.directory "${repo_root}" 2>/dev/null || true
 
     section "Git Update"
     log_info "Deploy self-update check in ${repo_root}"
@@ -3547,18 +3568,18 @@ maybe_self_update_and_restart() {
         run_step "Checking out ${BRANCH}" run_source_git_cmd "${repo_root}" checkout "${BRANCH}"
     fi
 
-    if [[ -z "$(git -C "${repo_root}" symbolic-ref --short HEAD 2>/dev/null || true)" ]]; then
+    if [[ -z "$(run_source_git_cmd "${repo_root}" symbolic-ref --short HEAD 2>/dev/null || true)" ]]; then
         log_warn "Detached HEAD detected; skipping deploy.sh self-update pull"
         return 0
     fi
 
     run_step "Merging latest origin/${BRANCH}" run_source_git_cmd "${repo_root}" merge --ff-only "origin/${BRANCH}"
-    after_commit="$(git -C "${repo_root}" rev-parse --short=12 HEAD 2>/dev/null || true)"
-    log_info "Repository commit: $(git -C "${repo_root}" rev-parse --short HEAD)"
+    after_commit="$(run_source_git_cmd "${repo_root}" rev-parse --short=12 HEAD 2>/dev/null || true)"
+    log_info "Repository commit: $(run_source_git_cmd "${repo_root}" rev-parse --short HEAD)"
 
     if [[ -n "${before_commit}" && -n "${after_commit}" && "${before_commit}" != "${after_commit}" ]]; then
         local commit_details=""
-        commit_details="$(git -C "${repo_root}" log --reverse --date=local --pretty=format:'%C(yellow)%h%Creset %ad %C(cyan)%an%Creset%n  %s%n%+b' "${before_commit}..${after_commit}" 2>/dev/null || true)"
+        commit_details="$(run_source_git_cmd "${repo_root}" log --reverse --date=local --pretty=format:'%C(yellow)%h%Creset %ad %C(cyan)%an%Creset%n  %s%n%+b' "${before_commit}..${after_commit}" 2>/dev/null || true)"
         if [[ -n "${commit_details}" ]]; then
             section "Git Changes"
             echo "${commit_details}"
@@ -4491,6 +4512,7 @@ log_info "Created release directory: ${NEW_RELEASE_DIR}"
 # Clone/copy repository from the resolved source dir (not the caller's cwd).
 if [[ "${SOURCE_MODE}" == "git" ]]; then
     # Running from git repository
+    run_source_git_cmd "${SOURCE_DIR}" config --global --add safe.directory "${SOURCE_DIR}" 2>/dev/null || true
     run_source_git_cmd "${SOURCE_DIR}" archive --format=tar "${BRANCH}" | tar -x -C "${NEW_RELEASE_DIR}"
 else
     # Copy current directory
