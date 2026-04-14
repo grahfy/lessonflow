@@ -5790,9 +5790,9 @@
 }
 
 #booking-detail-dialog {
-  --admin-communication-shell-height: min(68vh, 760px);
+  --admin-communication-shell-height: min(68vh, 880px);
   --booking-dialog-inner-gap: 18px;
-  --booking-detail-dialog-height: min(94vh, calc(100dvh - (var(--dialog-frame-gap) * 2)), 940px);
+  --booking-detail-dialog-height: min(94vh, calc(100dvh - (var(--dialog-frame-gap) * 2)), 1060px);
   width: min(1380px, calc(100vw - (var(--dialog-frame-gap) * 2)));
   min-height: var(--booking-detail-dialog-height);
   height: var(--booking-detail-dialog-height);
@@ -7876,13 +7876,13 @@
     max-height: min(91vh, calc(100dvh - (var(--dialog-frame-gap) * 2)), 940px);
   }
 
-  #customer-dialog,
-  #booking-detail-dialog {
+  #customer-dialog {
     --admin-communication-shell-height: min(60vh, 620px);
   }
 
   #booking-detail-dialog {
-    --booking-detail-dialog-height: min(91vh, calc(100dvh - (var(--dialog-frame-gap) * 2)), 940px);
+    --admin-communication-shell-height: min(60vh, 740px);
+    --booking-detail-dialog-height: min(91vh, calc(100dvh - (var(--dialog-frame-gap) * 2)), 1060px);
   }
 
   .booking-dialog-scroll {
@@ -8061,13 +8061,13 @@
     max-height: min(92vh, 820px);
   }
 
-  #customer-dialog,
-  #booking-detail-dialog {
+  #customer-dialog {
     --admin-communication-shell-height: min(56vh, 520px);
   }
 
   #booking-detail-dialog {
-    --booking-detail-dialog-height: min(92vh, 820px);
+    --admin-communication-shell-height: min(56vh, 640px);
+    --booking-detail-dialog-height: min(92vh, 940px);
   }
 
   .booking-dialog-scroll {
