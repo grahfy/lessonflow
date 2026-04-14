@@ -5,11 +5,23 @@ import { redirect } from "next/navigation";
 import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { getCurrentAdmin } from "@/lib/admin-auth";
-import { getVisibleAdminNavGroups } from "@/lib/admin/config";
+import { getVisibleAdminNavGroups, type AdminNavGroupKey } from "@/lib/admin/config";
 import { getSetupCompletionState } from "@/lib/setup";
 
 export const metadata = {
   title: "Booking Console Home"
+};
+
+const ADMIN_HOME_GROUP_CONTENT: Record<AdminNavGroupKey, { description: string }> = {
+  business: {
+    description: "Use Business for daily studio operations: manage bookings and requests, keep customer records current, create and follow up invoices, and review reports before making schedule or revenue decisions."
+  },
+  education: {
+    description: "Use Education for teaching workflows: manage teacher profiles, build reusable lesson plans, track student progress, and keep chord resources ready for upcoming lessons."
+  },
+  system: {
+    description: "Use System for owner-level administration: update branding and operational settings, review logs, read internal support guidance, and confirm release details before changing platform behavior."
+  }
 };
 
 /**
@@ -51,16 +63,19 @@ export default async function AdminIndexPage() {
         {groups.map((group) => {
           const featuredItem = group.items.find((item) => item.featured) ?? group.items[0];
           const secondaryItems = group.items.filter((item) => item.href !== featuredItem.href);
+          const homeContent = ADMIN_HOME_GROUP_CONTENT[group.key];
 
           return (
             <AdminCard
               key={group.key}
               className={`admin-home-card admin-home-card-${group.key}`}
             >
+              <div className="admin-home-card-media" aria-hidden="true" />
+
               <div className="admin-home-card-head">
                 <p className="admin-home-card-kicker">{group.label}</p>
                 <h3 className="admin-home-card-title">{featuredItem.label}</h3>
-                <p className="helper-text admin-home-card-summary">{group.description}</p>
+                <p className="helper-text admin-home-card-summary">{homeContent.description}</p>
               </div>
 
               <div className="admin-home-card-featured">

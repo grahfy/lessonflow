@@ -84,6 +84,9 @@ describe("admin-index-page", () => {
     expect(html).toContain("Business");
     expect(html).toContain("Education");
     expect(html).toContain("System");
+    expect(html).toContain("Use Business for daily studio operations");
+    expect(html).toContain("Use Education for teaching workflows");
+    expect(html).toContain("Use System for owner-level administration");
     expect(html).toContain("href=\"/admin/bookings\"");
     expect(html).toContain("href=\"/admin/lesson-plans\"");
     expect(html).toContain("href=\"/admin/settings\"");

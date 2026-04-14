@@ -3761,6 +3761,11 @@
   gap: 4px;
 }
 
+.admin-header-utility-copy .admin-header-group-description {
+  max-width: none;
+  white-space: nowrap;
+}
+
 .admin-header-quick-actions {
   display: flex;
   flex-wrap: wrap;
@@ -3821,7 +3826,7 @@
 
 .admin-home-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 0.92fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -3832,10 +3837,29 @@
   min-width: 0;
 }
 
+.admin-home-card-media {
+  width: 100%;
+  height: clamp(116px, 12vw, 156px);
+  border: 1px solid rgba(226, 232, 240, 0.16);
+  border-radius: 8px;
+  background-color: rgba(15, 23, 42, 0.62);
+  background-position: center;
+  background-size: cover;
+  box-shadow:
+    0 14px 32px rgba(2, 8, 23, 0.28),
+    0 1px 0 rgba(255, 255, 255, 0.06) inset;
+}
+
 .admin-home-card-business {
   background:
     linear-gradient(180deg, rgba(37, 99, 235, 0.14), rgba(15, 23, 42, 0.9)),
     rgba(255, 255, 255, 0.03);
+}
+
+.admin-home-card-business .admin-home-card-media {
+  background-image:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.06), rgba(15, 23, 42, 0.38)),
+    url("https://images.unsplash.com/photo-1666528422160-7439d4d57122?auto=format&fit=crop&w=960&q=78");
 }
 
 .admin-home-card-education {
@@ -3844,10 +3868,24 @@
     rgba(255, 255, 255, 0.03);
 }
 
+.admin-home-card-education .admin-home-card-media {
+  background-image:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.04), rgba(15, 23, 42, 0.44)),
+    url("https://images.unsplash.com/photo-1574052091235-9ca3fe476e32?auto=format&fit=crop&w=960&q=78");
+  background-position: center 48%;
+}
+
 .admin-home-card-system {
   background:
     linear-gradient(180deg, rgba(148, 163, 184, 0.08), rgba(15, 23, 42, 0.84)),
     rgba(255, 255, 255, 0.02);
+}
+
+.admin-home-card-system .admin-home-card-media {
+  background-image:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.04), rgba(15, 23, 42, 0.48)),
+    url("https://images.unsplash.com/photo-1702329179825-6c082db2bbac?auto=format&fit=crop&w=960&q=78");
+  background-position: center 58%;
 }
 
 .admin-home-card-head,
@@ -7347,10 +7385,6 @@
     border-radius: 12px;
   }
 
-  .admin-home-grid {
-    grid-template-columns: 1fr;
-  }
-
   .admin-build-info-footer {
     padding: 8px 12px;
     border-radius: 14px;
@@ -7610,6 +7644,10 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .admin-home-grid {
+    grid-template-columns: 1fr;
+  }
+
   .admin-workspace-actions,
   .admin-tab-bar,
   .admin-tab-bar-right,
@@ -7757,6 +7795,10 @@
 @media (max-width: 640px) {
   #booking-detail-dialog {
     --booking-dialog-inner-gap: 12px;
+  }
+
+  .admin-header-utility-copy .admin-header-group-description {
+    white-space: normal;
   }
 
   .admin-shell {
