@@ -16,6 +16,7 @@ export function BookingImageNodeView({ node, deleteNode, editor }: NodeViewProps
   return (
     <NodeViewWrapper className="booking-image-nodeview">
       <div className="booking-image-wrapper">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={src as string}
           alt={(alt as string) || ""}
