@@ -19,6 +19,12 @@
   --radius-lg: 28px;
   --radius-md: 18px;
   --radius-sm: 12px;
+  --surface-floating-radius: 14px;
+  --surface-floating-padding-block: 10px;
+  --surface-floating-padding-inline: 12px;
+  --surface-modal-padding: 18px;
+  --surface-modal-radius: 24px;
+  --surface-modal-close-size: 36px;
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
   --motion-fast: 140ms;
@@ -984,12 +990,12 @@ h1 {
 
 .ui-tooltip-content {
   max-width: min(320px, 82vw);
-  border-radius: 10px;
+  border-radius: var(--surface-floating-radius);
   border: 1px solid rgba(186, 205, 255, 0.42);
   background: linear-gradient(145deg, rgba(13, 21, 52, 0.99), rgba(9, 15, 40, 0.98));
   color: var(--ink-0);
   box-shadow: 0 18px 36px rgba(0, 0, 0, 0.42);
-  padding: 9px 11px;
+  padding: var(--surface-floating-padding-block) var(--surface-floating-padding-inline);
   font-size: 0.78rem;
   line-height: 1.4;
   letter-spacing: 0.01em;
@@ -1318,7 +1324,7 @@ h1 {
   position: relative;
   width: min(100%, 1040px);
   aspect-ratio: 16 / 9;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: #050814;
@@ -1327,7 +1333,7 @@ h1 {
 .video-consent-card {
   width: 100%;
   height: 100%;
-  padding: 28px;
+  padding: max(24px, var(--surface-modal-padding));
   display: grid;
   align-content: center;
   justify-items: start;
@@ -1369,6 +1375,17 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --surface-floating-radius: 12px;
+    --surface-floating-padding-block: 9px;
+    --surface-floating-padding-inline: 11px;
+    --surface-modal-padding: 14px;
+    --surface-modal-radius: 20px;
+    --surface-modal-close-size: 34px;
+  }
 }
 
 .list {

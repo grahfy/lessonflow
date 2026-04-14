@@ -1489,13 +1489,17 @@
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.85);
-  padding: 24px;
+  padding:
+    max(24px, env(safe-area-inset-top, 0px))
+    max(24px, env(safe-area-inset-right, 0px))
+    max(24px, env(safe-area-inset-bottom, 0px))
+    max(24px, env(safe-area-inset-left, 0px));
   cursor: pointer;
 }
 
 .modal-content {
-  --modal-shell-padding: 18px;
-  --modal-shell-radius: 24px;
+  --modal-shell-padding: var(--surface-modal-padding);
+  --modal-shell-radius: var(--surface-modal-radius);
   position: relative;
   max-width: 90vw;
   max-height: 90vh;
@@ -1520,6 +1524,8 @@
   width: min(85vw, calc(90vw - (var(--modal-shell-padding) * 2)));
   max-width: 800px;
   aspect-ratio: 16 / 9;
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
 
 .admin-manual-modal-content {
@@ -1576,17 +1582,17 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  border-radius: var(--radius-lg);
+  border-radius: inherit;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
 .modal-close {
   position: absolute;
-  top: 14px;
-  right: 14px;
+  top: max(12px, calc(var(--modal-shell-padding) - 2px));
+  right: max(12px, calc(var(--modal-shell-padding) - 2px));
   z-index: 1;
-  width: 32px;
-  height: 32px;
+  width: var(--surface-modal-close-size);
+  height: var(--surface-modal-close-size);
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 50%;
@@ -1607,7 +1613,9 @@
 .modal-caption {
   color: white;
   text-align: center;
-  margin-top: 16px;
+  margin: 0;
+  max-width: min(72ch, 100%);
+  padding-inline: 4px;
   font-size: 14px;
   line-height: 1.5;
 }
@@ -2047,25 +2055,34 @@
 }
 
 .invoice-dialog-body-lock {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   overflow: hidden !important;
 }
 
 .invoice-dialog-body {
   min-height: 0;
-  height: min(72vh, 780px);
-  overflow: hidden;
+  height: 100%;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .invoice-dialog-layout {
-  height: 100%;
+  min-height: 100%;
+  height: auto;
   grid-template-columns: minmax(0, 1.28fr) minmax(320px, 0.82fr);
-  align-items: stretch;
+  align-items: start;
+  align-content: start;
+  overflow: visible;
 }
 
 .invoice-dialog-main-col,
 .invoice-dialog-side-col {
   min-height: 0;
-  height: 100%;
+  height: auto;
 }
 
 .invoice-dialog-main-col {
@@ -2397,7 +2414,8 @@
   }
 
   .invoice-dialog-body {
-    height: min(66vh, 700px);
+    height: 100%;
+    max-height: 100%;
   }
 
   .invoice-dialog-layout {
@@ -2481,7 +2499,8 @@
 
 @media (max-height: 900px) {
   .invoice-dialog-body {
-    height: min(64vh, 600px);
+    height: 100%;
+    max-height: 100%;
   }
 
   .invoice-dialog-line-items {
@@ -2522,8 +2541,8 @@
 
   .invoice-dialog-layout {
     grid-template-columns: 1fr;
-    overflow: auto;
-    padding-right: 4px;
+    overflow: visible;
+    padding-right: 0;
   }
 
   .invoice-dialog-tax-field {
@@ -2531,9 +2550,9 @@
   }
 
   .invoice-dialog-body {
-    height: auto;
-    max-height: min(74vh, 780px);
-    overflow: auto;
+    height: 100%;
+    max-height: 100%;
+    overflow-y: auto;
   }
 
   .invoice-dialog-main-col {
@@ -2604,8 +2623,8 @@
   }
 
   .invoice-dialog-body {
-    height: auto;
-    max-height: min(76vh, 820px);
+    height: 100%;
+    max-height: 100%;
   }
 
   .invoice-dialog-line-items {
@@ -2653,9 +2672,10 @@
   }
 
   .invoice-dialog-body {
-    height: auto;
-    max-height: none;
-    overflow: visible;
+    height: 100%;
+    max-height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 
   .invoice-dialog-layout {
