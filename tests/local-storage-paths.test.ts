@@ -19,6 +19,11 @@ async function createStandaloneRuntimeRoot(prefix: string) {
   return { releaseDir, standaloneDir };
 }
 
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+});
+
 describe("local upload storage roots", () => {
   it("stores staff photos under the app root instead of .next/standalone", async () => {
     const { releaseDir, standaloneDir } = await createStandaloneRuntimeRoot("mgs-staff-photo-root-");
@@ -44,5 +49,36 @@ describe("local upload storage roots", () => {
     await expect(
       fs.access(path.join(standaloneDir, ".data", "email-signature-logo", "email-signature", "logo.webp"))
     ).rejects.toThrow();
+  });
+
+  it("stores admin asset roots on shared production paths when NODE_ENV is production", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "mgs-admin-production-roots-"));
+    const standaloneDir = path.join(tempRoot, "releases", "20260410120000", ".next", "standalone");
+    const staffRoot = path.join(tempRoot, "shared", "admin-staff-photos");
+    const emailRoot = path.join(tempRoot, "shared", "email-signature-logo");
+    await fs.mkdir(standaloneDir, { recursive: true });
+
+    vi.spyOn(process, "cwd").mockReturnValue(standaloneDir);
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ADMIN_STAFF_PHOTOS_LOCAL_ROOT", staffRoot);
+    vi.stubEnv("EMAIL_SIGNATURE_LOGO_LOCAL_ROOT", emailRoot);
+
+    try {
+      await putStaffPhoto("staff/admin-1/avatar.png", Buffer.from("staff-photo-prod"));
+      await putEmailSignatureLogo("email-signature/logo.webp", Buffer.from("signature-logo-prod"));
+
+      await expect(fs.readFile(path.join(staffRoot, "staff", "admin-1", "avatar.png"), "utf-8")).resolves.toBe("staff-photo-prod");
+      await expect(
+        fs.readFile(path.join(emailRoot, "email-signature", "logo.webp"), "utf-8")
+      ).resolves.toBe("signature-logo-prod");
+      await expect(
+        fs.access(path.join(standaloneDir, ".data", "admin-staff-photos", "staff", "admin-1", "avatar.png"))
+      ).rejects.toThrow();
+      await expect(
+        fs.access(path.join(standaloneDir, ".data", "email-signature-logo", "email-signature", "logo.webp"))
+      ).rejects.toThrow();
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

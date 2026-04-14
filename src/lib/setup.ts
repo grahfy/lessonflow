@@ -38,8 +38,11 @@ import { AppError } from "@/lib/errors";
 import { DEFAULT_GEOBLOCKING_SETTINGS_ID } from "@/lib/geoblocking-settings";
 import { geoblockingSettingsInputSchema } from "@/lib/geoblocking-settings-contract";
 import { logError } from "@/lib/observability";
-import { isRelativeConfiguredPath, resolveConfiguredStorageRoot, resolveRuntimeAppRoot } from "@/lib/runtime-paths";
+import { isRelativeConfiguredPath, resolveRuntimeAppRoot } from "@/lib/runtime-paths";
 import { getMaterialStorageDriverName } from "@/lib/student-portal/material-storage";
+import { getLocalMaterialStorageRoot } from "@/lib/student-portal/material-storage.local";
+import { getStaffPhotoStorageRoot } from "@/lib/admin/staff-photo-storage";
+import { getEmailSignatureLogoStorageRoot } from "@/lib/email/signature-storage";
 
 /**
  * Status levels for setup checks - determines UI display and if setup can proceed.
@@ -678,8 +681,6 @@ export type AdminSettingsSaveResult =
       error?: string;
     };
 
-const DEFAULT_LOCAL_MATERIAL_ROOT = ".data/learning-materials";
-
 /**
  * Returns true when the value is clearly a default/example placeholder.
  */
@@ -719,14 +720,13 @@ function hasStrongSecret(value: string, minLength: number): boolean {
  * Resolves the configured local learning-material root directory.
  */
 function getLocalMaterialRoot(): string {
-  return resolveConfiguredStorageRoot(process.env.LEARNING_MATERIALS_LOCAL_ROOT, DEFAULT_LOCAL_MATERIAL_ROOT);
+  return getLocalMaterialStorageRoot();
 }
 
 /**
  * Performs a writable-directory probe for local material storage.
  */
-async function canWriteLocalMaterialRoot(): Promise<boolean> {
-  const root = getLocalMaterialRoot();
+async function canWriteStorageRoot(root: string): Promise<boolean> {
   try {
     await fs.mkdir(root, { recursive: true });
     await fs.access(root);
@@ -982,9 +982,13 @@ export async function evaluateSetupChecks(): Promise<SetupCheck[]> {
       detail: "S3 storage driver is selected but not implemented in this build. Use local storage with persistent volume."
     });
   } else {
-    const localStorageWritable = await canWriteLocalMaterialRoot();
     const configuredMaterialRoot = process.env.LEARNING_MATERIALS_LOCAL_ROOT?.trim();
     const resolvedMaterialRoot = getLocalMaterialRoot();
+    const localStorageWritable = await canWriteStorageRoot(resolvedMaterialRoot);
+    const staffPhotoRoot = getStaffPhotoStorageRoot();
+    const emailSignatureRoot = getEmailSignatureLogoStorageRoot();
+    const staffPhotoWritable = await canWriteStorageRoot(staffPhotoRoot);
+    const emailSignatureWritable = await canWriteStorageRoot(emailSignatureRoot);
     const materialRootIsRelative = isRelativeConfiguredPath(configuredMaterialRoot);
     checks.push({
       id: "materials-storage-driver",
@@ -997,6 +1001,28 @@ export async function evaluateSetupChecks(): Promise<SetupCheck[]> {
             : `Local storage is writable at ${resolvedMaterialRoot}. Ensure your hosting keeps this directory persistent and backed up.`
           : "Local storage root is writable."
         : `Local storage root is not writable at ${resolvedMaterialRoot}. Fix LEARNING_MATERIALS_LOCAL_ROOT permissions.`
+    });
+
+    checks.push({
+      id: "staff-photo-storage",
+      title: "Staff photo storage",
+      status: staffPhotoWritable ? (isProduction ? "warn" : "pass") : "fail",
+      detail: staffPhotoWritable
+        ? isProduction
+          ? `Local storage is writable at ${staffPhotoRoot}. Ensure this shared path stays writable for admin profile photo uploads.`
+          : "Local staff photo storage root is writable."
+        : `Local staff photo storage root is not writable at ${staffPhotoRoot}.`
+    });
+
+    checks.push({
+      id: "email-signature-logo-storage",
+      title: "Email signature logo storage",
+      status: emailSignatureWritable ? (isProduction ? "warn" : "pass") : "fail",
+      detail: emailSignatureWritable
+        ? isProduction
+          ? `Local storage is writable at ${emailSignatureRoot}. Ensure this shared path stays writable for email signature logo uploads.`
+          : "Local email signature logo storage root is writable."
+        : `Local email signature logo storage root is not writable at ${emailSignatureRoot}.`
     });
   }
 

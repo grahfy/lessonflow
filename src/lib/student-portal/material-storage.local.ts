@@ -16,6 +16,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { resolveConfiguredStorageRoot } from "@/lib/runtime-paths";
+import { rethrowAsStoragePermissionDeniedError } from "@/lib/storage-errors";
 import type {
   DeleteMaterialInput,
   GetMaterialInput,
@@ -25,12 +26,19 @@ import type {
 } from "@/lib/student-portal/material-storage";
 
 const DEFAULT_LOCAL_ROOT = ".data/learning-materials";
+const PRODUCTION_LOCAL_ROOT = "/var/www/lessonflow/data/learning-materials";
 
 /**
  * Resolves the root directory used for local learning-material persistence.
  */
 export function getLocalMaterialStorageRoot(): string {
-  return resolveConfiguredStorageRoot(process.env.LEARNING_MATERIALS_LOCAL_ROOT, DEFAULT_LOCAL_ROOT);
+  return process.env.NODE_ENV === "production"
+    ? resolveConfiguredStorageRoot(
+        process.env.LEARNING_MATERIALS_LOCAL_ROOT,
+        DEFAULT_LOCAL_ROOT,
+        PRODUCTION_LOCAL_ROOT
+      )
+    : resolveConfiguredStorageRoot(process.env.LEARNING_MATERIALS_LOCAL_ROOT, DEFAULT_LOCAL_ROOT);
 }
 
 /**
@@ -58,20 +66,32 @@ async function ensureParentDirectory(filePath: string): Promise<void> {
 export function createLocalMaterialStorageDriver(): MaterialStorageDriver {
   return {
     async put(input: PutMaterialInput): Promise<void> {
-      const targetPath = resolveLocalPath(input.storageKey);
-      await ensureParentDirectory(targetPath);
-      await fs.writeFile(targetPath, input.buffer);
+      try {
+        const targetPath = resolveLocalPath(input.storageKey);
+        await ensureParentDirectory(targetPath);
+        await fs.writeFile(targetPath, input.buffer);
+      } catch (error) {
+        rethrowAsStoragePermissionDeniedError(error, "learning material storage");
+      }
     },
 
     async get(input: GetMaterialInput): Promise<MaterialBlob> {
-      const sourcePath = resolveLocalPath(input.storageKey);
-      const buffer = await fs.readFile(sourcePath);
-      return { buffer };
+      try {
+        const sourcePath = resolveLocalPath(input.storageKey);
+        const buffer = await fs.readFile(sourcePath);
+        return { buffer };
+      } catch (error) {
+        rethrowAsStoragePermissionDeniedError(error, "learning material storage");
+      }
     },
 
     async delete(input: DeleteMaterialInput): Promise<void> {
-      const targetPath = resolveLocalPath(input.storageKey);
-      await fs.rm(targetPath, { force: true });
+      try {
+        const targetPath = resolveLocalPath(input.storageKey);
+        await fs.rm(targetPath, { force: true });
+      } catch (error) {
+        rethrowAsStoragePermissionDeniedError(error, "learning material storage");
+      }
     }
   };
 }

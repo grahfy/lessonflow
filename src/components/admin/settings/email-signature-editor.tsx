@@ -33,6 +33,7 @@ export function AdminEmailSignatureEditor() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [removingLogo, setRemovingLogo] = useState(false);
+  const [logoPreviewFailed, setLogoPreviewFailed] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const { safeFetch, handleApiError } = useSafeFetch({ onError: setError });
@@ -62,6 +63,10 @@ export function AdminEmailSignatureEditor() {
 
     void load();
   }, [handleApiError, safeFetch]);
+
+  useEffect(() => {
+    setLogoPreviewFailed(false);
+  }, [signature.resolvedLogoUrl]);
 
   async function saveSignature() {
     setSaving(true);
@@ -212,7 +217,7 @@ export function AdminEmailSignatureEditor() {
             fullWidth
           >
             <div className="admin-email-signature-logo-stack">
-              {signature.resolvedLogoUrl ? (
+              {signature.resolvedLogoUrl && !logoPreviewFailed ? (
                 <>
                   {/* NOTE: This preview may point at external branding URLs or a local API route. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -220,10 +225,15 @@ export function AdminEmailSignatureEditor() {
                     className="admin-email-signature-logo-preview"
                     src={signature.resolvedLogoUrl}
                     alt="Email signature logo preview"
+                    onError={() => setLogoPreviewFailed(true)}
                   />
                 </>
               ) : (
-                <p className="helper-text">No logo available.</p>
+                <p className="helper-text">
+                  {signature.resolvedLogoUrl
+                    ? "Logo preview unavailable. The stored logo may still be used in outgoing emails."
+                    : "No logo available."}
+                </p>
               )}
               <p className="helper-text">
                 {signature.hasCustomLogo

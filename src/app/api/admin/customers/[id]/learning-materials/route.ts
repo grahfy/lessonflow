@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { canManageAssignedTeacher, canManagePrimaryTeacherCustomer } from "@/lib/admin/permissions";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
+import { AppError } from "@/lib/errors";
 import { verifyCaptchaSubmission } from "@/lib/captcha";
 import { prisma } from "@/lib/db";
 import { logError } from "@/lib/observability";
@@ -222,6 +223,10 @@ export async function POST(request: NextRequest, { params }: Params) {
         mimeType: classification.mimeType
       });
     } catch (error) {
+      if (error instanceof AppError) {
+        return jsonUnexpectedError(error, "Unable to store learning material file. Check the configured storage path and permissions.");
+      }
+
       logError("learning_material.storage_put_failed", error, {
         customerId: customer.id,
         bookingId: linkedBookingId,

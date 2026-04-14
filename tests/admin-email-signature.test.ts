@@ -1,7 +1,9 @@
 import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GET as getEmailSignature, POST as saveEmailSignature } from "@/app/api/admin/email-signature/route";
 import { DELETE as deleteEmailSignatureLogo, POST as uploadEmailSignatureLogo } from "@/app/api/admin/email-signature/logo/route";
@@ -27,6 +29,11 @@ describe("admin-email-signature", () => {
       recursive: true,
       force: true
     });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it("loads the default fallback signature state when no custom settings exist", async () => {
@@ -129,5 +136,45 @@ describe("admin-email-signature", () => {
 
     const afterDeleteResponse = await getPublicEmailSignatureLogo();
     expect(afterDeleteResponse.status).toBe(404);
+  });
+
+  it("returns a sanitized storage error when the signature logo root is not writable", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "mgs-email-signature-eacces-root-"));
+    await fs.chmod(tempRoot, 0o555);
+    vi.stubEnv("EMAIL_SIGNATURE_LOGO_LOCAL_ROOT", tempRoot);
+
+    try {
+      const admin = await ensureOwnerAdmin();
+      const token = createSessionToken(admin.email);
+      const cookie = `${getSessionCookieName()}=${token}`;
+
+      const uploadForm = new FormData();
+      uploadForm.set(
+        "file",
+        new File([Buffer.from("locked-logo")], "signature-logo.png", {
+          type: "image/png"
+        })
+      );
+
+      const uploadResponse = await uploadEmailSignatureLogo(
+        new NextRequest("http://localhost/api/admin/email-signature/logo", {
+          method: "POST",
+          body: uploadForm,
+          headers: {
+            cookie
+          }
+        })
+      );
+
+      expect(uploadResponse.status).toBe(503);
+      const body = (await uploadResponse.json()) as { code?: string; error?: string };
+      expect(body.code).toBe("STORAGE_PERMISSION_DENIED");
+      expect(body.error).toContain("Storage is unavailable for email signature logo storage");
+      expect(JSON.stringify(body)).not.toContain("EACCES");
+      expect(JSON.stringify(body)).not.toContain(tempRoot);
+    } finally {
+      await fs.chmod(tempRoot, 0o755).catch(() => null);
+      vi.unstubAllEnvs();
+    }
   });
 });

@@ -34,6 +34,36 @@ export function resolveConfiguredStorageRoot(
 }
 
 /**
+ * Resolves a storage root that should stay on the shared production volume
+ * even when the configured value is missing or relative.
+ */
+export function resolveProductionAwareStorageRoot(
+  configuredRoot: string | null | undefined,
+  defaultRelativeRoot: string,
+  productionAbsoluteRoot: string,
+  cwd: string = process.cwd()
+): string {
+  const trimmedConfiguredRoot = configuredRoot?.trim();
+  if (trimmedConfiguredRoot) {
+    if (path.isAbsolute(trimmedConfiguredRoot)) {
+      return path.resolve(trimmedConfiguredRoot);
+    }
+
+    if (process.env.NODE_ENV === "production") {
+      return path.resolve(productionAbsoluteRoot);
+    }
+
+    return path.resolve(resolveRuntimeAppRoot(cwd), trimmedConfiguredRoot);
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    return path.resolve(productionAbsoluteRoot);
+  }
+
+  return path.resolve(resolveRuntimeAppRoot(cwd), defaultRelativeRoot);
+}
+
+/**
  * Returns true when the configured storage root is set and relative.
  */
 export function isRelativeConfiguredPath(configuredRoot: string | null | undefined): boolean {

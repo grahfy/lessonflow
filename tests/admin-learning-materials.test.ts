@@ -268,6 +268,47 @@ describe("admin-learning-materials", () => {
     }
   });
 
+  it("returns a sanitized storage error when the learning materials root is not writable", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "mgs-material-eacces-root-"));
+    await fs.chmod(tempRoot, 0o555);
+    vi.stubEnv("LEARNING_MATERIALS_LOCAL_ROOT", tempRoot);
+
+    try {
+      const admin = await ensureOwnerAdmin();
+      const token = createSessionToken(admin.email);
+      const cookie = `${getSessionCookieName()}=${token}`;
+
+      const customer = await createCustomer("Locked Student", "locked@example.com", "0400999888", "3070");
+
+      const uploadForm = new FormData();
+      uploadForm.set(
+        "file",
+        new File([Buffer.from("locked-pdf")], "lesson.pdf", {
+          type: "application/pdf"
+        })
+      );
+
+      const uploadRequest = new NextRequest(`http://localhost/api/admin/customers/${customer.id}/learning-materials`, {
+        method: "POST",
+        body: uploadForm,
+        headers: { cookie }
+      });
+      const uploadResponse = await POST(uploadRequest, {
+        params: Promise.resolve({ id: customer.id })
+      });
+
+      expect(uploadResponse.status).toBe(503);
+      const body = (await uploadResponse.json()) as { code?: string; error?: string };
+      expect(body.code).toBe("STORAGE_PERMISSION_DENIED");
+      expect(body.error).toContain("Storage is unavailable for learning material storage");
+      expect(JSON.stringify(body)).not.toContain("EACCES");
+      expect(JSON.stringify(body)).not.toContain(tempRoot);
+    } finally {
+      await fs.chmod(tempRoot, 0o755).catch(() => null);
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("does not expose another teacher's booking-linked materials to the customer's primary teacher", async () => {
     const teacherA = await createTeacher("materials-primary@example.com", "Materials Primary");
     const teacherB = await createTeacher("materials-booking@example.com", "Materials Booking");

@@ -46,6 +46,7 @@ export function AdminMaterialsPanel({
   const fileInputId = useId();
   const captcha = useCaptcha();
   const [selectedFileName, setSelectedFileName] = useState("No file selected");
+  const [failedPreviewIds, setFailedPreviewIds] = useState<string[]>([]);
 
   /**
    * Validates the human check before handing the actual file upload off to the
@@ -120,15 +121,24 @@ export function AdminMaterialsPanel({
                     />
                   ) : null}
 
-                  {material.mimeType.startsWith("image/") ? (
-                    <Image
-                      src={`/api/admin/learning-materials/${material.id}`}
-                      alt={material.title}
-                      width={480}
-                      height={120}
-                      unoptimized
-                      className="customer-materials-image"
-                    />
+                    {material.mimeType.startsWith("image/") ? (
+                    failedPreviewIds.includes(material.id) ? (
+                      <p className="helper-text">Preview unavailable. Open the file directly to inspect it.</p>
+                    ) : (
+                      <Image
+                        src={`/api/admin/learning-materials/${material.id}`}
+                        alt={material.title}
+                        width={480}
+                        height={120}
+                        unoptimized
+                        className="customer-materials-image"
+                        onError={() =>
+                          setFailedPreviewIds((current) =>
+                            current.includes(material.id) ? current : [...current, material.id]
+                          )
+                        }
+                      />
+                    )
                   ) : null}
                 </div>
               ))}

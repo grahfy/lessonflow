@@ -307,6 +307,8 @@ UPDATES_DEPLOY_USER="grahf"
 # Learning Materials Storage
 LEARNING_MATERIALS_STORAGE_DRIVER="local"
 LEARNING_MATERIALS_LOCAL_ROOT="/var/www/lessonflow/data/learning-materials"
+ADMIN_STAFF_PHOTOS_LOCAL_ROOT="/var/www/lessonflow/data/admin-staff-photos"
+EMAIL_SIGNATURE_LOGO_LOCAL_ROOT="/var/www/lessonflow/data/email-signature-logo"
 
 # Invoice Configuration
 INVOICE_BUSINESS_NAME="LessonFlow"
@@ -337,6 +339,7 @@ The first command should succeed, and the second should resolve to `/var/www/les
 The third command should also succeed.
 
 Use an absolute `LEARNING_MATERIALS_LOCAL_ROOT` in production. Relative roots are acceptable for local development, but in standalone deployments they resolve from the runtime app directory and can end up inside the current release tree instead of persistent shared storage.
+The admin profile photo and email-signature logo stores follow the same rule and should point at shared absolute paths in production.
 
 ---
 

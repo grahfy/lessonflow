@@ -2,7 +2,8 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { resolveConfiguredStorageRoot } from "@/lib/runtime-paths";
+import { resolveProductionAwareStorageRoot } from "@/lib/runtime-paths";
+import { rethrowAsStoragePermissionDeniedError } from "@/lib/storage-errors";
 
 type StoredEmailSignatureLogo = {
   buffer: Buffer;
@@ -10,6 +11,7 @@ type StoredEmailSignatureLogo = {
 };
 
 const DEFAULT_LOCAL_ROOT = ".data/email-signature-logo";
+const PRODUCTION_LOCAL_ROOT = "/var/www/lessonflow/data/email-signature-logo";
 const ALLOWED_IMAGE_TYPES = new Map<string, string>([
   ["image/jpeg", "jpg"],
   ["image/png", "png"],
@@ -18,7 +20,18 @@ const ALLOWED_IMAGE_TYPES = new Map<string, string>([
 ]);
 
 function getStorageRoot(): string {
-  return resolveConfiguredStorageRoot(undefined, DEFAULT_LOCAL_ROOT);
+  return resolveProductionAwareStorageRoot(
+    process.env.EMAIL_SIGNATURE_LOGO_LOCAL_ROOT,
+    DEFAULT_LOCAL_ROOT,
+    PRODUCTION_LOCAL_ROOT
+  );
+}
+
+/**
+ * Resolves the storage root used for email signature logos.
+ */
+export function getEmailSignatureLogoStorageRoot(): string {
+  return getStorageRoot();
 }
 
 function resolveLocalPath(storageKey: string): string {
@@ -53,23 +66,34 @@ export function buildEmailSignatureLogoStorageKey(extension: string): string {
 }
 
 export async function putEmailSignatureLogo(storageKey: string, buffer: Buffer): Promise<void> {
-  const targetPath = resolveLocalPath(storageKey);
-  await ensureParentDirectory(targetPath);
-  await fs.writeFile(targetPath, buffer);
+  try {
+    const targetPath = resolveLocalPath(storageKey);
+    await ensureParentDirectory(targetPath);
+    await fs.writeFile(targetPath, buffer);
+  } catch (error) {
+    rethrowAsStoragePermissionDeniedError(error, "email signature logo storage");
+  }
 }
 
 export async function getEmailSignatureLogo(storageKey: string, mimeType: string): Promise<StoredEmailSignatureLogo> {
-  const sourcePath = resolveLocalPath(storageKey);
-  return {
-    buffer: await fs.readFile(sourcePath),
-    mimeType
-  };
+  try {
+    const sourcePath = resolveLocalPath(storageKey);
+    return {
+      buffer: await fs.readFile(sourcePath),
+      mimeType
+    };
+  } catch (error) {
+    rethrowAsStoragePermissionDeniedError(error, "email signature logo storage");
+  }
 }
 
 export async function deleteEmailSignatureLogo(storageKey: string | null | undefined): Promise<void> {
   if (!storageKey) {
     return;
   }
-
-  await fs.rm(resolveLocalPath(storageKey), { force: true });
+  try {
+    await fs.rm(resolveLocalPath(storageKey), { force: true });
+  } catch (error) {
+    rethrowAsStoragePermissionDeniedError(error, "email signature logo storage");
+  }
 }
