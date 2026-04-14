@@ -114,6 +114,8 @@ DEPLOY_MODE="release-directory"
 DEPLOY_MODE_DETAIL=""
 DEPLOY_MODE_RUNTIME_PATH=""
 DEPLOY_MODE_WARNING=""
+DEPLOY_INTERRUPT_CAUGHT=false
+DEPLOY_INTERRUPT_SIGNAL=""
 
 # Colors for output
 RED='\033[0;31m'
@@ -904,6 +906,38 @@ sync_deploy_tree_ownership() {
     else
         run_sudo_cmd chown -R :www-data "${DEPLOY_DIR}" 2>/dev/null || true
     fi
+}
+
+resolve_production_storage_root() {
+    local configured_root="$1"
+    local production_root="$2"
+
+    if [[ -n "${configured_root}" && "${configured_root}" == /* ]]; then
+        printf '%s\n' "${configured_root}"
+    else
+        printf '%s\n' "${production_root}"
+    fi
+}
+
+ensure_runtime_upload_storage_permissions() {
+    local shared_env_path="${SHARED_DIR}/.env"
+    local storage_root=""
+    local -a storage_roots=()
+
+    [[ -f "${shared_env_path}" ]] || return 0
+
+    storage_roots=(
+        "$(resolve_production_storage_root "$(read_env_file_value "${shared_env_path}" "LEARNING_MATERIALS_LOCAL_ROOT" || true)" "${DEPLOY_DIR}/data/learning-materials")"
+        "$(resolve_production_storage_root "$(read_env_file_value "${shared_env_path}" "ADMIN_STAFF_PHOTOS_LOCAL_ROOT" || true)" "${DEPLOY_DIR}/data/admin-staff-photos")"
+        "$(resolve_production_storage_root "$(read_env_file_value "${shared_env_path}" "EMAIL_SIGNATURE_LOGO_LOCAL_ROOT" || true)" "${DEPLOY_DIR}/data/email-signature-logo")"
+    )
+
+    for storage_root in "${storage_roots[@]}"; do
+        mkdir -p "${storage_root}"
+        run_sudo_cmd chown -R :www-data "${storage_root}" 2>/dev/null || true
+        run_sudo_cmd find "${storage_root}" -type d -exec chmod 2775 {} + 2>/dev/null || true
+        run_sudo_cmd find "${storage_root}" -type f -exec chmod 0664 {} + 2>/dev/null || true
+    done
 }
 
 remove_path_with_sudo_fallback() {
@@ -3041,6 +3075,49 @@ run_step() {
     return 1
 }
 
+collect_process_children() {
+    local parent_pid="$1"
+
+    if command -v pgrep >/dev/null 2>&1; then
+        pgrep -P "${parent_pid}" 2>/dev/null || true
+        return 0
+    fi
+
+    ps -eo pid=,ppid= 2>/dev/null | awk -v parent="${parent_pid}" '$2 == parent { print $1 }' || true
+}
+
+terminate_process_descendants() {
+    local parent_pid="$1"
+    local signal="${2:-TERM}"
+    local child_pid=""
+    local child_pids=()
+
+    mapfile -t child_pids < <(collect_process_children "${parent_pid}")
+
+    for child_pid in "${child_pids[@]}"; do
+        terminate_process_descendants "${child_pid}" "${signal}"
+        kill -s "${signal}" "${child_pid}" 2>/dev/null || true
+    done
+}
+
+handle_interrupt_signal() {
+    local signal_name="$1"
+
+    if [[ "${DEPLOY_INTERRUPT_CAUGHT}" == true ]]; then
+        return 0
+    fi
+
+    DEPLOY_INTERRUPT_CAUGHT=true
+    DEPLOY_INTERRUPT_SIGNAL="${signal_name}"
+    trap - INT TERM HUP
+    log_warn "Received ${signal_name}; stopping deploy and terminating child processes..."
+    stop_spinner "fail"
+    terminate_process_descendants "$$" TERM
+    sleep 0.2
+    terminate_process_descendants "$$" KILL
+    exit 130
+}
+
 # Repair a corrupted npm cache (common after interrupted deploys/reboots) so a
 # transient cache ENOENT does not require manual operator intervention.
 repair_npm_cache() {
@@ -4072,6 +4149,9 @@ cleanup_incomplete_release_on_exit() {
     exit "${exit_code}"
 }
 
+trap 'handle_interrupt_signal INT' INT
+trap 'handle_interrupt_signal TERM' TERM
+trap 'handle_interrupt_signal HUP' HUP
 trap cleanup_incomplete_release_on_exit EXIT
 
 require_option_value() {
@@ -4485,6 +4565,7 @@ run_sudo_cmd chmod -R 775 "${DEPLOY_SHARED_CACHE_DIR}" 2>/dev/null || true
 section "Environment File (.env)"
 ensure_shared_env_file "${SOURCE_DIR}/.env.example" || true
 maybe_edit_shared_env_before_deploy "${SOURCE_DIR}"
+ensure_runtime_upload_storage_permissions
 
 if [[ "${INSTALL_NGINX_IF_NEEDED}" == true ]]; then
     ensure_nginx_installed_from_deploy
@@ -4650,10 +4731,12 @@ log_info "Updating current symlink..."
 ln -sfn "${NEW_RELEASE_DIR}" "${CURRENT_LINK}"
 
 # Fix permissions for the entire deploy directory
-# Do this AFTER everything is set up to ensure all new files are owned by www-data
+# Do this AFTER everything is set up so the release tree stays readable/executable
+# for the runtime while owner-writable files like .deploy-version and generated
+# public artifacts keep their write bit. Shared mutable state is handled below.
 log_info "Fixing permissions..."
 sync_deploy_tree_ownership
-run_sudo_cmd chmod -R 755 "${NEW_RELEASE_DIR}" 2>/dev/null || true
+run_sudo_cmd chmod -R u=rwX,go=rX "${NEW_RELEASE_DIR}" 2>/dev/null || true
 
 # Ensure systemd service is installed
 SERVICE_FILE="$(app_systemd_dir)/${APP_NAME}.service"
