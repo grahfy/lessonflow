@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Overpass } from "next/font/google";
 import { PropsWithChildren } from "react";
 
 import { MotionProvider } from "@/components/motion/tween-orchestrator";
@@ -9,6 +10,13 @@ import { getPublicSiteUrl } from "@/lib/env";
 import "@/styles/globals.css";
 import "@/styles/admin.css";
 import "@/styles/extended-features.css";
+
+const overpass = Overpass({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800"],
+  display: "swap",
+  variable: "--font-overpass"
+});
 
 export function generateMetadata(): Metadata {
   const branding = getBranding();
@@ -93,8 +101,8 @@ export default function RootLayout({ children }: PropsWithChildren) {
   const branding = getBranding();
 
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" className={overpass.variable}>
+      <body className={overpass.className}>
         <GlobalTooltipProvider>
           <MotionProvider>
             <PublicSiteFrame brandName={branding.PUBLIC_BRAND_NAME}>{children}</PublicSiteFrame>

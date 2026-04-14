@@ -4572,7 +4572,7 @@ if [[ "${SKIP_DEPS}" == false ]]; then
     # RATIONALE: Production dependency installation can OOM on 1GB/2GB hosts
     # before the later build-phase swap setup would otherwise kick in.
     ensure_temporary_build_swap
-    run_npm_step_with_cache_repair "Installing production dependencies (npm ci)" npm ci --omit=dev --ignore-scripts
+    run_npm_step_with_cache_repair "Installing production dependencies (npm ci)" npm ci --omit=dev --ignore-scripts --prefer-offline
 fi
 
 # Consolidate Prisma update (generate client and run migrations)

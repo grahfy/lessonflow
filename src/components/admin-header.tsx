@@ -6,6 +6,7 @@ import { AdminDeployUpdatesButton } from "@/components/admin-deploy-updates-butt
 import { invalidateCustomerEmailAlertsSessionCache } from "@/lib/admin/customer-email-alerts";
 import { getActiveAdminNavGroup, getVisibleAdminNavGroups } from "@/lib/admin/config";
 import { Tooltip } from "@/components/admin/ui/tooltip";
+import { useInitialAdminRole } from "@/lib/admin/admin-initial-role-context";
 import type { AdminSessionSummary } from "@/lib/admin/use-admin-session";
 
 interface AdminHeaderProps {
@@ -22,8 +23,9 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const initialRole = useInitialAdminRole();
   const adminRoleLabel = admin?.role === "owner" ? "Owner" : "Teacher";
-  const visibleNavGroups = getVisibleAdminNavGroups(adminLoading ? null : admin?.role);
+  const visibleNavGroups = getVisibleAdminNavGroups(initialRole ?? (adminLoading ? null : admin?.role));
   const activeGroupKey = getActiveAdminNavGroup(pathname, visibleNavGroups);
 
   useEffect(() => {

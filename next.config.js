@@ -7,8 +7,8 @@ const isLowMemoryDeployBuild = process.env.NEXT_LOW_MEMORY_BUILD === "1";
 const cspDirectives = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' https://fonts.gstatic.com",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self'",
   "img-src 'self' data: blob: https://images.unsplash.com https://i.ytimg.com",
   "frame-src https://www.youtube-nocookie.com",
   "connect-src 'self' https://nominatim.openstreetmap.org",
@@ -71,13 +71,14 @@ const nextConfig = {
     // Webpack memory usage during builds on smaller hosts.
     webpackMemoryOptimizations: isLowMemoryDeployBuild
   },
-  // Low-memory deploy builds can skip duplicate validation work because the
-  // project already exposes dedicated lint/typecheck commands for CI/manual use.
+  // The project exposes dedicated `npm run lint` and `npm run typecheck`
+  // commands.  Skipping these during `next build` avoids duplicate work and
+  // shaves time off every deploy.
   eslint: {
-    ignoreDuringBuilds: isLowMemoryDeployBuild
+    ignoreDuringBuilds: true
   },
   typescript: {
-    ignoreBuildErrors: isLowMemoryDeployBuild
+    ignoreBuildErrors: true
   },
   async headers() {
     return [

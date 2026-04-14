@@ -3601,8 +3601,12 @@ if [[ "${SKIP_DEPLOY}" == false ]]; then
   ensure_shared_env_file "${REPO_ROOT}/.env.example" || true
   maybe_edit_shared_env_before_deploy "${REPO_ROOT}"
   run_deploy
-  sync_manual_docs_into_current_standalone_from_update
-  ensure_seeded_chord_library
+  # Run independent post-deploy steps in parallel to reduce total deploy time.
+  sync_manual_docs_into_current_standalone_from_update &
+  _docs_pid=$!
+  ensure_seeded_chord_library &
+  _chords_pid=$!
+  wait "${_docs_pid}" "${_chords_pid}"
   maybe_seed_example_lesson_plan_templates
   notify_updates
 else
