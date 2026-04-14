@@ -3443,79 +3443,89 @@
 
 /* ───────────────────────────────────────────────
    Site Analytics Dashboard
+   Teal-cyan accent palette to differentiate from
+   blue-purple business reports.
    ─────────────────────────────────────────────── */
 
 .analytics-layout-content {
   overflow: visible;
   padding-right: 0;
+  display: grid;
+  gap: 20px;
 }
 
+/* --- Shared card base --- */
+
 .analytics-toolbar-card,
-.analytics-controls-card,
 .analytics-chart-card,
 .analytics-breakdown-card {
   display: grid;
   gap: 14px;
   position: relative;
   overflow: hidden;
-  border-color: rgba(139, 168, 255, 0.28);
+  border-color: rgba(94, 194, 200, 0.24);
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
 
 .analytics-toolbar-card::before,
-.analytics-controls-card::before,
 .analytics-chart-card::before,
 .analytics-breakdown-card::before {
   content: "";
   position: absolute;
   inset: 0 0 auto;
   height: 2px;
-  background: linear-gradient(90deg, rgba(107, 211, 255, 0.65), rgba(164, 129, 255, 0.68), rgba(255, 102, 156, 0.62));
+  background: linear-gradient(90deg, rgba(45, 212, 191, 0.7), rgba(34, 211, 238, 0.65), rgba(167, 139, 250, 0.5));
   pointer-events: none;
 }
 
 .analytics-toolbar-card:hover,
-.analytics-controls-card:hover,
 .analytics-chart-card:hover,
 .analytics-breakdown-card:hover {
   transform: translateY(-1px);
-  border-color: rgba(169, 193, 255, 0.38);
+  border-color: rgba(94, 194, 200, 0.36);
   box-shadow: 0 16px 30px rgba(6, 12, 34, 0.32);
 }
+
+/* --- Toolbar card --- */
 
 .analytics-toolbar-card {
   grid-template-columns: 1fr;
   align-items: start;
   background:
-    radial-gradient(130% 120% at 6% 5%, rgba(90, 176, 255, 0.17), transparent 58%),
-    linear-gradient(148deg, rgba(12, 24, 56, 0.92), rgba(17, 32, 64, 0.78));
+    radial-gradient(130% 120% at 6% 5%, rgba(45, 212, 191, 0.12), transparent 58%),
+    linear-gradient(148deg, rgba(8, 22, 32, 0.94), rgba(12, 28, 38, 0.82));
 }
 
-.analytics-toolbar-title {
-  font-size: 1.04rem;
-  font-weight: 700;
-  color: rgba(241, 248, 255, 0.98);
-}
-
-.analytics-controls-card {
-  background:
-    radial-gradient(120% 120% at 88% 12%, rgba(168, 124, 255, 0.16), transparent 56%),
-    linear-gradient(155deg, rgba(11, 25, 56, 0.92), rgba(20, 31, 58, 0.8));
-}
-
-.analytics-controls-card .report-controls-primary {
+.analytics-toolbar-actions {
   display: flex;
-  gap: 16px;
-  align-items: end;
+  align-items: center;
+  gap: 10px;
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
-.analytics-controls-card select {
-  min-height: 40px;
-  font-size: 0.84rem;
+.analytics-toolbar-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
-/* Period summary cards */
+.analytics-toolbar-select {
+  min-height: 36px;
+  font-size: 0.8rem;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.86));
+  color: rgba(226, 232, 240, 0.96);
+  cursor: pointer;
+}
+
+.analytics-toolbar-select:hover {
+  border-color: rgba(45, 212, 191, 0.36);
+}
+
+/* --- Period summary cards --- */
 
 .analytics-period-grid {
   display: grid;
@@ -3525,15 +3535,14 @@
 
 .analytics-period-card {
   display: grid;
-  gap: 4px;
+  gap: 6px;
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(139, 168, 255, 0.28);
+  border: 1px solid rgba(94, 194, 200, 0.2);
   border-radius: 16px;
   background:
-    radial-gradient(120% 120% at 20% 10%, rgba(95, 160, 255, 0.12), transparent 56%),
-    linear-gradient(155deg, rgba(11, 25, 56, 0.92), rgba(20, 31, 58, 0.8));
-  padding: 16px;
+    linear-gradient(155deg, rgba(8, 22, 32, 0.94), rgba(12, 28, 38, 0.82));
+  padding: 18px 16px;
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
 
@@ -3541,67 +3550,148 @@
   content: "";
   position: absolute;
   inset: 0 0 auto;
-  height: 2px;
-  background: linear-gradient(90deg, rgba(107, 211, 255, 0.65), rgba(164, 129, 255, 0.68));
+  height: 3px;
   pointer-events: none;
 }
 
+/* Per-period accent colors on top bar */
+.analytics-period-card.accent-teal::before {
+  background: linear-gradient(90deg, #2dd4bf, rgba(45, 212, 191, 0.3));
+}
+.analytics-period-card.accent-cyan::before {
+  background: linear-gradient(90deg, #22d3ee, rgba(34, 211, 238, 0.3));
+}
+.analytics-period-card.accent-violet::before {
+  background: linear-gradient(90deg, #a78bfa, rgba(167, 139, 250, 0.3));
+}
+.analytics-period-card.accent-amber::before {
+  background: linear-gradient(90deg, #fbbf24, rgba(251, 191, 36, 0.3));
+}
+
+/* Subtle radial glow matching the accent */
+.analytics-period-card.accent-teal {
+  background:
+    radial-gradient(120% 120% at 20% 10%, rgba(45, 212, 191, 0.08), transparent 56%),
+    linear-gradient(155deg, rgba(8, 22, 32, 0.94), rgba(12, 28, 38, 0.82));
+}
+.analytics-period-card.accent-cyan {
+  background:
+    radial-gradient(120% 120% at 20% 10%, rgba(34, 211, 238, 0.08), transparent 56%),
+    linear-gradient(155deg, rgba(8, 22, 32, 0.94), rgba(12, 28, 38, 0.82));
+}
+.analytics-period-card.accent-violet {
+  background:
+    radial-gradient(120% 120% at 20% 10%, rgba(167, 139, 250, 0.08), transparent 56%),
+    linear-gradient(155deg, rgba(8, 22, 32, 0.94), rgba(12, 28, 38, 0.82));
+}
+.analytics-period-card.accent-amber {
+  background:
+    radial-gradient(120% 120% at 20% 10%, rgba(251, 191, 36, 0.06), transparent 56%),
+    linear-gradient(155deg, rgba(8, 22, 32, 0.94), rgba(12, 28, 38, 0.82));
+}
+
 .analytics-period-card:hover {
-  transform: translateY(-1px);
-  border-color: rgba(169, 193, 255, 0.38);
-  box-shadow: 0 16px 30px rgba(6, 12, 34, 0.32);
+  transform: translateY(-2px);
+  border-color: rgba(94, 194, 200, 0.36);
+  box-shadow:
+    0 12px 28px rgba(6, 12, 34, 0.36),
+    0 0 0 1px rgba(94, 194, 200, 0.08);
 }
 
 .analytics-period-header {
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
-.analytics-period-label {
-  font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.72);
+.analytics-period-short {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
 }
 
 .analytics-period-value {
-  font-size: 1.8rem;
+  font-size: 2.2rem;
   font-weight: 800;
-  color: rgba(255, 255, 255, 0.96);
-  line-height: 1.1;
+  color: rgba(255, 255, 255, 0.97);
+  line-height: 1;
+  letter-spacing: -0.02em;
 }
 
 .analytics-period-sublabel {
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.46);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
 }
 
-.analytics-period-delta {
-  font-size: 0.82rem;
+.analytics-period-delta-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  font-size: 0.76rem;
   font-weight: 600;
+  width: fit-content;
+}
+
+.analytics-period-delta-row.positive {
+  background: rgba(34, 197, 94, 0.14);
+  color: #86efac;
+}
+
+.analytics-period-delta-row.negative {
+  background: rgba(239, 68, 68, 0.14);
+  color: #fca5a5;
+}
+
+.analytics-period-delta-row.neutral {
+  background: rgba(148, 163, 184, 0.12);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.analytics-period-arrow {
+  font-size: 0.82rem;
+}
+
+.analytics-period-delta-text {
+  font-variant-numeric: tabular-nums;
 }
 
 .analytics-period-prev {
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.52);
+  font-size: 0.66rem;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 2px;
 }
 
-/* Chart card */
+/* --- Chart card --- */
 
 .analytics-chart-card {
   background:
-    radial-gradient(120% 110% at 50% 5%, rgba(90, 155, 255, 0.12), transparent 56%),
-    linear-gradient(152deg, rgba(12, 24, 56, 0.92), rgba(17, 32, 64, 0.78));
+    radial-gradient(120% 110% at 50% 5%, rgba(45, 212, 191, 0.08), transparent 56%),
+    linear-gradient(152deg, rgba(8, 22, 32, 0.94), rgba(12, 28, 38, 0.82));
 }
 
-/* Analytics chart bar color */
+.analytics-chart-svg {
+  background:
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.03) 1px, transparent 0),
+    radial-gradient(140% 95% at 50% 0%, rgba(45, 212, 191, 0.06), transparent 56%),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.005)),
+    rgba(255, 255, 255, 0.01) !important;
+  background-size: 20px 20px, 100% 100%, 100% 100%, 100% 100% !important;
+}
+
+/* Analytics chart bar color — teal instead of purple */
 
 .analytics-bar {
   opacity: 0.95;
-  filter: drop-shadow(0 0 8px rgba(167, 139, 255, 0.22));
+  filter: drop-shadow(0 0 8px rgba(45, 212, 191, 0.22));
 }
 
 .analytics-bar-views {
-  fill: #b89eff;
+  fill: #2dd4bf;
 }
 
 .analytics-bar-views.report-line-stroke,
@@ -3610,15 +3700,58 @@
 .analytics-bar-views.report-step-point,
 .analytics-bar-views.report-lollipop-stem,
 .analytics-bar-views.report-lollipop-head {
-  stroke: #b89eff;
-  fill: #b89eff;
+  stroke: #2dd4bf;
+  fill: #2dd4bf;
 }
 
 .analytics-bar-views.report-area-fill {
-  fill: #b89eff;
+  fill: #2dd4bf;
 }
 
-/* Breakdown grid */
+/* --- Empty chart placeholder --- */
+
+.analytics-empty-chart {
+  display: grid;
+  gap: 12px;
+}
+
+.analytics-empty-chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 12px;
+  border: 1px solid rgba(94, 194, 200, 0.1);
+  background:
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.02) 1px, transparent 0),
+    rgba(255, 255, 255, 0.01);
+  background-size: 20px 20px, 100% 100%;
+}
+
+.analytics-empty-grid-line {
+  stroke: rgba(255, 255, 255, 0.05);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.analytics-empty-axis {
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 1;
+}
+
+.analytics-empty-bar {
+  fill: rgba(45, 212, 191, 0.08);
+  rx: 3;
+}
+
+.analytics-empty-chart-message {
+  margin: 0;
+  text-align: center;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+}
+
+/* --- Breakdown grid --- */
 
 .analytics-breakdown-grid {
   display: grid;
@@ -3628,31 +3761,32 @@
 
 .analytics-breakdown-card {
   background:
-    radial-gradient(120% 120% at 80% 8%, rgba(130, 100, 255, 0.12), transparent 56%),
-    linear-gradient(155deg, rgba(11, 25, 56, 0.92), rgba(20, 31, 58, 0.8));
+    radial-gradient(120% 120% at 80% 8%, rgba(45, 212, 191, 0.06), transparent 56%),
+    linear-gradient(155deg, rgba(8, 22, 32, 0.94), rgba(12, 28, 38, 0.82));
 }
 
-/* Ranked bar list */
+/* --- Ranked bar list --- */
 
 .analytics-ranked-list {
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
 .analytics-ranked-list h3 {
   margin: 0;
-  font-size: 0.94rem;
+  font-size: 0.92rem;
   letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.88);
 }
 
 .analytics-ranked-items {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .analytics-ranked-row {
   display: grid;
-  gap: 4px;
+  gap: 5px;
 }
 
 .analytics-ranked-label {
@@ -3671,30 +3805,67 @@
 }
 
 .analytics-ranked-count {
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .analytics-ranked-bar-track {
-  height: 6px;
+  height: 8px;
   border-radius: 99px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
   overflow: hidden;
 }
 
 .analytics-ranked-bar-fill {
   height: 100%;
   border-radius: 99px;
-  background: linear-gradient(90deg, #b89eff, #67d3ff);
-  transition: width 300ms ease;
+  background: linear-gradient(90deg, #2dd4bf, #22d3ee);
+  transition: width 500ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Responsive */
+/* --- Empty bar placeholder --- */
+
+.analytics-ranked-empty {
+  display: grid;
+  gap: 10px;
+}
+
+.analytics-ranked-empty-row {
+  display: grid;
+  gap: 5px;
+}
+
+.analytics-ranked-empty-label {
+  height: 10px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.analytics-ranked-empty-bar {
+  height: 100%;
+  border-radius: 99px;
+  background: rgba(45, 212, 191, 0.06);
+}
+
+.analytics-empty-hint {
+  margin: 4px 0 0;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.32);
+  font-style: italic;
+}
+
+/* --- Responsive --- */
 
 @media (max-width: 1100px) {
   .analytics-period-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .analytics-toolbar-actions {
+    flex-direction: column;
+    align-items: flex-end;
   }
 }
 
@@ -3705,5 +3876,17 @@
 
   .analytics-breakdown-grid {
     grid-template-columns: 1fr;
+  }
+
+  .analytics-toolbar-actions {
+    align-items: stretch;
+  }
+
+  .analytics-toolbar-controls {
+    justify-content: stretch;
+  }
+
+  .analytics-toolbar-select {
+    flex: 1;
   }
 }

@@ -67,11 +67,24 @@ function periodTitle(key: AnalyticsPeriodKey): string {
   return "Yearly";
 }
 
+function periodShortLabel(key: AnalyticsPeriodKey): string {
+  if (key === "daily") return "Today";
+  if (key === "weekly") return "This week";
+  if (key === "monthly") return "This month";
+  return "This year";
+}
+
 function trendTitle(key: AnalyticsPeriodKey): string {
   if (key === "daily") return "Daily trend (last 14 days)";
   if (key === "weekly") return "Weekly trend (last 8 weeks)";
   if (key === "monthly") return "Monthly trend (last 12 months)";
   return "Yearly trend (last 6 years)";
+}
+
+function deltaArrow(value: number): string {
+  if (value > 0) return "\u2197"; // ↗
+  if (value < 0) return "\u2198"; // ↘
+  return "\u2192"; // →
 }
 
 // --- SVG Trend Chart (adapted from ReportTrendChart for analytics) ---
@@ -91,6 +104,62 @@ function buildStepPath(coords: Array<{ x: number; y: number }>): string {
   return path;
 }
 
+/** Decorative SVG placeholder shown when the chart has no data. */
+function EmptyChartPlaceholder(): ReactElement {
+  const width = 560;
+  const height = 188;
+  const padX = 14;
+  const bottom = 34;
+  const top = 14;
+
+  // Generate faded placeholder bars at random heights
+  const barCount = 14;
+  const slotWidth = (width - padX * 2) / barCount;
+  const barWidth = Math.max(6, Math.min(24, slotWidth * 0.56));
+  const chartHeight = height - top - bottom;
+  const placeholderHeights = [0.15, 0.25, 0.18, 0.35, 0.3, 0.22, 0.4, 0.32, 0.28, 0.2, 0.38, 0.25, 0.33, 0.18];
+
+  return (
+    <div className="analytics-empty-chart">
+      <svg viewBox={`0 0 ${width} ${height}`} className="analytics-empty-chart-svg" role="img" aria-label="No chart data yet">
+        {/* Faded grid lines */}
+        {[0.25, 0.5, 0.75].map((ratio) => (
+          <line
+            key={ratio}
+            x1={padX}
+            y1={height - bottom - chartHeight * ratio}
+            x2={width - padX}
+            y2={height - bottom - chartHeight * ratio}
+            className="analytics-empty-grid-line"
+          />
+        ))}
+        {/* Axis */}
+        <line x1={padX} y1={height - bottom} x2={width - padX} y2={height - bottom} className="analytics-empty-axis" />
+        {/* Ghost bars */}
+        {placeholderHeights.map((h, i) => {
+          const barX = padX + slotWidth * i + (slotWidth - barWidth) / 2;
+          const barH = chartHeight * h;
+          const barY = height - bottom - barH;
+          return (
+            <rect
+              key={i}
+              x={barX}
+              y={barY}
+              width={barWidth}
+              height={barH}
+              rx={3}
+              className="analytics-empty-bar"
+            />
+          );
+        })}
+      </svg>
+      <p className="analytics-empty-chart-message">
+        Data will appear as visitors browse your public pages.
+      </p>
+    </div>
+  );
+}
+
 function AnalyticsTrendChart({
   points,
   chartStyle,
@@ -107,8 +176,10 @@ function AnalyticsTrendChart({
   const bottom = 34;
   const chartHeight = height - top - bottom;
 
-  if (points.length === 0) {
-    return <p className="report-chart-empty">{emptyLabel}</p>;
+  const allZero = points.length > 0 && points.every((p) => p.views === 0);
+
+  if (points.length === 0 || allZero) {
+    return <EmptyChartPlaceholder />;
   }
 
   const values = points.map((p) => p.views);
@@ -137,7 +208,7 @@ function AnalyticsTrendChart({
 
   return (
     <div className="report-chart-shell">
-      <svg viewBox={`0 0 ${width} ${height}`} className="report-chart-svg" role="img" aria-label={emptyLabel}>
+      <svg viewBox={`0 0 ${width} ${height}`} className="report-chart-svg analytics-chart-svg" role="img" aria-label={emptyLabel}>
         <line x1={padX} y1={height - bottom} x2={width - padX} y2={height - bottom} className="report-chart-axis" />
         {chartStyle === "area" && areaPath ? <path d={areaPath} className={`${strokeClass} report-area-fill`} /> : null}
         {(chartStyle === "line" || chartStyle === "area") && linePath ? (
@@ -185,17 +256,32 @@ function AnalyticsTrendChart({
 
 // --- Horizontal Bar List (for top pages, referrers, countries) ---
 
+/** Decorative placeholder shown when a ranked list has no data. */
+function EmptyBarPlaceholder({ label }: { label: string }) {
+  return (
+    <div className="analytics-ranked-list">
+      <h3>{label}</h3>
+      <div className="analytics-ranked-empty">
+        {[0.85, 0.6, 0.4, 0.25].map((w, i) => (
+          <div key={i} className="analytics-ranked-empty-row">
+            <div className="analytics-ranked-empty-label" style={{ width: `${40 + i * 8}%` }} />
+            <div className="analytics-ranked-bar-track">
+              <div className="analytics-ranked-empty-bar" style={{ width: `${w * 100}%` }} />
+            </div>
+          </div>
+        ))}
+        <p className="analytics-empty-hint">Waiting for visitor data</p>
+      </div>
+    </div>
+  );
+}
+
 function RankedBarList({ items, label }: { items: RankedItem[]; label: string }) {
   const maxCount = items.length > 0 ? Math.max(...items.map((i) => i.count)) : 1;
   const total = items.reduce((sum, i) => sum + i.count, 0);
 
   if (items.length === 0) {
-    return (
-      <div className="analytics-ranked-list">
-        <h3>{label}</h3>
-        <p className="helper-text">No data for this period.</p>
-      </div>
-    );
+    return <EmptyBarPlaceholder label={label} />;
   }
 
   return (
@@ -224,16 +310,29 @@ function RankedBarList({ items, label }: { items: RankedItem[]; label: string })
 
 // --- Period Summary Card ---
 
+const PERIOD_ACCENT: Record<AnalyticsPeriodKey, string> = {
+  daily: "accent-teal",
+  weekly: "accent-cyan",
+  monthly: "accent-violet",
+  yearly: "accent-amber"
+};
+
 function PeriodCard({ period }: { period: PeriodSummary }) {
+  const periodKey = period.key as AnalyticsPeriodKey;
+  const accent = PERIOD_ACCENT[periodKey] || "accent-teal";
+
   return (
-    <div className="analytics-period-card">
+    <div className={`analytics-period-card ${accent}`}>
       <div className="analytics-period-header">
-        <span className="analytics-period-label">{period.label}</span>
+        <span className="analytics-period-short">{periodShortLabel(periodKey)}</span>
       </div>
       <div className="analytics-period-value">{period.totalViews.toLocaleString()}</div>
       <div className="analytics-period-sublabel">page views</div>
-      <div className={`analytics-period-delta report-delta ${deltaClass(period.comparison.delta)}`}>
-        {formatDelta(period.comparison.delta)} ({formatPercent(period.comparison.deltaPercent)})
+      <div className={`analytics-period-delta-row ${deltaClass(period.comparison.delta)}`}>
+        <span className="analytics-period-arrow">{deltaArrow(period.comparison.delta)}</span>
+        <span className="analytics-period-delta-text">
+          {formatDelta(period.comparison.delta)} ({formatPercent(period.comparison.deltaPercent)})
+        </span>
       </div>
       <div className="analytics-period-prev">{period.comparison.previousLabel}</div>
     </div>
@@ -297,76 +396,43 @@ export function AdminAnalyticsClient(): ReactElement {
     <AdminShell title="Site Analytics" error={error} loading={loading} className="admin-shell-analytics">
       <div className="admin-layout-content analytics-layout-content">
 
-        {/* Toolbar */}
+        {/* Toolbar — controls integrated into actions area */}
         <div className="admin-card admin-toolbar-card analytics-toolbar-card admin-workspace-panel">
           <div className="admin-workspace-head">
             <div className="admin-workspace-copy">
-              <p className="helper-text analytics-toolbar-title">Public website traffic and visitor analytics</p>
-              <h2 className="admin-workspace-title">Page views, traffic sources, and visitor geography</h2>
+              <h2 className="admin-workspace-title">Website Analytics</h2>
               <p className="helper-text admin-workspace-summary">
-                Tracks page views on public pages. Privacy-friendly — no cookies, no PII stored.
+                Public page traffic, visitor geography, and referral sources. Privacy-friendly — no cookies, no PII.
               </p>
               <div className="admin-workspace-chip-row" aria-label="Analytics workspace context">
                 <span className="admin-workspace-chip">{periodTitle(activeTrend)} trend</span>
-                <span className="admin-workspace-chip">{chartStyle} charts</span>
-                {dashboard ? <span className="admin-workspace-chip">{dashboard.periods.monthly.totalViews} views this month</span> : null}
+                {dashboard ? <span className="admin-workspace-chip">{dashboard.periods.monthly.totalViews.toLocaleString()} views this month</span> : null}
               </div>
             </div>
-            <div className="admin-workspace-actions">
+            <div className="admin-workspace-actions analytics-toolbar-actions">
+              <div className="analytics-toolbar-controls">
+                <Tooltip content="Switch the trend chart between daily, weekly, monthly, and yearly views.">
+                  <select value={activeTrend} onChange={(e) => setActiveTrend(e.target.value as AnalyticsPeriodKey)} className="analytics-toolbar-select">
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="yearly">Yearly</option>
+                  </select>
+                </Tooltip>
+                <Tooltip content="Choose bar, line, area, step, or lollipop style.">
+                  <select value={chartStyle} onChange={(e) => setChartStyle(e.target.value as ChartStyle)} className="analytics-toolbar-select">
+                    <option value="bar">Bar</option>
+                    <option value="line">Line</option>
+                    <option value="area">Area</option>
+                    <option value="step">Step</option>
+                    <option value="lollipop">Lollipop</option>
+                  </select>
+                </Tooltip>
+              </div>
               <Tooltip content="Reload analytics data.">
                 <button className="btn btn-secondary" type="button" onClick={() => void load("refresh")} disabled={loading || refreshing}>
                   {refreshing ? "Refreshing..." : "Refresh"}
                 </button>
-              </Tooltip>
-            </div>
-          </div>
-
-          {dashboard ? (
-            <div className="admin-workspace-stats" aria-label="Analytics summary metrics">
-              <div className="admin-workspace-stat">
-                <span className="admin-workspace-stat-label">Today</span>
-                <strong>{dashboard.periods.daily.totalViews}</strong>
-              </div>
-              <div className="admin-workspace-stat">
-                <span className="admin-workspace-stat-label">This week</span>
-                <strong>{dashboard.periods.weekly.totalViews}</strong>
-              </div>
-              <div className="admin-workspace-stat">
-                <span className="admin-workspace-stat-label">This month</span>
-                <strong>{dashboard.periods.monthly.totalViews}</strong>
-              </div>
-              <div className="admin-workspace-stat">
-                <span className="admin-workspace-stat-label">This year</span>
-                <strong>{dashboard.periods.yearly.totalViews}</strong>
-              </div>
-            </div>
-          ) : null}
-        </div>
-
-        {/* Controls */}
-        <div className="admin-card admin-toolbar-card analytics-controls-card">
-          <div className="report-controls-primary">
-            <div className="field">
-              <label>Trend period</label>
-              <Tooltip content="Switch the trend chart between daily, weekly, monthly, and yearly views.">
-                <select value={activeTrend} onChange={(e) => setActiveTrend(e.target.value as AnalyticsPeriodKey)}>
-                  <option value="daily">Daily (last 14 days)</option>
-                  <option value="weekly">Weekly (last 8 weeks)</option>
-                  <option value="monthly">Monthly (last 12 months)</option>
-                  <option value="yearly">Yearly (last 6 years)</option>
-                </select>
-              </Tooltip>
-            </div>
-            <div className="field">
-              <label>Chart type</label>
-              <Tooltip content="Choose bar, line, area, step, or lollipop style.">
-                <select value={chartStyle} onChange={(e) => setChartStyle(e.target.value as ChartStyle)}>
-                  <option value="bar">Bar charts</option>
-                  <option value="line">Line charts</option>
-                  <option value="area">Area charts</option>
-                  <option value="step">Step charts</option>
-                  <option value="lollipop">Lollipop charts</option>
-                </select>
               </Tooltip>
             </div>
           </div>
