@@ -1045,3 +1045,37 @@ model SystemLog {
   @@index([level])
   @@index([createdAt])
 }
+
+// Individual page view events for public website analytics.
+// Captured by a client-side beacon firing to /api/analytics/pageview.
+// No PII is stored: IP addresses are used transiently for geo-lookup but never persisted.
+// Raw events are retained for 90 days then purged by the analytics-purge cron job.
+model PageView {
+  id         String   @id @default(cuid())
+  path       String   // e.g. "/lessons", "/book"
+  referrer   String?  // referrer domain only, e.g. "google.com"
+  country    String?  // ISO 3166-1 alpha-2, e.g. "AU"
+  deviceType String   // "desktop", "mobile", "tablet"
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([path, createdAt])
+}
+
+// Pre-aggregated daily page view counts for fast historical queries.
+// Populated by the analytics-rollup cron job; retained indefinitely.
+// Uses non-nullable fields with empty-string defaults so the composite unique
+// constraint works correctly in MySQL/MariaDB (NULL breaks unique matching).
+model PageViewDaily {
+  id         String   @id @default(cuid())
+  date       DateTime // start-of-day, e.g. 2026-04-15T00:00:00
+  path       String
+  referrer   String   @default("")
+  country    String   @default("")
+  deviceType String
+  count      Int      @default(0)
+
+  @@unique([date, path, referrer, country, deviceType])
+  @@index([date])
+  @@index([path, date])
+}

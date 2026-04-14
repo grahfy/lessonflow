@@ -52,6 +52,14 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     roles: ["owner"]
   },
   {
+    label: "Analytics",
+    href: "/admin/analytics",
+    tooltip: "View public website traffic and visitor trends.",
+    description: "Monitor page views, referrers, and visitor geography.",
+    group: "business",
+    roles: ["owner"]
+  },
+  {
     label: "Teachers",
     href: "/admin/teachers",
     tooltip: "Manage teacher accounts, profiles, and assignment defaults.",

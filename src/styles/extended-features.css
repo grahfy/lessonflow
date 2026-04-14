@@ -3440,3 +3440,270 @@
 .update-banner-button:hover {
   background: rgba(255, 255, 255, 0.3);
 }
+
+/* ───────────────────────────────────────────────
+   Site Analytics Dashboard
+   ─────────────────────────────────────────────── */
+
+.analytics-layout-content {
+  overflow: visible;
+  padding-right: 0;
+}
+
+.analytics-toolbar-card,
+.analytics-controls-card,
+.analytics-chart-card,
+.analytics-breakdown-card {
+  display: grid;
+  gap: 14px;
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(139, 168, 255, 0.28);
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.analytics-toolbar-card::before,
+.analytics-controls-card::before,
+.analytics-chart-card::before,
+.analytics-breakdown-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(107, 211, 255, 0.65), rgba(164, 129, 255, 0.68), rgba(255, 102, 156, 0.62));
+  pointer-events: none;
+}
+
+.analytics-toolbar-card:hover,
+.analytics-controls-card:hover,
+.analytics-chart-card:hover,
+.analytics-breakdown-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(169, 193, 255, 0.38);
+  box-shadow: 0 16px 30px rgba(6, 12, 34, 0.32);
+}
+
+.analytics-toolbar-card {
+  grid-template-columns: 1fr;
+  align-items: start;
+  background:
+    radial-gradient(130% 120% at 6% 5%, rgba(90, 176, 255, 0.17), transparent 58%),
+    linear-gradient(148deg, rgba(12, 24, 56, 0.92), rgba(17, 32, 64, 0.78));
+}
+
+.analytics-toolbar-title {
+  font-size: 1.04rem;
+  font-weight: 700;
+  color: rgba(241, 248, 255, 0.98);
+}
+
+.analytics-controls-card {
+  background:
+    radial-gradient(120% 120% at 88% 12%, rgba(168, 124, 255, 0.16), transparent 56%),
+    linear-gradient(155deg, rgba(11, 25, 56, 0.92), rgba(20, 31, 58, 0.8));
+}
+
+.analytics-controls-card .report-controls-primary {
+  display: flex;
+  gap: 16px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.analytics-controls-card select {
+  min-height: 40px;
+  font-size: 0.84rem;
+}
+
+/* Period summary cards */
+
+.analytics-period-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.analytics-period-card {
+  display: grid;
+  gap: 4px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(139, 168, 255, 0.28);
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 120% at 20% 10%, rgba(95, 160, 255, 0.12), transparent 56%),
+    linear-gradient(155deg, rgba(11, 25, 56, 0.92), rgba(20, 31, 58, 0.8));
+  padding: 16px;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.analytics-period-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(107, 211, 255, 0.65), rgba(164, 129, 255, 0.68));
+  pointer-events: none;
+}
+
+.analytics-period-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(169, 193, 255, 0.38);
+  box-shadow: 0 16px 30px rgba(6, 12, 34, 0.32);
+}
+
+.analytics-period-header {
+  margin-bottom: 4px;
+}
+
+.analytics-period-label {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.analytics-period-value {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.96);
+  line-height: 1.1;
+}
+
+.analytics-period-sublabel {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.58);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.analytics-period-delta {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.analytics-period-prev {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.52);
+}
+
+/* Chart card */
+
+.analytics-chart-card {
+  background:
+    radial-gradient(120% 110% at 50% 5%, rgba(90, 155, 255, 0.12), transparent 56%),
+    linear-gradient(152deg, rgba(12, 24, 56, 0.92), rgba(17, 32, 64, 0.78));
+}
+
+/* Analytics chart bar color */
+
+.analytics-bar {
+  opacity: 0.95;
+  filter: drop-shadow(0 0 8px rgba(167, 139, 255, 0.22));
+}
+
+.analytics-bar-views {
+  fill: #b89eff;
+}
+
+.analytics-bar-views.report-line-stroke,
+.analytics-bar-views.report-step-stroke,
+.analytics-bar-views.report-line-point,
+.analytics-bar-views.report-step-point,
+.analytics-bar-views.report-lollipop-stem,
+.analytics-bar-views.report-lollipop-head {
+  stroke: #b89eff;
+  fill: #b89eff;
+}
+
+.analytics-bar-views.report-area-fill {
+  fill: #b89eff;
+}
+
+/* Breakdown grid */
+
+.analytics-breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.analytics-breakdown-card {
+  background:
+    radial-gradient(120% 120% at 80% 8%, rgba(130, 100, 255, 0.12), transparent 56%),
+    linear-gradient(155deg, rgba(11, 25, 56, 0.92), rgba(20, 31, 58, 0.8));
+}
+
+/* Ranked bar list */
+
+.analytics-ranked-list {
+  display: grid;
+  gap: 12px;
+}
+
+.analytics-ranked-list h3 {
+  margin: 0;
+  font-size: 0.94rem;
+  letter-spacing: 0.01em;
+}
+
+.analytics-ranked-items {
+  display: grid;
+  gap: 8px;
+}
+
+.analytics-ranked-row {
+  display: grid;
+  gap: 4px;
+}
+
+.analytics-ranked-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.82rem;
+}
+
+.analytics-ranked-name {
+  color: rgba(255, 255, 255, 0.92);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analytics-ranked-count {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.analytics-ranked-bar-track {
+  height: 6px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.analytics-ranked-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #b89eff, #67d3ff);
+  transition: width 300ms ease;
+}
+
+/* Responsive */
+
+@media (max-width: 1100px) {
+  .analytics-period-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .analytics-period-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .analytics-breakdown-grid {
+    grid-template-columns: 1fr;
+  }
+}

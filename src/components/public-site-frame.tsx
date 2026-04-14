@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { PropsWithChildren, useEffect } from "react";
 
+import { PageViewTracker } from "@/components/page-view-tracker";
 import { PublicCookieConsentBanner } from "@/components/public-cookie-consent-banner";
 import { SiteShell } from "@/components/site-shell";
 import { primePublicHeroImages } from "@/lib/public-hero-preload";
@@ -83,6 +84,7 @@ export function PublicSiteFrame({ brandName, children }: PublicSiteFrameProps) {
     <SiteShell brandName={brandName} footerCopy={footerCopy}>
       {children}
       <PublicCookieConsentBanner />
+      <PageViewTracker />
     </SiteShell>
   );
 }
