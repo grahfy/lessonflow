@@ -21,8 +21,9 @@ git init --bare "${ORIGIN_DIR}" >/dev/null
 git clone "${ORIGIN_DIR}" "${WORKTREE_DIR}" >/dev/null 2>&1
 
 cp package.json package-lock.json .env.example "${WORKTREE_DIR}/"
-mkdir -p "${WORKTREE_DIR}/public"
+mkdir -p "${WORKTREE_DIR}/public/audio/chord-preview/guitar-acoustic"
 printf 'test asset\n' > "${WORKTREE_DIR}/public/.keep"
+printf 'test audio\n' > "${WORKTREE_DIR}/public/audio/chord-preview/guitar-acoustic/B3.mp3"
 cp -r Documentation "${WORKTREE_DIR}/" 2>/dev/null || true
 mkdir -p "${WORKTREE_DIR}/deploy"
 cp deploy/deploy.sh deploy/app.service.template deploy/bootstrap-host.sh deploy/sudoers.template deploy/web-update-trigger.sudoers.template deploy/nginx-http.conf deploy/nginx.conf "${WORKTREE_DIR}/deploy/"
@@ -49,7 +50,7 @@ printf 'seed\n' > "${DEPLOY_TARGET_DIR}/data/email-signature-logo/seed.txt"
   cd "${WORKTREE_DIR}"
   git config user.name "Test User"
   git config user.email "test@example.com"
-  git add package.json package-lock.json .env.example public/.keep deploy/deploy.sh deploy/app.service.template deploy/bootstrap-host.sh deploy/sudoers.template deploy/web-update-trigger.sudoers.template deploy/nginx-http.conf deploy/nginx.conf
+  git add package.json package-lock.json .env.example public/.keep public/audio/chord-preview/guitar-acoustic/B3.mp3 deploy/deploy.sh deploy/app.service.template deploy/bootstrap-host.sh deploy/sudoers.template deploy/web-update-trigger.sudoers.template deploy/nginx-http.conf deploy/nginx.conf
   git commit -m "test fixture" >/dev/null
   git branch -M main
   git push -u origin main >/dev/null 2>&1
@@ -189,6 +190,13 @@ if ! grep -Fq "git -C ${WORKTREE_DIR} rev-parse main" "${RUNUSER_LOG}"; then
 fi
 
 RELEASE_DIR="$(find "${DEPLOY_TARGET_DIR}/releases" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+if [[ ! -f "${RELEASE_DIR}/.next/standalone/public/audio/chord-preview/guitar-acoustic/B3.mp3" ]]; then
+  echo "Expected deploy.sh to copy chord preview audio into standalone public assets"
+  cat "${OUTPUT_LOG}"
+  find "${RELEASE_DIR}" -maxdepth 8 -type f | sort
+  exit 1
+fi
+
 if ! grep -Fq -- "-R u=rwX,go=rX ${RELEASE_DIR}" "${CHMOD_LOG}"; then
   echo "Expected deploy.sh to apply release permissions with u=rwX,go=rX"
   cat "${OUTPUT_LOG}"

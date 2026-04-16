@@ -116,6 +116,7 @@ DEPLOY_MODE_RUNTIME_PATH=""
 DEPLOY_MODE_WARNING=""
 DEPLOY_INTERRUPT_CAUGHT=false
 DEPLOY_INTERRUPT_SIGNAL=""
+CHORD_PREVIEW_SENTINEL_FILE="audio/chord-preview/guitar-acoustic/B3.mp3"
 
 # Colors for output
 RED='\033[0;31m'
@@ -4714,6 +4715,18 @@ if [[ -d ".next/standalone" ]]; then
     fi
     mkdir -p ".next/standalone/.next"
     cp -r ".next/static" ".next/standalone/.next/"
+fi
+
+if [[ ! -f "public/${CHORD_PREVIEW_SENTINEL_FILE}" ]]; then
+    log_error "Chord preview audio asset missing from release: public/${CHORD_PREVIEW_SENTINEL_FILE}"
+    log_error "Refusing to promote this release because admin chord previews depend on the public audio sample pack."
+    exit 1
+fi
+
+if [[ ! -f ".next/standalone/public/${CHORD_PREVIEW_SENTINEL_FILE}" ]]; then
+    log_error "Chord preview audio asset missing from standalone output: .next/standalone/public/${CHORD_PREVIEW_SENTINEL_FILE}"
+    log_error "Refusing to promote this release because production serves the standalone Next.js output."
+    exit 1
 fi
 
 if [[ -f "${SHARED_DIR}/.env" ]]; then

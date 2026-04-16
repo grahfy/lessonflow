@@ -7840,7 +7840,7 @@
   }
 
   .admin-header-nav-sections {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     padding-top: 10px;
   }
 
@@ -8006,6 +8006,48 @@
   .teacher-profile-footer {
     padding: 10px 10px 8px;
     border-radius: 14px;
+  }
+}
+
+@media (max-height: 1080px) and (min-width: 1181px) {
+  .admin-header-group-description,
+  .admin-header-utility-copy,
+  .admin-shell-bookings .admin-bookings-workspace-copy .admin-console-kicker,
+  .admin-shell-bookings .admin-bookings-workspace-summary,
+  .admin-shell-bookings .admin-bookings-workspace-chips,
+  .admin-shell-bookings .booking-teacher-filter-field label {
+    display: none;
+  }
+
+  .admin-header-nav {
+    gap: 6px;
+    padding-top: 6px;
+  }
+
+  .admin-header-nav-sections {
+    padding-top: 0;
+  }
+
+  .admin-header-nav-group {
+    gap: 6px;
+    padding: 7px 9px;
+  }
+
+  .admin-header-nav-actions {
+    padding-top: 4px;
+  }
+
+  .admin-header-quick-actions .btn {
+    min-height: 26px;
+    padding: 4px 10px;
+  }
+
+  .admin-shell-bookings .admin-range-card {
+    gap: 8px;
+  }
+
+  .admin-shell-bookings .admin-bookings-workspace-copy {
+    gap: 4px;
   }
 }
 
@@ -8473,6 +8515,16 @@
   grid-template-columns: 200px 1fr 200px;
   gap: 20px;
   min-height: 380px;
+}
+
+.admin-shell-chords .admin-shell-content,
+.chord-builder-dialog-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.chord-builder-dialog-body {
+  padding-bottom: 4px;
 }
 
 .chord-builder-panel-left {

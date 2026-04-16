@@ -2,21 +2,11 @@
   "cookies": [
     {
       "name": "admin_session",
-      "value": "eyJlbWFpbCI6ImFkbWluQGV4YW1wbGUuY29tIiwiaWF0IjoxNzc1MTg0OTA4MzE3LCJleHAiOjE3NzU3ODk3MDgzMTd9.6c602c56a600e96ba0feeef193ab3c68613007ddf13d6eaf91391ecd2fe66674",
+      "value": "eyJlbWFpbCI6ImFkbWluQGV4YW1wbGUuY29tIiwiaWF0IjoxNzc2MTg3NTM3ODkzLCJleHAiOjE3NzY3OTIzMzc4OTN9.cd84972e438d3b9d0b5610244ac92937e87a135e0ebea1ee20759b7f48bda684",
       "domain": "localhost",
       "path": "/",
-      "expires": 1775789708.318,
+      "expires": 1776792337.894,
       "httpOnly": true,
-      "secure": false,
-      "sameSite": "Lax"
-    },
-    {
-      "name": "__next_hmr_refresh_hash__",
-      "value": "de96ff6c378994ffdb669d115794bb565aead34b65e39653",
-      "domain": "localhost",
-      "path": "/",
-      "expires": -1,
-      "httpOnly": false,
       "secure": false,
       "sameSite": "Lax"
     }

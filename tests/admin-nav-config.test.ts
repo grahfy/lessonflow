@@ -7,7 +7,7 @@ describe("admin-nav-config", () => {
     const groups = getVisibleAdminNavGroups("owner");
 
     expect(groups.map((group) => group.label)).toEqual(["Business", "Education", "System"]);
-    expect(groups[0]?.items.map((item) => item.label)).toEqual(["Bookings", "Customers", "Invoices", "Reports"]);
+    expect(groups[0]?.items.map((item) => item.label)).toEqual(["Bookings", "Customers", "Invoices", "Reports", "Analytics"]);
     expect(groups[1]?.items.map((item) => item.label)).toEqual(["Teachers", "Lesson Plans", "Chords"]);
     expect(groups[2]?.items.map((item) => item.label)).toEqual(["Settings", "Logs", "Manual", "About"]);
   });

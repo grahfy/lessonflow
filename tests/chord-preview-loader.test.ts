@@ -96,6 +96,7 @@ describe("chord preview sampler loader", () => {
       D2: "D2.mp3",
       "D#2": "Ds2.mp3",
       E2: "E2.mp3",
+      B3: "B3.mp3",
       D5: "D5.mp3",
     });
   });

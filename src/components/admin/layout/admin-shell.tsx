@@ -25,6 +25,10 @@ interface ScrollResetTarget {
   scrollTo?: (options: { top?: number; left?: number; behavior?: "auto" | "smooth" }) => void;
 }
 
+interface WindowScrollResetTarget {
+  scrollTo?: (options: { top?: number; left?: number; behavior?: "auto" | "smooth" }) => void;
+}
+
 interface AdminShellContentRoot extends Partial<ScrollResetTarget> {
   querySelector: (selector: string) => ScrollResetTarget | null;
 }
@@ -51,6 +55,10 @@ export function resetAdminScrollPosition(target: ScrollResetTarget | null) {
   target.scrollTop = 0;
 }
 
+export function resetAdminWindowScroll(target: WindowScrollResetTarget | undefined = globalThis.window) {
+  target?.scrollTo?.({ top: 0, left: 0, behavior: "auto" });
+}
+
 /**
  * Standard shell for all admin pages.
  * Centralizes layout, header, and common UI elements like errors and notices.
@@ -68,6 +76,7 @@ export function AdminShell({ title, error, notice, loading, style, className, ch
 
   useEffect(() => {
     resetAdminScrollPosition(findAdminScrollResetTarget(contentRef.current));
+    resetAdminWindowScroll();
   }, [pathname]);
 
   return (

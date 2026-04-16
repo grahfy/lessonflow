@@ -110,6 +110,16 @@ async function closeBlockingAdminDialogs(page: Page): Promise<void> {
   }
 }
 
+async function gotoCompactAdminRoute(page: Page, route: { path: string; heading: RegExp }): Promise<void> {
+  await page.goto(route.path, { waitUntil: "domcontentloaded" });
+  await page.getByRole("heading", { name: route.heading }).first().waitFor({ timeout: 12_000 });
+  await closeBlockingAdminDialogs(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(() => page.evaluate(() => window.scrollY), {
+    message: `${route.path} should be measured from the top of the viewport.`
+  }).toBeLessThanOrEqual(1);
+}
+
 /** Reads the effective grid column count for a CSS grid container. */
 async function readGridColumnCount(locator: Locator): Promise<number> {
   return locator.evaluate((node) => {
@@ -145,6 +155,7 @@ test.describe("admin mobile responsiveness", () => {
       { path: "/admin/invoices", heading: /invoices/i },
       { path: "/admin/reports", heading: /reports console/i },
       { path: "/admin/settings", heading: /admin configuration/i },
+      { path: "/admin/chords", heading: /chords/i },
       { path: "/admin/teachers", heading: /teachers/i },
       { path: "/admin/manual", heading: /manual/i }
     ];
@@ -338,14 +349,13 @@ test.describe("admin compact 1080p desktop density", () => {
       { path: "/admin/invoices", heading: /invoices/i },
       { path: "/admin/reports", heading: /reports console/i },
       { path: "/admin/settings", heading: /admin configuration/i },
+      { path: "/admin/chords", heading: /chords/i },
       { path: "/admin/teachers", heading: /teachers/i },
       { path: "/admin/manual", heading: /manual/i }
     ];
 
     for (const route of routes) {
-      await page.goto(route.path, { waitUntil: "domcontentloaded" });
-      await page.getByRole("heading", { name: route.heading }).first().waitFor({ timeout: 12_000 });
-      await closeBlockingAdminDialogs(page);
+      await gotoCompactAdminRoute(page, route);
       await assertNoHorizontalOverflow(page, `${route.path} compact desktop`);
 
       const shell = page.locator(".admin-shell").first();
@@ -370,7 +380,7 @@ test.describe("admin compact 1080p desktop density", () => {
       }
     }
 
-    await page.goto("/admin/bookings", { waitUntil: "domcontentloaded" });
+    await gotoCompactAdminRoute(page, { path: "/admin/bookings", heading: /bookings/i });
     await page.waitForLoadState("networkidle");
     await closeBlockingAdminDialogs(page);
     const bookingsToolbar = page.locator(".admin-range-card").first();
@@ -388,7 +398,7 @@ test.describe("admin compact 1080p desktop density", () => {
     await assertNoDialogContentOverflow(page, manualDialog, "Manual booking compact desktop");
     await page.keyboard.press("Escape");
 
-    await page.goto("/admin/customers", { waitUntil: "domcontentloaded" });
+    await gotoCompactAdminRoute(page, { path: "/admin/customers", heading: /customers/i });
     await page.waitForLoadState("networkidle");
     await closeBlockingAdminDialogs(page);
     await page.getByRole("button", { name: /create new customer/i }).first().click();
@@ -398,7 +408,7 @@ test.describe("admin compact 1080p desktop density", () => {
     await assertNoDialogContentOverflow(page, customerDialog, "Customer create compact desktop");
     await page.keyboard.press("Escape");
 
-    await page.goto("/admin/invoices", { waitUntil: "domcontentloaded" });
+    await gotoCompactAdminRoute(page, { path: "/admin/invoices", heading: /invoices/i });
     await page.waitForLoadState("networkidle");
     await closeBlockingAdminDialogs(page);
     await page.getByRole("button", { name: /create invoice/i }).first().click();
@@ -423,7 +433,7 @@ test.describe("admin compact 1080p desktop density", () => {
     ).toBeGreaterThanOrEqual(invoiceBodyMetrics.clientHeight);
     await page.keyboard.press("Escape");
 
-    await page.goto("/admin/teachers", { waitUntil: "domcontentloaded" });
+    await gotoCompactAdminRoute(page, { path: "/admin/teachers", heading: /teachers/i });
     await page.waitForLoadState("networkidle");
     await closeBlockingAdminDialogs(page);
     const teacherHero = page.locator(".teacher-workspace-hero").first();
@@ -438,5 +448,23 @@ test.describe("admin compact 1080p desktop density", () => {
       expect(heroBox.height, "Teacher hero should stay compact at 1080p.").toBeLessThanOrEqual(240);
       expect(footerBox.height, "Teacher footer should stay compact at 1080p.").toBeLessThanOrEqual(120);
     }
+
+    await gotoCompactAdminRoute(page, { path: "/admin/chords", heading: /chords/i });
+    await page.waitForLoadState("networkidle");
+    await closeBlockingAdminDialogs(page);
+    await page.getByRole("button", { name: /new chord/i }).click();
+    const chordBuilderDialog = page.locator(".dialog-panel").filter({ has: page.getByRole("heading", { name: /chord builder/i }) }).first();
+    await expect(chordBuilderDialog).toBeVisible();
+    await assertDialogFitsViewport(page, chordBuilderDialog, "Chord builder compact desktop");
+    await assertNoDialogContentOverflow(page, chordBuilderDialog, "Chord builder compact desktop");
+
+    const chordBuilderBodyMetrics = await chordBuilderDialog.locator(".chord-builder-dialog-body").evaluate((node) => ({
+      clientHeight: node.clientHeight,
+      scrollHeight: node.scrollHeight
+    }));
+    expect(
+      chordBuilderBodyMetrics.scrollHeight,
+      "Chord builder dialog body should own vertical overflow at 1080p."
+    ).toBeGreaterThanOrEqual(chordBuilderBodyMetrics.clientHeight);
   });
 });

@@ -191,6 +191,7 @@ export function ChordBuilder({
       onClose={onClose}
       title={`Chord Builder — ${title}`}
       size="wide"
+      bodyClassName="chord-builder-dialog-body"
       footer={footer}
     >
       <div className="chord-builder-layout">

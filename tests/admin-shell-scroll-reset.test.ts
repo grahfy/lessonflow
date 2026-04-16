@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   findAdminScrollResetTarget,
+  resetAdminWindowScroll,
   resetAdminScrollPosition,
 } from "@/components/admin/layout/admin-shell";
 
@@ -50,5 +51,13 @@ describe("admin-shell scroll reset helpers", () => {
 
   it("ignores null targets", () => {
     expect(() => resetAdminScrollPosition(null)).not.toThrow();
+  });
+
+  it("resets the outer window scroll when available", () => {
+    const scrollTo = vi.fn();
+
+    resetAdminWindowScroll({ scrollTo });
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: "auto" });
   });
 });
