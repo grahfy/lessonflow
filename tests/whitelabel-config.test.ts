@@ -8,6 +8,10 @@ describe("Whitelabel Configuration", () => {
   });
 
   it("should use default branding when no env vars are set", () => {
+    vi.stubEnv("NEXT_PUBLIC_BRAND_NAME", "");
+    vi.stubEnv("NEXT_PUBLIC_PRIMARY_SUBJECT", "");
+    vi.stubEnv("NEXT_PUBLIC_PRIMARY_LOCATION", "");
+    vi.stubEnv("NEXT_PUBLIC_FAVICON_URL", "");
     expect(branding.getBranding().PUBLIC_BRAND_NAME).toBe("Melbourne Guitar School");
     expect(branding.getBranding().PRIMARY_SUBJECT).toBe("Guitar");
     expect(branding.getBranding().PRIMARY_LOCATION).toBe("Northcote");
