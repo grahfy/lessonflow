@@ -3,6 +3,7 @@ import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 const DEFAULT_CONNECT_TIMEOUT_SECONDS = 5;
 const DEFAULT_ACQUIRE_TIMEOUT_SECONDS = 10;
 const DEFAULT_IDLE_TIMEOUT_SECONDS = 300;
+const DEFAULT_CONNECTION_LIMIT = 25;
 
 function ensurePositiveIntegerParam(value: string | null): boolean {
   if (!value) {
@@ -44,6 +45,17 @@ export function normalizePrismaMariaDbConnectionString(databaseUrl: string): str
 
   if (!ensurePositiveIntegerParam(parsedUrl.searchParams.get("max_idle_connection_lifetime"))) {
     parsedUrl.searchParams.set("max_idle_connection_lifetime", String(DEFAULT_IDLE_TIMEOUT_SECONDS));
+  }
+
+  // RATIONALE: Increase pool limit from default (10) to handle higher concurrency
+  // for background synchronization tasks and multiple admin sessions.
+  // We set both Prisma-style and MariaDB-driver-style parameters.
+  if (!ensurePositiveIntegerParam(parsedUrl.searchParams.get("connection_limit"))) {
+    parsedUrl.searchParams.set("connection_limit", String(DEFAULT_CONNECTION_LIMIT));
+  }
+
+  if (!ensurePositiveIntegerParam(parsedUrl.searchParams.get("connectionLimit"))) {
+    parsedUrl.searchParams.set("connectionLimit", String(DEFAULT_CONNECTION_LIMIT));
   }
 
   return parsedUrl.toString();
