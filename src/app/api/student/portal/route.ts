@@ -38,7 +38,8 @@ export async function GET(request: NextRequest) {
         lessonPlan: {
           select: {
             sections: true,
-            status: true
+            status: true,
+            quickCaptureNotes: true
           }
         }
       },

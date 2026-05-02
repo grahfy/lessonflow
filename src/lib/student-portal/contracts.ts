@@ -117,6 +117,7 @@ type BookingMapInput = Pick<
   lessonPlan?: {
     sections: unknown;
     status: string;
+    quickCaptureNotes: string | null;
   } | null;
   learningMaterials: MaterialMapInput[];
 };
@@ -148,7 +149,7 @@ export function mapStudentPortalMaterial(material: MaterialMapInput): StudentPor
  * Filters to student-visible sections only.
  */
 export function mapStudentPortalLessonPlanSummary(
-  lessonPlan: { sections: unknown; status: string } | null | undefined
+  lessonPlan: { sections: unknown; status: string; quickCaptureNotes: string | null } | null | undefined
 ): StudentPortalLessonPlanV2Summary | null {
   if (!lessonPlan) return null;
 
@@ -160,10 +161,13 @@ export function mapStudentPortalLessonPlanSummary(
     .filter((s) => s.visibility === "student_visible")
     .filter((s) => s.content.content.length > 0);
 
-  if (parsed.length === 0) return null;
+  const quickCaptureNotes = lessonPlan.quickCaptureNotes?.trim() || null;
+
+  if (parsed.length === 0 && !quickCaptureNotes) return null;
 
   return studentPortalLessonPlanV2SummarySchema.parse({
-    sections: parsed.map((s) => ({ key: s.key, title: s.title, content: s.content }))
+    sections: parsed.map((s) => ({ key: s.key, title: s.title, content: s.content })),
+    quickCaptureNotes
   });
 }
 

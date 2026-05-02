@@ -480,7 +480,11 @@ function BookingList(input: BookingListProps) {
           {booking.lessonPlanSummary ? (
             <div className={styles["lesson-plan-summary"]}>
               <strong className={styles["materials-section-title"]}>Lesson plan summary</strong>
-              <LessonPlanViewer sections={booking.lessonPlanSummary.sections} bookingId={booking.id} />
+              <LessonPlanViewer
+                sections={booking.lessonPlanSummary.sections}
+                quickCaptureNotes={booking.lessonPlanSummary.quickCaptureNotes}
+                bookingId={booking.id}
+              />
             </div>
           ) : null}
 

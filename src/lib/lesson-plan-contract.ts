@@ -77,7 +77,8 @@ export const studentPortalLessonPlanV2SectionSchema = z.object({
 });
 
 export const studentPortalLessonPlanV2SummarySchema = z.object({
-  sections: z.array(studentPortalLessonPlanV2SectionSchema)
+  sections: z.array(studentPortalLessonPlanV2SectionSchema),
+  quickCaptureNotes: z.string().nullable()
 });
 
 export type LessonPlanSection = z.infer<typeof lessonPlanSectionSchema>;
