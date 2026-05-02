@@ -21,6 +21,10 @@
 import { prisma } from "./db";
 import { Prisma } from "@/generated/prisma/client";
 
+const isTestEnv =
+  process.env.NODE_ENV === "test" ||
+  process.env.VITEST != null;
+
 /** Supported severity levels for the observability stack. */
 type LogLevel = "info" | "warn" | "error";
 
@@ -32,6 +36,7 @@ type LogLevel = "info" | "warn" | "error";
  * crashing the main application flow.
  */
 function persistLog(level: LogLevel, event: string, message: string, meta?: Record<string, unknown>) {
+  if (isTestEnv) return;
   // RATIONALE: We do NOT await this promise to avoid blocking the Event Loop.
   prisma.systemLog.create({
     data: {
@@ -65,6 +70,7 @@ function stringifyMeta(meta?: Record<string, unknown>) {
  * @param meta - Contextual data (e.g. { invoiceId: "..." })
  */
 export function logEvent(event: string, meta?: Record<string, unknown>) {
+  if (isTestEnv) return;
   const line = `[${new Date().toISOString()}] [info] ${event} ${stringifyMeta(meta)}`;
   console.info(line);
   persistLog("info", event, line, meta);
@@ -81,6 +87,7 @@ export function logEvent(event: string, meta?: Record<string, unknown>) {
  * @param meta - Local variables at the point of failure
  */
 export function logError(event: string, error: unknown, meta?: Record<string, unknown>) {
+  if (isTestEnv) return;
   const line = `[${new Date().toISOString()}] [error] ${event} ${stringifyMeta(meta)}`;
   console.error(line);
   
@@ -100,6 +107,7 @@ export function logError(event: string, error: unknown, meta?: Record<string, un
  * Generic logging bridge.
  */
 export function log(level: LogLevel, event: string, meta?: Record<string, unknown>) {
+  if (isTestEnv) return;
   if (level === "error") {
     logError(event, null, meta);
     return;
