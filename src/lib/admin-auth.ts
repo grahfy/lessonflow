@@ -42,6 +42,17 @@ function signPayload(payload: string): string {
   return crypto.createHmac("sha256", getSessionSecret()).update(payload).digest("hex");
 }
 
+/**
+ * Constant-time comparison of a computed signature against the supplied one.
+ * RATIONALE: Avoids leaking signature bytes via early-exit string comparison.
+ */
+function signatureMatches(payload: string, signature: string): boolean {
+  const expected = Buffer.from(signPayload(payload), "utf8");
+  const provided = Buffer.from(signature, "utf8");
+  if (expected.length !== provided.length) return false;
+  return crypto.timingSafeEqual(expected, provided);
+}
+
 /** Standard base64url encoding for token segments. */
 function encode(data: object): string {
   return Buffer.from(JSON.stringify(data), "utf8").toString("base64url");
@@ -59,7 +70,7 @@ function decode(token: string): { email: string; exp: number; iat: number | null
     const [payload, signature] = token.split(".");
     if (!payload || !signature) return null;
     
-    if (signPayload(payload) !== signature) return null;
+    if (!signatureMatches(payload, signature)) return null;
 
     const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
       email?: unknown;
@@ -97,13 +108,38 @@ export function getSessionCookieName() {
 }
 
 /**
+ * Resolves the bootstrap admin password used when first provisioning the owner.
+ *
+ * SECURITY: In production we fail closed if `ADMIN_PASSWORD` is unset rather than
+ * silently bootstrapping a well-known `"change-me"` credential. The legacy
+ * default is retained only for tests/dev (gated on VITEST or a non-production
+ * NODE_ENV) so seed/setup flows keep working.
+ */
+function resolveBootstrapAdminPassword(): string {
+  const explicit = process.env.ADMIN_PASSWORD;
+  if (explicit) return explicit;
+
+  const isProduction = process.env.NODE_ENV === "production";
+  const isTestEnv = process.env.VITEST != null;
+  if (isProduction && !isTestEnv) {
+    throw new AppError(
+      "ADMIN_PASSWORD is required to provision the owner account in production.",
+      "MISSING_CONFIG",
+      500
+    );
+  }
+
+  return "change-me";
+}
+
+/**
  * Ensures a baseline 'Owner' account exists in the database.
  * RATIONALE: Automates initial setup using the .env provided credentials.
  */
 export async function ensureOwnerAdmin(): Promise<AdminUser> {
   const email = process.env.ADMIN_EMAIL || "owner@example.com";
   const displayName = "Owner";
-  const password = process.env.ADMIN_PASSWORD || "change-me";
+  const password = resolveBootstrapAdminPassword();
   const passwordHash = await bcrypt.hash(password, 12);
 
   const existing = await prisma.adminUser.findUnique({

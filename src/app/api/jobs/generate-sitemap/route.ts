@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { getCronSecret, getPublicSiteUrl, hasCronSecret } from "@/lib/env";
+import { verifyCronSecret } from "@/lib/cron-auth";
+import { getPublicSiteUrl, hasCronSecret } from "@/lib/env";
 import { PUBLIC_BRAND_NAME } from "@/lib/branding";
 
 type PageConfig = {
@@ -37,8 +38,7 @@ export async function POST(request: NextRequest) {
   if (!hasCronSecret()) {
     return NextResponse.json({ error: "Cron secret not configured" }, { status: 401 });
   }
-  const secret = request.headers.get("x-cron-secret");
-  if (!secret || secret !== getCronSecret()) {
+  if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -308,8 +308,10 @@ export function verifyCaptchaGuard(input: {
     };
   }
 
-  // 3. Environment Bypass (Tests/Dev)
-  if (process.env.NODE_ENV === "test" || process.env.NODE_ENV === "development") {
+  // 3. Explicit Bypass (vitest auto-sets VITEST; dev/staging can opt in).
+  // RATIONALE: Never key the bypass on NODE_ENV so a misconfigured production
+  // process can never silently fail open.
+  if (process.env.VITEST != null || process.env.CAPTCHA_TEST_BYPASS === "1") {
     return { ok: true };
   }
 

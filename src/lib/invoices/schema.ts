@@ -90,7 +90,13 @@ export const invoiceLineItemInputSchema = z
     id: z.string().trim().min(1).optional(),
     description: z.string().trim().min(1).max(200),
     quantity: z.number().int().min(1).max(999),
-    unitPriceCents: z.number().int().min(-50_000_000).max(50_000_000),
+    // SECURITY: Client-supplied line prices must be non-negative. Credit notes are
+    // the only documents with negative amounts, and they are generated entirely
+    // server-side (the credit-note route negates the original invoice's persisted
+    // line items — see src/app/api/admin/invoices/[id]/credit-note/route.ts), so
+    // they never flow back through this client schema. Allowing negatives here
+    // would let a client mint a negative-priced invoice line.
+    unitPriceCents: z.number().int().min(0).max(50_000_000),
     taxMode: invoiceTaxModeSchema.default("taxable"),
     kind: invoiceLineItemKindSchema.default("custom"),
     sortOrder: z.number().int().min(0).max(9_999).default(0)

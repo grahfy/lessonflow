@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCronSecret, hasCronSecret } from "@/lib/env";
+import { z } from "zod";
+
+import { verifyCronSecret } from "@/lib/cron-auth";
+import { hasCronSecret } from "@/lib/env";
 import { syncGmailSentMessages } from "@/lib/gmail/sync";
 import { isGmailConfigured } from "@/lib/email/gmail-service";
+
+const requestSchema = z.object({
+  maxResults: z.number().int().min(1).max(500).optional()
+});
 
 /**
  * Scheduled job endpoint that syncs sent messages from Gmail.
@@ -11,8 +18,7 @@ export async function POST(request: NextRequest) {
   if (!hasCronSecret()) {
     return NextResponse.json({ error: "Cron secret not configured" }, { status: 401 });
   }
-  const secret = request.headers.get("x-cron-secret");
-  if (!secret || secret !== getCronSecret()) {
+  if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -22,7 +28,11 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const maxResults = body.maxResults || 50;
+    const parsed = requestSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid sync payload.", details: parsed.error.flatten() }, { status: 400 });
+    }
+    const maxResults = parsed.data.maxResults ?? 50;
 
     const result = await syncGmailSentMessages(maxResults);
 

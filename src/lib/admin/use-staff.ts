@@ -76,13 +76,16 @@ export function useStaffDirectory(options: { onAuthError?: () => void; onError?:
     return body.staff;
   }, [safeFetch, handleApiError]);
 
-  const updatePassword = useCallback(async (id: string, password: string) => {
+  const updatePassword = useCallback(async (id: string, password: string, currentPassword?: string) => {
     const response = await safeFetch(`/api/admin/staff/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         mode: "password",
-        password
+        password,
+        // Self-service rotations must re-authenticate; the server requires this
+        // when the target account is the acting admin's own.
+        ...(currentPassword ? { currentPassword } : {})
       })
     });
     if (!response.ok) {

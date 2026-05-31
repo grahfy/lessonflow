@@ -22,7 +22,11 @@ const result = spawnSync(process.platform === "win32" ? "npx.cmd" : "npx", ["vit
   stdio: "inherit",
   env: {
     ...process.env,
-    DATABASE_URL: testDatabaseUrl
+    DATABASE_URL: testDatabaseUrl,
+    // The geo/country tests simulate an edge-fronted (Vercel) deployment by
+    // sending x-vercel-ip-country headers. Production no longer trusts those
+    // headers unless TRUST_EDGE_GEO is set, so enable it for the suite here.
+    TRUST_EDGE_GEO: process.env.TRUST_EDGE_GEO ?? "vercel"
   }
 });
 

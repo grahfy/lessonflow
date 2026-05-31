@@ -4,6 +4,8 @@ import { jsonUnexpectedError } from "@/lib/api-errors";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { canManageStaffAccount } from "@/lib/admin/permissions";
 import {
+  InvalidStaffPhotoContentError,
+  assertValidStaffPhotoContent,
   buildStaffPhotoStorageKey,
   classifyStaffPhoto,
   deleteStaffPhoto,
@@ -50,7 +52,8 @@ export async function GET(request: NextRequest, { params }: Params) {
       headers: {
         "content-type": blob.mimeType,
         "cache-control": "private, max-age=300",
-        "content-length": String(blob.buffer.length)
+        "content-length": String(blob.buffer.length),
+        "x-content-type-options": "nosniff"
       }
     });
   } catch (error) {
@@ -101,6 +104,21 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const storageKey = buildStaffPhotoStorageKey(staff.id, classification.extension);
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    // Validate the REAL image content (magic bytes) before persisting so a
+    // renamed/spoofed upload cannot be written under a trusted extension.
+    try {
+      await assertValidStaffPhotoContent(buffer);
+    } catch (error) {
+      if (error instanceof InvalidStaffPhotoContentError) {
+        return NextResponse.json(
+          { error: "Profile photo must be a valid JPEG, PNG, GIF, or WebP image." },
+          { status: 400 }
+        );
+      }
+      throw error;
+    }
+
     await putStaffPhoto(storageKey, buffer);
 
     try {

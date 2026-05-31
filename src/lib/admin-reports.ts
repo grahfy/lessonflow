@@ -46,6 +46,74 @@ import {
 } from "date-fns";
 
 import { prisma } from "@/lib/db";
+import { APP_TIMEZONE, dateTimeLocalToDate, toDateKey } from "@/lib/time";
+
+/**
+ * APP_TIMEZONE-aware period boundary helpers.
+ *
+ * RATIONALE: date-fns `startOfDay`/`endOfDay`/`startOfWeek`/`startOfMonth`/...
+ * resolve boundaries in the server process timezone (UTC in production), while
+ * every label in these reports is rendered in APP_TIMEZONE. That mismatch
+ * mis-buckets late-evening Melbourne activity into the wrong calendar period.
+ *
+ * APPROACH: We model period math on a "naive local anchor" — a `Date` whose
+ * UTC-clock fields hold the desired local Y/M/D/00:00. All calendar arithmetic
+ * (start-of-week/month/year, +/- N units) is done with UTC getters/setters so
+ * it is independent of the server process TZ. Each resulting boundary is then
+ * mapped back to a real UTC instant via `dateTimeLocalToDate`, which applies the
+ * correct (DST-aware) APP_TIMEZONE offset. Inclusive windows use an EXCLUSIVE
+ * next-boundary upper bound to avoid the millisecond gaps of `endOf*`.
+ */
+
+/** Builds a naive local anchor (UTC fields = local Y/M/D, time at 00:00). */
+function localAnchor(date: Date): Date {
+  const key = toDateKey(date, APP_TIMEZONE);
+  return new Date(`${key}T00:00:00.000Z`);
+}
+
+/** Converts a naive local anchor (UTC fields) into the real UTC instant. */
+function anchorToInstant(anchor: Date): Date {
+  const key = `${anchor.getUTCFullYear()}-${String(anchor.getUTCMonth() + 1).padStart(2, "0")}-${String(anchor.getUTCDate()).padStart(2, "0")}`;
+  const resolved = dateTimeLocalToDate(`${key}T00:00`, APP_TIMEZONE);
+  if (!resolved) {
+    throw new Error(`Unable to resolve local midnight for ${key}`);
+  }
+  return resolved;
+}
+
+/** Half-open local period window [start, endExclusive) as UTC instants, plus naive anchors for labels. */
+type LocalWindow = { start: Date; endExclusive: Date; startAnchor: Date; endAnchor: Date };
+
+function dayWindow(anchor: Date, offsetDays = 0): LocalWindow {
+  const startAnchor = new Date(anchor);
+  startAnchor.setUTCDate(startAnchor.getUTCDate() + offsetDays);
+  const endAnchor = new Date(startAnchor);
+  endAnchor.setUTCDate(endAnchor.getUTCDate() + 1);
+  return { start: anchorToInstant(startAnchor), endExclusive: anchorToInstant(endAnchor), startAnchor, endAnchor };
+}
+
+/** Week starts on Monday, matching the previous `weekStartsOn: 1` convention. */
+function weekWindow(anchor: Date, offsetWeeks = 0): LocalWindow {
+  const startAnchor = new Date(anchor);
+  const dow = startAnchor.getUTCDay(); // 0=Sun..6=Sat
+  const daysSinceMonday = (dow + 6) % 7;
+  startAnchor.setUTCDate(startAnchor.getUTCDate() - daysSinceMonday + offsetWeeks * 7);
+  const endAnchor = new Date(startAnchor);
+  endAnchor.setUTCDate(endAnchor.getUTCDate() + 7);
+  return { start: anchorToInstant(startAnchor), endExclusive: anchorToInstant(endAnchor), startAnchor, endAnchor };
+}
+
+function monthWindow(anchor: Date, offsetMonths = 0): LocalWindow {
+  const startAnchor = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() + offsetMonths, 1));
+  const endAnchor = new Date(Date.UTC(startAnchor.getUTCFullYear(), startAnchor.getUTCMonth() + 1, 1));
+  return { start: anchorToInstant(startAnchor), endExclusive: anchorToInstant(endAnchor), startAnchor, endAnchor };
+}
+
+function yearWindow(anchor: Date, offsetYears = 0): LocalWindow {
+  const startAnchor = new Date(Date.UTC(anchor.getUTCFullYear() + offsetYears, 0, 1));
+  const endAnchor = new Date(Date.UTC(startAnchor.getUTCFullYear() + 1, 0, 1));
+  return { start: anchorToInstant(startAnchor), endExclusive: anchorToInstant(endAnchor), startAnchor, endAnchor };
+}
 
 /** Supported time buckets for standard administrative visibility. */
 export type AdminReportPeriodKey = "daily" | "weekly" | "monthly" | "yearly";
@@ -163,67 +231,70 @@ const REPORT_EMAIL_OUTSTANDING_INVOICE_ROWS = parseReportEmailRowLimit(process.e
  * Calculates start/end boundaries and the parallel comparative window 
  * (Prior Day/Week/Month/Year) for a given reporting key.
  */
+/** Inclusive upper bound (last representable ms) for a half-open window. */
+function inclusiveEnd(endExclusive: Date): Date {
+  return new Date(endExclusive.getTime() - 1);
+}
+
 function periodBounds(period: AdminReportPeriodKey, now: Date): PeriodBounds {
+  const anchor = localAnchor(now);
+
   if (period === "daily") {
-    const start = startOfDay(now);
-    const end = endOfDay(now);
-    const previousStart = startOfDay(subDays(start, 1));
-    const previousEnd = endOfDay(previousStart);
+    const current = dayWindow(anchor, 0);
+    const previous = dayWindow(anchor, -1);
     return {
       key: period,
-      label: `Today (${format(start, "d MMM")})`,
-      start,
-      end,
-      previousLabel: `Previous day (${format(previousStart, "d MMM")})`,
-      previousStart,
-      previousEnd
+      label: `Today (${format(current.startAnchor, "d MMM")})`,
+      start: current.start,
+      end: inclusiveEnd(current.endExclusive),
+      previousLabel: `Previous day (${format(previous.startAnchor, "d MMM")})`,
+      previousStart: previous.start,
+      previousEnd: inclusiveEnd(previous.endExclusive)
     };
   }
 
   if (period === "weekly") {
-    const start = startOfWeek(now, { weekStartsOn: 1 });
-    const end = endOfWeek(now, { weekStartsOn: 1 });
-    const previousStart = startOfWeek(subWeeks(start, 1), { weekStartsOn: 1 });
-    const previousEnd = endOfWeek(previousStart, { weekStartsOn: 1 });
+    const current = weekWindow(anchor, 0);
+    const previous = weekWindow(anchor, -1);
+    const currentEndAnchor = new Date(current.endAnchor);
+    currentEndAnchor.setUTCDate(currentEndAnchor.getUTCDate() - 1);
+    const previousEndAnchor = new Date(previous.endAnchor);
+    previousEndAnchor.setUTCDate(previousEndAnchor.getUTCDate() - 1);
     return {
       key: period,
-      label: `This week (${format(start, "d MMM")} - ${format(end, "d MMM")})`,
-      start,
-      end,
-      previousLabel: `Previous week (${format(previousStart, "d MMM")} - ${format(previousEnd, "d MMM")})`,
-      previousStart,
-      previousEnd
+      label: `This week (${format(current.startAnchor, "d MMM")} - ${format(currentEndAnchor, "d MMM")})`,
+      start: current.start,
+      end: inclusiveEnd(current.endExclusive),
+      previousLabel: `Previous week (${format(previous.startAnchor, "d MMM")} - ${format(previousEndAnchor, "d MMM")})`,
+      previousStart: previous.start,
+      previousEnd: inclusiveEnd(previous.endExclusive)
     };
   }
 
-  const start = startOfMonth(now);
-  const end = endOfMonth(now);
-  const previousStart = startOfMonth(subMonths(start, 1));
-  const previousEnd = endOfMonth(previousStart);
   if (period === "monthly") {
+    const current = monthWindow(anchor, 0);
+    const previous = monthWindow(anchor, -1);
     return {
       key: period,
-      label: `This month (${format(start, "MMMM yyyy")})`,
-      start,
-      end,
-      previousLabel: `Previous month (${format(previousStart, "MMMM yyyy")})`,
-      previousStart,
-      previousEnd
+      label: `This month (${format(current.startAnchor, "MMMM yyyy")})`,
+      start: current.start,
+      end: inclusiveEnd(current.endExclusive),
+      previousLabel: `Previous month (${format(previous.startAnchor, "MMMM yyyy")})`,
+      previousStart: previous.start,
+      previousEnd: inclusiveEnd(previous.endExclusive)
     };
   }
 
-  const yearStart = startOfYear(now);
-  const yearEnd = endOfYear(now);
-  const previousYearStart = startOfYear(subYears(yearStart, 1));
-  const previousYearEnd = endOfYear(previousYearStart);
+  const current = yearWindow(anchor, 0);
+  const previous = yearWindow(anchor, -1);
   return {
     key: period,
-    label: `This year (${format(yearStart, "yyyy")})`,
-    start: yearStart,
-    end: yearEnd,
-    previousLabel: `Previous year (${format(previousYearStart, "yyyy")})`,
-    previousStart: previousYearStart,
-    previousEnd: previousYearEnd
+    label: `This year (${format(current.startAnchor, "yyyy")})`,
+    start: current.start,
+    end: inclusiveEnd(current.endExclusive),
+    previousLabel: `Previous year (${format(previous.startAnchor, "yyyy")})`,
+    previousStart: previous.start,
+    previousEnd: inclusiveEnd(previous.endExclusive)
   };
 }
 

@@ -228,6 +228,13 @@ export async function rotatePortalCredential(input: {
     }
   });
 
+  // Revoke any live student sessions so a rotated/compromised credential cannot
+  // continue to authenticate with the previous stateless token.
+  await db.customer.update({
+    where: { id: input.customerId },
+    data: { sessionInvalidBefore: rotatedAt }
+  });
+
   await writeCredentialAuditLog({
     db,
     customerId: input.customerId,

@@ -20,6 +20,36 @@
 import { Prisma, PrismaClient } from "@/generated/prisma/client";
 
 /**
+ * Detects a Prisma UNIQUE-constraint violation (P2002) on the `invoiceNumber`
+ * column.
+ *
+ * RATIONALE: Document numbers are derived from the latest existing row, so two
+ * concurrent creates can compute the same sequence and collide on the DB UNIQUE
+ * constraint. Callers use this guard to distinguish that recoverable collision
+ * (safe to retry with a freshly recomputed number) from any other failure.
+ */
+export function isInvoiceNumberConflict(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+    return false;
+  }
+
+  // The `target` meta lists the offending field(s). When the driver omits it we
+  // conservatively treat any invoice-table P2002 as an invoice-number collision,
+  // since `invoiceNumber` is the only UNIQUE constraint we allocate by hand.
+  const target = error.meta?.target;
+  if (target === undefined) {
+    return true;
+  }
+  if (typeof target === "string") {
+    return target.toLowerCase().includes("invoicenumber");
+  }
+  if (Array.isArray(target)) {
+    return target.some((field) => String(field).toLowerCase().includes("invoicenumber"));
+  }
+  return false;
+}
+
+/**
  * Parses a document string to find the numeric end-piece.
  * Logic: Finds the portion after the final hyphen.
  */

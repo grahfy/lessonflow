@@ -34,6 +34,8 @@ type StudentSessionPayload = {
   customerId: string;
   /** UNIX EPOCH timestamp in milliseconds. */
   exp: number;
+  /** Issued-at UNIX EPOCH timestamp in milliseconds (absent on legacy tokens). */
+  iat?: number;
 };
 
 /**
@@ -47,8 +49,25 @@ export function getStudentSessionMaxAgeSeconds(): number {
 
 /**
  * Resolves the signing secret, enforcing high-security in production.
+ *
+ * SECURITY: Production requires a dedicated `STUDENT_SESSION_SECRET` so a leak of
+ * the admin secret cannot forge student sessions (and vice versa). Outside
+ * production (tests/dev) we still allow falling back to `ADMIN_SESSION_SECRET`
+ * for convenience.
  */
 function getStudentSessionSecret(): string {
+  if (process.env.NODE_ENV === "production") {
+    const dedicated = process.env.STUDENT_SESSION_SECRET;
+    if (!dedicated) {
+      throw new AppError(
+        "Critical Security Error: STUDENT_SESSION_SECRET is required in production.",
+        "MISSING_CONFIG",
+        500
+      );
+    }
+    return dedicated;
+  }
+
   const secret = process.env.STUDENT_SESSION_SECRET || process.env.ADMIN_SESSION_SECRET;
   if (!secret) {
     throw new AppError("Critical Security Error: STUDENT_SESSION_SECRET is not configured.", "MISSING_CONFIG", 500);
@@ -63,6 +82,17 @@ function getStudentSessionSecret(): string {
  */
 function signPayload(payload: string): string {
   return crypto.createHmac("sha256", getStudentSessionSecret()).update(payload).digest("hex");
+}
+
+/**
+ * Constant-time comparison of a computed signature against the supplied one.
+ * RATIONALE: Avoids leaking signature bytes via early-exit string comparison.
+ */
+function signatureMatches(payload: string, signature: string): boolean {
+  const expected = Buffer.from(signPayload(payload), "utf8");
+  const provided = Buffer.from(signature, "utf8");
+  if (expected.length !== provided.length) return false;
+  return crypto.timingSafeEqual(expected, provided);
 }
 
 /** Base64URL encoding for cookie safety. */
@@ -81,14 +111,17 @@ function decode(token: string): StudentSessionPayload | null {
   const parts = token.split(".");
   const [payload, signature] = parts;
   if (!payload || !signature) return null;
-  
-  if (signPayload(payload) !== signature) return null;
+
+  if (!signatureMatches(payload, signature)) return null;
 
   try {
     const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as StudentSessionPayload;
     // RATIONALE: We verify expiration BEFORE checking customer existence for speed.
     if (!decoded.customerId || !decoded.exp || Date.now() > decoded.exp) return null;
-    return decoded;
+    // Legacy tokens lack `iat`; treat them as iat=0 so they remain revocable once
+    // `sessionInvalidBefore` is set on the customer.
+    const iat = typeof decoded.iat === "number" ? decoded.iat : 0;
+    return { customerId: decoded.customerId, exp: decoded.exp, iat };
   } catch {
     return null;
   }
@@ -98,8 +131,9 @@ function decode(token: string): StudentSessionPayload | null {
  * Generates a fresh signed session token.
  */
 export function createStudentSessionToken(customerId: string): string {
-  const exp = Date.now() + getStudentSessionMaxAgeSeconds() * 1000;
-  const payload = encode({ customerId, exp });
+  const iat = Date.now();
+  const exp = iat + getStudentSessionMaxAgeSeconds() * 1000;
+  const payload = encode({ customerId, exp, iat });
   return `${payload}.${signPayload(payload)}`;
 }
 
@@ -126,7 +160,17 @@ export async function getStudentFromToken(token?: string | null) {
   });
 
   if (!customer || customer.isArchived) return null;
-  
+
+  // Stateless revocation: reject tokens issued before the customer's last
+  // invalidation point (set on logout and credential rotation). Tokens without
+  // an `iat` decode as iat=0, so they are revoked once the field is set.
+  if (customer.sessionInvalidBefore) {
+    const iat = payload.iat ?? 0;
+    if (iat < customer.sessionInvalidBefore.getTime()) {
+      return null;
+    }
+  }
+
   return customer;
 }
 

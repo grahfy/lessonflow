@@ -1,27 +1,31 @@
 import { InvoiceStatus } from "@/generated/prisma/client";
 
 import { type InvoiceReminderPolicy } from "@/lib/email/notification-settings";
+import { APP_TIMEZONE, toDateKey } from "@/lib/time";
 
 export type InvoiceAgingBucket = "current" | "overdue_1_30" | "overdue_31_plus";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
 /**
- * Normalizes a date to UTC midnight so day-difference calculations remain deterministic.
+ * Resolves an instant to its APP_TIMEZONE calendar day as a UTC-midnight epoch,
+ * so whole-day differences are computed against the business timezone rather
+ * than the server process timezone.
  */
-function atUtcDayStart(date: Date): number {
-  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+function atLocalDayStart(date: Date): number {
+  const key = toDateKey(date, APP_TIMEZONE); // YYYY-MM-DD in business timezone
+  return Date.parse(`${key}T00:00:00.000Z`);
 }
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Calculates overdue day count for an invoice relative to now.
  */
 export function getInvoiceOverdueDays(dueAt: Date, now: Date = new Date()): number {
-  const diff = atUtcDayStart(now) - atUtcDayStart(dueAt);
+  const diff = atLocalDayStart(now) - atLocalDayStart(dueAt);
   if (diff <= 0) {
     return 0;
   }
-  return Math.floor(diff / DAY_MS);
+  return Math.round(diff / DAY_MS);
 }
 
 /**
