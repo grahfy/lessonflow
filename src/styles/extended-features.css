@@ -648,7 +648,8 @@
 
   .admin-shell-content,
   .admin-layout-content,
-  .admin-layout-content.is-scrollable {
+  .admin-layout-content.is-scrollable,
+  .analytics-layout-content {
     overflow: visible;
     padding-right: 0;
   }
@@ -3448,9 +3449,13 @@
    ─────────────────────────────────────────────── */
 
 .analytics-layout-content {
-  overflow: visible;
-  padding-right: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
   display: grid;
+  /* Pack rows from the top so the height-constrained flex item never
+     distributes negative free space into overlapping rows. */
+  align-content: start;
   gap: 20px;
 }
 
