@@ -18,6 +18,8 @@ WorkingDirectory=/var/www/{{APP_NAME}}/current
 EnvironmentFile=/var/www/{{APP_NAME}}/shared/.env
 Environment=NODE_ENV=production
 Environment=PORT=3000
+# Pin the business timezone so any server-local date math matches Melbourne.
+Environment=TZ=Australia/Melbourne
 
 # Executable
 ExecStart=/usr/bin/node /var/www/{{APP_NAME}}/current/.next/standalone/server.js
