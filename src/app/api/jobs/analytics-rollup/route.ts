@@ -18,32 +18,39 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db";
-import { getCronSecret, hasCronSecret } from "@/lib/env";
+import { verifyCronSecret } from "@/lib/cron-auth";
+import { hasCronSecret } from "@/lib/env";
 import { logEvent } from "@/lib/observability";
+import { dateTimeLocalToDate, toDateKey } from "@/lib/time";
 
 export async function POST(request: NextRequest) {
   if (!hasCronSecret()) {
     return NextResponse.json({ error: "Cron secret not configured" }, { status: 401 });
   }
-  const secret = request.headers.get("x-cron-secret");
-  if (!secret || secret !== getCronSecret()) {
+  if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    // Calculate yesterday's window
+    // Calculate yesterday's window in the configured business timezone so the
+    // stored `date` dimension and the raw-event window align with the calendar
+    // day used everywhere else, regardless of the server process TZ.
     const now = new Date();
-    const yesterdayStart = new Date(now);
-    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-    yesterdayStart.setHours(0, 0, 0, 0);
+    const todayKey = toDateKey(now);
+    const yesterdayKeyDate = new Date(`${todayKey}T00:00:00.000Z`);
+    yesterdayKeyDate.setUTCDate(yesterdayKeyDate.getUTCDate() - 1);
+    const yesterdayKey = `${yesterdayKeyDate.getUTCFullYear()}-${String(yesterdayKeyDate.getUTCMonth() + 1).padStart(2, "0")}-${String(yesterdayKeyDate.getUTCDate()).padStart(2, "0")}`;
 
-    const yesterdayEnd = new Date(yesterdayStart);
-    yesterdayEnd.setHours(23, 59, 59, 999);
+    const yesterdayStart = dateTimeLocalToDate(`${yesterdayKey}T00:00`);
+    const yesterdayEnd = dateTimeLocalToDate(`${todayKey}T00:00`);
+    if (!yesterdayStart || !yesterdayEnd) {
+      return NextResponse.json({ error: "Failed to resolve rollup window." }, { status: 500 });
+    }
 
-    // Fetch raw page views for yesterday
+    // Fetch raw page views for yesterday (half-open window: [start, nextStart)).
     const rawViews = await prisma.pageView.findMany({
       where: {
-        createdAt: { gte: yesterdayStart, lte: yesterdayEnd }
+        createdAt: { gte: yesterdayStart, lt: yesterdayEnd }
       },
       select: {
         path: true,
@@ -103,14 +110,14 @@ export async function POST(request: NextRequest) {
     }
 
     logEvent("analytics.rollup.completed", {
-      date: yesterdayStart.toISOString(),
+      date: yesterdayKey,
       rawEvents: rawViews.length,
       rowsCreated
     });
 
     return NextResponse.json({
       ok: true,
-      date: yesterdayStart.toISOString().split("T")[0],
+      date: yesterdayKey,
       rawEvents: rawViews.length,
       rowsCreated
     });

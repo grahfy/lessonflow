@@ -837,7 +837,9 @@ describe("admin role permissions", () => {
         headers: authHeaders(token, true),
         body: JSON.stringify({
           mode: "password",
-          password: "teacher-password-rotated"
+          password: "teacher-password-rotated",
+          // Self-service rotation now re-authenticates with the current password.
+          currentPassword: "teacher-password"
         })
       }),
       { params: Promise.resolve({ id: teacher.id }) }

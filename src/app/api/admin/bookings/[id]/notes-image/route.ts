@@ -6,6 +6,7 @@ import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
 import {
+  InvalidNoteImageContentError,
   MAX_NOTE_IMAGE_SIZE,
   buildBookingNoteImageStorageKey,
   buildBookingNoteImageUrl,
@@ -89,6 +90,12 @@ export async function POST(request: NextRequest, { params }: Params) {
       url: buildBookingNoteImageUrl(id, record.id),
     });
   } catch (error) {
+    if (error instanceof InvalidNoteImageContentError) {
+      return NextResponse.json(
+        { error: "Image must be a valid PNG, JPEG, GIF, or WebP file." },
+        { status: 400 }
+      );
+    }
     return jsonUnexpectedError(error, "Unable to upload booking note image.");
   }
 }

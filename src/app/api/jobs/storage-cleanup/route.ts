@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { jsonUnexpectedError } from "@/lib/api-errors";
+import { verifyCronSecret } from "@/lib/cron-auth";
 import { prisma } from "@/lib/db";
-import { getCronSecret, hasCronSecret } from "@/lib/env";
+import { hasCronSecret } from "@/lib/env";
 import { processStorageCleanupTasks } from "@/lib/storage-cleanup";
 
 const requestSchema = z.object({
@@ -16,8 +17,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Cron secret not configured" }, { status: 401 });
     }
 
-    const secret = request.headers.get("x-cron-secret");
-    if (!secret || secret !== getCronSecret()) {
+    if (!verifyCronSecret(request)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

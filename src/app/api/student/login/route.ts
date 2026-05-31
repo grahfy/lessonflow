@@ -15,6 +15,11 @@ import {
 
 const MAX_LOGIN_CANDIDATES = 20;
 
+// Precomputed bcrypt hash (cost 10) of a value no real password equals. Used to
+// perform a dummy comparison so the zero-candidate path still does bcrypt work,
+// keeping login timing roughly independent of whether a student exists.
+const DUMMY_PASSWORD_HASH = "$2a$10$CwTycUXWue0Thq9StjUM0uJ8DvA0jjuM8h/dD3GE5b3kFkXh8h9.K";
+
 const loginSchema = z.object({
   fullName: z.string().trim().min(2).max(120),
   postcode: auPostcodeSchema,
@@ -105,18 +110,21 @@ export async function POST(request: NextRequest) {
   const boundedCandidates = candidates.slice(0, MAX_LOGIN_CANDIDATES);
   let matchedCustomerId: string | null = null;
 
-  for (const candidate of boundedCandidates) {
-    const credential = candidate.portalCredential;
-    if (!credential || !credential.isActive) {
-      continue;
-    }
+  // Constant-work verification: always perform exactly MAX_LOGIN_CANDIDATES
+  // bcrypt comparisons regardless of how many real candidates matched, and never
+  // early-`break`, so response time does not leak "no such student", duplicate
+  // count, or "wrong password" via timing. We evaluate all candidates and record
+  // the first match without short-circuiting.
+  for (let i = 0; i < MAX_LOGIN_CANDIDATES; i += 1) {
+    const candidate = boundedCandidates[i];
+    const credential = candidate?.portalCredential;
+    const passwordHash = credential && credential.isActive ? credential.passwordHash : DUMMY_PASSWORD_HASH;
     const validPassword = await verifyPortalPassword({
       plaintext: parsed.data.password,
-      passwordHash: credential.passwordHash
+      passwordHash
     });
-    if (validPassword) {
+    if (validPassword && candidate && credential && credential.isActive && matchedCustomerId === null) {
       matchedCustomerId = candidate.id;
-      break;
     }
   }
 
@@ -130,7 +138,7 @@ export async function POST(request: NextRequest) {
     value: createStudentSessionToken(matchedCustomerId),
     httpOnly: true,
     // Keep local development usable over HTTP while requiring secure cookies in production.
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.NODE_ENV === "production" || process.env.COOKIE_SECURE === "1",
     sameSite: "lax",
     path: "/",
     maxAge: getStudentSessionMaxAgeSeconds()

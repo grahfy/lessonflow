@@ -26,12 +26,29 @@ import {
   TRACKED_PUBLIC_PATHS
 } from "@/lib/analytics";
 import { resolveRequestCountry } from "@/lib/geo-country";
+import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
 
 const EMPTY_204 = () => new NextResponse(null, { status: 204 });
+
+/** Per-IP throttle for this unauthenticated beacon: 60 hits / 60s. */
+const ANALYTICS_RATE_LIMIT = 60;
+const ANALYTICS_RATE_WINDOW_MS = 60_000;
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const userAgent = request.headers.get("user-agent") || "";
   if (isBot(userAgent)) {
+    return EMPTY_204();
+  }
+
+  // Throttle per IP before the outbound geo fetch + DB insert to cap abuse.
+  // Returns the same opaque 204 as other rejections (no harsh client error).
+  const ip = getRequestIp(request);
+  const rateLimit = consumeRateLimit({
+    key: `analytics:${ip}`,
+    limit: ANALYTICS_RATE_LIMIT,
+    windowMs: ANALYTICS_RATE_WINDOW_MS
+  });
+  if (!rateLimit.allowed) {
     return EMPTY_204();
   }
 

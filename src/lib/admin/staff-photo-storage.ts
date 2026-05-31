@@ -2,6 +2,8 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import sharp from "sharp";
+
 import { resolveProductionAwareStorageRoot } from "@/lib/runtime-paths";
 import { rethrowAsStoragePermissionDeniedError } from "@/lib/storage-errors";
 
@@ -18,6 +20,43 @@ const ALLOWED_IMAGE_TYPES = new Map<string, string>([
   ["image/gif", "gif"],
   ["image/webp", "webp"]
 ]);
+
+/**
+ * Maps a sharp-detected image format to its canonical MIME type, restricted to
+ * the staff-photo allowlist. SVG and any other format resolve to undefined and
+ * are rejected.
+ */
+const SHARP_FORMAT_TO_MIME: Record<string, string> = {
+  jpeg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp"
+};
+
+export class InvalidStaffPhotoContentError extends Error {
+  constructor(message = "Uploaded file is not a supported image.") {
+    super(message);
+    this.name = "InvalidStaffPhotoContentError";
+  }
+}
+
+/**
+ * Validates the REAL content of a staff-photo buffer via magic bytes (sharp)
+ * instead of trusting the client-supplied MIME type. Throws when the detected
+ * format is absent or outside the allowlist (png/jpeg/gif/webp; SVG disallowed).
+ */
+export async function assertValidStaffPhotoContent(buffer: Buffer): Promise<void> {
+  let format: string | undefined;
+  try {
+    ({ format } = await sharp(buffer).metadata());
+  } catch {
+    throw new InvalidStaffPhotoContentError();
+  }
+
+  if (!format || !SHARP_FORMAT_TO_MIME[format]) {
+    throw new InvalidStaffPhotoContentError();
+  }
+}
 
 function getStorageRoot(): string {
   return resolveProductionAwareStorageRoot(
@@ -64,6 +103,9 @@ export function buildStaffPhotoStorageKey(staffId: string, extension: string): s
 }
 
 export async function putStaffPhoto(storageKey: string, buffer: Buffer): Promise<void> {
+  // NOTE: real-content (magic-byte) validation happens at the upload route via
+  // assertValidStaffPhotoContent before this is called. The storage layer stays
+  // content-agnostic so it can persist any caller-provided bytes.
   try {
     const targetPath = resolveLocalPath(storageKey);
     await ensureParentDirectory(targetPath);

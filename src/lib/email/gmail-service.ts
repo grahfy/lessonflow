@@ -58,6 +58,29 @@ export function isGmailConfigured(): boolean {
 }
 
 /**
+ * Strips CR/LF characters from a header value to prevent RFC 2822 header
+ * injection. The Gmail MIME message is hand-built via string concatenation, so
+ * any unescaped `\r`/`\n` in an address or attachment filename could inject
+ * additional headers or body content.
+ */
+function sanitizeHeaderValue(value: string): string {
+  return value.replace(/[\r\n]+/g, " ").trim();
+}
+
+/**
+ * Normalizes an address field (string or array) by sanitizing each entry.
+ */
+function sanitizeAddressField(value: string | string[] | undefined): string | string[] | undefined {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sanitizeHeaderValue(entry));
+  }
+  if (typeof value === "string") {
+    return sanitizeHeaderValue(value);
+  }
+  return value;
+}
+
+/**
  * Encodes an email message in RFC 2822 format for Gmail API.
  *
  * We build the MIME message manually so the Gmail path supports the same HTML + attachment shape
@@ -77,25 +100,33 @@ function encodeEmailMessage(
   }>
 ): string {
   const boundary = `boundary_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  
+
+  // Strip CR/LF from all address fields before composing headers to block
+  // RFC 2822 header injection through `To`/`Cc`/`Bcc`. (Subject is base64-encoded
+  // below, so it is already injection-safe.)
+  const safeFrom = sanitizeHeaderValue(from);
+  const safeTo = sanitizeHeaderValue(to);
+  const safeCc = sanitizeAddressField(cc);
+  const safeBcc = sanitizeAddressField(bcc);
+
   // Build standards-compliant headers first; Gmail expects the final payload as a raw RFC 2822
   // message encoded with base64url.
   let email = [
-    `From: ${from}`,
-    `To: ${to}`,
-    ...(Array.isArray(cc)
-      ? cc.length > 0
-        ? [`Cc: ${cc.join(", ")}`]
+    `From: ${safeFrom}`,
+    `To: ${safeTo}`,
+    ...(Array.isArray(safeCc)
+      ? safeCc.length > 0
+        ? [`Cc: ${safeCc.join(", ")}`]
         : []
-      : typeof cc === "string" && cc.trim()
-        ? [`Cc: ${cc}`]
+      : typeof safeCc === "string" && safeCc.trim()
+        ? [`Cc: ${safeCc}`]
         : []),
-    ...(Array.isArray(bcc)
-      ? bcc.length > 0
-        ? [`Bcc: ${bcc.join(", ")}`]
+    ...(Array.isArray(safeBcc)
+      ? safeBcc.length > 0
+        ? [`Bcc: ${safeBcc.join(", ")}`]
         : []
-      : typeof bcc === "string" && bcc.trim()
-        ? [`Bcc: ${bcc}`]
+      : typeof safeBcc === "string" && safeBcc.trim()
+        ? [`Bcc: ${safeBcc}`]
         : []),
     `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
     "MIME-Version: 1.0",
@@ -113,10 +144,11 @@ function encodeEmailMessage(
     email += Buffer.from(html).toString("base64");
 
     for (const attachment of attachments) {
+      const safeFilename = sanitizeHeaderValue(attachment.filename).replace(/"/g, "");
       email += `\r\n--${boundary}\r\n`;
-      email += `Content-Type: ${attachment.contentType || "application/octet-stream"}\r\n`;
+      email += `Content-Type: ${sanitizeHeaderValue(attachment.contentType || "application/octet-stream")}\r\n`;
       email += "Content-Transfer-Encoding: base64\r\n";
-      email += `Content-Disposition: attachment; filename="${attachment.filename}"\r\n\r\n`;
+      email += `Content-Disposition: attachment; filename="${safeFilename}"\r\n\r\n`;
       email += attachment.content.toString("base64");
     }
 

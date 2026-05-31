@@ -58,12 +58,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => null);
     const email = String(body?.email || "").trim().toLowerCase();
     const password = String(body?.password || "");
-    
-    // Debug logging for development
-    if (process.env.NODE_ENV === "development") {
-      console.log("[LOGIN] Attempt:", { email, passwordLength: password.length });
-    }
-    
+
     const gate = verifyCaptchaGuard({
       body,
       headers: request.headers,
@@ -72,9 +67,6 @@ export async function POST(request: NextRequest) {
       windowMs: 10 * 60 * 1000
     });
     if (!gate.ok) {
-      if (process.env.NODE_ENV === "development") {
-        console.log("[LOGIN] CAPTCHA guard failed:", gate.code, gate.message);
-      }
       return NextResponse.json(
         { error: gate.message, code: gate.code },
         {
@@ -84,20 +76,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (process.env.NODE_ENV === "development") {
-      console.log("[LOGIN] CAPTCHA passed, verifying password...");
-    }
-    
     const admin = await verifyAdminPassword(email, password);
     if (!admin) {
-      if (process.env.NODE_ENV === "development") {
-        console.log("[LOGIN] Password verification failed for:", email);
-      }
       return NextResponse.json({ error: "Invalid login credentials." }, { status: 401 });
-    }
-
-    if (process.env.NODE_ENV === "development") {
-      console.log("[LOGIN] Success for:", email);
     }
 
     const token = createSessionToken(admin.email);
@@ -105,7 +86,7 @@ export async function POST(request: NextRequest) {
     response.cookies.set(getSessionCookieName(), token, {
       httpOnly: true,
       // Allow local HTTP development while enforcing secure cookies in production.
-      secure: process.env.NODE_ENV === "production",
+      secure: process.env.NODE_ENV === "production" || process.env.COOKIE_SECURE === "1",
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 7

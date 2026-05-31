@@ -34,6 +34,9 @@ type StaffFormState = {
   musicalHistory: string;
   isActive: boolean;
   password: string;
+  // Only used when an admin rotates their OWN password; the server requires it
+  // as a re-authentication step for self-service changes.
+  currentPassword: string;
 };
 
 type StaffEditorTab = "basics" | "teaching" | "address" | "security";
@@ -70,7 +73,8 @@ function emptyStaffForm(): StaffFormState {
     background: "",
     musicalHistory: "",
     isActive: true,
-    password: ""
+    password: "",
+    currentPassword: ""
   };
 }
 
@@ -93,7 +97,8 @@ function formFromProfile(profile: StaffProfile): StaffFormState {
     background: profile.background ?? "",
     musicalHistory: profile.musicalHistory ?? "",
     isActive: profile.isActive,
-    password: ""
+    password: "",
+    currentPassword: ""
   };
 }
 
@@ -117,6 +122,9 @@ function normalizeForm(form: StaffFormState): StaffFormState {
     background: form.background.trim(),
     musicalHistory: form.musicalHistory.trim(),
     password: form.password,
+    // Transient re-auth field — excluded from dirty comparison so typing it
+    // alone never marks the profile as having unsaved changes.
+    currentPassword: "",
     isActive: form.isActive
   };
 }
@@ -378,14 +386,19 @@ export function AdminTeachersClient() {
       return;
     }
 
+    const isSelfSelection = activeSelection.id === currentAdmin?.id;
     const updated = await updateProfile(activeSelection.id, payload);
     if (updated && form.password.trim()) {
-      await updatePassword(activeSelection.id, form.password.trim());
+      await updatePassword(
+        activeSelection.id,
+        form.password.trim(),
+        isSelfSelection ? form.currentPassword.trim() : undefined
+      );
     }
     setSaving(false);
 
     if (updated) {
-      const nextForm = { ...normalizeForm(form), password: "" };
+      const nextForm = { ...normalizeForm(form), password: "", currentPassword: "" };
       setNotice(form.password.trim() ? "Profile and password updated." : "Profile updated.");
       setForm(nextForm);
       setBaselineForm(nextForm);
@@ -834,6 +847,19 @@ export function AdminTeachersClient() {
                       </div>
                     </div>
                     <AdminForm className="dialog-form-grid teacher-editor-grid">
+                      {!isCreating && activeSelection?.id === currentAdmin?.id ? (
+                        <AdminField
+                          label="Current Password"
+                          tooltip="Required to change your own password — confirms it's really you."
+                          fullWidth
+                        >
+                          <input
+                            type="password"
+                            value={form.currentPassword}
+                            onChange={(event) => updateForm({ currentPassword: event.target.value })}
+                          />
+                        </AdminField>
+                      ) : null}
                       <AdminField
                         label={isCreating ? "Initial Password" : "New Password"}
                         tooltip="Leave blank to keep the existing password."
