@@ -21,7 +21,13 @@
 import { addMinutes, addWeeks, isAfter, isBefore } from "date-fns";
 import { z } from "zod";
 
-import { getCurrentCalendarYear, isDateInCalendarYear } from "@/lib/time";
+import {
+  APP_TIMEZONE,
+  dateTimeLocalToDate,
+  getCurrentCalendarYear,
+  isDateInCalendarYear,
+  toDateTimeLocalValue
+} from "@/lib/time";
 
 // =============================================================================
 // SCHEMA DEFINITIONS - Australian address and booking validation rules
@@ -304,11 +310,49 @@ export function getBookingEnd(
 // =============================================================================
 
 /**
+ * Adds one calendar week to an instant while preserving the wall-clock time in
+ * the app timezone, so weekly series stay anchored to (e.g.) 16:00 Melbourne
+ * even across DST transitions.
+ *
+ * RATIONALE: `addWeeks` adds exactly 7×24h to a UTC instant, which silently
+ * shifts the local hour by ±1 whenever the week spans a DST boundary (AEST↔AEDT
+ * on the first Sundays of April/October). Instead we round-trip through the
+ * Melbourne wall-clock value: take the current local datetime-local string, add
+ * 7 days to its calendar date, then re-resolve that local time back to a UTC
+ * instant. This keeps `startTimeLocal` and `startAt` in agreement.
+ */
+function addWeekInAppTimezone(current: Date): Date {
+  const local = toDateTimeLocalValue(current, APP_TIMEZONE);
+  const match = local.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+  if (!match) {
+    // Defensive: an unparseable local value should never happen for a valid
+    // instant. Fall back to the raw +7d advance rather than aborting the series.
+    return addWeeks(current, 1);
+  }
+
+  const [, year, month, day, hour, minute] = match;
+  // Advance the calendar date by 7 days using UTC date math (no DST involved),
+  // then reattach the original Melbourne hour:minute as the target wall-clock.
+  const nextDate = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day) + 7));
+  const nextLocal =
+    `${String(nextDate.getUTCFullYear()).padStart(4, "0")}-` +
+    `${String(nextDate.getUTCMonth() + 1).padStart(2, "0")}-` +
+    `${String(nextDate.getUTCDate()).padStart(2, "0")}T${hour}:${minute}`;
+
+  const resolved = dateTimeLocalToDate(nextLocal, APP_TIMEZONE);
+  // DST EDGE CASE: `dateTimeLocalToDate` returns null when the target wall-clock
+  // is impossible (the spring-forward gap, e.g. 02:30 on the October transition).
+  // That gap only affects times that don't exist locally; fall back to the raw
+  // +7d instant for that single occurrence so the series still progresses.
+  return resolved ?? addWeeks(current, 1);
+}
+
+/**
  * Generates all booking dates for a recurring weekly lesson.
- * 
+ *
  * LOGIC: Creates weekly occurrences from start date until end date (inclusive).
- * RATIONALE: We generate discrete dates here so that the DB can store them 
- * as individual 'Booking' records, allowing per-lesson notes and manual 
+ * RATIONALE: We generate discrete dates here so that the DB can store them
+ * as individual 'Booking' records, allowing per-lesson notes and manual
  * rescheduling of specific weeks.
  */
 export function generateRecurringStartDates(input: {
@@ -322,10 +366,12 @@ export function generateRecurringStartDates(input: {
   const dates: Date[] = [];
   let current = input.startAt;
 
-  // Generate weekly occurrences until end date
+  // Generate weekly occurrences until end date. Advancing in wall-clock space
+  // (see `addWeekInAppTimezone`) keeps each occurrence at the same local time
+  // even when a week crosses a Melbourne DST boundary.
   while (!isAfter(current, input.recurrenceEndAt)) {
     dates.push(current);
-    current = addWeeks(current, 1);
+    current = addWeekInAppTimezone(current);
   }
 
   return dates;

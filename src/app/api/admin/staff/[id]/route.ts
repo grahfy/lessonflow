@@ -78,6 +78,20 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         return NextResponse.json({ error: "Invalid password payload.", details: parsed.error.flatten() }, { status: 400 });
       }
 
+      // Self-service password changes must re-authenticate with the current
+      // password so a hijacked session cannot silently rotate the credential and
+      // lock out the user. Owner-driven resets of OTHER accounts are exempt.
+      if (existing.id === admin.id) {
+        const currentPassword = typeof body?.currentPassword === "string" ? body.currentPassword : "";
+        if (!currentPassword) {
+          return NextResponse.json({ error: "Current password is required." }, { status: 400 });
+        }
+        const currentValid = await bcrypt.compare(currentPassword, existing.passwordHash);
+        if (!currentValid) {
+          return NextResponse.json({ error: "Current password is incorrect." }, { status: 403 });
+        }
+      }
+
       const updated = await prisma.adminUser.update({
         where: { id },
         data: {

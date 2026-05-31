@@ -15,6 +15,7 @@
 import { InvoiceDocumentType, InvoiceStatus, InvoiceTaxMode, Prisma } from "@/generated/prisma/client";
 
 import { calculateInvoiceTotals } from "@/lib/invoices/calculate";
+import { isInvoiceNumberConflict } from "@/lib/invoices/numbering";
 import { getDefaultInvoiceTaxModeForCurrencyValue } from "@/lib/invoices/gst-policy";
 import { generateNextInvoiceNumber } from "@/lib/invoices/numbering";
 import { sellerSnapshotFromEnv } from "@/lib/invoices/snapshots";
@@ -110,94 +111,124 @@ export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
     )
   );
   
-  // NOTE: Number generation is transaction-scoped to maintain consistency under concurrency.
-  const invoiceNumber = await generateNextInvoiceNumber(input.tx, input.issuedAt);
+  // CONCURRENCY: `generateNextInvoiceNumber` derives the next sequence from the
+  // latest existing row, so two creates racing inside separate transactions can
+  // compute the same number; the DB UNIQUE constraint then makes one create
+  // throw P2002. Rather than surfacing a 500, we retry the allocate-and-create a
+  // bounded number of times, recomputing a fresh number on each attempt so the
+  // loser simply lands on the next free sequence. The number must be (re)allocated
+  // immediately before the create so each retry observes the row the winner just
+  // inserted. (MariaDB does not abort the surrounding interactive transaction on a
+  // duplicate-key error, so the provided `tx` remains usable across attempts.)
+  const MAX_INVOICE_NUMBER_ATTEMPTS = 5;
+  let invoice: Awaited<ReturnType<typeof input.tx.invoice.create>> | undefined;
 
-  const invoice = await input.tx.invoice.create({
-    data: {
-      invoiceNumber,
-      status: input.status ?? "draft",
-      documentType: input.documentType ?? "invoice",
-      currency,
-      taxMode,
-      discountKind: input.invoiceDiscount?.discountKind ?? null,
-      discountValue: input.invoiceDiscount?.discountValue ?? null,
-      discountCents: calculation.totals.discountCents,
-      customerId: input.customerId ?? null,
-      bookingId: input.bookingId ?? null,
-      originalInvoiceId: input.originalInvoiceId ?? null,
-      
-      // DENORMALIZED CUSTOMER DATA
-      customerFirstName: input.customerSnapshot.customerFirstName,
-      customerLastName: input.customerSnapshot.customerLastName,
-      customerName: input.customerSnapshot.customerName,
-      customerEmail: input.customerSnapshot.customerEmail,
-      customerPhone: input.customerSnapshot.customerPhone,
-      customerAddress: input.customerSnapshot.customerAddress,
-      
-      // DENORMALIZED SELLER DATA
-      sellerBusinessName: sellerSnapshot.sellerBusinessName,
-      sellerAbn: sellerSnapshot.sellerAbn,
-      sellerEmail: sellerSnapshot.sellerEmail,
-      bankName: sellerSnapshot.bankName,
-      bankBsb: sellerSnapshot.bankBsb,
-      bankAccountName: sellerSnapshot.bankAccountName,
-      bankAccountNumber: sellerSnapshot.bankAccountNumber,
-      paymentDetailsSource: "system",
-      
-      // CALCULATED TOTALS
-      subtotalCents: calculation.totals.subtotalCents,
-      gstCents: calculation.totals.gstCents,
-      totalCents: calculation.totals.totalCents,
-      
-      notes: input.notes?.trim() || null,
-      issuedAt: input.issuedAt,
-      dueAt: input.dueAt,
-      createdById: input.adminId,
-      updatedById: input.adminId,
-      
-      // ATOMIC LINE ITEM CREATION
-      lineItems: {
-        create: calculation.lineItems.map((lineItem) => ({
-          kind: lineItem.kind,
-          description: lineItem.description,
-          quantity: lineItem.quantity,
-          unitPriceCents: lineItem.unitPriceCents,
-          taxMode: lineItem.taxMode,
-          discountKind: lineItem.discountKind ?? null,
-          discountValue: lineItem.discountValue ?? null,
-          lineDiscountCents: lineItem.lineDiscountCents,
-          lineSubtotalCents: lineItem.lineSubtotalCents,
-          lineGstCents: lineItem.lineGstCents,
-          lineTotalCents: lineItem.lineTotalCents,
-          sortOrder: lineItem.sortOrder
-        }))
-      },
-      bookingLinks: resolvedBookingIds.length > 0
-        ? {
-            create: resolvedBookingIds.map((bookingId) => ({
-              bookingId
+  for (let attempt = 1; attempt <= MAX_INVOICE_NUMBER_ATTEMPTS; attempt += 1) {
+    const invoiceNumber = await generateNextInvoiceNumber(input.tx, input.issuedAt);
+
+    try {
+      invoice = await input.tx.invoice.create({
+        data: {
+          invoiceNumber,
+          status: input.status ?? "draft",
+          documentType: input.documentType ?? "invoice",
+          currency,
+          taxMode,
+          discountKind: input.invoiceDiscount?.discountKind ?? null,
+          discountValue: input.invoiceDiscount?.discountValue ?? null,
+          discountCents: calculation.totals.discountCents,
+          customerId: input.customerId ?? null,
+          bookingId: input.bookingId ?? null,
+          originalInvoiceId: input.originalInvoiceId ?? null,
+
+          // DENORMALIZED CUSTOMER DATA
+          customerFirstName: input.customerSnapshot.customerFirstName,
+          customerLastName: input.customerSnapshot.customerLastName,
+          customerName: input.customerSnapshot.customerName,
+          customerEmail: input.customerSnapshot.customerEmail,
+          customerPhone: input.customerSnapshot.customerPhone,
+          customerAddress: input.customerSnapshot.customerAddress,
+
+          // DENORMALIZED SELLER DATA
+          sellerBusinessName: sellerSnapshot.sellerBusinessName,
+          sellerAbn: sellerSnapshot.sellerAbn,
+          sellerEmail: sellerSnapshot.sellerEmail,
+          bankName: sellerSnapshot.bankName,
+          bankBsb: sellerSnapshot.bankBsb,
+          bankAccountName: sellerSnapshot.bankAccountName,
+          bankAccountNumber: sellerSnapshot.bankAccountNumber,
+          paymentDetailsSource: "system",
+
+          // CALCULATED TOTALS
+          subtotalCents: calculation.totals.subtotalCents,
+          gstCents: calculation.totals.gstCents,
+          totalCents: calculation.totals.totalCents,
+
+          notes: input.notes?.trim() || null,
+          issuedAt: input.issuedAt,
+          dueAt: input.dueAt,
+          createdById: input.adminId,
+          updatedById: input.adminId,
+
+          // ATOMIC LINE ITEM CREATION
+          lineItems: {
+            create: calculation.lineItems.map((lineItem) => ({
+              kind: lineItem.kind,
+              description: lineItem.description,
+              quantity: lineItem.quantity,
+              unitPriceCents: lineItem.unitPriceCents,
+              taxMode: lineItem.taxMode,
+              discountKind: lineItem.discountKind ?? null,
+              discountValue: lineItem.discountValue ?? null,
+              lineDiscountCents: lineItem.lineDiscountCents,
+              lineSubtotalCents: lineItem.lineSubtotalCents,
+              lineGstCents: lineItem.lineGstCents,
+              lineTotalCents: lineItem.lineTotalCents,
+              sortOrder: lineItem.sortOrder
             }))
+          },
+          bookingLinks: resolvedBookingIds.length > 0
+            ? {
+                create: resolvedBookingIds.map((bookingId) => ({
+                  bookingId
+                }))
+              }
+            : undefined,
+
+          // AUTOMATIC AUDIT LOGGING
+          auditLogs: {
+            create: {
+              action: "created",
+              actorId: input.adminId,
+              details: "Invoice created"
+            }
           }
-        : undefined,
-      
-      // AUTOMATIC AUDIT LOGGING
-      auditLogs: {
-        create: {
-          action: "created",
-          actorId: input.adminId,
-          details: "Invoice created"
+        },
+        include: {
+          lineItems: {
+            orderBy: {
+              sortOrder: "asc"
+            }
+          }
         }
+      });
+
+      break;
+    } catch (error) {
+      // Retry only on an invoice-number UNIQUE collision; rethrow anything else.
+      // If we have exhausted our attempts, surface the conflict to the caller.
+      if (isInvoiceNumberConflict(error) && attempt < MAX_INVOICE_NUMBER_ATTEMPTS) {
+        continue;
       }
-    },
-    include: {
-      lineItems: {
-        orderBy: {
-          sortOrder: "asc"
-        }
-      }
+      throw error;
     }
-  });
+  }
+
+  // INVARIANT: the loop either assigns `invoice` and breaks, or rethrows. The
+  // guard satisfies the type checker and documents the unreachable fallthrough.
+  if (!invoice) {
+    throw new Error("Failed to allocate a unique invoice number after multiple attempts.");
+  }
 
   return invoice;
 }

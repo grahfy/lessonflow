@@ -12,13 +12,14 @@
  * authorized CI/CD triggers can initiate the mailing.
  */
 
-import { endOfDay, startOfDay } from "date-fns";
 import { NextRequest, NextResponse } from "next/server";
 
+import { verifyCronSecret } from "@/lib/cron-auth";
 import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/email/service";
 import { ownerDailyDigestTemplate } from "@/lib/email/templates";
-import { getCronSecret, getOwnerEmail, hasCronSecret } from "@/lib/env";
+import { getOwnerEmail, hasCronSecret } from "@/lib/env";
+import { dateTimeLocalToDate, toDateKey } from "@/lib/time";
 
 /**
  * POST: Triggers the generation and delivery of the daily schedule digest.
@@ -37,21 +38,34 @@ export async function POST(request: NextRequest) {
   if (!hasCronSecret()) {
     return NextResponse.json({ error: "Cron secret not configured" }, { status: 401 });
   }
-  const secret = request.headers.get("x-cron-secret");
-  if (!secret || secret !== getCronSecret()) {
+  if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   // STEP 1: Fetch today's schedule
+  // Compute the [start, nextStart) day window for "today" in APP_TIMEZONE so
+  // late-evening Melbourne lessons are included and early-AM next-day lessons
+  // are excluded, regardless of the server process TZ.
   const now = new Date();
+  const todayKey = toDateKey(now);
+  const nextDayKeyDate = new Date(`${todayKey}T00:00:00.000Z`);
+  nextDayKeyDate.setUTCDate(nextDayKeyDate.getUTCDate() + 1);
+  const nextDayKey = `${nextDayKeyDate.getUTCFullYear()}-${String(nextDayKeyDate.getUTCMonth() + 1).padStart(2, "0")}-${String(nextDayKeyDate.getUTCDate()).padStart(2, "0")}`;
+
+  const dayStartUtc = dateTimeLocalToDate(`${todayKey}T00:00`);
+  const nextDayStartUtc = dateTimeLocalToDate(`${nextDayKey}T00:00`);
+  if (!dayStartUtc || !nextDayStartUtc) {
+    return NextResponse.json({ error: "Failed to resolve digest window." }, { status: 500 });
+  }
+
   const rows = await prisma.booking.findMany({
     where: {
       status: {
         not: "cancelled"
       },
       startAt: {
-        gte: startOfDay(now),
-        lte: endOfDay(now)
+        gte: dayStartUtc,
+        lt: nextDayStartUtc
       }
     },
     orderBy: {

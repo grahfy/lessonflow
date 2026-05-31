@@ -15,7 +15,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getPrimaryActiveAdmin } from "@/lib/admin-auth";
-import { getCronSecret, hasCronSecret } from "@/lib/env";
+import { verifyCronSecret } from "@/lib/cron-auth";
+import { hasCronSecret } from "@/lib/env";
 import { runInvoiceReminderBatch } from "@/lib/invoices/reminder-runner";
 import { sendInvoiceRemindersSchema } from "@/lib/invoices/schema";
 
@@ -42,8 +43,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Guard: Verify secret caller.
-  const secret = request.headers.get("x-cron-secret");
-  if (!secret || secret !== getCronSecret()) {
+  if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

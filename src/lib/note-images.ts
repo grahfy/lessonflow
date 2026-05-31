@@ -1,5 +1,7 @@
 import { randomUUID } from "crypto";
 
+import sharp from "sharp";
+
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import type { StorageCleanupScope, StorageCleanupTaskInput } from "@/lib/storage-cleanup";
 import { enqueueStorageCleanupTasks } from "@/lib/storage-cleanup";
@@ -32,11 +34,55 @@ export function resolveNoteImageExtension(mimeType: string): string | null {
   return ALLOWED_NOTE_IMAGE_MIME_TYPES[mimeType] ?? null;
 }
 
+/**
+ * Maps a sharp-detected format to its canonical MIME type, restricted to the
+ * note-image allowlist. Returns null for any format outside the allowlist
+ * (notably SVG, which must remain disallowed to avoid stored XSS).
+ */
+const SHARP_FORMAT_TO_MIME: Record<string, string> = {
+  jpeg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+};
+
+export class InvalidNoteImageContentError extends Error {
+  constructor(message = "Uploaded file is not a supported image.") {
+    super(message);
+    this.name = "InvalidNoteImageContentError";
+  }
+}
+
+/**
+ * Validates the REAL content of an image buffer via magic bytes (sharp) rather
+ * than trusting the client-supplied MIME type. Rejects when the detected format
+ * is absent or outside the allowlist (png/jpeg/gif/webp; SVG disallowed).
+ *
+ * @returns the canonical MIME type derived from the actual content.
+ */
+export async function assertValidNoteImageContent(buffer: Buffer): Promise<string> {
+  let format: string | undefined;
+  try {
+    ({ format } = await sharp(buffer).metadata());
+  } catch {
+    throw new InvalidNoteImageContentError();
+  }
+
+  const mimeType = format ? SHARP_FORMAT_TO_MIME[format] : undefined;
+  if (!mimeType) {
+    throw new InvalidNoteImageContentError();
+  }
+  return mimeType;
+}
+
 export async function storeNoteImageFile(input: {
   file: File;
   storageKey: string;
 }): Promise<void> {
   const buffer = Buffer.from(await input.file.arrayBuffer());
+  // Validate the real image content (magic bytes) before persisting, so a
+  // renamed/spoofed upload cannot be stored under a trusted extension.
+  await assertValidNoteImageContent(buffer);
   const driver = createMaterialStorageDriver();
   await driver.put({
     storageKey: input.storageKey,

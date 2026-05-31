@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { getCronSecret, getOwnerEmail, hasCronSecret } from "@/lib/env";
+import { verifyCronSecret } from "@/lib/cron-auth";
+import { getOwnerEmail, hasCronSecret } from "@/lib/env";
 import { sendEmail } from "@/lib/email/service";
 import { ownerOperationsReportTemplate } from "@/lib/email/templates";
 import { getAdminReportsDashboard } from "@/lib/admin-reports";
@@ -23,8 +24,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Cron secret not configured" }, { status: 401 });
     }
 
-    const secret = request.headers.get("x-cron-secret");
-    if (!secret || secret !== getCronSecret()) {
+    if (!verifyCronSecret(request)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

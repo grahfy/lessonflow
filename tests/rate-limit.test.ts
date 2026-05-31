@@ -15,14 +15,16 @@ describe("rate-limit", () => {
     expect(getRequestIp(request)).toBe("203.0.113.10");
   });
 
-  it("falls back to the first x-forwarded-for hop when x-real-ip is missing", () => {
+  it("uses the right-most (trusted proxy) x-forwarded-for hop when x-real-ip is missing", () => {
+    // SECURITY: the left-most XFF value is attacker-controlled. With the default
+    // single trusted proxy hop, we take the right-most entry the proxy appended.
     const request = new NextRequest("http://localhost/api/admin/login", {
       headers: {
         "x-forwarded-for": "198.51.100.5, 203.0.113.20"
       }
     });
 
-    expect(getRequestIp(request)).toBe("198.51.100.5");
+    expect(getRequestIp(request)).toBe("203.0.113.20");
   });
 
   it("returns unknown when no proxy headers are present", () => {

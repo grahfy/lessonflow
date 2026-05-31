@@ -45,6 +45,7 @@ export async function GET(request: NextRequest, { params }: Params) {
         "Content-Type": image.mimeType,
         "Content-Length": String(image.sizeBytes),
         "Cache-Control": "private, max-age=86400",
+        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch (error) {

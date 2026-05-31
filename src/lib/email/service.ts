@@ -54,6 +54,12 @@ export type SendEmailInput = {
   }>;
   notification?: EmailNotificationMetadata;
   skipNotificationPolicyCheck?: boolean;
+  /**
+   * Opt this send OUT of the owner audit BCC.
+   * RATIONALE: Some customer emails (e.g. portal-credential emails) contain
+   * plaintext secrets that must not accumulate in the owner inbox.
+   */
+  skipAuditBcc?: boolean;
 };
 
 /** Standardized response for all email delivery attempts. */
@@ -137,17 +143,34 @@ function mergeBccValues(existing: string | string[] | undefined, extra: string):
 }
 
 /**
- * Returns the owner's email if the target 'to' address is a customer.
- * 
- * RATIONALE: We BCC the owner on customer emails so they have a local copy 
- * in their inbox for historical context and verification.
+ * Heuristic guard that detects portal-credential emails by subject.
+ *
+ * RATIONALE: Credential emails carry the customer's plaintext portal password.
+ * The primary opt-out is the explicit `skipAuditBcc` flag set at the call site,
+ * but this subject check is a defense-in-depth fallback so a credential email is
+ * never BCC'd to the owner even if a caller forgets to set the flag.
  */
-function getCustomerAuditBccRecipient(to: string): string | null {
+function isCredentialEmailSubject(subject: string): boolean {
+  return /student portal login details/i.test(subject);
+}
+
+/**
+ * Returns the owner's email if the target 'to' address is a customer and the
+ * send has not opted out of the audit BCC.
+ *
+ * RATIONALE: We BCC the owner on customer emails so they have a local copy
+ * in their inbox for historical context and verification — EXCEPT for emails
+ * that contain secrets (portal credentials).
+ */
+function getCustomerAuditBccRecipient(input: SendEmailInput): string | null {
+  // Never BCC secret-bearing emails to the owner inbox.
+  if (input.skipAuditBcc || isCredentialEmailSubject(input.subject)) return null;
+
   const ownerEmail = getOwnerEmail();
   if (!ownerEmail) return null;
 
   // Don't BCC the owner on emails ALREADY going to the owner (e.g. daily digest).
-  if (normalizeAddressValue(to) === normalizeAddressValue(ownerEmail)) return null;
+  if (normalizeAddressValue(input.to) === normalizeAddressValue(ownerEmail)) return null;
 
   return ownerEmail;
 }
@@ -190,6 +213,7 @@ type SendTemplateEmailInput = {
   }>;
   notification?: EmailNotificationMetadata;
   skipNotificationPolicyCheck?: boolean;
+  skipAuditBcc?: boolean;
 };
 
 function toPolicyAuditHtml(input: Pick<SendEmailInput, "html" | "subject">): string {
@@ -255,7 +279,8 @@ export async function sendTemplateEmail(input: SendTemplateEmailInput): Promise<
     bcc: input.bcc,
     attachments: input.attachments,
     notification: input.notification,
-    skipNotificationPolicyCheck: input.skipNotificationPolicyCheck
+    skipNotificationPolicyCheck: input.skipNotificationPolicyCheck,
+    skipAuditBcc: input.skipAuditBcc
   });
 }
 
@@ -279,13 +304,15 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   const from = process.env.SMTP_FROM || "LessonFlow <no-reply@example.com>";
   const provider = (process.env.EMAIL_PROVIDER || "smtp").toLowerCase();
   const tx = getTransporter();
-  const ownerBcc = getCustomerAuditBccRecipient(input.to);
+  const ownerBcc = getCustomerAuditBccRecipient(input);
   const bcc = ownerBcc ? mergeBccValues(input.bcc, ownerBcc) : input.bcc;
   const html = await injectEmailSignature(input.html, input.subject);
+  // Audited/BCC'd copy must match what is actually delivered, so providers and
+  // audit logging share the signature-injected `html` (not the raw input.html).
   const providerInput = {
     to: input.to,
     subject: input.subject,
-    html: input.html,
+    html,
     cc: input.cc,
     bcc: input.bcc,
     attachments: input.attachments

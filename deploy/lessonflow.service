@@ -23,6 +23,8 @@ WorkingDirectory=/var/www/lessonflow/current
 EnvironmentFile=/var/www/lessonflow/shared/.env
 Environment=NODE_ENV=production
 Environment=PORT=3000
+# Pin the business timezone so any server-local date math matches Melbourne.
+Environment=TZ=Australia/Melbourne
 
 # Executable
 # The standalone Next.js output embeds server code and reads static assets from

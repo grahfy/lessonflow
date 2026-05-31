@@ -16,7 +16,8 @@ export async function GET() {
       headers: {
         "content-type": blob.mimeType,
         "cache-control": "public, max-age=300, stale-while-revalidate=86400",
-        "content-length": String(blob.buffer.length)
+        "content-length": String(blob.buffer.length),
+        "x-content-type-options": "nosniff"
       }
     });
   } catch (error) {

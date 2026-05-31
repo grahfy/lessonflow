@@ -17,6 +17,10 @@ WorkingDirectory=/var/www/lessonflow/current
 
 # Load environment from shared .env
 EnvironmentFile=/var/www/lessonflow/shared/.env
+# Cron jobs must run with production env + Melbourne timezone so date-windowed
+# digests/reports/rollups bucket by the business day, not the server's UTC day.
+Environment=NODE_ENV=production
+Environment=TZ=Australia/Melbourne
 
 # Execute the cron runner script for admin-reports-weekly
 ExecStart=/var/www/lessonflow/current/deploy/cron.sh admin-reports-weekly

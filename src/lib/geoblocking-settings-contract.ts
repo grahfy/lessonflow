@@ -54,6 +54,12 @@ export const geoblockingSettingsInputSchema = z.object({
 
 export type GeoblockingSettingsInput = z.infer<typeof geoblockingSettingsInputSchema>;
 
+// Default is "allow" so that an unconfigured install (allowedCountries = every
+// country) is genuinely unrestricted and never blocks the owner during setup or
+// legitimate visitors behind unresolvable IPs. The practical "force an unknown
+// country" bypass is closed upstream by no longer trusting spoofable client geo
+// headers (see resolveRequestCountry / getRequestIpFromHeaders). Operators who
+// actively restrict allowedCountries should set unknownCountryMode = "block".
 export const DEFAULT_UNKNOWN_COUNTRY_MODE: UnknownCountryModeValue = "allow";
 
 export const DEFAULT_ALLOWED_COUNTRIES = [...GEOBLOCKING_COUNTRY_CODES];

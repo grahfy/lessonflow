@@ -8,8 +8,10 @@
  * 1. Low-Latency Protection: By using a simple in-memory Map (scoped to 
  *    `globalThis` to survive HMR), we avoid the network overhead of an 
  *    external cache (like Redis) for the current single-droplet architecture.
- * 2. IP-Based Identification: Uses the most trustworthy client IP extracted 
- *    from headers (`X-Real-IP` or `X-Forwarded-For`).
+ * 2. IP-Based Identification: Uses the most trustworthy client IP extracted
+ *    from headers (`X-Real-IP` or `X-Forwarded-For`). These headers are
+ *    client-spoofable, so trust is gated on `TRUST_PROXY` /
+ *    `TRUSTED_PROXY_HOPS` to reflect the single-droplet Nginx topology.
  * 3. Transparent Feedback: Returns standard rate-limit headers to clients, 
  *    allowing the UI to show accurate "Retry-After" countdowns.
  */
@@ -57,15 +59,33 @@ if (!globalStore.__rateLimitStore) {
 }
 
 /**
- * Extracts the most granular client IP from request headers.
- * 
- * LOGIC:
- * 1. Check `X-Real-IP` (Set by Nginx/Caddy proxies).
- * 2. Check `X-Forwarded-For` (Taking the left-most client hop).
- * 
+ * Extracts the most trustworthy client IP from request headers.
+ *
+ * TRUST MODEL (single-droplet behind Nginx):
+ * Both `X-Real-IP` and `X-Forwarded-For` are client-spoofable unless the
+ * front proxy is known to overwrite them. Trust is therefore gated on env:
+ *
+ * - `TRUST_PROXY` (default "true"): Nginx is the only hop and sets/overwrites
+ *   `x-real-ip` with the real peer address, so prefer it. When `x-real-ip`
+ *   is absent, fall back to `X-Forwarded-For` parsed from the RIGHT by
+ *   `TRUSTED_PROXY_HOPS` (the right-most entries are appended by trusted
+ *   proxies; the left-most are attacker-controlled and must NOT be used).
+ * - `TRUST_PROXY === "false"`: ignore both headers entirely and return
+ *   "unknown". This fails safe by funnelling everyone into a single shared
+ *   bucket rather than honoring a spoofable identity.
+ *
+ * `TRUSTED_PROXY_HOPS` (int, default 1) is the number of trusted proxy hops
+ * in front of the app; `parts[parts.length - hops]` is the address handed to
+ * the outermost trusted proxy.
+ *
  * @param headers - Request headers
  */
 export function getRequestIpFromHeaders(headers: Headers): string {
+  if (process.env.TRUST_PROXY === "false") {
+    // Fail-safe: do not trust any client-supplied forwarding headers.
+    return "unknown";
+  }
+
   const realIp = headers.get("x-real-ip")?.trim();
   if (realIp) return realIp;
 
@@ -75,8 +95,16 @@ export function getRequestIpFromHeaders(headers: Headers): string {
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean);
-    const first = parts[0];
-    if (first) return first;
+
+    if (parts.length > 0) {
+      const parsedHops = Number.parseInt(process.env.TRUSTED_PROXY_HOPS ?? "", 10);
+      const hops = Number.isFinite(parsedHops) && parsedHops >= 1 ? parsedHops : 1;
+      // Parse from the RIGHT: the right-most entries are appended by our own
+      // trusted proxies; left-most entries are attacker-controlled.
+      const index = Math.max(parts.length - hops, 0);
+      const candidate = parts[index];
+      if (candidate) return candidate;
+    }
   }
 
   return "unknown";
@@ -102,8 +130,10 @@ function evictExpiredEntries(now: number): void {
  * @param input - Key and Window constraints
  */
 export function consumeRateLimit(input: RateLimitInput): RateLimitResult {
-  // SECURITY: Disable rate limiting in tests to avoid flakiness in E2E suites.
-  if (process.env.NODE_ENV === "test") {
+  // SECURITY: Disable rate limiting only under an explicit test signal.
+  // Vitest auto-sets `VITEST`, so the suite stays unaffected, but a production
+  // process accidentally started with NODE_ENV=test will NOT bypass throttling.
+  if (process.env.VITEST != null || process.env.RATE_LIMIT_DISABLED === "1") {
     return {
       allowed: true,
       remaining: input.limit,

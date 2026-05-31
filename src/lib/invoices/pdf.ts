@@ -126,16 +126,35 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord, templateC
         resolvedLogoUrl = resolvedLogoUrl.replace(/\.webp$/i, ".png");
       }
 
-      // LOGIC: Support both absolute URLs and local public paths.
-      const logoPath = resolvedLogoUrl.startsWith("/")
-        ? path.join(process.cwd(), "public", resolvedLogoUrl)
-        : resolvedLogoUrl;
-      const logoBytes = await fs.readFile(logoPath);
+      // SECURITY: Only two logo sources are permitted, to prevent the configured
+      // `logoUrl` from being used to read arbitrary local files via fs.readFile:
+      //   (a) remote https:// URLs (fetched below), or
+      //   (b) a local path that, once resolved, stays inside the public/ dir.
+      // Anything else (absolute paths, http://, traversal escaping public/) is
+      // rejected and the invoice renders without a logo.
+      const publicDir = path.join(process.cwd(), "public");
+      let logoBytes: Uint8Array;
+
+      if (/^https:\/\//i.test(resolvedLogoUrl)) {
+        const response = await fetch(resolvedLogoUrl);
+        if (!response.ok) {
+          throw new Error(`Logo fetch failed with status ${response.status}`);
+        }
+        logoBytes = new Uint8Array(await response.arrayBuffer());
+      } else {
+        const resolvedPath = path.resolve(publicDir, `.${resolvedLogoUrl.startsWith("/") ? "" : "/"}${resolvedLogoUrl}`);
+        const relative = path.relative(publicDir, resolvedPath);
+        const isContained = relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
+        if (!isContained) {
+          throw new Error(`Logo path "${resolvedLogoUrl}" resolves outside the public directory.`);
+        }
+        logoBytes = await fs.readFile(resolvedPath);
+      }
 
       const logoImage = resolvedLogoUrl.toLowerCase().endsWith(".png")
         ? await document.embedPng(logoBytes)
         : await document.embedJpg(logoBytes);
-      
+
       const scale = 150 / logoImage.height;
       const logoDims = logoImage.scale(scale);
       page.drawImage(logoImage, {

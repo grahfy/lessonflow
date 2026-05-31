@@ -140,6 +140,9 @@ export async function POST(request: NextRequest, { params }: Params) {
           to: customer.email,
           subject: template.subject,
           html: template.html,
+          // Never BCC the owner on credential emails: they contain the
+          // customer's plaintext portal password.
+          skipAuditBcc: true,
           notification: {
             triggerMode: "manual"
           }

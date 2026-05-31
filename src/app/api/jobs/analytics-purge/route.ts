@@ -10,7 +10,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db";
-import { getCronSecret, hasCronSecret } from "@/lib/env";
+import { verifyCronSecret } from "@/lib/cron-auth";
+import { hasCronSecret } from "@/lib/env";
 import { logEvent } from "@/lib/observability";
 
 const RETENTION_DAYS = 90;
@@ -19,8 +20,7 @@ export async function POST(request: NextRequest) {
   if (!hasCronSecret()) {
     return NextResponse.json({ error: "Cron secret not configured" }, { status: 401 });
   }
-  const secret = request.headers.get("x-cron-secret");
-  if (!secret || secret !== getCronSecret()) {
+  if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
