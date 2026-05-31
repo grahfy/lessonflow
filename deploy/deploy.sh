@@ -548,6 +548,42 @@ app_service_unit_needs_refresh() {
     return 0
 }
 
+# Returns success (0) when any installed managed job/timer unit differs from the
+# version shipped in deploy/, so a routine deploy can auto-refresh them the same
+# way app_service_unit_needs_refresh handles the app unit. Unlike the app unit
+# these job units are not templated, so a plain file compare is sufficient.
+managed_timer_units_need_refresh() {
+    command -v systemctl >/dev/null 2>&1 || return 1
+
+    local systemd_dir="/etc/systemd/system"
+    local unit_basenames=(
+        "lessonflow-daily-bookings"
+        "lessonflow-invoice-reminders"
+        "lessonflow-admin-reports-daily"
+        "lessonflow-admin-reports-weekly"
+        "lessonflow-admin-reports-monthly"
+        "lessonflow-admin-reports-yearly"
+        "lessonflow-gmail-sync"
+        "lessonflow-analytics-rollup"
+        "lessonflow-analytics-purge"
+    )
+
+    local base="" ext="" src="" dst=""
+    for base in "${unit_basenames[@]}"; do
+        for ext in service timer; do
+            src="${SCRIPT_DIR}/${base}.${ext}"
+            dst="${systemd_dir}/${base}.${ext}"
+            [[ -f "${src}" ]] || continue
+            # A shipped unit that is missing or differs on the host needs a refresh.
+            if [[ ! -f "${dst}" ]] || ! cmp -s "${src}" "${dst}"; then
+                return 0
+            fi
+        done
+    done
+
+    return 1
+}
+
 run_host_bootstrap() {
     local env_template_path="$1"
 
@@ -4541,6 +4577,12 @@ if [[ "${AUTO_BOOTSTRAP}" == true ]] && app_service_unit_needs_refresh; then
     if [[ "${INSTALL_APP_SERVICE_IF_NEEDED}" != true ]]; then
         INSTALL_APP_SERVICE_IF_NEEDED=true
         log_info "Auto-bootstrap enabled install-app-service because the existing systemd unit is stale."
+    fi
+fi
+if [[ "${AUTO_BOOTSTRAP}" == true ]] && managed_timer_units_need_refresh; then
+    if [[ "${INSTALL_CRON_JOBS_IF_NEEDED}" != true ]]; then
+        INSTALL_CRON_JOBS_IF_NEEDED=true
+        log_info "Auto-bootstrap enabled install-cron-jobs because installed job/timer units are stale."
     fi
 fi
 
