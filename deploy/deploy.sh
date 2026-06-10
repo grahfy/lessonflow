@@ -566,6 +566,7 @@ managed_timer_units_need_refresh() {
         "lessonflow-gmail-sync"
         "lessonflow-analytics-rollup"
         "lessonflow-analytics-purge"
+        "lessonflow-db-watchdog"
     )
 
     local base="" ext="" src="" dst=""
@@ -3375,6 +3376,7 @@ install_systemd_timers_from_deploy() {
         "lessonflow-gmail-sync"
         "lessonflow-analytics-rollup"
         "lessonflow-analytics-purge"
+        "lessonflow-db-watchdog"
     )
 
     # Copy service and timer unit files to systemd directory

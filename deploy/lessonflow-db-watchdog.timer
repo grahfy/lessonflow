@@ -1,0 +1,17 @@
+# LessonFlow - Database connectivity watchdog timer
+# Install: sudo cp deploy/lessonflow-db-watchdog.timer /etc/systemd/system/
+# Enable:  sudo systemctl enable lessonflow-db-watchdog.timer
+# Status:  systemctl list-timers lessonflow-db-watchdog.timer
+
+[Unit]
+Description=Run the LessonFlow database watchdog every minute
+Documentation=https://gitlab.com/grahfmusic/lessonflow
+
+[Timer]
+# Start shortly after boot, then check once a minute.
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

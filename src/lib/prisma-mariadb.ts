@@ -4,6 +4,7 @@ const DEFAULT_CONNECT_TIMEOUT_SECONDS = 5;
 const DEFAULT_ACQUIRE_TIMEOUT_SECONDS = 10;
 const DEFAULT_IDLE_TIMEOUT_SECONDS = 300;
 const DEFAULT_CONNECTION_LIMIT = 25;
+const DEFAULT_ALLOW_PUBLIC_KEY_RETRIEVAL = "true";
 
 function ensurePositiveIntegerParam(value: string | null): boolean {
   if (!value) {
@@ -56,6 +57,21 @@ export function normalizePrismaMariaDbConnectionString(databaseUrl: string): str
 
   if (!ensurePositiveIntegerParam(parsedUrl.searchParams.get("connectionLimit"))) {
     parsedUrl.searchParams.set("connectionLimit", String(DEFAULT_CONNECTION_LIMIT));
+  }
+
+  // RATIONALE: MySQL 8 defaults users to the `caching_sha2_password` auth
+  // plugin. After a MySQL restart flushes the server-side auth cache, a fresh
+  // connection must complete *full* authentication, which over a non-TLS TCP
+  // socket requires fetching the server's RSA public key. The MariaDB driver
+  // refuses to do this unless `allowPublicKeyRetrieval` is enabled, so without
+  // it every connection attempt hangs until the acquire timeout and the app
+  // reports "pool timeout (active=0 idle=0)" with the database unreachable
+  // (observed in production after a MySQL restart; the app could not reconnect
+  // until the process was restarted). Default it on so the pool re-establishes
+  // automatically after a database restart. Callers can still override it via
+  // DATABASE_URL, and it has no effect when SSL or a Unix socket is used.
+  if (!parsedUrl.searchParams.has("allowPublicKeyRetrieval")) {
+    parsedUrl.searchParams.set("allowPublicKeyRetrieval", DEFAULT_ALLOW_PUBLIC_KEY_RETRIEVAL);
   }
 
   return parsedUrl.toString();
