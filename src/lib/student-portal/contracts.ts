@@ -19,10 +19,35 @@ export const studentPortalMaterialSchema = z.object({
   materialType: studentPortalMaterialTypeSchema,
   mimeType: z.string(),
   sizeBytes: z.number().int().nonnegative(),
+  // `folderId` is the canonical tree location (null = student root). `bookingId`
+  // context remains available via the owning booking; folders are the grouping axis.
+  folderId: z.string().nullable(),
   createdAt: z.string().datetime({ offset: true }),
   downloadUrl: z.string().min(1),
   previewUrl: z.string().min(1)
 });
+
+/**
+ * Recursive folder tree node for the read-only student materials tree (AC-10).
+ * Each node carries the ids of materials placed directly in it; the materials
+ * themselves live in the flat `materials`/`standaloneMaterials` arrays and are
+ * grouped by `folderId` on the client (C0: folder is the only grouping axis).
+ */
+export type StudentPortalFolder = {
+  id: string;
+  parentId: string | null;
+  name: string;
+  children: StudentPortalFolder[];
+};
+
+export const studentPortalFolderSchema: z.ZodType<StudentPortalFolder> = z.lazy(() =>
+  z.object({
+    id: z.string(),
+    parentId: z.string().nullable(),
+    name: z.string(),
+    children: z.array(studentPortalFolderSchema)
+  })
+);
 
 export const studentPortalBookingSchema = z.object({
   id: z.string(),
@@ -58,6 +83,7 @@ export const studentPortalPayloadSchema = z.object({
   upcoming: z.array(studentPortalBookingSchema),
   previous: z.array(studentPortalBookingSchema),
   standaloneMaterials: z.array(studentPortalMaterialSchema),
+  folders: z.array(studentPortalFolderSchema),
   pendingRequests: z.array(studentPortalPendingRequestSchema)
 });
 
@@ -98,7 +124,7 @@ export type StudentPortalCancelBookingResponse = z.infer<typeof studentPortalCan
 
 type MaterialMapInput = Pick<
   LearningMaterial,
-  "id" | "title" | "description" | "materialType" | "mimeType" | "sizeBytes" | "createdAt"
+  "id" | "title" | "description" | "materialType" | "mimeType" | "sizeBytes" | "folderId" | "createdAt"
 >;
 
 type BookingMapInput = Pick<
@@ -138,9 +164,28 @@ export function mapStudentPortalMaterial(material: MaterialMapInput): StudentPor
     materialType: material.materialType,
     mimeType: material.mimeType,
     sizeBytes: material.sizeBytes,
+    folderId: material.folderId,
     createdAt: material.createdAt.toISOString(),
     downloadUrl: `/api/student/learning-materials/${material.id}/download`,
     previewUrl: `/api/student/learning-materials/${material.id}/download?disposition=inline`
+  });
+}
+
+/**
+ * Maps one DB folder row to the student-portal folder contract (children attached
+ * by the tree builder). Used to serialize the read-only materials tree (AC-10).
+ */
+export function mapStudentPortalFolder(folder: {
+  id: string;
+  parentId: string | null;
+  name: string;
+  children: StudentPortalFolder[];
+}): StudentPortalFolder {
+  return studentPortalFolderSchema.parse({
+    id: folder.id,
+    parentId: folder.parentId,
+    name: folder.name,
+    children: folder.children
   });
 }
 

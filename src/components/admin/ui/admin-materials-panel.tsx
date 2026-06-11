@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import type { RefObject } from "react";
 import Image from "next/image";
 
@@ -8,8 +8,35 @@ import { CaptchaField, useCaptcha } from "@/components/captcha";
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AdminField, AdminForm } from "@/components/admin/ui/admin-form";
 import { Tooltip } from "@/components/admin/ui/tooltip";
-import { LEARNING_MATERIAL_ACCEPT, type LearningMaterialBooking, type LearningMaterialRow } from "@/lib/admin/types";
+import {
+  LEARNING_MATERIAL_ACCEPT,
+  type AdminFolderRow,
+  type LearningMaterialBooking,
+  type LearningMaterialRow
+} from "@/lib/admin/types";
 import { formatDateTime } from "@/lib/admin/utils";
+
+/** A folder with the breadcrumb path leading to it (root excluded). */
+type FlatFolder = {
+  id: string;
+  name: string;
+  parentId: string | null;
+};
+
+export interface MaterialsFolderField {
+  /** Full per-customer folder tree (from buildFolderTree). */
+  folders: AdminFolderRow[];
+  /** Currently navigated folder id; null = student root. */
+  currentFolderId: string | null;
+  onNavigate: (folderId: string | null) => void;
+}
+
+export interface MaterialsFolderActions {
+  onCreateFolder: (name: string, parentId: string | null) => void;
+  onRenameFolder: (folderId: string, name: string) => void;
+  onDeleteFolder: (folderId: string) => void;
+  onMoveMaterial: (materialId: string, folderId: string | null) => void;
+}
 
 interface AdminMaterialsPanelProps {
   materialsLoading: boolean;
@@ -24,6 +51,40 @@ interface AdminMaterialsPanelProps {
     bookings: LearningMaterialBooking[];
     onChange: (bookingId: string) => void;
   };
+  folderField?: MaterialsFolderField;
+  folderActions?: MaterialsFolderActions;
+}
+
+/** Flattens the folder tree to a lookup-friendly list (depth-first). */
+function flattenFolders(nodes: AdminFolderRow[], parentId: string | null = null, acc: FlatFolder[] = []): FlatFolder[] {
+  for (const node of nodes) {
+    acc.push({ id: node.id, name: node.name, parentId });
+    flattenFolders(node.children, node.id, acc);
+  }
+  return acc;
+}
+
+/** Finds a node in the tree by id. */
+function findNode(nodes: AdminFolderRow[], id: string): AdminFolderRow | null {
+  for (const node of nodes) {
+    if (node.id === id) return node;
+    const found = findNode(node.children, id);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** Builds the breadcrumb label (root-to-folder, " / "-joined) for a flattened folder. */
+function folderPathLabel(folderId: string, byId: Map<string, FlatFolder>): string {
+  const segments: string[] = [];
+  let cursor: string | null = folderId;
+  while (cursor) {
+    const node = byId.get(cursor);
+    if (!node) break;
+    segments.unshift(node.name);
+    cursor = node.parentId;
+  }
+  return segments.join(" / ");
 }
 
 /**
@@ -32,6 +93,10 @@ interface AdminMaterialsPanelProps {
  * RATIONALE: Booking/customer dialogs share the same material workflow but
  * differ slightly in upload context. Keeping the view/upload UI here ensures
  * captcha rules, file affordances, and booking-assignment behavior stay aligned.
+ *
+ * When `folderField`/`folderActions` are supplied the panel renders a navigable
+ * folder tree (subfolders + materials in the current folder) plus folder CRUD and
+ * per-material move affordances; otherwise it falls back to a flat materials list.
  */
 export function AdminMaterialsPanel({
   materialsLoading,
@@ -41,12 +106,48 @@ export function AdminMaterialsPanel({
   uploadFormRef,
   onUpload,
   onDelete,
-  bookingField
+  bookingField,
+  folderField,
+  folderActions
 }: AdminMaterialsPanelProps) {
   const fileInputId = useId();
   const captcha = useCaptcha();
   const [selectedFileName, setSelectedFileName] = useState("No file selected");
   const [failedPreviewIds, setFailedPreviewIds] = useState<string[]>([]);
+  const [uploadFolderId, setUploadFolderId] = useState<string | "">("");
+
+  const folders = useMemo<AdminFolderRow[]>(() => folderField?.folders ?? [], [folderField]);
+  const currentFolderId = folderField?.currentFolderId ?? null;
+  const flatFolders = useMemo(() => flattenFolders(folders), [folders]);
+  const flatFolderById = useMemo(() => new Map(flatFolders.map((f) => [f.id, f])), [flatFolders]);
+
+  // Subfolders directly under the current folder.
+  const currentChildren = useMemo<AdminFolderRow[]>(() => {
+    if (!folderField) return [];
+    if (currentFolderId === null) return folders;
+    return findNode(folders, currentFolderId)?.children ?? [];
+  }, [folderField, folders, currentFolderId]);
+
+  // Breadcrumb path from root to the current folder.
+  const breadcrumb = useMemo<FlatFolder[]>(() => {
+    if (!currentFolderId) return [];
+    const path: FlatFolder[] = [];
+    let cursor: string | null = currentFolderId;
+    while (cursor) {
+      const node = flatFolderById.get(cursor);
+      if (!node) break;
+      path.unshift(node);
+      cursor = node.parentId;
+    }
+    return path;
+  }, [currentFolderId, flatFolderById]);
+
+  // Materials shown in the panel: only those in the current folder when folder
+  // navigation is active; otherwise the full flat list (legacy callers).
+  const visibleMaterials = useMemo(() => {
+    if (!folderField) return materialsList;
+    return materialsList.filter((m) => (m.folderId ?? null) === currentFolderId);
+  }, [folderField, materialsList, currentFolderId]);
 
   /**
    * Validates the human check before handing the actual file upload off to the
@@ -63,16 +164,125 @@ export function AdminMaterialsPanel({
     void captcha.regenerate();
   }
 
+  function handleCreateFolder() {
+    if (!folderActions) return;
+    const name = window.prompt("New folder name");
+    if (name && name.trim()) {
+      folderActions.onCreateFolder(name.trim(), currentFolderId);
+    }
+  }
+
+  function handleRenameFolder(folder: AdminFolderRow) {
+    if (!folderActions) return;
+    const name = window.prompt("Rename folder", folder.name);
+    if (name && name.trim() && name.trim() !== folder.name) {
+      folderActions.onRenameFolder(folder.id, name.trim());
+    }
+  }
+
+  function handleDeleteFolder(folder: AdminFolderRow) {
+    if (!folderActions) return;
+    if (
+      window.confirm(
+        `Delete folder "${folder.name}"? Its contents (files and subfolders) move up one level to the parent folder.`
+      )
+    ) {
+      folderActions.onDeleteFolder(folder.id);
+    }
+  }
+
+  function handleMoveMaterial(material: LearningMaterialRow) {
+    if (!folderActions) return;
+    // Build a numbered destination menu (root + each folder by breadcrumb path).
+    const options: Array<{ label: string; folderId: string | null }> = [
+      { label: "Student root", folderId: null }
+    ];
+    for (const f of flatFolders) {
+      options.push({ label: folderPathLabel(f.id, flatFolderById), folderId: f.id });
+    }
+    const prompt = options.map((o, i) => `${i}: ${o.label}`).join("\n");
+    const answer = window.prompt(`Move "${material.title}" to which folder?\n\n${prompt}`, "0");
+    if (answer === null) return;
+    const index = Number.parseInt(answer.trim(), 10);
+    if (Number.isNaN(index) || index < 0 || index >= options.length) return;
+    folderActions.onMoveMaterial(material.id, options[index].folderId);
+  }
+
   return (
     <>
       <div className="dialog-col dialog-tab-section">
         <h3 className="manual-section-title">Materials List</h3>
+
+        {folderField ? (
+          <AdminCard ghost className="customer-materials-folders-card">
+            <div className="customer-materials-breadcrumb">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => folderField.onNavigate(null)}
+              >
+                Root
+              </button>
+              {breadcrumb.map((crumb) => (
+                <span key={crumb.id} className="customer-materials-breadcrumb-segment">
+                  {" / "}
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => folderField.onNavigate(crumb.id)}
+                  >
+                    {crumb.name}
+                  </button>
+                </span>
+              ))}
+            </div>
+
+            <div className="customer-materials-folder-toolbar">
+              <Tooltip content="Create a new folder inside the current folder.">
+                <button type="button" className="btn btn-secondary btn-sm" onClick={handleCreateFolder}>
+                  New folder
+                </button>
+              </Tooltip>
+            </div>
+
+            {currentChildren.length > 0 ? (
+              <div className="customer-materials-subfolders">
+                {currentChildren.map((folder) => (
+                  <div key={folder.id} className="customer-materials-subfolder">
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm customer-materials-subfolder-open"
+                      onClick={() => folderField.onNavigate(folder.id)}
+                    >
+                      {folder.name}
+                    </button>
+                    <div className="customer-materials-subfolder-actions">
+                      <Tooltip content="Rename this folder.">
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleRenameFolder(folder)}>
+                          Rename
+                        </button>
+                      </Tooltip>
+                      <Tooltip content="Delete this folder; its contents move up one level.">
+                        <button type="button" className="btn btn-danger btn-sm" onClick={() => handleDeleteFolder(folder)}>
+                          Delete
+                        </button>
+                      </Tooltip>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="helper-text">No subfolders here.</p>
+            )}
+          </AdminCard>
+        ) : null}
+
         <AdminCard ghost className="customer-materials-list-card">
           {materialsLoading ? (
             <p className="helper-text">Loading materials...</p>
-          ) : materialsList.length > 0 ? (
+          ) : visibleMaterials.length > 0 ? (
             <div className="customer-materials-list">
-              {materialsList.map((material) => (
+              {visibleMaterials.map((material) => (
                 <div key={material.id} className="customer-materials-item">
                   <div className="customer-materials-item-head">
                     <div className="customer-materials-item-copy">
@@ -100,6 +310,17 @@ export function AdminMaterialsPanel({
                           View
                         </button>
                       </Tooltip>
+                      {folderActions ? (
+                        <Tooltip content="Move this material to another folder.">
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            type="button"
+                            onClick={() => handleMoveMaterial(material)}
+                          >
+                            Move
+                          </button>
+                        </Tooltip>
+                      ) : null}
                       <Tooltip content="Permanently remove this material.">
                         <button
                           className="btn btn-danger btn-sm"
@@ -178,6 +399,29 @@ export function AdminMaterialsPanel({
                           hour: "numeric",
                           minute: "2-digit"
                         })}
+                      </option>
+                    ))}
+                  </select>
+                </AdminField>
+              ) : null}
+              {folderField ? (
+                <AdminField
+                  label="Destination folder"
+                  tooltip="Choose which folder the upload lands in. Defaults to the folder you're currently viewing. Independent of the lesson booking link."
+                  fullWidth
+                >
+                  {/* RATIONALE: empty value means student root. We default to the
+                      currently navigated folder. The select carries name="folderId"
+                      so the destination submits with the upload form directly. */}
+                  <select
+                    name="folderId"
+                    value={uploadFolderId === "" ? currentFolderId ?? "" : uploadFolderId}
+                    onChange={(event) => setUploadFolderId(event.target.value)}
+                  >
+                    <option value="">Student root</option>
+                    {flatFolders.map((folder) => (
+                      <option key={folder.id} value={folder.id}>
+                        {folderPathLabel(folder.id, flatFolderById)}
                       </option>
                     ))}
                   </select>

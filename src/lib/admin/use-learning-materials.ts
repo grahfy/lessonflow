@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useSafeFetch } from "./use-safe-fetch";
-import { type LearningMaterialBooking, type LearningMaterialRow } from "./types";
+import { type AdminFolderRow, type LearningMaterialBooking, type LearningMaterialRow } from "./types";
 
 export interface UseLearningMaterialsOptions {
     /** Called on auth error */
@@ -14,12 +14,17 @@ export interface UseLearningMaterialsOptions {
 export interface UseLearningMaterialsResult {
     materials: LearningMaterialRow[];
     bookings: LearningMaterialBooking[];
+    folders: AdminFolderRow[];
     loading: boolean;
     uploading: boolean;
     deletingId: string | null;
     load: (customerId: string, bookingId?: string | null) => Promise<void>;
     upload: (customerId: string, bookingId: string, form: HTMLFormElement, captcha?: { captchaToken: string; captchaAnswer: string }) => Promise<boolean>;
     remove: (materialId: string) => Promise<boolean>;
+    createFolder: (customerId: string, name: string, parentId: string | null) => Promise<boolean>;
+    renameFolder: (customerId: string, folderId: string, name: string) => Promise<boolean>;
+    deleteFolder: (customerId: string, folderId: string) => Promise<boolean>;
+    moveMaterial: (customerId: string, materialId: string, folderId: string | null) => Promise<boolean>;
 }
 
 /**
@@ -29,6 +34,7 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
   const { onAuthError, onError } = options;
   const [materials, setMaterials] = useState<LearningMaterialRow[]>([]);
   const [bookings, setBookings] = useState<LearningMaterialBooking[]>([]);
+  const [folders, setFolders] = useState<AdminFolderRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -47,6 +53,7 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
       const data = await response.json();
       setMaterials(data.materials || []);
       setBookings(data.bookings || []);
+      setFolders(data.folders || []);
     } catch {
       if (onError) onError("Network error loading learning materials.");
     } finally {
@@ -60,6 +67,9 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
     form: HTMLFormElement,
     captcha?: { captchaToken: string; captchaAnswer: string }
   ): Promise<boolean> => {
+    // NOTE: the destination folder is carried by the form's name="folderId"
+    // select (defaulting to the currently navigated folder), independent of the
+    // booking link which is appended below.
     const formData = new FormData(form);
     if (bookingId) {
       formData.append("bookingId", bookingId);
@@ -120,14 +130,93 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
     }
   }, [safeFetch, handleApiError]);
 
+  const createFolder = useCallback(async (customerId: string, name: string, parentId: string | null): Promise<boolean> => {
+    try {
+      const response = await safeFetch(`/api/admin/customers/${customerId}/material-folders`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, parentId })
+      });
+      if (!response.ok) {
+        await handleApiError(response, "Unable to create folder.");
+        return false;
+      }
+      await load(customerId);
+      return true;
+    } catch {
+      if (onError) onError("Network error creating folder.");
+      return false;
+    }
+  }, [safeFetch, handleApiError, load, onError]);
+
+  const renameFolder = useCallback(async (customerId: string, folderId: string, name: string): Promise<boolean> => {
+    try {
+      const response = await safeFetch(`/api/admin/material-folders/${folderId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name })
+      });
+      if (!response.ok) {
+        await handleApiError(response, "Unable to rename folder.");
+        return false;
+      }
+      await load(customerId);
+      return true;
+    } catch {
+      if (onError) onError("Network error renaming folder.");
+      return false;
+    }
+  }, [safeFetch, handleApiError, load, onError]);
+
+  const deleteFolder = useCallback(async (customerId: string, folderId: string): Promise<boolean> => {
+    try {
+      const response = await safeFetch(`/api/admin/material-folders/${folderId}`, {
+        method: "DELETE"
+      });
+      if (!response.ok) {
+        await handleApiError(response, "Unable to delete folder.");
+        return false;
+      }
+      await load(customerId);
+      return true;
+    } catch {
+      if (onError) onError("Network error deleting folder.");
+      return false;
+    }
+  }, [safeFetch, handleApiError, load, onError]);
+
+  const moveMaterial = useCallback(async (customerId: string, materialId: string, folderId: string | null): Promise<boolean> => {
+    try {
+      const response = await safeFetch(`/api/admin/learning-materials/${materialId}/move`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ folderId })
+      });
+      if (!response.ok) {
+        await handleApiError(response, "Unable to move material.");
+        return false;
+      }
+      await load(customerId);
+      return true;
+    } catch {
+      if (onError) onError("Network error moving material.");
+      return false;
+    }
+  }, [safeFetch, handleApiError, load, onError]);
+
   return {
     materials,
     bookings,
+    folders,
     loading,
     uploading,
     deletingId,
     load,
     upload,
-    remove
+    remove,
+    createFolder,
+    renameFolder,
+    deleteFolder,
+    moveMaterial
   };
 }
