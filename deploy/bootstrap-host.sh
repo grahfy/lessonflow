@@ -164,6 +164,16 @@ main() {
 
   run_root_cmd mkdir -p "${SHARED_DIR}"
 
+  # Ensure the cron/timer log directory exists and is owned by the runtime user.
+  # The scheduled units (gmail-sync, invoice-reminders, admin-reports, analytics)
+  # run as ${RUNTIME_USER}. If /var/log/${APP_NAME} is left owned by root, those
+  # units fail at startup with "Permission denied" when cron.sh opens the daily
+  # log file (cron-YYYYMMDD.log), which silently stops all background jobs. The
+  # setgid bit keeps new log files in the runtime group.
+  run_root_cmd mkdir -p "/var/log/${APP_NAME}"
+  run_root_cmd chown -R "${RUNTIME_USER}:${RUNTIME_USER}" "/var/log/${APP_NAME}"
+  run_root_cmd chmod 2775 "/var/log/${APP_NAME}"
+
   if [[ ! -f "${shared_env_path}" && -n "${ENV_TEMPLATE_PATH}" && -f "${ENV_TEMPLATE_PATH}" ]]; then
     log_info "Creating shared env from template: ${shared_env_path}"
     run_root_cmd cp "${ENV_TEMPLATE_PATH}" "${shared_env_path}"

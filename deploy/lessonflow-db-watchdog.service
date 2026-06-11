@@ -1,0 +1,28 @@
+# LessonFlow - Database connectivity watchdog service
+# Install: sudo cp deploy/lessonflow-db-watchdog.service /etc/systemd/system/
+# Enable:  sudo systemctl enable lessonflow-db-watchdog.timer
+# Status:  journalctl -t lessonflow-watchdog
+#
+# Triggered by lessonflow-db-watchdog.timer (every minute). Runs as root because
+# it must read the journal, ping MySQL (root via auth_socket) and restart the
+# app service. Intentionally NOT sandboxed like the cron units so it can call
+# systemctl.
+
+[Unit]
+Description=LessonFlow database-connectivity watchdog (auto-recovers app DB pool)
+Documentation=https://gitlab.com/grahfmusic/lessonflow
+After=lessonflow.service mysql.service
+Wants=mysql.service
+
+[Service]
+Type=oneshot
+# Runs from the active release tree, like the cron runner, so it ships and
+# versions with the app.
+ExecStart=/var/www/lessonflow/current/deploy/lessonflow-db-watchdog.sh
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lessonflow-watchdog
+
+[Install]
+WantedBy=multi-user.target
