@@ -14,6 +14,11 @@ import {
   classifyLearningMaterialFile,
   sanitizeLearningMaterialTitle
 } from "@/lib/student-portal/materials";
+import {
+  assertSameCustomerFolder,
+  buildFolderTree,
+  FolderValidationError
+} from "@/lib/student-portal/folders";
 
 type Params = {
   params: Promise<{
@@ -64,9 +69,9 @@ export async function GET(request: NextRequest, { params }: Params) {
       }
     }
 
-    // Load bookings and materials together because the modal needs both datasets to drive the
-    // selector and the list.
-    const [bookings, materials] = await Promise.all([
+    // Load bookings, materials, and folders together because the modal needs all
+    // datasets to drive the selectors, the list, and the folder tree (C0).
+    const [bookings, materials, folders] = await Promise.all([
       prisma.booking.findMany({
         where: {
           customerId: customer.id,
@@ -96,6 +101,11 @@ export async function GET(request: NextRequest, { params }: Params) {
         orderBy: {
           createdAt: "desc"
         }
+      }),
+      prisma.studentMaterialFolder.findMany({
+        where: {
+          customerId: customer.id
+        }
       })
     ]);
 
@@ -114,13 +124,15 @@ export async function GET(request: NextRequest, { params }: Params) {
         title: material.title,
         description: material.description,
         bookingId: material.bookingId,
+        folderId: material.folderId,
         materialType: material.materialType,
         mimeType: material.mimeType,
         sizeBytes: material.sizeBytes,
         createdAt: material.createdAt.toISOString(),
         previewUrl: `/api/admin/learning-materials/${material.id}?disposition=inline`,
         downloadUrl: `/api/admin/learning-materials/${material.id}?disposition=attachment`
-      }))
+      })),
+      folders: buildFolderTree(folders)
     });
   } catch (error) {
     return jsonUnexpectedError(error, "Unable to load learning materials.");
@@ -156,6 +168,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     const bookingId = String(form.get("bookingId") || "").trim();
+    const folderId = String(form.get("folderId") || "").trim();
     const title = sanitizeLearningMaterialTitle(String(form.get("title") || ""));
     // Optional free-text description; trim and cap at 500 characters to prevent
     // excessively long values, store null when the admin leaves it blank.
@@ -196,6 +209,30 @@ export async function POST(request: NextRequest, { params }: Params) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
       linkedBookingId = booking.id;
+    }
+
+    // Destination folder is independent of the booking link (AC-9): a material may
+    // be booking-linked AND placed in an arbitrary folder. Validate same-customer
+    // ownership (INV-3) before storing.
+    let linkedFolderId: string | null = null;
+    if (folderId) {
+      const folder = await prisma.studentMaterialFolder.findUnique({
+        where: {
+          id: folderId
+        }
+      });
+      if (!folder) {
+        return NextResponse.json({ error: "Selected folder is not linked to this customer." }, { status: 400 });
+      }
+      try {
+        assertSameCustomerFolder(customer.id, folder);
+      } catch (error) {
+        if (error instanceof FolderValidationError) {
+          return NextResponse.json({ error: "Selected folder is not linked to this customer." }, { status: 400 });
+        }
+        throw error;
+      }
+      linkedFolderId = folder.id;
     }
 
     // File classification normalizes MIME/extension handling and enforces allowed upload types.
@@ -249,6 +286,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         data: {
           customerId: customer.id,
           bookingId: linkedBookingId,
+          folderId: linkedFolderId,
           uploadedById: admin.id,
           title,
           description,
@@ -266,6 +304,7 @@ export async function POST(request: NextRequest, { params }: Params) {
             title: material.title,
             description: material.description,
             bookingId: material.bookingId,
+            folderId: material.folderId,
             materialType: material.materialType,
             mimeType: material.mimeType,
             sizeBytes: material.sizeBytes,

@@ -3,10 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import {
   mapStudentPortalBooking,
+  mapStudentPortalFolder,
   mapStudentPortalMaterial,
   mapStudentPortalPendingRequest,
   studentPortalPayloadSchema
 } from "@/lib/student-portal/contracts";
+import { buildFolderTree } from "@/lib/student-portal/folders";
 import { requireStudentFromRequest } from "@/lib/student-portal/session";
 
 /**
@@ -60,15 +62,24 @@ export async function GET(request: NextRequest) {
       }
     })
   ]);
-  const standaloneMaterials = await prisma.learningMaterial.findMany({
-    where: {
-      customerId: student.id,
-      bookingId: null
-    },
-    orderBy: {
-      createdAt: "desc"
-    }
-  });
+  // Fetch standalone (non-booking) materials and the student's folder set together;
+  // both are scoped to the authenticated student's customerId (AC-12).
+  const [standaloneMaterials, folders] = await Promise.all([
+    prisma.learningMaterial.findMany({
+      where: {
+        customerId: student.id,
+        bookingId: null
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    }),
+    prisma.studentMaterialFolder.findMany({
+      where: {
+        customerId: student.id
+      }
+    })
+  ]);
 
   // Split into upcoming/previous here so all student-facing clients can reuse the same route shape.
   const upcoming = bookings
@@ -84,6 +95,11 @@ export async function GET(request: NextRequest) {
       mapStudentPortalBooking(booking)
     );
 
+  // Build the read-only folder tree (folder = the only grouping axis; C0/AC-10).
+  // `materialIds` are not needed in the payload — the client groups materials by
+  // their own `folderId`, so an empty material map keeps the tree pure structure.
+  const folderTree = buildFolderTree(folders).map(mapStudentPortalFolder);
+
   const payload = studentPortalPayloadSchema.parse({
     student: {
       id: student.id,
@@ -94,6 +110,7 @@ export async function GET(request: NextRequest) {
     upcoming,
     previous,
     standaloneMaterials: standaloneMaterials.map(mapStudentPortalMaterial),
+    folders: folderTree,
     pendingRequests: pendingRequests.map(mapStudentPortalPendingRequest)
   });
 

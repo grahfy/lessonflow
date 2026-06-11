@@ -1,6 +1,10 @@
 import { type RefObject } from "react";
 
-import { AdminMaterialsPanel } from "@/components/admin/ui/admin-materials-panel";
+import {
+  AdminMaterialsPanel,
+  type MaterialsFolderActions,
+  type MaterialsFolderField
+} from "@/components/admin/ui/admin-materials-panel";
 import { type LearningMaterialBooking, type LearningMaterialRow } from "@/lib/admin/types";
 
 type Props = {
@@ -15,6 +19,8 @@ type Props = {
   onUpload: (captcha?: { captchaToken: string; captchaAnswer: string }) => void;
   onDelete: (id: string) => void;
   onBookingSelect: (bookingId: string) => void;
+  folderField?: MaterialsFolderField;
+  folderActions?: MaterialsFolderActions;
 };
 
 export function CustomerMaterialsDialog({
@@ -28,7 +34,9 @@ export function CustomerMaterialsDialog({
   materialsUploadFormRef,
   onUpload,
   onDelete,
-  onBookingSelect
+  onBookingSelect,
+  folderField,
+  folderActions
 }: Props) {
   return (
     <div className="dialog-layout customer-tab-panel customer-materials-panel">
@@ -48,6 +56,8 @@ export function CustomerMaterialsDialog({
             onBookingSelect(bookingId);
           }
         }}
+        folderField={folderField}
+        folderActions={folderActions}
       />
     </div>
   );

@@ -624,6 +624,83 @@
   margin: 0;
 }
 
+.drive-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.8rem;
+}
+
+.drive-crumb-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.drive-crumb {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 2px 6px;
+  border-radius: 8px;
+  color: var(--brand-0);
+  font: inherit;
+  cursor: pointer;
+}
+
+.drive-crumb:hover:not(:disabled) {
+  background: rgba(126, 148, 255, 0.12);
+}
+
+.drive-crumb:disabled {
+  color: var(--ink-1);
+  cursor: default;
+}
+
+.drive-crumb-sep {
+  color: rgba(221, 232, 255, 0.5);
+}
+
+.drive-folder-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.drive-folder-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 10px 12px;
+  color: var(--ink-1);
+  font: inherit;
+  cursor: pointer;
+}
+
+.drive-folder-row:hover {
+  background: rgba(126, 148, 255, 0.08);
+}
+
+.drive-folder-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.drive-folder-name {
+  color: #f3f7ff;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
 .drive-table-wrap {
   border: 1px solid var(--line);
   border-radius: 12px;
