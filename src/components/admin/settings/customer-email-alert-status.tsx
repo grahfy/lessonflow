@@ -51,7 +51,7 @@ export function CustomerEmailAlertStatus() {
         <Tooltip content="Refresh inbox alert connection status.">
           <button
             type="button"
-            className="btn btn-secondary btn-small"
+            className="btn btn-secondary btn-sm"
             onClick={check}
             disabled={loading}
             aria-label="Refresh"

@@ -26,7 +26,7 @@
 import { Dispatch, RefObject, SetStateAction } from "react";
 
 import { AdminCard } from "@/components/admin/ui/admin-card";
-import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AppDialog } from "@/components/ui/app-dialog";
 import { AdminEmailPanel } from "@/components/admin/ui/admin-email-panel";
 import { AdminField, AdminForm } from "@/components/admin/ui/admin-form";
 import {
@@ -198,14 +198,14 @@ export function BookingDetailDialog({
 
   return (
     <>
-    <AdminDialog
+    <AppDialog
       isOpen={isOpen}
       onClose={onClose}
       rootRef={rootRef}
       id="booking-detail-dialog"
       title={event.entityType === 'booking' ? "Edit Booking" : "Booking Request"}
       description={`Status: ${event.status} / Type: ${event.entityType === 'booking' ? "Confirmed" : "Request"}`}
-      size="wide"
+      size="lg"
       bodyClassName="booking-dialog-body-lock"
       lockBodyScrollArea
       hideHeaderClose
@@ -608,7 +608,7 @@ export function BookingDetailDialog({
             />
           ) : null}
       </div>
-    </AdminDialog>
+    </AppDialog>
     </>
   );
 }

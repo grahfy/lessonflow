@@ -5,8 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { ChordDiagramData } from "@/lib/chords/chord-types";
 import { createEmptyChordDiagram } from "@/lib/chords/chord-types";
 
-vi.mock("@/components/admin/ui/admin-dialog", () => ({
-  AdminDialog: ({
+vi.mock("@/components/ui/app-dialog", () => ({
+  AppDialog: ({
     title,
     footer,
     children,

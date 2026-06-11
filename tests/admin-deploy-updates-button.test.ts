@@ -12,8 +12,8 @@ vi.mock("@/components/admin/ui/tooltip", () => ({
   Tooltip: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children)
 }));
 
-vi.mock("@/components/admin/ui/admin-dialog", () => ({
-  AdminDialog: ({
+vi.mock("@/components/ui/app-dialog", () => ({
+  AppDialog: ({
     isOpen,
     title,
     children

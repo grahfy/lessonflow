@@ -9,7 +9,7 @@ import { ChordBuilderNaming } from "./chord-builder-naming";
 import { ChordBuilderFingerSelector } from "./chord-builder-finger-selector";
 import { ChordBuilderAlternatives } from "./chord-builder-alternatives";
 import { useChordPreview } from "./use-chord-preview";
-import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AppDialog } from "@/components/ui/app-dialog";
 import { formatChordName } from "@/lib/chords/music-theory";
 
 interface ChordBuilderProps {
@@ -186,11 +186,11 @@ export function ChordBuilder({
   );
 
   return (
-    <AdminDialog
+    <AppDialog
       isOpen={isOpen}
       onClose={onClose}
       title={`Chord Builder — ${title}`}
-      size="wide"
+      size="lg"
       bodyClassName="chord-builder-dialog-body"
       footer={footer}
     >
@@ -250,6 +250,6 @@ export function ChordBuilder({
           />
         </div>
       </div>
-    </AdminDialog>
+    </AppDialog>
   );
 }

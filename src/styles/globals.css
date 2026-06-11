@@ -21,9 +21,34 @@
   --surface-floating-radius: 14px;
   --surface-floating-padding-block: 10px;
   --surface-floating-padding-inline: 12px;
-  --surface-modal-padding: 18px;
-  --surface-modal-radius: 24px;
+  /* Modal geometry — the former admin density dialog responsive family,
+     renamed and shared across all surfaces. The three @media :root blocks
+     below (max-height 900px / max-width 960px / max-width 640px) carry the
+     preserved density behavior; keep exactly one redefinition per breakpoint. */
+  --surface-modal-radius: 20px;
+  --surface-modal-padding: 24px;
+  --surface-modal-body-padding: 20px;
+  --surface-modal-gap: 12px;
+  --surface-modal-head-gap: 16px;
   --surface-modal-close-size: 36px;
+  /* Modal surface colors (criterion: no raw slate literals in dialog rules) */
+  --overlay-backdrop: rgba(2, 6, 23, 0.82);
+  --overlay-backdrop-media: rgba(0, 0, 0, 0.85);
+  --surface-panel-border: rgba(148, 163, 184, 0.18);
+  --surface-panel-bg:
+    linear-gradient(168deg, rgba(15, 23, 42, 0.985), rgba(15, 23, 42, 0.95)),
+    radial-gradient(150% 150% at 0% 0%, rgba(59, 130, 246, 0.06), transparent 50%);
+  --surface-panel-shadow: 0 28px 72px rgba(2, 8, 23, 0.42);
+  /* Overlay z-ladder — the full inventory, defined once. Tooltip, popover,
+     and context-menu rungs sit ABOVE --z-modal on purpose: they open from
+     inside dialogs and must keep painting over them. Stacked modals rely on
+     DOM order at the same --z-modal rung. */
+  --z-dropdown: 100;
+  --z-toast: 120;
+  --z-modal: 200;
+  --z-tooltip: 500;
+  --z-popover: 1200;
+  --z-context-menu: 1400;
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
   --motion-fast: 140ms;
@@ -122,7 +147,7 @@ a {
 .cookie-consent-banner {
   position: fixed;
   inset: auto 20px max(20px, env(safe-area-inset-bottom, 0px));
-  z-index: 120;
+  z-index: var(--z-toast);
   width: min(680px, calc(100vw - 40px));
   margin-left: auto;
   padding: 18px 20px;
@@ -932,7 +957,6 @@ h1 {
   background: linear-gradient(155deg, rgba(192, 62, 87, 0.88), rgba(126, 34, 52, 0.9));
 }
 
-.btn-small,
 .btn-sm {
   padding: 5px 10px;
   font-size: 0.72rem;
@@ -998,7 +1022,7 @@ h1 {
   font-size: 0.78rem;
   line-height: 1.4;
   letter-spacing: 0.01em;
-  z-index: 500;
+  z-index: var(--z-tooltip);
   pointer-events: none;
   animation: ui-tooltip-fade-in 120ms var(--ease-out);
 }
@@ -1314,11 +1338,6 @@ h1 {
   border: 0;
 }
 
-.video-modal-content {
-  width: min(96vw, 1100px);
-  max-width: none;
-}
-
 .video-modal-frame {
   position: relative;
   width: min(100%, 1040px);
@@ -1376,13 +1395,210 @@ h1 {
   gap: 10px;
 }
 
+/* ── Shared dialog primitives (AppDialog base) ──────────────────────────────
+   One modal base for all surfaces. Size tiers are keyed off data-size on
+   .dialog-panel; the bare .dialog-panel geometry IS the `md` tier (default).
+   Dialogs are content-height within each tier's max-height clamp — no tier
+   or consumer sets height/min-height. Portal-scoping invariant: panels
+   portal into document.body, so these tokens must live on :root. */
+
+.dialog-backdrop {
+  --dialog-frame-gap: 20px;
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  background: var(--overlay-backdrop);
+  backdrop-filter: blur(8px);
+  display: grid;
+  place-items: center;
+  padding:
+    max(var(--dialog-frame-gap), env(safe-area-inset-top, 0px))
+    max(var(--dialog-frame-gap), env(safe-area-inset-right, 0px))
+    max(var(--dialog-frame-gap), env(safe-area-inset-bottom, 0px))
+    max(var(--dialog-frame-gap), env(safe-area-inset-left, 0px));
+}
+
+/* Chrome-light lightbox backdrop: darker and near-opaque, media content only. */
+.dialog-backdrop.is-media {
+  background: var(--overlay-backdrop-media);
+}
+
+.dialog-panel {
+  width: min(880px, calc(100vw - (var(--dialog-frame-gap) * 2)));
+  max-height: min(88vh, calc(100dvh - (var(--dialog-frame-gap) * 2)), 920px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  font-family: "Overpass", "Segoe UI", Tahoma, sans-serif;
+  border-radius: var(--surface-modal-radius);
+  border: 1px solid var(--surface-panel-border);
+  background: var(--surface-panel-bg);
+  box-shadow: var(--surface-panel-shadow);
+  padding: var(--surface-modal-padding);
+  box-sizing: border-box;
+}
+
+.dialog-panel[data-size="sm"] {
+  width: min(480px, calc(100vw - (var(--dialog-frame-gap) * 2)));
+  max-height: min(80vh, calc(100dvh - (var(--dialog-frame-gap) * 2)), 700px);
+}
+
+.dialog-panel[data-size="lg"] {
+  width: min(1320px, calc(100vw - (var(--dialog-frame-gap) * 2)));
+  max-height: min(96vh, calc(100dvh - (var(--dialog-frame-gap) * 2)), 1020px);
+}
+
+.dialog-panel[data-size="media"] {
+  position: relative;
+  width: min(90vw, calc(100vw - (var(--dialog-frame-gap) * 2)));
+  max-height: min(90vh, calc(100dvh - (var(--dialog-frame-gap) * 2)));
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+  align-items: center;
+  gap: 14px;
+}
+
+/* Media-tier icon close — seeded from the migrated lightbox .modal-close. */
+.dialog-media-close {
+  position: absolute;
+  top: max(12px, calc(var(--surface-modal-padding) - 2px));
+  right: max(12px, calc(var(--surface-modal-padding) - 2px));
+  z-index: 1;
+  width: var(--surface-modal-close-size);
+  height: var(--surface-modal-close-size);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  color: white;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.dialog-media-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Media-tier content rules, folded from the deleted lightbox family
+   (former .modal-image-container / .modal-image / .modal-caption and the
+   .admin-manual-modal-* variants in extended-features.css). */
+.dialog-media-image-container {
+  position: relative;
+  width: min(85vw, calc(90vw - (var(--surface-modal-padding) * 2)));
+  max-width: 800px;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.dialog-media-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: inherit;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.dialog-media-caption {
+  color: white;
+  text-align: center;
+  margin: 0;
+  max-width: min(72ch, 100%);
+  padding-inline: 4px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Manual-screenshot lightbox: wide shots are contained, tall shots scroll. */
+.dialog-media-manual-container {
+  width: min(100%, 1400px);
+  max-width: none;
+  min-height: 0;
+  max-height: min(82vh, 920px);
+}
+
+.dialog-media-manual-container.is-contained {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.dialog-media-manual-container.is-scrollable {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.dialog-media-manual-container.is-contained .dialog-media-manual-image {
+  display: block;
+  width: auto;
+  max-width: min(1320px, 92vw);
+  max-height: min(82vh, 920px);
+  height: auto;
+}
+
+.dialog-media-manual-container.is-scrollable .dialog-media-manual-image {
+  display: block;
+  width: 100%;
+  max-width: none;
+  height: auto;
+}
+
+@media (max-width: 900px) {
+  .dialog-media-manual-container {
+    max-height: min(70vh, 560px);
+  }
+}
+
+.dialog-body-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 12px var(--surface-modal-body-padding) var(--surface-modal-body-padding);
+  box-sizing: border-box;
+}
+
+.dialog-body-scroll-locked {
+  overflow-y: hidden;
+}
+
+/* Responsive modal-geometry redefinitions (moved verbatim from the former
+   admin density dialog family in admin.css — density values win). */
+@media (max-height: 900px) {
+  :root {
+    --surface-modal-padding: 16px;
+    --surface-modal-body-padding: 12px;
+    --surface-modal-radius: 16px;
+    --surface-modal-gap: 8px;
+    --surface-modal-head-gap: 8px;
+  }
+}
+
+@media (max-width: 960px) {
+  :root {
+    --surface-modal-padding: 16px;
+    --surface-modal-body-padding: 12px;
+    --surface-modal-radius: 18px;
+    --surface-modal-gap: 8px;
+    --surface-modal-head-gap: 10px;
+  }
+}
+
 @media (max-width: 640px) {
   :root {
     --surface-floating-radius: 12px;
     --surface-floating-padding-block: 9px;
     --surface-floating-padding-inline: 11px;
-    --surface-modal-padding: 14px;
-    --surface-modal-radius: 20px;
+    --surface-modal-padding: 10px;
+    --surface-modal-body-padding: 10px;
+    --surface-modal-radius: 16px;
+    --surface-modal-gap: 8px;
+    --surface-modal-head-gap: 8px;
     --surface-modal-close-size: 34px;
   }
 }

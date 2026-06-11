@@ -1,5 +1,5 @@
 import { RefObject } from "react";
-import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AppDialog } from "@/components/ui/app-dialog";
 import { AdminNoticeStack } from "@/components/admin/ui/admin-notice";
 import { AdminTabBar } from "@/components/admin/ui/admin-tab-bar";
 import { CustomerProfileDialog, type CustomerForm, type CustomerRow } from "./customer-profile-dialog";
@@ -105,12 +105,12 @@ export function CustomerDialogWrapper({
     );
 
     return (
-        <AdminDialog
+        <AppDialog
             isOpen={true} // Presence handled by wrapper
             onClose={onClose}
             title="Customer Details"
             rootRef={dialogRootRef}
-            size="wide"
+            size="lg"
             description={description}
             id="customer-dialog"
             bodyClassName="customer-dialog-body-lock"
@@ -208,6 +208,6 @@ export function CustomerDialogWrapper({
                     />
                 )}
             </div>
-        </AdminDialog>
+        </AppDialog>
     );
 }

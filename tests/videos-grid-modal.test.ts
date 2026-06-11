@@ -74,10 +74,10 @@ describe("videos-grid-modal", () => {
     expect(thumbnail?.getAttribute("src")).toContain("i.ytimg.com/vi/abc123/hqdefault.jpg");
     await openVideo();
 
-    const iframe = container.querySelector("iframe");
+    const iframe = document.body.querySelector("iframe");
     expect(iframe).toBeTruthy();
     expect(iframe?.getAttribute("src")).toContain("youtube-nocookie.com/embed/abc123?autoplay=1");
-    expect(container.textContent).not.toContain("Consent required");
+    expect(document.body.textContent).not.toContain("Consent required");
   });
 
   it("blocks playback and explains the consent requirement when consent is unknown", async () => {
@@ -87,10 +87,10 @@ describe("videos-grid-modal", () => {
     expect(container.querySelector(".video-thumb-placeholder")).toBeTruthy();
     await openVideo();
 
-    expect(container.querySelector("iframe")).toBeFalsy();
-    expect(container.textContent).toContain("Consent required");
-    expect(container.textContent).toContain("Accept optional cookies to play this video.");
-    expect(container.querySelector("a")?.getAttribute("href")).toBe("/privacy");
+    expect(document.body.querySelector("iframe")).toBeFalsy();
+    expect(document.body.textContent).toContain("Consent required");
+    expect(document.body.textContent).toContain("Accept optional cookies to play this video.");
+    expect(document.body.querySelector("a")?.getAttribute("href")).toBe("/privacy");
   });
 
   it("keeps playback blocked after an explicit decline", async () => {
@@ -102,8 +102,8 @@ describe("videos-grid-modal", () => {
     expect(container.querySelector(".video-thumb-placeholder")).toBeTruthy();
     await openVideo();
 
-    expect(container.querySelector("iframe")).toBeFalsy();
-    expect(container.textContent).toContain("Consent required");
+    expect(document.body.querySelector("iframe")).toBeFalsy();
+    expect(document.body.textContent).toContain("Consent required");
     expect(window.localStorage.getItem(PUBLIC_COOKIE_CONSENT_STORAGE_KEY)).toBe("declined");
   });
 
@@ -111,7 +111,7 @@ describe("videos-grid-modal", () => {
     await renderModal();
     await openVideo();
 
-    const acceptButton = Array.from(container.querySelectorAll("button")).find(
+    const acceptButton = Array.from(document.body.querySelectorAll("button")).find(
       (button) => button.textContent === "Accept optional cookies"
     );
     expect(acceptButton).toBeTruthy();
@@ -121,8 +121,8 @@ describe("videos-grid-modal", () => {
     });
 
     expect(window.localStorage.getItem(PUBLIC_COOKIE_CONSENT_STORAGE_KEY)).toBe("accepted");
-    expect(container.querySelector("iframe")).toBeTruthy();
-    expect(container.textContent).not.toContain("Consent required");
+    expect(document.body.querySelector("iframe")).toBeTruthy();
+    expect(document.body.textContent).not.toContain("Consent required");
     expect(container.querySelector(".video-thumb-image")).toBeTruthy();
     expect(container.querySelector(".video-thumb-placeholder")).toBeFalsy();
   });
@@ -133,7 +133,7 @@ describe("videos-grid-modal", () => {
     await renderModal();
     await openVideo();
 
-    const closeButton = Array.from(container.querySelectorAll("button")).find(
+    const closeButton = Array.from(document.body.querySelectorAll("button")).find(
       (button) => button.textContent === "Close"
     );
     expect(closeButton).toBeTruthy();
@@ -143,6 +143,6 @@ describe("videos-grid-modal", () => {
     });
 
     expect(window.localStorage.getItem(PUBLIC_COOKIE_CONSENT_STORAGE_KEY)).toBe("declined");
-    expect(container.querySelector("[role='dialog']")).toBeFalsy();
+    expect(document.body.querySelector("[role='dialog']")).toBeFalsy();
   });
 });

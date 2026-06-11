@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { format } from "date-fns";
-import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AppDialog } from "@/components/ui/app-dialog";
 import { getEmailViewerContent } from "@/lib/admin/email-history";
 import { type EmailRecord } from "@/lib/admin/use-email-history";
 
@@ -21,12 +21,12 @@ export function EmailViewerDialog({ isOpen, onClose, email }: EmailViewerDialogP
   const formattedDate = format(new Date(email.createdAt), "dd MMM yyyy, HH:mm");
 
   return (
-    <AdminDialog
+    <AppDialog
       isOpen={isOpen}
       onClose={onClose}
       title="View Email"
       rootRef={rootRef}
-      size="wide"
+      size="lg"
       id="email-viewer-dialog"
       bodyClassName="email-viewer-dialog-body"
       lockBodyScrollArea
@@ -96,6 +96,6 @@ export function EmailViewerDialog({ isOpen, onClose, email }: EmailViewerDialogP
           )}
         </div>
       </div>
-    </AdminDialog>
+    </AppDialog>
   );
 }

@@ -20,7 +20,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 
-import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AppDialog } from "@/components/ui/app-dialog";
 import { AdminNoticeStack } from "@/components/admin/ui/admin-notice";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { useSafeFetch } from "@/lib/admin/use-safe-fetch";
@@ -216,11 +216,11 @@ export function AdminDeployUpdatesButton() {
           {loading ? "Loading..." : "Updates"}
         </button>
       </Tooltip>
-      <AdminDialog
+      <AppDialog
         isOpen={open}
         onClose={closeModal}
         title="Deployment Updates"
-        size="wide"
+        size="lg"
         id="deploy-updates-dialog"
         bodyClassName="deploy-history-dialog-body"
       >
@@ -336,7 +336,7 @@ export function AdminDeployUpdatesButton() {
             )
           ) : null}
         </div>
-      </AdminDialog>
+      </AppDialog>
     </>
   );
 }

@@ -495,7 +495,7 @@ export function AdminMaterialsPanel({
       </div>
 
       {/* Panel-owned modals, mounted only while open so their local state
-          (input value, inline error) resets on every open. AdminDialog
+          (input value, inline error) resets on every open. AppDialog
           portals them to document.body, so placement here is layout-neutral. */}
       {dialogState?.kind === "create" && folderActions ? (
         <MaterialsFolderNameDialog

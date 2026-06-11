@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { ChordDiagramData } from "@/lib/chords/chord-types";
-import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AppDialog } from "@/components/ui/app-dialog";
 import { renderChordSvg } from "@/lib/chords/chord-svg";
 import { ChordBuilder } from "./chord-builder";
 
@@ -62,7 +62,7 @@ export function ChordPickerDialog({ isOpen, onClose, onSelect }: ChordPickerDial
 
   return (
     <>
-      <AdminDialog isOpen={isOpen && !builderOpen} onClose={onClose} title="Insert Chord" size="wide">
+      <AppDialog isOpen={isOpen && !builderOpen} onClose={onClose} title="Insert Chord" size="lg">
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "flex", gap: 8 }}>
             <input
@@ -109,7 +109,7 @@ export function ChordPickerDialog({ isOpen, onClose, onSelect }: ChordPickerDial
             </div>
           )}
         </div>
-      </AdminDialog>
+      </AppDialog>
 
       {builderOpen && (
         <ChordBuilder

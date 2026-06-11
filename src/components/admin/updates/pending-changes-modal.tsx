@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AppDialog } from "@/components/ui/app-dialog";
 import { AdminNoticeStack } from "@/components/admin/ui/admin-notice";
 import { useSafeFetch } from "@/lib/admin/use-safe-fetch";
 import type { CommitMetadata } from "@/lib/services/updates-service";
@@ -56,11 +56,11 @@ export function PendingChangesModal({
   }
 
   return (
-    <AdminDialog
+    <AppDialog
       isOpen={true}
       onClose={onClose}
       title="Available Repository Updates"
-      size="wide"
+      size="lg"
       id="pending-updates-dialog"
       bodyClassName="deploy-updates-dialog-body"
       footer={(
@@ -123,6 +123,6 @@ export function PendingChangesModal({
           )}
         </div>
       </div>
-    </AdminDialog>
+    </AppDialog>
   );
 }
