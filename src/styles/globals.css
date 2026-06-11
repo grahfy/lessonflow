@@ -957,7 +957,6 @@ h1 {
   background: linear-gradient(155deg, rgba(192, 62, 87, 0.88), rgba(126, 34, 52, 0.9));
 }
 
-.btn-small,
 .btn-sm {
   padding: 5px 10px;
   font-size: 0.72rem;
@@ -1339,11 +1338,6 @@ h1 {
   border: 0;
 }
 
-.video-modal-content {
-  width: min(96vw, 1100px);
-  max-width: none;
-}
-
 .video-modal-frame {
   position: relative;
   width: min(100%, 1040px);
@@ -1462,6 +1456,8 @@ h1 {
   border: none;
   background: none;
   box-shadow: none;
+  align-items: center;
+  gap: 14px;
 }
 
 /* Media-tier icon close — seeded from the migrated lightbox .modal-close. */
@@ -1487,6 +1483,77 @@ h1 {
 
 .dialog-media-close:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+/* Media-tier content rules, folded from the deleted lightbox family
+   (former .modal-image-container / .modal-image / .modal-caption and the
+   .admin-manual-modal-* variants in extended-features.css). */
+.dialog-media-image-container {
+  position: relative;
+  width: min(85vw, calc(90vw - (var(--surface-modal-padding) * 2)));
+  max-width: 800px;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.dialog-media-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: inherit;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.dialog-media-caption {
+  color: white;
+  text-align: center;
+  margin: 0;
+  max-width: min(72ch, 100%);
+  padding-inline: 4px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Manual-screenshot lightbox: wide shots are contained, tall shots scroll. */
+.dialog-media-manual-container {
+  width: min(100%, 1400px);
+  max-width: none;
+  min-height: 0;
+  max-height: min(82vh, 920px);
+}
+
+.dialog-media-manual-container.is-contained {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.dialog-media-manual-container.is-scrollable {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.dialog-media-manual-container.is-contained .dialog-media-manual-image {
+  display: block;
+  width: auto;
+  max-width: min(1320px, 92vw);
+  max-height: min(82vh, 920px);
+  height: auto;
+}
+
+.dialog-media-manual-container.is-scrollable .dialog-media-manual-image {
+  display: block;
+  width: 100%;
+  max-width: none;
+  height: auto;
+}
+
+@media (max-width: 900px) {
+  .dialog-media-manual-container {
+    max-height: min(70vh, 560px);
+  }
 }
 
 .dialog-body-scroll {

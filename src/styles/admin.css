@@ -5701,8 +5701,6 @@
 
 #customer-dialog {
   --admin-communication-shell-height: min(68vh, 760px);
-  width: min(1380px, calc(100vw - (var(--dialog-frame-gap) * 2)));
-  max-height: min(96vh, calc(100dvh - (var(--dialog-frame-gap) * 2)), 1020px);
 }
 
 #customer-dialog .customer-dialog-body-lock {
@@ -5736,11 +5734,6 @@
 #booking-detail-dialog {
   --admin-communication-shell-height: min(68vh, 880px);
   --booking-dialog-inner-gap: 18px;
-  --booking-detail-dialog-height: min(94vh, calc(100dvh - (var(--dialog-frame-gap) * 2)), 1060px);
-  width: min(1380px, calc(100vw - (var(--dialog-frame-gap) * 2)));
-  min-height: var(--booking-detail-dialog-height);
-  height: var(--booking-detail-dialog-height);
-  max-height: var(--booking-detail-dialog-height);
 }
 
 #booking-detail-dialog .booking-dialog-body-lock {
@@ -5761,13 +5754,6 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
-  max-height: min(90vh, 920px);
-  width: min(1100px, 97vw);
-}
-
-.dialog-panel-wide {
-  width: min(1380px, calc(100vw - (var(--dialog-frame-gap) * 2)));
-  max-height: min(96vh, calc(100dvh - (var(--dialog-frame-gap) * 2)), 1020px);
 }
 
 .dialog-head {
@@ -6741,12 +6727,6 @@
   box-shadow: 0 0 0 2px rgba(143, 114, 255, 0.2);
 }
 
-.dialog-panel-compact {
-  width: min(640px, calc(100vw - 40px));
-  max-height: min(80vh, 700px);
-  padding: 16px;
-}
-
 .dialog-backdrop.is-secondary {
   background: rgba(5, 9, 24, 0.6);
   backdrop-filter: blur(6px);
@@ -6757,7 +6737,7 @@
     max(24px, env(safe-area-inset-left, 0px));
 }
 
-.dialog-panel-compact .field textarea {
+.dialog-panel[data-size="sm"] .field textarea {
   min-height: 160px;
 }
 
@@ -8133,30 +8113,6 @@
       max(var(--dialog-frame-gap), env(safe-area-inset-left, 0px));
   }
 
-  .dialog-panel,
-  .dialog-panel-wide,
-  .booking-dialog-panel,
-  #customer-dialog,
-  #booking-detail-dialog {
-    width: min(calc(100vw - (var(--dialog-frame-gap) * 2)), 1380px);
-    max-height: min(92dvh, calc(100dvh - (var(--dialog-frame-gap) * 2)), 980px);
-  }
-
-  #booking-detail-dialog {
-    min-height: auto;
-  }
-
-  .dialog-panel {
-    padding: 14px;
-    border-radius: 18px;
-  }
-
-  .dialog-panel-compact {
-    width: min(100vw - 20px, 640px);
-    max-height: min(88dvh, 760px);
-    padding: 14px;
-    border-radius: 18px;
-  }
 
   .dialog-head .btn {
     width: 100%;
@@ -8333,21 +8289,7 @@
       max(var(--dialog-frame-gap), env(safe-area-inset-left, 0px));
   }
 
-  .dialog-panel,
-  .dialog-panel-wide,
-  .dialog-panel-compact,
-  .booking-dialog-panel,
-  #customer-dialog,
-  #booking-detail-dialog {
-    width: calc(100vw - (var(--dialog-frame-gap) * 2));
-    max-height: min(94dvh, calc(100dvh - (var(--dialog-frame-gap) * 2)), 920px);
-    border-radius: 16px;
-  }
 
-  .dialog-panel,
-  .dialog-panel-compact {
-    padding: 10px;
-  }
 
   .dialog-body-scroll {
     padding: 12px 12px var(--surface-modal-body-padding, 10px);

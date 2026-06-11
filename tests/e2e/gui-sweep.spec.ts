@@ -316,13 +316,13 @@ async function capturePublic(page: PW, viewport: ViewportName) {
     await captureRoute(page, viewport, route);
   }
 
-  await captureDialog(page, viewport, "dialog-contact-image-lightbox", ".modal-overlay", async () => {
+  await captureDialog(page, viewport, "dialog-contact-image-lightbox", ".dialog-backdrop", async () => {
     await gotoWithRetry(page, "/contact");
     await waitForPageSettle(page);
     await page.locator(".map-trigger-item button").first().click();
   });
 
-  await captureDialog(page, viewport, "dialog-videos-lightbox", ".modal-overlay", async () => {
+  await captureDialog(page, viewport, "dialog-videos-lightbox", ".dialog-backdrop", async () => {
     await gotoWithRetry(page, "/videos");
     await waitForPageSettle(page);
     await page.locator(".video-launch-button").first().click();
@@ -569,8 +569,8 @@ async function captureAdminDialogs(page: PW, viewport: ViewportName) {
     await page.getByRole("dialog", { name: /insert chord/i }).first().waitFor({ timeout: 10_000 });
   });
 
-  // Manual screenshot lightbox (.modal-overlay) on a manual section page.
-  await captureDialog(page, viewport, "dialog-manual-lightbox", ".modal-overlay", async () => {
+  // Manual screenshot lightbox (.dialog-backdrop) on a manual section page.
+  await captureDialog(page, viewport, "dialog-manual-lightbox", ".dialog-backdrop", async () => {
     await gotoWithRetry(page, "/admin/manual/start-here-features");
     await waitForPageSettle(page);
     await dismissDeployUpdatesModal(page);

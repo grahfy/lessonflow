@@ -7,7 +7,7 @@ import { CalendarDays } from "lucide-react";
 import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AdminTable, AdminTableSeparator as Separator } from "@/components/admin/ui/admin-table";
-import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AppDialog } from "@/components/ui/app-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { useTweenOrchestrator } from "@/components/motion/tween-orchestrator";
@@ -1288,11 +1288,11 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
         </AdminTable>
       </div>
 
-      <AdminDialog
+      <AppDialog
         isOpen={!!selectedInvoice}
         onClose={closeDetail}
         title={`Invoice ${selectedInvoice?.invoiceNumber}`}
-        size="wide"
+        size="lg"
         id="invoice-detail-dialog"
         bodyClassName="invoice-dialog-body-lock"
         lockBodyScrollArea
@@ -1686,16 +1686,16 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
             </div>
           </div>
         )}
-      </AdminDialog>
+      </AppDialog>
 
-      <AdminDialog
+      <AppDialog
         isOpen={createOpen}
         onClose={() => {
           resetCreateDialog();
           setCreateOpen(false);
         }}
         title="New Invoice"
-        size="wide"
+        size="lg"
         id="invoice-create-dialog"
         bodyClassName="invoice-dialog-body-lock"
         lockBodyScrollArea
@@ -2072,13 +2072,13 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
           </div>
         </div>
         </div>
-      </AdminDialog>
+      </AppDialog>
 
-      <AdminDialog
+      <AppDialog
         isOpen={createBookingDialogOpen}
         onClose={() => setCreateBookingDialogOpen(false)}
         title={createUsesSingleBookingLesson ? "Select Single Lesson Booking" : "Select Customer Bookings"}
-        size="wide"
+        size="lg"
         footer={
           <div className="dialog-footer-row dialog-footer-row-end">
             <button className="btn btn-secondary" type="button" onClick={() => setCreateBookingDialogOpen(false)}>
@@ -2156,7 +2156,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
             )}
           </AdminCard>
         </div>
-      </AdminDialog>
+      </AppDialog>
     </AdminShell>
   );
 }

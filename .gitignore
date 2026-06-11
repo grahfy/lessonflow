@@ -50,3 +50,7 @@ settings-*.png
 
 # GUI sweep screenshot galleries (never committed — local/CI artifacts only)
 artifacts/
+
+# MemPalace per-project files (issue #185)
+mempalace.yaml
+entities.json

@@ -109,7 +109,7 @@ export function AdminLoginForm() {
           <button
             type="button"
             id="admin-password-toggle"
-            className="btn btn-small password-visibility-toggle"
+            className="btn btn-sm password-visibility-toggle"
             aria-label={showPassword ? "Hide password" : "Show password"}
             aria-pressed={showPassword}
             onClick={() => setShowPassword((current) => !current)}

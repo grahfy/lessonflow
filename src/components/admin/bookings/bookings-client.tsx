@@ -31,7 +31,7 @@ import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AdminBookingCalendar, type AdminCalendarEvent } from "@/components/admin-booking-calendar";
 import { animateIn, animateOut, useTweenOrchestrator } from "@/components/motion/tween-orchestrator";
 import { usePresenceExit } from "@/components/motion/use-presence-exit";
-import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AppDialog } from "@/components/ui/app-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { formatDateTime } from "@/lib/admin/formatters";
@@ -1416,9 +1416,10 @@ export function AdminBookingsClient() {
         />
       )}
 
-      <AdminDialog
+      <AppDialog
         isOpen={invoiceCandidates.length > 0}
         onClose={() => setInvoiceCandidates([])}
+        size="md"
         title="Possible Existing Invoices"
         description="Choose an existing invoice for this booking or create a new booking-linked draft."
         footer={(
@@ -1476,14 +1477,14 @@ export function AdminBookingsClient() {
             </div>
           )}
         </AdminCard>
-      </AdminDialog>
+      </AppDialog>
 
       {isMoveOpen && (
-        <AdminDialog
+        <AppDialog
           isOpen={true}
           onClose={() => setIsMoveOpen(false)}
           title="Move Lesson Time"
-          size="wide"
+          size="lg"
           footer={
             <div className="dialog-footer-row dialog-footer-row-end">
               <button className="btn btn-secondary" onClick={() => setIsMoveOpen(false)}>CANCEL</button>
@@ -1498,7 +1499,7 @@ export function AdminBookingsClient() {
               <input type="datetime-local" value={moveNewStart} onChange={e => setMoveNewStart(e.target.value)} />
             </AdminField>
           </AdminForm>
-        </AdminDialog>
+        </AppDialog>
       )}
 
       {isManualDialogMounted && (

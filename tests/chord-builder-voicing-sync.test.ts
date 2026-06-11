@@ -9,8 +9,8 @@ import { createEmptyChordDiagram } from "@/lib/chords/chord-types";
 
 const lookupChordVoicingsMock = vi.fn<(root: string, quality: string, bassNote?: string) => ChordFingering[]>();
 
-vi.mock("@/components/admin/ui/admin-dialog", () => ({
-  AdminDialog: ({
+vi.mock("@/components/ui/app-dialog", () => ({
+  AppDialog: ({
     children,
     footer,
   }: {

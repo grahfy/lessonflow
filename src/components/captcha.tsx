@@ -205,7 +205,7 @@ export function CaptchaField(props: {
           value={props.captcha.userAnswer}
           onChange={(event) => props.captcha.handleChange(event.currentTarget.value)}
         />
-        <button type="button" className="btn btn-small" onClick={() => void props.captcha.regenerate()}>
+        <button type="button" className="btn btn-sm" onClick={() => void props.captcha.regenerate()}>
           New image
         </button>
       </div>

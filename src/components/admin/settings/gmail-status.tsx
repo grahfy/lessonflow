@@ -40,7 +40,7 @@ export function GmailStatus() {
         <Tooltip content="Refresh Gmail connection status.">
           <button
             type="button"
-            className="btn btn-secondary btn-small"
+            className="btn btn-secondary btn-sm"
             onClick={check}
             disabled={status.status === "loading"}
             aria-label="Refresh"
