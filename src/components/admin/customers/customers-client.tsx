@@ -418,7 +418,6 @@ export function AdminCustomersClient() {
   }
 
   async function deleteMaterial(materialId: string) {
-    if (!window.confirm("Are you sure you want to delete this material?")) return;
     setError("");
     const success = await removeMaterialApi(materialId);
     if (success) {
@@ -426,27 +425,26 @@ export function AdminCustomersClient() {
     }
   }
 
-  function handleMaterialBookingSelect(bookingId: string) {
-    if (!selectedCustomer) return;
-    void loadMaterials(selectedCustomer.id, bookingId);
-  }
-
+  // NOTE: folder handlers return the API success flag so the panel's modals
+  // can stay open (showing the server's error) when a mutation fails.
   async function handleCreateMaterialFolder(name: string, parentId: string | null) {
-    if (!selectedCustomer) return;
+    if (!selectedCustomer) return false;
     setError("");
     const success = await createMaterialFolderApi(selectedCustomer.id, name, parentId);
     if (success) setNotice("Folder created.");
+    return success;
   }
 
   async function handleRenameMaterialFolder(folderId: string, name: string) {
-    if (!selectedCustomer) return;
+    if (!selectedCustomer) return false;
     setError("");
     const success = await renameMaterialFolderApi(selectedCustomer.id, folderId, name);
     if (success) setNotice("Folder renamed.");
+    return success;
   }
 
   async function handleDeleteMaterialFolder(folderId: string) {
-    if (!selectedCustomer) return;
+    if (!selectedCustomer) return false;
     setError("");
     const success = await deleteMaterialFolderApi(selectedCustomer.id, folderId);
     if (success) {
@@ -454,13 +452,15 @@ export function AdminCustomersClient() {
       // If we were viewing the deleted folder, fall back to root.
       setCurrentMaterialsFolderId((current) => (current === folderId ? null : current));
     }
+    return success;
   }
 
   async function handleMoveMaterial(materialId: string, folderId: string | null) {
-    if (!selectedCustomer) return;
+    if (!selectedCustomer) return false;
     setError("");
     const success = await moveMaterialApi(selectedCustomer.id, materialId, folderId);
     if (success) setNotice("Material moved.");
+    return success;
   }
 
   function openCustomerBooking(booking: CustomerBookingHistoryRow) {
@@ -712,7 +712,6 @@ export function AdminCustomersClient() {
           materialsUploadFormRef={materialsUploadFormRef}
           onUploadMaterial={uploadMaterial}
           onDeleteMaterial={(mId) => deleteMaterial(mId)}
-          onMaterialBookingSelect={handleMaterialBookingSelect}
           materialsFolderField={{
             folders: materialsFolders,
             currentFolderId: currentMaterialsFolderId,

@@ -7,6 +7,12 @@ import Image from "next/image";
 import { CaptchaField, useCaptcha } from "@/components/captcha";
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AdminField, AdminForm } from "@/components/admin/ui/admin-form";
+import {
+  MaterialsConfirmDialog,
+  MaterialsFolderNameDialog,
+  MaterialsMoveDialog,
+  type MoveTargetOption
+} from "@/components/admin/ui/materials-folder-dialogs";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import {
   LEARNING_MATERIAL_ACCEPT,
@@ -32,11 +38,26 @@ export interface MaterialsFolderField {
 }
 
 export interface MaterialsFolderActions {
-  onCreateFolder: (name: string, parentId: string | null) => void;
-  onRenameFolder: (folderId: string, name: string) => void;
-  onDeleteFolder: (folderId: string) => void;
-  onMoveMaterial: (materialId: string, folderId: string | null) => void;
+  // NOTE: Actions may report failure by returning/resolving `false` (the
+  // hook's mutations already do); the name modal uses this to stay open on a
+  // server rejection. Plain `void` returns are treated as success.
+  onCreateFolder: (name: string, parentId: string | null) => void | boolean | Promise<void | boolean>;
+  onRenameFolder: (folderId: string, name: string) => void | boolean | Promise<void | boolean>;
+  onDeleteFolder: (folderId: string) => void | boolean | Promise<void | boolean>;
+  onMoveMaterial: (materialId: string, folderId: string | null) => void | boolean | Promise<void | boolean>;
 }
+
+/**
+ * Which panel modal is open. Folder/material payloads are captured at open
+ * time so the modal keeps a stable subject even if the tree reloads under it.
+ */
+type MaterialsDialogState =
+  | { kind: "create" }
+  | { kind: "rename"; folder: AdminFolderRow }
+  | { kind: "deleteFolder"; folder: AdminFolderRow }
+  | { kind: "deleteMaterial"; material: LearningMaterialRow }
+  | { kind: "move"; material: LearningMaterialRow }
+  | null;
 
 interface AdminMaterialsPanelProps {
   materialsLoading: boolean;
@@ -115,6 +136,7 @@ export function AdminMaterialsPanel({
   const [selectedFileName, setSelectedFileName] = useState("No file selected");
   const [failedPreviewIds, setFailedPreviewIds] = useState<string[]>([]);
   const [uploadFolderId, setUploadFolderId] = useState<string | "">("");
+  const [dialogState, setDialogState] = useState<MaterialsDialogState>(null);
 
   const folders = useMemo<AdminFolderRow[]>(() => folderField?.folders ?? [], [folderField]);
   const currentFolderId = folderField?.currentFolderId ?? null;
@@ -164,49 +186,41 @@ export function AdminMaterialsPanel({
     void captcha.regenerate();
   }
 
+  // Folder/material actions open panel-owned modals (rendered below) instead
+  // of native prompt/confirm dialogs, which browsers can suppress silently.
   function handleCreateFolder() {
     if (!folderActions) return;
-    const name = window.prompt("New folder name");
-    if (name && name.trim()) {
-      folderActions.onCreateFolder(name.trim(), currentFolderId);
-    }
+    setDialogState({ kind: "create" });
   }
 
   function handleRenameFolder(folder: AdminFolderRow) {
     if (!folderActions) return;
-    const name = window.prompt("Rename folder", folder.name);
-    if (name && name.trim() && name.trim() !== folder.name) {
-      folderActions.onRenameFolder(folder.id, name.trim());
-    }
+    setDialogState({ kind: "rename", folder });
   }
 
   function handleDeleteFolder(folder: AdminFolderRow) {
     if (!folderActions) return;
-    if (
-      window.confirm(
-        `Delete folder "${folder.name}"? Its contents (files and subfolders) move up one level to the parent folder.`
-      )
-    ) {
-      folderActions.onDeleteFolder(folder.id);
-    }
+    setDialogState({ kind: "deleteFolder", folder });
+  }
+
+  function handleDeleteMaterial(material: LearningMaterialRow) {
+    setDialogState({ kind: "deleteMaterial", material });
   }
 
   function handleMoveMaterial(material: LearningMaterialRow) {
     if (!folderActions) return;
-    // Build a numbered destination menu (root + each folder by breadcrumb path).
-    const options: Array<{ label: string; folderId: string | null }> = [
-      { label: "Student root", folderId: null }
-    ];
-    for (const f of flatFolders) {
-      options.push({ label: folderPathLabel(f.id, flatFolderById), folderId: f.id });
-    }
-    const prompt = options.map((o, i) => `${i}: ${o.label}`).join("\n");
-    const answer = window.prompt(`Move "${material.title}" to which folder?\n\n${prompt}`, "0");
-    if (answer === null) return;
-    const index = Number.parseInt(answer.trim(), 10);
-    if (Number.isNaN(index) || index < 0 || index >= options.length) return;
-    folderActions.onMoveMaterial(material.id, options[index].folderId);
+    setDialogState({ kind: "move", material });
   }
+
+  // Destination menu for the move picker: student root + every folder labeled
+  // by its breadcrumb path (mirrors the upload form's destination select).
+  const moveOptions = useMemo<MoveTargetOption[]>(
+    () => [
+      { folderId: null, label: "Student root" },
+      ...flatFolders.map((f) => ({ folderId: f.id, label: folderPathLabel(f.id, flatFolderById) }))
+    ],
+    [flatFolders, flatFolderById]
+  );
 
   return (
     <>
@@ -326,7 +340,7 @@ export function AdminMaterialsPanel({
                           className="btn btn-danger btn-sm"
                           type="button"
                           disabled={materialsDeletingId === material.id}
-                          onClick={() => void onDelete(material.id)}
+                          onClick={() => handleDeleteMaterial(material)}
                         >
                           {materialsDeletingId === material.id ? "Deleting..." : "Delete"}
                         </button>
@@ -479,6 +493,78 @@ export function AdminMaterialsPanel({
           </form>
         </AdminCard>
       </div>
+
+      {/* Panel-owned modals, mounted only while open so their local state
+          (input value, inline error) resets on every open. AdminDialog
+          portals them to document.body, so placement here is layout-neutral. */}
+      {dialogState?.kind === "create" && folderActions ? (
+        <MaterialsFolderNameDialog
+          title="New folder"
+          submitLabel="Create"
+          initialName=""
+          siblingNames={currentChildren.map((f) => f.name)}
+          onSubmit={(name) => folderActions.onCreateFolder(name, currentFolderId)}
+          onClose={() => setDialogState(null)}
+        />
+      ) : null}
+
+      {dialogState?.kind === "rename" && folderActions ? (
+        <MaterialsFolderNameDialog
+          title="Rename folder"
+          submitLabel="Rename"
+          initialName={dialogState.folder.name}
+          siblingNames={flatFolders
+            .filter((f) => f.parentId === dialogState.folder.parentId && f.id !== dialogState.folder.id)
+            .map((f) => f.name)}
+          onSubmit={(name) =>
+            // NOTE: An unchanged name just closes the modal (matches the old
+            // prompt flow) instead of issuing a no-op rename request.
+            name === dialogState.folder.name
+              ? undefined
+              : folderActions.onRenameFolder(dialogState.folder.id, name)
+          }
+          onClose={() => setDialogState(null)}
+        />
+      ) : null}
+
+      {dialogState?.kind === "deleteFolder" && folderActions ? (
+        <MaterialsConfirmDialog
+          title="Delete folder"
+          message={`Delete folder "${dialogState.folder.name}"? Its contents (files and subfolders) move up one level to the parent folder.`}
+          confirmLabel="Delete"
+          onConfirm={() => {
+            void folderActions.onDeleteFolder(dialogState.folder.id);
+            setDialogState(null);
+          }}
+          onClose={() => setDialogState(null)}
+        />
+      ) : null}
+
+      {dialogState?.kind === "deleteMaterial" ? (
+        <MaterialsConfirmDialog
+          title="Delete material"
+          message="Delete this material permanently?"
+          confirmLabel="Delete"
+          onConfirm={() => {
+            void onDelete(dialogState.material.id);
+            setDialogState(null);
+          }}
+          onClose={() => setDialogState(null)}
+        />
+      ) : null}
+
+      {dialogState?.kind === "move" && folderActions ? (
+        <MaterialsMoveDialog
+          materialTitle={dialogState.material.title}
+          options={moveOptions}
+          currentFolderId={dialogState.material.folderId ?? null}
+          onSelect={(folderId) => {
+            void folderActions.onMoveMaterial(dialogState.material.id, folderId);
+            setDialogState(null);
+          }}
+          onClose={() => setDialogState(null)}
+        />
+      ) : null}
     </>
   );
 }

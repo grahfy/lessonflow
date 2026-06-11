@@ -74,7 +74,6 @@ type Props = {
     materialsUploadFormRef: RefObject<HTMLFormElement | null>;
     onUploadMaterial: (captcha?: { captchaToken: string; captchaAnswer: string }) => void;
     onDeleteMaterial: (id: string) => void;
-    onMaterialBookingSelect: (bookingId: string) => void;
     materialsFolderField?: MaterialsFolderField;
     materialsFolderActions?: MaterialsFolderActions;
 };
@@ -204,7 +203,6 @@ export function CustomerDialogWrapper({
                         materialsUploadFormRef={rest.materialsUploadFormRef}
                         onUpload={rest.onUploadMaterial}
                         onDelete={rest.onDeleteMaterial}
-                        onBookingSelect={rest.onMaterialBookingSelect}
                         folderField={rest.materialsFolderField}
                         folderActions={rest.materialsFolderActions}
                     />

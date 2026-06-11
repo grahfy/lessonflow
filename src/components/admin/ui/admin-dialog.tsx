@@ -61,6 +61,39 @@ function unlockBodyScroll(): void {
 }
 
 /**
+ * Identity tokens of the dialogs currently open, in opening order.
+ *
+ * RATIONALE: Every open dialog listens for Escape on `document`, so stacked
+ * dialogs (e.g. a confirm modal layered over the booking dialog) would all
+ * close on a single keypress. Tracking open instances by a per-instance
+ * identity token (NOT the optional `id` prop, whose `undefined` values would
+ * collide) lets each handler close only when it is the topmost dialog.
+ */
+const openDialogStack: object[] = [];
+
+function pushDialogToken(token: object): void {
+  openDialogStack.push(token);
+}
+
+/**
+ * Removes a dialog's token wherever it sits in the stack.
+ *
+ * NOTE: Removal is by identity (splice), not pop() — a parent dialog can close
+ * programmatically underneath an open child, and popping would hand "topmost"
+ * to the wrong instance.
+ */
+function removeDialogToken(token: object): void {
+  const index = openDialogStack.indexOf(token);
+  if (index !== -1) {
+    openDialogStack.splice(index, 1);
+  }
+}
+
+function isTopmostDialog(token: object): boolean {
+  return openDialogStack[openDialogStack.length - 1] === token;
+}
+
+/**
  * Standard modal/dialog for admin actions.
  * Consistently handles backdrop, layout, and common header elements.
  */
@@ -81,6 +114,8 @@ export function AdminDialog({
   const dialogPanelRef = useRef<HTMLDivElement | null>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
+  // Stable per-instance identity for the module-level open-dialog stack.
+  const stackTokenRef = useRef<object>({});
   const generatedTitleId = useId();
   const generatedDescriptionId = useId();
   const titleId = id ? `${id}-title` : generatedTitleId;
@@ -96,6 +131,15 @@ export function AdminDialog({
     lockBodyScroll();
     return () => {
       unlockBodyScroll();
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const token = stackTokenRef.current;
+    pushDialogToken(token);
+    return () => {
+      removeDialogToken(token);
     };
   }, [isOpen]);
 
@@ -138,7 +182,11 @@ export function AdminDialog({
     const onKeyDown = (event: KeyboardEvent) => {
       const panel = dialogPanelRef.current;
       if (event.key === "Escape") {
-        onCloseRef.current();
+        // Only the topmost open dialog responds, so Escape peels stacked
+        // dialogs one at a time instead of ejecting the whole stack.
+        if (isTopmostDialog(stackTokenRef.current)) {
+          onCloseRef.current();
+        }
         return;
       }
 

@@ -191,6 +191,11 @@ export function AdminBookingsClient() {
   const [emailComposerSubject, setEmailComposerSubject] = useState("");
   const [emailComposerMessage, setEmailComposerMessage] = useState("");
 
+  // Materials State (Default booking link for uploads; never filters the list)
+  const [materialsBookingId, setMaterialsBookingId] = useState("");
+  // Currently navigated folder in the materials tree; null = student root.
+  const [currentMaterialsFolderId, setCurrentMaterialsFolderId] = useState<string | null>(null);
+
   const {
     isMounted: isDialogMounted,
     show: showDialog,
@@ -248,7 +253,21 @@ export function AdminBookingsClient() {
     send: sendEmailApi,
     sync: syncEmailApi
   } = useEmailHistory({ onAuthError, onError: setError });
-  const { materials: materialsList, loading: materialsLoading, uploading: materialsUploading, deletingId: materialsDeletingId, load: loadMaterials, upload: uploadMaterialApi, remove: removeMaterialApi } = useLearningMaterials({ onAuthError, onError: setError });
+  const {
+    materials: materialsList,
+    bookings: materialsBookings,
+    folders: materialsFolders,
+    loading: materialsLoading,
+    uploading: materialsUploading,
+    deletingId: materialsDeletingId,
+    load: loadMaterials,
+    upload: uploadMaterialApi,
+    remove: removeMaterialApi,
+    createFolder: createMaterialFolderApi,
+    renameFolder: renameMaterialFolderApi,
+    deleteFolder: deleteMaterialFolderApi,
+    moveMaterial: moveMaterialApi
+  } = useLearningMaterials({ onAuthError, onError: setError });
   const { templates: lessonPlanTemplates, loading: lessonPlanTemplatesLoading, load: loadLessonPlanTemplates } = useLessonPlanTemplates({ onAuthError, onError: setError });
   const {
     lessonPlan,
@@ -572,13 +591,18 @@ export function AdminBookingsClient() {
     setError("");
     setNotice("");
     resetBookingLessonPlan();
+    // Reset materials context unconditionally so stale booking/folder state never
+    // leaks across events. The booking id only seeds the upload selector default;
+    // booking requests are not bookings, so they default to "Unassigned".
+    setMaterialsBookingId(event.entityType === "booking" ? event.id : "");
+    setCurrentMaterialsFolderId(null);
 
     const emailTarget = getEmailHistoryTargetForEvent(event as EventWithRow);
     if (emailTarget) {
       void loadEmailHistory(emailTarget);
       if (currentAdmin?.role === "owner" || row.assignedTeacherId === currentAdmin?.id) {
         if (typeof row.customerId === "string" && row.customerId) {
-          void loadMaterials(row.customerId, event.id);
+          void loadMaterials(row.customerId);
         }
       }
     }
@@ -876,11 +900,63 @@ export function AdminBookingsClient() {
 
   async function uploadMaterial(captcha?: { captchaToken: string; captchaAnswer: string }) {
     const event = events.find(e => e.id === selectedKey);
-    if (!event?.row.customerId || !event.id || !materialsUploadFormRef.current) return;
-    const success = await uploadMaterialApi(event.row.customerId, event.id, materialsUploadFormRef.current, captcha);
+    if (!event?.row.customerId || !materialsUploadFormRef.current) return;
+    setError("");
+    const success = await uploadMaterialApi(event.row.customerId, materialsBookingId, materialsUploadFormRef.current, captcha);
     if (success) {
       setNotice("Material uploaded.");
+      materialsUploadFormRef.current.reset();
     }
+  }
+
+  async function deleteMaterial(materialId: string) {
+    setError("");
+    const success = await removeMaterialApi(materialId);
+    if (success) {
+      setNotice("Material deleted.");
+    }
+  }
+
+  // NOTE: folder handlers return the API success flag so the panel's modals
+  // can stay open (showing the server's error) when a mutation fails.
+  async function handleCreateMaterialFolder(name: string, parentId: string | null) {
+    const event = events.find(e => e.id === selectedKey);
+    if (!event?.row.customerId) return false;
+    setError("");
+    const success = await createMaterialFolderApi(event.row.customerId, name, parentId);
+    if (success) setNotice("Folder created.");
+    return success;
+  }
+
+  async function handleRenameMaterialFolder(folderId: string, name: string) {
+    const event = events.find(e => e.id === selectedKey);
+    if (!event?.row.customerId) return false;
+    setError("");
+    const success = await renameMaterialFolderApi(event.row.customerId, folderId, name);
+    if (success) setNotice("Folder renamed.");
+    return success;
+  }
+
+  async function handleDeleteMaterialFolder(folderId: string) {
+    const event = events.find(e => e.id === selectedKey);
+    if (!event?.row.customerId) return false;
+    setError("");
+    const success = await deleteMaterialFolderApi(event.row.customerId, folderId);
+    if (success) {
+      setNotice("Folder deleted. Its contents moved up one level.");
+      // If we were viewing the deleted folder, fall back to root.
+      setCurrentMaterialsFolderId((current) => (current === folderId ? null : current));
+    }
+    return success;
+  }
+
+  async function handleMoveMaterial(materialId: string, folderId: string | null) {
+    const event = events.find(e => e.id === selectedKey);
+    if (!event?.row.customerId) return false;
+    setError("");
+    const success = await moveMaterialApi(event.row.customerId, materialId, folderId);
+    if (success) setNotice("Material moved.");
+    return success;
   }
 
   function createScratchLessonPlanDraft() {
@@ -1301,8 +1377,24 @@ export function AdminBookingsClient() {
             materialsUploading,
             materialsDeletingId,
             onUpload: uploadMaterial,
-            onDelete: removeMaterialApi,
-            uploadFormRef: materialsUploadFormRef
+            onDelete: deleteMaterial,
+            uploadFormRef: materialsUploadFormRef,
+            bookingField: {
+              bookingId: materialsBookingId,
+              bookings: materialsBookings,
+              onChange: setMaterialsBookingId
+            },
+            folderField: {
+              folders: materialsFolders,
+              currentFolderId: currentMaterialsFolderId,
+              onNavigate: setCurrentMaterialsFolderId
+            },
+            folderActions: {
+              onCreateFolder: handleCreateMaterialFolder,
+              onRenameFolder: handleRenameMaterialFolder,
+              onDeleteFolder: handleDeleteMaterialFolder,
+              onMoveMaterial: handleMoveMaterial
+            }
           }}
           lessonPlanDialogProps={{
             lessonPlan,

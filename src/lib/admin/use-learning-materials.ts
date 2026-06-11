@@ -100,7 +100,9 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
         return false;
       }
 
-      void load(customerId, bookingId);
+      // Reload unfiltered so the folder tree stays complete after an upload;
+      // the booking link only affects the uploaded material's metadata.
+      void load(customerId);
       return true;
     } catch {
       return false;
