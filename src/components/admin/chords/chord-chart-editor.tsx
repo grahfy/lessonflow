@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import type { ChordDiagramData } from "@/lib/chords/chord-types";
-import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AppDialog } from "@/components/ui/app-dialog";
 import { renderChordSvg } from "@/lib/chords/chord-svg";
 import { Trash2 } from "lucide-react";
 
@@ -110,7 +110,7 @@ export function ChordChartEditor({
   );
 
   return (
-    <AdminDialog isOpen={isOpen} onClose={onClose} title="Chord Chart" size="wide" footer={footer}>
+    <AppDialog isOpen={isOpen} onClose={onClose} title="Chord Chart" size="lg" footer={footer}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div className="chord-builder-field">
           <label className="chord-builder-label">Title (e.g. song name)</label>
@@ -225,6 +225,6 @@ export function ChordChartEditor({
           )}
         </div>
       </div>
-    </AdminDialog>
+    </AppDialog>
   );
 }

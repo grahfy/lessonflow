@@ -2,11 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useCallback, useMemo, useState, type MouseEvent } from "react";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminCard } from "@/components/admin/ui/admin-card";
-import { Tooltip } from "@/components/admin/ui/tooltip";
+import { AppDialog } from "@/components/ui/app-dialog";
 import type {
   AdminManualIndex,
   AdminManualSection,
@@ -75,27 +75,6 @@ export function AdminManualSectionClient({
   const [activeScreenshot, setActiveScreenshot] = useState<ActiveManualImage | null>(null);
 
   const closeScreenshot = useCallback(() => setActiveScreenshot(null), []);
-
-  useEffect(() => {
-    if (!activeScreenshot) return;
-
-    const previousOverflow = document.body.style.overflow;
-    const onEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closeScreenshot();
-      }
-    };
-
-    // RATIONALE: The screenshot viewer behaves like a modal. Locking body
-    // scroll avoids the background document jumping underneath large images.
-    document.body.style.overflow = "hidden";
-    document.addEventListener("keydown", onEscape);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", onEscape);
-    };
-  }, [activeScreenshot, closeScreenshot]);
 
   const updatedLabel = useMemo(() => {
     return new Intl.DateTimeFormat("en-AU", {
@@ -296,30 +275,21 @@ export function AdminManualSectionClient({
       </AdminCard>
 
       {activeScreenshot ? (
-        <div className="modal-overlay" onClick={closeScreenshot} role="dialog" aria-modal="true" aria-label={activeScreenshot.alt}>
-          {/* NOTE: Clicks on the inner panel are stopped so the same overlay can
-              support both click-away close and interactive image controls. */}
-          <div className="modal-content admin-manual-modal-content" onClick={(event) => event.stopPropagation()}>
-            <Tooltip content="Close screenshot.">
-              <button type="button" className="modal-close" onClick={closeScreenshot} aria-label="Close screenshot">
-                ×
-              </button>
-            </Tooltip>
-            <div
-              className={`modal-image-container admin-manual-modal-image-container ${
-                activeScreenshot.mode === "scroll" ? "is-scrollable" : "is-contained"
-              }`}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={activeScreenshot.src}
-                alt={activeScreenshot.alt}
-                className="modal-image admin-manual-modal-image"
-              />
-            </div>
-            <p className="modal-caption">{activeScreenshot.caption}</p>
+        <AppDialog isOpen onClose={closeScreenshot} size="media" ariaLabel={activeScreenshot.alt}>
+          <div
+            className={`dialog-media-image-container dialog-media-manual-container ${
+              activeScreenshot.mode === "scroll" ? "is-scrollable" : "is-contained"
+            }`}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={activeScreenshot.src}
+              alt={activeScreenshot.alt}
+              className="dialog-media-image dialog-media-manual-image"
+            />
           </div>
-        </div>
+          <p className="dialog-media-caption">{activeScreenshot.caption}</p>
+        </AppDialog>
       ) : null}
     </AdminShell>
   );

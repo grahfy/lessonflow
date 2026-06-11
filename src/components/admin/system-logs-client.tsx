@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminCard } from "@/components/admin/ui/admin-card";
-import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AppDialog } from "@/components/ui/app-dialog";
 import { AdminNotice } from "@/components/admin/ui/admin-notice";
 import { AlertCircle, CheckCircle, RefreshCw, Bug, Search, Terminal, ChevronRight, ChevronDown, ImagePlus, X } from "lucide-react";
 import { Pagination } from "@/components/pagination";
@@ -529,12 +529,12 @@ export function SystemLogsClient() {
         </div>
       </div>
 
-      {/* Bug Report Dialog — uses the standard AdminDialog component */}
-      <AdminDialog
+      {/* Bug Report Dialog — uses the standard AppDialog component */}
+      <AppDialog
         isOpen={isReportingBug}
         onClose={() => setIsReportingBug(false)}
         title="Report Technical Issue"
-        size="compact"
+        size="sm"
         description="Describe the issue you're experiencing. Recent system logs will be attached automatically to help the developer with troubleshooting."
         footer={
           <>
@@ -660,13 +660,13 @@ export function SystemLogsClient() {
             </AdminNotice>
           )}
         </form>
-      </AdminDialog>
+      </AppDialog>
 
-      <AdminDialog
+      <AppDialog
         isOpen={isClearBeforeOpen}
         onClose={() => setIsClearBeforeOpen(false)}
         title="Clear Logs Up To"
-        size="compact"
+        size="sm"
         description={`Delete every log entry at or before the selected ${APP_TIMEZONE} timestamp.`}
         footer={
           <>
@@ -703,7 +703,7 @@ export function SystemLogsClient() {
           </div>
           <p className="helper-text">Timezone: {APP_TIMEZONE}</p>
         </form>
-      </AdminDialog>
+      </AppDialog>
     </AdminShell>
   );
 }

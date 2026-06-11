@@ -1,7 +1,7 @@
 "use client";
 
 import { RefObject } from "react";
-import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AppDialog } from "@/components/ui/app-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { STREET_TYPES } from "@/lib/admin/constants";
@@ -111,12 +111,12 @@ export function ManualBookingDialog({
   };
 
   return (
-    <AdminDialog
+    <AppDialog
       isOpen={isOpen}
       onClose={onClose}
       rootRef={rootRef}
       title="Add Manual Booking"
-      size="wide"
+      size="lg"
       footer={
         <div className="manual-dialog-footer">
           <div>
@@ -380,6 +380,6 @@ export function ManualBookingDialog({
             )}
           </div>
       </form>
-    </AdminDialog>
+    </AppDialog>
   );
 }

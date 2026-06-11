@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 
-import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AppDialog } from "@/components/ui/app-dialog";
 import { AdminField, AdminForm } from "@/components/admin/ui/admin-form";
 import { MAX_FOLDER_NAME_LENGTH, normalizeFolderName } from "@/lib/student-portal/folders";
 
@@ -11,7 +11,7 @@ import { MAX_FOLDER_NAME_LENGTH, normalizeFolderName } from "@/lib/student-porta
  *
  * RATIONALE: native window.prompt/window.confirm can be suppressed by the
  * browser, returning null with no visible feedback — indistinguishable from
- * "feature missing" to admins. These AdminDialog-based replacements give
+ * "feature missing" to admins. These AppDialog-based replacements give
  * inline validation and explicit confirm/cancel affordances. They live in a
  * sibling module so the panel stays focused on the materials view itself.
  *
@@ -86,11 +86,11 @@ export function MaterialsFolderNameDialog({
   }
 
   return (
-    <AdminDialog
+    <AppDialog
       isOpen
       onClose={onClose}
       title={title}
-      size="compact"
+      size="sm"
       footer={
         <>
           <button type="button" className="btn btn-secondary" onClick={onClose} disabled={submitting}>
@@ -125,7 +125,7 @@ export function MaterialsFolderNameDialog({
           </AdminField>
         </AdminForm>
       </form>
-    </AdminDialog>
+    </AppDialog>
   );
 }
 
@@ -146,11 +146,11 @@ export function MaterialsConfirmDialog({
   onClose
 }: MaterialsConfirmDialogProps) {
   return (
-    <AdminDialog
+    <AppDialog
       isOpen
       onClose={onClose}
       title={title}
-      size="compact"
+      size="sm"
       footer={
         <>
           <button type="button" className="btn btn-secondary" onClick={onClose}>
@@ -163,7 +163,7 @@ export function MaterialsConfirmDialog({
       }
     >
       <p className="helper-text">{message}</p>
-    </AdminDialog>
+    </AppDialog>
   );
 }
 
@@ -194,11 +194,11 @@ export function MaterialsMoveDialog({
   onClose
 }: MaterialsMoveDialogProps) {
   return (
-    <AdminDialog
+    <AppDialog
       isOpen
       onClose={onClose}
       title="Move material"
-      size="compact"
+      size="sm"
       description={`Choose a destination folder for "${materialTitle}".`}
       footer={
         <button type="button" className="btn btn-secondary" onClick={onClose}>
@@ -224,6 +224,6 @@ export function MaterialsMoveDialog({
           );
         })}
       </div>
-    </AdminDialog>
+    </AppDialog>
   );
 }

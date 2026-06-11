@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRef, useState } from "react";
 import Papa from "papaparse";
 
-import { AdminDialog } from "@/components/admin/ui/admin-dialog";
+import { AppDialog } from "@/components/ui/app-dialog";
 import { AdminNoticeStack } from "@/components/admin/ui/admin-notice";
 import { useSafeFetch } from "@/lib/admin/use-safe-fetch";
 
@@ -88,12 +88,12 @@ export function ImportCustomersDialog({ open, onOpenChange, onSuccess }: ImportC
   };
 
   return (
-    <AdminDialog
+    <AppDialog
       isOpen={open}
       onClose={closeDialog}
       rootRef={rootRef}
       title="Import Customers"
-      size="compact"
+      size="sm"
       id="import-customers-dialog"
       footer={(
         <div className="dialog-footer-row dialog-footer-row-end">
@@ -132,6 +132,6 @@ export function ImportCustomersDialog({ open, onOpenChange, onSuccess }: ImportC
         </div>
         <p className="helper-text">Large imports may complete with partial success, so row-level failures are reported separately from successful records.</p>
       </div>
-    </AdminDialog>
+    </AppDialog>
   );
 }
