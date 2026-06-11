@@ -670,6 +670,40 @@ async function captureAdmin(page: PW, viewport: ViewportName) {
   await captureUpdateProgressRoute(page, viewport);
 }
 
+/**
+ * Merges this run's records with any existing results.json so a partial
+ * re-run can only improve the gallery, never degrade it: a prior "ok" entry
+ * survives unless the new run also captured that shot successfully (PNGs
+ * already behave this way — screenshots are only written on success, so a
+ * failed re-capture leaves the previous file in place). To rebuild a phase
+ * from scratch, delete its artifacts/gui-sweep/{phase}/ directory first.
+ */
+function mergeWithExistingResults(current: ShotRecord[]): ShotRecord[] {
+  const resultsPath = path.join(outputDir, "results.json");
+  let previous: ShotRecord[] = [];
+  try {
+    previous = JSON.parse(fs.readFileSync(resultsPath, "utf8")) as ShotRecord[];
+  } catch {
+    return current;
+  }
+
+  const merged = new Map<string, ShotRecord>();
+  for (const entry of previous) {
+    merged.set(`${entry.name}|${entry.viewport}`, entry);
+  }
+  for (const entry of current) {
+    const key = `${entry.name}|${entry.viewport}`;
+    const old = merged.get(key);
+    if (old && old.status === "ok" && entry.status !== "ok") {
+      // Keep the prior success (its PNG is still on disk); annotate the miss.
+      merged.set(key, { ...old, note: `kept from earlier run; latest attempt: ${entry.status}` });
+    } else {
+      merged.set(key, entry);
+    }
+  }
+  return [...merged.values()];
+}
+
 function writeGallery() {
   fs.mkdirSync(outputDir, { recursive: true });
 
@@ -686,7 +720,7 @@ function writeGallery() {
     }
   }
 
-  const ordered = [...results].sort((a, b) =>
+  const ordered = mergeWithExistingResults(results).sort((a, b) =>
     a.category === b.category ? a.name.localeCompare(b.name) : a.category.localeCompare(b.category)
   );
 
