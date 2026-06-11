@@ -197,3 +197,30 @@ The recommended action is:
 4. only then test the Prisma `7.7.0` upgrade
 
 This keeps the recovery change narrow and avoids mixing a connection-pool behavior fix with a dependency refresh in the same recovery step.
+
+## Resolution (2026-06-10)
+
+The outage recurred and was root-caused to MySQL 8's `caching_sha2_password`
+auth plugin. After MySQL restarts (e.g. `2026-06-04`), the server-side auth
+cache is flushed; a fresh connection must then complete *full* authentication,
+which over a non-TLS TCP socket requires fetching the server's RSA public key.
+The MariaDB driver will not do this unless `allowPublicKeyRetrieval` is enabled,
+so every pool connection attempt hung until the acquire timeout — surfacing as
+`pool timeout (active=0 idle=0)` and the "Admin service unavailable" page. The
+app could not self-recover because it kept serving HTTP 200 (graceful DB-down
+fallback), so systemd's `Restart=on-failure` never fired.
+
+Changes shipped:
+
+1. **App fix** — `src/lib/prisma-mariadb.ts` now defaults
+   `allowPublicKeyRetrieval=true` in the normalized connection string (callers
+   can still override via `DATABASE_URL`; no effect under SSL/Unix socket). The
+   pool now re-establishes automatically after a database restart.
+2. **Self-healing watchdog** — `deploy/lessonflow-db-watchdog.{sh,service,timer}`
+   (registered in `deploy.sh`) checks the app journal every minute for the
+   DB-failure signature and, only when MySQL is confirmed up, restarts the app
+   to rebuild its pool. Rate-limited; a no-op while healthy and during a real
+   MySQL outage.
+3. **Cron logging fix** — `deploy/bootstrap-host.sh` now creates
+   `/var/log/lessonflow` owned by the runtime user, so the scheduled units stop
+   failing with "Permission denied" on the daily cron log.
