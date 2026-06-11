@@ -42,12 +42,24 @@ export type LearningMaterialRow = {
     title: string;
     description: string | null;
     bookingId: string | null;
+    folderId: string | null;
     materialType: "audio" | "pdf" | "image";
     mimeType: string;
     sizeBytes: number;
     createdAt: string;
     previewUrl?: string;
     downloadUrl?: string;
+};
+
+// One folder in the admin materials tree. `children`/`materialIds` are populated
+// when the API returns the per-customer tree (built via buildFolderTree).
+export type AdminFolderRow = {
+    id: string;
+    parentId: string | null;
+    name: string;
+    sourceBookingId: string | null;
+    children: AdminFolderRow[];
+    materialIds: string[];
 };
 
 export const PHONE_PATTERN = /^\d{10}$/;

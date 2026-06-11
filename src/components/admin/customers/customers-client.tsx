@@ -96,6 +96,8 @@ export function AdminCustomersClient() {
 
   // Materials State (Filtering uploads to specific bookings)
   const [materialsBookingId, setMaterialsBookingId] = useState("");
+  // Currently navigated folder in the materials tree; null = student root.
+  const [currentMaterialsFolderId, setCurrentMaterialsFolderId] = useState<string | null>(null);
 
   const {
     isMounted: isDialogMounted,
@@ -151,12 +153,17 @@ export function AdminCustomersClient() {
   const {
     materials: materialsList,
     bookings: materialsBookings,
+    folders: materialsFolders,
     loading: materialsLoading,
     uploading: materialsUploading,
     deletingId: materialsDeletingId,
     load: loadMaterials,
     upload: uploadMaterialApi,
-    remove: removeMaterialApi
+    remove: removeMaterialApi,
+    createFolder: createMaterialFolderApi,
+    renameFolder: renameMaterialFolderApi,
+    deleteFolder: deleteMaterialFolderApi,
+    moveMaterial: moveMaterialApi
   } = useLearningMaterials({ onAuthError, onError: setError });
 
   const {
@@ -201,6 +208,7 @@ export function AdminCustomersClient() {
     setCustomerForm(nextForm);
     setActiveTab("profile");
     setMaterialsBookingId("");
+    setCurrentMaterialsFolderId(null);
 
     // Eagerly load history if a customer is selected
     if (customer) {
@@ -225,6 +233,7 @@ export function AdminCustomersClient() {
     setIsEditing(false);
     setCustomerForm(emptyCustomerForm());
     setMaterialsBookingId("");
+    setCurrentMaterialsFolderId(null);
     // Clear URL segments to maintain clean routing
     router.replace(customersBasePath, { scroll: false });
   }, [customersBasePath, hideDialog, router]);
@@ -420,6 +429,38 @@ export function AdminCustomersClient() {
   function handleMaterialBookingSelect(bookingId: string) {
     if (!selectedCustomer) return;
     void loadMaterials(selectedCustomer.id, bookingId);
+  }
+
+  async function handleCreateMaterialFolder(name: string, parentId: string | null) {
+    if (!selectedCustomer) return;
+    setError("");
+    const success = await createMaterialFolderApi(selectedCustomer.id, name, parentId);
+    if (success) setNotice("Folder created.");
+  }
+
+  async function handleRenameMaterialFolder(folderId: string, name: string) {
+    if (!selectedCustomer) return;
+    setError("");
+    const success = await renameMaterialFolderApi(selectedCustomer.id, folderId, name);
+    if (success) setNotice("Folder renamed.");
+  }
+
+  async function handleDeleteMaterialFolder(folderId: string) {
+    if (!selectedCustomer) return;
+    setError("");
+    const success = await deleteMaterialFolderApi(selectedCustomer.id, folderId);
+    if (success) {
+      setNotice("Folder deleted. Its contents moved up one level.");
+      // If we were viewing the deleted folder, fall back to root.
+      setCurrentMaterialsFolderId((current) => (current === folderId ? null : current));
+    }
+  }
+
+  async function handleMoveMaterial(materialId: string, folderId: string | null) {
+    if (!selectedCustomer) return;
+    setError("");
+    const success = await moveMaterialApi(selectedCustomer.id, materialId, folderId);
+    if (success) setNotice("Material moved.");
   }
 
   function openCustomerBooking(booking: CustomerBookingHistoryRow) {
@@ -672,6 +713,17 @@ export function AdminCustomersClient() {
           onUploadMaterial={uploadMaterial}
           onDeleteMaterial={(mId) => deleteMaterial(mId)}
           onMaterialBookingSelect={handleMaterialBookingSelect}
+          materialsFolderField={{
+            folders: materialsFolders,
+            currentFolderId: currentMaterialsFolderId,
+            onNavigate: setCurrentMaterialsFolderId
+          }}
+          materialsFolderActions={{
+            onCreateFolder: handleCreateMaterialFolder,
+            onRenameFolder: handleRenameMaterialFolder,
+            onDeleteFolder: handleDeleteMaterialFolder,
+            onMoveMaterial: handleMoveMaterial
+          }}
           canEditAssignment={currentAdmin?.role === "owner"}
           teacherOptions={teacherOptions.map((teacher) => ({ id: teacher.id, displayName: teacher.displayName }))}
           canManagePortalCredentials={canManagePortalCredentials}

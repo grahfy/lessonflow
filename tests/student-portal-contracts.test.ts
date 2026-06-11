@@ -17,6 +17,7 @@ describe("student-portal-contracts", () => {
       materialType: "pdf",
       mimeType: "application/pdf",
       sizeBytes: 2048,
+      folderId: null,
       createdAt: new Date("2026-03-01T10:00:00.000Z")
     });
     expect(material.downloadUrl).toBe("/api/student/learning-materials/mat_1/download");
@@ -28,6 +29,7 @@ describe("student-portal-contracts", () => {
       materialType: "image",
       mimeType: "image/png",
       sizeBytes: 1024,
+      folderId: null,
       createdAt: new Date("2026-03-05T10:00:00.000Z")
     });
     expect(imageMaterial.materialType).toBe("image");
@@ -52,6 +54,7 @@ describe("student-portal-contracts", () => {
           materialType: "pdf",
           mimeType: "application/pdf",
           sizeBytes: 2048,
+          folderId: null,
           createdAt: new Date("2026-03-01T10:00:00.000Z")
         }
       ]
@@ -83,6 +86,7 @@ describe("student-portal-contracts", () => {
       upcoming: [],
       previous: [],
       standaloneMaterials: [],
+      folders: [],
       pendingRequests: []
     });
     expect(payload.student.fullName).toBe("Jamie Student");
@@ -111,6 +115,7 @@ describe("student-portal-contracts", () => {
       ],
       previous: [],
       standaloneMaterials: [],
+      folders: [],
       pendingRequests: []
     });
     // RATIONALE: Upcoming bookings must already be confirmed/cancelled/etc.;

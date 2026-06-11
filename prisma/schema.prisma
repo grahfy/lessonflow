@@ -179,38 +179,38 @@ model ContactSubmission {
 // They remain separate from confirmed Booking rows so rejected/cancelled history
 // can be tracked without polluting the confirmed bookings table.
 model BookingRequest {
-  id                    String               @id @default(cuid())
-  status                BookingRequestStatus @default(pending)
-  firstName             String               @default("")
-  lastName              String               @default("")
+  id                    String                    @id @default(cuid())
+  status                BookingRequestStatus      @default(pending)
+  firstName             String                    @default("")
+  lastName              String                    @default("")
   name                  String
   email                 String
   phone                 String
   address               String
   unitNumber            String?
-  houseNumber           String               @default("")
-  streetName            String               @default("")
-  streetType            String               @default("")
-  suburb                String               @default("")
-  state                 String               @default("")
-  postcode              String               @default("")
+  houseNumber           String                    @default("")
+  streetName            String                    @default("")
+  streetType            String                    @default("")
+  suburb                String                    @default("")
+  state                 String                    @default("")
+  postcode              String                    @default("")
   lessonMode            LessonMode
   skillLevel            SkillLevel
   lessonDuration        LessonDuration
   customDurationMinutes Int?
   requestedStartAt      DateTime
-  notes                 String?               @db.Text
+  notes                 String?                   @db.Text
   notesContent          Json?
-  isRecurring           Boolean              @default(false)
+  isRecurring           Boolean                   @default(false)
   recurrenceEndAt       DateTime?
-  createdAt             DateTime             @default(now())
-  updatedAt             DateTime             @updatedAt
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
   approvedById          String?
-  approvedBy            AdminUser?           @relation("RequestApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedBy            AdminUser?                @relation("RequestApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
   assignedTeacherId     String?
-  assignedTeacher       AdminUser?           @relation("BookingRequestAssignedTeacher", fields: [assignedTeacherId], references: [id], onDelete: SetNull)
+  assignedTeacher       AdminUser?                @relation("BookingRequestAssignedTeacher", fields: [assignedTeacherId], references: [id], onDelete: SetNull)
   customerId            String?
-  customer              Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customer              Customer?                 @relation(fields: [customerId], references: [id], onDelete: SetNull)
   noteImages            BookingRequestNoteImage[]
   bookings              Booking[]
 
@@ -276,21 +276,21 @@ model BookingSeries {
 // Confirmed or cancelled lesson instances shown in admin/student calendar views.
 // A Booking can be linked back to its original request and/or recurring series.
 model Booking {
-  id                    String               @id @default(cuid())
-  status                BookingStatus        @default(approved)
-  firstName             String               @default("")
-  lastName              String               @default("")
+  id                    String                  @id @default(cuid())
+  status                BookingStatus           @default(approved)
+  firstName             String                  @default("")
+  lastName              String                  @default("")
   name                  String
   email                 String
   phone                 String
   address               String
   unitNumber            String?
-  houseNumber           String               @default("")
-  streetName            String               @default("")
-  streetType            String               @default("")
-  suburb                String               @default("")
-  state                 String               @default("")
-  postcode              String               @default("")
+  houseNumber           String                  @default("")
+  streetName            String                  @default("")
+  streetType            String                  @default("")
+  suburb                String                  @default("")
+  state                 String                  @default("")
+  postcode              String                  @default("")
   lessonMode            LessonMode
   skillLevel            SkillLevel
   lessonDuration        LessonDuration
@@ -298,25 +298,26 @@ model Booking {
   startAt               DateTime
   endAt                 DateTime
   timezone              String
-  notes                 String?               @db.Text
+  notes                 String?                 @db.Text
   notesContent          Json?
-  createdAt             DateTime             @default(now())
-  updatedAt             DateTime             @updatedAt
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
   cancelledAt           DateTime?
   requestId             String?
-  request               BookingRequest?      @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  request               BookingRequest?         @relation(fields: [requestId], references: [id], onDelete: SetNull)
   seriesId              String?
-  series                BookingSeries?       @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  series                BookingSeries?          @relation(fields: [seriesId], references: [id], onDelete: SetNull)
   assignedTeacherId     String?
-  assignedTeacher       AdminUser?           @relation("BookingAssignedTeacher", fields: [assignedTeacherId], references: [id], onDelete: SetNull)
+  assignedTeacher       AdminUser?              @relation("BookingAssignedTeacher", fields: [assignedTeacherId], references: [id], onDelete: SetNull)
   customerId            String?
-  customer              Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customer              Customer?               @relation(fields: [customerId], references: [id], onDelete: SetNull)
   modifiedById          String?
-  modifiedBy            AdminUser?           @relation("BookingEdits", fields: [modifiedById], references: [id], onDelete: SetNull)
+  modifiedBy            AdminUser?              @relation("BookingEdits", fields: [modifiedById], references: [id], onDelete: SetNull)
   auditLogs             BookingAuditLog[]
   invoices              Invoice[]
   invoiceLinks          InvoiceBookingLink[]
   learningMaterials     LearningMaterial[]
+  sourceMaterialFolders StudentMaterialFolder[] @relation("FolderSourceBooking")
   lessonPlan            LessonPlan?
   noteImages            BookingNoteImage[]
 
@@ -440,6 +441,7 @@ model Customer {
   portalCredential          CustomerPortalCredential?
   portalCredentialAuditLogs CustomerPortalCredentialAuditLog[]
   learningMaterials         LearningMaterial[]
+  materialFolders           StudentMaterialFolder[]
   inboundEmails             CustomerInboundEmail[]
   homeworkCompletions       HomeworkCompletion[]
   lessonSeries              LessonSeries[]
@@ -527,12 +529,40 @@ model LearningMaterial {
   storageKey      String                   @unique
   mimeType        String
   sizeBytes       Int
+  folderId        String?
+  folder          StudentMaterialFolder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
   createdAt       DateTime                 @default(now())
   updatedAt       DateTime                 @updatedAt
   lessonPlanLinks LessonPlanMaterialLink[]
 
   @@index([customerId, bookingId, createdAt])
   @@index([bookingId, createdAt])
+  @@index([customerId, folderId, createdAt])
+}
+
+// Per-student tree of folders that organize LearningMaterial rows. A folder is
+// the primary organizing axis (bookingId is retained but demoted to metadata).
+// `parentId` is a self-FK for arbitrary-depth nesting; `folderId` on a material
+// is logical metadata only — `storageKey` (physical layout) never mirrors it.
+// `sourceBookingId` is migration provenance set ONLY by the backfill script and
+// keys its idempotent upsert; it is never set by a user action.
+model StudentMaterialFolder {
+  id              String                  @id @default(cuid())
+  customerId      String
+  customer        Customer                @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  parentId        String?
+  parent          StudentMaterialFolder?  @relation("FolderParent", fields: [parentId], references: [id], onDelete: Cascade)
+  children        StudentMaterialFolder[] @relation("FolderParent")
+  name            String
+  sourceBookingId String?
+  sourceBooking   Booking?                @relation("FolderSourceBooking", fields: [sourceBookingId], references: [id], onDelete: SetNull)
+  materials       LearningMaterial[]
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  @@unique([customerId, sourceBookingId])
+  @@index([customerId, parentId])
+  @@index([sourceBookingId])
 }
 
 // Reusable structured lesson-plan templates that staff can apply to a booking
@@ -575,31 +605,31 @@ model LessonPlanTemplate {
 // V2: `sections` holds an array of TipTap-JSON section objects. Legacy text
 // fields are retained during the migration window and dropped in cleanup.
 model LessonPlan {
-  id                String                   @id @default(cuid())
-  bookingId         String                   @unique
-  booking           Booking                  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  sourceTemplateId  String?
-  sourceTemplate    LessonPlanTemplate?      @relation(fields: [sourceTemplateId], references: [id], onDelete: SetNull)
-  status            LessonPlanStatus         @default(draft)
-  sections          Json?
-  quickCaptureNotes String?                  @db.Text
-  seriesId          String?
-  series            LessonSeries?            @relation(fields: [seriesId], references: [id], onDelete: SetNull)
-  seriesSequence    Int?
+  id                  String                   @id @default(cuid())
+  bookingId           String                   @unique
+  booking             Booking                  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  sourceTemplateId    String?
+  sourceTemplate      LessonPlanTemplate?      @relation(fields: [sourceTemplateId], references: [id], onDelete: SetNull)
+  status              LessonPlanStatus         @default(draft)
+  sections            Json?
+  quickCaptureNotes   String?                  @db.Text
+  seriesId            String?
+  series              LessonSeries?            @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  seriesSequence      Int?
   // Legacy fixed-text fields – kept during migration, removed in cleanup.
-  lessonFocus       String                   @db.Text
-  goals             String                   @db.Text
-  activities        String                   @db.Text
-  homework          String                   @db.Text
-  sharedNotes       String                   @db.Text
-  privateNotes      String                   @db.Text
-  createdById       String
-  createdBy         AdminUser                @relation("LessonPlanCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
-  updatedById       String?
-  updatedBy         AdminUser?               @relation("LessonPlanUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
-  createdAt         DateTime                 @default(now())
-  updatedAt         DateTime                 @updatedAt
-  materialLinks     LessonPlanMaterialLink[]
+  lessonFocus         String                   @db.Text
+  goals               String                   @db.Text
+  activities          String                   @db.Text
+  homework            String                   @db.Text
+  sharedNotes         String                   @db.Text
+  privateNotes        String                   @db.Text
+  createdById         String
+  createdBy           AdminUser                @relation("LessonPlanCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  updatedById         String?
+  updatedBy           AdminUser?               @relation("LessonPlanUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  materialLinks       LessonPlanMaterialLink[]
   homeworkCompletions HomeworkCompletion[]
 
   @@index([sourceTemplateId])
@@ -644,19 +674,19 @@ model HomeworkCompletion {
 // Multi-lesson curriculum assigned to a student, optionally based on a series
 // template. Tracks overall progress through the ordered lesson plans.
 model LessonSeries {
-  id               String              @id @default(cuid())
+  id               String                @id @default(cuid())
   title            String
-  description      String?             @db.Text
+  description      String?               @db.Text
   customerId       String?
-  customer         Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customer         Customer?             @relation(fields: [customerId], references: [id], onDelete: SetNull)
   teacherId        String?
-  teacher          AdminUser?          @relation("LessonSeriesTeacher", fields: [teacherId], references: [id], onDelete: SetNull)
+  teacher          AdminUser?            @relation("LessonSeriesTeacher", fields: [teacherId], references: [id], onDelete: SetNull)
   totalLessons     Int
-  status           LessonSeriesStatus  @default(active)
+  status           LessonSeriesStatus    @default(active)
   sourceTemplateId String?
   sourceTemplate   LessonSeriesTemplate? @relation(fields: [sourceTemplateId], references: [id], onDelete: SetNull)
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
   lessonPlans      LessonPlan[]
 
   @@index([customerId, status])
@@ -687,14 +717,14 @@ model LessonSeriesTemplate {
 // One step in a series template, linking to an optional lesson plan template
 // and carrying sequence metadata.
 model LessonSeriesTemplateStep {
-  id                   String                @id @default(cuid())
+  id                   String               @id @default(cuid())
   seriesTemplateId     String
-  seriesTemplate       LessonSeriesTemplate  @relation(fields: [seriesTemplateId], references: [id], onDelete: Cascade)
+  seriesTemplate       LessonSeriesTemplate @relation(fields: [seriesTemplateId], references: [id], onDelete: Cascade)
   lessonPlanTemplateId String?
-  lessonPlanTemplate   LessonPlanTemplate?   @relation(fields: [lessonPlanTemplateId], references: [id], onDelete: SetNull)
+  lessonPlanTemplate   LessonPlanTemplate?  @relation(fields: [lessonPlanTemplateId], references: [id], onDelete: SetNull)
   sequenceNumber       Int
   title                String?
-  notes                String?               @db.Text
+  notes                String?              @db.Text
 
   @@unique([seriesTemplateId, sequenceNumber])
   @@index([lessonPlanTemplateId])
@@ -736,56 +766,56 @@ model StorageCleanupTask {
 // denormalized onto the record so documents remain historically accurate even if
 // the linked customer profile changes later.
 model Invoice {
-  id                 String               @id @default(cuid())
-  invoiceNumber      String               @unique
-  status             InvoiceStatus        @default(draft)
-  documentType       InvoiceDocumentType  @default(invoice)
-  taxMode            InvoiceTaxMode       @default(taxable)
-  discountKind       InvoiceDiscountKind?
-  discountValue      Int?
-  discountCents      Int                  @default(0)
-  currency           String               @default("AUD")
-  customerId         String?
-  customer           Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  bookingId          String?
-  booking            Booking?             @relation(fields: [bookingId], references: [id], onDelete: SetNull)
-  originalInvoiceId  String?
-  originalInvoice    Invoice?             @relation("InvoiceCreditNotes", fields: [originalInvoiceId], references: [id], onDelete: SetNull)
-  creditNotes        Invoice[]            @relation("InvoiceCreditNotes")
-  customerFirstName  String               @default("")
-  customerLastName   String               @default("")
-  customerName       String
-  customerEmail      String
-  customerPhone      String
-  customerAddress    String
-  sellerBusinessName String
-  sellerAbn          String
-  sellerEmail        String?
-  bankName           String
-  bankBsb            String
-  bankAccountName    String
-  bankAccountNumber  String
+  id                   String                      @id @default(cuid())
+  invoiceNumber        String                      @unique
+  status               InvoiceStatus               @default(draft)
+  documentType         InvoiceDocumentType         @default(invoice)
+  taxMode              InvoiceTaxMode              @default(taxable)
+  discountKind         InvoiceDiscountKind?
+  discountValue        Int?
+  discountCents        Int                         @default(0)
+  currency             String                      @default("AUD")
+  customerId           String?
+  customer             Customer?                   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  bookingId            String?
+  booking              Booking?                    @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  originalInvoiceId    String?
+  originalInvoice      Invoice?                    @relation("InvoiceCreditNotes", fields: [originalInvoiceId], references: [id], onDelete: SetNull)
+  creditNotes          Invoice[]                   @relation("InvoiceCreditNotes")
+  customerFirstName    String                      @default("")
+  customerLastName     String                      @default("")
+  customerName         String
+  customerEmail        String
+  customerPhone        String
+  customerAddress      String
+  sellerBusinessName   String
+  sellerAbn            String
+  sellerEmail          String?
+  bankName             String
+  bankBsb              String
+  bankAccountName      String
+  bankAccountNumber    String
   paymentDetailsSource InvoicePaymentDetailsSource @default(system)
-  subtotalCents      Int
-  gstCents           Int
-  totalCents         Int
-  notes              String?                 @db.Text
-  issuedAt           DateTime
-  dueAt              DateTime
-  sentAt             DateTime?
-  paidAt             DateTime?
-  lastReminderSentAt DateTime?
-  lastReminderStage  Int?
-  isDeleted          Boolean              @default(false)
-  createdById        String?
-  createdBy          AdminUser?           @relation("InvoiceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedById        String?
-  updatedBy          AdminUser?           @relation("InvoiceUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  lineItems          InvoiceLineItem[]
-  bookingLinks       InvoiceBookingLink[]
-  auditLogs          InvoiceAuditLog[]
+  subtotalCents        Int
+  gstCents             Int
+  totalCents           Int
+  notes                String?                     @db.Text
+  issuedAt             DateTime
+  dueAt                DateTime
+  sentAt               DateTime?
+  paidAt               DateTime?
+  lastReminderSentAt   DateTime?
+  lastReminderStage    Int?
+  isDeleted            Boolean                     @default(false)
+  createdById          String?
+  createdBy            AdminUser?                  @relation("InvoiceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById          String?
+  updatedBy            AdminUser?                  @relation("InvoiceUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+  lineItems            InvoiceLineItem[]
+  bookingLinks         InvoiceBookingLink[]
+  auditLogs            InvoiceAuditLog[]
 
   @@index([status, isDeleted, dueAt])
   @@index([documentType, createdAt])
@@ -1053,10 +1083,10 @@ model SystemLog {
 // Raw events are retained for 90 days then purged by the analytics-purge cron job.
 model PageView {
   id         String   @id @default(cuid())
-  path       String   // e.g. "/lessons", "/book"
-  referrer   String?  // referrer domain only, e.g. "google.com"
-  country    String?  // ISO 3166-1 alpha-2, e.g. "AU"
-  deviceType String   // "desktop", "mobile", "tablet"
+  path       String // e.g. "/lessons", "/book"
+  referrer   String? // referrer domain only, e.g. "google.com"
+  country    String? // ISO 3166-1 alpha-2, e.g. "AU"
+  deviceType String // "desktop", "mobile", "tablet"
   createdAt  DateTime @default(now())
 
   @@index([createdAt])

@@ -6,6 +6,7 @@ import { CustomerProfileDialog, type CustomerForm, type CustomerRow } from "./cu
 import { CustomerEmailDialog } from "./customer-email-dialog";
 import { CustomerBookingHistoryDialog } from "./customer-booking-history-dialog";
 import { CustomerMaterialsDialog } from "./customer-materials-dialog";
+import { type MaterialsFolderActions, type MaterialsFolderField } from "@/components/admin/ui/admin-materials-panel";
 import { type EmailRecord, type SendEmailResult } from "@/lib/admin/use-email-history";
 import { type CustomerBookingHistoryRow, type LearningMaterialBooking, type LearningMaterialRow } from "@/lib/admin/types";
 
@@ -74,6 +75,8 @@ type Props = {
     onUploadMaterial: (captcha?: { captchaToken: string; captchaAnswer: string }) => void;
     onDeleteMaterial: (id: string) => void;
     onMaterialBookingSelect: (bookingId: string) => void;
+    materialsFolderField?: MaterialsFolderField;
+    materialsFolderActions?: MaterialsFolderActions;
 };
 
 /**
@@ -202,6 +205,8 @@ export function CustomerDialogWrapper({
                         onUpload={rest.onUploadMaterial}
                         onDelete={rest.onDeleteMaterial}
                         onBookingSelect={rest.onMaterialBookingSelect}
+                        folderField={rest.materialsFolderField}
+                        folderActions={rest.materialsFolderActions}
                     />
                 )}
             </div>
