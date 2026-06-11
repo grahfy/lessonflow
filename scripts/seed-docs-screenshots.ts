@@ -780,6 +780,17 @@ async function seed() {
       }
     });
 
+    // Customer-addressed email so the customer dialog's Communication tab has
+    // a history entry (drives the email-viewer dialog in screenshot sweeps).
+    await prisma.outboundEmail.create({
+      data: {
+        toEmail: customer1.email,
+        subject: "Lesson reminder — Tuesday 4:00pm",
+        htmlBody: "<p>Hi Alex, just a reminder about your lesson this Tuesday at 4:00pm. See you then!</p>",
+        status: "sent"
+      }
+    });
+
     fs.writeFileSync(
       checklistPath,
       `# Screenshot Seed Checklist\n\nLast seeded: ${new Date().toISOString()}\n\n## Demo Credentials\n- Admin email: \`${adminEmail}\`\n- Admin password: \`${adminPassword}\`\n- Student login name: \`${customer1.fullName}\`\n- Student postcode: \`${customer1.postcode}\`\n- Student password: \`${studentPassword}\`\n\n## Dataset Summary\n- Staff accounts: 2 (owner + teacher)\n- Customers: 2\n- Booking requests: 4 (pending/approved/rejected/cancelled)\n- Bookings: 5 (approved + cancelled, cross-period)\n- Invoices: 5 (draft/sent/paid + comparisons)\n- Lesson pricing rows: 3 (30 / 60 / 120 minutes)\n- Learning materials: 2 (booking-linked + general)\n`,
