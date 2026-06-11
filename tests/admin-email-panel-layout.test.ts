@@ -219,8 +219,7 @@ describe("admin-email-panel-layout", () => {
         materialsDeletingId: null,
         materialsUploadFormRef: rootRef,
         onUploadMaterial: noop,
-        onDeleteMaterial: noop,
-        onMaterialBookingSelect: noop
+        onDeleteMaterial: noop
       })
     );
 
@@ -291,8 +290,7 @@ describe("admin-email-panel-layout", () => {
         materialsDeletingId: null,
         materialsUploadFormRef: rootRef,
         onUploadMaterial: noop,
-        onDeleteMaterial: noop,
-        onMaterialBookingSelect: noop
+        onDeleteMaterial: noop
       })
     );
 

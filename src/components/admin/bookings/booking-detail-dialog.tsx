@@ -29,6 +29,10 @@ import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AdminDialog } from "@/components/admin/ui/admin-dialog";
 import { AdminEmailPanel } from "@/components/admin/ui/admin-email-panel";
 import { AdminField, AdminForm } from "@/components/admin/ui/admin-form";
+import {
+  type MaterialsFolderActions,
+  type MaterialsFolderField
+} from "@/components/admin/ui/admin-materials-panel";
 import { AdminTabBar } from "@/components/admin/ui/admin-tab-bar";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { STREET_TYPES } from "@/lib/admin/constants";
@@ -36,7 +40,7 @@ import { getEmailSourceLabel } from "@/lib/admin/email-history";
 import { formatDateTime } from "@/lib/admin/formatters";
 import { type BookingEvent } from "@/lib/admin/use-bookings";
 import { type EmailRecord, type SendEmailResult } from "@/lib/admin/use-email-history";
-import { AU_STATES, type LearningMaterialRow } from "@/lib/admin/types";
+import { AU_STATES, type LearningMaterialBooking, type LearningMaterialRow } from "@/lib/admin/types";
 import { toAuState } from "@/lib/admin/utils";
 import { AddressAutocomplete } from "@/components/admin/ui/address-autocomplete";
 import type {
@@ -114,6 +118,13 @@ interface BookingDetailDialogProps {
     onUpload: (captcha?: { captchaToken: string; captchaAnswer: string }) => void;
     onDelete: (id: string) => void;
     uploadFormRef: RefObject<HTMLFormElement | null>;
+    bookingField?: {
+      bookingId: string;
+      bookings: LearningMaterialBooking[];
+      onChange: (bookingId: string) => void;
+    };
+    folderField?: MaterialsFolderField;
+    folderActions?: MaterialsFolderActions;
   };
   lessonPlanDialogProps: {
     lessonPlan: LessonPlanV2State | null;
@@ -573,6 +584,9 @@ export function BookingDetailDialog({
                 uploadFormRef={materialsDialogProps.uploadFormRef}
                 onUpload={materialsDialogProps.onUpload}
                 onDelete={materialsDialogProps.onDelete}
+                bookingField={materialsDialogProps.bookingField}
+                folderField={materialsDialogProps.folderField}
+                folderActions={materialsDialogProps.folderActions}
               />
             </>
         ) : activeTab === 'lesson-plan' ? (

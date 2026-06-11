@@ -1,7 +1,11 @@
 import { type RefObject } from "react";
 
-import { AdminMaterialsPanel } from "@/components/admin/ui/admin-materials-panel";
-import { type LearningMaterialRow } from "@/lib/admin/types";
+import {
+  AdminMaterialsPanel,
+  type MaterialsFolderActions,
+  type MaterialsFolderField
+} from "@/components/admin/ui/admin-materials-panel";
+import { type LearningMaterialBooking, type LearningMaterialRow } from "@/lib/admin/types";
 
 type Props = {
   materialsLoading: boolean;
@@ -11,6 +15,13 @@ type Props = {
   uploadFormRef: RefObject<HTMLFormElement | null>;
   onUpload: (captcha?: { captchaToken: string; captchaAnswer: string }) => void;
   onDelete: (id: string) => void;
+  bookingField?: {
+    bookingId: string;
+    bookings: LearningMaterialBooking[];
+    onChange: (bookingId: string) => void;
+  };
+  folderField?: MaterialsFolderField;
+  folderActions?: MaterialsFolderActions;
 };
 
 export function BookingMaterialsDialog({
@@ -20,7 +31,10 @@ export function BookingMaterialsDialog({
   materialsDeletingId,
   uploadFormRef,
   onUpload,
-  onDelete
+  onDelete,
+  bookingField,
+  folderField,
+  folderActions
 }: Props) {
   return (
     <div className="dialog-layout customer-tab-panel booking-materials-panel">
@@ -32,6 +46,9 @@ export function BookingMaterialsDialog({
         uploadFormRef={uploadFormRef}
         onUpload={onUpload}
         onDelete={onDelete}
+        bookingField={bookingField}
+        folderField={folderField}
+        folderActions={folderActions}
       />
     </div>
   );
