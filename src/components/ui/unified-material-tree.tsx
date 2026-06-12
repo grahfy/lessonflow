@@ -549,8 +549,6 @@ export function UnifiedMaterialTree({
       <div className={styles.treeViewport}>
         {!hasRootContents && searchQuery ? (
           <p className={styles.emptyState}>No matches found for &quot;{searchQuery}&quot;</p>
-        ) : !hasRootContents ? (
-          <p className={styles.emptyState}>No materials or folders here.</p>
         ) : (
           <div className={styles.nodeWrapper}>
             {/* Synthetic Root Folder Node */}
