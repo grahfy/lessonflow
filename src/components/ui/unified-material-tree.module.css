@@ -1,0 +1,320 @@
+.treeContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  position: relative;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 8px 12px;
+  padding-left: 34px;
+  font-size: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ink-0);
+  outline: none;
+  transition: border-color var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out);
+}
+
+.searchInput:focus {
+  border-color: var(--brand-0);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ink-2);
+  pointer-events: none;
+  width: 14px;
+  height: 14px;
+}
+
+.treeHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 4px;
+}
+
+.treeTitle {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink-1);
+}
+
+.treeToolbar {
+  display: flex;
+  gap: 8px;
+}
+
+.toolbarBtn {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink-1);
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all var(--motion-fast) var(--ease-out);
+}
+
+.toolbarBtn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink-0);
+  border-color: var(--ink-2);
+}
+
+.treeViewport {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(10, 14, 34, 0.3);
+  max-height: 480px;
+  overflow-y: auto;
+  position: relative;
+}
+
+.emptyState {
+  padding: 24px 0;
+  text-align: center;
+  color: var(--ink-2);
+  font-size: 0.85rem;
+}
+
+/* Recursive node classes */
+.nodeWrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.nodeRow {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+  transition: background-color var(--motion-fast) var(--ease-out);
+  user-select: none;
+  gap: 8px;
+}
+
+.nodeRow:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.activeFolder {
+  background: rgba(107, 140, 255, 0.08) !important;
+  border-left: 3px solid var(--brand-0);
+  padding-left: 5px !important; /* adjust for border */
+}
+
+.activeFile {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.chevronContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--ink-2);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color var(--motion-fast);
+}
+
+.chevronContainer:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink-0);
+}
+
+.nodeIcon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.folderIcon {
+  color: var(--brand-0);
+}
+
+.fileIcon {
+  color: var(--ink-2);
+}
+
+.audioIcon {
+  color: #ff9d5c;
+}
+
+.pdfIcon {
+  color: #ff6b6b;
+}
+
+.imageIcon {
+  color: #4cd964;
+}
+
+.nodeContent {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.nodeTitle {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--ink-0);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nodeMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: var(--ink-2);
+  margin-top: 1px;
+}
+
+.metaDivider {
+  color: var(--line);
+}
+
+.bookingChip {
+  background: rgba(143, 112, 255, 0.14);
+  color: #cbb8ff;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Hover Actions UI */
+.nodeActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+
+.nodeRow:hover .nodeActions,
+.nodeRow:focus-within .nodeActions {
+  opacity: 1;
+}
+
+.actionBtn {
+  background: transparent;
+  border: none;
+  color: var(--ink-2);
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--motion-fast) var(--ease-out);
+}
+
+.actionBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink-0);
+}
+
+.actionBtnDanger:hover {
+  background: rgba(248, 113, 113, 0.15);
+  color: var(--red);
+}
+
+/* Indented connection lines for nested elements */
+.childrenContainer {
+  margin-left: 16px;
+  padding-left: 8px;
+  border-left: 1px dashed var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+  margin-bottom: 2px;
+}
+
+/* Inline Preview styling */
+.previewContainer {
+  margin-top: 4px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: slideDown var(--motion-fast) var(--ease-out);
+}
+
+.previewDescription {
+  font-size: 0.78rem;
+  color: var(--ink-1);
+  line-height: 1.4;
+}
+
+.previewPlayer {
+  width: 100%;
+  height: 32px;
+  margin-top: 4px;
+}
+
+.previewImage {
+  max-width: 100%;
+  max-height: 160px;
+  object-fit: contain;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  margin-top: 4px;
+}
+
+.previewDocInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--ink-1);
+}
+
+.previewActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
