@@ -1,4 +1,4 @@
-import { RefObject, useRef, useEffect } from "react";
+import { RefObject, useRef, useEffect, useLayoutEffect } from "react";
 import gsap from "gsap";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { AdminNoticeStack } from "@/components/admin/ui/admin-notice";
@@ -95,7 +95,9 @@ export function CustomerDialogWrapper({
 }: Props) {
     const tabContentRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
+    const useSafeLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+    useSafeLayoutEffect(() => {
         if (tabContentRef.current) {
             gsap.killTweensOf(tabContentRef.current);
             gsap.fromTo(
