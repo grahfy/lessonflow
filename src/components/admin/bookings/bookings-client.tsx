@@ -266,7 +266,11 @@ export function AdminBookingsClient() {
     createFolder: createMaterialFolderApi,
     renameFolder: renameMaterialFolderApi,
     deleteFolder: deleteMaterialFolderApi,
-    moveMaterial: moveMaterialApi
+    moveFolder: moveFolderApi,
+    copyFolder: copyFolderApi,
+    moveMaterial: moveMaterialApi,
+    renameMaterial: renameMaterialApi,
+    copyMaterial: copyMaterialApi
   } = useLearningMaterials({ onAuthError, onError: setError });
   const { templates: lessonPlanTemplates, loading: lessonPlanTemplatesLoading, load: loadLessonPlanTemplates } = useLessonPlanTemplates({ onAuthError, onError: setError });
   const {
@@ -959,6 +963,42 @@ export function AdminBookingsClient() {
     return success;
   }
 
+  async function handleMoveFolder(folderId: string, parentId: string | null) {
+    const event = events.find(e => e.id === selectedKey);
+    if (!event?.row.customerId) return false;
+    setError("");
+    const success = await moveFolderApi(event.row.customerId, folderId, parentId);
+    if (success) setNotice("Folder moved.");
+    return success;
+  }
+
+  async function handleCopyFolder(folderId: string, parentId: string | null) {
+    const event = events.find(e => e.id === selectedKey);
+    if (!event?.row.customerId) return false;
+    setError("");
+    const success = await copyFolderApi(event.row.customerId, folderId, parentId);
+    if (success) setNotice("Folder copied.");
+    return success;
+  }
+
+  async function handleRenameMaterial(materialId: string, title: string, description: string | null) {
+    const event = events.find(e => e.id === selectedKey);
+    if (!event?.row.customerId) return false;
+    setError("");
+    const success = await renameMaterialApi(event.row.customerId, materialId, title, description);
+    if (success) setNotice("Material updated.");
+    return success;
+  }
+
+  async function handleCopyMaterial(materialId: string, folderId: string | null) {
+    const event = events.find(e => e.id === selectedKey);
+    if (!event?.row.customerId) return false;
+    setError("");
+    const success = await copyMaterialApi(event.row.customerId, materialId, folderId);
+    if (success) setNotice("Material copied.");
+    return success;
+  }
+
   function createScratchLessonPlanDraft() {
     setLessonPlanDraft({
       sections: buildDefaultLessonPlanSections(),
@@ -1393,7 +1433,11 @@ export function AdminBookingsClient() {
               onCreateFolder: handleCreateMaterialFolder,
               onRenameFolder: handleRenameMaterialFolder,
               onDeleteFolder: handleDeleteMaterialFolder,
-              onMoveMaterial: handleMoveMaterial
+              onMoveFolder: handleMoveFolder,
+              onCopyFolder: handleCopyFolder,
+              onMoveMaterial: handleMoveMaterial,
+              onRenameMaterial: handleRenameMaterial,
+              onCopyMaterial: handleCopyMaterial
             }
           }}
           lessonPlanDialogProps={{

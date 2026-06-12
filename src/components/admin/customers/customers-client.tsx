@@ -163,7 +163,11 @@ export function AdminCustomersClient() {
     createFolder: createMaterialFolderApi,
     renameFolder: renameMaterialFolderApi,
     deleteFolder: deleteMaterialFolderApi,
-    moveMaterial: moveMaterialApi
+    moveFolder: moveFolderApi,
+    copyFolder: copyFolderApi,
+    moveMaterial: moveMaterialApi,
+    renameMaterial: renameMaterialApi,
+    copyMaterial: copyMaterialApi
   } = useLearningMaterials({ onAuthError, onError: setError });
 
   const {
@@ -463,6 +467,38 @@ export function AdminCustomersClient() {
     return success;
   }
 
+  async function handleMoveFolder(folderId: string, parentId: string | null) {
+    if (!selectedCustomer) return false;
+    setError("");
+    const success = await moveFolderApi(selectedCustomer.id, folderId, parentId);
+    if (success) setNotice("Folder moved.");
+    return success;
+  }
+
+  async function handleCopyFolder(folderId: string, parentId: string | null) {
+    if (!selectedCustomer) return false;
+    setError("");
+    const success = await copyFolderApi(selectedCustomer.id, folderId, parentId);
+    if (success) setNotice("Folder copied.");
+    return success;
+  }
+
+  async function handleRenameMaterial(materialId: string, title: string, description: string | null) {
+    if (!selectedCustomer) return false;
+    setError("");
+    const success = await renameMaterialApi(selectedCustomer.id, materialId, title, description);
+    if (success) setNotice("Material updated.");
+    return success;
+  }
+
+  async function handleCopyMaterial(materialId: string, folderId: string | null) {
+    if (!selectedCustomer) return false;
+    setError("");
+    const success = await copyMaterialApi(selectedCustomer.id, materialId, folderId);
+    if (success) setNotice("Material copied.");
+    return success;
+  }
+
   function openCustomerBooking(booking: CustomerBookingHistoryRow) {
     const bookingDate = toDateKey(booking.startAt);
     void beginExitTransition(null, 0, () =>
@@ -717,11 +753,15 @@ export function AdminCustomersClient() {
             currentFolderId: currentMaterialsFolderId,
             onNavigate: setCurrentMaterialsFolderId
           }}
-          materialsFolderActions={{
+           materialsFolderActions={{
             onCreateFolder: handleCreateMaterialFolder,
             onRenameFolder: handleRenameMaterialFolder,
             onDeleteFolder: handleDeleteMaterialFolder,
-            onMoveMaterial: handleMoveMaterial
+            onMoveFolder: handleMoveFolder,
+            onCopyFolder: handleCopyFolder,
+            onMoveMaterial: handleMoveMaterial,
+            onRenameMaterial: handleRenameMaterial,
+            onCopyMaterial: handleCopyMaterial
           }}
           canEditAssignment={currentAdmin?.role === "owner"}
           teacherOptions={teacherOptions.map((teacher) => ({ id: teacher.id, displayName: teacher.displayName }))}

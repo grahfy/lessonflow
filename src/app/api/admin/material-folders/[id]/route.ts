@@ -7,6 +7,8 @@ import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
 import {
   assertUniqueSiblingName,
+  assertNoCycle,
+  assertSameCustomerFolder,
   FolderValidationError
 } from "@/lib/student-portal/folders";
 
@@ -16,12 +18,13 @@ type Params = {
   }>;
 };
 
-const renameFolderSchema = z.object({
-  name: z.string().min(1).max(255)
+const updateFolderSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  parentId: z.string().trim().min(1).nullable().optional()
 });
 
 /**
- * Renames a folder, re-checking sibling-name uniqueness (excluding itself).
+ * Updates a folder's name and/or moves it to another parent folder.
  */
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
@@ -50,22 +53,40 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const parsed = renameFolderSchema.safeParse(await request.json().catch(() => null));
+    const parsed = updateFolderSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid folder details.", details: parsed.error.flatten() }, { status: 400 });
     }
 
-    const siblings = await prisma.studentMaterialFolder.findMany({
-      where: {
-        customerId: folder.customerId,
-        parentId: folder.parentId
+    const targetParentId = parsed.data.parentId !== undefined ? parsed.data.parentId : folder.parentId;
+    const targetName = parsed.data.name !== undefined ? parsed.data.name : folder.name;
+
+    // Validate the destination parent folder belongs to the same customer (INV-3)
+    if (parsed.data.parentId !== undefined && targetParentId !== null) {
+      const parentFolder = await prisma.studentMaterialFolder.findUnique({
+        where: { id: targetParentId }
+      });
+      if (!parentFolder) {
+        return NextResponse.json({ error: "Target parent folder not found." }, { status: 400 });
       }
+      assertSameCustomerFolder(folder.customerId, parentFolder);
+    }
+
+    const allFolders = await prisma.studentMaterialFolder.findMany({
+      where: { customerId: folder.customerId }
     });
 
+    // Enforce cycle check if parentId is changing (INV-2)
+    if (parsed.data.parentId !== undefined) {
+      assertNoCycle(folder.id, targetParentId, allFolders);
+    }
+
+    // Enforce unique sibling name check
+    const siblings = allFolders.filter((f) => f.parentId === targetParentId);
     const name = assertUniqueSiblingName({
-      name: parsed.data.name,
+      name: targetName,
       customerId: folder.customerId,
-      parentId: folder.parentId,
+      parentId: targetParentId,
       siblings,
       excludeId: folder.id
     });
@@ -75,7 +96,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         id: folder.id
       },
       data: {
-        name
+        name,
+        parentId: targetParentId
       }
     });
 
@@ -91,7 +113,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (error instanceof FolderValidationError) {
       return NextResponse.json({ error: error.message, code: error.code }, { status: 400 });
     }
-    return jsonUnexpectedError(error, "Unable to rename material folder.");
+    return jsonUnexpectedError(error, "Unable to update material folder.");
   }
 }
 

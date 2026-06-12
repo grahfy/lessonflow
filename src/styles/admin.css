@@ -131,7 +131,7 @@
 .manual-booking-scroll {
   max-height: min(64vh, 680px);
   overflow-y: auto;
-  padding-right: 4px;
+  padding: 0 4px 16px 0;
 }
 
 .manual-booking-scroll.is-hidden {
@@ -2603,14 +2603,16 @@
   justify-content: flex-start;
 }
 
-.admin-shell.admin-shell-reports {
+.admin-shell.admin-shell-reports,
+.admin-shell.admin-shell-analytics {
   height: auto;
   max-height: none;
   min-height: 100dvh;
   overflow: visible;
 }
 
-.admin-shell.admin-shell-reports .admin-shell-content {
+.admin-shell.admin-shell-reports .admin-shell-content,
+.admin-shell.admin-shell-analytics .admin-shell-content {
   overflow: visible;
 }
 
@@ -3718,16 +3720,22 @@
 }
 
 .admin-header-nav-primary {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 10px;
-  align-items: center;
-  justify-content: center;
+  width: 100%;
+  max-width: 280px;
+  margin: 0 auto;
+}
+
+.admin-header-nav-primary .admin-header-nav-button:last-child:nth-child(odd) {
+  grid-column: span 2;
 }
 
 .admin-header-nav-button {
   position: relative;
   min-height: 34px;
+  width: 100%;
   overflow: visible;
   transform: translateY(0);
   transform-style: preserve-3d;

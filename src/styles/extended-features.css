@@ -523,6 +523,10 @@
     width: 100%;
   }
 
+  .admin-header-nav-primary .admin-header-nav-button:last-child:nth-child(odd) {
+    grid-column: auto;
+  }
+
   .admin-header-nav-actions {
     padding: 10px 0 0;
     border-top: 1px solid rgba(148, 163, 184, 0.12);
@@ -618,6 +622,10 @@
     grid-template-columns: 1fr;
     gap: 8px;
     width: 100%;
+  }
+
+  .admin-header-nav-primary .admin-header-nav-button:last-child:nth-child(odd) {
+    grid-column: auto;
   }
 
   .admin-header-nav-actions {
@@ -3457,6 +3465,10 @@
      distributes negative free space into overlapping rows. */
   align-content: start;
   gap: 20px;
+}
+
+.admin-shell.admin-shell-analytics .analytics-layout-content {
+  overflow: visible;
 }
 
 /* --- Shared card base --- */

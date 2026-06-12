@@ -118,15 +118,15 @@ export function ManualBookingDialog({
       title="Add Manual Booking"
       size="lg"
       footer={
-        <div className="manual-dialog-footer">
-          <div>
+        <div className="dialog-footer-row">
+          <div className="dialog-footer-left">
             {step !== 'customer' && (
               <Tooltip content="Return to the previous step.">
                 <button className="btn btn-secondary" onClick={() => setStep(MANUAL_STEP_ORDER[stepIndex - 1])}>Back</button>
               </Tooltip>
             )}
           </div>
-          <div className="manual-dialog-footer-right">
+          <div className="dialog-footer-right">
             <Tooltip content="Close this dialog without saving.">
               <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
             </Tooltip>

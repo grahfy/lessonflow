@@ -16,7 +16,8 @@ import {
   ArrowRightLeft,
   Download,
   Eye,
-  Search
+  Search,
+  Copy
 } from "lucide-react";
 
 import { Tooltip } from "@/components/admin/ui/tooltip";
@@ -57,7 +58,11 @@ interface UnifiedMaterialTreeProps {
   onCreateFolder?: (name: string, parentId: string | null) => void;
   onRenameFolder?: (folder: TreeFolder) => void;
   onDeleteFolder?: (folder: TreeFolder) => void;
+  onMoveFolder?: (folder: TreeFolder) => void;
+  onCopyFolder?: (folder: TreeFolder) => void;
   onMoveMaterial?: (material: TreeFile) => void;
+  onRenameMaterial?: (material: TreeFile) => void;
+  onCopyMaterial?: (material: TreeFile) => void;
 }
 
 /** Recursively checks if a folder or any of its children match the search query. */
@@ -107,7 +112,11 @@ export function UnifiedMaterialTree({
   onCreateFolder,
   onRenameFolder,
   onDeleteFolder,
-  onMoveMaterial
+  onMoveFolder,
+  onCopyFolder,
+  onMoveMaterial,
+  onRenameMaterial,
+  onCopyMaterial
 }: UnifiedMaterialTreeProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({
@@ -350,6 +359,28 @@ export function UnifiedMaterialTree({
                   </button>
                 </Tooltip>
               )}
+              {onMoveFolder && (
+                <Tooltip content="Move this folder.">
+                  <button
+                    type="button"
+                    className={styles.actionBtn}
+                    onClick={() => onMoveFolder(folder)}
+                  >
+                    <ArrowRightLeft size={14} />
+                  </button>
+                </Tooltip>
+              )}
+              {onCopyFolder && (
+                <Tooltip content="Copy this folder.">
+                  <button
+                    type="button"
+                    className={styles.actionBtn}
+                    onClick={() => onCopyFolder(folder)}
+                  >
+                    <Copy size={14} />
+                  </button>
+                </Tooltip>
+              )}
               {onDeleteFolder && (
                 <Tooltip content="Delete this folder. Contents move to parent.">
                   <button
@@ -419,6 +450,17 @@ export function UnifiedMaterialTree({
 
           {/* Actions on hover */}
           <div className={styles.nodeActions} onClick={(e) => e.stopPropagation()}>
+            {!isReadOnly && onRenameMaterial && (
+              <Tooltip content="Rename file.">
+                <button
+                  type="button"
+                  className={styles.actionBtn}
+                  onClick={() => onRenameMaterial(file)}
+                >
+                  <Pencil size={14} />
+                </button>
+              </Tooltip>
+            )}
             {!isReadOnly && onMoveMaterial && (
               <Tooltip content="Move file to another folder.">
                 <button
@@ -427,6 +469,17 @@ export function UnifiedMaterialTree({
                   onClick={() => onMoveMaterial(file)}
                 >
                   <ArrowRightLeft size={14} />
+                </button>
+              </Tooltip>
+            )}
+            {!isReadOnly && onCopyMaterial && (
+              <Tooltip content="Copy file.">
+                <button
+                  type="button"
+                  className={styles.actionBtn}
+                  onClick={() => onCopyMaterial(file)}
+                >
+                  <Copy size={14} />
                 </button>
               </Tooltip>
             )}
@@ -520,7 +573,7 @@ export function UnifiedMaterialTree({
                 <Folder className={`${styles.nodeIcon} ${styles.folderIcon}`} />
               )}
               <div className={styles.nodeContent}>
-                <span className={styles.nodeTitle}>Student Root</span>
+                <span className={styles.nodeTitle}>/</span>
               </div>
               {!isReadOnly && onCreateFolder && (
                 <div className={styles.nodeActions} onClick={(e) => e.stopPropagation()}>

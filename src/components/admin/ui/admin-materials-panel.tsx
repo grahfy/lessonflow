@@ -10,6 +10,8 @@ import {
   MaterialsConfirmDialog,
   MaterialsFolderNameDialog,
   MaterialsMoveDialog,
+  MaterialsTargetFolderDialog,
+  MaterialsFileRenameDialog,
   type MoveTargetOption
 } from "@/components/admin/ui/materials-folder-dialogs";
 import { Tooltip } from "@/components/admin/ui/tooltip";
@@ -43,7 +45,11 @@ export interface MaterialsFolderActions {
   onCreateFolder: (name: string, parentId: string | null) => void | boolean | Promise<void | boolean>;
   onRenameFolder: (folderId: string, name: string) => void | boolean | Promise<void | boolean>;
   onDeleteFolder: (folderId: string) => void | boolean | Promise<void | boolean>;
+  onMoveFolder?: (folderId: string, parentId: string | null) => void | boolean | Promise<void | boolean>;
+  onCopyFolder?: (folderId: string, parentId: string | null) => void | boolean | Promise<void | boolean>;
   onMoveMaterial: (materialId: string, folderId: string | null) => void | boolean | Promise<void | boolean>;
+  onRenameMaterial?: (materialId: string, title: string, description: string | null) => void | boolean | Promise<void | boolean>;
+  onCopyMaterial?: (materialId: string, folderId: string | null) => void | boolean | Promise<void | boolean>;
 }
 
 /**
@@ -54,8 +60,12 @@ type MaterialsDialogState =
   | { kind: "create"; parentId: string | null }
   | { kind: "rename"; folder: AdminFolderRow }
   | { kind: "deleteFolder"; folder: AdminFolderRow }
+  | { kind: "moveFolder"; folder: AdminFolderRow }
+  | { kind: "copyFolder"; folder: AdminFolderRow }
   | { kind: "deleteMaterial"; material: LearningMaterialRow }
   | { kind: "move"; material: LearningMaterialRow }
+  | { kind: "renameMaterial"; material: LearningMaterialRow }
+  | { kind: "copyMaterial"; material: LearningMaterialRow }
   | null;
 
 interface AdminMaterialsPanelProps {
@@ -105,6 +115,24 @@ function folderPathLabel(folderId: string, byId: Map<string, FlatFolder>): strin
     cursor = node.parentId;
   }
   return segments.join(" / ");
+}
+
+/** Recursively aggregates all descendant folder IDs to prevent circular folder moves. */
+function getDescendantFolderIds(nodes: AdminFolderRow[], folderId: string): Set<string> {
+  const descendants = new Set<string>();
+  const targetNode = findNode(nodes, folderId);
+  if (targetNode) {
+    const walk = (n: AdminFolderRow) => {
+      descendants.add(n.id);
+      for (const child of n.children) {
+        walk(child);
+      }
+    };
+    for (const child of targetNode.children) {
+      walk(child);
+    }
+  }
+  return descendants;
 }
 
 /**
@@ -163,7 +191,7 @@ export function AdminMaterialsPanel({
   // by its breadcrumb path (mirrors the upload form's destination select).
   const moveOptions = useMemo<MoveTargetOption[]>(
     () => [
-      { folderId: null, label: "Student root" },
+      { folderId: null, label: "/" },
       ...flatFolders.map((f) => ({ folderId: f.id, label: folderPathLabel(f.id, flatFolderById) }))
     ],
     [flatFolders, flatFolderById]
@@ -203,9 +231,29 @@ export function AdminMaterialsPanel({
                   ? (folder) => setDialogState({ kind: "deleteFolder", folder: folder as unknown as AdminFolderRow })
                   : undefined
               }
+              onMoveFolder={
+                folderActions?.onMoveFolder
+                  ? (folder) => setDialogState({ kind: "moveFolder", folder: folder as unknown as AdminFolderRow })
+                  : undefined
+              }
+              onCopyFolder={
+                folderActions?.onCopyFolder
+                  ? (folder) => setDialogState({ kind: "copyFolder", folder: folder as unknown as AdminFolderRow })
+                  : undefined
+              }
               onMoveMaterial={
                 folderActions
                   ? (material) => setDialogState({ kind: "move", material: material as unknown as LearningMaterialRow })
+                  : undefined
+              }
+              onRenameMaterial={
+                folderActions?.onRenameMaterial
+                  ? (material) => setDialogState({ kind: "renameMaterial", material: material as unknown as LearningMaterialRow })
+                  : undefined
+              }
+              onCopyMaterial={
+                folderActions?.onCopyMaterial
+                  ? (material) => setDialogState({ kind: "copyMaterial", material: material as unknown as LearningMaterialRow })
                   : undefined
               }
             />
@@ -262,7 +310,7 @@ export function AdminMaterialsPanel({
                   />
                   <div className="customer-materials-file-picker" style={{ background: "rgba(107, 140, 255, 0.05)", border: "1px dashed var(--brand-0)" }}>
                     <span className="customer-materials-file-name" style={{ color: "var(--ink-0)", fontWeight: 500 }}>
-                      📁 {currentFolderId ? folderPathLabel(currentFolderId, flatFolderById) : "Student root"}
+                      📁 {currentFolderId ? folderPathLabel(currentFolderId, flatFolderById) : "/"}
                     </span>
                   </div>
                 </AdminField>
@@ -390,6 +438,64 @@ export function AdminMaterialsPanel({
           currentFolderId={dialogState.material.folderId ?? null}
           onSelect={(folderId) => {
             void folderActions.onMoveMaterial(dialogState.material.id, folderId);
+            setDialogState(null);
+          }}
+          onClose={() => setDialogState(null)}
+        />
+      ) : null}
+
+      {dialogState?.kind === "moveFolder" && folderActions?.onMoveFolder ? (
+        <MaterialsTargetFolderDialog
+          title="Move folder"
+          description={`Choose a destination folder for "${dialogState.folder.name}".`}
+          options={[
+            { folderId: null, label: "/" },
+            ...flatFolders
+              .filter((f) => f.id !== dialogState.folder.id && !getDescendantFolderIds(folders, dialogState.folder.id).has(f.id))
+              .map((f) => ({ folderId: f.id, label: folderPathLabel(f.id, flatFolderById) }))
+          ]}
+          currentFolderId={dialogState.folder.parentId}
+          onSelect={(parentId) => {
+            void folderActions.onMoveFolder?.(dialogState.folder.id, parentId);
+            setDialogState(null);
+          }}
+          onClose={() => setDialogState(null)}
+        />
+      ) : null}
+
+      {dialogState?.kind === "copyFolder" && folderActions?.onCopyFolder ? (
+        <MaterialsTargetFolderDialog
+          title="Copy folder"
+          description={`Choose a destination folder for copy of "${dialogState.folder.name}".`}
+          options={moveOptions}
+          currentFolderId={dialogState.folder.parentId}
+          onSelect={(parentId) => {
+            void folderActions.onCopyFolder?.(dialogState.folder.id, parentId);
+            setDialogState(null);
+          }}
+          onClose={() => setDialogState(null)}
+        />
+      ) : null}
+
+      {dialogState?.kind === "renameMaterial" && folderActions?.onRenameMaterial ? (
+        <MaterialsFileRenameDialog
+          initialTitle={dialogState.material.title}
+          initialDescription={dialogState.material.description}
+          onSubmit={(title, description) => {
+            return folderActions.onRenameMaterial?.(dialogState.material.id, title, description) ?? true;
+          }}
+          onClose={() => setDialogState(null)}
+        />
+      ) : null}
+
+      {dialogState?.kind === "copyMaterial" && folderActions?.onCopyMaterial ? (
+        <MaterialsTargetFolderDialog
+          title="Copy material"
+          description={`Choose a destination folder for copy of "${dialogState.material.title}".`}
+          options={moveOptions}
+          currentFolderId={dialogState.material.folderId}
+          onSelect={(folderId) => {
+            void folderActions.onCopyMaterial?.(dialogState.material.id, folderId);
             setDialogState(null);
           }}
           onClose={() => setDialogState(null)}

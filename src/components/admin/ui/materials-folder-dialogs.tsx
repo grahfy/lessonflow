@@ -177,7 +177,7 @@ export interface MoveTargetOption {
 
 interface MaterialsMoveDialogProps {
   materialTitle: string;
-  /** "Student root" first, then every folder labeled by its breadcrumb path. */
+  /** "/" first, then every folder labeled by its breadcrumb path. */
   options: MoveTargetOption[];
   /** The material's current folder — indicated and disabled in the list. */
   currentFolderId: string | null;
@@ -212,7 +212,7 @@ export function MaterialsMoveDialog({
           return (
             <button
               // RATIONALE: folder ids are unique and null only appears once
-              // (student root), so this sentinel cannot collide.
+              // (synthetic root /), so this sentinel cannot collide.
               key={option.folderId ?? "__student-root__"}
               type="button"
               className="btn btn-secondary btn-sm"
@@ -227,3 +227,156 @@ export function MaterialsMoveDialog({
     </AppDialog>
   );
 }
+
+interface MaterialsTargetFolderDialogProps {
+  title: string;
+  description: string;
+  options: MoveTargetOption[];
+  currentFolderId?: string | null;
+  onSelect: (folderId: string | null) => void;
+  onClose: () => void;
+}
+
+/** Reusable destination picker dialog for moving or copying folders and files. */
+export function MaterialsTargetFolderDialog({
+  title,
+  description,
+  options,
+  currentFolderId = undefined,
+  onSelect,
+  onClose
+}: MaterialsTargetFolderDialogProps) {
+  return (
+    <AppDialog
+      isOpen
+      onClose={onClose}
+      title={title}
+      size="sm"
+      description={description}
+      footer={
+        <button type="button" className="btn btn-secondary" onClick={onClose}>
+          Cancel
+        </button>
+      }
+    >
+      <div className="dialog-col">
+        {options.map((option) => {
+          const isCurrent = currentFolderId !== undefined && option.folderId === currentFolderId;
+          return (
+            <button
+              key={option.folderId ?? "__student-root__"}
+              type="button"
+              className="btn btn-secondary btn-sm"
+              disabled={isCurrent}
+              onClick={() => onSelect(option.folderId)}
+            >
+              {isCurrent ? `${option.label} (current location)` : option.label}
+            </button>
+          );
+        })}
+      </div>
+    </AppDialog>
+  );
+}
+
+interface MaterialsFileRenameDialogProps {
+  initialTitle: string;
+  initialDescription: string | null;
+  onSubmit: (title: string, description: string | null) => void | boolean | Promise<void | boolean>;
+  onClose: () => void;
+}
+
+/** Rename and edit file description dialog. */
+export function MaterialsFileRenameDialog({
+  initialTitle,
+  initialDescription,
+  onSubmit,
+  onClose
+}: MaterialsFileRenameDialogProps) {
+  const formId = useId();
+  const titleInputId = useId();
+  const descInputId = useId();
+  const [titleText, setTitleText] = useState(initialTitle);
+  const [descText, setDescText] = useState(initialDescription || "");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit() {
+    const trimmedTitle = titleText.trim();
+    if (trimmedTitle.length === 0) {
+      setError("File title cannot be empty.");
+      return;
+    }
+    if (trimmedTitle.length > 255) {
+      setError("File title must be 255 characters or fewer.");
+      return;
+    }
+
+    setError("");
+    setSubmitting(true);
+    try {
+      const result = await Promise.resolve(onSubmit(trimmedTitle, descText.trim() || null));
+      if (result === false) {
+        setError("The file details could not be saved. See error for details.");
+        return;
+      }
+      onClose();
+    } catch {
+      setError("Something went wrong. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <AppDialog
+      isOpen
+      onClose={onClose}
+      title="Edit file details"
+      size="sm"
+      footer={
+        <>
+          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={submitting}>
+            Cancel
+          </button>
+          <button type="submit" form={formId} className="btn btn-primary" disabled={submitting}>
+            {submitting ? "Saving..." : "Save"}
+          </button>
+        </>
+      }
+    >
+      <form
+        id={formId}
+        onSubmit={(event) => {
+          event.preventDefault();
+          void handleSubmit();
+        }}
+      >
+        <AdminForm>
+          <AdminField label="Title" htmlFor={titleInputId} error={error || undefined} fullWidth>
+            <input
+              id={titleInputId}
+              type="text"
+              value={titleText}
+              autoFocus
+              disabled={submitting}
+              onChange={(event) => setTitleText(event.target.value)}
+            />
+          </AdminField>
+          <AdminField label="Description (optional)" htmlFor={descInputId} fullWidth>
+            <textarea
+              id={descInputId}
+              rows={3}
+              maxLength={1000}
+              value={descText}
+              disabled={submitting}
+              onChange={(event) => setDescText(event.target.value)}
+              placeholder="Provide context or instructions..."
+            />
+          </AdminField>
+        </AdminForm>
+      </form>
+    </AppDialog>
+  );
+}
+

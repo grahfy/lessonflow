@@ -24,7 +24,11 @@ export interface UseLearningMaterialsResult {
     createFolder: (customerId: string, name: string, parentId: string | null) => Promise<boolean>;
     renameFolder: (customerId: string, folderId: string, name: string) => Promise<boolean>;
     deleteFolder: (customerId: string, folderId: string) => Promise<boolean>;
+    moveFolder: (customerId: string, folderId: string, parentId: string | null) => Promise<boolean>;
+    copyFolder: (customerId: string, folderId: string, parentId: string | null) => Promise<boolean>;
     moveMaterial: (customerId: string, materialId: string, folderId: string | null) => Promise<boolean>;
+    renameMaterial: (customerId: string, materialId: string, title: string, description: string | null) => Promise<boolean>;
+    copyMaterial: (customerId: string, materialId: string, folderId: string | null) => Promise<boolean>;
 }
 
 /**
@@ -187,6 +191,44 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
     }
   }, [safeFetch, handleApiError, load, onError]);
 
+  const moveFolder = useCallback(async (customerId: string, folderId: string, parentId: string | null): Promise<boolean> => {
+    try {
+      const response = await safeFetch(`/api/admin/material-folders/${folderId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ parentId })
+      });
+      if (!response.ok) {
+        await handleApiError(response, "Unable to move folder.");
+        return false;
+      }
+      await load(customerId);
+      return true;
+    } catch {
+      if (onError) onError("Network error moving folder.");
+      return false;
+    }
+  }, [safeFetch, handleApiError, load, onError]);
+
+  const copyFolder = useCallback(async (customerId: string, folderId: string, parentId: string | null): Promise<boolean> => {
+    try {
+      const response = await safeFetch(`/api/admin/material-folders/${folderId}/copy`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ parentId })
+      });
+      if (!response.ok) {
+        await handleApiError(response, "Unable to copy folder.");
+        return false;
+      }
+      await load(customerId);
+      return true;
+    } catch {
+      if (onError) onError("Network error copying folder.");
+      return false;
+    }
+  }, [safeFetch, handleApiError, load, onError]);
+
   const moveMaterial = useCallback(async (customerId: string, materialId: string, folderId: string | null): Promise<boolean> => {
     try {
       const response = await safeFetch(`/api/admin/learning-materials/${materialId}/move`, {
@@ -206,6 +248,44 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
     }
   }, [safeFetch, handleApiError, load, onError]);
 
+  const renameMaterial = useCallback(async (customerId: string, materialId: string, title: string, description: string | null): Promise<boolean> => {
+    try {
+      const response = await safeFetch(`/api/admin/learning-materials/${materialId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title, description })
+      });
+      if (!response.ok) {
+        await handleApiError(response, "Unable to rename material.");
+        return false;
+      }
+      await load(customerId);
+      return true;
+    } catch {
+      if (onError) onError("Network error renaming material.");
+      return false;
+    }
+  }, [safeFetch, handleApiError, load, onError]);
+
+  const copyMaterial = useCallback(async (customerId: string, materialId: string, folderId: string | null): Promise<boolean> => {
+    try {
+      const response = await safeFetch(`/api/admin/learning-materials/${materialId}/copy`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ folderId })
+      });
+      if (!response.ok) {
+        await handleApiError(response, "Unable to copy material.");
+        return false;
+      }
+      await load(customerId);
+      return true;
+    } catch {
+      if (onError) onError("Network error copying material.");
+      return false;
+    }
+  }, [safeFetch, handleApiError, load, onError]);
+
   return {
     materials,
     bookings,
@@ -219,6 +299,10 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
     createFolder,
     renameFolder,
     deleteFolder,
-    moveMaterial
+    moveFolder,
+    copyFolder,
+    moveMaterial,
+    renameMaterial,
+    copyMaterial
   };
 }
