@@ -761,9 +761,13 @@ find_existing_nginx_site_config() {
 
 cert_files_exist_for_domain() {
     local domain="$1"
+    local fullchain_path=""
+    local privkey_path=""
 
     [[ -n "${domain}" ]] || return 1
-    [[ -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && -f "/etc/letsencrypt/live/${domain}/privkey.pem" ]]
+    fullchain_path="/etc/letsencrypt/live/${domain}/fullchain.pem"
+    privkey_path="/etc/letsencrypt/live/${domain}/privkey.pem"
+    [[ ( -f "${fullchain_path}" || -L "${fullchain_path}" ) && ( -f "${privkey_path}" || -L "${privkey_path}" ) ]]
 }
 
 # Reads the preferred SSL contact email from the deployed shared env so first
