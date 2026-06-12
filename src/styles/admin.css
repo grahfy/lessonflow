@@ -6749,6 +6749,10 @@
   min-height: 160px;
 }
 
+.dialog-panel[data-size="sm"] .dialog-actions {
+  justify-content: center;
+}
+
 .import-customers-dialog {
   display: grid;
   gap: 14px;
