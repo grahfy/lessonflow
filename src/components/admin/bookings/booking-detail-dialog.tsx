@@ -23,7 +23,8 @@
 
 "use client";
 
-import { Dispatch, RefObject, SetStateAction } from "react";
+import { Dispatch, RefObject, SetStateAction, useRef, useEffect } from "react";
+import gsap from "gsap";
 
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AppDialog } from "@/components/ui/app-dialog";
@@ -189,11 +190,25 @@ export function BookingDetailDialog({
   materialsDialogProps,
   lessonPlanDialogProps
 }: BookingDetailDialogProps) {
+  const tabContentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (tabContentRef.current) {
+      gsap.killTweensOf(tabContentRef.current);
+      gsap.fromTo(
+        tabContentRef.current,
+        { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.2, ease: "power2.out" }
+      );
+    }
+  }, [activeTab]);
+
   if (!event || !dialogForm) return null;
 
   /** Local helper for atomic form updates. */
   const updateForm = (patch: Partial<BookingDialogForm>) =>
     setDialogForm((current) => (current ? { ...current, ...patch } : current));
+
   const tabBodyClassName = "booking-dialog-layout booking-tab-panel";
 
   return (
@@ -343,7 +358,7 @@ export function BookingDetailDialog({
         ]}
       />
 
-      <div className={tabBodyClassName}>
+      <div className={tabBodyClassName} ref={tabContentRef}>
           {activeTab === 'appointment' ? (
             <div className="dialog-layout customer-tab-panel booking-appointment-panel">
               {/* SECTION: CUSTOMER INFORMATION */}

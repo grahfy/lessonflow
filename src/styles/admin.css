@@ -8910,3 +8910,104 @@
     justify-content: flex-start;
   }
 }
+
+/* -------------------------------------------------------------
+   UI/UX Dialog Sizing, Layout shifts, and Reports Console Overrides
+   ------------------------------------------------------------- */
+
+/* 1. Locked height for large dialog panels on desktop viewports to prevent tab-switching jumps */
+@media (min-width: 901px) {
+  .dialog-panel[data-size="lg"] {
+    height: min(90vh, 880px) !important;
+  }
+}
+
+/* 2. Stabilize vertical scrollbars in dialogs to prevent horizontal content shifting */
+#customer-dialog .customer-dialog-panel,
+#customer-dialog .customer-booking-history-panel,
+#customer-dialog .customer-materials-panel,
+#booking-detail-dialog .booking-appointment-panel,
+#booking-detail-dialog .booking-materials-panel,
+#booking-detail-dialog .booking-lesson-plan-panel {
+  scrollbar-gutter: stable;
+  overflow-y: auto !important;
+}
+
+/* 3. Normalize tab panel margins and layout heights inside dialog bodies */
+#customer-dialog .customer-dialog-panel,
+#customer-dialog .customer-booking-history-panel,
+#customer-dialog .customer-email-tab-shell,
+#customer-dialog .customer-materials-panel,
+#booking-detail-dialog .booking-appointment-panel,
+#booking-detail-dialog .booking-email-panel,
+#booking-detail-dialog .booking-materials-panel,
+#booking-detail-dialog .booking-lesson-plan-panel {
+  margin-top: 14px !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  flex: 1 1 auto;
+}
+
+/* 4. Modern, flat tab bar style with bottom slide/color active indicator inside dialogs */
+#customer-dialog .admin-tab-bar,
+#booking-detail-dialog .admin-tab-bar {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 0;
+  margin-bottom: 12px;
+}
+
+#customer-dialog .dialog-tabs-left,
+#booking-detail-dialog .dialog-tabs-left {
+  gap: 0 !important;
+}
+
+#customer-dialog .dialog-tabs-left .btn,
+#booking-detail-dialog .dialog-tabs-left .btn {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  color: var(--ink-2) !important;
+  box-shadow: none !important;
+  padding: 10px 4px !important;
+  font-weight: 500 !important;
+  transition: color 0.2s ease, border-color 0.2s ease !important;
+}
+
+#customer-dialog .dialog-tabs-left .btn:hover,
+#booking-detail-dialog .dialog-tabs-left .btn:hover {
+  color: var(--ink-1) !important;
+}
+
+#customer-dialog .dialog-tabs-left .btn.btn-primary,
+#booking-detail-dialog .dialog-tabs-left .btn.btn-primary {
+  color: var(--primary) !important;
+  border-bottom-color: var(--primary) !important;
+  font-weight: 600 !important;
+}
+
+/* 5. Responsive Reports Period Grid: prevent 4-column card compression on medium/tablet viewports */
+@media (max-width: 1200px) {
+  .reports-period-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .reports-period-grid-4 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* 6. Reports Toolbar Breakpoint: stack copy & buttons at 1200px (instead of 900px) to prevent action-row squishing */
+@media (max-width: 1200px) {
+  .admin-shell-reports .admin-workspace-head {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .admin-shell-reports .admin-workspace-actions {
+    justify-content: flex-start !important;
+  }
+}
+
