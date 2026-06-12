@@ -23,7 +23,7 @@
 
 "use client";
 
-import { Dispatch, RefObject, SetStateAction, useRef, useEffect } from "react";
+import { Dispatch, RefObject, SetStateAction, useRef, useEffect, useLayoutEffect } from "react";
 import gsap from "gsap";
 
 import { AdminCard } from "@/components/admin/ui/admin-card";
@@ -192,7 +192,9 @@ export function BookingDetailDialog({
 }: BookingDetailDialogProps) {
   const tabContentRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  const useSafeLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+  useSafeLayoutEffect(() => {
     if (tabContentRef.current) {
       gsap.killTweensOf(tabContentRef.current);
       gsap.fromTo(
