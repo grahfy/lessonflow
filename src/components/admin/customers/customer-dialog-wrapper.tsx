@@ -1,4 +1,5 @@
-import { RefObject } from "react";
+import { RefObject, useRef, useEffect } from "react";
+import gsap from "gsap";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { AdminNoticeStack } from "@/components/admin/ui/admin-notice";
 import { AdminTabBar } from "@/components/admin/ui/admin-tab-bar";
@@ -92,6 +93,19 @@ export function CustomerDialogWrapper({
     onClose,
     ...rest
 }: Props) {
+    const tabContentRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (tabContentRef.current) {
+            gsap.killTweensOf(tabContentRef.current);
+            gsap.fromTo(
+                tabContentRef.current,
+                { opacity: 0, y: 8 },
+                { opacity: 1, y: 0, duration: 0.2, ease: "power2.out" }
+            );
+        }
+    }, [activeTab]);
+
     // RATIONALE: Keep customer identity in the modal header while the shared
     // tab rail sits in the dialog body, matching the booking editor pattern.
     const description = (
@@ -133,7 +147,7 @@ export function CustomerDialogWrapper({
                 notice={notice}
                 className="customer-dialog-notice-stack"
             />
-            <div className="customer-dialog-tab-body">
+            <div className="customer-dialog-tab-body" ref={tabContentRef}>
                 {activeTab === 'profile' && (
                     <div className="dialog-layout customer-dialog-panel">
                         {/* NOTE: The profile tab keeps its own two-column layout,
