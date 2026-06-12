@@ -1,12 +1,23 @@
 import { describe, expect, it } from "vitest";
 
-import { STORAGE_PERMISSION_DENIED_CODE, StoragePermissionDeniedError, isFilesystemPermissionDeniedError, rethrowAsStoragePermissionDeniedError } from "@/lib/storage-errors";
+import {
+  STORAGE_PERMISSION_DENIED_CODE,
+  StoragePermissionDeniedError,
+  isFilesystemNotFoundError,
+  isFilesystemPermissionDeniedError,
+  rethrowAsStoragePermissionDeniedError
+} from "@/lib/storage-errors";
 
 describe("storage-errors", () => {
   it("detects filesystem permission errors", () => {
     expect(isFilesystemPermissionDeniedError({ code: "EACCES" })).toBe(true);
     expect(isFilesystemPermissionDeniedError({ code: "EPERM" })).toBe(true);
     expect(isFilesystemPermissionDeniedError({ code: "ENOENT" })).toBe(false);
+  });
+
+  it("detects filesystem not-found errors", () => {
+    expect(isFilesystemNotFoundError({ code: "ENOENT" })).toBe(true);
+    expect(isFilesystemNotFoundError({ code: "EACCES" })).toBe(false);
   });
 
   it("wraps permission failures in a sanitized app error", () => {

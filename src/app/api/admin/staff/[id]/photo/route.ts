@@ -13,6 +13,7 @@ import {
   putStaffPhoto
 } from "@/lib/admin/staff-photo-storage";
 import { prisma } from "@/lib/db";
+import { isFilesystemNotFoundError } from "@/lib/storage-errors";
 
 type Params = {
   params: Promise<{
@@ -47,7 +48,16 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const blob = await getStaffPhoto(staff.profilePhotoStorageKey, staff.profilePhotoMimeType);
+    const blob = await getStaffPhoto(staff.profilePhotoStorageKey, staff.profilePhotoMimeType).catch((error) => {
+      if (isFilesystemNotFoundError(error)) {
+        return null;
+      }
+      throw error;
+    });
+    if (!blob) {
+      return NextResponse.json({ error: "Profile photo not found." }, { status: 404 });
+    }
+
     return new NextResponse(new Uint8Array(blob.buffer), {
       headers: {
         "content-type": blob.mimeType,

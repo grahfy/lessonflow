@@ -1,6 +1,7 @@
 import { AppError } from "@/lib/errors";
 
 const PERMISSION_DENIED_CODES = new Set(["EACCES", "EPERM"]);
+const NOT_FOUND_CODES = new Set(["ENOENT"]);
 
 export const STORAGE_PERMISSION_DENIED_CODE = "STORAGE_PERMISSION_DENIED";
 
@@ -29,6 +30,14 @@ function getErrorCode(error: unknown): string | undefined {
 export function isFilesystemPermissionDeniedError(error: unknown): boolean {
   const code = getErrorCode(error);
   return Boolean(code && PERMISSION_DENIED_CODES.has(code));
+}
+
+/**
+ * Returns true when a filesystem call failed because the backing object is gone.
+ */
+export function isFilesystemNotFoundError(error: unknown): boolean {
+  const code = getErrorCode(error);
+  return Boolean(code && NOT_FOUND_CODES.has(code));
 }
 
 /**

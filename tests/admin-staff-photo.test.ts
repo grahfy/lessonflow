@@ -6,7 +6,7 @@ import { NextRequest } from "next/server";
 import bcrypt from "bcryptjs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as uploadStaffPhoto } from "@/app/api/admin/staff/[id]/photo/route";
+import { GET as getStaffPhoto, POST as uploadStaffPhoto } from "@/app/api/admin/staff/[id]/photo/route";
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 
@@ -83,6 +83,46 @@ describe("admin-staff-photo", () => {
       expect(JSON.stringify(body)).not.toContain(tempRoot);
     } finally {
       await fs.chmod(tempRoot, 0o755).catch(() => null);
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("returns not found when staff photo metadata points to a missing file", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "mgs-staff-photo-missing-root-"));
+    vi.stubEnv("ADMIN_STAFF_PHOTOS_LOCAL_ROOT", tempRoot);
+
+    try {
+      const admin = await ensureOwnerAdmin();
+      const targetStaff = await prisma.adminUser.create({
+        data: {
+          email: "missing-photo-target@example.com",
+          role: "teacher",
+          firstName: "Missing",
+          lastName: "Photo",
+          displayName: "Missing Photo",
+          passwordHash: await bcrypt.hash("staff-password", 12),
+          isActive: true,
+          profilePhotoStorageKey: "staff/missing/avatar.png",
+          profilePhotoMimeType: "image/png"
+        }
+      });
+      const cookie = `${getSessionCookieName()}=${createSessionToken(admin.email)}`;
+
+      const response = await getStaffPhoto(
+        new NextRequest(`http://localhost/api/admin/staff/${targetStaff.id}/photo`, {
+          headers: {
+            cookie
+          }
+        }),
+        {
+          params: Promise.resolve({ id: targetStaff.id })
+        }
+      );
+
+      expect(response.status).toBe(404);
+      const body = (await response.json()) as { error?: string };
+      expect(body.error).toBe("Profile photo not found.");
+    } finally {
       vi.unstubAllEnvs();
     }
   });

@@ -47,6 +47,30 @@ describe("api-contact", () => {
     expect(row?.email).toBe("jordan@example.com");
   });
 
+  it("stores contact messages up to the public form limit", async () => {
+    const message = "A".repeat(2000);
+    const request = new Request("http://localhost/api/contact", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Jordan",
+        email: "jordan.long@example.com",
+        phone: "0400000000",
+        message,
+        captchaToken: "test-token",
+        captchaAnswer: "test-answer"
+      })
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(202);
+
+    const row = await prisma.contactSubmission.findFirst({
+      where: { email: "jordan.long@example.com" }
+    });
+    expect(row?.message).toBe(message);
+  });
+
   it("rejects blocked-country contact submissions", async () => {
     await prisma.geoblockingSettings.create({
       data: {

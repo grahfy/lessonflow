@@ -5,8 +5,8 @@ import { NextRequest } from "next/server";
 import bcrypt from "bcryptjs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GET, POST } from "@/app/api/admin/customers/[id]/learning-materials/route";
-import { DELETE } from "@/app/api/admin/learning-materials/[id]/route";
+import { GET as listLearningMaterials, POST } from "@/app/api/admin/customers/[id]/learning-materials/route";
+import { DELETE, GET as getLearningMaterial } from "@/app/api/admin/learning-materials/[id]/route";
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
 import { customerSnapshotFromInput } from "@/lib/customer-match";
 import { prisma } from "@/lib/db";
@@ -125,7 +125,7 @@ describe("admin-learning-materials", () => {
         }
       }
     );
-    const listResponse = await GET(listRequest, {
+    const listResponse = await listLearningMaterials(listRequest, {
       params: Promise.resolve({ id: customer.id })
     });
     expect(listResponse.status).toBe(200);
@@ -309,6 +309,46 @@ describe("admin-learning-materials", () => {
     }
   });
 
+  it("returns not found when learning material metadata points to a missing file", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "mgs-material-missing-root-"));
+    vi.stubEnv("LEARNING_MATERIALS_LOCAL_ROOT", tempRoot);
+
+    try {
+      const admin = await ensureOwnerAdmin();
+      const token = createSessionToken(admin.email);
+      const cookie = `${getSessionCookieName()}=${token}`;
+      const customer = await createCustomer("Missing File Student", "missing-material@example.com", "0400123456", "3070");
+      const material = await prisma.learningMaterial.create({
+        data: {
+          customerId: customer.id,
+          uploadedById: admin.id,
+          title: "Missing audio",
+          materialType: "audio",
+          storageKey: `${customer.id}/general/missing-audio.mp3`,
+          mimeType: "audio/mpeg",
+          sizeBytes: 1234
+        }
+      });
+
+      const response = await getLearningMaterial(
+        new NextRequest(`http://localhost/api/admin/learning-materials/${material.id}`, {
+          headers: {
+            cookie
+          }
+        }),
+        {
+          params: Promise.resolve({ id: material.id })
+        }
+      );
+
+      expect(response.status).toBe(404);
+      const body = (await response.json()) as { error?: string };
+      expect(body.error).toBe("Learning material not found.");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("does not expose another teacher's booking-linked materials to the customer's primary teacher", async () => {
     const teacherA = await createTeacher("materials-primary@example.com", "Materials Primary");
     const teacherB = await createTeacher("materials-booking@example.com", "Materials Booking");
@@ -357,7 +397,7 @@ describe("admin-learning-materials", () => {
         }
       }
     );
-    const listResponse = await GET(listRequest, {
+    const listResponse = await listLearningMaterials(listRequest, {
       params: Promise.resolve({ id: customer.id })
     });
     expect(listResponse.status).toBe(200);

@@ -331,4 +331,46 @@ describe("student-portal-data", () => {
     expect(response.headers.get("content-type")).toBe("audio/mpeg");
     expect(response.headers.get("content-disposition") || "").toContain("Warmup track");
   });
+
+  it("returns not found when an owned learning material file is missing", async () => {
+    const customer = await prisma.customer.create({
+      data: customerSnapshotFromInput({
+        name: "Missing Download Student",
+        email: "missing-download@example.com",
+        phone: "0400222444",
+        lessonMode: "in_person",
+        skillLevel: "beginner",
+        unitNumber: undefined,
+        houseNumber: "4",
+        streetName: "Short",
+        streetType: "Street",
+        suburb: "Brunswick",
+        state: "VIC",
+        postcode: "3056"
+      })
+    });
+    const material = await prisma.learningMaterial.create({
+      data: {
+        customerId: customer.id,
+        title: "Missing worksheet",
+        materialType: "pdf",
+        storageKey: `${customer.id}/general/missing-worksheet.pdf`,
+        mimeType: "application/pdf",
+        sizeBytes: 2048
+      }
+    });
+
+    const request = new NextRequest(`http://localhost/api/student/learning-materials/${material.id}/download`, {
+      headers: {
+        cookie: `${getStudentSessionCookieName()}=${createStudentSessionToken(customer.id)}`
+      }
+    });
+    const response = await downloadMaterial(request, {
+      params: Promise.resolve({ id: material.id })
+    });
+
+    expect(response.status).toBe(404);
+    const body = (await response.json()) as { error?: string };
+    expect(body.error).toBe("Material not found or access denied.");
+  });
 });

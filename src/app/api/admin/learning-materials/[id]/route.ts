@@ -6,6 +6,7 @@ import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
 import { logError } from "@/lib/observability";
+import { isFilesystemNotFoundError } from "@/lib/storage-errors";
 import { createMaterialStorageDriver } from "@/lib/student-portal/material-storage";
 import { buildLearningMaterialDownloadFilename } from "@/lib/student-portal/materials";
 
@@ -111,9 +112,19 @@ export async function GET(request: NextRequest, { params }: Params) {
     const disposition = dispositionParam === "inline" ? "inline" : "attachment";
 
     const storage = createMaterialStorageDriver();
-    const blob = await storage.get({
-      storageKey: material.storageKey
-    });
+    const blob = await storage
+      .get({
+        storageKey: material.storageKey
+      })
+      .catch((error) => {
+        if (isFilesystemNotFoundError(error)) {
+          return null;
+        }
+        throw error;
+      });
+    if (!blob) {
+      return NextResponse.json({ error: "Learning material not found." }, { status: 404 });
+    }
 
     return buildMaterialResponse(
       blob.buffer,
@@ -273,4 +284,3 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return jsonUnexpectedError(error, "Unable to update learning material.");
   }
 }
-

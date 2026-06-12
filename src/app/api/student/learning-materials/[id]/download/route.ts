@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db";
+import { isFilesystemNotFoundError } from "@/lib/storage-errors";
 import { createMaterialStorageDriver } from "@/lib/student-portal/material-storage";
 import { buildLearningMaterialDownloadFilename } from "@/lib/student-portal/materials";
 import { requireStudentFromRequest } from "@/lib/student-portal/session";
@@ -120,9 +121,19 @@ export async function GET(request: NextRequest, { params }: Params) {
   const storage = createMaterialStorageDriver();
   
   // NOTE: Auth is verified before storage access.
-  const blob = await storage.get({
-    storageKey: material.storageKey
-  });
+  const blob = await storage
+    .get({
+      storageKey: material.storageKey
+    })
+    .catch((error) => {
+      if (isFilesystemNotFoundError(error)) {
+        return null;
+      }
+      throw error;
+    });
+  if (!blob) {
+    return NextResponse.json({ error: "Material not found or access denied." }, { status: 404 });
+  }
 
   return buildMaterialResponse(
     blob.buffer,
