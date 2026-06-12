@@ -162,7 +162,10 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const form = await request.formData().catch(() => null);
+    const form = await request.formData().catch((error) => {
+      logError("api.learning-materials.form_data_failed", error);
+      return null;
+    });
     if (!form) {
       return NextResponse.json({ error: "Invalid upload payload." }, { status: 400 });
     }

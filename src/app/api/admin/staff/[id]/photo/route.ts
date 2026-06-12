@@ -13,6 +13,7 @@ import {
   putStaffPhoto
 } from "@/lib/admin/staff-photo-storage";
 import { prisma } from "@/lib/db";
+import { logError } from "@/lib/observability";
 import { isFilesystemNotFoundError } from "@/lib/storage-errors";
 
 type Params = {
@@ -94,7 +95,10 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Staff account not found." }, { status: 404 });
     }
 
-    const form = await request.formData().catch(() => null);
+    const form = await request.formData().catch((error) => {
+      logError("api.staff.photo.form_data_failed", error);
+      return null;
+    });
     if (!form) {
       return NextResponse.json({ error: "Invalid upload payload." }, { status: 400 });
     }
