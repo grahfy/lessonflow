@@ -183,6 +183,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       data: {
         status: "paid",
         paidAt: new Date(),
+        paidVia: "manual",
         updatedById: admin.id,
         auditLogs: {
           create: {

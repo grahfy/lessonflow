@@ -23,6 +23,8 @@ import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
 import { getStudentPortalLoginUrl } from "@/lib/env";
+import { autoCreateDraftInvoicesForApproval } from "@/lib/invoices/auto-invoice";
+import { getNotificationSettingsState } from "@/lib/email/notification-settings";
 import {
   copyBookingRequestNotesToBooking,
   deleteStoredNoteImages,
@@ -197,6 +199,20 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       // Approval spans customer resolution, booking creation, request status update, and portal
       // credential ensure. Keeping this transactional prevents partially approved states.
       const clonedCleanupTasks: StorageCleanupTaskInput[] = [];
+      // Created booking rows are captured so that, after the approval commits, we
+      // can best-effort auto-create DRAFT invoices for them (gated on settings).
+      type CreatedBookingForInvoice = {
+        id: string;
+        customerId: string | null;
+        lessonDuration: "min30" | "min60";
+        customDurationMinutes: number | null;
+        firstName: string;
+        lastName: string;
+        name: string;
+        email: string;
+        phone: string;
+        address: string;
+      };
       let approvalResult: {
         updated: {
           email: string;
@@ -205,6 +221,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           requestedStartAt: Date;
         };
         generatedPassword: string | null;
+        createdBookings: CreatedBookingForInvoice[];
       } | null = null;
 
       try {
@@ -216,6 +233,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           if (!customerId) {
             throw new Error("Unable to resolve customer before approval.");
           }
+
+          const createdBookings: CreatedBookingForInvoice[] = [];
 
           const createBookingFromRequest = async (startAt: Date, seriesId?: string | null) => {
             const createdBooking = await tx.booking.create({
@@ -313,10 +332,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             // booking row so later admin investigation can trace the series back
             // to the original request details and approval action.
             for (const startAt of starts) {
-              await createBookingFromRequest(startAt, series.id);
+              createdBookings.push(await createBookingFromRequest(startAt, series.id));
             }
           } else {
-            await createBookingFromRequest(bookingRequest.requestedStartAt);
+            createdBookings.push(await createBookingFromRequest(bookingRequest.requestedStartAt));
           }
 
           const updated = await tx.bookingRequest.update({
@@ -346,7 +365,19 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
           return {
             updated,
-            generatedPassword: credentialResult.generatedPassword
+            generatedPassword: credentialResult.generatedPassword,
+            createdBookings: createdBookings.map((booking) => ({
+              id: booking.id,
+              customerId: booking.customerId,
+              lessonDuration: booking.lessonDuration,
+              customDurationMinutes: booking.customDurationMinutes,
+              firstName: booking.firstName,
+              lastName: booking.lastName,
+              name: booking.name,
+              email: booking.email,
+              phone: booking.phone,
+              address: booking.address
+            }))
           };
         });
       } catch (error) {
@@ -371,6 +402,22 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
       if (!approvalResult) {
         throw new Error("Booking request approval did not complete.");
+      }
+
+      // Best-effort auto-invoicing AFTER the approval has committed. Gated on the
+      // admin toggle and wrapped so any failure here is logged but never blocks or
+      // rolls back the approval (the bookings already exist and are valid).
+      try {
+        const notificationSettings = await getNotificationSettingsState();
+        if (notificationSettings.autoCreateInvoiceOnApproval) {
+          await autoCreateDraftInvoicesForApproval({
+            bookings: approvalResult.createdBookings,
+            adminId: admin.id,
+            requestId: id
+          });
+        }
+      } catch (error) {
+        logError("booking_request.auto_invoice_failed", error, { id, actorId: admin.id });
       }
 
       // Send customer email after transaction commit to avoid sending approvals that failed to persist.

@@ -52,6 +52,7 @@ export function serializeNotificationSettings(record: NotificationSettingsRecord
     automaticInvoiceRemindersEnabled: record?.automaticInvoiceRemindersEnabled ?? true,
     invoiceReminderFirstDelayDays: record?.invoiceReminderFirstDelayDays ?? 7,
     invoiceReminderResendIntervalDays: record?.invoiceReminderResendIntervalDays ?? 7,
+    autoCreateInvoiceOnApproval: record?.autoCreateInvoiceOnApproval ?? false,
     updatedAt: record?.updatedAt?.toISOString() ?? null
   };
 }
@@ -77,7 +78,8 @@ export async function saveNotificationSettings(input: NotificationSettingsInput)
       categoryPreferences: parsed.categoryPreferences,
       automaticInvoiceRemindersEnabled: parsed.automaticInvoiceRemindersEnabled,
       invoiceReminderFirstDelayDays: parsed.invoiceReminderFirstDelayDays,
-      invoiceReminderResendIntervalDays: parsed.invoiceReminderResendIntervalDays
+      invoiceReminderResendIntervalDays: parsed.invoiceReminderResendIntervalDays,
+      autoCreateInvoiceOnApproval: parsed.autoCreateInvoiceOnApproval
     },
     create: {
       id: DEFAULT_NOTIFICATION_SETTINGS_ID,
@@ -85,7 +87,8 @@ export async function saveNotificationSettings(input: NotificationSettingsInput)
       categoryPreferences: parsed.categoryPreferences,
       automaticInvoiceRemindersEnabled: parsed.automaticInvoiceRemindersEnabled,
       invoiceReminderFirstDelayDays: parsed.invoiceReminderFirstDelayDays,
-      invoiceReminderResendIntervalDays: parsed.invoiceReminderResendIntervalDays
+      invoiceReminderResendIntervalDays: parsed.invoiceReminderResendIntervalDays,
+      autoCreateInvoiceOnApproval: parsed.autoCreateInvoiceOnApproval
     }
   });
 }

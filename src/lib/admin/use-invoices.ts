@@ -32,6 +32,8 @@ export interface InvoiceRow {
     paymentDetailsSource: "system" | "custom";
     issuedAt: string;
     dueAt: string;
+    paidAt: string | null;
+    paidVia: "manual" | "stripe" | null;
     overdueDays: number | null;
     discountKind: InvoiceDiscountKind | null;
     discountValue: number | null;
