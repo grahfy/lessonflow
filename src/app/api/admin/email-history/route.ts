@@ -9,6 +9,15 @@ import { prisma } from "@/lib/db";
 import { getEmailHistoryForAddress } from "@/lib/email/history";
 import { sendEmail } from "@/lib/email/service";
 import { customerCustomMessageTemplate } from "@/lib/email/templates";
+import { log } from "@/lib/observability";
+
+/**
+ * Upper bound on customer rows resolved for an email-history target. The single
+ * Node process runs under a 1G memory cap, so we bound the customer lookup even
+ * though it only selects `id`. Realistic targets resolve a handful of customers;
+ * hitting the cap is logged for investigation.
+ */
+const MAX_EMAIL_HISTORY_CUSTOMERS = 500;
 
 const targetBaseSchema = z.object({
   customerId: z.string().trim().min(1).optional(),
@@ -68,8 +77,17 @@ async function resolveAuthorizedCustomerIds(
         },
     select: {
       id: true
-    }
+    },
+    take: MAX_EMAIL_HISTORY_CUSTOMERS
   });
+
+  if (customers.length === MAX_EMAIL_HISTORY_CUSTOMERS) {
+    log("warn", "email_history.customer_lookup_cap_reached", {
+      normalizedEmail,
+      candidateCount: uniqueCandidateIds.length,
+      cap: MAX_EMAIL_HISTORY_CUSTOMERS
+    });
+  }
 
   return customers.map((customer) => customer.id);
 }

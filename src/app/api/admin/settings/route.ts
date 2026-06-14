@@ -141,8 +141,10 @@ export async function POST(request: NextRequest) {
     if (result.requiresReauth) {
       response.cookies.set(getSessionCookieName(), "", {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        // Mirror the login cookie attributes exactly so this deletion reliably
+        // overwrites the session cookie and stays consistent with login/route.ts.
+        secure: process.env.NODE_ENV === "production" || process.env.COOKIE_SECURE === "1",
+        sameSite: "strict",
         path: "/",
         maxAge: 0
       });

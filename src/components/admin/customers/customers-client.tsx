@@ -24,6 +24,7 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminCard } from "@/components/admin/ui/admin-card";
@@ -89,6 +90,7 @@ export function AdminCustomersClient() {
   const [activeTab, setActiveTab] = useState<"profile" | "history" | "emails" | "materials">("profile");
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(null);
+  const [pendingDeleteCustomer, setPendingDeleteCustomer] = useState<CustomerRow | null>(null);
 
   // Email Composer State
   const [emailComposerSubject, setEmailComposerSubject] = useState("");
@@ -371,11 +373,8 @@ export function AdminCustomersClient() {
    * RATIONALE: We cannot hard-delete customers with financial or scheduling 
    * history as it would orphan child records.
    */
-  async function deleteCustomer(customer: CustomerRow) {
-    if (!window.confirm(`Are you sure you want to delete ${customer.fullName}? This will archive the customer if they have linked bookings.`)) {
-      return;
-    }
-
+  async function deleteCustomerConfirmed(customer: CustomerRow) {
+    setPendingDeleteCustomer(null);
     setError("");
     setNotice("");
     setDeletingCustomerId(customer.id);
@@ -693,7 +692,7 @@ export function AdminCustomersClient() {
           canManageCustomers={currentAdmin?.role === "owner"}
           canViewBilling={currentAdmin?.role === "owner"}
           onOpenCustomerDialog={openCustomerDialog}
-          onDeleteCustomer={deleteCustomer}
+          onDeleteCustomer={(customer) => setPendingDeleteCustomer(customer)}
           onViewInvoices={(name) => void beginExitTransition(null, 0, () => router.push(`/admin/invoices?q=${encodeURIComponent(name)}`))}
         />
       </div>
@@ -798,10 +797,19 @@ export function AdminCustomersClient() {
           // Profile Tab Internal Actions
           onCancelEdit={() => setIsEditing(false)}
           onStartEdit={() => canManageSelectedCustomer && setIsEditing(true)}
-          onDeleteCustomer={() => selectedCustomer && currentAdmin?.role === "owner" && deleteCustomer(selectedCustomer)}
+          onDeleteCustomer={() => selectedCustomer && currentAdmin?.role === "owner" && setPendingDeleteCustomer(selectedCustomer)}
           onViewBillingHistory={() => selectedCustomer && currentAdmin?.role === "owner" && void beginExitTransition(null, 0, () => router.push(`/admin/invoices?q=${encodeURIComponent(selectedCustomer.fullName)}`))}
         />
       )}
+      <ConfirmDialog
+        open={pendingDeleteCustomer !== null}
+        title="Delete Customer"
+        description={pendingDeleteCustomer ? `Are you sure you want to delete ${pendingDeleteCustomer.fullName}? This will archive the customer if they have linked bookings.` : ""}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => pendingDeleteCustomer && void deleteCustomerConfirmed(pendingDeleteCustomer)}
+        onCancel={() => setPendingDeleteCustomer(null)}
+      />
     </AdminShell>
   );
 }

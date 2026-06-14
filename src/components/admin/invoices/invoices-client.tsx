@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CalendarDays } from "lucide-react";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
@@ -168,6 +169,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
   }, [notice]);
 
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [pendingConfirm, setPendingConfirm] = useState<{ title: string; description: string; confirmLabel: string; destructive?: boolean; onConfirm: () => void } | null>(null);
 
   // Search & Filter State
   const [page, setPage] = useState(1);
@@ -860,9 +862,18 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
    * Runs one lifecycle action from the detail dialog and refreshes both the
    * open dialog and the surrounding table state.
    */
-  async function performAction(action: InvoiceAction) {
+  async function performAction(action: InvoiceAction, confirmed: boolean = false) {
     if (!selectedInvoice) return;
-    if (action === "void" && !window.confirm("Are you sure you want to void this invoice? This cannot be undone.")) return;
+    if (action === "void" && !confirmed) {
+      setPendingConfirm({
+        title: "Void Invoice",
+        description: "Are you sure you want to void this invoice? This cannot be undone.",
+        confirmLabel: "Void Invoice",
+        destructive: true,
+        onConfirm: () => void performAction("void", true)
+      });
+      return;
+    }
 
     setBusyAction(action);
     setError("");
@@ -993,8 +1004,16 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
     }
   }
 
-  async function sendBulkReminders() {
-    if (!window.confirm("Send email reminders for all overdue invoices?")) return;
+  function sendBulkReminders() {
+    setPendingConfirm({
+      title: "Send Bulk Reminders",
+      description: "Send email reminders for all overdue invoices?",
+      confirmLabel: "Send Reminders",
+      onConfirm: () => void doSendBulkReminders()
+    });
+  }
+
+  async function doSendBulkReminders() {
     setBusyAction("bulk-reminders");
     setError("");
     const count = await sendBulkRemindersApi();
@@ -1268,15 +1287,21 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                     className="btn btn-danger btn-xs admin-list-action-btn"
                     type="button"
                     disabled={busyAction === `delete-${inv.id}`}
-                    onClick={async () => {
-                      if (window.confirm("Delete this invoice permanently?")) {
-                        setBusyAction(`delete-${inv.id}`);
-                        await removeInvoiceApi(inv.id);
-                        setBusyAction(null);
-                        // RATIONALE: Delete changes pagination and filter counts,
-                        // so the table must be reloaded from the current server view.
-                        void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
-                      }
+                    onClick={() => {
+                      setPendingConfirm({
+                        title: "Delete Invoice",
+                        description: "Delete this invoice permanently?",
+                        confirmLabel: "Delete",
+                        destructive: true,
+                        onConfirm: async () => {
+                          setBusyAction(`delete-${inv.id}`);
+                          await removeInvoiceApi(inv.id);
+                          setBusyAction(null);
+                          // RATIONALE: Delete changes pagination and filter counts,
+                          // so the table must be reloaded from the current server view.
+                          void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
+                        }
+                      });
                     }}
                   >
                     {busyAction === `delete-${inv.id}` ? "..." : "Delete"}
@@ -1325,12 +1350,18 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                 </Tooltip>
               )}
               <Tooltip content="Permanently delete this invoice record when allowed.">
-                <button className="btn btn-danger" disabled={!!busyAction} onClick={async () => {
-                  if (window.confirm("Delete this invoice permanently?")) {
-                    await removeInvoiceApi(selectedInvoice!.id);
-                    closeDetail();
-                    void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
-                  }
+                <button className="btn btn-danger" disabled={!!busyAction} onClick={() => {
+                  setPendingConfirm({
+                    title: "Delete Invoice",
+                    description: "Delete this invoice permanently?",
+                    confirmLabel: "Delete",
+                    destructive: true,
+                    onConfirm: async () => {
+                      await removeInvoiceApi(selectedInvoice!.id);
+                      closeDetail();
+                      void loadInvoices(query, page, overdueOnly, sortBy, sortDir);
+                    }
+                  });
                 }}>DELETE</button>
               </Tooltip>
             </div>
@@ -2157,6 +2188,15 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
           </AdminCard>
         </div>
       </AppDialog>
+      <ConfirmDialog
+        open={pendingConfirm !== null}
+        title={pendingConfirm?.title ?? ""}
+        description={pendingConfirm?.description ?? ""}
+        confirmLabel={pendingConfirm?.confirmLabel ?? "Confirm"}
+        destructive={pendingConfirm?.destructive}
+        onConfirm={() => { const cb = pendingConfirm?.onConfirm; setPendingConfirm(null); cb?.(); }}
+        onCancel={() => setPendingConfirm(null)}
+      />
     </AdminShell>
   );
 }

@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       // Allow local HTTP development while enforcing secure cookies in production.
       secure: process.env.NODE_ENV === "production" || process.env.COOKIE_SECURE === "1",
-      sameSite: "lax",
+      sameSite: "strict",
       path: "/",
       maxAge: 60 * 60 * 24 * 7
     });

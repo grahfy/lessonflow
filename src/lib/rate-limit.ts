@@ -51,11 +51,35 @@ export type RateLimitResult = {
  */
 const globalStore = globalThis as unknown as {
   __rateLimitStore?: Map<string, RateLimitState>;
+  __rateLimitSweepRegistered?: boolean;
 };
 
 const store = globalStore.__rateLimitStore ?? new Map<string, RateLimitState>();
 if (!globalStore.__rateLimitStore) {
   globalStore.__rateLimitStore = store;
+}
+
+/** Interval between background prunes of expired rate-limit entries. */
+const SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+
+/**
+ * Registers a periodic background sweep that prunes expired entries even when no
+ * traffic is hitting `consumeRateLimit` (which only prunes lazily on call).
+ *
+ * RATIONALE: Under the single-process / 1G memory deployment a quiet period
+ * after a traffic spike would otherwise leave stale buckets resident until the
+ * next request. The interval is `.unref()`-ed so it never keeps the Node process
+ * alive, and a `globalThis` guard ensures only one timer survives HMR.
+ */
+function registerExpiredEntrySweep(): void {
+  if (globalStore.__rateLimitSweepRegistered) return;
+  globalStore.__rateLimitSweepRegistered = true;
+
+  const timer = setInterval(() => {
+    evictExpiredEntries(Date.now());
+  }, SWEEP_INTERVAL_MS);
+  // Do not let the sweep timer hold the event loop open.
+  timer.unref?.();
 }
 
 /**
@@ -123,6 +147,10 @@ function evictExpiredEntries(now: number): void {
     }
   }
 }
+
+// Register the background sweep once at module init so idle periods still prune
+// expired buckets even when no request triggers the lazy eviction path.
+registerExpiredEntrySweep();
 
 /**
  * Tickers the rate limiter for a specific key.
