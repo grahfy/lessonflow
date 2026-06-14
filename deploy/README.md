@@ -323,6 +323,12 @@ INVOICE_PAYMENT_TERMS_DAYS="14"
 INVOICE_GST_REGISTERED="false"
 INVOICE_DEFAULT_TAX_MODE="gst_free"
 INVOICE_CREDIT_NOTE_PREFIX="MGSCN"
+
+# Stripe online payments (optional). Stripe is enabled only when STRIPE_SECRET_KEY is set.
+# If unset the app runs normally: pay links are omitted and the public pay page shows "unavailable".
+STRIPE_SECRET_KEY=""
+# Signing secret (whsec_...) from your Stripe webhook endpoint. Required when STRIPE_SECRET_KEY is set.
+STRIPE_WEBHOOK_SECRET=""
 ```
 
 The first-install / repair bootstrap now creates `/var/www/lessonflow/shared/.env` from `.env.example`, fills the deploy/update keys above, and restores runtime ownership so `www-data` can keep saving settings.

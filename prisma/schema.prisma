@@ -804,6 +804,10 @@ model Invoice {
   dueAt                DateTime
   sentAt               DateTime?
   paidAt               DateTime?
+  paidVia              String?                     // "manual" | "stripe"
+  payToken             String?                     @unique
+  stripeCheckoutSessionId String?
+  stripePaymentIntentId   String?
   lastReminderSentAt   DateTime?
   lastReminderStage    Int?
   isDeleted            Boolean                     @default(false)
@@ -937,6 +941,7 @@ model NotificationSettings {
   automaticInvoiceRemindersEnabled  Boolean  @default(true)
   invoiceReminderFirstDelayDays     Int      @default(7)
   invoiceReminderResendIntervalDays Int      @default(7)
+  autoCreateInvoiceOnApproval       Boolean  @default(false)
   createdAt                         DateTime @default(now())
   updatedAt                         DateTime @updatedAt
 }

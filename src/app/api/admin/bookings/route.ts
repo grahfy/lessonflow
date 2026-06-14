@@ -20,6 +20,7 @@ import { getCalendarRange } from "@/lib/calendar-range";
 import { log } from "@/lib/observability";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { prisma } from "@/lib/db";
+import { findActiveInvoiceLinksForBookingIds } from "@/lib/invoices/booking-links";
 import { getActiveLessonPricingMap } from "@/lib/lesson-pricing";
 import { ensurePortalCredentialForCustomer } from "@/lib/student-portal/credentials";
 import { tiptapJsonToPlainText } from "@/lib/tiptap-utils";
@@ -209,6 +210,15 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Derive which bookings already have an active (non-void/non-deleted) invoice
+    // link so the calendar can flag approved-but-unbilled lessons with a badge.
+    const bookingIds = rows.map((booking) => booking.id);
+    const activeInvoiceLinks =
+      bookingIds.length > 0
+        ? await prisma.$transaction((tx) => findActiveInvoiceLinksForBookingIds(tx, bookingIds))
+        : [];
+    const billedBookingIds = new Set(activeInvoiceLinks.map((link) => link.bookingId));
+
     // Unified Event Mapping
     const events = [
       ...rows.map((booking) => ({
@@ -221,7 +231,8 @@ export async function GET(request: NextRequest) {
         title: booking.lastName ? `${booking.lastName}, ${booking.firstName}` : booking.name,
         row: {
           ...booking,
-          assignedTeacherName: booking.assignedTeacher?.displayName ?? null
+          assignedTeacherName: booking.assignedTeacher?.displayName ?? null,
+          hasActiveInvoice: billedBookingIds.has(booking.id)
         }
       })),
       ...requestRows.map((requestRow) => ({
