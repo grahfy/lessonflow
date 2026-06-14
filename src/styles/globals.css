@@ -998,6 +998,11 @@ h1 {
   border-color: var(--brand-0);
 }
 
+.admin-input:focus-visible {
+  outline: 2px solid rgba(103, 232, 249, 0.75);
+  outline-offset: 2px;
+}
+
 .admin-input::placeholder {
   color: var(--ink-3);
 }
@@ -1764,6 +1769,13 @@ h1 {
   border-color: rgba(96, 165, 250, 0.66);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
   background: rgba(15, 23, 42, 0.9);
+}
+
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible {
+  outline: 2px solid rgba(103, 232, 249, 0.75);
+  outline-offset: 2px;
 }
 
 .field textarea {

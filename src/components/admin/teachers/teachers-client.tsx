@@ -2,6 +2,7 @@
 
 import { type ChangeEvent, useDeferredValue, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Camera, MapPin, Shield, Sparkles, UserRound, Users } from "lucide-react";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
@@ -183,6 +184,7 @@ export function AdminTeachersClient() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [activeTab, setActiveTab] = useState<StaffEditorTab>("basics");
+  const [pendingDiscardAction, setPendingDiscardAction] = useState<(() => void) | null>(null);
 
   const {
     currentAdmin,
@@ -289,14 +291,21 @@ export function AdminTeachersClient() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isDirty]);
 
-  function confirmDiscardChanges(): boolean {
-    if (!isDirty) return true;
-    return window.confirm("You have unsaved teacher profile changes. Discard them and continue?");
+  /**
+   * If the form is dirty, stores `action` in state and opens the discard-
+   * changes confirmation dialog. The action runs only if the user confirms.
+   * If the form is clean, runs the action immediately and returns true.
+   */
+  function withDiscardGuard(action: () => void): boolean {
+    if (!isDirty) {
+      action();
+      return true;
+    }
+    setPendingDiscardAction(() => action);
+    return false;
   }
 
-  async function openStaff(id: string) {
-    if (!confirmDiscardChanges()) return;
-
+  async function doOpenStaff(id: string) {
     setError("");
     setNotice("");
     setIsCreating(false);
@@ -324,18 +333,22 @@ export function AdminTeachersClient() {
     }
   }
 
-  function beginCreateTeacher() {
-    if (!confirmDiscardChanges()) return;
+  function openStaff(id: string) {
+    withDiscardGuard(() => { void doOpenStaff(id); });
+  }
 
-    const nextForm = emptyStaffForm();
-    setSelectedId("new");
-    setSelectedProfile(null);
-    setForm(nextForm);
-    setBaselineForm(nextForm);
-    setIsCreating(true);
-    setError("");
-    setNotice("");
-    setActiveTab("basics");
+  function beginCreateTeacher() {
+    withDiscardGuard(() => {
+      const nextForm = emptyStaffForm();
+      setSelectedId("new");
+      setSelectedProfile(null);
+      setForm(nextForm);
+      setBaselineForm(nextForm);
+      setIsCreating(true);
+      setError("");
+      setNotice("");
+      setActiveTab("basics");
+    });
   }
 
   function updateForm(patch: Partial<StaffFormState>) {
@@ -951,6 +964,16 @@ export function AdminTeachersClient() {
           </div>
         </AdminCard>
       </div>
+      <ConfirmDialog
+        open={pendingDiscardAction !== null}
+        title="Unsaved Changes"
+        description="You have unsaved teacher profile changes. Discard them and continue?"
+        confirmLabel="Discard Changes"
+        cancelLabel="Keep Editing"
+        destructive
+        onConfirm={() => { const action = pendingDiscardAction; setPendingDiscardAction(null); action?.(); }}
+        onCancel={() => setPendingDiscardAction(null)}
+      />
     </AdminShell>
   );
 }

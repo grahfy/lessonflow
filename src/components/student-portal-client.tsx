@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ReactElement, FormEvent, useCallback, useEffect, useState } from "react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import styles from "@/components/student-portal.module.css";
@@ -47,6 +48,7 @@ export function StudentPortalClient(): ReactElement {
   const [requestLessonMode, setRequestLessonMode] = useState<"in_person" | "video">("in_person");
   const [requestLessonDuration, setRequestLessonDuration] = useState<LessonDurationChoice>("min60");
   const [requestNotes, setRequestNotes] = useState("");
+  const [confirmCancelBookingId, setConfirmCancelBookingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -158,13 +160,6 @@ export function StudentPortalClient(): ReactElement {
   async function cancelBookingById(bookingId: string) {
     if (!bookingId) {
       setError("Select an upcoming appointment to cancel.");
-      return;
-    }
-
-    const confirmed = window.confirm(
-      "Cancel this lesson?\n\nIf less than 24 hours notice is given, the full lesson fee is still payable. If more than 24 hours notice is given, a make-up lesson will be provided within the same week."
-    );
-    if (!confirmed) {
       return;
     }
 
@@ -375,7 +370,7 @@ export function StudentPortalClient(): ReactElement {
                   variant="upcoming"
                   cancellingBookingId={cancellingBookingId}
                   cancelledBookingIds={cancelledBookingIds}
-                  onCancelBooking={(bookingId) => void cancelBookingById(bookingId)}
+                  onCancelBooking={(bookingId) => setConfirmCancelBookingId(bookingId)}
                 />
               </div>
             </section>
@@ -391,6 +386,16 @@ export function StudentPortalClient(): ReactElement {
           </div>
         </>
       ) : null}
+      <ConfirmDialog
+        open={confirmCancelBookingId !== null}
+        title="Cancel Lesson"
+        description={"Cancel this lesson?\n\nIf less than 24 hours notice is given, the full lesson fee is still payable. If more than 24 hours notice is given, a make-up lesson will be provided within the same week."}
+        confirmLabel="Cancel Lesson"
+        cancelLabel="Keep Lesson"
+        destructive
+        onConfirm={() => { const id = confirmCancelBookingId; setConfirmCancelBookingId(null); if (id) void cancelBookingById(id); }}
+        onCancel={() => setConfirmCancelBookingId(null)}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { LessonPlanSectionsEditor } from "@/components/admin/lesson-plans/lesson-plan-sections-editor";
@@ -53,6 +54,7 @@ export function AdminLessonPlansClientV2() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [draft, setDraft] = useState<LessonPlanTemplateV2Input>(buildEmptyLessonPlanTemplateV2Input());
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [confirmArchiveOpen, setConfirmArchiveOpen] = useState(false);
 
   const onAuthError = () => window.location.assign("/admin/login");
   const { admin } = useAdminSession({ onAuthError, onError: setError });
@@ -125,10 +127,9 @@ export function AdminLessonPlansClientV2() {
     setNotice(selectedTemplate ? "Template updated." : "Template created.");
   }
 
-  async function archiveSelectedTemplate() {
+  async function archiveSelectedTemplateConfirmed() {
     if (!selectedTemplate) return;
-    if (!window.confirm(`Archive "${selectedTemplate.title}"? Existing booking plans keep their copied content.`)) return;
-
+    setConfirmArchiveOpen(false);
     setError("");
     setNotice("");
     const ok = await archive(selectedTemplate.id);
@@ -330,7 +331,7 @@ export function AdminLessonPlansClientV2() {
                     className="btn btn-danger"
                     type="button"
                     disabled={saving || !canEditSelectedTemplate}
-                    onClick={() => void archiveSelectedTemplate()}
+                    onClick={() => setConfirmArchiveOpen(true)}
                   >
                     Archive
                   </button>
@@ -350,6 +351,15 @@ export function AdminLessonPlansClientV2() {
           </div>
         </AdminCard>
       </div>
+      <ConfirmDialog
+        open={confirmArchiveOpen}
+        title="Archive Template"
+        description={selectedTemplate ? `Archive "${selectedTemplate.title}"? Existing booking plans keep their copied content.` : "Archive this template?"}
+        confirmLabel="Archive"
+        destructive
+        onConfirm={() => void archiveSelectedTemplateConfirmed()}
+        onCancel={() => setConfirmArchiveOpen(false)}
+      />
     </AdminShell>
   );
 }

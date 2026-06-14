@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AdminEditorPanel, AdminEditorSection } from "@/components/admin/ui/admin-editor-section";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { toMoneyInput } from "@/lib/admin/formatters";
@@ -55,6 +56,7 @@ export function AdminPresetsEditor() {
   const [notice, setNotice] = useState("");
   const [draftPresets, setDraftPresets] = useState<PresetDraft[]>([]);
   const [newPreset, setNewPreset] = useState<NewPresetDraft>(EMPTY_NEW_PRESET);
+  const [pendingDeletePresetId, setPendingDeletePresetId] = useState<string | null>(null);
 
   const { 
     presets, 
@@ -202,8 +204,8 @@ export function AdminPresetsEditor() {
   }
 
   /** Removes a preset after explicit confirmation from the admin. */
-  async function deletePreset(id: string) {
-    if (!window.confirm("Are you sure you want to delete this preset?")) return;
+  async function deletePresetConfirmed(id: string) {
+    setPendingDeletePresetId(null);
     clearMessages();
     const success = await removePresetApi(id);
     if (success) {
@@ -288,7 +290,7 @@ export function AdminPresetsEditor() {
                 <button className="btn btn-secondary" type="button" onClick={() => void updatePreset(preset.id)}>
                   Save Preset
                 </button>
-                <button className="btn btn-danger" type="button" onClick={() => void deletePreset(preset.id)}>
+                <button className="btn btn-danger" type="button" onClick={() => setPendingDeletePresetId(preset.id)}>
                   Delete Preset
                 </button>
               </div>
@@ -367,6 +369,15 @@ export function AdminPresetsEditor() {
           </div>
         </AdminForm>
       </AdminEditorPanel>
+      <ConfirmDialog
+        open={pendingDeletePresetId !== null}
+        title="Delete Preset"
+        description="Are you sure you want to delete this preset?"
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => void deletePresetConfirmed(pendingDeletePresetId!)}
+        onCancel={() => setPendingDeletePresetId(null)}
+      />
     </AdminEditorSection>
   );
 }
