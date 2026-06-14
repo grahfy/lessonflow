@@ -14,7 +14,7 @@
  * suitable for API responses or email attachments.
  */
 
-import { PDFDocument, StandardFonts, rgb, RGB } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, RGB, PDFName, PDFArray, PDFString } from "pdf-lib";
 import { InvoiceTemplateRecord } from "@/lib/invoices/template";
 import { InvoiceTemplate } from "@/generated/prisma/client";
 import { 
@@ -25,7 +25,10 @@ import {
 } from "@/lib/branding";
 import { formatCurrency } from "@/lib/invoices/currency";
 import { getInvoiceTaxName } from "@/lib/invoices/gst-policy";
+import { invoicePayUrl } from "@/lib/invoices/pay-token";
 import { withResolvedInvoicePaymentDetails } from "@/lib/invoices/payment-details";
+import { getPublicSiteUrl } from "@/lib/env";
+import { isStripeConfigured } from "@/lib/stripe/client";
 import fs from "fs/promises";
 import path from "path";
 
@@ -327,6 +330,58 @@ export async function renderInvoicePdf(invoice: InvoiceTemplateRecord, templateC
   page.drawText(`Account Name: ${resolvedInvoice.bankAccountName}`, { x: 40, y, size: 10, font });
   y -= 14;
   page.drawText(`Account Number: ${resolvedInvoice.bankAccountNumber}`, { x: 40, y, size: 10, font });
+
+  // Online payment line. Only shown when Stripe is configured and the invoice is
+  // in a payable state (sent, not paid/void, not deleted) and has a pay token, so
+  // unpayable or pre-Stripe PDFs render exactly as before. Rendered as a short,
+  // clickable "Pay online" link rather than a sprawling raw token URL.
+  if (
+    isStripeConfigured() &&
+    !resolvedInvoice.isDeleted &&
+    resolvedInvoice.status === "sent" &&
+    resolvedInvoice.documentType === "invoice" &&
+    resolvedInvoice.payToken
+  ) {
+    y -= 14;
+    const payUrl = invoicePayUrl(getPublicSiteUrl(), resolvedInvoice.payToken);
+    const linkColor = rgb(0.13, 0.28, 0.85);
+    const linkText = "Pay online";
+    const linkSize = 10;
+    page.drawText(linkText, { x: 40, y, size: linkSize, font, color: linkColor });
+
+    // Attach a clickable URI link annotation over the rendered text. pdf-lib 1.x
+    // has no high-level link helper, so we build the annotation dict directly and
+    // register it in the page's Annots array. The page is freshly created here, so
+    // there are no pre-existing annotations to clobber; we still append defensively
+    // in case that ever changes.
+    try {
+      const linkWidth = font.widthOfTextAtSize(linkText, linkSize);
+      const linkAnnotation = document.context.obj({
+        Type: "Annot",
+        Subtype: "Link",
+        // [x1, y1, x2, y2] hit rect; pad vertically to cover the glyph cap/descent.
+        Rect: [40, y - 2, 40 + linkWidth, y + linkSize],
+        Border: [0, 0, 0],
+        A: {
+          Type: "Action",
+          S: "URI",
+          URI: PDFString.of(payUrl),
+        },
+      });
+      const linkAnnotationRef = document.context.register(linkAnnotation);
+
+      const existingAnnots = page.node.Annots();
+      if (existingAnnots instanceof PDFArray) {
+        existingAnnots.push(linkAnnotationRef);
+      } else {
+        page.node.set(PDFName.of("Annots"), document.context.obj([linkAnnotationRef]));
+      }
+    } catch (error) {
+      // The visible "Pay online" text is already drawn; if annotation wiring fails
+      // for any reason, the PDF still renders correctly (just without the hotspot).
+      console.warn("Failed to attach pay-online link annotation to invoice PDF.", error);
+    }
+  }
 
   if (resolvedInvoice.notes) {
     y -= 30;

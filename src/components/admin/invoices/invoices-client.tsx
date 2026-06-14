@@ -94,6 +94,14 @@ function toCurrency(cents: number, currency: string) {
   return formatCurrency(cents, currency);
 }
 
+/**
+ * Renders how a paid invoice was settled. Legacy rows predating the paidVia column
+ * (null) were only ever settled manually, so they fall back to "Manually".
+ */
+function formatPaidVia(paidVia: InvoiceRow["paidVia"]): string {
+  return paidVia === "stripe" ? "Online (Stripe)" : "Manually";
+}
+
 function toDiscountValueInput(kind: InvoiceDiscountKind | null, value: number | null): string {
   if (!kind || value === null) {
     return "";
@@ -1665,6 +1673,12 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
                         {selectedInvoiceDisplayStatus ?? selectedInvoice.status}
                       </span>
                     </div>
+                    {selectedInvoice.status === 'paid' && (
+                      <div className="invoice-dialog-status-row">
+                        <span>Paid via:</span>
+                        <span>{formatPaidVia(selectedInvoice.paidVia)}</span>
+                      </div>
+                    )}
                     {selectedInvoice.status !== 'paid' && selectedInvoice.status !== 'void' && (
                       <div className="invoice-dialog-status-row invoice-dialog-status-row-alert">
                         <span>Outstanding:</span>

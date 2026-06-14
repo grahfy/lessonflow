@@ -108,6 +108,19 @@ function assignedTeacherLabel(event: AdminCalendarEvent): string | null {
   return null;
 }
 
+/**
+ * An approved booking with no active invoice link is "unbilled". The API derives
+ * `hasActiveInvoice` per booking event; only approved bookings (not requests) can
+ * be billed, so the badge is scoped to those.
+ */
+function isUnbilledBooking(event: AdminCalendarEvent): boolean {
+  if (event.entityType !== "booking" || event.status !== "approved") {
+    return false;
+  }
+  const row = event.row as { hasActiveInvoice?: unknown };
+  return row.hasActiveInvoice === false;
+}
+
 function countLabel(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }
@@ -129,7 +142,8 @@ function calendarLegendCounts(events: AdminCalendarEvent[]) {
     confirmed: events.filter((event) => event.color === "green").length,
     pending: events.filter((event) => event.color === "yellow").length,
     attention: events.filter((event) => event.color === "red").length,
-    archived: events.filter((event) => event.color === "slate").length
+    archived: events.filter((event) => event.color === "slate").length,
+    unbilled: events.filter((event) => isUnbilledBooking(event)).length
   };
 }
 
@@ -162,6 +176,7 @@ function DayCell(props: {
           >
             <span>{eventTime(event.startAt)}</span>
             <strong>{event.title}</strong>
+            {isUnbilledBooking(event) ? <span className="calendar-event-badge is-unbilled" title="Approved booking with no invoice yet">Unbilled</span> : null}
             <small>{assignedTeacherLabel(event) || "Unassigned"}</small>
           </button>
         ))}
@@ -200,6 +215,7 @@ function YearMonthCell(props: {
           >
             <span>{format(parseISO(event.startAt), "d MMM")} · {eventTime(event.startAt)}</span>
             <strong>{event.title}</strong>
+            {isUnbilledBooking(event) ? <span className="calendar-event-badge is-unbilled" title="Approved booking with no invoice yet">Unbilled</span> : null}
             <small>{assignedTeacherLabel(event) || "Unassigned"}</small>
           </button>
         ))}
@@ -225,6 +241,7 @@ export function AdminBookingCalendar(props: Props) {
       <span className="calendar-legend-chip is-yellow">Pending {legendCounts.pending}</span>
       <span className="calendar-legend-chip is-red">Attention {legendCounts.attention}</span>
       <span className="calendar-legend-chip is-slate">Archived {legendCounts.archived}</span>
+      <span className="calendar-legend-chip is-amber">Unbilled {legendCounts.unbilled}</span>
     </div>
   );
 

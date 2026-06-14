@@ -19,6 +19,7 @@ type NotificationSettingsFormState = {
   automaticInvoiceRemindersEnabled: boolean;
   invoiceReminderFirstDelayDays: string;
   invoiceReminderResendIntervalDays: string;
+  autoCreateInvoiceOnApproval: boolean;
   updatedAt: string | null;
 };
 
@@ -28,6 +29,7 @@ const EMPTY_NOTIFICATION_SETTINGS: NotificationSettingsFormState = {
   automaticInvoiceRemindersEnabled: true,
   invoiceReminderFirstDelayDays: "7",
   invoiceReminderResendIntervalDays: "7",
+  autoCreateInvoiceOnApproval: false,
   updatedAt: null
 };
 
@@ -41,6 +43,7 @@ function toFormState(input?: Partial<NotificationSettingsState>): NotificationSe
     automaticInvoiceRemindersEnabled: input?.automaticInvoiceRemindersEnabled ?? true,
     invoiceReminderFirstDelayDays: String(input?.invoiceReminderFirstDelayDays ?? 7),
     invoiceReminderResendIntervalDays: String(input?.invoiceReminderResendIntervalDays ?? 7),
+    autoCreateInvoiceOnApproval: input?.autoCreateInvoiceOnApproval ?? false,
     updatedAt: input?.updatedAt ?? null
   };
 }
@@ -93,7 +96,8 @@ export function AdminNotificationSettingsEditor() {
           categoryPreferences: settings.categoryPreferences,
           automaticInvoiceRemindersEnabled: settings.automaticInvoiceRemindersEnabled,
           invoiceReminderFirstDelayDays: settings.invoiceReminderFirstDelayDays,
-          invoiceReminderResendIntervalDays: settings.invoiceReminderResendIntervalDays
+          invoiceReminderResendIntervalDays: settings.invoiceReminderResendIntervalDays,
+          autoCreateInvoiceOnApproval: settings.autoCreateInvoiceOnApproval
         })
       });
 
@@ -228,6 +232,30 @@ export function AdminNotificationSettingsEditor() {
                 }))
               }
             />
+          </AdminField>
+        </AdminForm>
+      </AdminEditorPanel>
+
+      <AdminEditorPanel title="Auto-Invoicing" subdued>
+        <AdminForm>
+          <AdminField
+            label="Auto-create draft invoice on approval"
+            description="When an owner approves a booking request, automatically create a DRAFT invoice for each new booking from its lesson pricing. Drafts are never sent automatically — review and send them as usual."
+            fullWidth
+          >
+            <label className="admin-inline-checkbox">
+              <input
+                type="checkbox"
+                checked={settings.autoCreateInvoiceOnApproval}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    autoCreateInvoiceOnApproval: event.target.checked
+                  }))
+                }
+              />
+              Enabled
+            </label>
           </AdminField>
         </AdminForm>
       </AdminEditorPanel>

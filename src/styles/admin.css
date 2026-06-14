@@ -5513,6 +5513,11 @@
   color: #dbeafe;
 }
 
+.calendar-legend-chip.is-amber {
+  border-color: rgba(244, 183, 64, 0.34);
+  color: #fde68a;
+}
+
 .calendar-grid {
   display: grid;
   gap: 8px;
@@ -5619,6 +5624,20 @@
   color: rgba(255, 255, 255, 0.82);
   font-size: 0.68rem;
   letter-spacing: 0.03em;
+}
+
+/* Compact pill flagging an approved booking that has no active invoice yet. */
+.calendar-event span.calendar-event-badge.is-unbilled {
+  justify-self: start;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #1a1205;
+  background: #f4b740;
+  border: 1px solid rgba(0, 0, 0, 0.15);
 }
 
 .calendar-year-month {

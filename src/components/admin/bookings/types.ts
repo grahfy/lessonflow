@@ -22,6 +22,7 @@ export type BookingRowData = Record<string, unknown> & {
   skillLevel?: string | null;
   lessonDuration?: string | null;
   customDurationMinutes?: string | number | null;
+  hasActiveInvoice?: boolean;
 };
 
 export type BookingDialogForm = {

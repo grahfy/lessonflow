@@ -67,8 +67,11 @@ export async function POST(request: NextRequest, { params }: Params) {
       }
     });
 
+    // The pay token + "Pay online" link are provisioned inside
+    // sendCustomerInvoiceEmail (invoice-events.ts) so the email and the attached
+    // PDF both carry a working link; nothing extra is needed here.
     try {
-      const deliveryResult = await sendCustomerInvoiceEmail(invoice);
+      const deliveryResult = await sendCustomerInvoiceEmail(updated);
       if (deliveryResult.status === "failed") {
         return NextResponse.json(
           {

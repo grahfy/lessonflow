@@ -249,12 +249,31 @@ export function customerPortalCredentialTemplate(input: {
   };
 }
 
+/**
+ * Renders a "Pay online" call-to-action block for invoice emails. Returns an
+ * empty string when no pay URL is provided, so the templates render exactly as
+ * before whenever online payment is unavailable (e.g. Stripe not configured or
+ * the invoice is not in a payable state). The caller is responsible for only
+ * passing a URL when payment should be offered.
+ */
+function payOnlineCta(payUrl?: string | null): string {
+  const url = payUrl?.trim();
+  if (!url) {
+    return "";
+  }
+  return `
+        <p style="margin:0 0 16px;">
+          <a href="${escapeHtml(url)}" style="display:inline-block;padding:12px 22px;border-radius:10px;background:#2247d8;color:#ffffff;font-weight:700;text-decoration:none;">Pay online</a>
+        </p>`;
+}
+
 export function customerInvoiceTemplate(input: {
   invoiceNumber: string;
   customerName: string;
   dueAt: Date;
   totalCents: number;
   sellerBusinessName: string;
+  payUrl?: string | null;
 }) {
   return {
     subject: `Invoice ${input.invoiceNumber} from ${input.sellerBusinessName}`,
@@ -265,7 +284,7 @@ export function customerInvoiceTemplate(input: {
         <p style="margin:0 0 10px;">Hi ${escapeHtml(input.customerName)},</p>
         <p style="margin:0 0 10px;">Please find invoice <strong>${escapeHtml(input.invoiceNumber)}</strong> attached as a PDF.</p>
         <p style="margin:0 0 10px;"><strong>Total due:</strong> ${money(input.totalCents)}</p>
-        <p style="margin:0 0 10px;"><strong>Due date:</strong> ${fmt(input.dueAt)}</p>
+        <p style="margin:0 0 10px;"><strong>Due date:</strong> ${fmt(input.dueAt)}</p>${payOnlineCta(input.payUrl)}
         <p style="margin:0;">If you've already paid, please disregard this message.</p>
       `
     })
@@ -282,6 +301,7 @@ export function customerInvoiceReminderTemplate(input: {
   totalCents: number;
   sellerBusinessName: string;
   overdueDays: number;
+  payUrl?: string | null;
 }) {
   return {
     subject: `Reminder: invoice ${input.invoiceNumber} is overdue`,
@@ -293,7 +313,7 @@ export function customerInvoiceReminderTemplate(input: {
         <p style="margin:0 0 10px;">This is a reminder that invoice <strong>${escapeHtml(input.invoiceNumber)}</strong> is currently overdue.</p>
         <p style="margin:0 0 10px;"><strong>Total due:</strong> ${money(input.totalCents)}</p>
         <p style="margin:0 0 10px;"><strong>Due date:</strong> ${fmt(input.dueAt)}</p>
-        <p style="margin:0 0 10px;"><strong>Overdue by:</strong> ${input.overdueDays} day${input.overdueDays === 1 ? "" : "s"}</p>
+        <p style="margin:0 0 10px;"><strong>Overdue by:</strong> ${input.overdueDays} day${input.overdueDays === 1 ? "" : "s"}</p>${payOnlineCta(input.payUrl)}
         <p style="margin:0 0 10px;">If payment has already been made, please disregard this reminder.</p>
         <p style="margin:0;">${escapeHtml(input.sellerBusinessName)}</p>
       `
