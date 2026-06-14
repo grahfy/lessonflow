@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AppDialog } from "@/components/ui/app-dialog";
@@ -82,6 +83,7 @@ export function SystemLogsClient() {
   const [isClearBeforeOpen, setIsClearBeforeOpen] = useState(false);
   const [clearCutoffLocal, setClearCutoffLocal] = useState("");
   const [clearingMode, setClearingMode] = useState<"before" | "all" | null>(null);
+  const [confirmClearAllOpen, setConfirmClearAllOpen] = useState(false);
   const [downloadingLogs, setDownloadingLogs] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -223,10 +225,6 @@ export function SystemLogsClient() {
   }, [buildLogQuery]);
 
   const handleClearAllLogs = useCallback(async () => {
-    if (!window.confirm("Delete every system log entry? This cannot be undone.")) {
-      return;
-    }
-
     setClearingMode("all");
     setError("");
     try {
@@ -388,7 +386,7 @@ export function SystemLogsClient() {
                 <button
                   className="btn btn-danger"
                   type="button"
-                  onClick={() => void handleClearAllLogs()}
+                  onClick={() => setConfirmClearAllOpen(true)}
                   disabled={clearingMode !== null}
                 >
                   {clearingMode === "all" ? "CLEARING..." : "CLEAR ALL"}
@@ -704,6 +702,15 @@ export function SystemLogsClient() {
           <p className="helper-text">Timezone: {APP_TIMEZONE}</p>
         </form>
       </AppDialog>
+      <ConfirmDialog
+        open={confirmClearAllOpen}
+        title="Clear All Logs"
+        description="Delete every system log entry? This cannot be undone."
+        confirmLabel="Clear All"
+        destructive
+        onConfirm={() => { setConfirmClearAllOpen(false); void handleClearAllLogs(); }}
+        onCancel={() => setConfirmClearAllOpen(false)}
+      />
     </AdminShell>
   );
 }

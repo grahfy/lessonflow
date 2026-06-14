@@ -23,6 +23,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { format, parseISO, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, addYears, subYears } from "date-fns";
 import { AlertCircle, CalendarRange, Clock3, UserRound } from "lucide-react";
 
@@ -190,6 +191,7 @@ export function AdminBookingsClient() {
   // Email Composer State
   const [emailComposerSubject, setEmailComposerSubject] = useState("");
   const [emailComposerMessage, setEmailComposerMessage] = useState("");
+  const [pendingConfirm, setPendingConfirm] = useState<{ title: string; description: string; confirmLabel: string; destructive?: boolean; onConfirm: () => void } | null>(null);
 
   // Materials State (Default booking link for uploads; never filters the list)
   const [materialsBookingId, setMaterialsBookingId] = useState("");
@@ -861,11 +863,21 @@ export function AdminBookingsClient() {
     }
   }
 
-  async function deleteBooking() {
+  function deleteBooking() {
     const event = events.find(e => e.id === selectedKey);
-    if (!selectedKey || !event || !window.confirm("Are you sure you want to cancel this booking?")) return;
+    if (!selectedKey || !event) return;
+    setPendingConfirm({
+      title: "Cancel Booking",
+      description: "Are you sure you want to cancel this booking?",
+      confirmLabel: "Cancel Booking",
+      destructive: true,
+      onConfirm: () => void doDeleteBooking(selectedKey, event)
+    });
+  }
+
+  async function doDeleteBooking(key: string, event: (typeof events)[number]) {
     setBusyAction("delete");
-    const result = await removeBookingApi(selectedKey, event.entityType);
+    const result = await removeBookingApi(key, event.entityType);
     setBusyAction(null);
     if (result.ok) {
       setNotice(result.notice || "Booking cancelled.");
@@ -1022,12 +1034,20 @@ export function AdminBookingsClient() {
     }
 
     if (lessonPlanDraft) {
-      const shouldReplace = window.confirm(`Replace the current booking lesson plan with "${template.title}"? Unsaved changes in this draft will be overwritten.`);
-      if (!shouldReplace) {
-        return;
-      }
+      setPendingConfirm({
+        title: "Replace Lesson Plan",
+        description: `Replace the current booking lesson plan with "${template.title}"? Unsaved changes in this draft will be overwritten.`,
+        confirmLabel: "Replace",
+        destructive: true,
+        onConfirm: () => doApplyLessonPlanTemplate(template)
+      });
+      return;
     }
 
+    doApplyLessonPlanTemplate(template);
+  }
+
+  function doApplyLessonPlanTemplate(template: (typeof lessonPlanTemplates)[number]) {
     setLessonPlanDraft({
       sections: template.sections.length > 0
         ? template.sections.map((s) => ({ ...s, content: { ...s.content, content: [...(s.content.content ?? [])] } }))
@@ -1045,12 +1065,19 @@ export function AdminBookingsClient() {
       return;
     }
 
-    const shouldClear = window.confirm(
-      lessonPlan
+    setPendingConfirm({
+      title: "Clear Lesson Plan",
+      description: lessonPlan
         ? "Clear this booking lesson plan? This will remove the saved lesson plan for this booking."
-        : "Clear this unsaved booking lesson-plan draft?"
-    );
-    if (!shouldClear) {
+        : "Clear this unsaved booking lesson-plan draft?",
+      confirmLabel: "Clear",
+      destructive: true,
+      onConfirm: () => void doClearLessonPlanDraft()
+    });
+  }
+
+  async function doClearLessonPlanDraft() {
+    if (!lessonPlanDraft) {
       return;
     }
 
@@ -1577,6 +1604,15 @@ export function AdminBookingsClient() {
           busyAction={busyAction}
         />
       )}
+      <ConfirmDialog
+        open={pendingConfirm !== null}
+        title={pendingConfirm?.title ?? ""}
+        description={pendingConfirm?.description ?? ""}
+        confirmLabel={pendingConfirm?.confirmLabel ?? "Confirm"}
+        destructive={pendingConfirm?.destructive}
+        onConfirm={() => { const cb = pendingConfirm?.onConfirm; setPendingConfirm(null); cb?.(); }}
+        onCancel={() => setPendingConfirm(null)}
+      />
     </AdminShell>
   );
 }

@@ -45,6 +45,9 @@ type AppDialogBaseProps = PropsWithChildren<{
   backdropClassName?: string;
   lockBodyScrollArea?: boolean;
   hideHeaderClose?: boolean;
+  /** Override the ARIA role on the dialog panel (default: "dialog"). Use
+   *  "alertdialog" for confirmation prompts that interrupt the user workflow. */
+  panelRole?: "dialog" | "alertdialog";
 }>;
 
 export type AppDialogProps = AppDialogBaseProps & AppDialogLabel;
@@ -138,6 +141,7 @@ export function AppDialog({
   backdropClassName,
   lockBodyScrollArea,
   hideHeaderClose,
+  panelRole,
   children
 }: AppDialogProps) {
   const dialogPanelRef = useRef<HTMLDivElement | null>(null);
@@ -291,7 +295,7 @@ export function AppDialog({
         // NOTE: Stop propagation so click-away close only applies to the
         // backdrop, not interactive controls inside the dialog panel.
         onClick={(event) => event.stopPropagation()}
-        role="dialog"
+        role={panelRole ?? "dialog"}
         aria-modal="true"
         aria-labelledby={titleId}
         aria-label={title ? undefined : ariaLabel}

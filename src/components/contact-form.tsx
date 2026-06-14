@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 import { CaptchaField, useCaptcha } from "@/components/captcha";
 import { useNoticeTween } from "@/components/motion/use-notice-tween";
@@ -40,19 +40,30 @@ function getFieldErrorMessage(result: unknown): string | null {
   return null;
 }
 
+type ContactFieldErrors = Partial<Record<"name" | "email" | "message", string>>;
+
 export function ContactForm() {
   const [state, setState] = useState<ContactState>({ status: "idle" });
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<ContactFieldErrors>({});
   const successNoticeRef = useNoticeTween(state.status === "success");
   const errorNoticeRef = useNoticeTween(state.status === "error");
+  const successFocusRef = useRef<HTMLParagraphElement>(null);
   const captcha = useCaptcha();
+
+  /** Move keyboard focus to the success notice when it appears. */
+  useEffect(() => {
+    if (state.status === "success" && successFocusRef.current) {
+      successFocusRef.current.focus();
+    }
+  }, [state.status]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     // Capture the form element synchronously before any awaits. React event
     // objects do not guarantee `currentTarget` remains usable later.
     const formElement = event.currentTarget;
-    
+
     const form = new FormData(formElement);
     const payload = {
       name: String(form.get("name") || "").trim(),
@@ -62,15 +73,26 @@ export function ContactForm() {
       website: String(form.get("website") || "")
     };
 
-    // Enforce trimmed required fields before sending to avoid whitespace-only
-    // submissions passing browser `required` checks.
-    if (!payload.name || !payload.email || !payload.message) {
-      setState({
-        status: "error",
-        message: "Name, email, and message are required before sending."
-      });
+    // Per-field inline validation before sending.
+    const errors: ContactFieldErrors = {};
+    if (!payload.name) {
+      errors.name = "Name is required.";
+    }
+    if (!payload.email) {
+      errors.email = "Email address is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
+      errors.email = "Enter a valid email address.";
+    }
+    if (!payload.message) {
+      errors.message = "Message is required.";
+    } else if (payload.message.length < 10) {
+      errors.message = "Message must be at least 10 characters.";
+    }
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       return;
     }
+    setFieldErrors({});
 
     // CAPTCHA is checked client-side for presence/availability first to avoid unnecessary requests.
     if (!captcha.validateAnswer()) {
@@ -132,12 +154,34 @@ export function ContactForm() {
     <form className="form-grid" onSubmit={onSubmit} data-motion-item="contact-form">
       <div className="field" data-motion-item="contact-name-field">
         <label htmlFor="contact-name">Name</label>
-        <input id="contact-name" name="name" minLength={2} maxLength={120} required />
+        <input
+          id="contact-name"
+          name="name"
+          minLength={2}
+          maxLength={120}
+          required
+          aria-invalid={fieldErrors.name ? true : undefined}
+          aria-describedby={fieldErrors.name ? "contact-name-error" : undefined}
+        />
+        {fieldErrors.name ? (
+          <p id="contact-name-error" className="field-error" role="alert">{fieldErrors.name}</p>
+        ) : null}
       </div>
 
       <div className="field" data-motion-item="contact-email-field">
         <label htmlFor="contact-email">Email</label>
-        <input id="contact-email" type="email" name="email" maxLength={200} required />
+        <input
+          id="contact-email"
+          type="email"
+          name="email"
+          maxLength={200}
+          required
+          aria-invalid={fieldErrors.email ? true : undefined}
+          aria-describedby={fieldErrors.email ? "contact-email-error" : undefined}
+        />
+        {fieldErrors.email ? (
+          <p id="contact-email-error" className="field-error" role="alert">{fieldErrors.email}</p>
+        ) : null}
       </div>
 
       <div className="field full" data-motion-item="contact-phone-field">
@@ -147,7 +191,18 @@ export function ContactForm() {
 
       <div className="field full" data-motion-item="contact-message-field">
         <label htmlFor="contact-message">Message</label>
-        <textarea id="contact-message" name="message" minLength={10} maxLength={2000} required />
+        <textarea
+          id="contact-message"
+          name="message"
+          minLength={10}
+          maxLength={2000}
+          required
+          aria-invalid={fieldErrors.message ? true : undefined}
+          aria-describedby={fieldErrors.message ? "contact-message-error" : undefined}
+        />
+        {fieldErrors.message ? (
+          <p id="contact-message-error" className="field-error" role="alert">{fieldErrors.message}</p>
+        ) : null}
       </div>
 
       <CaptchaField idPrefix="contact" captcha={captcha} motionItem="contact-captcha-field" />
@@ -159,7 +214,17 @@ export function ContactForm() {
       </div>
 
       {state.status === "success" ? (
-        <p className="notice success" role="status" ref={successNoticeRef} data-motion-item="contact-success-notice">
+        <p
+          className="notice success"
+          role="status"
+          aria-live="polite"
+          tabIndex={-1}
+          ref={(node) => {
+            successNoticeRef.current = node;
+            successFocusRef.current = node;
+          }}
+          data-motion-item="contact-success-notice"
+        >
           {state.message}
         </p>
       ) : null}

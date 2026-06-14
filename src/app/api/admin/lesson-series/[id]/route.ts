@@ -4,6 +4,7 @@ import { jsonUnexpectedError } from "@/lib/api-errors";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import {
   archiveLessonSeries,
+  lessonSeriesUpdateSchema,
   updateLessonSeries,
 } from "@/lib/lesson-series";
 
@@ -21,11 +22,19 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
     const { id } = await params;
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    const parsed = lessonSeriesUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid lesson series payload.", details: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+
     const series = await updateLessonSeries(
       { id: admin.id, role: admin.role },
       id,
-      body
+      parsed.data
     );
 
     return NextResponse.json({ ok: true, series });

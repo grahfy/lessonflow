@@ -13,7 +13,7 @@
 
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { CaptchaField, useCaptcha } from "@/components/captcha";
 import { dateTimeLocalToIso } from "@/lib/time";
@@ -29,14 +29,21 @@ type BookingState =
 /**
  * Primary component for the public-facing booking request page.
  */
+type BookingFieldErrors = Partial<Record<
+  "firstName" | "lastName" | "email" | "phone" | "postcode" | "lessonMode" | "skillLevel" | "duration" | "customDurationMinutes" | "requestedStartAt",
+  string
+>>;
+
 export function BookingForm() {
   const [state, setState] = useState<BookingState>({ status: "idle" });
   const [loading, setLoading] = useState(false);
-  
+  const [fieldErrors, setFieldErrors] = useState<BookingFieldErrors>({});
+  const successRef = useRef<HTMLParagraphElement>(null);
+
   // DRIVING UI: keep durationType and lessonMode in state for conditional inputs
   const [durationType, setDurationType] = useState<"min30" | "min60" | "custom">("min60");
   const [lessonMode, setLessonMode] = useState<"in_person" | "video">("in_person");
-  
+
   const captcha = useCaptcha();
 
   /** Close status dialog on Escape key. */
@@ -51,12 +58,69 @@ export function BookingForm() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [state.status]);
 
+  /** Move keyboard focus into the success dialog when it appears. */
+  useEffect(() => {
+    if (state.status === "success" && successRef.current) {
+      successRef.current.focus();
+    }
+  }, [state.status]);
+
+  /**
+   * Validates fields client-side and returns an error map. Empty map = valid.
+   */
+  function validateFields(form: FormData): BookingFieldErrors {
+    const errors: BookingFieldErrors = {};
+    if (!String(form.get("firstName") || "").trim()) {
+      errors.firstName = "First name is required.";
+    }
+    if (!String(form.get("lastName") || "").trim()) {
+      errors.lastName = "Last name is required.";
+    }
+    const email = String(form.get("email") || "").trim();
+    if (!email) {
+      errors.email = "Email address is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.email = "Enter a valid email address.";
+    }
+    const phone = String(form.get("phone") || "").replace(/\D/g, "");
+    if (!phone) {
+      errors.phone = "Phone number is required.";
+    } else if (phone.length !== 10) {
+      errors.phone = "Enter a 10-digit Australian phone number.";
+    }
+    const postcode = String(form.get("postcode") || "").replace(/\D/g, "");
+    if (!postcode) {
+      errors.postcode = "Postcode is required.";
+    } else if (postcode.length !== 4) {
+      errors.postcode = "Enter a 4-digit Australian postcode.";
+    }
+    if (!String(form.get("requestedStartAt") || "")) {
+      errors.requestedStartAt = "Please choose a start date and time.";
+    }
+    if (durationType === "custom") {
+      const custom = String(form.get("customDurationMinutes") || "");
+      if (!custom || !/^[0-9]{2,3}$/.test(custom)) {
+        errors.customDurationMinutes = "Enter a custom duration in minutes (2–3 digits).";
+      }
+    }
+    return errors;
+  }
+
   /**
    * Main submission handler.
    */
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formElement = event.currentTarget;
+
+    // CLIENT-SIDE FIELD VALIDATION
+    const form = new FormData(formElement);
+    const errors = validateFields(form);
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      return;
+    }
+    setFieldErrors({});
 
     // STEP 1: CAPTCHA CHECK
     if (!captcha.validateAnswer()) {
@@ -92,7 +156,6 @@ export function BookingForm() {
       }
 
       // STEP 3: DATA AGGREGATION
-      const form = new FormData(formElement);
       const firstName = String(form.get("firstName") || "").trim();
       const lastName = String(form.get("lastName") || "").trim();
       const fullName = [firstName, lastName].filter(Boolean).join(" ");
@@ -200,15 +263,43 @@ export function BookingForm() {
     <form className="form-grid" onSubmit={onSubmit} data-motion-item="booking-form">
       <div className="field" data-motion-item="booking-field">
         <label htmlFor="book-first-name">First Name *</label>
-        <input id="book-first-name" name="firstName" required />
+        <input
+          id="book-first-name"
+          name="firstName"
+          required
+          aria-invalid={fieldErrors.firstName ? true : undefined}
+          aria-describedby={fieldErrors.firstName ? "book-first-name-error" : undefined}
+        />
+        {fieldErrors.firstName ? (
+          <p id="book-first-name-error" className="field-error" role="alert">{fieldErrors.firstName}</p>
+        ) : null}
       </div>
       <div className="field" data-motion-item="booking-field">
         <label htmlFor="book-last-name">Last Name *</label>
-        <input id="book-last-name" name="lastName" required />
+        <input
+          id="book-last-name"
+          name="lastName"
+          required
+          aria-invalid={fieldErrors.lastName ? true : undefined}
+          aria-describedby={fieldErrors.lastName ? "book-last-name-error" : undefined}
+        />
+        {fieldErrors.lastName ? (
+          <p id="book-last-name-error" className="field-error" role="alert">{fieldErrors.lastName}</p>
+        ) : null}
       </div>
       <div className="field" data-motion-item="booking-field">
         <label htmlFor="book-email">Email *</label>
-        <input id="book-email" type="email" name="email" required />
+        <input
+          id="book-email"
+          type="email"
+          name="email"
+          required
+          aria-invalid={fieldErrors.email ? true : undefined}
+          aria-describedby={fieldErrors.email ? "book-email-error" : undefined}
+        />
+        {fieldErrors.email ? (
+          <p id="book-email-error" className="field-error" role="alert">{fieldErrors.email}</p>
+        ) : null}
       </div>
       <div className="field field-compact" data-motion-item="booking-field">
         <label htmlFor="book-phone">Phone *</label>
@@ -221,11 +312,16 @@ export function BookingForm() {
             inputMode="numeric"
             pattern="[0-9]{10}"
             placeholder="10 digits"
+            aria-invalid={fieldErrors.phone ? true : undefined}
+            aria-describedby={fieldErrors.phone ? "book-phone-error" : undefined}
             onInput={(event) => {
               event.currentTarget.value = event.currentTarget.value.replace(/\D/g, "").slice(0, 10);
             }}
           />
         </Tooltip>
+        {fieldErrors.phone ? (
+          <p id="book-phone-error" className="field-error" role="alert">{fieldErrors.phone}</p>
+        ) : null}
       </div>
       <div className="field field-compact" data-motion-item="booking-field">
         <label htmlFor="book-postcode">Postcode *</label>
@@ -238,11 +334,16 @@ export function BookingForm() {
             inputMode="numeric"
             pattern="[0-9]{4}"
             placeholder="3000"
+            aria-invalid={fieldErrors.postcode ? true : undefined}
+            aria-describedby={fieldErrors.postcode ? "book-postcode-error" : undefined}
             onInput={(event) => {
               event.currentTarget.value = event.currentTarget.value.replace(/\D/g, "").slice(0, 4);
             }}
           />
         </Tooltip>
+        {fieldErrors.postcode ? (
+          <p id="book-postcode-error" className="field-error" role="alert">{fieldErrors.postcode}</p>
+        ) : null}
       </div>
       <div className="field" data-motion-item="booking-field">
         <label htmlFor="book-mode">Mode *</label>
@@ -289,15 +390,30 @@ export function BookingForm() {
             inputMode="numeric"
             pattern="[0-9]{2,3}"
             placeholder="e.g. 45"
+            aria-invalid={fieldErrors.customDurationMinutes ? true : undefined}
+            aria-describedby={fieldErrors.customDurationMinutes ? "book-custom-duration-error" : undefined}
             onInput={(event) => {
               event.currentTarget.value = event.currentTarget.value.replace(/\D/g, "").slice(0, 3);
             }}
           />
+          {fieldErrors.customDurationMinutes ? (
+            <p id="book-custom-duration-error" className="field-error" role="alert">{fieldErrors.customDurationMinutes}</p>
+          ) : null}
         </div>
       ) : null}
       <div className="field" data-motion-item="booking-field">
         <label htmlFor="book-start">Start *</label>
-        <input id="book-start" type="datetime-local" name="requestedStartAt" required />
+        <input
+          id="book-start"
+          type="datetime-local"
+          name="requestedStartAt"
+          required
+          aria-invalid={fieldErrors.requestedStartAt ? true : undefined}
+          aria-describedby={fieldErrors.requestedStartAt ? "book-start-error" : undefined}
+        />
+        {fieldErrors.requestedStartAt ? (
+          <p id="book-start-error" className="field-error" role="alert">{fieldErrors.requestedStartAt}</p>
+        ) : null}
       </div>
 
       <div className="field full" data-motion-item="booking-field">
@@ -341,6 +457,8 @@ export function BookingForm() {
               data-motion-item={state.status === "success" ? "booking-success-notice" : "booking-error-notice"}
               role={state.status === "success" ? "status" : "alert"}
               aria-live={state.status === "success" ? "polite" : "assertive"}
+              ref={state.status === "success" ? successRef : undefined}
+              tabIndex={state.status === "success" ? -1 : undefined}
             >
               {state.message}
             </p>

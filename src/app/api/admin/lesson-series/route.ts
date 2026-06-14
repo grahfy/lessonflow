@@ -4,6 +4,7 @@ import { jsonUnexpectedError } from "@/lib/api-errors";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import {
   createLessonSeries,
+  lessonSeriesInputSchema,
   listLessonSeries,
 } from "@/lib/lesson-series";
 
@@ -41,10 +42,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    const parsed = lessonSeriesInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid lesson series payload.", details: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+
     const series = await createLessonSeries(
       { id: admin.id, role: admin.role },
-      body
+      parsed.data
     );
 
     return NextResponse.json({ ok: true, series }, { status: 201 });

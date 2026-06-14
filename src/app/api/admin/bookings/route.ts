@@ -17,6 +17,7 @@ import { jsonUnexpectedError } from "@/lib/api-errors";
 import { adminManualBookingSchema, formatBookingAddress, generateRecurringStartDates, getBookingEnd, getDurationMinutes } from "@/lib/booking-rules";
 import { customerSnapshotFromInput, normalizeEmail, normalizePhone } from "@/lib/customer-match";
 import { getCalendarRange } from "@/lib/calendar-range";
+import { log } from "@/lib/observability";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { prisma } from "@/lib/db";
 import { getActiveLessonPricingMap } from "@/lib/lesson-pricing";
@@ -38,6 +39,21 @@ const manualBookingSchema = adminManualBookingSchema.and(
 );
 
 type ManualBookingInput = z.infer<typeof manualBookingSchema>;
+
+/**
+ * Safety cap on calendar rows returned per entity in the GET handler.
+ * RATIONALE: The single Node process runs under a 1G memory cap, so even though
+ * the calendar is constrained by a date window we add an explicit `take` bound
+ * to guarantee a pathological window can never load an unbounded result set.
+ */
+const MAX_CALENDAR_ROWS = 2000;
+
+/**
+ * Hard ceiling on the calendar window (in days). A request whose computed range
+ * exceeds this is rejected so the client cannot ask for an effectively unbounded
+ * span. The widest legitimate view is "year", which is comfortably under this.
+ */
+const MAX_CALENDAR_RANGE_DAYS = 400;
 
 /**
  * Internal helper to create a new customer record from booking data.
@@ -119,7 +135,14 @@ export async function GET(request: NextRequest) {
     if (Number.isNaN(range.start.getTime()) || Number.isNaN(range.end.getTime())) {
       return NextResponse.json({ error: "Invalid calendar date." }, { status: 400 });
     }
-    
+
+    // Clamp the requested window: reject spans wider than the supported views so a
+    // crafted `date`/`view` combination can never request an unbounded range.
+    const rangeDays = (range.end.getTime() - range.start.getTime()) / (24 * 60 * 60 * 1000);
+    if (rangeDays > MAX_CALENDAR_RANGE_DAYS) {
+      return NextResponse.json({ error: "Calendar range is too large." }, { status: 400 });
+    }
+
     const now = new Date();
     const recencyCutoff = getRecencyCutoff(now);
 
@@ -148,7 +171,8 @@ export async function GET(request: NextRequest) {
           }
         }
       },
-      orderBy: { startAt: "asc" }
+      orderBy: { startAt: "asc" },
+      take: MAX_CALENDAR_ROWS
     });
 
     // Fetch pending and recently rejected/cancelled requests
@@ -170,8 +194,20 @@ export async function GET(request: NextRequest) {
           }
         }
       },
-      orderBy: { requestedStartAt: "asc" }
+      orderBy: { requestedStartAt: "asc" },
+      take: MAX_CALENDAR_ROWS
     });
+
+    // RATIONALE: The take caps protect the 1G process from an oversized window,
+    // but if either cap is actually hit the calendar is silently truncated
+    // (asc order drops the latest rows). Warn so it's diagnosable rather than mysterious.
+    if (rows.length === MAX_CALENDAR_ROWS || requestRows.length === MAX_CALENDAR_ROWS) {
+      log("warn", "admin_bookings.calendar_row_cap_reached", {
+        bookings: rows.length,
+        requests: requestRows.length,
+        cap: MAX_CALENDAR_ROWS
+      });
+    }
 
     // Unified Event Mapping
     const events = [

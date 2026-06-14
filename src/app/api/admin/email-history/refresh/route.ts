@@ -7,6 +7,14 @@ import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
 import { refreshEmailHistoryForAddress } from "@/lib/email/history";
+import { log } from "@/lib/observability";
+
+/**
+ * Upper bound on customer rows resolved for an email-history refresh target.
+ * Bounds the lookup under the single-process 1G memory cap; hitting the cap is
+ * logged for investigation.
+ */
+const MAX_EMAIL_HISTORY_CUSTOMERS = 500;
 
 const targetSchema = z.object({
   customerId: z.string().trim().min(1).optional(),
@@ -48,8 +56,17 @@ async function resolveAuthorizedCustomerIds(
         },
     select: {
       id: true
-    }
+    },
+    take: MAX_EMAIL_HISTORY_CUSTOMERS
   });
+
+  if (customers.length === MAX_EMAIL_HISTORY_CUSTOMERS) {
+    log("warn", "email_history.refresh_customer_lookup_cap_reached", {
+      normalizedEmail,
+      candidateCount: uniqueCandidateIds.length,
+      cap: MAX_EMAIL_HISTORY_CUSTOMERS
+    });
+  }
 
   return customers.map((customer) => customer.id);
 }
