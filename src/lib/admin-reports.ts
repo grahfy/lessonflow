@@ -134,6 +134,8 @@ export type ReportMetricSnapshot = {
   appointments: {
     confirmedCount: number;
     cancelledCount: number;
+    attendedCount: number;
+    noShowCount: number;
   };
   appointmentPipeline: {
     pendingRequestCount: number;
@@ -298,9 +300,9 @@ function periodBounds(period: AdminReportPeriodKey, now: Date): PeriodBounds {
   };
 }
 
-/** Queries confirmed vs cancelled booking counts in a window. */
+/** Queries confirmed vs cancelled booking counts in a window, plus attendance outcomes. */
 async function getAppointmentCountsForWindow(start: Date, end: Date) {
-  const [confirmedCount, cancelledCount] = await Promise.all([
+  const [confirmedCount, cancelledCount, attendedCount, noShowCount] = await Promise.all([
     prisma.booking.count({
       where: {
         status: "approved",
@@ -312,9 +314,23 @@ async function getAppointmentCountsForWindow(start: Date, end: Date) {
         status: "cancelled",
         startAt: { gte: start, lte: end }
       }
+    }),
+    prisma.booking.count({
+      where: {
+        status: "approved",
+        attendanceStatus: "attended",
+        startAt: { gte: start, lte: end }
+      }
+    }),
+    prisma.booking.count({
+      where: {
+        status: "approved",
+        attendanceStatus: "no_show",
+        startAt: { gte: start, lte: end }
+      }
     })
   ]);
-  return { confirmedCount, cancelledCount };
+  return { confirmedCount, cancelledCount, attendedCount, noShowCount };
 }
 
 /** Snapshot of global application health (Requests needing attention). */

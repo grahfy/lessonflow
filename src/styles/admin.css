@@ -4077,6 +4077,104 @@
   min-height: 34px;
 }
 
+.admin-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.admin-dashboard-card {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  min-width: 0;
+}
+
+.admin-dashboard-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-dashboard-card-title {
+  margin: 0;
+  color: #f8fafc;
+  font-size: clamp(1.02rem, 1.4vw, 1.24rem);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.admin-dashboard-card-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.16);
+  color: #e2e8f0;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.admin-dashboard-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-dashboard-list-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.06);
+  font-size: 0.86rem;
+}
+
+.admin-dashboard-list-time {
+  flex: 0 0 auto;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+}
+
+.admin-dashboard-list-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #f1f5f9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-dashboard-list-meta {
+  flex: 0 0 auto;
+  color: var(--ink-2);
+  font-size: 0.76rem;
+  text-transform: capitalize;
+}
+
+.admin-dashboard-list-more {
+  background: transparent;
+}
+
+.admin-dashboard-list-more .admin-dashboard-list-name {
+  color: var(--ink-2);
+  font-size: 0.78rem;
+}
+
+.admin-dashboard-card-link {
+  width: fit-content;
+  min-height: 34px;
+}
+
 .admin-header-nav-group:focus-within {
   transform: translateY(-3px);
   border-color: var(--admin-header-group-outline-strong);
@@ -5518,6 +5616,21 @@
   color: #fde68a;
 }
 
+.calendar-legend-chip.is-waitlisted {
+  border-color: rgba(147, 184, 255, 0.42);
+  color: #cfe0ff;
+}
+
+.calendar-legend-chip.is-attended {
+  border-color: rgba(74, 222, 128, 0.42);
+  color: #bbf7d0;
+}
+
+.calendar-legend-chip.is-no-show {
+  border-color: rgba(220, 38, 38, 0.42);
+  color: #fecaca;
+}
+
 .calendar-grid {
   display: grid;
   gap: 8px;
@@ -5638,6 +5751,63 @@
   color: #1a1205;
   background: #f4b740;
   border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+/* Compact pill flagging a waitlisted request so it is distinguishable from an
+   ordinary pending request without opening the event. */
+.calendar-event span.calendar-event-badge.is-waitlisted {
+  justify-self: start;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #0b1c3a;
+  background: #93b8ff;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+/* Small inline attendance marker for past confirmed lessons, distinct from the
+   event status color. Attended = green tick, no-show = red cross. */
+.calendar-event span.calendar-event-attendance {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.calendar-event span.calendar-event-attendance.is-attended {
+  color: #06321a;
+  background: #4ade80;
+}
+
+.calendar-event span.calendar-event-attendance.is-no_show {
+  color: #fff;
+  background: #dc2626;
+}
+
+/* Attendance control row in the booking detail dialog appointment tab. */
+.booking-attendance-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+/* Recorded "Attended" reads green to match the calendar attendance pill, while
+   a recorded "No-show" uses the danger palette so the outcome is legible at a glance. */
+.admin-shell .booking-attendance-control .btn.is-attended-active {
+  border-color: rgba(136, 237, 186, 0.55);
+  background: linear-gradient(140deg, rgba(29, 156, 95, 0.92), rgba(16, 122, 73, 0.92));
+  color: #ecfff5;
 }
 
 .calendar-year-month {
@@ -8110,7 +8280,8 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .admin-home-grid {
+  .admin-home-grid,
+  .admin-dashboard-grid {
     grid-template-columns: 1fr;
   }
 

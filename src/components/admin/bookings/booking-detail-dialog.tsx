@@ -277,6 +277,24 @@ export function BookingDetailDialog({
                     </button>
                   </Tooltip>
                 )}
+                {/* RATIONALE: A pending request with no free slot can be parked on the waitlist
+                    instead of being approved/rejected, keeping it visible for later promotion. */}
+                {event.entityType === "booking_request" && event.status === 'pending' && canManageAppointment && (
+                  <Tooltip content="Park this request on the waitlist. It stays visible and can be promoted to a booking when a slot frees up.">
+                    <button className="btn btn-secondary" disabled={!!busyAction} onClick={() => onPerformAction('waitlist')}>
+                      Waitlist
+                    </button>
+                  </Tooltip>
+                )}
+                {/* RATIONALE: A waitlisted request is promoted to a confirmed booking, reusing the
+                    same booking-creation path as approval. */}
+                {event.entityType === "booking_request" && event.status === 'waitlisted' && canManageAppointment && (
+                  <Tooltip content="Promote this waitlisted request into a confirmed booking and notify the student.">
+                    <button className="btn btn-primary" disabled={!!busyAction} onClick={() => onPerformAction('promote')}>
+                      Promote to Booking
+                    </button>
+                  </Tooltip>
+                )}
               </>
             ) : activeTab === "lesson-plan" ? (
               <>
@@ -527,6 +545,54 @@ export function BookingDetailDialog({
                   <p className="helper-text">
                     This booking uses a duration that is not configured in Lesson Info / Prices. Add it in settings or change the booking to a configured duration before saving.
                   </p>
+                ) : null}
+
+                {/* SECTION: ATTENDANCE — only for confirmed lessons that have already started. */}
+                {event.entityType === "booking" &&
+                event.status === "approved" &&
+                new Date(event.startAt).getTime() < Date.now() ? (
+                  <>
+                    <h3 className="manual-section-title booking-section-title">Attendance</h3>
+                    <div className="booking-attendance-control" role="group" aria-label="Lesson attendance">
+                      <Tooltip content="Mark this lesson as attended by the student.">
+                        <button
+                          type="button"
+                          className={`btn ${event.attendanceStatus === "attended" ? "btn-primary is-attended-active" : "btn-secondary"}`}
+                          disabled={!canManageAppointment || busyAction === "set_attendance:attended"}
+                          aria-pressed={event.attendanceStatus === "attended"}
+                          onClick={() => onPerformAction("set_attendance:attended")}
+                        >
+                          Attended
+                        </button>
+                      </Tooltip>
+                      <Tooltip content="Mark this lesson as a no-show. Cancellation fees may still apply.">
+                        <button
+                          type="button"
+                          className={`btn ${event.attendanceStatus === "no_show" ? "btn-danger" : "btn-secondary"}`}
+                          disabled={!canManageAppointment || busyAction === "set_attendance:no_show"}
+                          aria-pressed={event.attendanceStatus === "no_show"}
+                          onClick={() => onPerformAction("set_attendance:no_show")}
+                        >
+                          No-show
+                        </button>
+                      </Tooltip>
+                      {event.attendanceStatus ? (
+                        <Tooltip content="Clear the recorded attendance for this lesson.">
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            disabled={!canManageAppointment || busyAction === "set_attendance:clear"}
+                            onClick={() => onPerformAction("set_attendance:clear")}
+                          >
+                            Clear
+                          </button>
+                        </Tooltip>
+                      ) : null}
+                    </div>
+                    {!event.attendanceStatus ? (
+                      <p className="helper-text">Attendance has not been recorded for this lesson yet.</p>
+                    ) : null}
+                  </>
                 ) : null}
               </div>
 

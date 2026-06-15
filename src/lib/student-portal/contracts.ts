@@ -1,5 +1,10 @@
 import { z } from "zod";
-import type { Booking, BookingRequest, LearningMaterial } from "@/generated/prisma/client";
+import type {
+  Booking,
+  BookingRequest,
+  BookingRescheduleRequest,
+  LearningMaterial
+} from "@/generated/prisma/client";
 import { nullableOptionalCustomDurationMinutesSchema } from "@/lib/booking-rules";
 import {
   lessonPlanSectionSchema,
@@ -49,6 +54,19 @@ export const studentPortalFolderSchema: z.ZodType<StudentPortalFolder> = z.lazy(
   })
 );
 
+/**
+ * Pending reschedule request attached to an upcoming booking. Carried per-booking
+ * so the portal can show "reschedule requested" state and suppress a second
+ * request without a separate lookup.
+ */
+export const studentPortalPendingRescheduleSchema = z.object({
+  id: z.string(),
+  requestedStartAt: z.string().datetime({ offset: true }),
+  reason: z.string().nullable(),
+  status: z.literal("pending"),
+  createdAt: z.string().datetime({ offset: true })
+});
+
 export const studentPortalBookingSchema = z.object({
   id: z.string(),
   status: studentPortalBookingStatusSchema,
@@ -61,7 +79,8 @@ export const studentPortalBookingSchema = z.object({
   notes: z.string().nullable(),
   notesContent: z.record(z.unknown()).nullable(),
   lessonPlanSummary: studentPortalLessonPlanV2SummarySchema.nullable(),
-  materials: z.array(studentPortalMaterialSchema)
+  materials: z.array(studentPortalMaterialSchema),
+  pendingReschedule: studentPortalPendingRescheduleSchema.nullable()
 });
 
 export const studentPortalPendingRequestSchema = z.object({
@@ -70,7 +89,8 @@ export const studentPortalPendingRequestSchema = z.object({
   lessonMode: studentPortalLessonModeSchema,
   lessonDuration: studentPortalLessonDurationSchema,
   customDurationMinutes: z.number().int().min(15).max(300).nullable(),
-  status: z.literal("pending")
+  // "waitlisted" mirrors a request parked on the admin waitlist (BookingRequestStatus.waitlisted).
+  status: z.enum(["pending", "waitlisted"])
 });
 
 export const studentPortalPayloadSchema = z.object({
@@ -114,13 +134,33 @@ export const studentPortalCancelBookingResponseSchema = z.object({
   })
 });
 
+export const studentPortalRescheduleRequestInputSchema = z.object({
+  requestedStartAt: z.string().datetime({ offset: true }),
+  reason: z.string().trim().max(1000).optional()
+});
+
+export const studentPortalRescheduleRequestResponseSchema = z.object({
+  rescheduleRequest: z.object({
+    id: z.string(),
+    bookingId: z.string(),
+    status: z.literal("pending"),
+    requestedStartAt: z.string().datetime({ offset: true })
+  }),
+  partial: z.boolean().optional(),
+  warning: z.string().optional(),
+  deliveryStatus: z.string().optional()
+});
+
 export type StudentPortalMaterial = z.infer<typeof studentPortalMaterialSchema>;
+export type StudentPortalPendingReschedule = z.infer<typeof studentPortalPendingRescheduleSchema>;
 export type StudentPortalBooking = z.infer<typeof studentPortalBookingSchema>;
 export type StudentPortalPendingRequest = z.infer<typeof studentPortalPendingRequestSchema>;
 export type StudentPortalPayload = z.infer<typeof studentPortalPayloadSchema>;
 export type StudentPortalBookingRequestInput = z.infer<typeof studentPortalBookingRequestInputSchema>;
 export type StudentPortalBookingRequestResponse = z.infer<typeof studentPortalBookingRequestResponseSchema>;
 export type StudentPortalCancelBookingResponse = z.infer<typeof studentPortalCancelBookingResponseSchema>;
+export type StudentPortalRescheduleRequestInput = z.infer<typeof studentPortalRescheduleRequestInputSchema>;
+export type StudentPortalRescheduleRequestResponse = z.infer<typeof studentPortalRescheduleRequestResponseSchema>;
 
 type MaterialMapInput = Pick<
   LearningMaterial,
@@ -146,6 +186,12 @@ type BookingMapInput = Pick<
     quickCaptureNotes: string | null;
   } | null;
   learningMaterials: MaterialMapInput[];
+  // Pending reschedule requests for this booking. Application logic guarantees at
+  // most one pending request per booking, so the portal surfaces the first.
+  rescheduleRequests?: Pick<
+    BookingRescheduleRequest,
+    "id" | "requestedStartAt" | "reason" | "status" | "createdAt"
+  >[];
 };
 
 type PendingRequestMapInput = Pick<
@@ -220,6 +266,9 @@ export function mapStudentPortalLessonPlanSummary(
  * Maps one DB booking row (with materials) to the student-portal booking contract.
  */
 export function mapStudentPortalBooking(booking: BookingMapInput): StudentPortalBooking {
+  const pendingReschedule =
+    booking.rescheduleRequests?.find((requestRow) => requestRow.status === "pending") ?? null;
+
   return studentPortalBookingSchema.parse({
     id: booking.id,
     status: booking.status,
@@ -232,7 +281,16 @@ export function mapStudentPortalBooking(booking: BookingMapInput): StudentPortal
     notes: booking.notes,
     notesContent: booking.notesContent ?? null,
     lessonPlanSummary: mapStudentPortalLessonPlanSummary(booking.lessonPlan),
-    materials: booking.learningMaterials.map(mapStudentPortalMaterial)
+    materials: booking.learningMaterials.map(mapStudentPortalMaterial),
+    pendingReschedule: pendingReschedule
+      ? {
+          id: pendingReschedule.id,
+          requestedStartAt: pendingReschedule.requestedStartAt.toISOString(),
+          reason: pendingReschedule.reason,
+          status: "pending",
+          createdAt: pendingReschedule.createdAt.toISOString()
+        }
+      : null
   });
 }
 

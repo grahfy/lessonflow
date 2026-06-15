@@ -14,10 +14,13 @@ export function bookingColor(status: "approved" | "cancelled"): "green" | "slate
   return status === "approved" ? "green" : "slate";
 }
 
-export function bookingRequestColor(status: "pending" | "rejected" | "approved" | "cancelled"): "yellow" | "red" | "green" | "slate" {
+export function bookingRequestColor(
+  status: "pending" | "rejected" | "approved" | "cancelled" | "waitlisted"
+): "yellow" | "red" | "green" | "slate" {
   // Pending and rejected requests get distinct triage colors; approved/cancelled align with the
-  // booking palette to reflect resolved states in the calendar.
-  if (status === "pending") {
+  // booking palette to reflect resolved states in the calendar. Waitlisted requests are parked
+  // pending-like items, so they share the pending triage color until promoted/declined.
+  if (status === "pending" || status === "waitlisted") {
     return "yellow";
   }
   if (status === "rejected") {

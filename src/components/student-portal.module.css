@@ -340,11 +340,67 @@
   color: #dbffe6;
 }
 
+.chip-info {
+  border-color: rgba(150, 184, 255, 0.46);
+  background: rgba(110, 153, 255, 0.16);
+  color: #d6e2ff;
+}
+
 .booking-actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   justify-content: flex-start;
   margin-top: 4px;
   padding-top: 2px;
+}
+
+.reschedule-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.reschedule-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--ink-1);
+}
+
+.reschedule-field input,
+.reschedule-field textarea {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--ink-0);
+  font: inherit;
+}
+
+.reschedule-field input::placeholder,
+.reschedule-field textarea::placeholder {
+  color: rgba(228, 236, 255, 0.45);
+}
+
+.reschedule-field input:focus,
+.reschedule-field textarea:focus {
+  outline: none;
+  border-color: rgba(143, 114, 255, 0.5);
+}
+
+.reschedule-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .cancel-button {

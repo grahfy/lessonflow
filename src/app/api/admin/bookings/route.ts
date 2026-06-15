@@ -183,6 +183,7 @@ export async function GET(request: NextRequest) {
         ...(admin.role === "teacher" ? { assignedTeacherId: admin.id } : {}),
         OR: [
           { status: "pending" },
+          { status: "waitlisted" },
           { status: "rejected", updatedAt: { gte: recencyCutoff } },
           { status: "cancelled", updatedAt: { gte: recencyCutoff } }
         ]
@@ -227,6 +228,7 @@ export async function GET(request: NextRequest) {
         startAt: booking.startAt.toISOString(),
         endAt: booking.endAt.toISOString(),
         status: booking.status,
+        attendanceStatus: booking.attendanceStatus,
         color: bookingColor(booking.status),
         title: booking.lastName ? `${booking.lastName}, ${booking.firstName}` : booking.name,
         row: {

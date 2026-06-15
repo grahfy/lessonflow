@@ -53,7 +53,9 @@ export const notificationSettingsInputSchema = z.object({
   automaticInvoiceRemindersEnabled: z.boolean(),
   invoiceReminderFirstDelayDays: z.coerce.number().int().min(1).max(365),
   invoiceReminderResendIntervalDays: z.coerce.number().int().min(1).max(365),
-  autoCreateInvoiceOnApproval: z.boolean()
+  autoCreateInvoiceOnApproval: z.boolean(),
+  lessonReminderEnabled: z.boolean(),
+  lessonReminderHoursBefore: z.coerce.number().int().min(1).max(168)
 });
 
 export type NotificationSettingsInput = z.infer<typeof notificationSettingsInputSchema>;

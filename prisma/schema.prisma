@@ -43,6 +43,7 @@ enum BookingRequestStatus {
   approved
   rejected
   cancelled
+  waitlisted
 }
 
 enum BookingStatus {
@@ -60,6 +61,23 @@ enum AuditAction {
   reminder_sent
   custom_email_sent
   series_removed
+  attendance_marked
+  reschedule_requested
+  reschedule_approved
+  reschedule_declined
+  waitlisted
+  waitlist_promoted
+}
+
+enum AttendanceStatus {
+  attended
+  no_show
+}
+
+enum RescheduleRequestStatus {
+  pending
+  approved
+  declined
 }
 
 enum InvoiceStatus {
@@ -303,6 +321,10 @@ model Booking {
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
   cancelledAt           DateTime?
+  attendanceStatus      AttendanceStatus?
+  attendanceMarkedAt    DateTime?
+  attendanceMarkedById  String?
+  reminderSentAt        DateTime?
   requestId             String?
   request               BookingRequest?         @relation(fields: [requestId], references: [id], onDelete: SetNull)
   seriesId              String?
@@ -320,6 +342,7 @@ model Booking {
   sourceMaterialFolders StudentMaterialFolder[] @relation("FolderSourceBooking")
   lessonPlan            LessonPlan?
   noteImages            BookingNoteImage[]
+  rescheduleRequests    BookingRescheduleRequest[]
 
   @@index([startAt, status])
   @@index([customerId])
@@ -339,6 +362,24 @@ model BookingAuditLog {
   createdAt DateTime    @default(now())
 
   @@index([createdAt])
+  @@index([bookingId])
+}
+
+// Student-initiated reschedule requests against a confirmed booking. The admin
+// (owner or assigned teacher) approves (moving the booking) or declines. A
+// single pending request per booking is enforced in application logic.
+model BookingRescheduleRequest {
+  id               String                  @id @default(cuid())
+  bookingId        String
+  booking          Booking                 @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  requestedStartAt DateTime
+  reason           String?                 @db.Text
+  status           RescheduleRequestStatus @default(pending)
+  createdAt        DateTime                @default(now())
+  resolvedAt       DateTime?
+  resolvedById     String?
+
+  @@index([status])
   @@index([bookingId])
 }
 
@@ -942,6 +983,8 @@ model NotificationSettings {
   invoiceReminderFirstDelayDays     Int      @default(7)
   invoiceReminderResendIntervalDays Int      @default(7)
   autoCreateInvoiceOnApproval       Boolean  @default(false)
+  lessonReminderEnabled             Boolean  @default(false)
+  lessonReminderHoursBefore         Int      @default(24)
   createdAt                         DateTime @default(now())
   updatedAt                         DateTime @updatedAt
 }
