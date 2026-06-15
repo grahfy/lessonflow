@@ -55,6 +55,7 @@ export function serializeNotificationSettings(record: NotificationSettingsRecord
     autoCreateInvoiceOnApproval: record?.autoCreateInvoiceOnApproval ?? false,
     lessonReminderEnabled: record?.lessonReminderEnabled ?? false,
     lessonReminderHoursBefore: record?.lessonReminderHoursBefore ?? 24,
+    errorAlertsEnabled: record?.errorAlertsEnabled ?? true,
     updatedAt: record?.updatedAt?.toISOString() ?? null
   };
 }
@@ -83,7 +84,8 @@ export async function saveNotificationSettings(input: NotificationSettingsInput)
       invoiceReminderResendIntervalDays: parsed.invoiceReminderResendIntervalDays,
       autoCreateInvoiceOnApproval: parsed.autoCreateInvoiceOnApproval,
       lessonReminderEnabled: parsed.lessonReminderEnabled,
-      lessonReminderHoursBefore: parsed.lessonReminderHoursBefore
+      lessonReminderHoursBefore: parsed.lessonReminderHoursBefore,
+      errorAlertsEnabled: parsed.errorAlertsEnabled
     },
     create: {
       id: DEFAULT_NOTIFICATION_SETTINGS_ID,
@@ -94,7 +96,8 @@ export async function saveNotificationSettings(input: NotificationSettingsInput)
       invoiceReminderResendIntervalDays: parsed.invoiceReminderResendIntervalDays,
       autoCreateInvoiceOnApproval: parsed.autoCreateInvoiceOnApproval,
       lessonReminderEnabled: parsed.lessonReminderEnabled,
-      lessonReminderHoursBefore: parsed.lessonReminderHoursBefore
+      lessonReminderHoursBefore: parsed.lessonReminderHoursBefore,
+      errorAlertsEnabled: parsed.errorAlertsEnabled
     }
   });
 }

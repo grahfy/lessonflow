@@ -1897,6 +1897,23 @@ run_migrations() {
     
     log_info "Running database migrations..."
 
+    # Pre-flight gate: refuse to deploy on top of a *failed* migration state.
+    # `prisma migrate status` exits non-zero for BOTH pending and failed
+    # migrations, so we cannot key off the exit code alone — pending migrations
+    # are expected here (this function is about to apply them). We only abort
+    # when the status output explicitly reports a failed/rolled-back migration,
+    # which requires manual `prisma migrate resolve` before any further deploy.
+    local status_output=""
+    status_output="$(npm exec --no -- prisma migrate status 2>&1)" || true
+    # Prisma prints "have failed" / "failed to apply" and suggests
+    # `prisma migrate resolve` only for failed (not merely pending) migrations.
+    if printf '%s' "${status_output}" | grep -Eqi 'migration.*(have|has) failed|failed to apply|prisma migrate resolve|rolled back'; then
+        log_error "Aborting: database has a failed migration that must be resolved before deploying."
+        log_error "Run 'prisma migrate status' and resolve it (e.g. 'prisma migrate resolve --rolled-back <name>') first."
+        printf '%s\n' "${status_output}"
+        return 1
+    fi
+
     # Determine the first migration directory for safe baseline recovery on
     # already-initialized databases.
     local first_migration=""

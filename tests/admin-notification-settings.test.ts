@@ -69,7 +69,11 @@ describe("admin-notification-settings", () => {
           },
           automaticInvoiceRemindersEnabled: false,
           invoiceReminderFirstDelayDays: 10,
-          invoiceReminderResendIntervalDays: 5
+          invoiceReminderResendIntervalDays: 5,
+          autoCreateInvoiceOnApproval: false,
+          lessonReminderEnabled: true,
+          lessonReminderHoursBefore: 24,
+          errorAlertsEnabled: true
         }
       })
     );

@@ -126,6 +126,21 @@ export function validateBookingData(data: unknown) {
 - Validate API request bodies with Zod schemas.
 - Return consistent response structures from API routes.
 
+#### Soft-delete convention
+There is intentionally no single shared soft-delete column. Use the right flag
+per model and prefer the helpers in `src/lib/db/soft-delete.ts` for `where`
+clauses so intent stays explicit and greppable:
+- `isArchived` (Boolean) — Customer, LessonPlanTemplate, LessonSeriesTemplate,
+  LessonSeries, StudentMaterialFolder, Chord, ChordChart. Use `excludeArchived()`
+  (or `activeWhere()`) to hide archived rows.
+- `isDeleted` (Boolean) — `Invoice` ONLY (financial table; read by the Stripe
+  webhook, payment, and reporting paths). Use `excludeDeleted()`. Do NOT rename
+  this column or fold it into `isArchived` — the rename is higher risk than the
+  uniformity is worth.
+- `cancelledAt` (DateTime?) — `Booking`. This is a semantic "when cancelled"
+  timestamp, not a generic soft-delete flag; treat it as business state and do
+  not include it in the soft-delete helpers.
+
 ### CSS & Styling
 - Use global CSS variables in `src/styles/globals.css` for theming, and prefer CSS Modules for feature-local frontend styling.
 - Use Tailwind-style class composition or CSS modules.

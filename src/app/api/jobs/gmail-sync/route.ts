@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import { jsonUnexpectedError } from "@/lib/api-errors";
 import { verifyCronSecret } from "@/lib/cron-auth";
 import { hasCronSecret } from "@/lib/env";
 import { syncGmailSentMessages } from "@/lib/gmail/sync";
 import { isGmailConfigured } from "@/lib/email/gmail-service";
+import { logCritical } from "@/lib/observability";
 
 const requestSchema = z.object({
   maxResults: z.number().int().min(1).max(500).optional()
@@ -41,7 +43,9 @@ export async function POST(request: NextRequest) {
       ...result
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown sync error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Fatal job failure: persist + alert the owner (rate-limited), then return a
+    // normalized error response without double-logging.
+    logCritical("job.gmail-sync.failed", error);
+    return jsonUnexpectedError(error, "Gmail sync failed.", { skipLog: true });
   }
 }

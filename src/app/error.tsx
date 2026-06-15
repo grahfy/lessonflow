@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 
+import { reportClientError } from "@/lib/report-client-error";
+
 export default function GlobalError({
   error,
   reset,
@@ -11,6 +13,7 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error("Unhandled error:", error);
+    reportClientError("root", error);
   }, [error]);
 
   return (

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { Prisma } from "@/generated/prisma/client";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
 import { ownerRescheduleRequestTemplate } from "@/lib/email/templates";
@@ -98,8 +99,11 @@ export async function POST(request: NextRequest, { params }: Params) {
       );
     }
 
-    // Single-pending guard: reject if this booking already has an unresolved
-    // reschedule request so the admin queue stays unambiguous.
+    // Single-pending guard (fast path): reject if this booking already has an
+    // unresolved reschedule request so the admin queue stays unambiguous. This
+    // check is racy on its own (TOCTOU), so the DB enforces the invariant via a
+    // unique index on the `pendingFlag` generated column; the catch below turns
+    // that constraint violation into the same 409 for concurrent submissions.
     const existingPending = await prisma.bookingRescheduleRequest.findFirst({
       where: {
         bookingId: booking.id,
@@ -113,26 +117,40 @@ export async function POST(request: NextRequest, { params }: Params) {
       );
     }
 
-    const created = await prisma.$transaction(async (tx) => {
-      const rescheduleRequest = await tx.bookingRescheduleRequest.create({
-        data: {
-          bookingId: booking.id,
-          requestedStartAt,
-          reason: parsed.data.reason?.trim() || null,
-          status: "pending"
-        }
-      });
+    let created;
+    try {
+      created = await prisma.$transaction(async (tx) => {
+        const rescheduleRequest = await tx.bookingRescheduleRequest.create({
+          data: {
+            bookingId: booking.id,
+            requestedStartAt,
+            reason: parsed.data.reason?.trim() || null,
+            status: "pending"
+          }
+        });
 
-      await tx.bookingAuditLog.create({
-        data: {
-          bookingId: booking.id,
-          action: "reschedule_requested",
-          details: `Student requested reschedule to ${requestedStartAt.toISOString()} (${student.id}).`
-        }
-      });
+        await tx.bookingAuditLog.create({
+          data: {
+            bookingId: booking.id,
+            action: "reschedule_requested",
+            details: `Student requested reschedule to ${requestedStartAt.toISOString()} (${student.id}).`
+          }
+        });
 
-      return rescheduleRequest;
-    });
+        return rescheduleRequest;
+      });
+    } catch (error) {
+      // A concurrent request won the race and created the pending row first. The
+      // DB unique constraint (one pending reschedule per booking) rejected this
+      // one with P2002 — surface it as the same 409 as the pre-check above.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        return NextResponse.json(
+          { error: "A reschedule request is already pending for this booking." },
+          { status: 409 }
+        );
+      }
+      throw error;
+    }
 
     logEvent("student_portal.reschedule_request.created", {
       id: created.id,

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { POST as studentReschedule } from "@/app/api/student/bookings/[id]/reschedule/route";
 import { PATCH as resolveReschedule } from "@/app/api/admin/reschedule-requests/[id]/route";
+import { Prisma } from "@/generated/prisma/client";
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
 import { customerSnapshotFromInput } from "@/lib/customer-match";
 import { prisma } from "@/lib/db";
@@ -175,6 +176,60 @@ describe("phase2-reschedule", () => {
 
     const count = await prisma.bookingRescheduleRequest.count({ where: { bookingId: booking.id } });
     expect(count).toBe(1);
+  });
+
+  it("DB constraint blocks a second pending request for the same booking (P2002)", async () => {
+    // Directly exercise the DB-level guard (generated pendingFlag + composite
+    // unique index) that backs the route's 409, independent of the app pre-check.
+    const customer = await createCustomer();
+    const booking = await createBooking(customer.id);
+
+    await prisma.bookingRescheduleRequest.create({
+      data: { bookingId: booking.id, requestedStartAt: futureWithinYear(12), status: "pending" }
+    });
+
+    let caught: unknown;
+    try {
+      await prisma.bookingRescheduleRequest.create({
+        data: { bookingId: booking.id, requestedStartAt: futureWithinYear(13), status: "pending" }
+      });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
+    expect((caught as Prisma.PrismaClientKnownRequestError).code).toBe("P2002");
+
+    const count = await prisma.bookingRescheduleRequest.count({ where: { bookingId: booking.id } });
+    expect(count).toBe(1);
+  });
+
+  it("DB constraint allows many resolved requests per booking (NULL pendingFlag does not collide)", async () => {
+    const customer = await createCustomer();
+    const booking = await createBooking(customer.id);
+
+    // Resolved rows carry a NULL pendingFlag, so the unique index permits any
+    // number of them per booking — only a second *pending* row is blocked.
+    await prisma.bookingRescheduleRequest.create({
+      data: { bookingId: booking.id, requestedStartAt: futureWithinYear(12), status: "approved" }
+    });
+    await prisma.bookingRescheduleRequest.create({
+      data: { bookingId: booking.id, requestedStartAt: futureWithinYear(13), status: "declined" }
+    });
+    await prisma.bookingRescheduleRequest.create({
+      data: { bookingId: booking.id, requestedStartAt: futureWithinYear(14), status: "approved" }
+    });
+
+    const count = await prisma.bookingRescheduleRequest.count({ where: { bookingId: booking.id } });
+    expect(count).toBe(3);
+
+    // And a single fresh pending row is still allowed alongside resolved ones.
+    await prisma.bookingRescheduleRequest.create({
+      data: { bookingId: booking.id, requestedStartAt: futureWithinYear(15), status: "pending" }
+    });
+    const pendingCount = await prisma.bookingRescheduleRequest.count({
+      where: { bookingId: booking.id, status: "pending" }
+    });
+    expect(pendingCount).toBe(1);
   });
 
   it("rejects rescheduling another student's booking (404)", async () => {

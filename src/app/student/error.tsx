@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 
+import { reportClientError } from "@/lib/report-client-error";
+
 export default function StudentError({
   error,
   reset,
@@ -11,6 +13,7 @@ export default function StudentError({
 }) {
   useEffect(() => {
     console.error("Student portal error:", error);
+    reportClientError("student", error);
   }, [error]);
 
   return (
