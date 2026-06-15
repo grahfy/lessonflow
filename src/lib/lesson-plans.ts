@@ -1,6 +1,7 @@
 import { Prisma, type AdminRole } from "@/generated/prisma/client";
 import { canManageLessonPlanTemplate } from "@/lib/admin/permissions";
 import { prisma } from "@/lib/db";
+import { excludeArchived } from "@/lib/db/soft-delete";
 import { AppError, NotFoundError, ValidationError } from "@/lib/errors";
 import {
   lessonPlanSectionsInputSchema,
@@ -77,7 +78,7 @@ function assertValidSections(sections: LessonPlanSection[]) {
 
 async function listTemplateV2Rows(includeArchived = false) {
   return prisma.lessonPlanTemplate.findMany({
-    where: includeArchived ? undefined : { isArchived: false },
+    where: includeArchived ? undefined : excludeArchived(),
     include: {
       createdBy: { select: { id: true, displayName: true } }
     },

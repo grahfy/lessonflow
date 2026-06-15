@@ -55,10 +55,13 @@ export const notificationSettingsInputSchema = z.object({
   invoiceReminderResendIntervalDays: z.coerce.number().int().min(1).max(365),
   autoCreateInvoiceOnApproval: z.boolean(),
   lessonReminderEnabled: z.boolean(),
-  lessonReminderHoursBefore: z.coerce.number().int().min(1).max(168)
+  lessonReminderHoursBefore: z.coerce.number().int().min(1).max(168),
+  // Defaults on so pre-existing callers/persisted rows opt into error alerts
+  // without an explicit value; the editor UI always sends it explicitly.
+  errorAlertsEnabled: z.boolean().default(true)
 });
 
-export type NotificationSettingsInput = z.infer<typeof notificationSettingsInputSchema>;
+export type NotificationSettingsInput = z.input<typeof notificationSettingsInputSchema>;
 
 export type NotificationSettingsState = NotificationSettingsInput & {
   updatedAt: string | null;

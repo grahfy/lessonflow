@@ -66,6 +66,12 @@ const nextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.join(__dirname),
   poweredByHeader: false,
+  // Keep the native MariaDB driver and Prisma adapter out of the bundled graph.
+  // They depend on Node built-ins ('crypto', 'os', etc.); bundling them (e.g. via
+  // the instrumentation.ts -> observability -> db -> adapter chain Next traces at
+  // build time) fails with "Can't resolve 'crypto'/'os'". Treating them as
+  // external defers resolution to Node at runtime where the built-ins exist.
+  serverExternalPackages: ["@prisma/adapter-mariadb", "mariadb"],
   experimental: {
     // RATIONALE: Next.js documents this as a low-risk way to reduce peak
     // Webpack memory usage during builds on smaller hosts.

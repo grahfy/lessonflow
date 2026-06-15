@@ -18,9 +18,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db";
+import { jsonUnexpectedError } from "@/lib/api-errors";
 import { verifyCronSecret } from "@/lib/cron-auth";
 import { hasCronSecret } from "@/lib/env";
-import { logEvent } from "@/lib/observability";
+import { logCritical, logEvent } from "@/lib/observability";
 import { dateTimeLocalToDate, toDateKey } from "@/lib/time";
 
 export async function POST(request: NextRequest) {
@@ -122,7 +123,7 @@ export async function POST(request: NextRequest) {
       rowsCreated
     });
   } catch (err) {
-    console.error("[analytics-rollup] Failed:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    logCritical("job.analytics-rollup.failed", err);
+    return jsonUnexpectedError(err, "Failed to roll up analytics data.", { skipLog: true });
   }
 }
