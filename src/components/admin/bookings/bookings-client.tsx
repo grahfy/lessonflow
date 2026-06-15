@@ -1189,18 +1189,43 @@ export function AdminBookingsClient() {
   async function performAction(action: string) {
     const event = events.find(e => e.id === selectedKey);
     if (!event) return;
-    
+
+    // Attendance actions are UI-namespaced (set_attendance:attended|no_show|clear) so the dialog can
+    // track per-button busy state, but they all map to the single `set_attendance` API action.
+    if (action.startsWith("set_attendance:")) {
+      const choice = action.slice("set_attendance:".length);
+      const attendanceStatus = choice === "clear" ? null : choice;
+      setBusyAction(action);
+      const result = await updateBookingApi(selectedKey!, event.entityType, "set_attendance", {
+        attendanceStatus
+      });
+      setBusyAction(null);
+      if (result.ok) {
+        setNotice(
+          result.notice ||
+            (attendanceStatus === null
+              ? "Attendance cleared."
+              : `Attendance marked as ${attendanceStatus === "no_show" ? "no-show" : "attended"}.`)
+        );
+        void loadBookings(view, dateStr);
+      }
+      return;
+    }
+
     setBusyAction(action);
+    // Approve and promote both create bookings, so carry through any teacher assignment picked in the dialog.
     const payload =
-      action === "approve" && dialogForm
+      (action === "approve" || action === "promote") && dialogForm
         ? { assignedTeacherId: dialogForm.assignedTeacherId || null }
         : {};
     const result = await updateBookingApi(selectedKey!, event.entityType, action, payload);
     setBusyAction(null);
-    
+
     if (result.ok) {
       setNotice(result.notice || `Booking ${action}ed.`);
-      if (action === "approve" || action === "reject") {
+      // Approve/reject/promote resolve the request out of its current state; close the dialog so it
+      // doesn't keep showing stale actions. Waitlist keeps the request open for further handling.
+      if (action === "approve" || action === "reject" || action === "promote") {
         void closeDialog();
       }
       void loadBookings(view, dateStr);

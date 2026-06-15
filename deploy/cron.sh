@@ -9,6 +9,7 @@
 # Example crontab entries:
 #   0 20 * * * /var/www/lessonflow/current/deploy/cron.sh daily-bookings-digest
 #   30 20 * * * /var/www/lessonflow/current/deploy/cron.sh invoice-reminders
+#   0 * * * * /var/www/lessonflow/current/deploy/cron.sh lesson-reminders
 #   45 20 * * * /var/www/lessonflow/current/deploy/cron.sh admin-reports-daily
 #   0 8 * * 1 /var/www/lessonflow/current/deploy/cron.sh admin-reports-weekly
 #   15 8 1 * * /var/www/lessonflow/current/deploy/cron.sh admin-reports-monthly
@@ -104,6 +105,9 @@ case "${JOB_TYPE}" in
     invoice-reminders)
         ENDPOINT="/api/jobs/invoice-reminders"
         ;;
+    lesson-reminders)
+        ENDPOINT="/api/jobs/lesson-reminders"
+        ;;
     admin-reports-daily)
         ENDPOINT="/api/jobs/admin-reports/daily"
         ;;
@@ -133,7 +137,7 @@ case "${JOB_TYPE}" in
         ;;
     *)
         log "ERROR: Unknown job type: ${JOB_TYPE}"
-        echo "Usage: $0 {daily-bookings-digest|invoice-reminders|admin-reports-daily|admin-reports-weekly|admin-reports-monthly|admin-reports-yearly|generate-sitemap|gmail-sync|purge-logs|analytics-rollup|analytics-purge}"
+        echo "Usage: $0 {daily-bookings-digest|invoice-reminders|lesson-reminders|admin-reports-daily|admin-reports-weekly|admin-reports-monthly|admin-reports-yearly|generate-sitemap|gmail-sync|purge-logs|analytics-rollup|analytics-purge}"
         exit 1
         ;;
 esac

@@ -49,6 +49,12 @@ export function StudentPortalClient(): ReactElement {
   const [requestLessonDuration, setRequestLessonDuration] = useState<LessonDurationChoice>("min60");
   const [requestNotes, setRequestNotes] = useState("");
   const [confirmCancelBookingId, setConfirmCancelBookingId] = useState<string | null>(null);
+  // Reschedule request state: which booking's form is open, the desired time, an
+  // optional reason, and the in-flight booking id while the request submits.
+  const [rescheduleBookingId, setRescheduleBookingId] = useState<string | null>(null);
+  const [rescheduleStartAtLocal, setRescheduleStartAtLocal] = useState(defaultStartAtLocalValue());
+  const [rescheduleReason, setRescheduleReason] = useState("");
+  const [submittingRescheduleId, setSubmittingRescheduleId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -204,6 +210,45 @@ export function StudentPortalClient(): ReactElement {
     }, 900);
   }
 
+  /**
+   * Submits a reschedule request for an upcoming booking. The booking is not moved
+   * immediately — it stays scheduled until an admin approves the request.
+   */
+  async function submitRescheduleRequest(bookingId: string) {
+    const requestedStartAt = toIsoFromLocal(rescheduleStartAtLocal);
+    if (!requestedStartAt) {
+      setError("Choose a valid new lesson time.");
+      return;
+    }
+
+    setSubmittingRescheduleId(bookingId);
+    setError("");
+    setNotice("");
+    const response = await fetch(`/api/student/bookings/${bookingId}/reschedule`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        requestedStartAt,
+        reason: rescheduleReason.trim() || undefined
+      })
+    });
+    setSubmittingRescheduleId(null);
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      setError(payload?.error || "Unable to submit reschedule request.");
+      return;
+    }
+
+    setRescheduleBookingId(null);
+    setRescheduleReason("");
+    setNotice(
+      payload?.warning || "Reschedule request submitted. We'll confirm your new time soon."
+    );
+    // Reload so the booking shows its pending-reschedule state from the server.
+    void load();
+  }
+
   return (
     <div className={styles["portal-shell"]} data-motion-root="student-portal">
       {showAnnouncement && announcement ? (
@@ -349,6 +394,12 @@ export function StudentPortalClient(): ReactElement {
                             : requestRow.lessonDuration === "min30"
                               ? "30 min"
                               : "60 min"}
+                          {requestRow.status === "waitlisted" ? (
+                            <>
+                              {" "}
+                              <span className={cx(styles["chip"], styles["chip-info"])}>Waitlisted</span>
+                            </>
+                          ) : null}
                         </li>
                       ))}
                     </ul>
@@ -371,6 +422,19 @@ export function StudentPortalClient(): ReactElement {
                   cancellingBookingId={cancellingBookingId}
                   cancelledBookingIds={cancelledBookingIds}
                   onCancelBooking={(bookingId) => setConfirmCancelBookingId(bookingId)}
+                  rescheduleBookingId={rescheduleBookingId}
+                  rescheduleStartAtLocal={rescheduleStartAtLocal}
+                  rescheduleReason={rescheduleReason}
+                  submittingRescheduleId={submittingRescheduleId}
+                  onOpenReschedule={(bookingId) => {
+                    setRescheduleStartAtLocal(defaultStartAtLocalValue());
+                    setRescheduleReason("");
+                    setRescheduleBookingId(bookingId);
+                  }}
+                  onCloseReschedule={() => setRescheduleBookingId(null)}
+                  onRescheduleStartAtChange={setRescheduleStartAtLocal}
+                  onRescheduleReasonChange={setRescheduleReason}
+                  onSubmitReschedule={(bookingId) => void submitRescheduleRequest(bookingId)}
                 />
               </div>
             </section>
@@ -415,6 +479,16 @@ type BookingListProps = {
   cancellingBookingId?: string | null;
   cancelledBookingIds?: Record<string, boolean>;
   onCancelBooking?: (bookingId: string) => void;
+  // Reschedule controls (upcoming variant only). The open form is keyed by booking id.
+  rescheduleBookingId?: string | null;
+  rescheduleStartAtLocal?: string;
+  rescheduleReason?: string;
+  submittingRescheduleId?: string | null;
+  onOpenReschedule?: (bookingId: string) => void;
+  onCloseReschedule?: () => void;
+  onRescheduleStartAtChange?: (value: string) => void;
+  onRescheduleReasonChange?: (value: string) => void;
+  onSubmitReschedule?: (bookingId: string) => void;
 };
 
 function BookingList(input: BookingListProps) {
@@ -435,12 +509,17 @@ function BookingList(input: BookingListProps) {
             <span className={styles["chip"]}>{describeDuration(booking)}</span>
             <span className={styles["chip"]}>{booking.lessonMode === "in_person" ? "In-person" : "Video"}</span>
             <span className={cx(styles["chip"], booking.status === "cancelled" ? styles["chip-cancelled"] : styles["chip-approved"])}>
-              {booking.status}
+              {describeBookingStatus(booking.status)}
             </span>
             {isWithin24Hours(booking.startAt) && booking.status !== "cancelled" ? (
-              <span className={cx(styles["chip"], styles["chip-warning"])}>Within 24h: full fee applies</span>
+              <span className={cx(styles["chip"], styles["chip-warning"])}>Within 24h — full fee</span>
             ) : null}
             {input.cancelledBookingIds?.[booking.id] ? <span className={cx(styles["chip"], styles["chip-success"])}>Cancelled</span> : null}
+            {booking.pendingReschedule ? (
+              <span className={cx(styles["chip"], styles["chip-warning"])}>
+                Reschedule requested: {formatWhen(booking.pendingReschedule.requestedStartAt)}
+              </span>
+            ) : null}
           </div>
 
           {input.variant === "upcoming" && booking.status !== "cancelled" ? (
@@ -464,7 +543,70 @@ function BookingList(input: BookingListProps) {
                   {input.cancellingBookingId === booking.id ? "Cancelling..." : "Cancel lesson"}
                 </button>
               </Tooltip>
+              {booking.pendingReschedule ? (
+                <span className="helper-text">Reschedule request pending review.</span>
+              ) : input.rescheduleBookingId === booking.id ? null : (
+                <Tooltip content="Request a new time for this lesson. The admin will confirm before it changes.">
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    disabled={!!input.submittingRescheduleId}
+                    onClick={() => input.onOpenReschedule?.(booking.id)}
+                  >
+                    Request reschedule
+                  </button>
+                </Tooltip>
+              )}
             </div>
+          ) : null}
+
+          {input.variant === "upcoming" &&
+          booking.status !== "cancelled" &&
+          !booking.pendingReschedule &&
+          input.rescheduleBookingId === booking.id ? (
+            <form
+              className={styles["reschedule-form"]}
+              onSubmit={(event) => {
+                event.preventDefault();
+                input.onSubmitReschedule?.(booking.id);
+              }}
+            >
+              <label className={styles["reschedule-field"]}>
+                <span>New lesson time</span>
+                <input
+                  type="datetime-local"
+                  required
+                  value={input.rescheduleStartAtLocal ?? ""}
+                  onChange={(event) => input.onRescheduleStartAtChange?.(event.target.value)}
+                />
+              </label>
+              <label className={styles["reschedule-field"]}>
+                <span>Reason (optional)</span>
+                <textarea
+                  rows={2}
+                  maxLength={1000}
+                  value={input.rescheduleReason ?? ""}
+                  onChange={(event) => input.onRescheduleReasonChange?.(event.target.value)}
+                />
+              </label>
+              <div className={styles["reschedule-actions"]}>
+                <button
+                  className="btn btn-primary"
+                  type="submit"
+                  disabled={input.submittingRescheduleId === booking.id}
+                >
+                  {input.submittingRescheduleId === booking.id ? "Submitting..." : "Submit request"}
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  disabled={input.submittingRescheduleId === booking.id}
+                  onClick={() => input.onCloseReschedule?.()}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           ) : null}
 
           {booking.notesContent ? (
@@ -605,6 +747,25 @@ function describeDuration(booking: StudentPortalBooking): string {
     return `${booking.customDurationMinutes} min`;
   }
   return booking.lessonDuration === "min30" ? "30 min" : "60 min";
+}
+
+/**
+ * Maps a raw booking status enum to title-case display copy that matches the
+ * admin calendar legend wording (e.g. "approved" => "Confirmed").
+ */
+function describeBookingStatus(status: string): string {
+  switch (status) {
+    case "approved":
+      return "Confirmed";
+    case "cancelled":
+      return "Cancelled";
+    case "pending":
+      return "Pending";
+    case "waitlisted":
+      return "Waitlisted";
+    default:
+      return status.charAt(0).toUpperCase() + status.slice(1);
+  }
 }
 
 /**

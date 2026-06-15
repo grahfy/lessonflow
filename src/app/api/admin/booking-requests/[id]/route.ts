@@ -175,12 +175,26 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Request not found." }, { status: 404 });
     }
 
-    if (action === "approve") {
-      if (!isOwner(admin)) {
-        return NextResponse.json({ error: "Only the owner can approve booking requests." }, { status: 403 });
-      }
-      if (bookingRequest.status !== "pending") {
-        return NextResponse.json({ error: "Only pending requests can be approved." }, { status: 400 });
+    if (action === "approve" || action === "promote") {
+      // Promotion converts a parked waitlisted request into a real booking using the exact same
+      // customer-resolution, booking-creation and portal-credential pipeline as a normal approval.
+      // The only differences are the required starting status and the audit/notification framing.
+      const isPromotion = action === "promote";
+
+      if (isPromotion) {
+        if (!canManageAssignedTeacher(admin, bookingRequest.assignedTeacherId)) {
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+        if (bookingRequest.status !== "waitlisted") {
+          return NextResponse.json({ error: "Only waitlisted requests can be promoted." }, { status: 400 });
+        }
+      } else {
+        if (!isOwner(admin)) {
+          return NextResponse.json({ error: "Only the owner can approve booking requests." }, { status: 403 });
+        }
+        if (bookingRequest.status !== "pending") {
+          return NextResponse.json({ error: "Only pending requests can be approved." }, { status: 400 });
+        }
       }
 
       const requestedAssignedTeacherId = await resolveAssignedTeacherId({
@@ -348,6 +362,20 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             }
           });
 
+          // Record the approval/promotion audit INSIDE the transaction so it is durable even
+          // when the customer email is later suppressed or fails. Approvals/promotions create
+          // bookings; link the audit to the first/primary booking created. For recurring
+          // approvals several rows are created but one audit entry covers the event, with
+          // traceability back to the request ID preserved via details.
+          await tx.bookingAuditLog.create({
+            data: {
+              bookingId: createdBookings[0]?.id,
+              actorId: admin.id,
+              action: isPromotion ? "waitlist_promoted" : "approved",
+              details: `requestId=${id}`
+            }
+          });
+
           await ensureCustomerPrimaryTeacher({
             db: tx,
             customerId,
@@ -421,7 +449,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       }
 
       // Send customer email after transaction commit to avoid sending approvals that failed to persist.
-      // Audit log entry is recorded by the event wrapper.
+      // The approval/promotion audit is written durably inside the transaction above, so it is NOT
+      // passed here (which would double-write only on delivered emails).
       // RATIONALE: The credential helper returns a plaintext password only when a
       // credential is created/rotated during this approval. Existing customers
       // keep their current portal access and therefore receive no new password.
@@ -436,15 +465,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
                 loginUrl: getStudentPortalLoginUrl(),
                 generatedPassword: approvalResult.generatedPassword
               }
-            : null,
-          audit: {
-            // Approvals create bookings; link audit to the first/primary booking created.
-            // For recurring approvals, several are created but one audit log entry covers the event.
-            // Traceability back to the request ID is preserved via details.
-            actorId: admin.id,
-            action: "approved",
-            details: `requestId=${id}`
-          }
+            : null
         });
 
         if (deliveryResult.status !== "sent") {
@@ -454,34 +475,70 @@ export async function PATCH(request: NextRequest, { params }: Params) {
               partial: true,
               warning:
                 deliveryResult.status === "suppressed"
-                  ? "Booking approved, but automated customer booking-update emails are disabled in admin settings."
-                  : deliveryResult.error || "Booking approved, but the customer notification email could not be sent.",
+                  ? `${isPromotion ? "Waitlisted request promoted" : "Booking approved"}, but automated customer booking-update emails are disabled in admin settings.`
+                  : deliveryResult.error ||
+                    `${isPromotion ? "Waitlisted request promoted" : "Booking approved"}, but the customer notification email could not be sent.`,
               deliveryStatus: deliveryResult.status
             },
             { status: 202 }
           );
         }
       } catch (error) {
-        logError("booking_request.approval_notification_failed", error, { id, actorId: admin.id });
+        logError("booking_request.approval_notification_failed", error, { id, actorId: admin.id, isPromotion });
         return NextResponse.json(
           {
             ok: true,
             partial: true,
-            warning: "Booking approved, but the customer notification email could not be sent."
+            warning: `${isPromotion ? "Waitlisted request promoted" : "Booking approved"}, but the customer notification email could not be sent.`
           },
           { status: 202 }
         );
       }
 
-      return NextResponse.json({ ok: true, message: "Booking approved." });
+      return NextResponse.json({
+        ok: true,
+        message: isPromotion ? "Waitlisted request promoted to a booking." : "Booking approved."
+      });
+    }
+
+    if (action === "waitlist") {
+      // Waitlisting "parks" a pending request: the lesson cannot be confirmed yet (no free slot),
+      // but the request is kept visible so an admin can promote it later. No customer email is sent
+      // here — promotion is the customer-facing event. Teachers may waitlist their own requests.
+      if (!canManageAssignedTeacher(admin, bookingRequest.assignedTeacherId)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      if (bookingRequest.status !== "pending") {
+        return NextResponse.json({ error: "Only pending requests can be waitlisted." }, { status: 400 });
+      }
+
+      await prisma.$transaction(async (tx) => {
+        await tx.bookingRequest.update({
+          where: { id },
+          data: {
+            status: "waitlisted",
+            approvedById: admin.id
+          }
+        });
+        await tx.bookingAuditLog.create({
+          data: {
+            actorId: admin.id,
+            action: "waitlisted",
+            details: `requestId=${id}`
+          }
+        });
+      });
+
+      return NextResponse.json({ ok: true, message: "Request moved to the waitlist." });
     }
 
     if (action === "reject") {
       if (!canManageAssignedTeacher(admin, bookingRequest.assignedTeacherId)) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
-      if (bookingRequest.status !== "pending") {
-        return NextResponse.json({ error: "Only pending requests can be rejected." }, { status: 400 });
+      // Pending OR waitlisted requests can be rejected (declining a parked waitlist entry).
+      if (bookingRequest.status !== "pending" && bookingRequest.status !== "waitlisted") {
+        return NextResponse.json({ error: "Only pending or waitlisted requests can be rejected." }, { status: 400 });
       }
 
       const updated = await prisma.bookingRequest.update({

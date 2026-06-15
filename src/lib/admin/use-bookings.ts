@@ -4,7 +4,8 @@ import { useCallback, useState } from "react";
 import { dateTimeLocalToIso } from "@/lib/time";
 import { useSafeFetch } from "./use-safe-fetch";
 
-export type BookingStatus = "pending" | "approved" | "cancelled" | "rejected";
+// Includes booking-request-only states (rejected/waitlisted); confirmed bookings are approved/cancelled.
+export type BookingStatus = "pending" | "approved" | "cancelled" | "rejected" | "waitlisted";
 
 export interface BookingEvent {
     id: string;
@@ -12,6 +13,8 @@ export interface BookingEvent {
     startAt: string;
     endAt: string;
     status: BookingStatus;
+    /** Recorded attendance outcome for past confirmed lessons (null = not yet recorded). */
+    attendanceStatus?: "attended" | "no_show" | null;
     customerName: string;
     customerEmail: string;
     lessonMode: "in_person" | "video";

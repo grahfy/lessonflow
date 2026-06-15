@@ -559,6 +559,7 @@ managed_timer_units_need_refresh() {
     local unit_basenames=(
         "lessonflow-daily-bookings"
         "lessonflow-invoice-reminders"
+        "lessonflow-lesson-reminders"
         "lessonflow-admin-reports-daily"
         "lessonflow-admin-reports-weekly"
         "lessonflow-admin-reports-monthly"
@@ -3373,6 +3374,7 @@ install_systemd_timers_from_deploy() {
     local timer_names=(
         "lessonflow-daily-bookings"
         "lessonflow-invoice-reminders"
+        "lessonflow-lesson-reminders"
         "lessonflow-admin-reports-daily"
         "lessonflow-admin-reports-weekly"
         "lessonflow-admin-reports-monthly"
