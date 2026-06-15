@@ -21,6 +21,13 @@ export type AdminNavGroup = {
 
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   {
+    label: "Dashboard",
+    href: "/admin/dashboard",
+    tooltip: "Read-only overview of your schedule and students.",
+    description: "See today's and this week's schedule and your students at a glance.",
+    group: "business"
+  },
+  {
     label: "Bookings",
     href: "/admin/bookings",
     tooltip: "View and manage lesson schedule and booking requests.",

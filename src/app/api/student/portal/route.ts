@@ -43,6 +43,16 @@ export async function GET(request: NextRequest) {
             status: true,
             quickCaptureNotes: true
           }
+        },
+        // Surface pending reschedule requests so the portal can show "reschedule
+        // requested" state and block a duplicate request on the same booking.
+        rescheduleRequests: {
+          where: {
+            status: "pending"
+          },
+          orderBy: {
+            createdAt: "desc"
+          }
         }
       },
       orderBy: {
@@ -52,7 +62,9 @@ export async function GET(request: NextRequest) {
     prisma.bookingRequest.findMany({
       where: {
         customerId: student.id,
-        status: "pending",
+        // Show both pending and waitlisted requests so the student can see a request that has been
+        // parked on the waitlist (awaiting a free slot) rather than it silently disappearing.
+        status: { in: ["pending", "waitlisted"] },
         requestedStartAt: {
           gte: now
         }

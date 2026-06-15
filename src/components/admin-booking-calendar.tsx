@@ -121,6 +121,34 @@ function isUnbilledBooking(event: AdminCalendarEvent): boolean {
   return row.hasActiveInvoice === false;
 }
 
+/**
+ * A waitlisted booking request shares the yellow "pending" color, so without a
+ * marker it is indistinguishable from an ordinary pending request and only
+ * discoverable by opening each event. This badge surfaces the queued state in
+ * the cell and is mirrored by a legend chip.
+ */
+function isWaitlistedRequest(event: AdminCalendarEvent): boolean {
+  return event.entityType === "booking_request" && event.status === "waitlisted";
+}
+
+/**
+ * Small attendance marker for past confirmed lessons, distinct from the status color.
+ * Returns the recorded outcome (attended / no-show) or null when not yet recorded.
+ */
+function attendanceIndicator(event: AdminCalendarEvent): { kind: "attended" | "no_show"; symbol: string; label: string } | null {
+  if (event.entityType !== "booking" || event.status !== "approved") {
+    return null;
+  }
+  const row = event.row as { attendanceStatus?: unknown };
+  if (row.attendanceStatus === "attended") {
+    return { kind: "attended", symbol: "✓", label: "Attended" };
+  }
+  if (row.attendanceStatus === "no_show") {
+    return { kind: "no_show", symbol: "✕", label: "No-show" };
+  }
+  return null;
+}
+
 function countLabel(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }
@@ -143,7 +171,8 @@ function calendarLegendCounts(events: AdminCalendarEvent[]) {
     pending: events.filter((event) => event.color === "yellow").length,
     attention: events.filter((event) => event.color === "red").length,
     archived: events.filter((event) => event.color === "slate").length,
-    unbilled: events.filter((event) => isUnbilledBooking(event)).length
+    unbilled: events.filter((event) => isUnbilledBooking(event)).length,
+    waitlisted: events.filter((event) => isWaitlistedRequest(event)).length
   };
 }
 
@@ -177,6 +206,19 @@ function DayCell(props: {
             <span>{eventTime(event.startAt)}</span>
             <strong>{event.title}</strong>
             {isUnbilledBooking(event) ? <span className="calendar-event-badge is-unbilled" title="Approved booking with no invoice yet">Unbilled</span> : null}
+            {isWaitlistedRequest(event) ? <span className="calendar-event-badge is-waitlisted" title="Waitlisted request — queued, awaiting an open slot">Waitlisted</span> : null}
+            {(() => {
+              const attendance = attendanceIndicator(event);
+              return attendance ? (
+                <span
+                  className={`calendar-event-attendance is-${attendance.kind}`}
+                  title={attendance.label}
+                  aria-label={attendance.label}
+                >
+                  {attendance.symbol}
+                </span>
+              ) : null;
+            })()}
             <small>{assignedTeacherLabel(event) || "Unassigned"}</small>
           </button>
         ))}
@@ -216,6 +258,19 @@ function YearMonthCell(props: {
             <span>{format(parseISO(event.startAt), "d MMM")} · {eventTime(event.startAt)}</span>
             <strong>{event.title}</strong>
             {isUnbilledBooking(event) ? <span className="calendar-event-badge is-unbilled" title="Approved booking with no invoice yet">Unbilled</span> : null}
+            {isWaitlistedRequest(event) ? <span className="calendar-event-badge is-waitlisted" title="Waitlisted request — queued, awaiting an open slot">Waitlisted</span> : null}
+            {(() => {
+              const attendance = attendanceIndicator(event);
+              return attendance ? (
+                <span
+                  className={`calendar-event-attendance is-${attendance.kind}`}
+                  title={attendance.label}
+                  aria-label={attendance.label}
+                >
+                  {attendance.symbol}
+                </span>
+              ) : null;
+            })()}
             <small>{assignedTeacherLabel(event) || "Unassigned"}</small>
           </button>
         ))}
@@ -242,6 +297,9 @@ export function AdminBookingCalendar(props: Props) {
       <span className="calendar-legend-chip is-red">Attention {legendCounts.attention}</span>
       <span className="calendar-legend-chip is-slate">Archived {legendCounts.archived}</span>
       <span className="calendar-legend-chip is-amber">Unbilled {legendCounts.unbilled}</span>
+      <span className="calendar-legend-chip is-waitlisted">Waitlisted {legendCounts.waitlisted}</span>
+      <span className="calendar-legend-chip is-attended">✓ Attended</span>
+      <span className="calendar-legend-chip is-no-show">✕ No-show</span>
     </div>
   );
 

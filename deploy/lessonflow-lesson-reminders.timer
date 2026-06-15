@@ -1,0 +1,21 @@
+# LessonFlow - Lesson Reminders Timer
+# Install: sudo cp deploy/lessonflow-lesson-reminders.timer /etc/systemd/system/
+# Enable:  sudo systemctl enable lessonflow-lesson-reminders.timer
+# Status:  systemctl list-timers lessonflow-lesson-reminders.timer
+
+[Unit]
+Description=Run Pre-Lesson Reminders hourly
+Documentation=https://gitlab.com/grahfmusic/lessonflow
+
+[Timer]
+# Run hourly: the reminder lead time is configurable (hours before the lesson),
+# so an hourly cadence keeps the send window tight. The runner is idempotent
+# (dedup via Booking.reminderSentAt), so overlapping windows are safe.
+OnCalendar=*-*-* *:00:00
+# If the timer was missed (e.g., server was down), run it when the system comes back up
+Persistent=true
+# Add a small random delay to avoid thundering herd
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

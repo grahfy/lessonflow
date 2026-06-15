@@ -175,6 +175,62 @@ export function customerBookingMovedTemplate(input: {
   };
 }
 
+/**
+ * Owner/teacher notification when a student requests a reschedule. Surfaces the
+ * current and requested times plus the optional reason so the admin can act from
+ * the bookings console.
+ */
+export function ownerRescheduleRequestTemplate(input: {
+  name: string;
+  currentWhen: Date;
+  requestedWhen: Date;
+  reason?: string | null;
+}) {
+  const reasonRow = input.reason
+    ? `<p style="margin:0 0 10px;"><strong>Reason:</strong> ${escapeHtml(input.reason)}</p>`
+    : "";
+  return {
+    subject: `Reschedule request: ${input.name}`,
+    html: renderEmailLayout({
+      title: "Reschedule request awaiting review",
+      previewText: `${input.name} requested a new lesson time`,
+      leadHtml:
+        "A student has requested to reschedule a confirmed lesson. Review and approve or decline it in the admin bookings console.",
+      contentHtml: `
+        <p style="margin:0 0 10px;"><strong>Student:</strong> ${escapeHtml(input.name)}</p>
+        <p style="margin:0 0 10px;"><strong>Current time:</strong> ${fmt(input.currentWhen)}</p>
+        <p style="margin:0 0 10px;"><strong>Requested time:</strong> ${fmt(input.requestedWhen)}</p>
+        ${reasonRow}
+      `
+    })
+  };
+}
+
+/**
+ * Student notification when an admin declines their reschedule request. The
+ * original lesson time is unchanged, so we restate it to avoid confusion.
+ */
+export function customerRescheduleDeclinedTemplate(input: {
+  name: string;
+  currentWhen: Date;
+  requestedWhen: Date;
+}) {
+  return {
+    subject: "Your reschedule request could not be accommodated",
+    html: renderEmailLayout({
+      title: "Reschedule request declined",
+      previewText: "Your reschedule request could not be accommodated.",
+      contentHtml: `
+        <p style="margin:0 0 10px;">Hi ${escapeHtml(input.name)},</p>
+        <p style="margin:0 0 10px;">Unfortunately we were unable to accommodate your request to move your lesson to ${fmt(
+          input.requestedWhen
+        )}.</p>
+        <p style="margin:0;"><strong>Your lesson remains scheduled for:</strong> ${fmt(input.currentWhen)}</p>
+      `
+    })
+  };
+}
+
 export function customerBookingReminderTemplate(input: {
   name: string;
   when: Date;
@@ -188,6 +244,53 @@ export function customerBookingReminderTemplate(input: {
         <p style="margin:0 0 10px;">Hi ${escapeHtml(input.name)},</p>
         <p style="margin:0 0 10px;">This is a reminder for your upcoming lesson.</p>
         <p style="margin:0;"><strong>Lesson time:</strong> ${fmt(input.when)}</p>
+      `
+    })
+  };
+}
+
+/**
+ * Pre-lesson reminder for an upcoming confirmed booking.
+ *
+ * RATIONALE: Richer than the generic booking reminder — it surfaces the teacher,
+ * lesson mode, and an optional student-portal link so the student can prepare.
+ * All times render in APP_TIMEZONE via the shared `fmt` helper.
+ */
+export function customerLessonReminderTemplate(input: {
+  name: string;
+  when: Date;
+  lessonMode: LessonMode;
+  teacherName?: string | null;
+  portalLoginUrl?: string | null;
+}) {
+  const teacherRow = input.teacherName
+    ? `<p style="margin:0 0 10px;"><strong>Teacher:</strong> ${escapeHtml(input.teacherName)}</p>`
+    : "";
+  const portalRow = input.portalLoginUrl
+    ? `
+        <p style="margin:14px 0 6px;color:#41506f;">Access your lessons and materials:</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 4px;">
+          <tr>
+            <td bgcolor="#2247d8" style="border-radius:10px;">
+              <a href="${escapeHtml(
+                input.portalLoginUrl
+              )}" style="display:inline-block;padding:12px 22px;border-radius:10px;background:#2247d8;color:#ffffff;font-weight:700;text-decoration:none;">Open student portal</a>
+            </td>
+          </tr>
+        </table>`
+    : "";
+  return {
+    subject: "Reminder: your upcoming lesson",
+    html: renderEmailLayout({
+      title: "Lesson reminder",
+      previewText: "This is a reminder for your upcoming lesson.",
+      contentHtml: `
+        <p style="margin:0 0 10px;">Hi ${escapeHtml(input.name)},</p>
+        <p style="margin:0 0 10px;">This is a friendly reminder for your upcoming lesson.</p>
+        <p style="margin:0 0 10px;"><strong>Lesson time:</strong> ${fmt(input.when)}</p>
+        <p style="margin:0 0 10px;"><strong>Mode:</strong> ${describeMode(input.lessonMode)}</p>
+        ${teacherRow}
+        ${portalRow}
       `
     })
   };
@@ -515,7 +618,9 @@ export function ownerOperationsReportTemplate(input: {
             <p style="margin:0 0 4px;">Pending appointments: ${input.report.appointmentPipeline.pendingRequestCount}</p>
             <p style="margin:0 0 4px;">Upcoming confirmed appointments: ${input.report.appointmentPipeline.upcomingConfirmedCount}</p>
             <p style="margin:0 0 4px;">Confirmed appointments (${escapeHtml(input.report.label)}): ${input.report.appointments.confirmedCount}</p>
-            <p style="margin:0;">Cancelled appointments (${escapeHtml(input.report.label)}): ${input.report.appointments.cancelledCount}</p>
+            <p style="margin:0 0 4px;">Cancelled appointments (${escapeHtml(input.report.label)}): ${input.report.appointments.cancelledCount}</p>
+            <p style="margin:0 0 4px;">Attended (${escapeHtml(input.report.label)}): ${input.report.appointments.attendedCount}</p>
+            <p style="margin:0;">No-shows (${escapeHtml(input.report.label)}): ${input.report.appointments.noShowCount}</p>
             <div style="margin-top:10px;padding-top:10px;border-top:1px solid #edf1f8;">
               <p style="margin:0 0 6px;"><strong>Pending appointments (time + customer)</strong></p>
               ${appointmentListHtml(input.report.details.pendingAppointments, "No pending appointments.")}

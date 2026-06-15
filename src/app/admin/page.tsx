@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminCard } from "@/components/admin/ui/admin-card";
-import { getCurrentAdmin } from "@/lib/admin-auth";
+import { getCurrentAdmin, isOwnerAdmin } from "@/lib/admin-auth";
 import { getVisibleAdminNavGroups, type AdminNavGroupKey } from "@/lib/admin/config";
 import { getSetupCompletionState } from "@/lib/setup";
 
@@ -40,6 +40,11 @@ export default async function AdminIndexPage() {
   const admin = await getCurrentAdmin();
   if (!admin) {
     redirect("/admin/login");
+  }
+
+  // Teachers land on their scoped dashboard; owners keep the workspace overview.
+  if (!isOwnerAdmin(admin)) {
+    redirect("/admin/dashboard");
   }
 
   const groups = getVisibleAdminNavGroups(admin.role);

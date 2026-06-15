@@ -53,6 +53,11 @@ const editSchema = z.object({
   notesContent: z.record(z.unknown()).nullable().optional()
 });
 
+// Attendance is clearable: an explicit null resets the lesson back to un-recorded.
+const setAttendanceSchema = z.object({
+  attendanceStatus: z.enum(["attended", "no_show"]).nullable()
+});
+
 /**
  * Admin booking mutation route used by the bookings dialog.
  *
@@ -324,6 +329,59 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       });
 
       return NextResponse.json({ ok: true });
+    }
+
+    if (action === "set_attendance") {
+      // Attendance can only be recorded for confirmed lessons that have already started.
+      if (existing.status !== "approved") {
+        return NextResponse.json(
+          { error: "Attendance can only be set on confirmed bookings." },
+          { status: 400 }
+        );
+      }
+      if (existing.startAt.getTime() >= Date.now()) {
+        return NextResponse.json(
+          { error: "Attendance can only be set after the lesson has started." },
+          { status: 400 }
+        );
+      }
+
+      const parsed = setAttendanceSchema.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: "Invalid attendance payload.", details: parsed.error.flatten() },
+          { status: 400 }
+        );
+      }
+
+      const nextAttendanceStatus = parsed.data.attendanceStatus;
+      const now = new Date();
+
+      await prisma.$transaction(async (tx) => {
+        await tx.booking.update({
+          where: { id },
+          data: {
+            attendanceStatus: nextAttendanceStatus,
+            // Clearing attendance also resets the marked metadata so the lesson reads as un-recorded.
+            attendanceMarkedAt: nextAttendanceStatus === null ? null : now,
+            attendanceMarkedById: nextAttendanceStatus === null ? null : admin.id,
+            modifiedById: admin.id
+          }
+        });
+        await tx.bookingAuditLog.create({
+          data: {
+            bookingId: id,
+            actorId: admin.id,
+            action: "attendance_marked",
+            details:
+              nextAttendanceStatus === null
+                ? "Attendance cleared"
+                : `Attendance set to ${nextAttendanceStatus}`
+          }
+        });
+      });
+
+      return NextResponse.json({ ok: true, attendanceStatus: nextAttendanceStatus });
     }
 
     return NextResponse.json({ error: "Unsupported action." }, { status: 400 });

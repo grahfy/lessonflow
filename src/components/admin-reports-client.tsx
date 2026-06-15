@@ -24,6 +24,8 @@ type PeriodReport = {
   appointments: {
     confirmedCount: number;
     cancelledCount: number;
+    attendedCount: number;
+    noShowCount: number;
   };
   outstandingInvoices: {
     count: number;
@@ -256,6 +258,8 @@ function PeriodCard({ period, dateFormat }: { period: PeriodReport; dateFormat: 
     () => [
       { label: "Confirmed appointments", value: String(period.appointments.confirmedCount) },
       { label: "Cancelled appointments", value: String(period.appointments.cancelledCount) },
+      { label: "Attended", value: String(period.appointments.attendedCount) },
+      { label: "No-shows", value: String(period.appointments.noShowCount) },
       { label: "Outstanding invoices", value: String(period.outstandingInvoices.count) },
       { label: "Outstanding total", value: formatAud(period.outstandingInvoices.totalCents) },
       { label: "Overdue invoices", value: String(period.outstandingInvoices.overdueCount) },
@@ -316,6 +320,8 @@ function CustomRangeCard({ period, dateFormat }: { period: CustomRangeReport; da
     () => [
       { label: "Confirmed appointments", value: String(period.appointments.confirmedCount) },
       { label: "Cancelled appointments", value: String(period.appointments.cancelledCount) },
+      { label: "Attended", value: String(period.appointments.attendedCount) },
+      { label: "No-shows", value: String(period.appointments.noShowCount) },
       { label: "Outstanding invoices", value: String(period.outstandingInvoices.count) },
       { label: "Outstanding total", value: formatAud(period.outstandingInvoices.totalCents) },
       { label: "Overdue invoices", value: String(period.outstandingInvoices.overdueCount) },

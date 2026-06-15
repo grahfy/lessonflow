@@ -20,6 +20,8 @@ type NotificationSettingsFormState = {
   invoiceReminderFirstDelayDays: string;
   invoiceReminderResendIntervalDays: string;
   autoCreateInvoiceOnApproval: boolean;
+  lessonReminderEnabled: boolean;
+  lessonReminderHoursBefore: string;
   updatedAt: string | null;
 };
 
@@ -30,6 +32,8 @@ const EMPTY_NOTIFICATION_SETTINGS: NotificationSettingsFormState = {
   invoiceReminderFirstDelayDays: "7",
   invoiceReminderResendIntervalDays: "7",
   autoCreateInvoiceOnApproval: false,
+  lessonReminderEnabled: false,
+  lessonReminderHoursBefore: "24",
   updatedAt: null
 };
 
@@ -44,6 +48,8 @@ function toFormState(input?: Partial<NotificationSettingsState>): NotificationSe
     invoiceReminderFirstDelayDays: String(input?.invoiceReminderFirstDelayDays ?? 7),
     invoiceReminderResendIntervalDays: String(input?.invoiceReminderResendIntervalDays ?? 7),
     autoCreateInvoiceOnApproval: input?.autoCreateInvoiceOnApproval ?? false,
+    lessonReminderEnabled: input?.lessonReminderEnabled ?? false,
+    lessonReminderHoursBefore: String(input?.lessonReminderHoursBefore ?? 24),
     updatedAt: input?.updatedAt ?? null
   };
 }
@@ -97,7 +103,9 @@ export function AdminNotificationSettingsEditor() {
           automaticInvoiceRemindersEnabled: settings.automaticInvoiceRemindersEnabled,
           invoiceReminderFirstDelayDays: settings.invoiceReminderFirstDelayDays,
           invoiceReminderResendIntervalDays: settings.invoiceReminderResendIntervalDays,
-          autoCreateInvoiceOnApproval: settings.autoCreateInvoiceOnApproval
+          autoCreateInvoiceOnApproval: settings.autoCreateInvoiceOnApproval,
+          lessonReminderEnabled: settings.lessonReminderEnabled,
+          lessonReminderHoursBefore: settings.lessonReminderHoursBefore
         })
       });
 
@@ -229,6 +237,49 @@ export function AdminNotificationSettingsEditor() {
                 setSettings((current) => ({
                   ...current,
                   invoiceReminderResendIntervalDays: event.target.value
+                }))
+              }
+            />
+          </AdminField>
+        </AdminForm>
+      </AdminEditorPanel>
+
+      <AdminEditorPanel title="Pre-Lesson Reminders" subdued>
+        <AdminForm>
+          <AdminField
+            label="Enable pre-lesson reminders"
+            description="Automatically email students a reminder before each upcoming confirmed lesson (sent once per lesson). Runs on a scheduled job."
+            fullWidth
+          >
+            <label className="admin-inline-checkbox">
+              <input
+                type="checkbox"
+                checked={settings.lessonReminderEnabled}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    lessonReminderEnabled: event.target.checked
+                  }))
+                }
+              />
+              Pre-lesson reminders enabled
+            </label>
+          </AdminField>
+
+          <AdminField
+            label="Hours before lesson"
+            description="How many hours ahead of the lesson start the reminder is sent."
+            error={fieldErrors.lessonReminderHoursBefore}
+          >
+            <input
+              type="number"
+              min={1}
+              max={168}
+              value={settings.lessonReminderHoursBefore}
+              onChange={(event) =>
+                setSettings((current) => ({
+                  ...current,
+                  lessonReminderHoursBefore: event.target.value
                 }))
               }
             />

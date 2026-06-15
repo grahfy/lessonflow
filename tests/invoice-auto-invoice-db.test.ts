@@ -313,7 +313,9 @@ describe("auto-invoicing (DB-backed)", () => {
       categoryPreferences: { ...DEFAULT_NOTIFICATION_CATEGORY_PREFERENCES },
       automaticInvoiceRemindersEnabled: true,
       invoiceReminderFirstDelayDays: 7,
-      invoiceReminderResendIntervalDays: 7
+      invoiceReminderResendIntervalDays: 7,
+      lessonReminderEnabled: false,
+      lessonReminderHoursBefore: 24
     };
 
     it("persists and reads back autoCreateInvoiceOnApproval=true", async () => {
