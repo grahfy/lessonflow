@@ -379,6 +379,17 @@ model BookingRescheduleRequest {
   resolvedAt       DateTime?
   resolvedById     String?
 
+  // DB-enforced "one pending reschedule request per booking" guard. MariaDB has
+  // no partial indexes, and a STORED generated column may not reference a
+  // foreign-key column (bookingId) directly, so we derive a flag from `status`
+  // alone: pendingFlag = 1 while pending, NULL once resolved. A composite UNIQUE
+  // index on (bookingId, pendingFlag) then allows at most one pending row per
+  // booking (NULLs never collide, so resolved rows are unconstrained). Defined as
+  // raw SQL in the migration; modeled here as Unsupported so Prisma never
+  // reads/writes it and introspection stays in sync.
+  pendingFlag Unsupported("tinyint")? @default(dbgenerated("(if(`status` = 'pending',1,NULL))"))
+
+  @@unique([bookingId, pendingFlag], map: "BookingRescheduleRequest_bookingId_pendingFlag_key")
   @@index([status])
   @@index([bookingId])
 }
@@ -985,6 +996,7 @@ model NotificationSettings {
   autoCreateInvoiceOnApproval       Boolean  @default(false)
   lessonReminderEnabled             Boolean  @default(false)
   lessonReminderHoursBefore         Int      @default(24)
+  errorAlertsEnabled                Boolean  @default(true)
   createdAt                         DateTime @default(now())
   updatedAt                         DateTime @updatedAt
 }
@@ -1122,6 +1134,7 @@ model SystemLog {
   createdAt DateTime @default(now())
 
   @@index([level])
+  @@index([event])
   @@index([createdAt])
 }
 

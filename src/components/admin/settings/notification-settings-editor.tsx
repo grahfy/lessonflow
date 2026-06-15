@@ -22,6 +22,7 @@ type NotificationSettingsFormState = {
   autoCreateInvoiceOnApproval: boolean;
   lessonReminderEnabled: boolean;
   lessonReminderHoursBefore: string;
+  errorAlertsEnabled: boolean;
   updatedAt: string | null;
 };
 
@@ -34,6 +35,7 @@ const EMPTY_NOTIFICATION_SETTINGS: NotificationSettingsFormState = {
   autoCreateInvoiceOnApproval: false,
   lessonReminderEnabled: false,
   lessonReminderHoursBefore: "24",
+  errorAlertsEnabled: true,
   updatedAt: null
 };
 
@@ -50,6 +52,7 @@ function toFormState(input?: Partial<NotificationSettingsState>): NotificationSe
     autoCreateInvoiceOnApproval: input?.autoCreateInvoiceOnApproval ?? false,
     lessonReminderEnabled: input?.lessonReminderEnabled ?? false,
     lessonReminderHoursBefore: String(input?.lessonReminderHoursBefore ?? 24),
+    errorAlertsEnabled: input?.errorAlertsEnabled ?? true,
     updatedAt: input?.updatedAt ?? null
   };
 }
@@ -105,7 +108,8 @@ export function AdminNotificationSettingsEditor() {
           invoiceReminderResendIntervalDays: settings.invoiceReminderResendIntervalDays,
           autoCreateInvoiceOnApproval: settings.autoCreateInvoiceOnApproval,
           lessonReminderEnabled: settings.lessonReminderEnabled,
-          lessonReminderHoursBefore: settings.lessonReminderHoursBefore
+          lessonReminderHoursBefore: settings.lessonReminderHoursBefore,
+          errorAlertsEnabled: settings.errorAlertsEnabled
         })
       });
 
@@ -306,6 +310,30 @@ export function AdminNotificationSettingsEditor() {
                 }
               />
               Enabled
+            </label>
+          </AdminField>
+        </AdminForm>
+      </AdminEditorPanel>
+
+      <AdminEditorPanel title="System Error Alerts" subdued>
+        <AdminForm>
+          <AdminField
+            label="Email the owner on critical errors"
+            description="When a fatal application error or background job failure occurs, send a rate-limited alert email to the owner. Alerts are throttled (at most one every few minutes) and never include client-reported browser errors."
+            fullWidth
+          >
+            <label className="admin-inline-checkbox">
+              <input
+                type="checkbox"
+                checked={settings.errorAlertsEnabled}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    errorAlertsEnabled: event.target.checked
+                  }))
+                }
+              />
+              Critical error alerts enabled
             </label>
           </AdminField>
         </AdminForm>

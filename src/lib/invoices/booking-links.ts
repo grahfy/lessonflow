@@ -1,6 +1,7 @@
 import { Prisma } from "@/generated/prisma/client";
 
 import { getDurationMinutes } from "@/lib/booking-rules";
+import { excludeDeleted } from "@/lib/db/soft-delete";
 
 type BookingDurationInput = {
   lessonDuration: "min30" | "min60";
@@ -26,7 +27,7 @@ export async function findActiveInvoiceLinksForBookingIds(
 
   const invoiceWhere = {
     documentType: "invoice" as const,
-    isDeleted: false,
+    ...excludeDeleted(),
     status: {
       not: "void" as const
     },

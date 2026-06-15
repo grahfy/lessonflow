@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { addDays } from "date-fns";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { prisma } from "@/lib/db";
 import { GET, POST } from "@/app/api/booking-requests/route";
@@ -15,6 +15,11 @@ describe("api-booking-requests", () => {
     await prisma.customer.deleteMany();
     await prisma.adminUser.deleteMany();
     await prisma.geoblockingSettings.deleteMany();
+  });
+
+  afterEach(() => {
+    // Undo any per-test env stubs (e.g. TRUST_EDGE_GEO) so suites stay isolated.
+    vi.unstubAllEnvs();
   });
 
   it("does not expose booking request rows via public GET", async () => {
@@ -80,6 +85,11 @@ describe("api-booking-requests", () => {
   });
 
   it("rejects booking requests from blocked countries", async () => {
+    // The route only honours the x-vercel-ip-country edge header when
+    // TRUST_EDGE_GEO names the platform; stub it so this case is self-contained
+    // and passes standalone (not only via the npm-test wrapper's global env).
+    vi.stubEnv("TRUST_EDGE_GEO", "vercel");
+
     await prisma.geoblockingSettings.create({
       data: {
         id: DEFAULT_GEOBLOCKING_SETTINGS_ID,

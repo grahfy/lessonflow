@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { jsonUnexpectedError } from "@/lib/api-errors";
 import { verifyCronSecret } from "@/lib/cron-auth";
 import { getPublicSiteUrl, hasCronSecret } from "@/lib/env";
 import { PUBLIC_BRAND_NAME } from "@/lib/branding";
+import { logCritical } from "@/lib/observability";
 
 type PageConfig = {
   enabled: boolean;
@@ -79,11 +81,8 @@ export async function POST(request: NextRequest) {
       }
     });
   } catch (error) {
-    console.error("Failed to generate sitemap:", error);
-    return NextResponse.json(
-      { error: "Failed to generate sitemap", details: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
+    logCritical("job.generate-sitemap.failed", error);
+    return jsonUnexpectedError(error, "Failed to generate sitemap.", { skipLog: true });
   }
 }
 

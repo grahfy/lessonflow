@@ -10,9 +10,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db";
+import { jsonUnexpectedError } from "@/lib/api-errors";
 import { verifyCronSecret } from "@/lib/cron-auth";
 import { hasCronSecret } from "@/lib/env";
-import { logEvent } from "@/lib/observability";
+import { logCritical, logEvent } from "@/lib/observability";
 
 const RETENTION_DAYS = 90;
 
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
       deletedCount: count
     });
   } catch (err) {
-    console.error("[analytics-purge] Failed:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    logCritical("job.analytics-purge.failed", err);
+    return jsonUnexpectedError(err, "Failed to purge analytics data.", { skipLog: true });
   }
 }

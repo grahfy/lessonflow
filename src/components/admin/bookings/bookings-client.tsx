@@ -25,7 +25,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction 
 import { useRouter, useSearchParams } from "next/navigation";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { format, parseISO, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, addYears, subYears } from "date-fns";
-import { AlertCircle, CalendarRange, Clock3, UserRound } from "lucide-react";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminCard } from "@/components/admin/ui/admin-card";
@@ -34,8 +33,6 @@ import { animateIn, animateOut, useTweenOrchestrator } from "@/components/motion
 import { usePresenceExit } from "@/components/motion/use-presence-exit";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
-import { Tooltip } from "@/components/admin/ui/tooltip";
-import { formatDateTime } from "@/lib/admin/formatters";
 
 import { useBookings, type BookingEvent } from "@/lib/admin/use-bookings";
 import { useCustomers } from "@/lib/admin/use-customers";
@@ -47,14 +44,13 @@ import { useLessonPlanTemplates } from "@/lib/admin/use-lesson-plan-templates";
 import { useAdminSession } from "@/lib/admin/use-admin-session";
 import { usePresets } from "@/lib/admin/use-presets";
 import { useTeachers } from "@/lib/admin/use-teachers";
-import { buildManualBookingPayload } from "@/lib/admin/manual-booking-payload";
+import { useBookingActions } from "@/lib/admin/use-booking-actions";
+import { useMaterialHandlers } from "@/lib/admin/use-material-handlers";
+import { useLessonPlanHandlers } from "@/lib/admin/use-lesson-plan-handlers";
 import {
-  buildDefaultLessonPlanSections,
-  type LessonPlanSection,
   type LessonPlanSectionsInput,
 } from "@/lib/lesson-plan-contract";
-import { durationMinutesToBookingPayload, durationMinutesToChoiceValue, getPersistedDurationMinutes } from "@/lib/lesson-duration-utils";
-import { formatCurrency } from "@/lib/invoices/currency";
+import { durationMinutesToChoiceValue, getPersistedDurationMinutes } from "@/lib/lesson-duration-utils";
 import { type BookingInvoiceCandidateSummary, type BookingInvoiceResolveResponse } from "@/lib/invoices/schema";
 import { toDateKey, toDateTimeLocalValue } from "@/lib/time";
 import { plainTextToTiptapJson } from "@/lib/tiptap-utils";
@@ -62,29 +58,23 @@ import type { JSONContent } from "@tiptap/react";
 
 import { BookingDetailDialog } from "./booking-detail-dialog";
 import { ManualBookingDialog } from "./manual-booking-dialog";
+import { BookingsWorkspaceToolbar, countLabel, type CalendarView } from "./bookings-workspace-toolbar";
+import { InvoiceCandidateDialog } from "./invoice-candidate-dialog";
 
 import {
-  sanitizeBookingEditPayload,
   type BookingCustomerLookupState,
   type BookingDialogForm,
   type BookingMatchedCustomer,
   type BookingRowData
 } from "./types";
 
-import { 
-  type ManualStep, 
+import {
+  type ManualStep,
 } from "@/lib/admin/types";
-
-/** Available calendar layouts. */
-type CalendarView = "day" | "week" | "month" | "year";
 
 /** Extends the base booking event with raw row data for detailed editing. */
 interface EventWithRow extends BookingEvent {
   row: BookingRowData;
-}
-
-function countLabel(count: number, singular: string, plural = `${singular}s`): string {
-  return `${count} ${count === 1 ? singular : plural}`;
 }
 
 /** Normalization for phone matching (strips non-digits, handles AU prefix). */
@@ -116,22 +106,6 @@ function getEmailHistoryTargetForEvent(event: EventWithRow | null): EmailHistory
   return event.entityType === "booking_request"
     ? { bookingRequestId: event.id }
     : { bookingId: event.id };
-}
-
-/** Extracts first validation error message from API response details. */
-function getFieldErrorMessage(result: unknown): string | null {
-  if (!result || typeof result !== "object") return null;
-  const details = (result as { details?: unknown }).details;
-  if (!details || typeof details !== "object") return null;
-  const fieldErrors = (details as { fieldErrors?: unknown }).fieldErrors;
-  if (!fieldErrors || typeof fieldErrors !== "object") return null;
-
-  for (const [field, messages] of Object.entries(fieldErrors)) {
-    if (Array.isArray(messages) && typeof messages[0] === "string") {
-      return `${field}: ${messages[0]}`;
-    }
-  }
-  return null;
 }
 
 /**
@@ -255,6 +229,7 @@ export function AdminBookingsClient() {
     send: sendEmailApi,
     sync: syncEmailApi
   } = useEmailHistory({ onAuthError, onError: setError });
+  const materials = useLearningMaterials({ onAuthError, onError: setError });
   const {
     materials: materialsList,
     bookings: materialsBookings,
@@ -262,18 +237,8 @@ export function AdminBookingsClient() {
     loading: materialsLoading,
     uploading: materialsUploading,
     deletingId: materialsDeletingId,
-    load: loadMaterials,
-    upload: uploadMaterialApi,
-    remove: removeMaterialApi,
-    createFolder: createMaterialFolderApi,
-    renameFolder: renameMaterialFolderApi,
-    deleteFolder: deleteMaterialFolderApi,
-    moveFolder: moveFolderApi,
-    copyFolder: copyFolderApi,
-    moveMaterial: moveMaterialApi,
-    renameMaterial: renameMaterialApi,
-    copyMaterial: copyMaterialApi
-  } = useLearningMaterials({ onAuthError, onError: setError });
+    load: loadMaterials
+  } = materials;
   const { templates: lessonPlanTemplates, loading: lessonPlanTemplatesLoading, load: loadLessonPlanTemplates } = useLessonPlanTemplates({ onAuthError, onError: setError });
   const {
     lessonPlan,
@@ -683,36 +648,6 @@ export function AdminBookingsClient() {
     void beginExitTransition(null, 0, () => router.push(`/admin/invoices?openInvoiceId=${encodeURIComponent(invoiceId)}`));
   }, [beginExitTransition, closeDialog, router]);
 
-  const createBookingInvoiceDraft = useCallback(async (bookingId: string) => {
-    const lessonPreset = presets.find((preset) => `${preset.label} ${preset.description}`.toLowerCase().includes("lesson")) || presets[0] || null;
-    const res = await fetch(`/api/admin/bookings/${bookingId}/invoice`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        lineItems: [{
-          description: lessonPreset?.description || lessonPreset?.label || "Standard Lesson Fee",
-          quantity: 1,
-          unitPriceCents: lessonPreset?.unitPriceCents ?? 6000,
-          kind: "lesson_fee",
-          discountKind: lessonPreset?.discountKind ?? null,
-          discountValue: lessonPreset?.discountValue ?? null
-        }]
-      })
-    });
-
-    if (!res.ok) {
-      const payload = await res.json().catch(() => null);
-      throw new Error(payload?.error || "Unable to create invoice draft.");
-    }
-
-    const payload = await res.json() as { invoice?: { id?: string } };
-    if (!payload.invoice?.id) {
-      throw new Error("Invoice draft was created but no invoice id was returned.");
-    }
-
-    await openInvoiceById(payload.invoice.id, "Draft invoice created.");
-  }, [openInvoiceById, presets]);
-
   const openManualDialog = useCallback(async () => {
     setManualStep("customer");
     setCustomerQuery("");
@@ -826,411 +761,91 @@ export function AdminBookingsClient() {
     void beginExitTransition(null, 0, () => router.push(`/admin/customers?customerId=${matchedDialogCustomer.id}&open=true`));
   }, [closeDialog, matchedDialogCustomer, router, beginExitTransition]);
 
-  // ACTION LOGIC: Wrappers around API hooks with state management and user feedback
-  
-  async function saveBooking() {
-    const event = events.find(e => e.id === selectedKey);
-    const currentDialogForm = dialogFormRef.current;
-    if (!selectedKey || !currentDialogForm || !event) return;
-    const nextDurationMinutes = Number.parseInt(currentDialogForm.durationChoice, 10);
-    if (!Number.isInteger(nextDurationMinutes)) {
-      setError("Select a configured lesson duration before saving.");
-      return;
-    }
-    if (configuredDurationValues.size > 0 && !configuredDurationValues.has(nextDurationMinutes)) {
-      setError("This booking uses a duration that is not configured in Lesson Info / Prices. Add that duration in settings or choose a configured duration before saving.");
-      return;
-    }
+  // ACTION LOGIC: Wrappers around API hooks with state management and user feedback.
+  // Extracted into focused hooks (useBookingActions / useMaterialHandlers /
+  // useLessonPlanHandlers); the orchestrator only wires shared state into them.
 
-    const normalizedDuration = durationMinutesToBookingPayload(nextDurationMinutes);
-    setBusyAction("save");
-    const payload: Record<string, unknown> = {
-      ...sanitizeBookingEditPayload(currentDialogForm),
-      lessonDuration: normalizedDuration.lessonDuration,
-      customDurationMinutes: normalizedDuration.customDurationMinutes
-    };
-    if (event.entityType === "booking_request") {
-      payload.customerId = currentDialogForm.linkedCustomerId || null;
-      payload.startAtLocal = currentDialogForm.startAtLocal;
-    }
-    const result = await updateBookingApi(selectedKey, event.entityType, "edit", {
-      ...payload
-    });
-    setBusyAction(null);
-    if (result.ok) {
-      setNotice(result.notice || "Booking updated.");
-      void loadBookings(view, dateStr);
-    }
-  }
+  const {
+    createBookingInvoiceDraft,
+    saveBooking,
+    deleteBooking,
+    moveBooking,
+    sendCustomEmail,
+    addManualBooking,
+    performAction
+  } = useBookingActions<EventWithRow>({
+    events,
+    selectedKey,
+    getDialogForm: () => dialogFormRef.current,
+    dialogForm,
+    view,
+    dateStr,
+    configuredDurationValues,
+    activeLessonPricingOptions,
+    presets,
+    manualCustomerId,
+    manualUpdateCustomerFromBooking,
+    manualFormRef,
+    getEmailHistoryTargetForEvent: (event) => getEmailHistoryTargetForEvent(event),
+    setError,
+    setNotice,
+    setBusyAction,
+    setPendingConfirm,
+    setIsMoveOpen,
+    setManualMatch,
+    setManualStep,
+    setEmailComposerSubject,
+    setEmailComposerMessage,
+    loadBookings,
+    updateBookingApi,
+    removeBookingApi,
+    sendEmailApi,
+    closeDialog,
+    closeManualDialog,
+    openInvoiceById
+  });
 
-  function deleteBooking() {
-    const event = events.find(e => e.id === selectedKey);
-    if (!selectedKey || !event) return;
-    setPendingConfirm({
-      title: "Cancel Booking",
-      description: "Are you sure you want to cancel this booking?",
-      confirmLabel: "Cancel Booking",
-      destructive: true,
-      onConfirm: () => void doDeleteBooking(selectedKey, event)
-    });
-  }
+  const {
+    uploadMaterial,
+    deleteMaterial,
+    handleCreateMaterialFolder,
+    handleRenameMaterialFolder,
+    handleDeleteMaterialFolder,
+    handleMoveMaterial,
+    handleMoveFolder,
+    handleCopyFolder,
+    handleRenameMaterial,
+    handleCopyMaterial
+  } = useMaterialHandlers({
+    getSelectedEvent: () => events.find((e) => e.id === selectedKey) || null,
+    uploadFormRef: materialsUploadFormRef,
+    setError,
+    setNotice,
+    setCurrentMaterialsFolderId,
+    materials
+  });
 
-  async function doDeleteBooking(key: string, event: (typeof events)[number]) {
-    setBusyAction("delete");
-    const result = await removeBookingApi(key, event.entityType);
-    setBusyAction(null);
-    if (result.ok) {
-      setNotice(result.notice || "Booking cancelled.");
-      void closeDialog();
-      void loadBookings(view, dateStr);
-    }
-  }
-
-  async function moveBooking() {
-    const event = events.find(e => e.id === selectedKey);
-    if (!selectedKey || !event || !moveNewStart) return;
-    setBusyAction("move");
-    const result = await updateBookingApi(selectedKey, event.entityType, "move", { newStartAt: moveNewStart });
-    setBusyAction(null);
-    if (result.ok) {
-      setNotice(result.notice || "Booking moved.");
-      setIsMoveOpen(false);
-      void loadBookings(view, dateStr);
-    }
-  }
-
-  async function sendCustomEmail(subject: string, message: string, captcha?: { captchaToken: string; captchaAnswer: string }) {
-    const event = events.find(e => e.id === selectedKey);
-    const emailTarget = getEmailHistoryTargetForEvent((event as EventWithRow | undefined) || null);
-    if (!emailTarget || !subject || !message) return { success: false };
-    
-    setError("");
-    const result = await sendEmailApi(emailTarget, subject, message, captcha);
-    if (result.success) {
-      setNotice("Email sent.");
-      setEmailComposerSubject("");
-      setEmailComposerMessage("");
-    }
-    return result;
-  }
-
-  async function uploadMaterial(captcha?: { captchaToken: string; captchaAnswer: string }) {
-    const event = events.find(e => e.id === selectedKey);
-    if (!event?.row.customerId || !materialsUploadFormRef.current) return;
-    setError("");
-    const success = await uploadMaterialApi(event.row.customerId, materialsBookingId, materialsUploadFormRef.current, captcha);
-    if (success) {
-      setNotice("Material uploaded.");
-      materialsUploadFormRef.current.reset();
-    }
-  }
-
-  async function deleteMaterial(materialId: string) {
-    setError("");
-    const success = await removeMaterialApi(materialId);
-    if (success) {
-      setNotice("Material deleted.");
-    }
-  }
-
-  // NOTE: folder handlers return the API success flag so the panel's modals
-  // can stay open (showing the server's error) when a mutation fails.
-  async function handleCreateMaterialFolder(name: string, parentId: string | null) {
-    const event = events.find(e => e.id === selectedKey);
-    if (!event?.row.customerId) return false;
-    setError("");
-    const success = await createMaterialFolderApi(event.row.customerId, name, parentId);
-    if (success) setNotice("Folder created.");
-    return success;
-  }
-
-  async function handleRenameMaterialFolder(folderId: string, name: string) {
-    const event = events.find(e => e.id === selectedKey);
-    if (!event?.row.customerId) return false;
-    setError("");
-    const success = await renameMaterialFolderApi(event.row.customerId, folderId, name);
-    if (success) setNotice("Folder renamed.");
-    return success;
-  }
-
-  async function handleDeleteMaterialFolder(folderId: string) {
-    const event = events.find(e => e.id === selectedKey);
-    if (!event?.row.customerId) return false;
-    setError("");
-    const success = await deleteMaterialFolderApi(event.row.customerId, folderId);
-    if (success) {
-      setNotice("Folder deleted. Its contents moved up one level.");
-      // If we were viewing the deleted folder, fall back to root.
-      setCurrentMaterialsFolderId((current) => (current === folderId ? null : current));
-    }
-    return success;
-  }
-
-  async function handleMoveMaterial(materialId: string, folderId: string | null) {
-    const event = events.find(e => e.id === selectedKey);
-    if (!event?.row.customerId) return false;
-    setError("");
-    const success = await moveMaterialApi(event.row.customerId, materialId, folderId);
-    if (success) setNotice("Material moved.");
-    return success;
-  }
-
-  async function handleMoveFolder(folderId: string, parentId: string | null) {
-    const event = events.find(e => e.id === selectedKey);
-    if (!event?.row.customerId) return false;
-    setError("");
-    const success = await moveFolderApi(event.row.customerId, folderId, parentId);
-    if (success) setNotice("Folder moved.");
-    return success;
-  }
-
-  async function handleCopyFolder(folderId: string, parentId: string | null) {
-    const event = events.find(e => e.id === selectedKey);
-    if (!event?.row.customerId) return false;
-    setError("");
-    const success = await copyFolderApi(event.row.customerId, folderId, parentId);
-    if (success) setNotice("Folder copied.");
-    return success;
-  }
-
-  async function handleRenameMaterial(materialId: string, title: string, description: string | null) {
-    const event = events.find(e => e.id === selectedKey);
-    if (!event?.row.customerId) return false;
-    setError("");
-    const success = await renameMaterialApi(event.row.customerId, materialId, title, description);
-    if (success) setNotice("Material updated.");
-    return success;
-  }
-
-  async function handleCopyMaterial(materialId: string, folderId: string | null) {
-    const event = events.find(e => e.id === selectedKey);
-    if (!event?.row.customerId) return false;
-    setError("");
-    const success = await copyMaterialApi(event.row.customerId, materialId, folderId);
-    if (success) setNotice("Material copied.");
-    return success;
-  }
-
-  function createScratchLessonPlanDraft() {
-    setLessonPlanDraft({
-      sections: buildDefaultLessonPlanSections(),
-      status: "in_progress",
-      sourceTemplateId: null,
-      seriesId: null,
-      seriesSequence: null
-    });
-  }
-
-  function applySelectedLessonPlanTemplate() {
-    if (!lessonPlanTemplateSelection) {
-      setError("Choose a lesson-plan template first.");
-      return;
-    }
-
-    const template = lessonPlanTemplates.find((row) => row.id === lessonPlanTemplateSelection);
-    if (!template) {
-      setError("Selected lesson-plan template could not be loaded.");
-      return;
-    }
-
-    if (lessonPlanDraft) {
-      setPendingConfirm({
-        title: "Replace Lesson Plan",
-        description: `Replace the current booking lesson plan with "${template.title}"? Unsaved changes in this draft will be overwritten.`,
-        confirmLabel: "Replace",
-        destructive: true,
-        onConfirm: () => doApplyLessonPlanTemplate(template)
-      });
-      return;
-    }
-
-    doApplyLessonPlanTemplate(template);
-  }
-
-  function doApplyLessonPlanTemplate(template: (typeof lessonPlanTemplates)[number]) {
-    setLessonPlanDraft({
-      sections: template.sections.length > 0
-        ? template.sections.map((s) => ({ ...s, content: { ...s.content, content: [...(s.content.content ?? [])] } }))
-        : buildDefaultLessonPlanSections(),
-      status: "in_progress",
-      sourceTemplateId: template.id,
-      seriesId: null,
-      seriesSequence: null
-    });
-    setNotice(lessonPlan ? `Template "${template.title}" copied into this booking draft. Save to keep it.` : `Template "${template.title}" copied into this booking.`);
-  }
-
-  async function clearLessonPlanDraft() {
-    if (!lessonPlanDraft) {
-      return;
-    }
-
-    setPendingConfirm({
-      title: "Clear Lesson Plan",
-      description: lessonPlan
-        ? "Clear this booking lesson plan? This will remove the saved lesson plan for this booking."
-        : "Clear this unsaved booking lesson-plan draft?",
-      confirmLabel: "Clear",
-      destructive: true,
-      onConfirm: () => void doClearLessonPlanDraft()
-    });
-  }
-
-  async function doClearLessonPlanDraft() {
-    if (!lessonPlanDraft) {
-      return;
-    }
-
-    if (lessonPlan && selectedEvent?.entityType === "booking") {
-      const cleared = await clearBookingLessonPlan(selectedEvent.id);
-      if (!cleared) {
-        return;
-      }
-      setNotice("Lesson plan cleared.");
-    } else {
-      setNotice("Lesson-plan draft cleared.");
-    }
-
-    setLessonPlanDraft(null);
-    setLessonPlanTemplateSelection("");
-  }
-
-  async function saveLessonPlan() {
-    if (!selectedEvent || selectedEvent.entityType !== "booking") return;
-    if (!lessonPlanDraft) {
-      setError("Create a lesson plan draft before saving.");
-      return;
-    }
-
-    const saved = await saveBookingLessonPlan(selectedEvent.id, lessonPlanDraft);
-    if (!saved) {
-      return;
-    }
-
-    setLessonPlanDraft({
-      sections: saved.sections,
-      status: saved.status,
-      sourceTemplateId: saved.sourceTemplateId,
-      seriesId: saved.seriesId,
-      seriesSequence: saved.seriesSequence
-    });
-    setNotice(lessonPlan ? "Lesson plan saved." : "Lesson plan created.");
-  }
-
-  function updateLessonPlanDraftSections(sections: LessonPlanSection[]) {
-    setLessonPlanDraft((prev) => prev ? { ...prev, sections } : prev);
-  }
-
-  function updateLessonPlanDraftStatus(status: LessonPlanSectionsInput["status"]) {
-    setLessonPlanDraft((prev) => prev ? { ...prev, status } : prev);
-  }
-
-  /** logic for resolving manual booking with potential duplicates. */
-  async function addManualBooking(resolution?: "use_existing" | "update_existing" | "create_new") {
-    if (!manualFormRef.current) return;
-    if (activeLessonPricingOptions.length === 0) {
-      setError("Add at least one active lesson duration in Lesson Info / Prices before creating manual bookings.");
-      return;
-    }
-    setBusyAction("create");
-    setError("");
-
-    const formData = new FormData(manualFormRef.current);
-    const payloadResult = buildManualBookingPayload(formData, {
-      manualCustomerId,
-      matchResolution: resolution,
-      updateCustomerFromBooking: manualUpdateCustomerFromBooking
-    });
-    if (!payloadResult.ok) {
-      setError(payloadResult.error);
-      setBusyAction(null);
-      return;
-    }
-
-    try {
-      const response = await fetch("/api/admin/bookings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payloadResult.payload)
-      });
-
-      if (response.status === 401) {
-        window.location.assign("/admin/login");
-        setBusyAction(null);
-        return;
-      }
-
-      if (response.status === 409) {
-        const data = await response.json();
-        setManualMatch(data.customer || null);
-        setManualStep("schedule");
-        setBusyAction(null);
-        return;
-      }
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        const fieldError = getFieldErrorMessage(data);
-        setError(fieldError ?? (typeof data?.error === "string" ? data.error : "Unable to create booking."));
-        setBusyAction(null);
-        return;
-      }
-
-      setNotice("Booking created.");
-      void closeManualDialog();
-      void loadBookings(view, dateStr);
-    } catch {
-      setError("Network error.");
-    } finally {
-      setBusyAction(null);
-    }
-  }
-
-  async function performAction(action: string) {
-    const event = events.find(e => e.id === selectedKey);
-    if (!event) return;
-
-    // Attendance actions are UI-namespaced (set_attendance:attended|no_show|clear) so the dialog can
-    // track per-button busy state, but they all map to the single `set_attendance` API action.
-    if (action.startsWith("set_attendance:")) {
-      const choice = action.slice("set_attendance:".length);
-      const attendanceStatus = choice === "clear" ? null : choice;
-      setBusyAction(action);
-      const result = await updateBookingApi(selectedKey!, event.entityType, "set_attendance", {
-        attendanceStatus
-      });
-      setBusyAction(null);
-      if (result.ok) {
-        setNotice(
-          result.notice ||
-            (attendanceStatus === null
-              ? "Attendance cleared."
-              : `Attendance marked as ${attendanceStatus === "no_show" ? "no-show" : "attended"}.`)
-        );
-        void loadBookings(view, dateStr);
-      }
-      return;
-    }
-
-    setBusyAction(action);
-    // Approve and promote both create bookings, so carry through any teacher assignment picked in the dialog.
-    const payload =
-      (action === "approve" || action === "promote") && dialogForm
-        ? { assignedTeacherId: dialogForm.assignedTeacherId || null }
-        : {};
-    const result = await updateBookingApi(selectedKey!, event.entityType, action, payload);
-    setBusyAction(null);
-
-    if (result.ok) {
-      setNotice(result.notice || `Booking ${action}ed.`);
-      // Approve/reject/promote resolve the request out of its current state; close the dialog so it
-      // doesn't keep showing stale actions. Waitlist keeps the request open for further handling.
-      if (action === "approve" || action === "reject" || action === "promote") {
-        void closeDialog();
-      }
-      void loadBookings(view, dateStr);
-    }
-  }
+  const {
+    createScratchLessonPlanDraft,
+    applySelectedLessonPlanTemplate,
+    clearLessonPlanDraft,
+    saveLessonPlan,
+    updateLessonPlanDraftSections,
+    updateLessonPlanDraftStatus
+  } = useLessonPlanHandlers({
+    selectedEvent,
+    lessonPlan,
+    lessonPlanDraft,
+    setLessonPlanDraft,
+    lessonPlanTemplates,
+    lessonPlanTemplateSelection,
+    setLessonPlanTemplateSelection,
+    setError,
+    setNotice,
+    setPendingConfirm,
+    saveBookingLessonPlan,
+    clearBookingLessonPlan
+  });
 
   const rangeLabel = useMemo(() => {
     const d = parseISO(dateStr);
@@ -1257,113 +872,24 @@ export function AdminBookingsClient() {
       className="admin-shell-bookings"
     >
       <div className="admin-layout-content">
-        <AdminCard className="admin-toolbar-card admin-range-card admin-bookings-workspace">
-          <div className="admin-bookings-workspace-hero">
-            <div className="admin-bookings-workspace-copy">
-              <p className="admin-console-kicker">Schedule Workspace</p>
-              <div className="admin-bookings-workspace-heading">
-                <h2>{rangeLabel}</h2>
-                <span className="admin-bookings-workspace-view-pill">{viewLabel}</span>
-              </div>
-              <p className="helper-text admin-bookings-workspace-summary">{workspaceSummary}</p>
-
-              <div className="admin-bookings-workspace-chips" aria-label="Current bookings context">
-                <span className="admin-bookings-workspace-chip">
-                  <UserRound size={15} aria-hidden="true" />
-                  {teacherFilterLabel}
-                </span>
-                <span className="admin-bookings-workspace-chip">
-                  <CalendarRange size={15} aria-hidden="true" />
-                  {rangeLabel}
-                </span>
-                <span className="admin-bookings-workspace-chip">
-                  <Clock3 size={15} aria-hidden="true" />
-                  {loadingBookings || !hasLoadedInitialBookings
-                    ? "Loading bookings"
-                    : countLabel(bookingWorkspaceStats.confirmed, "confirmed booking", "confirmed bookings")}
-                </span>
-              </div>
-            </div>
-
-            <div className="admin-bookings-workspace-stats" aria-label="Visible booking totals">
-              <div className="admin-bookings-workspace-stat">
-                <span className="admin-bookings-workspace-stat-label">Visible items</span>
-                <strong>{loadingBookings || !hasLoadedInitialBookings ? "—" : bookingWorkspaceStats.total}</strong>
-              </div>
-              <div className="admin-bookings-workspace-stat">
-                <span className="admin-bookings-workspace-stat-label">Confirmed</span>
-                <strong>{loadingBookings || !hasLoadedInitialBookings ? "—" : bookingWorkspaceStats.confirmed}</strong>
-              </div>
-              <div className="admin-bookings-workspace-stat">
-                <span className="admin-bookings-workspace-stat-label">Pending</span>
-                <strong>{loadingBookings || !hasLoadedInitialBookings ? "—" : bookingWorkspaceStats.pending}</strong>
-              </div>
-              <div className="admin-bookings-workspace-stat is-warning">
-                <span className="admin-bookings-workspace-stat-label">Unassigned</span>
-                <strong>{loadingBookings || !hasLoadedInitialBookings ? "—" : bookingWorkspaceStats.unassigned}</strong>
-              </div>
-            </div>
-          </div>
-
-          <div className="admin-range-row">
-            <div className="admin-range-primary">
-              <div className="button-row admin-range-nav-buttons">
-                <Tooltip content="Go to the previous date range.">
-                  <button className="btn btn-secondary btn-icon" type="button" onClick={goPrev} aria-label="Previous range">←</button>
-                </Tooltip>
-                <Tooltip content="Go to the next date range.">
-                  <button className="btn btn-secondary btn-icon" type="button" onClick={goNext} aria-label="Next range">→</button>
-                </Tooltip>
-              </div>
-              <div className="admin-range-copy">
-                <span className="admin-inline-field">Schedule Window</span>
-                <strong className="admin-range-label">{rangeLabel}</strong>
-              </div>
-            </div>
-
-            <div className="admin-range-actions">
-              <div className="site-nav admin-range-view-nav">
-                <Tooltip content="Switch to a single-day booking timeline.">
-                  <button className={`btn ${view === "day" ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => navigate("day", dateStr)}>Day</button>
-                </Tooltip>
-                <Tooltip content="Switch to week view for lesson planning.">
-                  <button className={`btn ${view === "week" ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => navigate("week", dateStr)}>Week</button>
-                </Tooltip>
-                <Tooltip content="Switch to month view for broader scheduling.">
-                  <button className={`btn ${view === "month" ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => navigate("month", dateStr)}>Month</button>
-                </Tooltip>
-                <Tooltip content="Switch to year view for long-range planning.">
-                  <button className={`btn ${view === "year" ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => navigate("year", dateStr)}>Year</button>
-                </Tooltip>
-              </div>
-              <div className="field admin-inline-field booking-teacher-filter-field">
-                <label htmlFor="booking-teacher-filter">Teacher</label>
-                <select id="booking-teacher-filter" value={teacherFilter} onChange={(event) => setTeacherFilter(event.target.value)}>
-                  <option value="all">All teachers</option>
-                  <option value="unassigned">Unassigned</option>
-                  {teacherOptions.map((teacher) => (
-                    <option key={teacher.id} value={teacher.id}>
-                      {teacher.displayName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="admin-range-divider" />
-              <Tooltip content="Create a new booking directly from the admin calendar.">
-                <button className="btn btn-primary" type="button" onClick={openManualDialog}>Add Manual Booking</button>
-              </Tooltip>
-            </div>
-          </div>
-
-          {!loadingBookings && hasLoadedInitialBookings && bookingWorkspaceStats.unassigned > 0 ? (
-            <div className="admin-bookings-workspace-alert" role="status">
-              <AlertCircle size={16} aria-hidden="true" />
-              <span>
-                {countLabel(bookingWorkspaceStats.unassigned, "unassigned lesson", "unassigned lessons")} still need a teacher in this window.
-              </span>
-            </div>
-          ) : null}
-        </AdminCard>
+        <BookingsWorkspaceToolbar
+          view={view}
+          dateStr={dateStr}
+          rangeLabel={rangeLabel}
+          viewLabel={viewLabel}
+          workspaceSummary={workspaceSummary}
+          teacherFilterLabel={teacherFilterLabel}
+          loadingBookings={loadingBookings}
+          hasLoadedInitialBookings={hasLoadedInitialBookings}
+          stats={bookingWorkspaceStats}
+          teacherFilter={teacherFilter}
+          setTeacherFilter={setTeacherFilter}
+          teacherOptions={teacherOptions}
+          onPrev={goPrev}
+          onNext={goNext}
+          onNavigate={navigate}
+          onAddManualBooking={openManualDialog}
+        />
 
         <AdminCard noPadding className="admin-bookings-calendar-card">
           <div className="admin-bookings-calendar-scroll">
@@ -1468,7 +994,7 @@ export function AdminBookingsClient() {
             materialsLoading,
             materialsUploading,
             materialsDeletingId,
-            onUpload: uploadMaterial,
+            onUpload: (captcha) => uploadMaterial(materialsBookingId, captcha),
             onDelete: deleteMaterial,
             uploadFormRef: materialsUploadFormRef,
             bookingField: {
@@ -1512,68 +1038,24 @@ export function AdminBookingsClient() {
         />
       )}
 
-      <AppDialog
-        isOpen={invoiceCandidates.length > 0}
+      <InvoiceCandidateDialog
+        candidates={invoiceCandidates}
         onClose={() => setInvoiceCandidates([])}
-        size="md"
-        title="Possible Existing Invoices"
-        description="Choose an existing invoice for this booking or create a new booking-linked draft."
-        footer={(
-          <div className="dialog-footer-row dialog-footer-row-end">
-            <button className="btn btn-secondary" type="button" onClick={() => setInvoiceCandidates([])}>
-              Close
-            </button>
-            <button
-              className="btn btn-primary"
-              type="button"
-              disabled={busyAction === "invoice" || !selectedEvent || selectedEvent.entityType !== "booking"}
-              onClick={async () => {
-                if (!selectedEvent || selectedEvent.entityType !== "booking") return;
-                setBusyAction("invoice");
-                try {
-                  await createBookingInvoiceDraft(selectedEvent.id);
-                } catch (error) {
-                  setError(error instanceof Error ? error.message : "Unable to create invoice draft.");
-                } finally {
-                  setBusyAction(null);
-                }
-              }}
-            >
-              {busyAction === "invoice" ? "Creating..." : "Create New"}
-            </button>
-          </div>
-        )}
-      >
-        <AdminCard ghost>
-          {invoiceCandidates.length === 0 ? (
-            <p className="helper-text">No candidate invoices found.</p>
-          ) : (
-            <div className="invoice-dialog-preset-list">
-              {invoiceCandidates.map((candidate) => (
-                <div key={candidate.invoiceId} className="invoice-dialog-preset-option">
-                  <div className="admin-list-strong">
-                    {candidate.invoiceNumber} · {candidate.status}
-                  </div>
-                  <div className="helper-text">
-                    Issued {formatDateTime(candidate.issuedAt)} · Due {formatDateTime(candidate.dueAt)} · {formatCurrency(candidate.totalCents, candidate.currency)}
-                  </div>
-                  <div className="helper-text">{candidate.matchReason}</div>
-                  <div className="button-row">
-                    <button
-                      className="btn btn-secondary"
-                      type="button"
-                      disabled={busyAction === "invoice"}
-                      onClick={() => void openInvoiceById(candidate.invoiceId, "Candidate invoice opened.")}
-                    >
-                      Open Existing
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </AdminCard>
-      </AppDialog>
+        busy={busyAction === "invoice"}
+        canCreate={Boolean(selectedEvent && selectedEvent.entityType === "booking")}
+        onOpenExisting={(invoiceId) => void openInvoiceById(invoiceId, "Candidate invoice opened.")}
+        onCreateNew={async () => {
+          if (!selectedEvent || selectedEvent.entityType !== "booking") return;
+          setBusyAction("invoice");
+          try {
+            await createBookingInvoiceDraft(selectedEvent.id);
+          } catch (error) {
+            setError(error instanceof Error ? error.message : "Unable to create invoice draft.");
+          } finally {
+            setBusyAction(null);
+          }
+        }}
+      />
 
       {isMoveOpen && (
         <AppDialog
@@ -1584,7 +1066,7 @@ export function AdminBookingsClient() {
           footer={
             <div className="dialog-footer-row dialog-footer-row-end">
               <button className="btn btn-secondary" onClick={() => setIsMoveOpen(false)}>CANCEL</button>
-              <button className="btn btn-primary" disabled={!!busyAction} onClick={moveBooking}>
+              <button className="btn btn-primary" disabled={!!busyAction} onClick={() => moveBooking(moveNewStart)}>
                 {busyAction === "move" ? "MOVING..." : "CONFIRM MOVE"}
               </button>
             </div>

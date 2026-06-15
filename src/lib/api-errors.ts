@@ -7,7 +7,7 @@ import { logError } from "./observability";
  * Normalizes unexpected API exceptions into a JSON response that clients can parse.
  * If the error is an instance of AppError, it uses its status and code.
  */
-export function jsonUnexpectedError(error: unknown, fallback: string) {
+export function jsonUnexpectedError(error: unknown, fallback: string, options?: { skipLog?: boolean }) {
   let message = fallback;
   let status = 500;
   let code = "INTERNAL_ERROR";
@@ -30,8 +30,12 @@ export function jsonUnexpectedError(error: unknown, fallback: string) {
     message = error.message;
   }
 
-  // Ensure we log the actual error for observability
-  logError("api_error", error, { code, status });
+  // Ensure we log the actual error for observability. Callers that have already
+  // logged the failure themselves (e.g. job routes using logCritical) pass
+  // skipLog to avoid a duplicate SystemLog row.
+  if (!options?.skipLog) {
+    logError("api_error", error, { code, status });
+  }
 
   return NextResponse.json(
     {

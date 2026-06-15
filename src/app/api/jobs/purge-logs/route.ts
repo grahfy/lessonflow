@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { jsonUnexpectedError } from "@/lib/api-errors";
 import { verifyCronSecret } from "@/lib/cron-auth";
 import { hasCronSecret } from "@/lib/env";
-import { logEvent } from "@/lib/observability";
+import { logCritical, logEvent } from "@/lib/observability";
 
 /**
  * Scheduled job to purge system logs older than 30 days.
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
       deletedCount: count,
     });
   } catch (err) {
-    console.error("[purge-logs] Failed to purge logs:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    logCritical("job.purge-logs.failed", err);
+    return jsonUnexpectedError(err, "Failed to purge system logs.", { skipLog: true });
   }
 }

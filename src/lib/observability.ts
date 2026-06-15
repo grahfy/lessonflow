@@ -20,6 +20,8 @@
 
 import { prisma } from "./db";
 import { Prisma } from "@/generated/prisma/client";
+import { getOwnerEmail } from "./env";
+import { consumeRateLimit } from "./rate-limit";
 
 /**
  * Suppression is keyed on the vitest marker (so the test suite stays quiet
@@ -107,6 +109,121 @@ export function logError(event: string, error: unknown, meta?: Record<string, un
   }
 
   persistLog("error", event, `${line}\n${errorMessage}`, meta);
+}
+
+/**
+ * Maximum characters of any error stack/message included in an alert email.
+ * RATIONALE: Alert bodies are operator-facing diagnostics, not full dumps.
+ * Truncating bounds the email size and avoids accidentally mailing large
+ * payloads (which could contain sensitive request bodies appended by callers).
+ */
+const ALERT_DETAIL_MAX_CHARS = 2000;
+
+/**
+ * Escapes user/error-derived text for safe inclusion in an HTML email body.
+ * The alert body is owner-only, but errors can contain attacker-influenced
+ * strings (e.g. a thrown message echoing request input), so we never inject
+ * raw markup.
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
+ * Sends a rate-limited owner alert email for a critical error.
+ *
+ * @internal - invoked fire-and-forget by {@link logCritical}.
+ * RATIONALE: Isolated so logCritical stays synchronous/non-blocking; all of the
+ * gating (errorAlertsEnabled), throttling (consumeRateLimit), and delivery live
+ * behind one awaited helper whose rejections are swallowed by the caller.
+ */
+async function sendOwnerErrorAlert(event: string, errorDetail: string, meta?: Record<string, unknown>) {
+  // Honour the explicit OBSERVABILITY_SILENT opt-out so the owner-alert path
+  // respects the documented silencing flag. We deliberately do NOT gate on
+  // VITEST here: VITEST only suppresses DB SystemLog rows (see isSilenced), while
+  // the alert pipeline (sendEmail/rate-limit) is exercised by the observability
+  // tests via mocks. Real sends in tests are inert (SMTP unconfigured) and the
+  // caller swallows rejections.
+  if (process.env.OBSERVABILITY_SILENT === "1") return;
+
+  // Gate: respect the owner's NotificationSettings.errorAlertsEnabled toggle.
+  // A missing settings row defaults to enabled (matches schema @default(true)).
+  const settings = await prisma.notificationSettings.findUnique({
+    where: { id: "default-notification-settings" },
+    select: { errorAlertsEnabled: true }
+  });
+  if (settings && settings.errorAlertsEnabled === false) {
+    return;
+  }
+
+  // Throttle: never send more than one alert per 5-minute window across all
+  // critical events, so an error storm cannot flood the owner inbox.
+  const limit = consumeRateLimit({ key: "error-alert", limit: 1, windowMs: 5 * 60 * 1000 });
+  if (!limit.allowed) {
+    return;
+  }
+
+  const truncatedDetail = errorDetail.slice(0, ALERT_DETAIL_MAX_CHARS);
+  const metaText = stringifyMeta(meta).slice(0, ALERT_DETAIL_MAX_CHARS);
+  const subject = `[LessonFlow] Critical error: ${event}`;
+  const html = [
+    `<p>A critical error was reported by the LessonFlow application.</p>`,
+    `<p><strong>Event:</strong> ${escapeHtml(event)}</p>`,
+    `<p><strong>Time:</strong> ${escapeHtml(new Date().toISOString())}</p>`,
+    metaText ? `<p><strong>Context:</strong> ${escapeHtml(metaText)}</p>` : "",
+    `<pre>${escapeHtml(truncatedDetail)}</pre>`,
+    `<p>Review the System Logs in the admin console for full details.</p>`
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  // Dynamic import avoids a static import cycle: email/service.ts imports this
+  // module (logEvent/logError). triggerMode "manual" intentionally bypasses the
+  // automated-notification suppression so operational alerts always go out when
+  // errorAlertsEnabled is on.
+  const { sendEmail } = await import("./email/service");
+  await sendEmail({
+    to: getOwnerEmail(),
+    subject,
+    html,
+    notification: { triggerMode: "manual" },
+    skipAuditBcc: true
+  });
+}
+
+/**
+ * Logs a fatal/critical error AND notifies the owner by email.
+ *
+ * RATIONALE: For failures that need human attention (crashed jobs, process-level
+ * unhandled rejections) we persist the error like {@link logError} and, when the
+ * owner has error alerts enabled, send a rate-limited alert email. The email is
+ * fire-and-forget so a slow/failed SMTP send never blocks or crashes the caller.
+ *
+ * @param event - High-level context (e.g. "job.gmail-sync.failed")
+ * @param error - The error instance (or unknown) that triggered the alert
+ * @param meta - Contextual data persisted with the log and summarized in the alert
+ */
+export function logCritical(event: string, error: unknown, meta?: Record<string, unknown>) {
+  // Persist + console exactly like a normal error (respects VITEST silencing).
+  logError(event, error, meta);
+
+  let errorDetail: string;
+  if (error instanceof Error) {
+    errorDetail = error.stack || error.message;
+  } else {
+    errorDetail = String(error);
+  }
+
+  // Fire-and-forget: the alert pipeline must never block or throw into the
+  // caller's request/job flow.
+  void sendOwnerErrorAlert(event, errorDetail, meta).catch((err) => {
+    console.error(`[observability] Failed to send owner error alert for "${event}":`, err);
+  });
 }
 
 /**
