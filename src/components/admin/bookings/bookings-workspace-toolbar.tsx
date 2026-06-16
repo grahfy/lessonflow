@@ -145,7 +145,7 @@ export function BookingsWorkspaceToolbar({
           </div>
           <div className="field admin-inline-field booking-teacher-filter-field">
             <label htmlFor="booking-teacher-filter">Teacher</label>
-            <select id="booking-teacher-filter" value={teacherFilter} onChange={(event) => setTeacherFilter(event.target.value)}>
+            <select id="booking-teacher-filter" aria-label="Teacher" value={teacherFilter} onChange={(event) => setTeacherFilter(event.target.value)}>
               <option value="all">All teachers</option>
               <option value="unassigned">Unassigned</option>
               {teacherOptions.map((teacher) => (

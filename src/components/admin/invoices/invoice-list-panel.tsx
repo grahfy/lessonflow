@@ -2,6 +2,7 @@
 
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AdminTable, AdminTableSeparator as Separator } from "@/components/admin/ui/admin-table";
+import { AdminTableSkeleton } from "@/components/admin/ui/admin-table-skeleton";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { type InvoiceRow } from "@/lib/admin/use-invoices";
 import { type InvoiceSortBy, type InvoiceSortDirection } from "@/lib/invoices/schema";
@@ -238,6 +239,12 @@ export function InvoiceListPanel({
       <AdminTable
         header={header}
         loading={loading}
+        loadingSkeleton={
+          <AdminTableSkeleton
+            label="Loading invoices"
+            columns={["0.9fr", "1.4fr", "0.8fr", "0.8fr", "1fr", "0.9fr"]}
+          />
+        }
         emptyLabel="No invoices found."
         pagination={{
           currentPage: page,

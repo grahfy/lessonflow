@@ -76,6 +76,7 @@ export default async function VouchersPage() {
           href={bodyContent.orderUrl}
           target="_blank"
           rel="noopener noreferrer"
+          aria-label="Buy a Voucher (opens in new tab)"
           data-motion-item="vouchers-action-order"
         >
           Buy a Voucher

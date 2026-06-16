@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AdminDeployUpdatesButton } from "@/components/admin-deploy-updates-button";
 import { invalidateCustomerEmailAlertsSessionCache } from "@/lib/admin/customer-email-alerts";
 import { getActiveAdminNavGroup, getVisibleAdminNavGroups } from "@/lib/admin/config";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { useInitialAdminRole } from "@/lib/admin/admin-initial-role-context";
+import { useOverlay } from "@/lib/ui/use-overlay";
 import type { AdminSessionSummary } from "@/lib/admin/use-admin-session";
 
 interface AdminHeaderProps {
@@ -23,16 +24,25 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const navPanelRef = useRef<HTMLDivElement | null>(null);
   const initialRole = useInitialAdminRole();
   const adminRoleLabel = admin?.role === "owner" ? "Owner" : "Teacher";
   const visibleNavGroups = getVisibleAdminNavGroups(initialRole ?? (adminLoading ? null : admin?.role));
   const activeGroupKey = getActiveAdminNavGroup(pathname, visibleNavGroups);
+
+  const closeMenu = () => setMenuOpen(false);
 
   useEffect(() => {
     // NOTE: Close the mobile menu on route change so stale open state does not
     // leak across section navigations.
     setMenuOpen(false);
   }, [pathname]);
+
+  // When open as a mobile drawer, share the dialog overlay behavior: ref-counted
+  // body scroll-lock, stack-aware Escape close, focus trap, and return-focus.
+  // Only engages while menuOpen — which can only be set at mobile widths where
+  // the toggle is visible — so desktop inline nav is unaffected.
+  useOverlay({ isOpen: menuOpen, panelRef: navPanelRef, onClose: closeMenu });
 
   /** Ends the admin session and sends the browser back to the login screen. */
   async function logout() {
@@ -82,7 +92,36 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
         </Tooltip>
       </div>
 
-      <div id="admin-header-menu-panel" className={`admin-header-nav ${menuOpen ? "is-open" : ""}`.trim()}>
+      {/* Mobile drawer backdrop — only rendered while open so it never blocks
+          interaction on the desktop inline layout. Click closes the drawer. */}
+      {menuOpen ? (
+        <div className="admin-header-nav-backdrop" onClick={closeMenu} aria-hidden="true" />
+      ) : null}
+
+      <div
+        id="admin-header-menu-panel"
+        ref={navPanelRef}
+        className={`admin-header-nav ${menuOpen ? "is-open" : ""}`.trim()}
+        // RATIONALE: At mobile widths this collapses into a slide-in drawer; the
+        // dialog semantics only apply while open (when it is an overlay), so the
+        // desktop inline nav keeps its plain region role.
+        role={menuOpen ? "dialog" : undefined}
+        aria-modal={menuOpen ? true : undefined}
+        aria-label={menuOpen ? "Admin navigation menu" : undefined}
+        tabIndex={menuOpen ? -1 : undefined}
+      >
+        {menuOpen ? (
+          <div className="admin-header-nav-drawer-head">
+            <p className="admin-header-nav-drawer-title">Navigation</p>
+            <button
+              className="btn btn-secondary admin-header-nav-drawer-close"
+              type="button"
+              onClick={closeMenu}
+            >
+              Close
+            </button>
+          </div>
+        ) : null}
         <div className="admin-header-nav-sections" aria-label="Admin sections">
           {visibleNavGroups.map((group) => {
             const isGroupActive = activeGroupKey === group.key;
