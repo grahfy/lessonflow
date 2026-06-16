@@ -18,8 +18,18 @@ async function createCaptchaPayload(page: import("@playwright/test").Page) {
   expect(imageDataUrl.startsWith("data:image/svg+xml;base64,"), "Captcha should be returned as SVG data URL.").toBeTruthy();
 
   const svg = Buffer.from(imageDataUrl.split(",")[1] || "", "base64").toString("utf8");
+  // Decode XML entities (e.g. &amp;) so an answer containing "&" is not sent as
+  // the literal "&amp;" and rejected as INVALID_CAPTCHA (~20% of challenges).
+  const decodeXmlEntities = (value: string) =>
+    value
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&apos;/g, "'");
   const answer = Array.from(svg.matchAll(/<text[^>]*>([^<]+)<\/text>/g))
-    .map((match) => match[1])
+    .map((match) => decodeXmlEntities(match[1]))
     .join("")
     .trim();
 

@@ -8,6 +8,12 @@ interface AdminTableProps {
   header?: ReactNode;
   children: ReactNode;
   loading?: boolean;
+  /**
+   * Optional skeleton placeholder shown (instead of the default spinner) while
+   * loading with no rows yet. Pass a shape matching this table's columns so the
+   * placeholder occupies the same footprint and avoids layout shift.
+   */
+  loadingSkeleton?: ReactNode;
   emptyLabel?: string;
   pagination?: {
     currentPage: number;
@@ -24,12 +30,13 @@ interface AdminTableProps {
  * Standard table container for admin lists.
  * Handles header, scrollable list, and pagination.
  */
-export function AdminTable({ 
-  header, 
-  children, 
-  loading, 
+export function AdminTable({
+  header,
+  children,
+  loading,
+  loadingSkeleton,
   emptyLabel = "No items found.",
-  pagination 
+  pagination
 }: AdminTableProps) {
   return (
     <div className="admin-card invoice-list-card admin-table-card">
@@ -43,10 +50,12 @@ export function AdminTable({
           <div className="admin-table-body">
             {children}
             {loading && (!children || (Array.isArray(children) && children.length === 0)) && (
-              <div className="admin-table-loading">
-                <Loader2 className="admin-spin" />
-                <span>retrieving data...</span>
-              </div>
+              loadingSkeleton ?? (
+                <div className="admin-table-loading">
+                  <Loader2 className="admin-spin" />
+                  <span>retrieving data...</span>
+                </div>
+              )
             )}
             {!loading && (!children || (Array.isArray(children) && children.length === 0)) && (
               <p className="helper-text admin-table-empty">{emptyLabel}</p>

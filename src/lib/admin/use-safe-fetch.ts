@@ -4,7 +4,9 @@ import { useCallback, useRef, useEffect } from "react";
 import { readApiErrorFromResponse } from "./utils";
 
 export interface UseSafeFetchOptions {
-  /** Called when API returns 401 or 403 */
+  /** Called when API returns 401 (unauthenticated). 403 (forbidden) is treated
+   *  as a normal, non-fatal error so a permitted-but-not-authorized user
+   *  (e.g. a teacher hitting owner-only data) is not logged out. */
   onAuthError?: () => void;
   /** Called with error message on other failures */
   onError?: (message: string) => void;
@@ -53,7 +55,10 @@ export function useSafeFetch(options: UseSafeFetchOptions = {}) {
 
   const handleApiError = useCallback(
     async (response: Response, fallback: string) => {
-      if (response.status === 401 || response.status === 403) {
+      // Only 401 (unauthenticated) forces a re-login. A 403 (forbidden) means
+      // the session is valid but lacks permission for this resource — logging
+      // out would not help, so it falls through to the normal error handler.
+      if (response.status === 401) {
         redirectToAdminLogin();
         return;
       }

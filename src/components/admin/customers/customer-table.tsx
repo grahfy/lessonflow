@@ -1,4 +1,5 @@
 import { AdminTable, AdminTableSeparator as Separator } from "@/components/admin/ui/admin-table";
+import { AdminTableSkeleton } from "@/components/admin/ui/admin-table-skeleton";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { getCustomerNamePresentation } from "@/lib/customers/name";
 import { type CustomerRow } from "./customer-profile-dialog";
@@ -63,6 +64,12 @@ export function CustomerTable({
         <AdminTable
             header={header}
             loading={loadingCustomers}
+            loadingSkeleton={
+                <AdminTableSkeleton
+                    label="Loading customers"
+                    columns={["1.4fr", "0.8fr", "0.9fr", "1fr", "1.1fr", "0.9fr"]}
+                />
+            }
             emptyLabel="No customers found."
             pagination={{
                 currentPage: page,

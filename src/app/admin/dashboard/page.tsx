@@ -8,7 +8,8 @@ import { getCurrentAdmin, isOwnerAdmin } from "@/lib/admin-auth";
 import { getCalendarRange } from "@/lib/calendar-range";
 import { prisma } from "@/lib/db";
 import { getSetupCompletionState } from "@/lib/setup";
-import { APP_TIMEZONE } from "@/lib/time";
+
+import { formatTime, formatWeekdayTime } from "./formatters";
 
 export const metadata = {
   title: "Booking Console Dashboard"
@@ -40,23 +41,6 @@ type ScheduleBooking = {
 
 function bookingDisplayName(booking: Pick<ScheduleBooking, "name" | "firstName" | "lastName">): string {
   return booking.lastName ? `${booking.lastName}, ${booking.firstName}` : booking.name;
-}
-
-function formatTime(value: Date): string {
-  return new Intl.DateTimeFormat("en-AU", {
-    timeZone: APP_TIMEZONE,
-    timeStyle: "short"
-  }).format(value);
-}
-
-// Compact weekday + time for the week list (e.g. "Mon 3:00 pm"), keeping it
-// shorter than the full long datetime used elsewhere.
-function formatWeekdayTime(value: Date): string {
-  return new Intl.DateTimeFormat("en-AU", {
-    timeZone: APP_TIMEZONE,
-    weekday: "short",
-    timeStyle: "short"
-  }).format(value);
 }
 
 export default async function AdminDashboardPage() {

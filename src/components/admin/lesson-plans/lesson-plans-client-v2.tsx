@@ -8,6 +8,7 @@ import { LessonPlanSectionsEditor } from "@/components/admin/lesson-plans/lesson
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AdminField, AdminForm } from "@/components/admin/ui/admin-form";
 import { Tooltip } from "@/components/admin/ui/tooltip";
+import { SkeletonBlock, SkeletonRegion } from "@/components/ui/skeleton";
 import { formatDateTime } from "@/lib/admin/formatters";
 import { resolveLessonPlanTemplateSelection } from "@/lib/admin/lesson-plan-template-selection";
 import { useAdminSession } from "@/lib/admin/use-admin-session";
@@ -203,7 +204,17 @@ export function AdminLessonPlansClientV2() {
           </div>
 
           <div className="lesson-plan-template-list" role="list">
-            {filteredTemplates.length === 0 ? (
+            {loading && !hasLoadedOnce ? (
+              <SkeletonRegion label="Loading lesson plan templates" className="lesson-plan-template-skeleton">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <div key={index} className="lesson-plan-template-skeleton-item" aria-hidden="true">
+                    <SkeletonBlock variant="text" width="70%" />
+                    <SkeletonBlock variant="text" width="50%" />
+                    <SkeletonBlock variant="text" width="40%" />
+                  </div>
+                ))}
+              </SkeletonRegion>
+            ) : filteredTemplates.length === 0 ? (
               <p className="helper-text">No templates match this filter.</p>
             ) : (
               filteredTemplates.map((template) => {

@@ -6,6 +6,7 @@ import { type ReactElement, FormEvent, useCallback, useEffect, useState } from "
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 import { Tooltip } from "@/components/admin/ui/tooltip";
+import { SkeletonBlock, SkeletonRegion } from "@/components/ui/skeleton";
 import styles from "@/components/student-portal.module.css";
 import { BookingNotesViewer } from "@/components/student-portal/booking-notes-viewer";
 import { LessonPlanViewer } from "@/components/student-portal/lesson-plan-viewer";
@@ -310,7 +311,27 @@ export function StudentPortalClient(): ReactElement {
         </div>
       </div>
 
-      {loading ? <p className="notice" role="status">Loading portal...</p> : null}
+      {loading ? (
+        <SkeletonRegion label="Loading portal" className={styles["portal-skeleton"]}>
+          <section className={cx("admin-card", styles["actions-panel"])} aria-hidden="true">
+            <SkeletonBlock variant="text" width="40%" height="1.25rem" />
+            <SkeletonBlock variant="text" width="70%" />
+            <SkeletonBlock height="2.5rem" radius={8} />
+          </section>
+          <div className={styles["portal-grid"]} aria-hidden="true">
+            <section className={cx("admin-card", styles["upcoming-panel"])}>
+              <SkeletonBlock variant="text" width="50%" height="1.1rem" />
+              <SkeletonBlock height="5rem" radius={10} />
+              <SkeletonBlock height="5rem" radius={10} />
+            </section>
+            <section className={cx("admin-card", styles["previous-panel"])}>
+              <SkeletonBlock variant="text" width="50%" height="1.1rem" />
+              <SkeletonBlock height="5rem" radius={10} />
+              <SkeletonBlock height="5rem" radius={10} />
+            </section>
+          </div>
+        </SkeletonRegion>
+      ) : null}
       {error ? <p className="notice error" role="alert">{error}</p> : null}
       {notice ? <p className="notice success" role="status">{notice}</p> : null}
 

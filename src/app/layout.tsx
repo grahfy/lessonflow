@@ -10,6 +10,7 @@ import { getPublicSiteUrl } from "@/lib/env";
 import "@/styles/globals.css";
 import "@/styles/admin.css";
 import "@/styles/extended-features.css";
+import "@/styles/skeleton.css";
 
 const overpass = Overpass({
   subsets: ["latin"],
