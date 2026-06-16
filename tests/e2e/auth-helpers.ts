@@ -43,6 +43,22 @@ function ensureStudentE2EFixture(input: {
   );
 }
 
+/**
+ * Decodes the XML entities the CAPTCHA SVG uses inside <text> nodes so the
+ * derived answer matches the literal characters the server expects. Without this
+ * an answer containing "&" arrives as the literal "&amp;" and the login is
+ * rejected with INVALID_CAPTCHA (~20% of challenges include such characters).
+ */
+function decodeXmlEntities(value: string): string {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'");
+}
+
 export async function createCaptchaPayload(
   request: APIRequestContext,
   label: string
@@ -65,7 +81,7 @@ export async function createCaptchaPayload(
 
   const svg = Buffer.from(imageDataUrl.split(",")[1] || "", "base64").toString("utf8");
   const answer = Array.from(svg.matchAll(/<text[^>]*>([^<]+)<\/text>/g))
-    .map((match) => match[1])
+    .map((match) => decodeXmlEntities(match[1]))
     .join("")
     .trim();
 

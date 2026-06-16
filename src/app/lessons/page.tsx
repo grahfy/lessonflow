@@ -84,14 +84,18 @@ export default async function LessonsPage() {
         <h3>{pricingContent.title}</h3>
         <div className="lesson-pricing-grid">
           <div>
-            <h4>{pricingContent.min30Label}</h4>
-            <p>{pricingContent.min30Option1}</p>
-            <p>{pricingContent.min30Option2}</p>
+            <dl className="lesson-pricing-list">
+              <dt>{pricingContent.min30Label}</dt>
+              <dd>{pricingContent.min30Option1}</dd>
+              <dd>{pricingContent.min30Option2}</dd>
+            </dl>
           </div>
           <div>
-            <h4>{pricingContent.min60Label}</h4>
-            <p>{pricingContent.min60Option1}</p>
-            <p>{pricingContent.min60Option2}</p>
+            <dl className="lesson-pricing-list">
+              <dt>{pricingContent.min60Label}</dt>
+              <dd>{pricingContent.min60Option1}</dd>
+              <dd>{pricingContent.min60Option2}</dd>
+            </dl>
           </div>
         </div>
         <p className="lesson-pricing-note">{pricingContent.note}</p>

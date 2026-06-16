@@ -5,6 +5,48 @@ import { loginAdminViaApi } from "./auth-helpers";
 const adminEmail = process.env.DOCS_SCREENSHOTS_ADMIN_EMAIL || "admin@example.com";
 const adminPassword = process.env.DOCS_SCREENSHOTS_ADMIN_PASSWORD || "admin123";
 
+// Teacher credentials for the docs-demo dataset. The fake `--seed` dataset does
+// not provision a teacher; role-gating coverage therefore requires the docs-demo
+// seed (the default for this phase's e2e run).
+const teacherEmail = process.env.DOCS_SCREENSHOTS_TEACHER_EMAIL || "tayla.teacher@example.com";
+const teacherPassword = process.env.DOCS_SCREENSHOTS_TEACHER_PASSWORD || "DocsDemoTeacher!23";
+
+// Nav items gated to owners only (see src/lib/admin/config.ts roles: ["owner"]).
+const ownerOnlyNavLabels = [
+  /^invoices$/i,
+  /^reports$/i,
+  /^analytics$/i,
+  /^settings$/i,
+  /^logs$/i
+] as const;
+
+/**
+ * Logs in via the API, retrying when the synthetic CAPTCHA solve occasionally
+ * produces a rejected payload (HTTP 400). Each attempt re-fetches a fresh
+ * CAPTCHA and uses a new forwarded IP so the login rate limit is never the
+ * cause of a retry. Keeps these login-heavy drawer specs from flaking on the
+ * one-shot CAPTCHA parse in the shared helper.
+ */
+async function loginAdminWithRetry(
+  page: Page,
+  creds: { email: string; password: string },
+  attempts = 5
+): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      await loginAdminViaApi(page, {
+        ...creds,
+        forwardedIp: `198.51.100.${Math.floor(Math.random() * 200) + 1}`
+      });
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
+
 /** Fails when the current page layout exceeds the mobile viewport width. */
 async function assertNoHorizontalOverflow(page: Page, label: string): Promise<void> {
   const metrics = await page.evaluate(() => ({
@@ -232,7 +274,7 @@ test.describe("admin mobile responsiveness", () => {
     await assertNoHorizontalOverflow(page, "/admin/settings scroll state");
 
     await page.goto("/admin/teachers", { waitUntil: "domcontentloaded" });
-    await page.getByRole("heading", { name: /teachers/i }).waitFor({ timeout: 12_000 });
+    await page.getByRole("heading", { name: "Teachers", exact: true }).first().waitFor({ timeout: 12_000 });
     const teacherMetrics = page.locator(".teacher-directory-metrics").first();
     await expect(teacherMetrics).toBeVisible();
     await expect(readGridColumnCount(teacherMetrics)).resolves.toBe(1);
@@ -303,7 +345,7 @@ test.describe("admin intermediate-width header responsiveness", () => {
     await assertNoHorizontalOverflow(page, "/admin/system-logs intermediate open menu");
 
     await page.goto("/admin/teachers", { waitUntil: "domcontentloaded" });
-    await page.getByRole("heading", { name: /teachers/i }).waitFor({ timeout: 12_000 });
+    await page.getByRole("heading", { name: "Teachers", exact: true }).first().waitFor({ timeout: 12_000 });
 
     const teacherMetrics = page.locator(".teacher-directory-metrics").first();
     await expect(teacherMetrics).toBeVisible();
@@ -466,5 +508,183 @@ test.describe("admin compact 1080p desktop density", () => {
       chordBuilderBodyMetrics.scrollHeight,
       "Chord builder dialog body should own vertical overflow at 1080p."
     ).toBeGreaterThanOrEqual(chordBuilderBodyMetrics.clientHeight);
+  });
+});
+
+/**
+ * Navigates to an authenticated admin route, retrying if the Next.js dev server
+ * bounces the very first hit to /admin/login while the route is still compiling
+ * (a known cold-compile race that does not reflect a real auth failure).
+ */
+async function gotoAuthedAdminRoute(page: Page, route: string): Promise<void> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.goto(route, { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle").catch(() => null);
+    if (!/\/admin\/login/.test(page.url())) {
+      return;
+    }
+    await page.waitForTimeout(750);
+  }
+  await page.goto(route, { waitUntil: "domcontentloaded" });
+  await page.waitForLoadState("networkidle").catch(() => null);
+}
+
+/** Opens the mobile nav drawer and waits for the overlay semantics to engage. */
+async function openMobileNavDrawer(page: Page): Promise<{ toggle: Locator; panel: Locator }> {
+  await closeBlockingAdminDialogs(page);
+  const toggle = page.getByRole("button", { name: /^menu$/i }).first();
+  await expect(toggle).toBeVisible();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await toggle.evaluate((button) => (button as HTMLButtonElement).click());
+
+  const panel = page.locator("#admin-header-menu-panel");
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(panel).toHaveClass(/is-open/);
+  await expect(panel).toHaveAttribute("role", "dialog");
+  await expect(panel).toHaveAttribute("aria-modal", "true");
+  return { toggle, panel };
+}
+
+test.describe("admin mobile nav drawer", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("toggle opens an accessible drawer with a trapped focus order", async ({ page }) => {
+    await loginAdminWithRetry(page, { email: adminEmail, password: adminPassword });
+    await gotoAuthedAdminRoute(page, "/admin/bookings");
+
+    const { panel } = await openMobileNavDrawer(page);
+
+    // Focus must land inside the drawer once it opens (the overlay hook moves it
+    // to the panel / first focusable), not remain on the page behind it.
+    const focusInsidePanel = await panel.evaluate((node) => node.contains(document.activeElement));
+    expect(focusInsidePanel, "Focus should move into the drawer when it opens.").toBe(true);
+
+    // Focus trap: Tabbing through every focusable should never escape the panel.
+    const focusableCount = await panel.evaluate(
+      (node) =>
+        node.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input, [tabindex]:not([tabindex="-1"])'
+        ).length
+    );
+    expect(focusableCount, "Drawer should expose focusable controls.").toBeGreaterThan(1);
+
+    for (let i = 0; i < focusableCount + 2; i += 1) {
+      await page.keyboard.press("Tab");
+      const trapped = await panel.evaluate((node) => node.contains(document.activeElement));
+      expect(trapped, "Tab focus should stay trapped inside the open drawer.").toBe(true);
+    }
+  });
+
+  test("ESC, backdrop click, and link navigation each close the drawer", async ({ page }) => {
+    await loginAdminWithRetry(page, { email: adminEmail, password: adminPassword });
+    await gotoAuthedAdminRoute(page, "/admin/bookings");
+
+    // ESC closes.
+    const escScenario = await openMobileNavDrawer(page);
+    await page.keyboard.press("Escape");
+    await expect(escScenario.panel).not.toHaveClass(/is-open/);
+    await expect(escScenario.toggle).toHaveAttribute("aria-expanded", "false");
+
+    // Backdrop click closes.
+    const backdropScenario = await openMobileNavDrawer(page);
+    await page.locator(".admin-header-nav-backdrop").click();
+    await expect(backdropScenario.panel).not.toHaveClass(/is-open/);
+    await expect(backdropScenario.toggle).toHaveAttribute("aria-expanded", "false");
+
+    // Navigating a link closes the drawer (route-change reset).
+    const navScenario = await openMobileNavDrawer(page);
+    await navScenario.panel.getByRole("button", { name: /^customers$/i }).first().click();
+    await page.waitForURL(/\/admin\/customers/, { timeout: 12_000 });
+    await expect(navScenario.panel).not.toHaveClass(/is-open/);
+    await expect(navScenario.toggle).toHaveAttribute("aria-expanded", "false");
+  });
+
+  test("drawer nav controls meet the ~44px touch target height", async ({ page }) => {
+    await loginAdminWithRetry(page, { email: adminEmail, password: adminPassword });
+    await gotoAuthedAdminRoute(page, "/admin/bookings");
+
+    const { panel } = await openMobileNavDrawer(page);
+
+    const navButtons = panel.locator(".admin-header-nav-button");
+    const count = await navButtons.count();
+    expect(count, "Drawer should render nav buttons.").toBeGreaterThan(0);
+
+    for (let i = 0; i < count; i += 1) {
+      const button = navButtons.nth(i);
+      const box = await button.boundingBox();
+      const label = await button.textContent();
+      expect(box, `Nav button "${label?.trim()}" should be visible.`).not.toBeNull();
+      if (box) {
+        // WCAG 2.5.5 target ~44px; allow 1px sub-pixel rounding slack.
+        expect(
+          box.height,
+          `Nav button "${label?.trim()}" should be at least 44px tall (was ${box.height}px).`
+        ).toBeGreaterThanOrEqual(43);
+      }
+    }
+  });
+
+  test("owner session exposes the owner-only nav items in the drawer", async ({ page }) => {
+    await loginAdminWithRetry(page, { email: adminEmail, password: adminPassword });
+    await gotoAuthedAdminRoute(page, "/admin/bookings");
+
+    const { panel } = await openMobileNavDrawer(page);
+    for (const label of ownerOnlyNavLabels) {
+      await expect(
+        panel.getByRole("button", { name: label }).first(),
+        `Owner drawer should expose the ${label} nav item.`
+      ).toBeVisible();
+    }
+  });
+
+  test("teacher session sees NO owner-only nav items in the drawer (role gating)", async ({ page }) => {
+    // SECURITY: This is the one authz-relevant assertion in Phase 4 — teachers
+    // must never see owner-only navigation. Requires the docs-demo seed (the
+    // fake --seed dataset does not provision a teacher account).
+    await loginAdminWithRetry(page, { email: teacherEmail, password: teacherPassword });
+
+    // NOTE: The bookings client eagerly fetches several owner-only endpoints
+    // (e.g. /api/admin/presets, /api/admin/lesson-pricing). Each returns 403 for
+    // a teacher, and the client's onAuthError handler then does
+    // window.location.assign("/admin/login"), booting the teacher off the page
+    // before the drawer can be exercised. This is a pre-existing product
+    // behavior (reported separately). To isolate THIS test to the drawer's role
+    // gating, soften any owner-only 403 from an admin GET into an empty 200 so
+    // the page does not self-redirect. The session/role itself is untouched, so
+    // the role-based nav filtering under test is still exercised faithfully.
+    await page.route("**/api/admin/**", async (route) => {
+      if (route.request().method() !== "GET") {
+        return route.continue();
+      }
+      const response = await route.fetch();
+      if (response.status() === 403) {
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ ok: true })
+        });
+      }
+      return route.fulfill({ response });
+    });
+
+    await gotoAuthedAdminRoute(page, "/admin/bookings");
+
+    const { panel } = await openMobileNavDrawer(page);
+
+    // Teacher-visible items should still be present so we know the drawer rendered.
+    await expect(panel.getByRole("button", { name: /^bookings$/i }).first()).toBeVisible();
+
+    for (const label of ownerOnlyNavLabels) {
+      await expect(
+        panel.getByRole("button", { name: label }),
+        `Teacher drawer must NOT expose the ${label} owner-only nav item.`
+      ).toHaveCount(0);
+    }
+
+    // The owner-only deploy "Updates" quick action must also be hidden.
+    await expect(
+      panel.getByRole("button", { name: /updates/i }),
+      "Teacher drawer must not expose the owner-only deploy updates action."
+    ).toHaveCount(0);
   });
 });

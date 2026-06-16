@@ -29,6 +29,12 @@ export function useLessonPricing(options: { onAuthError?: () => void; onError?: 
     setLoading(true);
     try {
       const response = await safeFetch("/api/admin/lesson-pricing", { cache: "no-store" });
+      if (response.status === 403) {
+        // Owner-only data: non-owner admins (e.g. teachers) keep the default
+        // pricing state rather than seeing a load error. Returning a fresh
+        // default (instead of component state) keeps load() identity stable.
+        return buildDefaultLessonPricingSettingsState().lessonPricingOptions;
+      }
       if (!response.ok) {
         await handleApiError(response, "Failed to load lesson pricing.");
         return [];

@@ -57,6 +57,14 @@
   --motion-exit-duration: 160ms;
   --motion-stagger-step: 24ms;
   --motion-enter-distance: 10px;
+  /* Loading skeletons — resting block fill, shimmer-sweep highlight, corner
+     radius, and sweep cycle duration. Consumed via var() with matching
+     fallbacks so any surface (admin or public) can render placeholders even if
+     this block is overridden. */
+  --skeleton-base: rgba(148, 163, 184, 0.12);
+  --skeleton-highlight: rgba(226, 232, 240, 0.22);
+  --skeleton-radius: 8px;
+  --skeleton-shimmer-duration: 1.4s;
 }
 
 * {
@@ -1231,17 +1239,27 @@ h1 {
   gap: 4px;
 }
 
-.lesson-pricing-grid h4 {
+.lesson-pricing-grid h4,
+.lesson-pricing-grid dt {
   margin: 0 0 4px;
   font-size: 0.86rem;
   color: #edf3ff;
 }
 
-.lesson-pricing-grid p {
+.lesson-pricing-grid p,
+.lesson-pricing-grid dd {
   margin: 0;
   color: var(--ink-1);
   font-size: 0.82rem;
   line-height: 1.3;
+}
+
+/* reset dl defaults for pricing lists */
+.lesson-pricing-list {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
 }
 
 .lesson-pricing-note {

@@ -33,6 +33,7 @@ import { animateIn, animateOut, useTweenOrchestrator } from "@/components/motion
 import { usePresenceExit } from "@/components/motion/use-presence-exit";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
+import { SkeletonBlock, SkeletonRegion } from "@/components/ui/skeleton";
 
 import { useBookings, type BookingEvent } from "@/lib/admin/use-bookings";
 import { useCustomers } from "@/lib/admin/use-customers";
@@ -893,14 +894,28 @@ export function AdminBookingsClient() {
 
         <AdminCard noPadding className="admin-bookings-calendar-card">
           <div className="admin-bookings-calendar-scroll">
-            <AdminBookingCalendar
-              view={view}
-              date={dateStr}
-              events={filteredEvents}
-              selectedEventId={selectedKey}
-              onSelect={openDialog}
-              teacherFilterLabel={teacherFilterLabel}
-            />
+            {loadingBookings || !hasLoadedInitialBookings ? (
+              <SkeletonRegion label="Loading bookings" className="admin-bookings-calendar-skeleton">
+                <div className="admin-bookings-calendar-skeleton-toolbar" aria-hidden="true">
+                  <SkeletonBlock variant="text" width="12rem" height="1.1rem" />
+                  <SkeletonBlock variant="text" width="8rem" />
+                </div>
+                <div className="admin-bookings-calendar-skeleton-grid" aria-hidden="true">
+                  {Array.from({ length: 35 }).map((_, index) => (
+                    <SkeletonBlock key={index} radius={6} />
+                  ))}
+                </div>
+              </SkeletonRegion>
+            ) : (
+              <AdminBookingCalendar
+                view={view}
+                date={dateStr}
+                events={filteredEvents}
+                selectedEventId={selectedKey}
+                onSelect={openDialog}
+                teacherFilterLabel={teacherFilterLabel}
+              />
+            )}
           </div>
         </AdminCard>
       </div>

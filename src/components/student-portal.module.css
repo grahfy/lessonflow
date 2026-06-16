@@ -11,6 +11,27 @@
   grid-auto-rows: min-content;
 }
 
+/* Loading skeleton container mirrors the portal grid spacing. */
+.portal-skeleton {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.portal-skeleton .upcoming-panel,
+.portal-skeleton .previous-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.portal-skeleton .actions-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .system-announcement-banner {
   display: flex;
   align-items: center;

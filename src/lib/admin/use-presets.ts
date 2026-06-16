@@ -43,6 +43,12 @@ export function usePresets(options: UsePresetsOptions = {}): UsePresetsResult {
         setLoading(true);
         try {
             const response = await safeFetch("/api/admin/presets", { cache: "no-store" });
+            if (response.status === 403) {
+                // Owner-only data: non-owner admins (e.g. teachers) simply have
+                // no presets available. Treat as empty rather than an error.
+                setPresets([]);
+                return;
+            }
             if (!response.ok) {
                 await handleApiError(response, "Unable to load presets.");
                 return;
