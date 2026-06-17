@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import { GET as getLessonPricing, POST as saveLessonPricing } from "@/app/api/admin/lesson-pricing/route";
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
@@ -21,6 +21,15 @@ describe("admin-lesson-pricing", () => {
   beforeEach(async () => {
     await prisma.lessonPricingOption.deleteMany();
     await prisma.adminUser.deleteMany();
+  });
+
+  // This suite seeds active lessonPricingOption rows that the edit-action
+  // pricing guard elsewhere reads. The shared test DB is not reset between
+  // files, so leftover rows would leak into later suites (e.g. booking
+  // mutations). Clear them once the suite finishes so nothing downstream
+  // inherits ambient pricing state.
+  afterAll(async () => {
+    await prisma.lessonPricingOption.deleteMany();
   });
 
   it("loads an empty lesson pricing state when no rows exist", async () => {
