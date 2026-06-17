@@ -181,6 +181,31 @@ enum LessonPlanSectionVisibility {
   teacher_only
 }
 
+// Origin of a lesson-credit batch — a paid package invoice, an admin manual
+// grant, or a redeemed voucher that was issued as lesson credits.
+enum LessonCreditSource {
+  package_purchase
+  admin_grant
+  voucher_grant
+}
+
+// Lifecycle of a gift voucher. pending = awaiting Stripe payment; active =
+// usable; expiry is derived from expiresAt at use-time (no separate state).
+enum VoucherStatus {
+  pending
+  active
+  redeemed
+  void
+}
+
+// Why a customer account-credit ledger entry was written.
+enum CreditLedgerReason {
+  voucher_redemption
+  invoice_application
+  admin_adjustment
+  refund
+}
+
 // Public website contact form submissions. These are stored even when email
 // delivery fails so admins can follow up later and inspect retry logs.
 model ContactSubmission {
@@ -335,6 +360,8 @@ model Booking {
   customer              Customer?               @relation(fields: [customerId], references: [id], onDelete: SetNull)
   modifiedById          String?
   modifiedBy            AdminUser?              @relation("BookingEdits", fields: [modifiedById], references: [id], onDelete: SetNull)
+  lessonCreditBatchId   String?
+  lessonCreditBatch     LessonCreditBatch?      @relation(fields: [lessonCreditBatchId], references: [id], onDelete: SetNull)
   auditLogs             BookingAuditLog[]
   invoices              Invoice[]
   invoiceLinks          InvoiceBookingLink[]
@@ -497,6 +524,8 @@ model Customer {
   inboundEmails             CustomerInboundEmail[]
   homeworkCompletions       HomeworkCompletion[]
   lessonSeries              LessonSeries[]
+  lessonCreditBatches       LessonCreditBatch[]
+  creditLedger              CustomerCreditLedger[]
 
   @@index([isArchived, fullName])
   @@index([normalizedFullName, postcode, isArchived])
@@ -915,6 +944,8 @@ model InvoiceLineItem {
   lineGstCents      Int
   lineTotalCents    Int
   sortOrder         Int                  @default(0)
+  packageId         String?
+  package           LessonPackage?       @relation(fields: [packageId], references: [id], onDelete: SetNull)
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
 
@@ -1170,4 +1201,90 @@ model PageViewDaily {
   @@unique([date, path, referrer, country, deviceType])
   @@index([date])
   @@index([path, date])
+}
+
+// Owner-managed prepaid lesson package definitions sold online or granted by
+// admins. A purchased package grants a LessonCreditBatch on invoice payment.
+model LessonPackage {
+  id              String            @id @default(cuid())
+  label           String
+  description     String?
+  lessonCount     Int
+  durationMinutes Int?
+  priceCents      Int
+  validityDays    Int?
+  isActive        Boolean           @default(true)
+  sortOrder       Int               @default(0)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  creditBatches   LessonCreditBatch[]
+  invoiceLineItems InvoiceLineItem[]
+
+  @@index([isActive, sortOrder])
+}
+
+// A batch of prepaid lesson credits owned by a customer. Credits auto-consume
+// FIFO (soonest expiry) on booking when the duration matches (or is unset).
+model LessonCreditBatch {
+  id                String             @id @default(cuid())
+  customerId        String
+  customer          Customer           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  durationMinutes   Int?
+  initialQuantity   Int
+  remainingQuantity Int
+  source            LessonCreditSource
+  sourceInvoiceId   String?
+  packageId         String?
+  package           LessonPackage?     @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  note              String?
+  expiresAt         DateTime?
+  createdById       String?
+  createdAt         DateTime           @default(now())
+  bookings          Booking[]
+
+  @@unique([sourceInvoiceId, packageId, note], name: "LessonCreditBatch_grant_dedupe")
+  @@index([customerId])
+}
+
+// Internal gift vouchers sold online via Stripe or comp-issued by admins.
+// Redemption converts the monetary value into customer account credit.
+model Voucher {
+  id                      String        @id @default(cuid())
+  code                    String        @unique
+  valueCents              Int
+  currency                String        @default("AUD")
+  status                  VoucherStatus @default(pending)
+  purchaserName           String?
+  purchaserEmail          String?
+  recipientName           String?
+  recipientEmail          String?
+  message                 String?       @db.Text
+  issuedById              String?
+  stripeCheckoutSessionId String?
+  stripePaymentIntentId   String?
+  paidVia                 String?
+  expiresAt               DateTime
+  redeemedAt              DateTime?
+  redeemedByCustomerId    String?
+  createdAt               DateTime      @default(now())
+
+  @@index([status])
+}
+
+// Append-only monetary account-credit ledger for a customer. The current
+// balance is the latest row's balanceAfterCents (ordered by createdAt).
+model CustomerCreditLedger {
+  id               String             @id @default(cuid())
+  customerId       String
+  customer         Customer           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  amountCents      Int
+  balanceAfterCents Int
+  reason           CreditLedgerReason
+  sourceVoucherId  String?
+  sourceInvoiceId  String?
+  note             String?
+  createdById      String?
+  createdAt        DateTime           @default(now())
+
+  @@index([customerId])
 }

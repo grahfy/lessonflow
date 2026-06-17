@@ -424,6 +424,56 @@ export function customerInvoiceReminderTemplate(input: {
   };
 }
 
+/**
+ * Delivers a purchased gift voucher's code to the recipient once payment has
+ * cleared. The code is a bearer credential, so this email is sent with
+ * skipAuditBcc at the call site (no audit-BCC copy of the live code) and
+ * skipNotificationPolicyCheck (it is a transactional fulfilment, not a marketing
+ * notification the owner can toggle off).
+ */
+export function customerGiftVoucherTemplate(input: {
+  recipientName: string;
+  purchaserName?: string | null;
+  code: string;
+  valueCents: number;
+  expiresAt: Date;
+  message?: string | null;
+  redeemUrl?: string | null;
+}) {
+  const greetingName = input.recipientName?.trim() || "there";
+  const fromLine = input.purchaserName?.trim()
+    ? `<p style="margin:0 0 10px;">${escapeHtml(input.purchaserName)} has sent you a ${PUBLIC_BRAND_NAME} gift voucher.</p>`
+    : `<p style="margin:0 0 10px;">You've received a ${PUBLIC_BRAND_NAME} gift voucher.</p>`;
+  const personalMessage = input.message?.trim()
+    ? `<div style="margin:0 0 18px;padding:16px;border-left:4px solid #2247d8;background:#f8faff;"><p style="margin:0;font-style:italic;">${nl2br(escapeHtml(input.message))}</p></div>`
+    : "";
+  const redeemCta = input.redeemUrl?.trim()
+    ? `<p style="margin:0 0 16px;"><a href="${escapeHtml(input.redeemUrl)}" style="display:inline-block;padding:12px 22px;border-radius:10px;background:#2247d8;color:#ffffff;font-weight:700;text-decoration:none;">Redeem your voucher</a></p>`
+    : "";
+
+  return {
+    subject: `Your ${PUBLIC_BRAND_NAME} gift voucher`,
+    html: renderEmailLayout({
+      title: "Your gift voucher",
+      previewText: `A ${PUBLIC_BRAND_NAME} gift voucher worth ${money(input.valueCents)}`,
+      contentHtml: `
+        <p style="margin:0 0 10px;">Hi ${escapeHtml(greetingName)},</p>
+        ${fromLine}
+        ${personalMessage}
+        <div style="margin:0 0 18px;padding:18px;border:1px solid #dfe6f2;border-radius:12px;background:#ffffff;text-align:center;">
+          <p style="margin:0 0 6px;color:#5a6480;">Voucher value</p>
+          <p style="margin:0 0 14px;font-size:22px;font-weight:700;">${money(input.valueCents)}</p>
+          <p style="margin:0 0 6px;color:#5a6480;">Voucher code</p>
+          <p style="margin:0;font-size:24px;font-weight:700;letter-spacing:2px;">${escapeHtml(input.code)}</p>
+        </div>
+        <p style="margin:0 0 10px;">Redeem this code for account credit toward lessons. The credit is applied to your invoices.</p>
+        <p style="margin:0 0 16px;"><strong>Valid until:</strong> ${fmt(input.expiresAt)}</p>${redeemCta}
+        <p style="margin:0;">Keep this code safe — anyone with the code can redeem the voucher.</p>
+      `
+    })
+  };
+}
+
 export function ownerDailyDigestTemplate(input: {
   date: Date;
   rows: Array<{

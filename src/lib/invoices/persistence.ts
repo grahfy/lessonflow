@@ -184,7 +184,8 @@ export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
               lineSubtotalCents: lineItem.lineSubtotalCents,
               lineGstCents: lineItem.lineGstCents,
               lineTotalCents: lineItem.lineTotalCents,
-              sortOrder: lineItem.sortOrder
+              sortOrder: lineItem.sortOrder,
+              packageId: lineItem.packageId ?? null
             }))
           },
           bookingLinks: resolvedBookingIds.length > 0

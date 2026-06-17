@@ -22,6 +22,7 @@ export interface InvoiceLineItem {
     lineTotalCents: number;
     lineGstCents: number;
     taxMode: InvoiceTaxMode;
+    packageId: string | null;
 }
 
 export interface InvoiceRow {

@@ -51,6 +51,14 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     roles: ["owner"]
   },
   {
+    label: "Vouchers",
+    href: "/admin/vouchers",
+    tooltip: "Issue, void, and redeem gift vouchers to account credit.",
+    description: "Manage gift vouchers and apply their value as customer account credit.",
+    group: "business",
+    roles: ["owner"]
+  },
+  {
     label: "Reports",
     href: "/admin/reports",
     tooltip: "View business metrics and revenue reporting.",

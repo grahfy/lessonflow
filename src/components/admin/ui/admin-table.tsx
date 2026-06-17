@@ -40,7 +40,13 @@ export function AdminTable({
 }: AdminTableProps) {
   return (
     <div className="admin-card invoice-list-card admin-table-card">
-      <div className="admin-list-scroll admin-table-scroll">
+      {/*
+        A11y: the list is horizontally/vertically scrollable, so it must be
+        reachable and operable by keyboard (axe scrollable-region-focusable,
+        WCAG 2.1.1). Exposing it as a labelled, focusable region lets keyboard
+        users scroll the table without a pointer.
+      */}
+      <div className="admin-list-scroll admin-table-scroll" role="region" aria-label="Table contents" tabIndex={0}>
         <div className="admin-table-inner">
           {header && (
             <div className="admin-table-header-row is-sticky">

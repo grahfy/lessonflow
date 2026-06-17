@@ -42,6 +42,7 @@ type Props = {
     onStartEdit: () => void;
     onDeleteCustomer: () => void;
     onViewBillingHistory: () => void;
+    onManageLessonCredits: () => void;
     onRevealPortalPassword: () => void;
     onRegeneratePortalPassword: () => void;
     onCopyPortalPassword: (password: string) => void | Promise<void>;
@@ -174,6 +175,7 @@ export function CustomerDialogWrapper({
                             onStartEdit={rest.onStartEdit}
                             onDelete={rest.onDeleteCustomer}
                             onViewBillingHistory={rest.onViewBillingHistory}
+                            onManageLessonCredits={rest.onManageLessonCredits}
                             onRevealPortalPassword={rest.onRevealPortalPassword}
                             onRegeneratePortalPassword={rest.onRegeneratePortalPassword}
                             onCopyPortalPassword={rest.onCopyPortalPassword}

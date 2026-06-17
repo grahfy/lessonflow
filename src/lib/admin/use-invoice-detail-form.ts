@@ -13,6 +13,7 @@ import {
   type InvoiceRow
 } from "@/lib/admin/use-invoices";
 import { type Preset } from "@/lib/admin/use-presets";
+import { type LessonPackage } from "@/lib/admin/use-packages";
 import { type InvoiceLineItemDraft } from "@/lib/invoices/types";
 import {
   parseDiscountValueForCurrency,
@@ -25,6 +26,8 @@ export interface UseInvoiceDetailFormOptions {
   /** Active lesson durations keyed by minutes, used to price quick-lesson line items. */
   activeLessonPricingMap: Map<number, { priceCents: number }>;
   presets: Preset[];
+  /** Active lesson packages selectable as credit-granting invoice lines. */
+  packages: LessonPackage[];
   onError: (message: string) => void;
 }
 
@@ -40,6 +43,7 @@ export function useInvoiceDetailForm({
   defaultCurrency,
   activeLessonPricingMap,
   presets,
+  packages,
   onError
 }: UseInvoiceDetailFormOptions) {
   const [editingNotes, setEditingNotes] = useState("");
@@ -50,6 +54,7 @@ export function useInvoiceDetailForm({
   const [editingCurrency, setEditingCurrency] = useState(getInvoiceCurrency(defaultCurrency));
   const [editingQuickLessonDurationMinutes, setEditingQuickLessonDurationMinutes] = useState("");
   const [editingProductPresetId, setEditingProductPresetId] = useState("");
+  const [editingPackageId, setEditingPackageId] = useState("");
   const [editingCustomerFirstName, setEditingCustomerFirstName] = useState("");
   const [editingCustomerLastName, setEditingCustomerLastName] = useState("");
   const [editingPaymentDetailsSource, setEditingPaymentDetailsSource] = useState<InvoiceRow["paymentDetailsSource"]>("system");
@@ -85,11 +90,13 @@ export function useInvoiceDetailForm({
         unitPriceInput: toMoneyInput(li.unitPriceCents),
         taxMode: li.taxMode,
         discountKind: li.discountKind ?? null,
-        discountValueInput: toDiscountValueInput(li.discountKind ?? null, li.discountValue ?? null)
+        discountValueInput: toDiscountValueInput(li.discountKind ?? null, li.discountValue ?? null),
+        packageId: li.packageId ?? null
       }))
     );
     setEditingQuickLessonDurationMinutes("");
     setEditingProductPresetId("");
+    setEditingPackageId("");
   }, []);
 
   const resetTransientFields = useCallback(() => {
@@ -132,6 +139,29 @@ export function useInvoiceDetailForm({
       }
     ]);
     setEditingProductPresetId("");
+  };
+
+  const addPackageToInvoice = (packageId: string) => {
+    const pkg = packages.find((p) => p.id === packageId);
+    if (!pkg) return;
+    setEditingLineItems((prev) => [
+      ...prev,
+      {
+        key: `package-${pkg.id}-${Date.now()}`,
+        kind: "custom",
+        description: pkg.label,
+        quantity: "1",
+        quantityLocked: true,
+        unitPriceInput: toMoneyInput(pkg.priceCents),
+        taxMode: getDefaultInvoiceTaxModeForCurrencyValue(resolvedEditingCurrency),
+        discountKind: null,
+        discountValueInput: "",
+        // The packageId is what triggers a prepaid lesson-credit grant when this
+        // invoice is paid (see grantCreditsForPaidInvoice).
+        packageId: pkg.id
+      }
+    ]);
+    setEditingPackageId("");
   };
 
   const addQuickLessonToInvoice = (rawDurationMinutes: string) => {
@@ -208,6 +238,8 @@ export function useInvoiceDetailForm({
     setEditingQuickLessonDurationMinutes,
     editingProductPresetId,
     setEditingProductPresetId,
+    editingPackageId,
+    setEditingPackageId,
     editingCustomerFirstName,
     setEditingCustomerFirstName,
     editingCustomerLastName,
@@ -228,6 +260,7 @@ export function useInvoiceDetailForm({
     resetTransientFields,
     addLineItem,
     addPresetToInvoice,
+    addPackageToInvoice,
     addQuickLessonToInvoice,
     removeLineItem,
     updateLineItem

@@ -7,6 +7,7 @@ import { getDurationMinutes } from "@/lib/booking-rules";
 import { prisma } from "@/lib/db";
 import { getInvoiceAgingBucket, getInvoiceOverdueDays } from "@/lib/invoices/aging";
 import { describeGroupedLessonLine, findActiveInvoiceLinksForBookingIds } from "@/lib/invoices/booking-links";
+import { assertPackageLinesAreValid } from "@/lib/credits/lesson-credits";
 import { getDefaultInvoiceTaxModeForCurrencyValue } from "@/lib/invoices/gst-policy";
 import { withResolvedInvoicePaymentDetails } from "@/lib/invoices/payment-details";
 import { createCustomerInvoiceSchema, listInvoicesQuerySchema } from "@/lib/invoices/schema";
@@ -304,8 +305,17 @@ export async function POST(request: NextRequest, { params }: Params) {
     kind: lineItem.kind,
     sortOrder: lineItem.sortOrder ?? index,
     discountKind: lineItem.discountKind ?? null,
-    discountValue: lineItem.discountValue ?? null
+    discountValue: lineItem.discountValue ?? null,
+    packageId: lineItem.packageId ?? null
   }));
+
+  // SECURITY: A client-supplied packageId controls whether paying this invoice
+  // grants prepaid lesson credits, so every referenced package must exist and be
+  // active. Reject unknown/inactive ids rather than silently dropping them.
+  const packageError = await assertPackageLinesAreValid(directLineItems);
+  if (packageError) {
+    return NextResponse.json({ error: packageError }, { status: 400 });
+  }
   let lessonLineItems: InvoiceLineItemDraft[] = [];
   let lineItems: InvoiceLineItemDraft[] = [];
 

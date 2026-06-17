@@ -4,6 +4,8 @@ import type Stripe from "stripe";
 import { prisma } from "@/lib/db";
 import { logError, logEvent } from "@/lib/observability";
 import { getStripe, isStripeConfigured } from "@/lib/stripe/client";
+import { grantCreditsForPaidInvoice } from "@/lib/credits/lesson-credits";
+import { fulfilVoucherFromSession } from "@/lib/vouchers/fulfill";
 
 // Stripe signature verification needs the exact raw request body, so this route
 // must run on the Node runtime and never have its body parsed/cached upstream.
@@ -75,6 +77,14 @@ export async function POST(request: NextRequest) {
  * amount and currency match the invoice.
  */
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session): Promise<void> {
+  // A checkout session belongs to exactly one product flow, identified by which
+  // metadata key it carries. Voucher purchases are fulfilled on their own branch
+  // (activate + email the code) and never touch the invoice path below.
+  if (session.metadata?.voucherId) {
+    await fulfilVoucherFromSession(session);
+    return;
+  }
+
   const invoiceId = session.metadata?.invoiceId;
   if (!invoiceId) {
     logError("stripe.webhook_missing_invoice_metadata", new Error("checkout.session.completed without metadata.invoiceId"), {
@@ -189,4 +199,14 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session): Promis
     sessionId: session.id,
     paymentIntentId,
   });
+
+  // Grant any prepaid lesson credits for package line items on this invoice.
+  // Best-effort + idempotent (keyed on sourceInvoiceId) so a webhook retry after
+  // the paid transition cannot double-grant, and a failure here cannot prevent
+  // the 200 response (it would only trigger a safe idempotent retry).
+  try {
+    await grantCreditsForPaidInvoice(invoice.id);
+  } catch (creditError) {
+    logError("lesson_credits.grant_failed_webhook", creditError, { invoiceId: invoice.id });
+  }
 }

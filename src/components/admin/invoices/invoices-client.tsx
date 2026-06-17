@@ -14,6 +14,7 @@ import {
   type InvoiceRow
 } from "@/lib/admin/use-invoices";
 import { usePresets } from "@/lib/admin/use-presets";
+import { usePackages } from "@/lib/admin/use-packages";
 import { useCustomers } from "@/lib/admin/use-customers";
 import { type InvoiceSortBy, type InvoiceSortDirection } from "@/lib/invoices/schema";
 import { canApplyInvoiceAction } from "@/lib/invoices/transitions";
@@ -88,6 +89,14 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
   });
 
   const { presets } = usePresets({ onAuthError, onError: setError });
+  const { packages } = usePackages({ onAuthError, onError: setError });
+  const activePackages = useMemo(
+    () =>
+      packages
+        .filter((pkg) => pkg.isActive)
+        .sort((a, b) => a.sortOrder - b.sortOrder),
+    [packages]
+  );
   const { customers: customerOptions, load: loadCustomers } = useCustomers({ pageSize: 250, onAuthError, onError: setError });
   const { lessonPricingOptions, load: loadLessonPricing } = useLessonPricing({ onAuthError, onError: setError });
 
@@ -114,12 +123,14 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
     defaultCurrency,
     activeLessonPricingMap,
     presets,
+    packages: activePackages,
     onError: setError
   });
   const createForm = useInvoiceCreateForm({
     defaultCurrency,
     activeLessonPricingMap,
     presets,
+    packages: activePackages,
     onAuthError,
     onError: setError
   });
@@ -356,6 +367,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
           detailForm={detailForm}
           busyAction={busyAction}
           presets={presets}
+          packages={activePackages}
           activeLessonPricingChoices={activeLessonPricingChoices}
           editingTaxLabel={editingTaxLabel}
           canMarkAsPaid={canMarkAsPaid}
@@ -373,6 +385,12 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
             reloadInvoices();
           }}
           setPendingConfirm={setPendingConfirm}
+          onAccountCreditApplied={(updated) => {
+            // Re-hydrate the open dialog from the updated invoice and refresh the
+            // list so the new total/discount and remaining balance are reflected.
+            openDetail(updated);
+            reloadInvoices();
+          }}
         />
 
         <InvoiceCreateDialog
@@ -380,6 +398,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
           busyAction={busyAction}
           customerOptions={customerOptions}
           presets={presets}
+          packages={activePackages}
           activeLessonPricingChoices={activeLessonPricingChoices}
           createTaxLabel={createTaxLabel}
           onClose={() => {
