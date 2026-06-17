@@ -34,6 +34,11 @@ describe("admin-booking-mutations", () => {
     await prisma.bookingSeries.deleteMany();
     await prisma.bookingRequest.deleteMany();
     await prisma.customer.deleteMany();
+    // Clear ambient lesson pricing so the edit-action pricing guard (which 400s
+    // when active pricing exists but lacks the booking's duration) can't be
+    // tripped by rows another test file leaves in the shared DB. These tests
+    // assert mutation/notes semantics, not pricing.
+    await prisma.lessonPricingOption.deleteMany();
   });
 
   it("edits and moves confirmed bookings", async () => {
