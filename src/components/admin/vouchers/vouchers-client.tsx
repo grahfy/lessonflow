@@ -75,6 +75,11 @@ export function VouchersClient({ defaultCurrency }: { defaultCurrency: string })
   const [redeeming, setRedeeming] = useState(false);
 
   const [pendingVoid, setPendingVoid] = useState<string | null>(null);
+  // Confirmation gates for the two money-moving actions. Issuing mints a free
+  // voucher; redeeming moves a voucher's value into a customer's account credit
+  // (both irreversible), so each is staged behind a ConfirmDialog.
+  const [confirmIssue, setConfirmIssue] = useState(false);
+  const [confirmRedeem, setConfirmRedeem] = useState(false);
 
   useEffect(() => {
     void load();
@@ -100,7 +105,31 @@ export function VouchersClient({ defaultCurrency }: { defaultCurrency: string })
     [customerMatches, redeemCustomerId],
   );
 
+  // Parsed issue amount, surfaced both for confirm copy and as a validity gate
+  // before the confirmation dialog opens.
+  const issueAmountCents = useMemo(
+    () => parseMoneyInputToCents(issueAmount, defaultCurrency).cents,
+    [issueAmount, defaultCurrency],
+  );
+
+  // Validate before opening the confirm so invalid input gives immediate
+  // feedback rather than a dialog that fails on confirm.
+  const requestIssue = useCallback(() => {
+    setError("");
+    setNotice("");
+    if (issueAmountCents === null || issueAmountCents <= 0) {
+      setError("Enter a valid voucher amount.");
+      return;
+    }
+    setConfirmIssue(true);
+  }, [issueAmountCents]);
+
   const handleIssue = useCallback(async () => {
+    // Guard against a re-fired confirm minting a duplicate comp voucher: bail if
+    // a request is already in flight.
+    if (issuing) {
+      return;
+    }
     setError("");
     setNotice("");
     const parsedAmount = parseMoneyInputToCents(issueAmount, defaultCurrency);
@@ -126,9 +155,13 @@ export function VouchersClient({ defaultCurrency }: { defaultCurrency: string })
     } finally {
       setIssuing(false);
     }
-  }, [issue, issueAmount, issueRecipientName, issueRecipientEmail, issueNote, defaultCurrency]);
+  }, [issue, issuing, issueAmount, issueRecipientName, issueRecipientEmail, issueNote, defaultCurrency]);
 
   const handleRedeem = useCallback(async () => {
+    // Guard against a re-fired confirm double-applying credit.
+    if (redeeming) {
+      return;
+    }
     setError("");
     setNotice("");
     if (!redeemCode.trim() || !redeemCustomerId.trim()) {
@@ -149,7 +182,18 @@ export function VouchersClient({ defaultCurrency }: { defaultCurrency: string })
     } finally {
       setRedeeming(false);
     }
-  }, [redeemToCustomer, redeemCode, redeemCustomerId, defaultCurrency]);
+  }, [redeemToCustomer, redeeming, redeemCode, redeemCustomerId, defaultCurrency]);
+
+  // Validate before opening the redeem confirm, mirroring requestIssue.
+  const requestRedeem = useCallback(() => {
+    setError("");
+    setNotice("");
+    if (!redeemCode.trim() || !redeemCustomerId.trim()) {
+      setError("Enter a voucher code and select a customer.");
+      return;
+    }
+    setConfirmRedeem(true);
+  }, [redeemCode, redeemCustomerId]);
 
   const rows = useMemo(() => vouchers, [vouchers]);
 
@@ -198,7 +242,12 @@ export function VouchersClient({ defaultCurrency }: { defaultCurrency: string })
           </AdminField>
         </AdminForm>
         <div className="button-row">
-          <button className="btn btn-primary" onClick={handleIssue} disabled={issuing}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={requestIssue}
+            disabled={issuing || issueAmountCents === null || issueAmountCents <= 0}
+          >
             {issuing ? "Issuing…" : "Issue voucher"}
           </button>
         </div>
@@ -269,8 +318,9 @@ export function VouchersClient({ defaultCurrency }: { defaultCurrency: string })
         </AdminForm>
         <div className="button-row">
           <button
+            type="button"
             className="btn btn-primary"
-            onClick={handleRedeem}
+            onClick={requestRedeem}
             disabled={redeeming || !redeemCode.trim() || !redeemCustomerId}
           >
             {redeeming ? "Redeeming…" : "Redeem to account credit"}
@@ -346,6 +396,38 @@ export function VouchersClient({ defaultCurrency }: { defaultCurrency: string })
           }
         }}
         onCancel={() => setPendingVoid(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmIssue}
+        title="Issue complimentary voucher"
+        description={
+          issueAmountCents !== null && issueAmountCents > 0
+            ? `This creates a complimentary voucher worth ${formatCurrency(issueAmountCents, defaultCurrency)} with no payment. The code can be redeemed for account credit.`
+            : "This creates a complimentary voucher with no payment."
+        }
+        confirmLabel="Issue voucher"
+        onConfirm={() => {
+          setConfirmIssue(false);
+          void handleIssue();
+        }}
+        onCancel={() => setConfirmIssue(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmRedeem}
+        title="Redeem voucher to account credit"
+        description={
+          selectedCustomer
+            ? `This moves the voucher's full value into ${selectedCustomer.fullName}'s account credit and cannot be undone.`
+            : "This moves the voucher's full value into the customer's account credit and cannot be undone."
+        }
+        confirmLabel="Redeem to account credit"
+        onConfirm={() => {
+          setConfirmRedeem(false);
+          void handleRedeem();
+        }}
+        onCancel={() => setConfirmRedeem(false)}
       />
     </AdminShell>
   );

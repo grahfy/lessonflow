@@ -217,29 +217,77 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 
   if (parsed.data.action === "mark_unpaid") {
-    const unpaid = await prisma.invoice.update({
-      where: { id },
-      data: {
-        status: existing.sentAt ? "sent" : "draft",
-        paidAt: null,
-        updatedById: admin.id,
-        auditLogs: {
-          create: {
-            action: "marked_unpaid",
-            actorId: admin.id,
-            details: "Invoice marked as unpaid"
-          }
+    // Reverting paid -> unpaid must also undo the lesson-credit grant that
+    // mark_paid / the Stripe webhook produced for this invoice, otherwise the
+    // customer keeps prepaid credits for a payment that no longer exists.
+    //
+    // SAFETY: we only delete batches that are still fully intact
+    // (remainingQuantity === initialQuantity). If ANY credit from a batch has
+    // already been consumed by a booking, we cannot cleanly un-consume it
+    // (bookings hold a SetNull FK to the batch and revoking would orphan a
+    // confirmed booking's credit), so we block the transition with a clear
+    // error and let the operator resolve the bookings first. The check and the
+    // revoke run inside the same transaction as the status flip so they cannot
+    // diverge.
+    try {
+      const unpaid = await prisma.$transaction(async (tx) => {
+        const grantedBatches = await tx.lessonCreditBatch.findMany({
+          where: { sourceInvoiceId: id },
+          select: { id: true, initialQuantity: true, remainingQuantity: true }
+        });
+
+        const consumed = grantedBatches.some(
+          (batch) => batch.remainingQuantity < batch.initialQuantity
+        );
+        if (consumed) {
+          // Sentinel error caught below and surfaced as a 409 so the operator
+          // knows why the transition was refused.
+          throw new Error("CREDITS_CONSUMED");
         }
-      },
-      include: {
-        lineItems: {
-          orderBy: {
-            sortOrder: "asc"
-          }
+
+        if (grantedBatches.length > 0) {
+          await tx.lessonCreditBatch.deleteMany({
+            where: { id: { in: grantedBatches.map((batch) => batch.id) } }
+          });
         }
+
+        return tx.invoice.update({
+          where: { id },
+          data: {
+            status: existing.sentAt ? "sent" : "draft",
+            paidAt: null,
+            updatedById: admin.id,
+            auditLogs: {
+              create: {
+                action: "marked_unpaid",
+                actorId: admin.id,
+                details: "Invoice marked as unpaid"
+              }
+            }
+          },
+          include: {
+            lineItems: {
+              orderBy: {
+                sortOrder: "asc"
+              }
+            }
+          }
+        });
+      });
+
+      return NextResponse.json({ invoice: withResolvedInvoicePaymentDetails(unpaid) });
+    } catch (error) {
+      if (error instanceof Error && error.message === "CREDITS_CONSUMED") {
+        return NextResponse.json(
+          {
+            error:
+              "This invoice's prepaid lesson credits have already been used for a booking and cannot be revoked. Resolve the affected bookings before marking it unpaid."
+          },
+          { status: 409 }
+        );
       }
-    });
-    return NextResponse.json({ invoice: withResolvedInvoicePaymentDetails(unpaid) });
+      throw error;
+    }
   }
 
   if (parsed.data.action === "void") {

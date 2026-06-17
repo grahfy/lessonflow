@@ -87,8 +87,16 @@ export function InvoiceAccountCreditPanel({
       <p className="helper-text">
         Available balance: <strong>{formatCurrency(balanceCents, invoice.currency)}</strong>
       </p>
-      {error ? <p className="helper-text error-text">{error}</p> : null}
-      {notice ? <p className="helper-text">{notice}</p> : null}
+      {error ? (
+        <p className="helper-text error-text" role="alert" aria-live="assertive" aria-atomic="true">
+          {error}
+        </p>
+      ) : null}
+      {notice ? (
+        <p className="helper-text" role="status" aria-live="polite" aria-atomic="true">
+          {notice}
+        </p>
+      ) : null}
       <div className="button-row">
         <button
           type="button"

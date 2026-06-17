@@ -112,9 +112,19 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session): Promis
     return;
   }
 
-  // Idempotency: a duplicate delivery for an already-paid invoice is a no-op.
+  // Idempotency: a duplicate delivery for an already-paid invoice does not flip
+  // status again, but it MUST still (re-)run the credit grant. The paid flip and
+  // grantCreditsForPaidInvoice are separate steps, so a crash after the flip but
+  // before the grant would otherwise never be retried. The grant is idempotent
+  // (unique grant-dedupe index + P2002 swallowed as a no-op), so re-running on an
+  // already-paid invoice safely recovers a missed grant without double-granting.
   if (invoice.status === "paid") {
     logEvent("stripe.webhook_duplicate_paid_ignored", { invoiceId, sessionId: session.id });
+    try {
+      await grantCreditsForPaidInvoice(invoice.id);
+    } catch (creditError) {
+      logError("lesson_credits.grant_failed_webhook", creditError, { invoiceId: invoice.id });
+    }
     return;
   }
 
