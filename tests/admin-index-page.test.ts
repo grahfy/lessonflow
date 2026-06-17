@@ -21,7 +21,8 @@ vi.mock("@/lib/setup", () => ({
   getSetupCompletionState: getSetupCompletionStateMock
 }));
 
-vi.mock("@/lib/admin-auth", () => ({
+vi.mock("@/lib/admin-auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/admin-auth")>()),
   getCurrentAdmin: getCurrentAdminMock
 }));
 
