@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { Prisma } from "@/generated/prisma/client";
 import { requireOwnerFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
+
+/** True when a Prisma update/delete failed because the row id does not exist. */
+function isRecordNotFound(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025";
+}
 
 type Context = {
   params: Promise<{ id: string }>;
@@ -76,6 +82,9 @@ export async function PATCH(request: NextRequest, { params }: Context) {
 
     return NextResponse.json({ ok: true, package: pkg });
   } catch (error) {
+    if (isRecordNotFound(error)) {
+      return NextResponse.json({ ok: false, error: "Package not found." }, { status: 404 });
+    }
     return jsonUnexpectedError(error, "Failed to update package.");
   }
 }
@@ -100,6 +109,9 @@ export async function DELETE(request: NextRequest, { params }: Context) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (isRecordNotFound(error)) {
+      return NextResponse.json({ ok: false, error: "Package not found." }, { status: 404 });
+    }
     return jsonUnexpectedError(error, "Failed to delete package.");
   }
 }

@@ -342,6 +342,52 @@ describe("lesson credits (DB-backed)", () => {
       expect(await batchRemaining(`${PREFIX}bLater`)).toBe(1);
     });
 
+    it("consumes a dated (soonest-expiry) batch before a never-expiring one", async () => {
+      // H1 regression guard for the MariaDB NULLs-FIRST ordering bug.
+      //
+      // MariaDB sorts NULLs FIRST on an ascending order and Prisma's
+      // `nulls: "last"` is unsupported on the mysql connector. A single
+      // `orderBy: [{ expiresAt: "asc" }, ...]` would therefore surface the
+      // never-expiring (NULL-expiry) batch BEFORE the dated one, burning a
+      // permanent credit while a dated credit silently lapses. consumeLessonCredit
+      // works around this by exhausting dated, non-expired batches in a first phase
+      // before ever touching NULL-expiry batches.
+      //
+      // We seed the never-expiring batch EARLIER (older createdAt) than the dated
+      // one specifically so a naive ordering — or any accidental fallback to
+      // createdAt/NULLs-first — would draw the never-expiring batch. Correct FIFO
+      // must still consume the DATED batch first and leave the permanent one intact.
+      await seedCustomer(`${PREFIX}cust1`);
+      const earlier = new Date(Date.now() - 2 * DAY_MS);
+      const later = new Date(Date.now() - 1 * DAY_MS);
+      const dated = new Date(Date.now() + 30 * DAY_MS);
+      await seedBatch({
+        id: `${PREFIX}bNever`,
+        customerId: `${PREFIX}cust1`,
+        durationMinutes: 30,
+        remaining: 1,
+        expiresAt: null,
+        createdAt: earlier
+      });
+      await seedBatch({
+        id: `${PREFIX}bDated`,
+        customerId: `${PREFIX}cust1`,
+        durationMinutes: 30,
+        remaining: 1,
+        expiresAt: dated,
+        createdAt: later
+      });
+
+      const used = await prisma.$transaction((tx) =>
+        consumeLessonCredit({ tx, customerId: `${PREFIX}cust1`, durationMinutes: 30 })
+      );
+
+      // The DATED batch is drawn first; the never-expiring batch is preserved.
+      expect(used).toBe(`${PREFIX}bDated`);
+      expect(await batchRemaining(`${PREFIX}bDated`)).toBe(0);
+      expect(await batchRemaining(`${PREFIX}bNever`)).toBe(1);
+    });
+
     it("matches a null-duration (any) batch when no exact-duration batch exists", async () => {
       await seedCustomer(`${PREFIX}cust1`);
       await seedBatch({ id: `${PREFIX}bAny`, customerId: `${PREFIX}cust1`, durationMinutes: null, remaining: 1 });

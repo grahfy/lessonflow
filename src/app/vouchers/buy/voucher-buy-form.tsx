@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 
 import { formatCurrency } from "@/lib/invoices/currency";
 
@@ -31,6 +31,12 @@ export function VoucherBuyForm({
   const [submitting, setSubmitting] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState<number>(denominations[0]);
   const [error, setError] = useState<string | null>(null);
+
+  // Error region id wired to the amount fieldset via aria-describedby so the
+  // group's validation message is announced as part of the control, and a ref
+  // so we can move focus to it on a failed submit.
+  const errorId = "voucher-buy-error";
+  const errorRef = useRef<HTMLParagraphElement>(null);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     // No-JS fallback relies on the native POST; once hydrated we take over so a
@@ -63,14 +69,20 @@ export function VoucherBuyForm({
         result && typeof result.error === "string"
           ? result.error
           : "We could not start your purchase. Please try again.";
-      setError(message);
-      setSubmitting(false);
+      failWith(message);
     } catch {
-      setError(
+      failWith(
         "We could not start your purchase due to a network error. Please try again.",
       );
-      setSubmitting(false);
     }
+  }
+
+  // Surface a submit failure and move focus to the (announced) error so keyboard
+  // and screen-reader users are taken straight to it, after the message renders.
+  function failWith(message: string) {
+    setError(message);
+    setSubmitting(false);
+    requestAnimationFrame(() => errorRef.current?.focus());
   }
 
   return (
@@ -80,7 +92,11 @@ export function VoucherBuyForm({
       className="form-grid voucher-buy-form"
       onSubmit={onSubmit}
     >
-      <fieldset className="field full voucher-amount-fieldset">
+      <fieldset
+        className="field full voucher-amount-fieldset"
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
+      >
         <legend>Voucher amount</legend>
         <div className="voucher-amount-options">
           {denominations.map((amount) => (
@@ -152,7 +168,13 @@ export function VoucherBuyForm({
       </div>
 
       {error ? (
-        <p className="notice error voucher-buy-error" role="alert">
+        <p
+          id={errorId}
+          ref={errorRef}
+          className="notice error voucher-buy-error"
+          role="alert"
+          tabIndex={-1}
+        >
           {error}
         </p>
       ) : null}

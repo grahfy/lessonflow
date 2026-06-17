@@ -131,6 +131,12 @@ export async function POST(request: NextRequest, { params }: Params) {
         if (Number.isNaN(parsedDate.getTime())) {
           return NextResponse.json({ error: "Expiry date is invalid." }, { status: 400 });
         }
+        // Reject a past expiry: such a batch would be born already-expired and
+        // never usable (consumeLessonCredit filters on expiresAt > now). Surface
+        // this as a 400 rather than silently creating a dead batch.
+        if (parsedDate.getTime() <= Date.now()) {
+          return NextResponse.json({ error: "Expiry date must be in the future." }, { status: 400 });
+        }
         expiresAt = parsedDate;
       }
     }
