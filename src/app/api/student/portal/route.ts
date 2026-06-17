@@ -10,6 +10,8 @@ import {
 } from "@/lib/student-portal/contracts";
 import { buildFolderTree } from "@/lib/student-portal/folders";
 import { requireStudentFromRequest } from "@/lib/student-portal/session";
+import { getLessonCreditSummary } from "@/lib/credits/lesson-credits";
+import { getAccountCreditBalanceCents } from "@/lib/vouchers/account-credit";
 
 /**
  * Returns the authenticated student's appointment history and linked learning materials.
@@ -112,6 +114,14 @@ export async function GET(request: NextRequest) {
   // their own `folderId`, so an empty material map keeps the tree pure structure.
   const folderTree = buildFolderTree(folders).map(mapStudentPortalFolder);
 
+  // Summarise the student's currently-usable prepaid lesson credits so the
+  // portal can show "X lessons remaining" (non-expired, with credits left).
+  const creditSummary = await getLessonCreditSummary(student.id, prisma, now);
+
+  // The student's monetary account-credit balance (e.g. from redeemed vouchers)
+  // so the portal can show "Account credit: $X".
+  const accountCreditCents = await getAccountCreditBalanceCents(student.id);
+
   const payload = studentPortalPayloadSchema.parse({
     student: {
       id: student.id,
@@ -123,7 +133,17 @@ export async function GET(request: NextRequest) {
     previous,
     standaloneMaterials: standaloneMaterials.map(mapStudentPortalMaterial),
     folders: folderTree,
-    pendingRequests: pendingRequests.map(mapStudentPortalPendingRequest)
+    pendingRequests: pendingRequests.map(mapStudentPortalPendingRequest),
+    lessonCredits: {
+      totalRemaining: creditSummary.totalRemaining,
+      batches: creditSummary.batches.map((batch) => ({
+        id: batch.id,
+        durationMinutes: batch.durationMinutes,
+        remainingQuantity: batch.remainingQuantity,
+        expiresAt: batch.expiresAt ? batch.expiresAt.toISOString() : null
+      }))
+    },
+    accountCreditCents
   });
 
   return NextResponse.json(payload);

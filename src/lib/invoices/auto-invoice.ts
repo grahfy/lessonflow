@@ -33,6 +33,10 @@ type AutoInvoiceBooking = {
   customerId: string | null;
   lessonDuration: "min30" | "min60";
   customDurationMinutes: number | null;
+  // When set, the booking was covered by a prepaid lesson credit and must NOT
+  // be auto-invoiced (the credit already paid for the lesson). Optional so
+  // older callers/fixtures that predate credits remain compatible.
+  lessonCreditBatchId?: string | null;
   firstName: string;
   lastName: string;
   name: string;
@@ -69,6 +73,16 @@ export async function autoCreateDraftInvoicesForApproval(input: {
         if (!booking.customerId) {
           // Without a customer we cannot attach a meaningful invoice; skip.
           logEvent("auto_invoice.skipped_no_customer", { requestId, bookingId: booking.id });
+          continue;
+        }
+
+        if (booking.lessonCreditBatchId) {
+          // A prepaid lesson credit already covered this booking; do not bill it.
+          logEvent("auto_invoice.skipped_credit_covered", {
+            requestId,
+            bookingId: booking.id,
+            lessonCreditBatchId: booking.lessonCreditBatchId
+          });
           continue;
         }
 

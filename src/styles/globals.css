@@ -1829,6 +1829,70 @@ h1 {
   color: #ffc0c0;
 }
 
+/*
+ * Public gift-voucher buy form. Reuses the shared `.form-grid` / `.field`
+ * inputs; the amount picker is a radio group that needs its own dark-theme
+ * styling so it reads as a set of selectable chips rather than raw OS radios.
+ */
+.voucher-amount-fieldset {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px 14px;
+  margin: 0;
+}
+
+.voucher-amount-fieldset legend {
+  color: var(--ink-1);
+  font-size: 0.8rem;
+  letter-spacing: 0.03em;
+  padding: 0 6px;
+}
+
+.voucher-amount-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.voucher-amount-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(15, 23, 42, 0.74);
+  color: var(--ink-0);
+  cursor: pointer;
+  transition:
+    border-color var(--motion-fast) var(--ease-out),
+    box-shadow var(--motion-fast) var(--ease-out),
+    background var(--motion-fast) var(--ease-out);
+}
+
+.voucher-amount-option:hover {
+  border-color: rgba(96, 165, 250, 0.66);
+}
+
+.voucher-amount-option:has(input:checked) {
+  border-color: rgba(96, 165, 250, 0.66);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.voucher-amount-option:has(input:focus-visible) {
+  outline: 2px solid rgba(103, 232, 249, 0.75);
+  outline-offset: 2px;
+}
+
+.voucher-amount-option input {
+  accent-color: rgba(96, 165, 250, 0.95);
+}
+
+.voucher-buy-error {
+  grid-column: 1 / -1;
+}
+
 .password-input-row {
   display: flex;
   align-items: center;

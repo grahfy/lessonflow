@@ -24,12 +24,14 @@ export type EditableLineItem = {
   discountKind: InvoiceDiscountKind | null;
   discountValueInput: string;
   isPreset?: boolean;
+  /** When set, this line grants the package's prepaid lesson credits on payment. */
+  packageId?: string | null;
 };
 
 export type InvoiceDisplayStatus = InvoiceRow["status"] | "overdue";
 export type InvoiceBookingIneligibilityReason = "already_invoiced" | "missing_lesson_price" | "invalid_status";
 export type CreateLessonSourceMode = "single_booking" | "single_quick" | "multiple_bookings";
-export type CreateSupplementalSource = "custom" | "presets";
+export type CreateSupplementalSource = "custom" | "presets" | "packages";
 export type CreateStandaloneItemDraft = {
   key: string;
   description: string;

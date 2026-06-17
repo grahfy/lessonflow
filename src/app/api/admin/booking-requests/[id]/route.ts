@@ -12,6 +12,7 @@ import {
   formatBookingAddress,
   generateRecurringStartDates,
   getBookingEnd,
+  getDurationMinutes,
   lessonDurationSchema,
   lessonModeSchema,
   nullableOptionalCustomDurationMinutesSchema,
@@ -24,6 +25,7 @@ import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
 import { getStudentPortalLoginUrl } from "@/lib/env";
 import { autoCreateDraftInvoicesForApproval } from "@/lib/invoices/auto-invoice";
+import { consumeLessonCredit } from "@/lib/credits/lesson-credits";
 import { getNotificationSettingsState } from "@/lib/email/notification-settings";
 import {
   copyBookingRequestNotesToBooking,
@@ -220,6 +222,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         customerId: string | null;
         lessonDuration: "min30" | "min60";
         customDurationMinutes: number | null;
+        lessonCreditBatchId?: string | null;
         firstName: string;
         lastName: string;
         name: string;
@@ -251,6 +254,17 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           const createdBookings: CreatedBookingForInvoice[] = [];
 
           const createBookingFromRequest = async (startAt: Date, seriesId?: string | null) => {
+            // Consume one matching lesson credit (if available) so the booking is
+            // tagged credit-covered and the auto-invoice step skips it. Each row
+            // in a recurring approval consumes its own credit.
+            const lessonCreditBatchId = await consumeLessonCredit({
+              tx,
+              customerId,
+              durationMinutes: getDurationMinutes(
+                bookingRequest.lessonDuration,
+                bookingRequest.customDurationMinutes
+              )
+            });
             const createdBooking = await tx.booking.create({
               data: {
                 firstName: bookingRequest.firstName,
@@ -277,6 +291,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
                 seriesId: seriesId ?? null,
                 assignedTeacherId: requestedAssignedTeacherId,
                 customerId,
+                lessonCreditBatchId,
                 modifiedById: admin.id,
                 notes: bookingRequest.notes,
                 notesContent:

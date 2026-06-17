@@ -76,6 +76,7 @@ describe("invoice template render", () => {
           lineGstCents: 1000,
           lineTotalCents: 11000,
           sortOrder: 0,
+          packageId: null,
           createdAt: new Date("2026-08-01T10:00:00.000Z"),
           updatedAt: new Date("2026-08-01T10:00:00.000Z")
         }

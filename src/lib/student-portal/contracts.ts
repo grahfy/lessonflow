@@ -93,6 +93,21 @@ export const studentPortalPendingRequestSchema = z.object({
   status: z.enum(["pending", "waitlisted"])
 });
 
+// A single usable prepaid lesson-credit batch shown to the student. Only
+// non-expired batches with credits remaining are surfaced.
+export const studentPortalCreditBatchSchema = z.object({
+  id: z.string(),
+  durationMinutes: z.number().int().positive().nullable(),
+  remainingQuantity: z.number().int().nonnegative(),
+  expiresAt: z.string().datetime({ offset: true }).nullable()
+});
+
+// Summary of the student's currently-usable prepaid lesson credits.
+export const studentPortalLessonCreditsSchema = z.object({
+  totalRemaining: z.number().int().nonnegative(),
+  batches: z.array(studentPortalCreditBatchSchema)
+});
+
 export const studentPortalPayloadSchema = z.object({
   student: z.object({
     id: z.string(),
@@ -104,7 +119,12 @@ export const studentPortalPayloadSchema = z.object({
   previous: z.array(studentPortalBookingSchema),
   standaloneMaterials: z.array(studentPortalMaterialSchema),
   folders: z.array(studentPortalFolderSchema),
-  pendingRequests: z.array(studentPortalPendingRequestSchema)
+  pendingRequests: z.array(studentPortalPendingRequestSchema),
+  // Optional so portal clients/tests that predate prepaid credits remain valid.
+  lessonCredits: studentPortalLessonCreditsSchema.optional(),
+  // Monetary account-credit balance in cents (from redeemed vouchers etc.).
+  // Optional so payloads that predate vouchers remain valid; defaults to 0.
+  accountCreditCents: z.number().int().nonnegative().optional()
 });
 
 export const studentPortalBookingRequestInputSchema = z.object({
@@ -156,6 +176,8 @@ export type StudentPortalPendingReschedule = z.infer<typeof studentPortalPending
 export type StudentPortalBooking = z.infer<typeof studentPortalBookingSchema>;
 export type StudentPortalPendingRequest = z.infer<typeof studentPortalPendingRequestSchema>;
 export type StudentPortalPayload = z.infer<typeof studentPortalPayloadSchema>;
+export type StudentPortalLessonCredits = z.infer<typeof studentPortalLessonCreditsSchema>;
+export type StudentPortalCreditBatch = z.infer<typeof studentPortalCreditBatchSchema>;
 export type StudentPortalBookingRequestInput = z.infer<typeof studentPortalBookingRequestInputSchema>;
 export type StudentPortalBookingRequestResponse = z.infer<typeof studentPortalBookingRequestResponseSchema>;
 export type StudentPortalCancelBookingResponse = z.infer<typeof studentPortalCancelBookingResponseSchema>;

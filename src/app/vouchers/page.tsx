@@ -33,13 +33,12 @@ export default async function VouchersPage() {
 
   const bodyContent = await getContent("/vouchers", "body", {
     card1Title: "How It Works",
-    card1Body: "Choose a package, add recipient details, and send a polished digital voucher in minutes.",
+    card1Body: "Choose an amount, add recipient details, and send a polished digital voucher in minutes.",
     card2Title: "Who It Suits",
     card2Body: "Kids, teens, and adults across all experience levels and musical tastes.",
     card3Title: "Flexible Start",
     card3Body: "The recipient books at a suitable time and learns at a pace that feels motivating, creative, and sustainable.",
-    helperText: "Vouchers are a great option when you want to give something memorable, practical, and personal. They suit complete beginners as well as players who want fresh direction, better technique, or renewed creative momentum.",
-    orderUrl: "https://giftup.app/place-order/903ac87a-4c81-4f66-6ec1-08de291b894b?platform=hosted"
+    helperText: "Vouchers are a great option when you want to give something memorable, practical, and personal. They suit complete beginners as well as players who want fresh direction, better technique, or renewed creative momentum. The voucher value is redeemed as account credit and is valid for six months."
   });
 
   return (
@@ -71,16 +70,14 @@ export default async function VouchersPage() {
       </p>
 
       <div className="button-row button-row-justify" data-motion-item="vouchers-actions">
-        <a
+        <TweenLink
           className="btn btn-primary"
-          href={bodyContent.orderUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Buy a Voucher (opens in new tab)"
+          href="/vouchers/buy"
+          aria-label="Buy a Voucher"
           data-motion-item="vouchers-action-order"
         >
           Buy a Voucher
-        </a>
+        </TweenLink>
         <TweenLink className="btn btn-secondary" href="/terms" data-motion-item="vouchers-action-terms">
           Voucher Terms
         </TweenLink>

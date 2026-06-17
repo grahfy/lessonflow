@@ -11,6 +11,7 @@ import {
   type InvoiceTaxMode
 } from "@/lib/admin/use-invoices";
 import { type Preset } from "@/lib/admin/use-presets";
+import { type LessonPackage } from "@/lib/admin/use-packages";
 import { getDefaultInvoiceTaxModeForCurrencyValue } from "@/lib/invoices/gst-policy";
 import { describeDiscount, toCurrency } from "@/lib/invoices/invoice-display-helpers";
 import { type useInvoiceCreateForm } from "@/lib/admin/use-invoice-create-form";
@@ -23,6 +24,7 @@ interface InvoiceCreateDialogProps {
   busyAction: string | null;
   customerOptions: Array<{ id: string; firstName: string | null; lastName: string | null; fullName: string }>;
   presets: Preset[];
+  packages: LessonPackage[];
   activeLessonPricingChoices: Array<{ durationMinutes: number; priceCents: number }>;
   createTaxLabel: string;
   onClose: () => void;
@@ -41,6 +43,7 @@ export function InvoiceCreateDialog({
   busyAction,
   customerOptions,
   presets,
+  packages,
   activeLessonPricingChoices,
   createTaxLabel,
   onClose,
@@ -53,9 +56,12 @@ export function InvoiceCreateDialog({
     createLessonSourceMode,
     createIncludeStandalone,
     createIncludePresets,
+    createIncludePackages,
     createStandaloneItems,
     createSelectedPresetIds,
     setCreateSelectedPresetIds,
+    createSelectedPackageIds,
+    setCreateSelectedPackageIds,
     createDueAt,
     setCreateDueAt,
     createCurrency,
@@ -202,6 +208,15 @@ export function InvoiceCreateDialog({
                         onChange={(e) => toggleCreateSource("presets", e.target.checked)}
                       />
                       Multiple Presets
+                    </label>
+                    <label className="admin-inline-checkbox invoice-dialog-source-option">
+                      <input
+                        type="checkbox"
+                        checked={createIncludePackages}
+                        disabled={packages.length === 0}
+                        onChange={(e) => toggleCreateSource("packages", e.target.checked)}
+                      />
+                      Lesson Packages
                     </label>
                   </div>
                 </AdminField>
@@ -382,6 +397,30 @@ export function InvoiceCreateDialog({
                     </div>
                   </AdminField>
                 )}
+                {createIncludePackages && (
+                  <AdminField
+                    label="Lesson Packages"
+                    tooltip="Choose one or more prepaid lesson packages. When this invoice is paid, the customer is granted the package's lesson credits automatically."
+                    fullWidth
+                    className="invoice-dialog-source-field"
+                  >
+                    <div className="invoice-dialog-preset-list">
+                      {packages.map((pkg) => (
+                        <label key={`create-package-${pkg.id}`} className="admin-inline-checkbox invoice-dialog-preset-option">
+                          <input
+                            type="checkbox"
+                            checked={createSelectedPackageIds.includes(pkg.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) setCreateSelectedPackageIds(prev => [...prev, pkg.id]);
+                              else setCreateSelectedPackageIds(prev => prev.filter(id => id !== pkg.id));
+                            }}
+                          />
+                          {pkg.label} ({pkg.lessonCount} {pkg.lessonCount === 1 ? "lesson" : "lessons"}{pkg.durationMinutes ? `, ${pkg.durationMinutes} min` : ""}, {toCurrency(pkg.priceCents, resolvedCreateCurrency)})
+                        </label>
+                      ))}
+                    </div>
+                  </AdminField>
+                )}
                 {createBlockingError && (
                   <AdminField label="Create Requirements" fullWidth>
                     <p className="field-error">{createBlockingError}</p>
@@ -438,7 +477,8 @@ export function InvoiceCreateDialog({
                             ? "Multiple Lessons (Bookings)"
                             : null,
                       createIncludeStandalone ? "Custom Item / Service" : null,
-                      createIncludePresets ? "Multiple Presets" : null
+                      createIncludePresets ? "Multiple Presets" : null,
+                      createIncludePackages ? "Lesson Packages" : null
                     ].filter(Boolean).join(", ") || "None"}
                   </span>
                 </div>

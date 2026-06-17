@@ -5,6 +5,8 @@ import { requireAdminFromRequest } from "@/lib/admin-route";
 import { prisma } from "@/lib/db";
 import { applyInvoiceTaxMode, calculateInvoiceTotals } from "@/lib/invoices/calculate";
 import { findActiveInvoiceLinksForBookingIds } from "@/lib/invoices/booking-links";
+import { assertPackageLinesAreValid, grantCreditsForPaidInvoice } from "@/lib/credits/lesson-credits";
+import { logError } from "@/lib/observability";
 import { getDefaultInvoiceTaxModeForCurrencyValue } from "@/lib/invoices/gst-policy";
 import { resolveInvoicePaymentDetails, withResolvedInvoicePaymentDetails } from "@/lib/invoices/payment-details";
 import { updateInvoiceSchema } from "@/lib/invoices/schema";
@@ -201,6 +203,16 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         }
       }
     });
+
+    // Grant any prepaid lesson credits for package line items on this invoice.
+    // Best-effort + idempotent (keyed on sourceInvoiceId): a failure here must
+    // not roll back the already-committed paid transition.
+    try {
+      await grantCreditsForPaidInvoice(paid.id);
+    } catch (creditError) {
+      logError("lesson_credits.grant_failed_mark_paid", creditError, { invoiceId: paid.id });
+    }
+
     return NextResponse.json({ invoice: withResolvedInvoicePaymentDetails(paid) });
   }
 
@@ -268,8 +280,21 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     kind: lineItem.kind as InvoiceLineItemDraft["kind"],
     sortOrder: lineItem.sortOrder ?? index,
     discountKind: lineItem.discountKind ?? null,
-    discountValue: lineItem.discountValue ?? null
+    discountValue: lineItem.discountValue ?? null,
+    // packageId survives an edit whether the line came from the client payload or
+    // the existing persisted rows (a tax-mode-only edit reuses existing lines).
+    packageId: lineItem.packageId ?? null
   }));
+
+  // SECURITY: When the admin sends a new line-item set, any package linkage must
+  // reference an existing, active package before we persist (it auto-grants
+  // credits on payment). Existing persisted packageIds are trusted as-is.
+  if (lineItemsProvided) {
+    const packageError = await assertPackageLinesAreValid(baseLineDrafts);
+    if (packageError) {
+      return NextResponse.json({ error: packageError }, { status: 400 });
+    }
+  }
 
   const currency = getInvoiceCurrency(parsed.data.currency ?? existing.currency);
   const resolvedTaxMode = parsed.data.taxMode ?? existing.taxMode ?? getDefaultInvoiceTaxModeForCurrencyValue(currency);
@@ -305,7 +330,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           lineSubtotalCents: lineItem.lineSubtotalCents,
           lineGstCents: lineItem.lineGstCents,
           lineTotalCents: lineItem.lineTotalCents,
-          sortOrder: lineItem.sortOrder
+          sortOrder: lineItem.sortOrder,
+          packageId: lineItem.packageId ?? null
         }))
       });
     }
