@@ -217,7 +217,7 @@ export function CustomerLessonCreditsDialog({ open, customer, onClose }: Props) 
                                                         {batch.packageLabel ? ` · ${batch.packageLabel}` : ""}
                                                         {" · "}
                                                         {batch.expiresAt
-                                                            ? `Expires ${new Date(batch.expiresAt).toLocaleDateString()}`
+                                                            ? `Expires ${new Date(batch.expiresAt).toLocaleDateString("en-AU")}`
                                                             : "No expiry"}
                                                     </p>
                                                     {batch.note ? (

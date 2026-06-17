@@ -18,7 +18,7 @@
  *    reduce user frustration from visually ambiguous characters.
  */
 
-import { randomUUID } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { consumeRateLimit, getRequestIpFromHeaders, type RateLimitResult } from "@/lib/rate-limit";
 
 /** Internal challenge state. */
@@ -59,7 +59,32 @@ const CAPTCHA_TTL_MS = 5 * 60 * 1000;
 const CAPTCHA_LENGTH = 6;
 // Filtered alphabet: No O, 0, I, 1
 const CAPTCHA_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%&*+-=?";
-const captchaStore = new Map<string, CaptchaRecord>();
+
+/** Interval between background prunes of expired challenges. */
+const CAPTCHA_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+/**
+ * Hard ceiling on resident challenges. A flood of un-consumed challenges (each
+ * lives until its 5m TTL or a single verification) could otherwise grow the
+ * Map unbounded between sweeps; once the cap is hit we evict the oldest
+ * (insertion-ordered) entries first.
+ */
+const CAPTCHA_MAX_ENTRIES = 50_000;
+
+/**
+ * Global in-memory store for CAPTCHA challenges.
+ * RATIONALE: pinned on `globalThis` (mirroring src/lib/rate-limit.ts) so the
+ * store survives Next.js HMR in development and is shared across module
+ * instances, and so only one background sweep timer is ever registered.
+ */
+const globalStore = globalThis as unknown as {
+  __captchaStore?: Map<string, CaptchaRecord>;
+  __captchaSweepRegistered?: boolean;
+};
+
+const captchaStore = globalStore.__captchaStore ?? new Map<string, CaptchaRecord>();
+if (!globalStore.__captchaStore) {
+  globalStore.__captchaStore = captchaStore;
+}
 
 /**
  * Normalizes input for comparison.
@@ -72,7 +97,8 @@ function normalizeCaptchaAnswer(value: unknown): string {
 }
 
 /**
- * Opportunistic cleanup to prevent memory leaks without background timers.
+ * Opportunistic cleanup of expired challenges. Runs lazily on every create /
+ * verify call; the background sweep below covers idle periods.
  */
 function cleanupExpiredChallenges(now = Date.now()): void {
   for (const [token, record] of captchaStore.entries()) {
@@ -82,11 +108,57 @@ function cleanupExpiredChallenges(now = Date.now()): void {
   }
 }
 
-/** Generates a random alphanumeric code. */
+/**
+ * Enforces the hard size cap. Expired entries are dropped first; if the store
+ * is still over the cap (a burst of still-valid challenges) the oldest entries
+ * are evicted in insertion order until it fits. Map iteration order is
+ * insertion order, so the first keys are the oldest.
+ */
+function enforceCaptchaStoreCap(now = Date.now()): void {
+  if (captchaStore.size <= CAPTCHA_MAX_ENTRIES) {
+    return;
+  }
+  cleanupExpiredChallenges(now);
+  for (const token of captchaStore.keys()) {
+    if (captchaStore.size <= CAPTCHA_MAX_ENTRIES) {
+      break;
+    }
+    captchaStore.delete(token);
+  }
+}
+
+/**
+ * Registers a periodic background sweep that prunes expired challenges even
+ * when no traffic hits the lazy cleanup path. The timer is `.unref()`-ed so it
+ * never keeps the Node process alive, and a `globalThis` guard ensures only one
+ * survives HMR. Mirrors the rate-limiter sweep in src/lib/rate-limit.ts.
+ */
+function registerExpiredChallengeSweep(): void {
+  if (globalStore.__captchaSweepRegistered) return;
+  globalStore.__captchaSweepRegistered = true;
+
+  const timer = setInterval(() => {
+    cleanupExpiredChallenges(Date.now());
+  }, CAPTCHA_SWEEP_INTERVAL_MS);
+  timer.unref?.();
+}
+
+// Register the background sweep once at module init so idle periods still prune
+// expired challenges even when no request triggers the lazy cleanup path.
+registerExpiredChallengeSweep();
+
+/**
+ * Generates a random CAPTCHA answer.
+ *
+ * SECURITY: the answer is the secret an attacker is trying to guess, so each
+ * character is drawn with a CSPRNG. `crypto.randomInt(0, n)` is uniform over
+ * `[0, n)` (it rejection-samples internally), so there is no modulo bias even
+ * though the alphabet length does not divide a power of two.
+ */
 function generateCaptchaCode(length = CAPTCHA_LENGTH): string {
   let code = "";
   for (let i = 0; i < length; i += 1) {
-    const index = Math.floor(Math.random() * CAPTCHA_ALPHABET.length);
+    const index = randomInt(0, CAPTCHA_ALPHABET.length);
     code += CAPTCHA_ALPHABET[index];
   }
   return code;
@@ -208,6 +280,9 @@ export function createCaptchaChallenge(): CaptchaChallenge {
     answer,
     expiresAt
   });
+
+  // Bound memory: drop expired/oldest entries if a burst pushed us over the cap.
+  enforceCaptchaStoreCap();
 
   return {
     token,

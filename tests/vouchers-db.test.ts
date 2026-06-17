@@ -43,6 +43,11 @@ import { getAccountCreditBalanceCents } from "@/lib/vouchers/account-credit";
 
 const PREFIX = "vch_test_";
 const CODE_PREFIX = "VCHTEST"; // distinct code namespace for seeded vouchers
+// All seeded codes are stored canonically (see seedVoucher). The normalizer
+// strips non-alphanumerics before re-grouping, so a code beginning "VCHTEST..."
+// is stored grouped as "VCHT-...". Cleanup must match that canonical leading
+// group, not the raw "VCHTEST" literal.
+const CANONICAL_CODE_PREFIX = "VCHT";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -69,10 +74,15 @@ async function seedVoucher(input: {
   expiresAt?: Date;
   recipientEmail?: string | null;
 }) {
+  // Store the code in the SAME canonical form production uses for storage and
+  // lookup. The redeem path normalizes the raw code before its DB lookup, so
+  // seeding the normalized form is what makes store-and-lookup agree. Seeding a
+  // raw literal would silently re-group on lookup and never match (not_found).
+  const code = normalizeVoucherCode(input.code ?? `${CODE_PREFIX}-${input.id}`);
   await prisma.voucher.create({
     data: {
       id: input.id,
-      code: input.code ?? `${CODE_PREFIX}-${input.id}`,
+      code,
       valueCents: input.valueCents ?? 10000,
       currency: input.currency ?? "AUD",
       status: input.status,
@@ -106,7 +116,7 @@ async function voucherStatus(id: string): Promise<string | null> {
 async function cleanup() {
   await prisma.customerCreditLedger.deleteMany({ where: { customerId: { startsWith: PREFIX } } });
   await prisma.voucher.deleteMany({ where: { id: { startsWith: PREFIX } } });
-  await prisma.voucher.deleteMany({ where: { code: { startsWith: CODE_PREFIX } } });
+  await prisma.voucher.deleteMany({ where: { code: { startsWith: CANONICAL_CODE_PREFIX } } });
   await prisma.customer.deleteMany({ where: { id: { startsWith: PREFIX } } });
 }
 

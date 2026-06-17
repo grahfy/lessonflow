@@ -72,13 +72,25 @@ export function generateVoucherCode(): string {
 }
 
 /**
- * Normalises user-entered codes for comparison/storage: trims, uppercases, and
- * removes spaces. Hyphens are preserved so the stored canonical form matches
- * what {@link generateVoucherCode} produces, but a user may type the code with
- * or without spaces around the groups.
+ * Canonicalises a voucher code for storage AND lookup so they always agree.
+ *
+ * CANONICAL FORM: uppercase, grouped with hyphens exactly as
+ * {@link generateVoucherCode} emits (e.g. `ABCD-EFGH-JKLM`). This is the form
+ * persisted in the `Voucher.code` column, so it must also be the form that
+ * lookups (redeem) compare against.
+ *
+ * A user reading a code off an email/print may retype it with spaces, no
+ * hyphens, lowercase, or extra punctuation. We strip everything that is not an
+ * alphanumeric, uppercase, then re-insert the canonical group hyphens. This
+ * makes hyphen/space/case variants all resolve to the same stored value while
+ * keeping the readable, hyphenated display form intact.
  */
 export function normalizeVoucherCode(raw: string): string {
-  return raw.trim().toUpperCase().replace(/\s+/g, "");
+  const stripped = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (!stripped) {
+    return "";
+  }
+  return groupCode(stripped);
 }
 
 /**

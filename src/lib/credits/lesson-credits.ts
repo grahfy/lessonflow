@@ -194,11 +194,36 @@ export async function grantCreditsForPaidInvoice(
 }
 
 /**
+ * FIFO comparator: soonest expiry first, never-expiring (NULL) batches last,
+ * ties broken by oldest createdAt.
+ *
+ * We sort in JS rather than in the DB because MariaDB/MySQL sorts NULLs FIRST on
+ * an ascending order, and Prisma's `nulls: "last"` modifier is unsupported on
+ * the mysql connector. A DB-side `orderBy: [{ expiresAt: "asc" }, ...]` would
+ * therefore surface never-expiring batches BEFORE dated ones, burning permanent
+ * credits while dated credits silently lapse — the exact inversion we must avoid.
+ */
+function sortByExpiryThenCreated<
+  T extends { expiresAt: Date | null; createdAt: Date }
+>(a: T, b: T): number {
+  // NULL expiry sorts last; dated expiries ascend (soonest first).
+  if (a.expiresAt === null && b.expiresAt === null) {
+    return a.createdAt.getTime() - b.createdAt.getTime();
+  }
+  if (a.expiresAt === null) return 1;
+  if (b.expiresAt === null) return -1;
+  const byExpiry = a.expiresAt.getTime() - b.expiresAt.getTime();
+  if (byExpiry !== 0) return byExpiry;
+  return a.createdAt.getTime() - b.createdAt.getTime();
+}
+
+/**
  * Attempts to consume one matching lesson credit for a booking, atomically.
  *
  * Selection: the customer's non-expired batches with `remainingQuantity > 0`
  * whose `durationMinutes` matches the booking duration (or is NULL = any
- * duration), ordered FIFO by soonest expiry (NULLs last), then oldest first.
+ * duration), ordered FIFO by soonest expiry (never-expiring NULL batches last),
+ * then oldest first. See `sortByExpiryThenCreated` for why we sort in JS.
  *
  * The decrement is guarded by `updateMany WHERE id=batch AND remainingQuantity>0`
  * so a concurrent booking that already drained the batch causes a zero-row
@@ -215,66 +240,75 @@ export async function consumeLessonCredit(input: {
   const { tx, customerId, durationMinutes } = input;
   const now = input.now ?? new Date();
 
-  const candidateWhere = {
+  const baseWhere = {
     customerId,
     remainingQuantity: { gt: 0 },
-    OR: [{ durationMinutes }, { durationMinutes: null }],
-    AND: [
-      {
-        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }]
-      }
-    ]
+    OR: [{ durationMinutes }, { durationMinutes: null }]
   } satisfies Prisma.LessonCreditBatchWhereInput;
 
+  // FIFO requires dated (soonest-expiry) credits be consumed before
+  // never-expiring (NULL-expiry) batches. MariaDB sorts NULLs FIRST on an
+  // ascending order and Prisma's `nulls: "last"` is unsupported on the mysql
+  // connector, so we cannot express NULLs-last in a single DB query. Instead we
+  // exhaust the dated, non-expired candidates first (their `expiresAt asc` order
+  // is correct since no NULLs are involved) and only fall through to the
+  // never-expiring batches once no dated credit could be consumed.
+  const phases: Prisma.LessonCreditBatchWhereInput[] = [
+    // Phase 1: dated credits that have not yet expired, soonest expiry first.
+    { ...baseWhere, expiresAt: { gt: now } },
+    // Phase 2: never-expiring batches, consumed last (oldest first).
+    { ...baseWhere, expiresAt: null }
+  ];
+
   // Bound the candidate fetch so a customer with a pathological number of open
-  // batches can't load an unbounded result set on every booking. The FIFO order
-  // is stable, so a capped page is the soonest-to-expire batches; if every
+  // batches can't load an unbounded result set on every booking. The order is
+  // stable, so a capped page is the soonest-to-expire batches; if every
   // candidate in a page is drained out from under us by concurrent consumers we
-  // fetch the next page rather than give up while usable credits remain.
+  // re-query rather than give up while usable credits remain.
   const PAGE_SIZE = 50;
 
-  for (let offset = 0; ; offset += PAGE_SIZE) {
-    // Candidate batches: matching duration (exact or any), non-expired, with
-    // credits left. FIFO by soonest expiry then creation order.
-    const candidates = await tx.lessonCreditBatch.findMany({
-      where: candidateWhere,
-      orderBy: [
-        // soonest expiry first; NULL expiry sorts last so dated credits burn first.
-        { expiresAt: "asc" },
-        { createdAt: "asc" }
-      ],
-      select: { id: true },
-      skip: offset,
-      take: PAGE_SIZE
-    });
-
-    if (candidates.length === 0) {
-      return null;
-    }
-
-    for (const candidate of candidates) {
-      // Atomic guarded decrement. If a concurrent consumer already took the last
-      // credit, this updates 0 rows and we fall through to the next candidate.
-      const result = await tx.lessonCreditBatch.updateMany({
-        where: { id: candidate.id, remainingQuantity: { gt: 0 } },
-        data: { remainingQuantity: { decrement: 1 } }
+  for (const where of phases) {
+    for (let offset = 0; ; offset += PAGE_SIZE) {
+      const candidates = await tx.lessonCreditBatch.findMany({
+        where,
+        // Within a phase there are no mixed NULL/dated expiries, so the DB
+        // ascending order is the correct FIFO order.
+        orderBy: [{ expiresAt: "asc" }, { createdAt: "asc" }],
+        select: { id: true },
+        skip: offset,
+        take: PAGE_SIZE
       });
 
-      if (result.count === 1) {
-        return candidate.id;
+      if (candidates.length === 0) {
+        break; // exhausted this phase; fall through to the next one.
       }
-    }
 
-    // Every batch in this page was drained by a concurrent consumer. If the page
-    // was full there may be more candidates beyond it; otherwise we've exhausted
-    // them. NOTE: drained rows still satisfy remainingQuantity>0? No — they now
-    // have 0 remaining, so they drop out of the filter and the next page's
-    // `skip` would step over still-usable rows. Re-query from offset 0 instead.
-    if (candidates.length < PAGE_SIZE) {
-      return null;
+      for (const candidate of candidates) {
+        // Atomic guarded decrement. If a concurrent consumer already took the
+        // last credit, this updates 0 rows and we fall through to the next.
+        const result = await tx.lessonCreditBatch.updateMany({
+          where: { id: candidate.id, remainingQuantity: { gt: 0 } },
+          data: { remainingQuantity: { decrement: 1 } }
+        });
+
+        if (result.count === 1) {
+          return candidate.id;
+        }
+      }
+
+      // Every batch in this page was drained by a concurrent consumer. If the
+      // page was full there may be more candidates; otherwise this phase is
+      // exhausted. Drained rows now have 0 remaining and drop out of the filter,
+      // so a `skip`-based next page would step over still-usable rows — re-query
+      // from offset 0 instead.
+      if (candidates.length < PAGE_SIZE) {
+        break;
+      }
+      offset = -PAGE_SIZE; // becomes 0 after the loop's += PAGE_SIZE
     }
-    offset = -PAGE_SIZE; // becomes 0 after the loop's += PAGE_SIZE
   }
+
+  return null;
 }
 
 /**
@@ -304,7 +338,6 @@ export async function getLessonCreditSummary(
       remainingQuantity: { gt: 0 },
       OR: [{ expiresAt: null }, { expiresAt: { gt: now } }]
     },
-    orderBy: [{ expiresAt: "asc" }, { createdAt: "asc" }],
     select: {
       id: true,
       durationMinutes: true,
@@ -315,6 +348,11 @@ export async function getLessonCreditSummary(
       createdAt: true
     }
   });
+
+  // Sort in JS for correct NULLs-last (never-expiring) FIFO ordering: MariaDB
+  // sorts NULLs first on ascending order and Prisma's `nulls: "last"` is
+  // unsupported on the mysql connector. Matches consumeLessonCredit's order.
+  batches.sort(sortByExpiryThenCreated);
 
   const totalRemaining = batches.reduce((sum, b) => sum + b.remainingQuantity, 0);
 
