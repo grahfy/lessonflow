@@ -94,7 +94,10 @@ export function useInvoiceActions({
       unitPriceCents: parseMoneyInputToCents(li.unitPriceInput, detailForm.resolvedEditingCurrency).cents || 0,
       taxMode: li.taxMode,
       discountKind: li.discountKind,
-      discountValue: parseDiscountValueForCurrency(li.discountKind, li.discountValueInput, detailForm.resolvedEditingCurrency)
+      discountValue: parseDiscountValueForCurrency(li.discountKind, li.discountValueInput, detailForm.resolvedEditingCurrency),
+      // Preserve package linkage so re-saving an invoice keeps its credit-granting
+      // package lines intact.
+      packageId: li.packageId ?? null
     }));
 
     const result = await saveInvoiceApi(selectedInvoice.id, {
@@ -213,7 +216,8 @@ export function useInvoiceActions({
     const directCreateLineItems = [
       ...createForm.createQuickLessonPreviewLineItems,
       ...createForm.createStandalonePreviewLineItems,
-      ...createForm.createPresetPreviewLineItems
+      ...createForm.createPresetPreviewLineItems,
+      ...createForm.createPackagePreviewLineItems
     ];
     if (directCreateLineItems.length > 0) {
       payload.lineItems = [

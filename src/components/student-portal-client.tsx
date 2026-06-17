@@ -17,6 +17,7 @@ import {
   type StudentPortalPayload
 } from "@/lib/student-portal/contracts";
 import { APP_TIMEZONE, dateTimeLocalToIso, toDateTimeLocalValue } from "@/lib/time";
+import { formatCurrency } from "@/lib/invoices/currency";
 
 type LessonDurationChoice = "min30" | "min60";
 
@@ -56,6 +57,8 @@ export function StudentPortalClient(): ReactElement {
   const [rescheduleStartAtLocal, setRescheduleStartAtLocal] = useState(defaultStartAtLocalValue());
   const [rescheduleReason, setRescheduleReason] = useState("");
   const [submittingRescheduleId, setSubmittingRescheduleId] = useState<string | null>(null);
+  const [voucherCode, setVoucherCode] = useState("");
+  const [redeemingVoucher, setRedeemingVoucher] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -250,6 +253,40 @@ export function StudentPortalClient(): ReactElement {
     void load();
   }
 
+  /**
+   * Redeems a gift-voucher code into the student's own account credit. The
+   * endpoint returns an oracle-free generic error on any failure, so the UI
+   * surfaces that message as-is without distinguishing failure causes.
+   */
+  async function redeemVoucher(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const code = voucherCode.trim();
+    if (!code) {
+      setError("Enter a voucher code to redeem.");
+      return;
+    }
+    setRedeemingVoucher(true);
+    setError("");
+    setNotice("");
+    const response = await fetch("/api/student/portal/redeem-voucher", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code })
+    });
+    setRedeemingVoucher(false);
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      setError(payload?.error || "This voucher code could not be redeemed.");
+      return;
+    }
+
+    setVoucherCode("");
+    setNotice("Voucher redeemed. Your account credit has been updated.");
+    // Reload so the new account-credit balance is reflected.
+    void load();
+  }
+
   return (
     <div className={styles["portal-shell"]} data-motion-root="student-portal">
       {showAnnouncement && announcement ? (
@@ -399,6 +436,55 @@ export function StudentPortalClient(): ReactElement {
               </form>
 
               <aside className={styles["actions-side"]} aria-label="Cancellation policy and pending requests">
+                {data.lessonCredits && data.lessonCredits.totalRemaining > 0 ? (
+                  <div className={styles["pending-list"]} role="status" aria-label="Prepaid lesson credits">
+                    <strong className={styles["pending-title"]}>Prepaid lessons</strong>
+                    <p className="helper-text">
+                      You have <strong>{data.lessonCredits.totalRemaining}</strong>{" "}
+                      prepaid {data.lessonCredits.totalRemaining === 1 ? "lesson" : "lessons"} remaining.
+                      These are applied automatically when your lesson is booked.
+                    </p>
+                    <ul className={styles["pending-items"]}>
+                      {data.lessonCredits.batches.map((batch) => (
+                        <li key={batch.id}>
+                          {batch.remainingQuantity}{" "}
+                          {batch.durationMinutes ? `× ${batch.durationMinutes} min` : "lesson"}
+                          {batch.remainingQuantity === 1 ? "" : "s"}
+                          {batch.expiresAt ? ` · expires ${formatWhen(batch.expiresAt)}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                <div className={styles["pending-list"]}>
+                  <strong className={styles["pending-title"]}>Account credit</strong>
+                  <p className="helper-text">
+                    Balance:{" "}
+                    <strong>{formatCurrency(data.accountCreditCents ?? 0)}</strong>
+                    . Account credit is applied to your invoices.
+                  </p>
+                  <form onSubmit={redeemVoucher}>
+                    <label htmlFor="student-voucher-code">Redeem a voucher</label>
+                    <input
+                      id="student-voucher-code"
+                      type="text"
+                      value={voucherCode}
+                      onChange={(event) => setVoucherCode(event.target.value)}
+                      placeholder="Enter voucher code"
+                      autoCapitalize="characters"
+                      maxLength={64}
+                    />
+                    <button
+                      type="submit"
+                      className="btn btn-secondary"
+                      disabled={redeemingVoucher}
+                    >
+                      {redeemingVoucher ? "Redeeming..." : "Redeem voucher"}
+                    </button>
+                  </form>
+                </div>
+
                 <p className={styles["policy-warning"]} role="note">
                   If less than 24 hours notice is given, the full lesson fee is still payable. If more than 24 hours notice is given, a make-up lesson will be provided within the same week.
                 </p>

@@ -32,6 +32,7 @@ import { animateIn, animateOut, useTweenOrchestrator } from "@/components/motion
 import { usePresenceExit } from "@/components/motion/use-presence-exit";
 import { CustomerTable } from "@/components/admin/customers/customer-table";
 import { CustomerDialogWrapper } from "@/components/admin/customers/customer-dialog-wrapper";
+import { CustomerLessonCreditsDialog } from "@/components/admin/customers/customer-lesson-credits-dialog";
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { emptyCustomerForm, customerFormFromRow, type CustomerRow, type CustomerForm } from "@/components/admin/customers/customer-profile-dialog";
 
@@ -91,6 +92,7 @@ export function AdminCustomersClient() {
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(null);
   const [pendingDeleteCustomer, setPendingDeleteCustomer] = useState<CustomerRow | null>(null);
+  const [lessonCreditsCustomer, setLessonCreditsCustomer] = useState<CustomerRow | null>(null);
 
   // Email Composer State
   const [emailComposerSubject, setEmailComposerSubject] = useState("");
@@ -799,6 +801,7 @@ export function AdminCustomersClient() {
           onStartEdit={() => canManageSelectedCustomer && setIsEditing(true)}
           onDeleteCustomer={() => selectedCustomer && currentAdmin?.role === "owner" && setPendingDeleteCustomer(selectedCustomer)}
           onViewBillingHistory={() => selectedCustomer && currentAdmin?.role === "owner" && void beginExitTransition(null, 0, () => router.push(`/admin/invoices?q=${encodeURIComponent(selectedCustomer.fullName)}`))}
+          onManageLessonCredits={() => selectedCustomer && currentAdmin?.role === "owner" && setLessonCreditsCustomer(selectedCustomer)}
         />
       )}
       <ConfirmDialog
@@ -809,6 +812,11 @@ export function AdminCustomersClient() {
         destructive
         onConfirm={() => pendingDeleteCustomer && void deleteCustomerConfirmed(pendingDeleteCustomer)}
         onCancel={() => setPendingDeleteCustomer(null)}
+      />
+      <CustomerLessonCreditsDialog
+        open={lessonCreditsCustomer !== null}
+        customer={lessonCreditsCustomer}
+        onClose={() => setLessonCreditsCustomer(null)}
       />
     </AdminShell>
   );

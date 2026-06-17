@@ -21,6 +21,7 @@ import { log } from "@/lib/observability";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { prisma } from "@/lib/db";
 import { findActiveInvoiceLinksForBookingIds } from "@/lib/invoices/booking-links";
+import { consumeLessonCredit } from "@/lib/credits/lesson-credits";
 import { getActiveLessonPricingMap } from "@/lib/lesson-pricing";
 import { ensurePortalCredentialForCustomer } from "@/lib/student-portal/credentials";
 import { tiptapJsonToPlainText } from "@/lib/tiptap-utils";
@@ -451,38 +452,63 @@ export async function POST(request: NextRequest) {
           }
         });
 
-        await tx.booking.createMany({
-          data: starts.map((start) => ({
-            firstName: parsed.data.firstName,
-            lastName: parsed.data.lastName,
-            name: parsed.data.name,
-            email: parsed.data.email,
-            phone: parsed.data.phone,
-            address: formatBookingAddress(parsed.data),
-            unitNumber: parsed.data.unitNumber,
-            houseNumber: parsed.data.houseNumber,
-            streetName: parsed.data.streetName,
-            streetType: parsed.data.streetType,
-            suburb: parsed.data.suburb,
-            state: parsed.data.state,
-            postcode: parsed.data.postcode,
-            lessonMode: parsed.data.lessonMode,
-            skillLevel: parsed.data.skillLevel,
-            lessonDuration: parsed.data.lessonDuration,
-            customDurationMinutes: parsed.data.customDurationMinutes ?? null,
-            startAt: start,
-            endAt: getBookingEnd(start, parsed.data.lessonDuration, parsed.data.customDurationMinutes),
-            timezone: APP_TIMEZONE,
-            notes: parsed.data.notesContent ? tiptapJsonToPlainText(parsed.data.notesContent) || parsed.data.notes : parsed.data.notes,
-            notesContent: parsed.data.notesContent ? (parsed.data.notesContent as Prisma.InputJsonValue) : undefined,
-            seriesId: series.id,
-            assignedTeacherId: requestedAssignedTeacherId,
+        // One create per generated start date (not createMany) so each row can
+        // independently consume a matching lesson credit and carry its own
+        // lessonCreditBatchId. Duration is identical across the series.
+        const seriesDurationMinutes = getDurationMinutes(
+          parsed.data.lessonDuration,
+          parsed.data.customDurationMinutes
+        );
+        for (const start of starts) {
+          const lessonCreditBatchId = await consumeLessonCredit({
+            tx,
             customerId,
-            modifiedById: admin.id
-          }))
-        });
+            durationMinutes: seriesDurationMinutes
+          });
+          await tx.booking.create({
+            data: {
+              firstName: parsed.data.firstName,
+              lastName: parsed.data.lastName,
+              name: parsed.data.name,
+              email: parsed.data.email,
+              phone: parsed.data.phone,
+              address: formatBookingAddress(parsed.data),
+              unitNumber: parsed.data.unitNumber,
+              houseNumber: parsed.data.houseNumber,
+              streetName: parsed.data.streetName,
+              streetType: parsed.data.streetType,
+              suburb: parsed.data.suburb,
+              state: parsed.data.state,
+              postcode: parsed.data.postcode,
+              lessonMode: parsed.data.lessonMode,
+              skillLevel: parsed.data.skillLevel,
+              lessonDuration: parsed.data.lessonDuration,
+              customDurationMinutes: parsed.data.customDurationMinutes ?? null,
+              startAt: start,
+              endAt: getBookingEnd(start, parsed.data.lessonDuration, parsed.data.customDurationMinutes),
+              timezone: APP_TIMEZONE,
+              notes: parsed.data.notesContent ? tiptapJsonToPlainText(parsed.data.notesContent) || parsed.data.notes : parsed.data.notes,
+              notesContent: parsed.data.notesContent ? (parsed.data.notesContent as Prisma.InputJsonValue) : undefined,
+              seriesId: series.id,
+              assignedTeacherId: requestedAssignedTeacherId,
+              customerId,
+              lessonCreditBatchId,
+              modifiedById: admin.id
+            }
+          });
+        }
       } else {
-        // Single booking creation
+        // Single booking creation. Consume one matching lesson credit (if any)
+        // and tag the booking so the auto-invoice step skips credit-covered rows.
+        const singleDurationMinutes = getDurationMinutes(
+          parsed.data.lessonDuration,
+          parsed.data.customDurationMinutes
+        );
+        const lessonCreditBatchId = await consumeLessonCredit({
+          tx,
+          customerId,
+          durationMinutes: singleDurationMinutes
+        });
         await tx.booking.create({
           data: {
             firstName: parsed.data.firstName,
@@ -509,6 +535,7 @@ export async function POST(request: NextRequest) {
             notesContent: parsed.data.notesContent ? (parsed.data.notesContent as Prisma.InputJsonValue) : undefined,
             assignedTeacherId: requestedAssignedTeacherId,
             customerId,
+            lessonCreditBatchId,
             modifiedById: admin.id
           }
         });

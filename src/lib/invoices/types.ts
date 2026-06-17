@@ -21,6 +21,13 @@ export type InvoiceLineItemDraft = InvoiceDiscountDraft & {
   taxMode: InvoiceTaxMode;
   kind: "lesson_fee" | "educational_books" | "digital_lessons" | "custom";
   sortOrder: number;
+  /**
+   * Optional link to a LessonPackage. When set, paying the invoice grants the
+   * package's prepaid lesson credits to the customer via
+   * `grantCreditsForPaidInvoice`. Carried through the calculation engine (which
+   * spreads the draft) so it survives into the persisted line item.
+   */
+  packageId?: string | null;
 };
 
 /**

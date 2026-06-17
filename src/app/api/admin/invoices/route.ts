@@ -14,6 +14,7 @@ import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
 import { getInvoiceAgingBucket, getInvoiceOverdueDays } from "@/lib/invoices/aging";
 import { findActiveInvoiceLinksForBookingIds } from "@/lib/invoices/booking-links";
+import { assertPackageLinesAreValid } from "@/lib/credits/lesson-credits";
 import { createInvoiceSchema, listInvoicesQuerySchema } from "@/lib/invoices/schema";
 import { withResolvedInvoicePaymentDetails } from "@/lib/invoices/payment-details";
 import { createInvoiceRecord } from "@/lib/invoices/persistence";
@@ -231,8 +232,16 @@ export async function POST(request: NextRequest) {
       kind: lineItem.kind,
       sortOrder: lineItem.sortOrder,
       discountKind: lineItem.discountKind ?? null,
-      discountValue: lineItem.discountValue ?? null
+      discountValue: lineItem.discountValue ?? null,
+      packageId: lineItem.packageId ?? null
     }));
+
+    // SECURITY: Reject unknown/inactive package linkage before persisting, since
+    // a package line auto-grants prepaid lesson credits when the invoice is paid.
+    const packageError = await assertPackageLinesAreValid(lineItems);
+    if (packageError) {
+      return NextResponse.json({ error: packageError }, { status: 400 });
+    }
 
     const issuedAt = parsed.data.issuedAt ? new Date(parsed.data.issuedAt) : new Date();
     const dueAt = new Date(parsed.data.dueAt);

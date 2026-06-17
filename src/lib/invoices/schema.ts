@@ -99,7 +99,12 @@ export const invoiceLineItemInputSchema = z
     unitPriceCents: z.number().int().min(0).max(50_000_000),
     taxMode: invoiceTaxModeSchema.default("taxable"),
     kind: invoiceLineItemKindSchema.default("custom"),
-    sortOrder: z.number().int().min(0).max(9_999).default(0)
+    sortOrder: z.number().int().min(0).max(9_999).default(0),
+    // Optional LessonPackage linkage. The line stays a normal billable item; the
+    // packageId only signals that paying the invoice should grant the package's
+    // prepaid lesson credits (see grantCreditsForPaidInvoice). Existence/active
+    // status is verified server-side before persistence.
+    packageId: z.string().trim().min(1).optional().nullable()
   })
   .extend(optionalDiscountFieldShape)
   .superRefine(validateOptionalDiscountFields);

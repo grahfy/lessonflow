@@ -13,6 +13,7 @@ import {
   type InvoiceTaxMode
 } from "@/lib/admin/use-invoices";
 import { type Preset } from "@/lib/admin/use-presets";
+import { type LessonPackage } from "@/lib/admin/use-packages";
 import { type InvoiceLineItemDraft } from "@/lib/invoices/types";
 import {
   makeCreateStandaloneItemDraft,
@@ -28,6 +29,8 @@ export interface UseInvoiceCreateFormOptions {
   /** Active lesson durations keyed by minutes, used to price quick-lesson line items. */
   activeLessonPricingMap: Map<number, { priceCents: number }>;
   presets: Preset[];
+  /** Active lesson packages selectable as credit-granting invoice lines. */
+  packages: LessonPackage[];
   onAuthError?: () => void;
   onError: (message: string) => void;
 }
@@ -44,6 +47,7 @@ export function useInvoiceCreateForm({
   defaultCurrency,
   activeLessonPricingMap,
   presets,
+  packages,
   onAuthError,
   onError
 }: UseInvoiceCreateFormOptions) {
@@ -54,8 +58,10 @@ export function useInvoiceCreateForm({
   const [createLessonSourceMode, setCreateLessonSourceMode] = useState<CreateLessonSourceMode | null>("multiple_bookings");
   const [createIncludeStandalone, setCreateIncludeStandalone] = useState(false);
   const [createIncludePresets, setCreateIncludePresets] = useState(false);
+  const [createIncludePackages, setCreateIncludePackages] = useState(false);
   const [createStandaloneItems, setCreateStandaloneItems] = useState<CreateStandaloneItemDraft[]>([]);
   const [createSelectedPresetIds, setCreateSelectedPresetIds] = useState<string[]>([]);
+  const [createSelectedPackageIds, setCreateSelectedPackageIds] = useState<string[]>([]);
   const [createDueAt, setCreateDueAt] = useState("");
   const [createCurrency, setCreateCurrency] = useState(getInvoiceCurrency(defaultCurrency));
   const [createTaxMode, setCreateTaxMode] = useState<InvoiceTaxMode>(getDefaultInvoiceTaxModeForCurrencyValue(defaultCurrency));
@@ -80,8 +86,10 @@ export function useInvoiceCreateForm({
     setCreateLessonSourceMode("multiple_bookings");
     setCreateIncludeStandalone(false);
     setCreateIncludePresets(false);
+    setCreateIncludePackages(false);
     setCreateStandaloneItems([]);
     setCreateSelectedPresetIds([]);
+    setCreateSelectedPackageIds([]);
     setCreateDueAt("");
     setCreateCurrency(getInvoiceCurrency(defaultCurrency));
     setCreateTaxMode(getDefaultInvoiceTaxModeForCurrencyValue(defaultCurrency));
@@ -168,6 +176,11 @@ export function useInvoiceCreateForm({
       return;
     }
 
+    if (source === "packages") {
+      setCreateIncludePackages(enabled);
+      return;
+    }
+
     setCreateIncludePresets(enabled);
   };
 
@@ -213,6 +226,25 @@ export function useInvoiceCreateForm({
           discountValue: preset.discountValue ?? null
         })),
     [createSelectedPresetIds, createTaxMode, presets]
+  );
+
+  const createPackagePreviewLineItems = useMemo(
+    () =>
+      packages
+        .filter((pkg) => createSelectedPackageIds.includes(pkg.id))
+        .map((pkg) => ({
+          description: pkg.label,
+          quantity: 1,
+          unitPriceCents: pkg.priceCents,
+          taxMode: createTaxMode,
+          kind: "custom" as const,
+          discountKind: null,
+          discountValue: null,
+          // The packageId is the load-bearing field: paying this invoice grants
+          // the package's prepaid lesson credits via grantCreditsForPaidInvoice.
+          packageId: pkg.id
+        })),
+    [createSelectedPackageIds, createTaxMode, packages]
   );
 
   const createBookingLessonPreviewLineItems = useMemo(() => {
@@ -296,6 +328,9 @@ export function useInvoiceCreateForm({
     if (createIncludePresets) {
       merged.push(...createPresetPreviewLineItems);
     }
+    if (createIncludePackages) {
+      merged.push(...createPackagePreviewLineItems);
+    }
 
     return merged.map((lineItem, index) => ({
       ...lineItem,
@@ -303,12 +338,14 @@ export function useInvoiceCreateForm({
     }));
   }, [
     createIncludePresets,
+    createIncludePackages,
     createIncludeStandalone,
     createUsesBookingLessons,
     createUsesQuickLesson,
     createBookingLessonPreviewLineItems,
     createQuickLessonPreviewLineItems,
     createPresetPreviewLineItems,
+    createPackagePreviewLineItems,
     createStandalonePreviewLineItems
   ]);
 
@@ -323,7 +360,7 @@ export function useInvoiceCreateForm({
   );
 
   const createBlockingError = useMemo(() => {
-    if (!createLessonSourceMode && !createIncludeStandalone && !createIncludePresets) {
+    if (!createLessonSourceMode && !createIncludeStandalone && !createIncludePresets && !createIncludePackages) {
       return "Select at least one invoice source.";
     }
     if (createUsesBookingLessons && createSelectedCustomerId && createSelectedBookingIds.length === 0) {
@@ -343,16 +380,21 @@ export function useInvoiceCreateForm({
     if (createIncludePresets && createSelectedPresetIds.length === 0) {
       return "Select at least one preset to include preset charges.";
     }
+    if (createIncludePackages && createSelectedPackageIds.length === 0) {
+      return "Select at least one package to include package charges.";
+    }
     return null;
   }, [
     createHasIncompleteStandaloneItems,
     createIncludePresets,
+    createIncludePackages,
     createIncludeStandalone,
     createLessonSourceMode,
     createQuickLessonPreviewLineItems.length,
     createSelectedCustomerId,
     createSelectedBookingIds.length,
     createSelectedPresetIds.length,
+    createSelectedPackageIds.length,
     createUsesBookingLessons,
     createUsesQuickLesson,
     createUsesSingleBookingLesson,
@@ -378,9 +420,12 @@ export function useInvoiceCreateForm({
     createLessonSourceMode,
     createIncludeStandalone,
     createIncludePresets,
+    createIncludePackages,
     createStandaloneItems,
     createSelectedPresetIds,
     setCreateSelectedPresetIds,
+    createSelectedPackageIds,
+    setCreateSelectedPackageIds,
     createDueAt,
     setCreateDueAt,
     createCurrency,
@@ -416,6 +461,7 @@ export function useInvoiceCreateForm({
     removeCreateStandaloneItem,
     createStandalonePreviewLineItems,
     createPresetPreviewLineItems,
+    createPackagePreviewLineItems,
     createBookingLessonPreviewLineItems,
     createQuickLessonPreviewLineItems,
     createPreviewLineItems,

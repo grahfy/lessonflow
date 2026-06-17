@@ -135,6 +135,7 @@ type Props = {
     onStartEdit: () => void;
     onDelete: () => void;
     onViewBillingHistory: () => void;
+    onManageLessonCredits: () => void;
     onRevealPortalPassword: () => void;
     onRegeneratePortalPassword: () => void;
     onCopyPortalPassword: (password: string) => void | Promise<void>;
@@ -160,6 +161,7 @@ export function CustomerProfileDialog({
     onStartEdit,
     onDelete,
     onViewBillingHistory,
+    onManageLessonCredits,
     onRevealPortalPassword,
     onRegeneratePortalPassword,
     onCopyPortalPassword
@@ -434,6 +436,16 @@ export function CustomerProfileDialog({
                                     onClick={onViewBillingHistory}
                                 >
                                     View Billing History
+                                </button>
+                            </Tooltip>
+                            <Tooltip content="Grant or view prepaid lesson credits for this customer.">
+                                <button
+                                    className="btn btn-secondary"
+                                    type="button"
+                                    disabled={!canViewBillingHistory}
+                                    onClick={onManageLessonCredits}
+                                >
+                                    Lesson Credits
                                 </button>
                             </Tooltip>
                             <Tooltip content="Modify this customer's details.">

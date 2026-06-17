@@ -9,6 +9,7 @@ import {
   type InvoiceRow
 } from "@/lib/admin/use-invoices";
 import { type Preset } from "@/lib/admin/use-presets";
+import { type LessonPackage } from "@/lib/admin/use-packages";
 import {
   describeDiscount,
   formatPaidVia,
@@ -17,6 +18,7 @@ import {
 } from "@/lib/invoices/invoice-display-helpers";
 import { type useInvoiceDetailForm } from "@/lib/admin/use-invoice-detail-form";
 import { type PendingConfirm } from "@/lib/admin/use-invoice-actions";
+import { InvoiceAccountCreditPanel } from "./invoice-account-credit-panel";
 
 type DetailForm = ReturnType<typeof useInvoiceDetailForm>;
 
@@ -26,6 +28,7 @@ interface InvoiceDetailDialogProps {
   detailForm: DetailForm;
   busyAction: string | null;
   presets: Preset[];
+  packages: LessonPackage[];
   activeLessonPricingChoices: Array<{ durationMinutes: number; priceCents: number }>;
   editingTaxLabel: string;
   canMarkAsPaid: boolean;
@@ -39,6 +42,8 @@ interface InvoiceDetailDialogProps {
   onOpenLinkedCustomer: () => void;
   onDeleteInvoice: () => void;
   setPendingConfirm: (value: PendingConfirm | null) => void;
+  /** Called with the updated invoice after account credit is applied. */
+  onAccountCreditApplied?: (updated: InvoiceRow) => void;
 }
 
 /**
@@ -55,6 +60,7 @@ export function InvoiceDetailDialog({
   detailForm,
   busyAction,
   presets,
+  packages,
   activeLessonPricingChoices,
   editingTaxLabel,
   canMarkAsPaid,
@@ -67,7 +73,8 @@ export function InvoiceDetailDialog({
   onPerformAction,
   onOpenLinkedCustomer,
   onDeleteInvoice,
-  setPendingConfirm
+  setPendingConfirm,
+  onAccountCreditApplied
 }: InvoiceDetailDialogProps) {
   const {
     editingNotes,
@@ -84,6 +91,7 @@ export function InvoiceDetailDialog({
     editingQuickLessonDurationMinutes,
     setEditingQuickLessonDurationMinutes,
     editingProductPresetId,
+    editingPackageId,
     editingCustomerFirstName,
     setEditingCustomerFirstName,
     editingCustomerLastName,
@@ -102,6 +110,7 @@ export function InvoiceDetailDialog({
     editingCalculation,
     addLineItem,
     addPresetToInvoice,
+    addPackageToInvoice,
     addQuickLessonToInvoice,
     removeLineItem,
     updateLineItem
@@ -247,6 +256,14 @@ export function InvoiceDetailDialog({
                   </AdminField>
                 </AdminForm>
               </AdminCard>
+
+              {onAccountCreditApplied ? (
+                <InvoiceAccountCreditPanel
+                  invoice={selectedInvoice}
+                  canApply={canEditSelectedInvoice}
+                  onApplied={onAccountCreditApplied}
+                />
+              ) : null}
 
               <h3 className="manual-section-title">Payment Details</h3>
               <AdminCard ghost className="invoice-dialog-section">
@@ -414,6 +431,27 @@ export function InvoiceDetailDialog({
                       >
                         <option value="">Add preset...</option>
                         {presets.map(p => <option key={p.id} value={p.id}>{p.label} ({toCurrency(p.unitPriceCents, resolvedEditingCurrency)}{p.discountKind ? `, ${describeDiscount(p.discountKind, p.discountValue ?? null, resolvedEditingCurrency)} off` : ""})</option>)}
+                      </select>
+                    </div>
+                    <div className="invoice-dialog-preset-row invoice-dialog-add-package-row">
+                      <select
+                        className="invoice-product-preset-select invoice-dialog-preset-select"
+                        value={editingPackageId}
+                        disabled={!canEditSelectedInvoice || packages.length === 0}
+                        onChange={(e) => {
+                          // Adding a package line carries packageId so paying the
+                          // invoice grants the package's prepaid lesson credits.
+                          if (e.target.value) {
+                            addPackageToInvoice(e.target.value);
+                          }
+                        }}
+                      >
+                        <option value="">Add lesson package...</option>
+                        {packages.map((pkg) => (
+                          <option key={pkg.id} value={pkg.id}>
+                            {pkg.label} ({pkg.lessonCount} {pkg.lessonCount === 1 ? "lesson" : "lessons"}{pkg.durationMinutes ? `, ${pkg.durationMinutes} min` : ""}, {toCurrency(pkg.priceCents, resolvedEditingCurrency)})
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>

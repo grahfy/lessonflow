@@ -1,6 +1,6 @@
 # Screenshot Seed Checklist
 
-Last seeded: 2026-06-11T14:03:07.805Z
+Last seeded: 2026-06-17T08:29:39.464Z
 
 ## Demo Credentials
 - Admin email: `owner@example.com`

@@ -1,0 +1,16 @@
+-- Additive idempotency guard for package-credit grants.
+--
+-- grantCreditsForPaidInvoice is called from BOTH the mark_paid path and the
+-- Stripe webhook; a findFirst-then-create across those processes can race and
+-- double-grant. This unique index makes the grant key atomic at the DB level so
+-- a concurrent / duplicate delivery hits a P2002 conflict the code treats as a
+-- no-op.
+--
+-- The key is (sourceInvoiceId, packageId, note); `note` carries the originating
+-- line item id (`lineItem:<id>`) so the same package on multiple invoice lines
+-- still gets one batch per line. MySQL allows multiple rows where any indexed
+-- column is NULL, so admin_grant / voucher_grant batches (sourceInvoiceId NULL)
+-- never collide with each other or with package grants.
+--
+-- Purely additive: adds a UNIQUE INDEX, no table/column drops or data changes.
+CREATE UNIQUE INDEX `LessonCreditBatch_grant_dedupe` ON `LessonCreditBatch`(`sourceInvoiceId`, `packageId`, `note`);
