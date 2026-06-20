@@ -4782,6 +4782,13 @@ if [[ -d ".next/standalone" ]]; then
     fi
     mkdir -p ".next/standalone/.next"
     cp -r ".next/static" ".next/standalone/.next/"
+    # The standalone server (server.js) resolves its runtime disk cache to
+    # `.next/standalone/.next/cache`, NOT the release-root `.next/cache` that
+    # configure_release_build_caches() symlinks. Without this, www-data hits
+    # EACCES at runtime trying to mkdir the cache (it can't write the
+    # root-owned standalone tree), spamming unhandledRejection. Point it at the
+    # same shared, group-writable cache so the runtime cache persists per host.
+    ln -sfn "${DEPLOY_SHARED_NEXT_CACHE_DIR}" ".next/standalone/.next/cache"
 fi
 
 if [[ ! -f "public/${CHORD_PREVIEW_SENTINEL_FILE}" ]]; then
