@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ReactElement, FormEvent, useCallback, useEffect, useState } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { PracticeAudioPlayer } from "@/components/ui/practice-audio-player";
 
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { SkeletonBlock, SkeletonRegion } from "@/components/ui/skeleton";
@@ -756,10 +757,8 @@ function BookingList(input: BookingListProps) {
                     </span>
                     <span className={styles["material-actions"]}>
                       {material.materialType === "audio" ? (
-                        <audio
+                        <PracticeAudioPlayer
                           className={cx("material-audio-player", styles["audio-player"])}
-                          controls
-                          preload="metadata"
                           src={material.previewUrl}
                         />
                       ) : (
@@ -802,10 +801,8 @@ function BookingList(input: BookingListProps) {
                     </span>
                     <span className={styles["material-actions"]}>
                       {material.materialType === "audio" ? (
-                        <audio
+                        <PracticeAudioPlayer
                           className={cx("material-audio-player", styles["audio-player"])}
-                          controls
-                          preload="metadata"
                           src={material.previewUrl}
                         />
                       ) : (
