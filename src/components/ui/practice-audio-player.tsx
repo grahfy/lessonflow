@@ -87,17 +87,20 @@ export function PracticeAudioPlayer({ src, className }: PracticeAudioPlayerProps
     audio.playbackRate = rate;
   }, [rate]);
 
-  // Sync any state the element already holds by mount. A local/cached file can
-  // fire `loadedmetadata` before React attaches its listeners (hydration race),
-  // which would otherwise leave the transport stuck at 0:00 with play disabled.
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (Number.isFinite(audio.duration) && audio.duration > 0) {
-      setDuration(audio.duration);
+  // Callback ref that initializes transport state the moment the <audio> node
+  // attaches. A local/cached file can reach HAVE_METADATA before React binds its
+  // synthetic `loadedmetadata` listener; binding init to attachment (rather than
+  // to a later effect that only fires if the event is caught) makes that race
+  // impossible — the element is read exactly when it exists. `rate`/pitch are
+  // owned by the effect above, so this stays dependency-free and stable.
+  const attachAudio = useCallback((node: HTMLAudioElement | null) => {
+    audioRef.current = node;
+    if (!node) return;
+    if (node.readyState >= HTMLMediaElement.HAVE_METADATA && Number.isFinite(node.duration) && node.duration > 0) {
+      setDuration(node.duration);
     }
-    setCurrentTime(audio.currentTime);
-    setIsPlaying(!audio.paused);
+    setCurrentTime(node.currentTime);
+    setIsPlaying(!node.paused);
   }, []);
 
   // The A–B loop needs the latest points inside the timeupdate handler without
@@ -244,7 +247,7 @@ export function PracticeAudioPlayer({ src, className }: PracticeAudioPlayerProps
   return (
     <div className={cx(styles.player, className)} data-testid="practice-audio-player">
       <audio
-        ref={audioRef}
+        ref={attachAudio}
         src={src}
         preload="metadata"
         onLoadedMetadata={(event) => {
