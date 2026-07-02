@@ -6,6 +6,11 @@ import { prisma } from "@/lib/db";
 import { ownerPendingBookingTemplate } from "@/lib/email/templates";
 import { sendEmail } from "@/lib/email/service";
 import { getOwnerEmail } from "@/lib/env";
+import {
+  evaluatePublicGeoblocking,
+  logPublicGeoblockingBlock,
+  PUBLIC_GEOBLOCKED_MESSAGE
+} from "@/lib/geoblocking-settings";
 import { logError, logEvent } from "@/lib/observability";
 import {
   studentPortalBookingRequestInputSchema,
@@ -22,6 +27,14 @@ export async function POST(request: NextRequest) {
   const student = await requireStudentFromRequest(request);
   if (!student) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Apply the same public geoblocking policy as the anonymous booking form so
+  // the region restriction is enforced consistently across booking entry points.
+  const geoblocking = await evaluatePublicGeoblocking(request.headers);
+  if (!geoblocking.allowed) {
+    logPublicGeoblockingBlock("student_portal_booking", request.headers, geoblocking);
+    return NextResponse.json({ error: PUBLIC_GEOBLOCKED_MESSAGE }, { status: 403 });
   }
 
   const fullNameParts = student.fullName.trim().split(/\s+/).filter(Boolean);

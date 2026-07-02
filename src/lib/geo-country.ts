@@ -4,8 +4,20 @@ type ResolveCountryResult = {
   country: string | null;
 };
 
-/** Upstream geo lookup timeout (ms) so a slow provider can't stall handling. */
-const GEO_FETCH_TIMEOUT_MS = 2500;
+/**
+ * Upstream geo lookup timeout (ms) so a slow provider can't stall handling.
+ * Sized to tolerate a single AU->US round-trip with TLS setup; the previous
+ * 2500ms was too tight once freeipapi.com started 302-redirecting (see
+ * GEO_LOOKUP_ENDPOINT), causing intermittent aborts -> null country.
+ */
+const GEO_FETCH_TIMEOUT_MS = 4000;
+
+/**
+ * Geo provider endpoint. Point directly at the `free.` host: `freeipapi.com`
+ * now 302-redirects there, and the extra redirect round-trip pushed lookups
+ * over GEO_FETCH_TIMEOUT_MS under real traffic, yielding null countries.
+ */
+const GEO_LOOKUP_ENDPOINT = "https://free.freeipapi.com/api/json";
 
 /** Matches a syntactically valid IPv4 dotted-quad or IPv6 address. */
 const IPV4_PATTERN = /^(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)$/;
@@ -70,7 +82,7 @@ export async function resolveRequestCountry(headers: Headers): Promise<ResolveCo
   const timeout = setTimeout(() => controller.abort(), GEO_FETCH_TIMEOUT_MS);
   try {
     const geoResponse = await fetch(
-      `https://freeipapi.com/api/json/${encodeURIComponent(ip)}`,
+      `${GEO_LOOKUP_ENDPOINT}/${encodeURIComponent(ip)}`,
       {
         cache: "no-store",
         signal: controller.signal

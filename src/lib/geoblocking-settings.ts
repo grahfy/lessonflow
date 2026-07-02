@@ -15,7 +15,7 @@ import {
 export const DEFAULT_GEOBLOCKING_SETTINGS_ID = "default-geoblocking-settings";
 export const PUBLIC_GEOBLOCKED_MESSAGE = "This form is not currently available from your region.";
 
-export type PublicGeoblockingSurface = "booking_requests" | "contact";
+export type PublicGeoblockingSurface = "booking_requests" | "contact" | "student_portal_booking";
 
 type GeoblockingSettingsRecord = Awaited<ReturnType<typeof prisma.geoblockingSettings.findUnique>>;
 
