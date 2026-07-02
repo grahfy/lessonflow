@@ -451,19 +451,87 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   }
 
   const { id } = await params;
+  // Owner override for the sent/paid guard. Absent this flag the default guard
+  // stands so an issued invoice can never be deleted by accident.
+  const force = request.nextUrl.searchParams.get("force") === "true";
   const existing = await prisma.invoice.findUnique({ where: { id } });
   if (!existing) {
     return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
   }
 
-  if (existing.documentType === "invoice" && (existing.status === "sent" || existing.status === "paid")) {
+  const isIssuedInvoice =
+    existing.documentType === "invoice" && (existing.status === "sent" || existing.status === "paid");
+
+  if (isIssuedInvoice && !force) {
     // RATIONALE: Issued financial documents should remain part of the audit
     // trail. Operators must correct them with credit notes rather than hiding
-    // them via delete once they have been sent or paid.
+    // them via delete once they have been sent or paid. Owners may override with
+    // an explicit `force` confirmation (handled below).
     return NextResponse.json(
       { error: "Sent or paid invoices cannot be deleted. Create a credit note instead." },
       { status: 400 }
     );
+  }
+
+  const auditDetails = isIssuedInvoice
+    ? `Invoice force-deleted (${existing.status} override)`
+    : "Invoice soft-deleted";
+
+  // A force-deleted PAID invoice may have granted prepaid lesson credits. Mirror
+  // the mark_unpaid safety: revoke batches that are still fully intact, and
+  // refuse the delete if any credit was already consumed by a booking (revoking
+  // it would orphan a confirmed booking's credit). The revoke and the soft-delete
+  // run in one transaction so they cannot diverge.
+  if (force && existing.status === "paid") {
+    try {
+      await prisma.$transaction(async (tx) => {
+        const grantedBatches = await tx.lessonCreditBatch.findMany({
+          where: { sourceInvoiceId: id },
+          select: { id: true, initialQuantity: true, remainingQuantity: true }
+        });
+
+        const consumed = grantedBatches.some(
+          (batch) => batch.remainingQuantity < batch.initialQuantity
+        );
+        if (consumed) {
+          throw new Error("CREDITS_CONSUMED");
+        }
+
+        if (grantedBatches.length > 0) {
+          await tx.lessonCreditBatch.deleteMany({
+            where: { id: { in: grantedBatches.map((batch) => batch.id) } }
+          });
+        }
+
+        await tx.invoice.update({
+          where: { id },
+          data: {
+            isDeleted: true,
+            updatedById: admin.id,
+            auditLogs: {
+              create: {
+                action: "deleted",
+                actorId: admin.id,
+                details: `${auditDetails}; prepaid credits revoked`
+              }
+            }
+          }
+        });
+      });
+
+      return NextResponse.json({ ok: true });
+    } catch (error) {
+      if (error instanceof Error && error.message === "CREDITS_CONSUMED") {
+        return NextResponse.json(
+          {
+            error:
+              "This invoice's prepaid lesson credits have already been used for a booking and cannot be revoked. Resolve the affected bookings before deleting it."
+          },
+          { status: 409 }
+        );
+      }
+      throw error;
+    }
   }
 
   await prisma.invoice.update({
@@ -475,7 +543,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
         create: {
           action: "deleted",
           actorId: admin.id,
-          details: "Invoice soft-deleted"
+          details: auditDetails
         }
       }
     }

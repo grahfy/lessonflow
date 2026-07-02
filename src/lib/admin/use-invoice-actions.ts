@@ -32,7 +32,7 @@ export interface UseInvoiceActionsOptions {
   saveInvoiceApi: (id: string, payload: Record<string, unknown>) => Promise<InvoiceRow | null>;
   performActionApi: (id: string, action: InvoiceAction) => Promise<InvoiceActionResult>;
   sendBulkRemindersApi: () => Promise<number | null>;
-  removeInvoiceApi: (id: string) => Promise<boolean>;
+  removeInvoiceApi: (id: string, force?: boolean) => Promise<boolean>;
   /** Reloads the backing list with the current filter/sort/page state. */
   reloadInvoices: () => void;
   /** Opens (and hydrates) the detail dialog for a freshly fetched invoice. */

@@ -40,7 +40,7 @@ interface InvoiceDetailDialogProps {
   onSave: () => void;
   onPerformAction: (action: "send" | "remind" | "mark_paid" | "mark_unpaid" | "void") => void;
   onOpenLinkedCustomer: () => void;
-  onDeleteInvoice: () => void;
+  onDeleteInvoice: (force: boolean) => void;
   setPendingConfirm: (value: PendingConfirm | null) => void;
   /** Called with the updated invoice after account credit is applied. */
   onAccountCreditApplied?: (updated: InvoiceRow) => void;
@@ -155,12 +155,17 @@ export function InvoiceDetailDialog({
             )}
             <Tooltip content="Permanently delete this invoice record when allowed.">
               <button className="btn btn-danger" disabled={!!busyAction} onClick={() => {
+                const isIssued =
+                  selectedInvoice?.documentType === "invoice" &&
+                  (selectedInvoice?.status === "sent" || selectedInvoice?.status === "paid");
                 setPendingConfirm({
-                  title: "Delete Invoice",
-                  description: "Delete this invoice permanently?",
-                  confirmLabel: "Delete",
+                  title: isIssued ? "Delete Issued Invoice" : "Delete Invoice",
+                  description: isIssued
+                    ? `This invoice is ${selectedInvoice?.status}. Deleting it removes it from active views and, if it granted prepaid lesson credits, revokes any unused credits. Delete anyway?`
+                    : "Delete this invoice permanently?",
+                  confirmLabel: isIssued ? "Force Delete" : "Delete",
                   destructive: true,
-                  onConfirm: onDeleteInvoice
+                  onConfirm: () => onDeleteInvoice(isIssued)
                 });
               }}>DELETE</button>
             </Tooltip>

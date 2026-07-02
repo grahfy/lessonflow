@@ -379,8 +379,8 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
           onSave={actions.saveInvoiceEdits}
           onPerformAction={actions.performAction}
           onOpenLinkedCustomer={openLinkedCustomer}
-          onDeleteInvoice={async () => {
-            await removeInvoiceApi(selectedInvoice!.id);
+          onDeleteInvoice={async (force) => {
+            await removeInvoiceApi(selectedInvoice!.id, force);
             closeDetail();
             reloadInvoices();
           }}
