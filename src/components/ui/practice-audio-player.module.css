@@ -1,0 +1,305 @@
+/*
+ * Practice audio player — a custom transport tuned for drilling a passage.
+ * The signature element is the scrubber: the A–B loop renders as a highlighted
+ * "practice zone" on the timeline so students see the bar they are repeating.
+ * Everything else stays quiet and leans on the app's existing design tokens.
+ */
+
+.player {
+  --pap-accent: var(--brand-0, #6b8cff);
+  --pap-accent-2: var(--brand-1, #8f72ff);
+  --pap-zone: rgba(143, 114, 255, 0.28);
+  --pap-track: rgba(255, 255, 255, 0.12);
+  display: grid;
+  gap: 8px;
+  width: min(320px, 100%);
+  padding: 10px 12px;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.14));
+  border-radius: var(--radius-sm, 12px);
+  background: var(--panel, rgba(10, 14, 34, 0.72));
+  color: var(--ink-0, #ecf2ff);
+  font-size: 0.8rem;
+  box-sizing: border-box;
+}
+
+/* Row 1 — transport: play, scrubber, time readout */
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.playButton {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  color: #0a0e22;
+  background: linear-gradient(135deg, var(--pap-accent), var(--pap-accent-2));
+  cursor: pointer;
+  transition: transform var(--motion-fast, 140ms) var(--ease-out, ease),
+    box-shadow var(--motion-fast, 140ms) var(--ease-out, ease);
+}
+
+.playButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(107, 140, 255, 0.35);
+}
+
+.playButton:active {
+  transform: translateY(0);
+}
+
+.playButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+  box-shadow: none;
+  transform: none;
+}
+
+.time {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--ink-1, #b9c3e6);
+  white-space: nowrap;
+}
+
+.time .sep {
+  color: var(--ink-3, #566a87);
+  margin: 0 2px;
+}
+
+/* The scrubber / practice timeline */
+.scrubber {
+  position: relative;
+  flex: 1 1 auto;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+  outline: none;
+}
+
+.track {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--pap-track);
+  overflow: visible;
+}
+
+/* Highlighted A–B "practice zone" sitting under the progress fill */
+.zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: var(--pap-zone);
+  box-shadow: inset 0 0 0 1px rgba(143, 114, 255, 0.45);
+}
+
+.zoneActive {
+  animation: pap-zone-pulse 1.8s var(--ease-in-out, ease-in-out) infinite;
+}
+
+@keyframes pap-zone-pulse {
+  0%,
+  100% {
+    background: var(--pap-zone);
+  }
+  50% {
+    background: rgba(143, 114, 255, 0.42);
+  }
+}
+
+.fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--pap-accent), var(--pap-accent-2));
+}
+
+.playhead {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* A / B flag markers pinned to the timeline */
+.flag {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 15px;
+  height: 15px;
+  margin-top: -1px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 0.58rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #0a0e22;
+  background: var(--ink-0, #ecf2ff);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+.flagB {
+  background: var(--pap-accent-2);
+  color: #fff;
+}
+
+.scrubber:focus-visible .track {
+  box-shadow: 0 0 0 2px var(--bg-1, #140d2e), 0 0 0 4px var(--pap-accent);
+}
+
+/* Row 2 — controls: loop tools on the left, speed on the right */
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.loopGroup,
+.speedGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ctrl {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.14));
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-1, #b9c3e6);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--motion-fast, 140ms) var(--ease-out, ease),
+    color var(--motion-fast, 140ms) var(--ease-out, ease),
+    background var(--motion-fast, 140ms) var(--ease-out, ease);
+}
+
+.ctrl:hover:not(:disabled) {
+  border-color: var(--pap-accent);
+  color: var(--ink-0, #ecf2ff);
+}
+
+.ctrl:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.loopToggle.active {
+  border-color: var(--pap-accent-2);
+  background: rgba(143, 114, 255, 0.18);
+  color: var(--ink-0, #ecf2ff);
+}
+
+.setActive {
+  border-color: var(--ink-0, #ecf2ff);
+  color: var(--ink-0, #ecf2ff);
+}
+
+.speedStepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.14));
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.speedBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: var(--ink-1, #b9c3e6);
+  cursor: pointer;
+  transition: background var(--motion-fast, 140ms) var(--ease-out, ease),
+    color var(--motion-fast, 140ms) var(--ease-out, ease);
+}
+
+.speedBtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink-0, #ecf2ff);
+}
+
+.speedBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.speedValue {
+  min-width: 42px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--ink-0, #ecf2ff);
+  border-left: 1px solid var(--line, rgba(255, 255, 255, 0.1));
+  border-right: 1px solid var(--line, rgba(255, 255, 255, 0.1));
+  padding: 0 2px;
+  line-height: 26px;
+}
+
+.speedValue.slowed {
+  color: var(--pap-accent);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 520px) {
+  .controls {
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playButton,
+  .ctrl,
+  .speedBtn {
+    transition: none;
+  }
+  .zoneActive {
+    animation: none;
+  }
+}

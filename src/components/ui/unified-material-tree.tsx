@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 
 import { Tooltip } from "@/components/admin/ui/tooltip";
+import { PracticeAudioPlayer } from "@/components/ui/practice-audio-player";
 import styles from "./unified-material-tree.module.css";
 
 export interface TreeFolder {
@@ -234,12 +235,7 @@ export function UnifiedMaterialTree({
         ) : null}
 
         {file.materialType === "audio" ? (
-          <audio
-            controls
-            src={rawUrl}
-            className={styles.previewPlayer}
-            preload="metadata"
-          />
+          <PracticeAudioPlayer src={rawUrl} className={styles.previewPlayer} />
         ) : null}
 
         {file.materialType === "image" ? (
