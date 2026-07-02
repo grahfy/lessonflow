@@ -43,7 +43,7 @@ interface InvoiceListPanelProps {
   onOpenDetail: (invoice: InvoiceRow) => void;
   setPendingConfirm: (value: PendingConfirm | null) => void;
   setBusyAction: (value: string | null) => void;
-  removeInvoiceApi: (id: string) => Promise<boolean>;
+  removeInvoiceApi: (id: string, force?: boolean) => Promise<boolean>;
   reloadInvoices: () => void;
 }
 
@@ -329,14 +329,19 @@ export function InvoiceListPanel({
                   type="button"
                   disabled={busyAction === `delete-${inv.id}`}
                   onClick={() => {
+                    const isIssued =
+                      inv.documentType === "invoice" &&
+                      (inv.status === "sent" || inv.status === "paid");
                     setPendingConfirm({
-                      title: "Delete Invoice",
-                      description: "Delete this invoice permanently?",
-                      confirmLabel: "Delete",
+                      title: isIssued ? "Delete Issued Invoice" : "Delete Invoice",
+                      description: isIssued
+                        ? `This invoice is ${inv.status}. Deleting it removes it from active views and, if it granted prepaid lesson credits, revokes any unused credits. Delete anyway?`
+                        : "Delete this invoice permanently?",
+                      confirmLabel: isIssued ? "Force Delete" : "Delete",
                       destructive: true,
                       onConfirm: async () => {
                         setBusyAction(`delete-${inv.id}`);
-                        await removeInvoiceApi(inv.id);
+                        await removeInvoiceApi(inv.id, isIssued);
                         setBusyAction(null);
                         // RATIONALE: Delete changes pagination and filter counts,
                         // so the table must be reloaded from the current server view.
