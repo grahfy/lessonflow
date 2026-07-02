@@ -78,7 +78,7 @@ export interface UseInvoicesResult {
     performAction: (id: string, action: InvoiceAction) => Promise<InvoiceActionResult>;
     create: (payload: Record<string, unknown>) => Promise<InvoiceRow | null>;
     sendBulkReminders: () => Promise<number | null>;
-    remove: (id: string) => Promise<boolean>;
+    remove: (id: string, force?: boolean) => Promise<boolean>;
 }
 
 export type InvoiceAction = "send" | "remind" | "restore" | InvoiceLifecycleAction;
@@ -266,9 +266,12 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
         }
     }, [safeFetch, handleApiError]);
 
-    const remove = useCallback(async (id: string): Promise<boolean> => {
+    const remove = useCallback(async (id: string, force = false): Promise<boolean> => {
         try {
-            const response = await safeFetch(`/api/admin/invoices/${id}`, {
+            const url = force
+                ? `/api/admin/invoices/${id}?force=true`
+                : `/api/admin/invoices/${id}`;
+            const response = await safeFetch(url, {
                 method: "DELETE"
             });
 
