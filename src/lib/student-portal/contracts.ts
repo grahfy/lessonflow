@@ -33,6 +33,37 @@ export const studentPortalMaterialSchema = z.object({
 });
 
 /**
+ * A single tag on a library item, surfaced for display in the student's
+ * "Assigned by teacher" area (e.g. Decade:80s, Style:Rock).
+ */
+export const studentPortalLibraryItemTagSchema = z.object({
+  category: z.string(),
+  value: z.string()
+});
+
+/**
+ * A LibraryItem assigned to the student by a teacher ("Assigned by teacher"
+ * area). Deliberately NOT the same shape as `studentPortalMaterialSchema`:
+ * library items are shared-by-reference masters with no `folderId`/`bookingId`
+ * context (they live outside the per-student folder tree), and their `id` is the
+ * `LibraryItem.id` used to build the `/api/student/library/{id}/download` URLs.
+ * `createdAt` is the ASSIGNMENT time (when the student received the item), not
+ * the item's own creation time.
+ */
+export const studentPortalLibraryItemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string().nullable(),
+  materialType: studentPortalMaterialTypeSchema,
+  mimeType: z.string(),
+  sizeBytes: z.number().int().nonnegative(),
+  createdAt: z.string().datetime({ offset: true }),
+  downloadUrl: z.string().min(1),
+  previewUrl: z.string().min(1),
+  tags: z.array(studentPortalLibraryItemTagSchema)
+});
+
+/**
  * Recursive folder tree node for the read-only student materials tree (AC-10).
  * Each node carries the ids of materials placed directly in it; the materials
  * themselves live in the flat `materials`/`standaloneMaterials` arrays and are
@@ -119,6 +150,10 @@ export const studentPortalPayloadSchema = z.object({
   previous: z.array(studentPortalBookingSchema),
   standaloneMaterials: z.array(studentPortalMaterialSchema),
   folders: z.array(studentPortalFolderSchema),
+  // Library items assigned to the student by a teacher. A SEPARATE array from the
+  // per-student folder tree so LibraryItem ids never collide with folder-tree
+  // material ids. Optional so clients/tests that predate the library remain valid.
+  assignedByTeacher: z.array(studentPortalLibraryItemSchema).optional(),
   pendingRequests: z.array(studentPortalPendingRequestSchema),
   // Optional so portal clients/tests that predate prepaid credits remain valid.
   lessonCredits: studentPortalLessonCreditsSchema.optional(),
@@ -172,6 +207,7 @@ export const studentPortalRescheduleRequestResponseSchema = z.object({
 });
 
 export type StudentPortalMaterial = z.infer<typeof studentPortalMaterialSchema>;
+export type StudentPortalLibraryItem = z.infer<typeof studentPortalLibraryItemSchema>;
 export type StudentPortalPendingReschedule = z.infer<typeof studentPortalPendingRescheduleSchema>;
 export type StudentPortalBooking = z.infer<typeof studentPortalBookingSchema>;
 export type StudentPortalPendingRequest = z.infer<typeof studentPortalPendingRequestSchema>;
@@ -236,6 +272,40 @@ export function mapStudentPortalMaterial(material: MaterialMapInput): StudentPor
     createdAt: material.createdAt.toISOString(),
     downloadUrl: `/api/student/learning-materials/${material.id}/download`,
     previewUrl: `/api/student/learning-materials/${material.id}/download?disposition=inline`
+  });
+}
+
+type LibraryAssignmentMapInput = {
+  createdAt: Date;
+  libraryItem: {
+    id: string;
+    title: string;
+    description: string | null;
+    materialType: StudentPortalMaterial["materialType"];
+    mimeType: string;
+    sizeBytes: number;
+    tags?: { tag: { category: string; value: string } }[];
+  };
+};
+
+/**
+ * Maps one LibraryAssignment (with its LibraryItem + tags) to the "Assigned by
+ * teacher" contract shape. `id` is the LibraryItem id (drives the download URLs)
+ * and `createdAt` is the ASSIGNMENT time (when the student received it).
+ */
+export function mapStudentPortalLibraryItem(assignment: LibraryAssignmentMapInput): StudentPortalLibraryItem {
+  const item = assignment.libraryItem;
+  return studentPortalLibraryItemSchema.parse({
+    id: item.id,
+    title: item.title,
+    description: item.description,
+    materialType: item.materialType,
+    mimeType: item.mimeType,
+    sizeBytes: item.sizeBytes,
+    createdAt: assignment.createdAt.toISOString(),
+    downloadUrl: `/api/student/library/${item.id}/download`,
+    previewUrl: `/api/student/library/${item.id}/download?disposition=inline`,
+    tags: (item.tags ?? []).map((join) => ({ category: join.tag.category, value: join.tag.value }))
   });
 }
 

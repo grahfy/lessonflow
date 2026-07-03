@@ -23,6 +23,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
@@ -79,6 +80,28 @@ export function AdminCustomersClient() {
   const [debouncedCustomerQuery, setDebouncedCustomerQuery] = useState("");
   const [sortBy, setSortBy] = useState<CustomersSortBy>("customer");
   const [sortDir, setSortDir] = useState<CustomersSortDirection>("asc");
+
+  // Directory-box collapse. Persisted in localStorage so it survives navigation
+  // (read after mount to avoid a hydration mismatch).
+  const [directoryCollapsed, setDirectoryCollapsed] = useState(false);
+  useEffect(() => {
+    try {
+      setDirectoryCollapsed(window.localStorage.getItem("customers-directory-collapsed") === "1");
+    } catch {
+      /* localStorage unavailable */
+    }
+  }, []);
+  const toggleDirectoryCollapsed = () => {
+    setDirectoryCollapsed((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem("customers-directory-collapsed", next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
 
   // Pagination State
   const [page, setPage] = useState(1);
@@ -592,10 +615,25 @@ export function AdminCustomersClient() {
           </AdminCard>
         ) : null}
 
-        <AdminCard className="admin-toolbar-card admin-actions-card admin-workspace-panel">
+        <AdminCard
+          className={`admin-toolbar-card admin-actions-card admin-workspace-panel${directoryCollapsed ? " is-collapsed" : ""}`}
+        >
           <div className="admin-workspace-head">
             <div className="admin-workspace-copy">
-              <p className="admin-inline-field">Customer Directory</p>
+              <div className="admin-workspace-kicker-row">
+                <p className="admin-inline-field">Customer Directory</p>
+                <Tooltip content={directoryCollapsed ? "Expand the directory panel." : "Collapse the directory panel."}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary admin-workspace-collapse-toggle"
+                    aria-expanded={!directoryCollapsed}
+                    aria-label={directoryCollapsed ? "Expand directory panel" : "Collapse directory panel"}
+                    onClick={toggleDirectoryCollapsed}
+                  >
+                    {directoryCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                  </button>
+                </Tooltip>
+              </div>
               <h2 className="admin-workspace-title">Student records and communication context</h2>
               <p className="helper-text admin-workspace-summary">{workspaceSummary}</p>
               <div className="admin-workspace-chip-row" aria-label="Customer workspace context">

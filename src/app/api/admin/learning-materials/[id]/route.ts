@@ -6,69 +6,14 @@ import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
 import { logError } from "@/lib/observability";
-import { isFilesystemNotFoundError } from "@/lib/storage-errors";
+import { streamMaterialBlob } from "@/lib/student-portal/material-response";
 import { createMaterialStorageDriver } from "@/lib/student-portal/material-storage";
-import { buildLearningMaterialDownloadFilename } from "@/lib/student-portal/materials";
 
 type Params = {
   params: Promise<{
     id: string;
   }>;
 };
-
-function buildMaterialResponse(buffer: Buffer, mimeType: string, disposition: string, filename: string, rangeHeader: string | null) {
-  const total = buffer.length;
-  const baseHeaders: Record<string, string> = {
-    "content-type": mimeType,
-    "content-disposition": `${disposition}; filename="${filename}"`,
-    "x-content-type-options": "nosniff",
-    "accept-ranges": "bytes"
-  };
-
-  if (!rangeHeader || !rangeHeader.startsWith("bytes=")) {
-    return new NextResponse(new Uint8Array(buffer), {
-      status: 200,
-      headers: {
-        ...baseHeaders,
-        "content-length": String(total)
-      }
-    });
-  }
-
-  const [startRaw, endRaw] = rangeHeader.replace(/^bytes=/, "").split("-", 2);
-  let start = startRaw ? Number.parseInt(startRaw, 10) : NaN;
-  let end = endRaw ? Number.parseInt(endRaw, 10) : NaN;
-
-  if (Number.isNaN(start) && !Number.isNaN(end)) {
-    const suffixLength = Math.max(0, end);
-    start = Math.max(0, total - suffixLength);
-    end = total - 1;
-  } else {
-    if (Number.isNaN(start)) start = 0;
-    if (Number.isNaN(end)) end = total - 1;
-  }
-
-  if (start < 0 || end < start || start >= total) {
-    return new NextResponse(null, {
-      status: 416,
-      headers: {
-        ...baseHeaders,
-        "content-range": `bytes */${total}`
-      }
-    });
-  }
-
-  end = Math.min(end, total - 1);
-  const chunk = buffer.subarray(start, end + 1);
-  return new NextResponse(new Uint8Array(chunk), {
-    status: 206,
-    headers: {
-      ...baseHeaders,
-      "content-length": String(chunk.length),
-      "content-range": `bytes ${start}-${end}/${total}`
-    }
-  });
-}
 
 /**
  * Streams one learning material file for admin preview/download.
@@ -108,34 +53,20 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const dispositionParam = request.nextUrl.searchParams.get("disposition");
-    const disposition = dispositionParam === "inline" ? "inline" : "attachment";
-
     const storage = createMaterialStorageDriver();
-    const blob = await storage
-      .get({
-        storageKey: material.storageKey
-      })
-      .catch((error) => {
-        if (isFilesystemNotFoundError(error)) {
-          return null;
-        }
-        throw error;
-      });
-    if (!blob) {
-      return NextResponse.json({ error: "Learning material not found." }, { status: 404 });
-    }
 
-    return buildMaterialResponse(
-      blob.buffer,
-      material.mimeType,
-      disposition,
-      buildLearningMaterialDownloadFilename({
+    // Auth verified above; the byte path (get -> 404 -> disposition -> range) is
+    // shared with the student and library read routes via streamMaterialBlob.
+    return await streamMaterialBlob(
+      storage,
+      {
+        storageKey: material.storageKey,
+        mimeType: material.mimeType,
         title: material.title,
-        materialType: material.materialType,
-        mimeType: material.mimeType
-      }),
-      request.headers.get("range")
+        materialType: material.materialType
+      },
+      request,
+      { notFoundMessage: "Learning material not found." }
     );
   } catch (error) {
     return jsonUnexpectedError(error, "Unable to load learning material.");

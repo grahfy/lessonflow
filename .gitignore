@@ -54,3 +54,16 @@ artifacts/
 # MemPalace per-project files (issue #185)
 mempalace.yaml
 entities.json
+
+# Local AI/tooling artifacts and scratch (never committed)
+.mcp.json
+.gemini/
+.kilo/
+.codex
+.playwright-mcp/
+chroma.sqlite3
+omc-fable5.sh
+captcha.png
+system-logs-*.txt
+.blob_seq_ids_migrated
+.collection_type_fixed
