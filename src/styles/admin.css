@@ -3449,6 +3449,19 @@
   white-space: nowrap;
 }
 
+/* Compact inline list of staged filenames, shown once more than one file is
+   selected so the admin can verify the batch before uploading. */
+.customer-materials-file-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  list-style: disc;
+  color: var(--ink-1);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  display: grid;
+  gap: 2px;
+}
+
 .customer-materials-upload-btn {
   width: 100%;
   grid-column: 1 / -1;

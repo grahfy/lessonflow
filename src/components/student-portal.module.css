@@ -367,6 +367,29 @@
   color: #d6e2ff;
 }
 
+/* Attendance annotations (previous-lesson cards). Outlined — not solid-filled
+   like the booking-status chips — so "Attended"/"Not attended" read as a
+   distinct class of information from "Confirmed"/"Cancelled", even though
+   both reuse the same success/danger colors. A leading glyph backs up the
+   color so meaning survives for color-blind or grayscale viewing. */
+.chip-attended {
+  border-color: rgba(144, 233, 171, 0.55);
+  background: rgba(88, 189, 118, 0.05);
+  color: #dbffe6;
+}
+
+.chip-not-attended {
+  border-color: rgba(255, 141, 154, 0.5);
+  background: rgba(189, 74, 95, 0.05);
+  color: #ffd9df;
+}
+
+.chip-marker {
+  margin-right: 3px;
+  font-size: 0.9em;
+  line-height: 1;
+}
+
 .booking-actions {
   display: flex;
   flex-wrap: wrap;

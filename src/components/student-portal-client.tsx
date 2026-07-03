@@ -620,10 +620,16 @@ function BookingList(input: BookingListProps) {
               {describeBookingStatus(booking.status)}
             </span>
             {input.variant === "previous" && booking.attendanceStatus === "attended" ? (
-              <span className={cx(styles["chip"], styles["chip-success"])}>Attended</span>
+              <span className={cx(styles["chip"], styles["chip-attended"])}>
+                <span aria-hidden="true" className={styles["chip-marker"]}>&#10003;</span>
+                Attended
+              </span>
             ) : null}
             {input.variant === "previous" && booking.attendanceStatus === "no_show" ? (
-              <span className={cx(styles["chip"], styles["chip-cancelled"])}>Not attended</span>
+              <span className={cx(styles["chip"], styles["chip-not-attended"])}>
+                <span aria-hidden="true" className={styles["chip-marker"]}>&#10005;</span>
+                Not attended
+              </span>
             ) : null}
             {isWithin24Hours(booking.startAt) && booking.status !== "cancelled" ? (
               <span className={cx(styles["chip"], styles["chip-warning"])}>Within 24h — full fee</span>

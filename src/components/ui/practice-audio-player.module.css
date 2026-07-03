@@ -319,6 +319,26 @@
   font-size: 0.62rem;
 }
 
+/* Secondary controls (Loop / Set A / Set B / Clear, and the speed steppers)
+   sit well under the 44px touch-target minimum in the compact/admin variant.
+   The large variant is the student/touch context, so bump their tap area
+   here only — the admin Library keeps the default compact sizing. */
+.large .ctrl {
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: 0.78rem;
+}
+
+.large .speedBtn {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.large .speedValue {
+  line-height: 44px;
+  font-size: 0.78rem;
+}
+
 @media (max-width: 520px) {
   .controls {
     justify-content: flex-start;

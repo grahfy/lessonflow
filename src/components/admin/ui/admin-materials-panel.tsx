@@ -421,6 +421,7 @@ export function AdminMaterialsPanel({
               ) : null}
               <AdminField
                 label="Select file(s)"
+                description="or drag & drop files here"
                 tooltip="Choose one or more files to upload from your computer, or drag and drop them onto the picker."
                 fullWidth
               >
@@ -456,6 +457,14 @@ export function AdminMaterialsPanel({
                     {selectedFilesLabel}
                   </span>
                 </div>
+                {selectedFiles.length > 1 ? (
+                  <ul className="customer-materials-file-list">
+                    {selectedFiles.slice(0, 5).map((file, index) => (
+                      <li key={`${file.name}-${index}`}>{file.name}</li>
+                    ))}
+                    {selectedFiles.length > 5 ? <li>+{selectedFiles.length - 5} more</li> : null}
+                  </ul>
+                ) : null}
               </AdminField>
               <AdminField
                 label="Description (optional)"
