@@ -24,7 +24,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { format, parseISO, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, addYears, subYears } from "date-fns";
+import { format, parseISO, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, addYears, subYears, startOfWeek } from "date-fns";
 
 import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { AdminCard } from "@/components/admin/ui/admin-card";
@@ -94,6 +94,14 @@ type BookingCustomerLookupResponse = {
   status: "linked" | "exact_match" | "possible_match" | "no_match";
   customers: BookingMatchedCustomer[];
 };
+
+/** Sets a named element's value on an uncontrolled manual-booking form. */
+function setManualFormFieldValue(form: HTMLFormElement, name: string, value: string) {
+  const field = form.elements.namedItem(name);
+  if (field && "value" in field) {
+    (field as unknown as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value = value;
+  }
+}
 
 function getEmailHistoryTargetForEvent(event: EventWithRow | null): EmailHistoryTarget | null {
   if (!event) {
@@ -482,23 +490,13 @@ export function AdminBookingsClient() {
   }, [router, searchParams]);
 
   const goPrev = () => {
-    const d = parseISO(dateStr);
-    let next;
-    if (view === "day") next = subDays(d, 1);
-    else if (view === "week") next = subWeeks(d, 1);
-    else if (view === "month") next = subMonths(d, 1);
-    else next = subYears(d, 1);
-    navigate(view, format(next, "yyyy-MM-dd"));
+    const step = { day: subDays, week: subWeeks, month: subMonths, year: subYears }[view];
+    navigate(view, format(step(parseISO(dateStr), 1), "yyyy-MM-dd"));
   };
 
   const goNext = () => {
-    const d = parseISO(dateStr);
-    let next;
-    if (view === "day") next = addDays(d, 1);
-    else if (view === "week") next = addWeeks(d, 1);
-    else if (view === "month") next = addMonths(d, 1);
-    else next = addYears(d, 1);
-    navigate(view, format(next, "yyyy-MM-dd"));
+    const step = { day: addDays, week: addWeeks, month: addMonths, year: addYears }[view];
+    navigate(view, format(step(parseISO(dateStr), 1), "yyyy-MM-dd"));
   };
 
   /**
@@ -672,51 +670,39 @@ export function AdminBookingsClient() {
 
 
   const applyCustomerToManual = useCallback((customer: BookingMatchedCustomer) => {
-    if (!manualFormRef.current) return;
-    const formElements = manualFormRef.current.elements;
-    const setFieldValue = (name: string, value: string) => {
-      const field = formElements.namedItem(name);
-      if (field && "value" in field) {
-        (field as unknown as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value = value;
-      }
-    };
-    setFieldValue("firstName", customer.firstName || customer.fullName.split(" ")[0] || "");
-    setFieldValue("lastName", customer.lastName || customer.fullName.split(" ").slice(1).join(" "));
-    setFieldValue("email", customer.email || "");
-    setFieldValue("phone", normalizePhoneForMatch(customer.phone || ""));
-    setFieldValue("unitNumber", customer.unitNumber || "");
-    setFieldValue("houseNumber", customer.houseNumber || "");
-    setFieldValue("streetName", customer.streetName || "");
-    setFieldValue("streetType", customer.streetType || "Street");
-    setFieldValue("suburb", customer.suburb || "");
-    setFieldValue("state", customer.state || "VIC");
-    setFieldValue("postcode", customer.postcode || "");
-    setFieldValue("skillLevel", customer.skillLevel || "beginner");
-    setFieldValue("lessonMode", customer.lessonMode || "in_person");
+    const form = manualFormRef.current;
+    if (!form) return;
+    setManualFormFieldValue(form, "firstName", customer.firstName || customer.fullName.split(" ")[0] || "");
+    setManualFormFieldValue(form, "lastName", customer.lastName || customer.fullName.split(" ").slice(1).join(" "));
+    setManualFormFieldValue(form, "email", customer.email || "");
+    setManualFormFieldValue(form, "phone", normalizePhoneForMatch(customer.phone || ""));
+    setManualFormFieldValue(form, "unitNumber", customer.unitNumber || "");
+    setManualFormFieldValue(form, "houseNumber", customer.houseNumber || "");
+    setManualFormFieldValue(form, "streetName", customer.streetName || "");
+    setManualFormFieldValue(form, "streetType", customer.streetType || "Street");
+    setManualFormFieldValue(form, "suburb", customer.suburb || "");
+    setManualFormFieldValue(form, "state", customer.state || "VIC");
+    setManualFormFieldValue(form, "postcode", customer.postcode || "");
+    setManualFormFieldValue(form, "skillLevel", customer.skillLevel || "beginner");
+    setManualFormFieldValue(form, "lessonMode", customer.lessonMode || "in_person");
   }, []);
 
   const clearManualCustomer = useCallback(() => {
-    if (!manualFormRef.current) return;
-    const formElements = manualFormRef.current.elements;
-    const setFieldValue = (name: string, value: string) => {
-      const field = formElements.namedItem(name);
-      if (field && "value" in field) {
-        (field as unknown as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value = value;
-      }
-    };
-    setFieldValue("firstName", "");
-    setFieldValue("lastName", "");
-    setFieldValue("email", "");
-    setFieldValue("phone", "");
-    setFieldValue("unitNumber", "");
-    setFieldValue("houseNumber", "");
-    setFieldValue("streetName", "");
-    setFieldValue("streetType", "Street");
-    setFieldValue("suburb", "");
-    setFieldValue("state", "VIC");
-    setFieldValue("postcode", "");
-    setFieldValue("skillLevel", "beginner");
-    setFieldValue("lessonMode", "in_person");
+    const form = manualFormRef.current;
+    if (!form) return;
+    setManualFormFieldValue(form, "firstName", "");
+    setManualFormFieldValue(form, "lastName", "");
+    setManualFormFieldValue(form, "email", "");
+    setManualFormFieldValue(form, "phone", "");
+    setManualFormFieldValue(form, "unitNumber", "");
+    setManualFormFieldValue(form, "houseNumber", "");
+    setManualFormFieldValue(form, "streetName", "");
+    setManualFormFieldValue(form, "streetType", "Street");
+    setManualFormFieldValue(form, "suburb", "");
+    setManualFormFieldValue(form, "state", "VIC");
+    setManualFormFieldValue(form, "postcode", "");
+    setManualFormFieldValue(form, "skillLevel", "beginner");
+    setManualFormFieldValue(form, "lessonMode", "in_person");
     setManualCustomerId("");
   }, []);
 
@@ -855,14 +841,6 @@ export function AdminBookingsClient() {
     if (view === "month") return format(d, "MMMM yyyy");
     return format(d, "yyyy");
   }, [view, dateStr]);
-
-  function startOfWeek(date: Date, options: { weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 }) {
-    const day = date.getDay();
-    const diff = (day < options.weekStartsOn ? 7 : 0) + day - options.weekStartsOn;
-    const result = new Date(date);
-    result.setDate(date.getDate() - diff);
-    return result;
-  }
 
   return (
     <AdminShell 

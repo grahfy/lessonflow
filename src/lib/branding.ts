@@ -70,8 +70,3 @@ export function getSubjectLabel(subjectValue?: string): string {
   const subject = (subjectValue || getBranding().PRIMARY_SUBJECT).trim();
   return subject.charAt(0).toUpperCase() + subject.slice(1);
 }
-
-/** Primary school name. */
-export function getBrandTitle(): string {
-  return getBranding().PUBLIC_BRAND_NAME;
-}

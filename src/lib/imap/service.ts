@@ -18,21 +18,6 @@ export type ImapConnectionStatus = {
   user: string;
 };
 
-function toPreviewText(source: Buffer): string {
-  const body = source
-    .toString("utf8")
-    .split(/\r?\n\r?\n/, 2)[1] || "";
-
-  return body
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/=\r?\n/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 220);
-}
-
 function toBodyText(source: Buffer): string {
   const body = source
     .toString("utf8")
@@ -45,6 +30,10 @@ function toBodyText(source: Buffer): string {
     .replace(/=\r?\n/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function toPreviewText(source: Buffer): string {
+  return toBodyText(source).slice(0, 220);
 }
 
 async function withImapMailbox<T>(callback: (client: ReturnType<typeof createImapClient>) => Promise<T>): Promise<T> {

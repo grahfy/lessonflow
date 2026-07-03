@@ -45,7 +45,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Load SEO configuration
     const seoConfigPath = path.join(process.cwd(), "src/lib/seo-config.json");
     if (!fs.existsSync(seoConfigPath)) {
       return NextResponse.json({ error: "SEO config not found" }, { status: 404 });
@@ -53,20 +52,16 @@ export async function POST(request: NextRequest) {
 
     const seoConfig: SeoConfig = JSON.parse(fs.readFileSync(seoConfigPath, "utf-8"));
 
-    // Get base URL from environment
     const baseUrl = getPublicSiteUrl().replace(/\/+$/, "");
 
-    // Generate sitemap.xml
     const sitemapXml = generateSitemapXml(baseUrl, seoConfig.pages);
     const sitemapPath = path.join(process.cwd(), "public/sitemap.xml");
     fs.writeFileSync(sitemapPath, sitemapXml, "utf-8");
 
-    // Generate robots.txt
     const robotsTxt = generateRobotsTxt(baseUrl, seoConfig);
     const robotsPath = path.join(process.cwd(), "public/robots.txt");
     fs.writeFileSync(robotsPath, robotsTxt, "utf-8");
 
-    // Update lastUpdated timestamp
     seoConfig.lastUpdated = new Date().toISOString();
     fs.writeFileSync(seoConfigPath, JSON.stringify(seoConfig, null, 2), "utf-8");
 
@@ -122,7 +117,6 @@ function generateRobotsTxt(baseUrl: string, config: SeoConfig): string {
 
   txt += `User-agent: ${config.robots.defaultUserAgent}\n\n`;
 
-  // Add allow rules for enabled pages
   txt += `# Allowed paths\n`;
   for (const [urlPath, pageConfig] of Object.entries(config.pages)) {
     if (pageConfig.enabled && !pageConfig.noindex && urlPath !== "/") {
@@ -130,13 +124,11 @@ function generateRobotsTxt(baseUrl: string, config: SeoConfig): string {
     }
   }
 
-  // Add disallow rules
   txt += `\n# Disallowed paths\n`;
   for (const disallow of config.robots.disallow) {
     txt += `Disallow: ${disallow}\n`;
   }
 
-  // Add sitemap reference
   txt += `\n# Sitemap\n`;
   txt += `Sitemap: ${baseUrl}/sitemap.xml\n`;
 

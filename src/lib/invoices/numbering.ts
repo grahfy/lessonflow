@@ -88,31 +88,35 @@ function getCreditNotePrefix(): string {
 }
 
 /**
- * Generates the next available Invoice number for the specified year.
- * 
+ * Generates the next available document number for the given prefix/year/type.
+ *
  * LOGIC:
  * 1. Calculate standard prefix based on the `issuedAt` date.
  * 2. Find the most recently created document (by `createdAt`) with that prefix.
  * 3. Increment its trailing sequence by 1.
  * 4. Pad with zeros (to a length of 4) for consistent sorting and visual alignment.
- * 
+ *
  * @param prisma - Active DB client or transaction
  * @param issuedAt - Date the document is officially "dated"
  */
-export async function generateNextInvoiceNumber(prisma: PrismaClient | Prisma.TransactionClient, issuedAt: Date): Promise<string> {
-  const prefix = getInvoicePrefix();
+async function generateNextDocumentNumber(
+  prisma: PrismaClient | Prisma.TransactionClient,
+  issuedAt: Date,
+  prefix: string,
+  documentType: "invoice" | "credit_note"
+): Promise<string> {
   const year = issuedAt.getUTCFullYear();
   const start = `${prefix}-${year}-`;
 
   const latest = await prisma.invoice.findFirst({
     where: {
       invoiceNumber: { startsWith: start },
-      documentType: "invoice"
+      documentType
     },
     orderBy: {
-      // NOTE: We order by createdAt to ensure we find the truly most recent 
+      // NOTE: We order by createdAt to ensure we find the truly most recent
       // entry, regardless of manual 'issuedAt' back-dating.
-      createdAt: "desc" 
+      createdAt: "desc"
     },
     select: { invoiceNumber: true }
   });
@@ -122,23 +126,16 @@ export async function generateNextInvoiceNumber(prisma: PrismaClient | Prisma.Tr
 }
 
 /**
+ * Generates the next available Invoice number for the specified year.
+ */
+export async function generateNextInvoiceNumber(prisma: PrismaClient | Prisma.TransactionClient, issuedAt: Date): Promise<string> {
+  return generateNextDocumentNumber(prisma, issuedAt, getInvoicePrefix(), "invoice");
+}
+
+/**
  * Generates the next unique Credit Note number.
  * Mirrors the invoice logic but uses the Credit Note prefix and document type.
  */
 export async function generateNextCreditNoteNumber(prisma: PrismaClient | Prisma.TransactionClient, issuedAt: Date): Promise<string> {
-  const prefix = getCreditNotePrefix();
-  const year = issuedAt.getUTCFullYear();
-  const start = `${prefix}-${year}-`;
-
-  const latest = await prisma.invoice.findFirst({
-    where: {
-      invoiceNumber: { startsWith: start },
-      documentType: "credit_note"
-    },
-    orderBy: { createdAt: "desc" },
-    select: { invoiceNumber: true }
-  });
-
-  const nextSequence = extractSequence(latest?.invoiceNumber || "") + 1;
-  return `${start}${String(nextSequence).padStart(4, "0")}`;
+  return generateNextDocumentNumber(prisma, issuedAt, getCreditNotePrefix(), "credit_note");
 }

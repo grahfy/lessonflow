@@ -234,7 +234,6 @@ export function useInvoiceActions({
       return;
     }
 
-    let result: InvoiceRow | null = null;
     const response = await safeFetch(`/api/admin/customers/${customer.id}/invoices`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -246,7 +245,7 @@ export function useInvoiceActions({
       return;
     }
     const data = (await response.json()) as { invoice: InvoiceRow };
-    result = data.invoice;
+    const result = data.invoice;
 
     if (result && shouldSend) {
       const sentResult = await performActionApi(result.id, "send");

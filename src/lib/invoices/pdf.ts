@@ -23,7 +23,7 @@ import {
   CONTACT_ADDRESS, 
   INVOICE_LOGO_URL
 } from "@/lib/branding";
-import { formatCurrency } from "@/lib/invoices/currency";
+import { basisPointsToPercentageInput, formatCurrency } from "@/lib/invoices/currency";
 import { getInvoiceTaxName } from "@/lib/invoices/gst-policy";
 import { invoicePayUrl } from "@/lib/invoices/pay-token";
 import { withResolvedInvoicePaymentDetails } from "@/lib/invoices/payment-details";
@@ -51,7 +51,7 @@ function formatPercentValue(basisPoints: number | null): string {
     return "";
   }
 
-  return `${(basisPoints / 100).toFixed(2).replace(/\.00$/, "").replace(/(\.\d*[1-9])0$/, "$1")}%`;
+  return `${basisPointsToPercentageInput(basisPoints)}%`;
 }
 
 /**

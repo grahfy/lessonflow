@@ -46,7 +46,9 @@ describe("Whitelabel Configuration", () => {
       description: "{{BRAND_NAME}} offers {{SUBJECT}} lessons in {{LOCATION}}."
     });
 
-    expect(metadata.title).toBe("Sydney Piano Studio | Piano Lessons in Sydney");
+    // The title already contains the brand, so it is emitted as `absolute` to
+    // opt out of the root layout's "%s | {brand}" template (avoids double-branding).
+    expect(metadata.title).toEqual({ absolute: "Sydney Piano Studio | Piano Lessons in Sydney" });
     expect(metadata.description).toBe("Sydney Piano Studio offers Piano lessons in Sydney.");
     expect(metadata.openGraph?.siteName).toBe("Sydney Piano Studio");
     const firstImage = Array.isArray(metadata.openGraph?.images) ? metadata.openGraph.images[0] : undefined;

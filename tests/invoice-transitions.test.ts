@@ -4,13 +4,16 @@ import { allowedStatusesForAction, canApplyInvoiceAction } from "@/lib/invoices/
 
 describe("invoice transition rules", () => {
   it("exposes allowed status matrix per action", () => {
-    expect(allowedStatusesForAction("mark_paid")).toEqual(["sent"]);
+    // 'draft' is a deliberate escape hatch for mark_paid: it records payments
+    // collected outside the system without emailing the customer (only 'sent'
+    // triggers the email). See src/lib/invoices/transitions.ts rationale.
+    expect(allowedStatusesForAction("mark_paid")).toEqual(["draft", "sent"]);
     expect(allowedStatusesForAction("mark_unpaid")).toEqual(["paid"]);
     expect(allowedStatusesForAction("void")).toEqual(["sent", "paid"]);
   });
 
   it("allows only supported transitions", () => {
-    expect(canApplyInvoiceAction("draft", "mark_paid")).toBe(false);
+    expect(canApplyInvoiceAction("draft", "mark_paid")).toBe(true);
     expect(canApplyInvoiceAction("sent", "mark_paid")).toBe(true);
     expect(canApplyInvoiceAction("paid", "mark_paid")).toBe(false);
     expect(canApplyInvoiceAction("void", "mark_paid")).toBe(false);

@@ -5,22 +5,11 @@ import {
   CONTACT_ADDRESS, 
   INVOICE_LOGO_URL
 } from "@/lib/branding";
-import { formatCurrency } from "@/lib/invoices/currency";
+import { basisPointsToPercentageInput, formatCurrency } from "@/lib/invoices/currency";
 import { getInvoiceTaxName } from "@/lib/invoices/gst-policy";
 import { withResolvedInvoicePaymentDetails } from "@/lib/invoices/payment-details";
+import { escapeHtml } from "@/lib/email/layout";
 import { APP_TIMEZONE } from "@/lib/time";
-
-/**
- * Escapes arbitrary text for safe HTML rendering.
- */
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
 
 /**
  * Formats a date for customer-facing invoice output in Australia locale.
@@ -36,7 +25,7 @@ function formatPercentValue(basisPoints: number | null): string {
   if (basisPoints === null) {
     return "";
   }
-  return `${(basisPoints / 100).toFixed(2).replace(/\.00$/, "").replace(/(\.\d*[1-9])0$/, "$1")}%`;
+  return `${basisPointsToPercentageInput(basisPoints)}%`;
 }
 
 function renderDiscountSummary(

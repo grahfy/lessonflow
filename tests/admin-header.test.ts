@@ -148,7 +148,11 @@ describe("admin-header", () => {
       menuToggle?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    expect(navPanel?.className).toContain("is-open");
+    // When open, the drawer is portaled out of the header (into .admin-shell, or
+    // document.body when the shell is absent as in this test), so re-query the
+    // live node from the document rather than the now-detached inline panel.
+    const openNavPanel = document.querySelector("#admin-header-menu-panel");
+    expect(openNavPanel?.className).toContain("is-open");
     expect(menuToggle?.getAttribute("aria-expanded")).toBe("true");
   });
 });

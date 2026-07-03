@@ -227,11 +227,3 @@ export function getCurrentCalendarYear(): number {
 export function isDateInCalendarYear(date: Date, year: number): boolean {
   return Number(toDateKey(date).slice(0, 4)) === year;
 }
-
-/**
- * Returns the current instant adjusted to the configured local timezone.
- * Useful for logical "now" comparisons in domain rules.
- */
-export function localNow(): Date {
-  return new Date();
-}

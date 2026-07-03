@@ -19,7 +19,7 @@ export interface UseSafeFetchOptions {
 export function useSafeFetch(options: UseSafeFetchOptions = {}) {
   const { onAuthError, onError } = options;
   const redirectingRef = useRef(false);
-  
+
   // Use refs for handlers to keep safeFetch and handleApiError stable
   const onAuthErrorRef = useRef(onAuthError);
   const onErrorRef = useRef(onError);

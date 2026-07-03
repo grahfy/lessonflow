@@ -8,7 +8,7 @@ describe("admin-nav-config", () => {
 
     expect(groups.map((group) => group.label)).toEqual(["Business", "Education", "System"]);
     expect(groups[0]?.items.map((item) => item.label)).toEqual(["Dashboard", "Bookings", "Customers", "Invoices", "Vouchers", "Reports", "Analytics"]);
-    expect(groups[1]?.items.map((item) => item.label)).toEqual(["Teachers", "Lesson Plans", "Chords"]);
+    expect(groups[1]?.items.map((item) => item.label)).toEqual(["Teachers", "Lesson Plans", "Library", "Chords"]);
     expect(groups[2]?.items.map((item) => item.label)).toEqual(["Settings", "Logs", "Manual", "About"]);
   });
 
@@ -17,7 +17,8 @@ describe("admin-nav-config", () => {
 
     expect(groups.map((group) => group.label)).toEqual(["Business", "Education"]);
     expect(groups[0]?.items.map((item) => item.label)).toEqual(["Dashboard", "Bookings", "Customers"]);
-    expect(groups[1]?.items.map((item) => item.label)).toEqual(["Teachers", "Lesson Plans"]);
+    // Library has no role restriction — teachers assign shared materials to their students.
+    expect(groups[1]?.items.map((item) => item.label)).toEqual(["Teachers", "Lesson Plans", "Library"]);
   });
 
   it("never leaks owner-only destinations into the teacher navigation (authz)", () => {

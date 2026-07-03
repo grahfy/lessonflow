@@ -25,6 +25,7 @@ import {
   isLikelyPlaceholder,
   normalizeManagedEnvValue,
   validateEnvConfig,
+  type ConfigurableEnvVar,
 } from "./env-var-registry";
 import { DEFAULT_INVOICE_PRESETS, DEFAULT_LESSON_PLAN_TEMPLATES } from "./seed-data";
 
@@ -376,6 +377,25 @@ export function getCurrentEnvValues(): Record<string, string> {
 }
 
 /**
+ * Resolves the persisted value for a managed env var from raw submitted input:
+ * the new value when one was submitted, the currently-stored secret when the
+ * input was blank/unchanged ("***SET***"), or "" to clear it.
+ */
+function resolveManagedEnvValue(
+  envVar: ConfigurableEnvVar,
+  rawValue: string,
+  currentValues: Record<string, string>
+): string {
+  if (rawValue && rawValue !== "***SET***") {
+    return rawValue;
+  }
+  if (envVar.isSecret && currentValues[envVar.key]) {
+    return currentValues[envVar.key];
+  }
+  return "";
+}
+
+/**
  * Saves env var configuration to the .env file.
  * This is a transactional operation - either all vars are saved or none are.
  */
@@ -390,15 +410,11 @@ export async function saveEnvConfig(input: Record<string, string>): Promise<{ su
   const vars = new Map<string, string>();
 
   for (const envVar of CONFIGURABLE_ENV_VARS) {
-    const value = input[envVar.key] || "";
-    if (value && value !== "***SET***") {
-      vars.set(envVar.key, value);
+    const value = resolveManagedEnvValue(envVar, input[envVar.key] || "", currentValues);
+    vars.set(envVar.key, value);
+    if (value) {
       process.env[envVar.key] = value;
-    } else if (envVar.isSecret && currentValues[envVar.key]) {
-      vars.set(envVar.key, currentValues[envVar.key]);
-      process.env[envVar.key] = currentValues[envVar.key];
     } else {
-      vars.set(envVar.key, "");
       delete process.env[envVar.key];
     }
   }
@@ -482,16 +498,13 @@ export async function saveAdminSettingsConfig(
   managedKeys.add("ADMIN_PASSWORD");
 
   for (const envVar of CONFIGURABLE_ENV_VARS) {
-    const value = normalizeManagedEnvValue(envVar.key, normalizedInput[envVar.key] || "");
-    if (value && value !== "***SET***") {
-      vars.set(envVar.key, value);
+    const rawValue = normalizeManagedEnvValue(envVar.key, normalizedInput[envVar.key] || "");
+    const value = resolveManagedEnvValue(envVar, rawValue, currentValues);
+    vars.set(envVar.key, value);
+    if (value) {
       // Update in-memory process.env so the current process sees the change immediately
       process.env[envVar.key] = value;
-    } else if (envVar.isSecret && currentValues[envVar.key]) {
-      vars.set(envVar.key, currentValues[envVar.key]);
-      process.env[envVar.key] = currentValues[envVar.key];
     } else {
-      vars.set(envVar.key, "");
       delete process.env[envVar.key];
     }
   }

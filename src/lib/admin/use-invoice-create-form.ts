@@ -252,26 +252,26 @@ export function useInvoiceCreateForm({
       return [];
     }
 
-      const grouped = new Map<number, number>();
-      for (const bookingId of createSelectedBookingIds) {
-        const booking = createBookingOptions.find((option) => option.id === bookingId);
-        if (!booking) {
-          continue;
-        }
-        grouped.set(booking.durationMinutes, (grouped.get(booking.durationMinutes) ?? 0) + 1);
+    const grouped = new Map<number, number>();
+    for (const bookingId of createSelectedBookingIds) {
+      const booking = createBookingOptions.find((option) => option.id === bookingId);
+      if (!booking) {
+        continue;
       }
+      grouped.set(booking.durationMinutes, (grouped.get(booking.durationMinutes) ?? 0) + 1);
+    }
 
-      return Array.from(grouped.entries())
-        .sort(([a], [b]) => a - b)
-        .map(([durationMinutes, quantity]) => ({
-          description: describeGroupedLessonLine(durationMinutes, quantity),
-          quantity,
-          unitPriceCents: activeLessonPricingMap.get(durationMinutes)?.priceCents ?? 0,
-          taxMode: createTaxMode,
-          kind: "lesson_fee" as const,
-          discountKind: null,
-          discountValue: null
-        }));
+    return Array.from(grouped.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([durationMinutes, quantity]) => ({
+        description: describeGroupedLessonLine(durationMinutes, quantity),
+        quantity,
+        unitPriceCents: activeLessonPricingMap.get(durationMinutes)?.priceCents ?? 0,
+        taxMode: createTaxMode,
+        kind: "lesson_fee" as const,
+        discountKind: null,
+        discountValue: null
+      }));
   }, [
     activeLessonPricingMap,
     createBookingOptions,

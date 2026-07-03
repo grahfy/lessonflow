@@ -85,7 +85,7 @@ export const navItems: NavItem[] = [
  * Strips query strings and hash fragments from pathname.
  * UI: Used for consistent route matching in transition animations.
  */
-function normalizePath(pathname: string): string {
+export function normalizePath(pathname: string): string {
   const [clean] = pathname.split(/[?#]/);
   return clean || "/";
 }

@@ -24,20 +24,3 @@ export function interpolatePlaceholders(template: string, context: PlaceholderCo
     return String(value);
   });
 }
-
-/**
- * Common placeholders used across the system.
- */
-export const COMMON_PLACEHOLDERS = {
-  BRAND_NAME: "brandName",
-  PRIMARY_SUBJECT: "primarySubject",
-  PRIMARY_LOCATION: "primaryLocation",
-  CONTACT_PHONE: "contactPhone",
-  CONTACT_ADDRESS: "contactAddress",
-  SITE_URL: "siteUrl",
-  CUSTOMER_NAME: "customerName",
-  LESSON_TIME: "lessonTime",
-  INVOICE_NUMBER: "invoiceNumber",
-  DUE_DATE: "dueDate",
-  TOTAL_AMOUNT: "totalAmount"
-} as const;

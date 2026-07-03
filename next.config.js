@@ -4,9 +4,17 @@ const isLowMemoryDeployBuild = process.env.NEXT_LOW_MEMORY_BUILD === "1";
 
 // Content Security Policy — defense-in-depth against XSS.
 // Directives are split across lines for readability; joined into a single header value below.
+// 'unsafe-eval' is only needed by the dev server (React Refresh / HMR); the
+// production bundle does not use eval, so it is dropped there to tighten the
+// policy. 'unsafe-inline' is retained because Next.js injects inline bootstrap/
+// hydration scripts that would otherwise require a per-request nonce.
+const scriptSrc = isProduction
+  ? "script-src 'self' 'unsafe-inline'"
+  : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
+
 const cspDirectives = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  scriptSrc,
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self'",
   "img-src 'self' data: blob: https://images.unsplash.com https://i.ytimg.com",

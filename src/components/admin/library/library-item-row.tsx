@@ -2,7 +2,20 @@
 
 import { useId, useRef, useState } from "react";
 import NextImage from "next/image";
-import { ChevronRight, Download, Eye, FileText, Image as ImageIcon, Music, Pencil, RefreshCw, Tags, Trash2, UserPlus } from "lucide-react";
+import {
+  ChevronRight,
+  Download,
+  Eye,
+  FileText,
+  Image as ImageIcon,
+  Music,
+  Pencil,
+  RefreshCw,
+  Tags,
+  Trash2,
+  UserPlus,
+  type LucideIcon
+} from "lucide-react";
 
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { PracticeAudioPlayer } from "@/components/ui/practice-audio-player";
@@ -47,6 +60,29 @@ function TypeIcon({ type }: { type: LibraryItem["materialType"] }) {
   if (type === "audio") return <Music size={16} />;
   if (type === "image") return <ImageIcon size={16} />;
   return <FileText size={16} />;
+}
+
+/** One tooltip-wrapped row action button. Shared by the expanded row's action bar. */
+function RowActionButton({
+  tooltip,
+  icon: Icon,
+  label,
+  disabled,
+  onClick
+}: {
+  tooltip: string;
+  icon: LucideIcon;
+  label: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Tooltip content={tooltip}>
+      <button type="button" className="btn btn-secondary btn-sm" disabled={disabled} onClick={onClick}>
+        <Icon size={13} style={{ marginRight: 4 }} /> {label}
+      </button>
+    </Tooltip>
+  );
 }
 
 /**
@@ -141,46 +177,44 @@ export function LibraryItemRow({
           ) : null}
 
           <div className={styles.rowActions}>
-            <Tooltip content="Open the master file in a new tab.">
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => window.open(item.previewUrl, "_blank")}>
-                <Eye size={13} style={{ marginRight: 4 }} /> Preview
-              </button>
-            </Tooltip>
+            <RowActionButton
+              tooltip="Open the master file in a new tab."
+              icon={Eye}
+              label="Preview"
+              onClick={() => window.open(item.previewUrl, "_blank")}
+            />
             <Tooltip content="Download the master file.">
               <a href={item.downloadUrl} download className="btn btn-secondary btn-sm">
                 <Download size={13} style={{ marginRight: 4 }} /> Download
               </a>
             </Tooltip>
-            <Tooltip content="Edit the title or description.">
-              <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => onEdit(item)}>
-                <Pencil size={13} style={{ marginRight: 4 }} /> Edit
-              </button>
-            </Tooltip>
-            <Tooltip content="Add or remove typed tags.">
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => onEditTags(item)}>
-                <Tags size={13} style={{ marginRight: 4 }} /> Tags
-              </button>
-            </Tooltip>
-            <Tooltip content="Assign this item to students.">
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => onAssign(item)}>
-                <UserPlus size={13} style={{ marginRight: 4 }} /> Assign
-              </button>
-            </Tooltip>
-            <Tooltip content="Replace the master file. Every assignee streams the new file.">
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                disabled={busy}
-                onClick={() => replaceInputRef.current?.click()}
-              >
-                <RefreshCw size={13} style={{ marginRight: 4 }} /> Replace
-              </button>
-            </Tooltip>
-            <Tooltip content="Delete this item for everyone.">
-              <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => onDelete(item)}>
-                <Trash2 size={13} style={{ marginRight: 4 }} /> Delete
-              </button>
-            </Tooltip>
+            <RowActionButton tooltip="Edit the title or description." icon={Pencil} label="Edit" disabled={busy} onClick={() => onEdit(item)} />
+            <RowActionButton
+              tooltip="Add or remove typed tags."
+              icon={Tags}
+              label="Tags"
+              onClick={() => onEditTags(item)}
+            />
+            <RowActionButton
+              tooltip="Assign this item to students."
+              icon={UserPlus}
+              label="Assign"
+              onClick={() => onAssign(item)}
+            />
+            <RowActionButton
+              tooltip="Replace the master file. Every assignee streams the new file."
+              icon={RefreshCw}
+              label="Replace"
+              disabled={busy}
+              onClick={() => replaceInputRef.current?.click()}
+            />
+            <RowActionButton
+              tooltip="Delete this item for everyone."
+              icon={Trash2}
+              label="Delete"
+              disabled={busy}
+              onClick={() => onDelete(item)}
+            />
             <input
               id={fileInputId}
               ref={replaceInputRef}

@@ -63,6 +63,22 @@ export function BookingsWorkspaceToolbar({
   onNavigate,
   onAddManualBooking
 }: BookingsWorkspaceToolbarProps) {
+  const statValue = (value: number) => (loadingBookings || !hasLoadedInitialBookings ? "—" : value);
+
+  const statItems: Array<{ label: string; value: number; isWarning?: boolean }> = [
+    { label: "Visible items", value: stats.total },
+    { label: "Confirmed", value: stats.confirmed },
+    { label: "Pending", value: stats.pending },
+    { label: "Unassigned", value: stats.unassigned, isWarning: true }
+  ];
+
+  const viewOptions: Array<{ view: CalendarView; label: string; tooltip: string }> = [
+    { view: "day", label: "Day", tooltip: "Switch to a single-day booking timeline." },
+    { view: "week", label: "Week", tooltip: "Switch to week view for lesson planning." },
+    { view: "month", label: "Month", tooltip: "Switch to month view for broader scheduling." },
+    { view: "year", label: "Year", tooltip: "Switch to year view for long-range planning." }
+  ];
+
   return (
     <AdminCard className="admin-toolbar-card admin-range-card admin-bookings-workspace">
       <div className="admin-bookings-workspace-hero">
@@ -93,22 +109,12 @@ export function BookingsWorkspaceToolbar({
         </div>
 
         <div className="admin-bookings-workspace-stats" aria-label="Visible booking totals">
-          <div className="admin-bookings-workspace-stat">
-            <span className="admin-bookings-workspace-stat-label">Visible items</span>
-            <strong>{loadingBookings || !hasLoadedInitialBookings ? "—" : stats.total}</strong>
-          </div>
-          <div className="admin-bookings-workspace-stat">
-            <span className="admin-bookings-workspace-stat-label">Confirmed</span>
-            <strong>{loadingBookings || !hasLoadedInitialBookings ? "—" : stats.confirmed}</strong>
-          </div>
-          <div className="admin-bookings-workspace-stat">
-            <span className="admin-bookings-workspace-stat-label">Pending</span>
-            <strong>{loadingBookings || !hasLoadedInitialBookings ? "—" : stats.pending}</strong>
-          </div>
-          <div className="admin-bookings-workspace-stat is-warning">
-            <span className="admin-bookings-workspace-stat-label">Unassigned</span>
-            <strong>{loadingBookings || !hasLoadedInitialBookings ? "—" : stats.unassigned}</strong>
-          </div>
+          {statItems.map(({ label, value, isWarning }) => (
+            <div key={label} className={`admin-bookings-workspace-stat${isWarning ? " is-warning" : ""}`}>
+              <span className="admin-bookings-workspace-stat-label">{label}</span>
+              <strong>{statValue(value)}</strong>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -130,18 +136,17 @@ export function BookingsWorkspaceToolbar({
 
         <div className="admin-range-actions">
           <div className="site-nav admin-range-view-nav">
-            <Tooltip content="Switch to a single-day booking timeline.">
-              <button className={`btn ${view === "day" ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => onNavigate("day", dateStr)}>Day</button>
-            </Tooltip>
-            <Tooltip content="Switch to week view for lesson planning.">
-              <button className={`btn ${view === "week" ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => onNavigate("week", dateStr)}>Week</button>
-            </Tooltip>
-            <Tooltip content="Switch to month view for broader scheduling.">
-              <button className={`btn ${view === "month" ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => onNavigate("month", dateStr)}>Month</button>
-            </Tooltip>
-            <Tooltip content="Switch to year view for long-range planning.">
-              <button className={`btn ${view === "year" ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => onNavigate("year", dateStr)}>Year</button>
-            </Tooltip>
+            {viewOptions.map(({ view: optionView, label, tooltip }) => (
+              <Tooltip key={optionView} content={tooltip}>
+                <button
+                  className={`btn ${view === optionView ? "btn-primary" : "btn-secondary"}`}
+                  type="button"
+                  onClick={() => onNavigate(optionView, dateStr)}
+                >
+                  {label}
+                </button>
+              </Tooltip>
+            ))}
           </div>
           <div className="field admin-inline-field booking-teacher-filter-field">
             <label htmlFor="booking-teacher-filter">Teacher</label>

@@ -44,13 +44,6 @@ export function buildEmailBranding() {
 }
 
 /**
- * Backward-compatible helper retained for existing imports.
- */
-export function getEmailBranding() {
-  return buildEmailBranding();
-}
-
-/**
  * Shared signature block appended to all branded emails.
  */
 export function renderSignatureHtml(input: {

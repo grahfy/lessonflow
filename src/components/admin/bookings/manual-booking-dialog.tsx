@@ -6,7 +6,7 @@ import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { STREET_TYPES } from "@/lib/admin/constants";
 import { type ManualStep, MANUAL_STEP_LABEL, MANUAL_STEP_ORDER, AU_STATES } from "@/lib/admin/types";
-import { toAuState } from "@/lib/admin/utils";
+import { toAuState, toDigits } from "@/lib/admin/utils";
 import { type BookingMatchedCustomer } from "./types";
 import { AddressAutocomplete, type ParsedAddress } from "@/components/admin/ui/address-autocomplete";
 import { Tooltip } from "@/components/admin/ui/tooltip";
@@ -39,11 +39,6 @@ interface ManualBookingDialogProps {
   onResolveMatch: (resolution: "use_existing" | "update_existing" | "create_new") => void;
   onSave: () => void;
   busyAction: string | null;
-}
-
-/** Restricts numeric-only inputs without allowing hidden punctuation through. */
-function toDigits(val: string, max: number) {
-  return val.replace(/\D/g, "").slice(0, max);
 }
 
 /**

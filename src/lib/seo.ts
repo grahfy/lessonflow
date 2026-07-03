@@ -48,8 +48,14 @@ export function buildPublicPageMetadata(input: PublicPageMetadataInput): Metadat
   const description = interpolateSeo(input.description);
   const keywords = (input.keywords || []).map(interpolateSeo);
 
+  // The root layout applies a "%s | {brand}" title template. Pages whose title
+  // already carries the brand must opt out via `absolute`, otherwise the brand
+  // is duplicated (e.g. "Book a Lesson | Brand | Brand"). Pages without the
+  // brand keep the plain string so the template appends it once.
+  const titleField = title.includes(branding.PUBLIC_BRAND_NAME) ? { absolute: title } : title;
+
   return {
-    title,
+    title: titleField,
     description,
     keywords,
     alternates: {
@@ -79,6 +85,53 @@ export function buildPublicPageMetadata(input: PublicPageMetadataInput): Metadat
       index: true,
       follow: true
     }
+  };
+}
+
+/**
+ * Parses the free-form CONTACT_ADDRESS ("Street, Suburb STATE POSTCODE") into
+ * schema.org PostalAddress fields. Falls back to using the whole string as the
+ * street address when the trailing "Suburb STATE POSTCODE" pattern is absent.
+ */
+function parsePostalAddress(address: string): Record<string, string> {
+  const result: Record<string, string> = { "@type": "PostalAddress", addressCountry: "AU" };
+  const parts = address.split(",").map((part) => part.trim()).filter(Boolean);
+  const tail = parts.at(-1) ?? "";
+  const match = tail.match(/^(.*?)\s+([A-Z]{2,3})\s+(\d{4})$/);
+  if (match) {
+    const street = parts.slice(0, -1).join(", ");
+    if (street) result.streetAddress = street;
+    result.addressLocality = match[1];
+    result.addressRegion = match[2];
+    result.postalCode = match[3];
+  } else if (address) {
+    result.streetAddress = address;
+  }
+  return result;
+}
+
+/**
+ * Builds MusicSchool (LocalBusiness) JSON-LD from real branding data for the
+ * public site. Emitted once site-wide from the root layout so search engines
+ * can surface the school's name, location, and contact details.
+ */
+export function buildOrganizationJsonLd(): Record<string, unknown> {
+  const branding = getBranding();
+  const base = getSeoSiteUrl();
+  const logo = branding.LOGO_URL.startsWith("http") ? branding.LOGO_URL : `${base}${branding.LOGO_URL}`;
+  const subject = branding.PRIMARY_SUBJECT.toLowerCase();
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "MusicSchool",
+    name: branding.PUBLIC_BRAND_NAME,
+    url: base,
+    logo,
+    image: logo,
+    telephone: branding.CONTACT_PHONE,
+    description: `${branding.PUBLIC_BRAND_NAME} offers ${subject} lessons in ${branding.PRIMARY_LOCATION}, Melbourne — in-person and online, for beginners through advanced players.`,
+    address: parsePostalAddress(branding.CONTACT_ADDRESS),
+    areaServed: { "@type": "City", name: "Melbourne" }
   };
 }
 

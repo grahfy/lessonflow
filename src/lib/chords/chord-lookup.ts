@@ -74,7 +74,7 @@ function getDbSuffixForChord(root: string, quality: string, bassNote?: string): 
  * Converts a chords-db position to our ChordFingering format.
  */
 function positionToFingering(pos: ChordsDbPosition): ChordFingering {
-  const strings = pos.frets.map((f) => (f === -1 ? -1 : f === 0 ? 0 : f)) as StringTuple<StringFretValue>;
+  const strings = [...pos.frets] as StringTuple<StringFretValue>;
   const fingers = pos.fingers.map((f) => Math.min(f, 4)) as StringTuple<FingerValue>;
 
   const barres = pos.barres.map((barreFret) => {

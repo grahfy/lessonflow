@@ -71,6 +71,11 @@ function stringifyMeta(meta?: Record<string, unknown>) {
   }
 }
 
+/** Formats the standard `[timestamp] [level] event meta` console/DB log line. */
+function buildLogLine(level: LogLevel, event: string, meta?: Record<string, unknown>): string {
+  return `[${new Date().toISOString()}] [${level}] ${event} ${stringifyMeta(meta)}`;
+}
+
 /**
  * Logs a standard business event.
  * 
@@ -79,7 +84,7 @@ function stringifyMeta(meta?: Record<string, unknown>) {
  */
 export function logEvent(event: string, meta?: Record<string, unknown>) {
   if (isSilenced) return;
-  const line = `[${new Date().toISOString()}] [info] ${event} ${stringifyMeta(meta)}`;
+  const line = buildLogLine("info", event, meta);
   console.info(line);
   persistLog("info", event, line, meta);
 }
@@ -96,7 +101,7 @@ export function logEvent(event: string, meta?: Record<string, unknown>) {
  */
 export function logError(event: string, error: unknown, meta?: Record<string, unknown>) {
   if (isSilenced) return;
-  const line = `[${new Date().toISOString()}] [error] ${event} ${stringifyMeta(meta)}`;
+  const line = buildLogLine("error", event, meta);
   console.error(line);
   
   let errorMessage = "";
@@ -236,8 +241,8 @@ export function log(level: LogLevel, event: string, meta?: Record<string, unknow
     return;
   }
   
-  const line = `[${new Date().toISOString()}] [${level}] ${event} ${stringifyMeta(meta)}`;
-  
+  const line = buildLogLine(level, event, meta);
+
   if (level === "warn") {
     console.warn(line);
   } else {
