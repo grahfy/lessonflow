@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { AdminDeployUpdatesButton } from "@/components/admin-deploy-updates-button";
 import { invalidateCustomerEmailAlertsSessionCache } from "@/lib/admin/customer-email-alerts";
@@ -24,7 +25,30 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  // Collapsed state persists in localStorage so it survives page navigation
+  // across the whole admin console. Read after mount to avoid hydration mismatch.
+  const [collapsed, setCollapsed] = useState(false);
   const navPanelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    try {
+      setCollapsed(window.localStorage.getItem("admin-header-collapsed") === "1");
+    } catch {
+      /* localStorage unavailable — keep expanded default */
+    }
+  }, []);
+
+  const toggleCollapsed = () => {
+    setCollapsed((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem("admin-header-collapsed", next ? "1" : "0");
+      } catch {
+        /* ignore persistence failure */
+      }
+      return next;
+    });
+  };
   const initialRole = useInitialAdminRole();
   const adminRoleLabel = admin?.role === "owner" ? "Owner" : "Teacher";
   const visibleNavGroups = getVisibleAdminNavGroups(initialRole ?? (adminLoading ? null : admin?.role));
@@ -55,7 +79,10 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
   }
 
   return (
-    <div className="admin-card admin-header-row" data-motion-item="admin-header-card">
+    <div
+      className={`admin-card admin-header-row${collapsed ? " is-collapsed" : ""}`}
+      data-motion-item="admin-header-card"
+    >
       <div className="admin-header-overview">
         <div className="admin-header-title-group">
           <p className="admin-console-kicker">Admin Console</p>
@@ -79,6 +106,17 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
       </div>
 
       <div className="admin-header-toolbar">
+        <Tooltip content={collapsed ? "Expand the header." : "Collapse the header."}>
+          <button
+            className="btn btn-secondary admin-header-collapse-toggle"
+            type="button"
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? "Expand header" : "Collapse header"}
+            onClick={toggleCollapsed}
+          >
+            {collapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+          </button>
+        </Tooltip>
         <Tooltip content="Toggle mobile navigation menu.">
           <button
             className="btn btn-secondary admin-header-menu-toggle"

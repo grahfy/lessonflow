@@ -536,6 +536,27 @@
   color: #f8fafc;
 }
 
+/* Directory panel collapse: kicker line carries the toggle; collapsing hides
+   the title, summary, context chips, and stats but keeps the search toolbar. */
+.admin-workspace-kicker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-workspace-collapse-toggle {
+  padding-inline: 10px;
+  flex: 0 0 auto;
+}
+
+.admin-workspace-panel.is-collapsed .admin-workspace-title,
+.admin-workspace-panel.is-collapsed .admin-workspace-summary,
+.admin-workspace-panel.is-collapsed .admin-workspace-chip-row,
+.admin-workspace-panel.is-collapsed .admin-workspace-stats {
+  display: none;
+}
+
 .admin-workspace-summary {
   margin: 0;
   max-width: 70ch;
@@ -3513,6 +3534,23 @@
   overflow: hidden;
 }
 
+/* Collapsed header: hide the descriptive kicker, subtitle, and session chips
+   so the box shrinks to the title + controls row. Navigation is preserved.
+   Collapsed state is persisted across page loads (see AdminHeader). */
+.admin-header-row.is-collapsed {
+  gap: 0 18px;
+}
+
+.admin-header-row.is-collapsed .admin-console-kicker,
+.admin-header-row.is-collapsed .admin-console-subtitle,
+.admin-header-row.is-collapsed .admin-header-session {
+  display: none;
+}
+
+.admin-header-collapse-toggle {
+  padding-inline: 10px;
+}
+
 .admin-header-overview {
   grid-area: overview;
   display: grid;
@@ -3611,6 +3649,7 @@
   display: flex;
   justify-content: flex-end;
   align-items: flex-start;
+  gap: 8px;
   min-width: fit-content;
 }
 
