@@ -3684,10 +3684,11 @@
   margin-right: 4px;
 }
 
-/* Collapsed header just hides the kicker and subtitle; the toolbar (session +
-   buttons) is unchanged. */
-.admin-header-row.is-collapsed .admin-console-kicker,
-.admin-header-row.is-collapsed .admin-console-subtitle {
+/* Collapsing the header folds away only the inline navigation grid (the
+   Business/Education/System boxes + Utilities) — the title text (kicker, title,
+   subtitle) and the session/buttons stay put. `:not(.is-open)` keeps the mobile
+   drawer usable: the Menu button still opens the nav while collapsed. */
+.admin-header-row.is-collapsed .admin-header-nav:not(.is-open) {
   display: none;
 }
 
