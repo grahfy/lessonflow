@@ -20,7 +20,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // Only surface tag values that are still attached to at least one item.
+    // Removing a tag from its last item leaves the shared Tag row intact (the
+    // vocabulary is deliberately not pruned), so an unfiltered list would show
+    // "orphaned" facets/suggestions that match zero items.
     const tags = await prisma.tag.findMany({
+      where: { items: { some: {} } },
       orderBy: [{ category: "asc" }, { value: "asc" }],
       select: { category: true, value: true }
     });
