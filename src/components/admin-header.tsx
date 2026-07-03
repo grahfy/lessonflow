@@ -263,8 +263,10 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
       <div className="admin-header-toolbar">
         {sessionChips}
         {/* With the header collapsed the inline nav grid is hidden, so surface a
-            browser-back control to keep navigation reachable. */}
-        {collapsed ? (
+            browser-back control to keep navigation reachable. The Dashboard is the
+            admin console home, so it never shows a Back control (router.back() there
+            just pops to whatever page preceded it, e.g. Lesson Plans). */}
+        {collapsed && pathname !== "/admin/dashboard" ? (
           <Tooltip content="Go back to the previous page." side="bottom">
             <button
               className="btn btn-secondary admin-header-back-toggle"
