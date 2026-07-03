@@ -239,7 +239,7 @@ export function UnifiedMaterialTree({
         ) : null}
 
         {file.materialType === "audio" ? (
-          <PracticeAudioPlayer src={rawUrl} className={styles.previewPlayer} />
+          <PracticeAudioPlayer src={rawUrl} className={styles.previewPlayer} size="large" />
         ) : null}
 
         {file.materialType === "image" ? (

@@ -115,7 +115,13 @@ function decode(token: string): StudentSessionPayload | null {
   if (!signatureMatches(payload, signature)) return null;
 
   try {
-    const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as StudentSessionPayload;
+    const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as StudentSessionPayload & {
+      purpose?: unknown;
+    };
+    // Domain separation: a session token carries NO `purpose`. A magic-link token
+    // is signed with the SAME secret but carries `purpose: "magic-link"`, so
+    // reject any token that has a `purpose` field to stop it being accepted here.
+    if (decoded.purpose !== undefined) return null;
     // RATIONALE: We verify expiration BEFORE checking customer existence for speed.
     if (!decoded.customerId || !decoded.exp || Date.now() > decoded.exp) return null;
     // Legacy tokens lack `iat`; treat them as iat=0 so they remain revocable once
@@ -139,6 +145,98 @@ export function createStudentSessionToken(customerId: string): string {
 
 export function getStudentSessionCookieName(): string {
   return STUDENT_SESSION_COOKIE_NAME;
+}
+
+/**
+ * Magic-Link Tokens (passwordless student login)
+ *
+ * A magic-link token is a SEPARATE, short-lived credential from the 30-day
+ * session token above. It is HMAC-signed with the SAME `STUDENT_SESSION_SECRET`
+ * (via `signPayload`) so no parallel secret exists, but a `purpose: "magic-link"`
+ * field provides domain separation: `decode()` above rejects any token bearing
+ * a `purpose`, so a magic-link token can never be accepted as a session token,
+ * and `verifyStudentMagicLinkToken` requires `purpose === "magic-link"`, so a
+ * session token can never be accepted as a magic link. Single-use consumption
+ * and the `ver` (session-invalidation) binding are enforced by the verify route.
+ */
+
+/** Short default lifetime for one-tap login links. */
+const MAGIC_LINK_DEFAULT_TTL_SECONDS = 15 * 60;
+
+/** Inner structure of a signed magic-link token. */
+export type StudentMagicLinkPayload = {
+  /** The customer the link authenticates. */
+  customerId: string;
+  /** Domain separation: rejects cross-use with session tokens. */
+  purpose: "magic-link";
+  /** Expiration (UNIX EPOCH milliseconds). */
+  exp: number;
+  /** Issued-at (UNIX EPOCH milliseconds). */
+  iat: number;
+  /**
+   * `customer.sessionInvalidBefore` epoch ms (0 when unset) captured at issue
+   * time. If the customer logs out or rotates credentials after the link is
+   * issued, the stored value advances and the link is rejected on verify.
+   */
+  ver: number;
+  /** Random per-token value; single-use consumption keys on this. */
+  nonce: string;
+};
+
+/** Bounds the magic-link lifetime from environment configuration (1 min .. 1 hour). */
+export function getStudentMagicLinkTtlSeconds(): number {
+  const raw = Number.parseInt(
+    process.env.STUDENT_MAGIC_LINK_TTL_SECONDS || `${MAGIC_LINK_DEFAULT_TTL_SECONDS}`,
+    10
+  );
+  if (!Number.isFinite(raw)) return MAGIC_LINK_DEFAULT_TTL_SECONDS;
+  return Math.min(Math.max(raw, 60), 60 * 60);
+}
+
+/**
+ * Mints a signed, short-lived, purpose-scoped magic-link token.
+ *
+ * @param customerId - The customer the link authenticates.
+ * @param sessionVersion - `customer.sessionInvalidBefore` epoch ms (0 when
+ *   unset) at issue time; binds the link to the customer's revocation state.
+ */
+export function createStudentMagicLinkToken(customerId: string, sessionVersion: number): string {
+  const iat = Date.now();
+  const exp = iat + getStudentMagicLinkTtlSeconds() * 1000;
+  const nonce = crypto.randomBytes(16).toString("hex");
+  const data: StudentMagicLinkPayload = {
+    customerId,
+    purpose: "magic-link",
+    exp,
+    iat,
+    ver: sessionVersion,
+    nonce
+  };
+  const payload = Buffer.from(JSON.stringify(data), "utf8").toString("base64url");
+  return `${payload}.${signPayload(payload)}`;
+}
+
+/**
+ * Verifies signature + expiry + purpose of a magic-link token.
+ * Returns the decoded payload, or null for tampered/expired/mismatched tokens.
+ * Version binding and single-use consumption are enforced by the caller.
+ */
+export function verifyStudentMagicLinkToken(token: string): StudentMagicLinkPayload | null {
+  const parts = token.split(".");
+  const [payload, signature] = parts;
+  if (!payload || !signature) return null;
+
+  if (!signatureMatches(payload, signature)) return null;
+
+  try {
+    const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as StudentMagicLinkPayload;
+    if (decoded.purpose !== "magic-link") return null;
+    if (!decoded.customerId || !decoded.exp || Date.now() > decoded.exp) return null;
+    if (typeof decoded.ver !== "number" || typeof decoded.nonce !== "string" || !decoded.nonce) return null;
+    return { customerId: decoded.customerId, purpose: "magic-link", exp: decoded.exp, iat: decoded.iat, ver: decoded.ver, nonce: decoded.nonce };
+  } catch {
+    return null;
+  }
 }
 
 /**

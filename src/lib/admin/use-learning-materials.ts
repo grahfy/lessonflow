@@ -84,12 +84,14 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
       formData.set("captchaAnswer", captcha.captchaAnswer);
     }
 
-    if (!formData.get("title")) {
-      const file = formData.get("file");
-      if (file instanceof File && file.name) {
-        const nameWithoutExt = file.name.replace(/\.[^.]+$/, "");
-        formData.set("title", nameWithoutExt);
-      }
+    // Auto-title each file from its own filename (matches the prior single-file
+    // default). Titles are appended in the same order as "file" entries so the
+    // API can zip them by index — this is what makes per-file titling work when
+    // multiple files are selected/dropped at once.
+    const files = formData.getAll("file").filter((entry): entry is File => entry instanceof File);
+    for (const file of files) {
+      const nameWithoutExt = file.name.replace(/\.[^.]+$/, "");
+      formData.append("title", nameWithoutExt);
     }
 
     setUploading(true);
@@ -100,8 +102,34 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
       });
 
       if (!response.ok) {
-        await handleApiError(response, "Upload failed.");
+        // 401 needs the shared redirect-to-login handling; everything else is
+        // read here (once — the body can only be consumed once) so a batch's
+        // per-file `errors` can be surfaced instead of a generic fallback.
+        if (response.status === 401) {
+          await handleApiError(response, "Upload failed.");
+          return false;
+        }
+        const payload = (await response.json().catch(() => null)) as
+          | { errors?: { filename: string; message: string }[]; error?: string }
+          | null;
+        if (onError) {
+          onError(
+            payload?.errors?.length
+              ? payload.errors.map((entry) => `${entry.filename}: ${entry.message}`).join(" ")
+              : payload?.error || "Upload failed."
+          );
+        }
         return false;
+      }
+
+      // A batch upload can partially succeed (HTTP 207): some files were saved
+      // while others were skipped into `errors`. Surface those alongside the
+      // success path below instead of silently dropping them.
+      const payload = (await response.json().catch(() => null)) as
+        | { errors?: { filename: string; message: string }[] }
+        | null;
+      if (payload?.errors?.length && onError) {
+        onError(`Some files failed to upload — ${payload.errors.map((entry) => `${entry.filename}: ${entry.message}`).join("; ")}`);
       }
 
       // Reload unfiltered so the folder tree stays complete after an upload;
@@ -113,7 +141,7 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
     } finally {
       setUploading(false);
     }
-  }, [safeFetch, handleApiError, load]);
+  }, [safeFetch, handleApiError, load, onError]);
 
   const remove = useCallback(async (materialId: string): Promise<boolean> => {
     setDeletingId(materialId);

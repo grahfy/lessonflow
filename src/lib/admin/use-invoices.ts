@@ -75,7 +75,7 @@ export interface UseInvoicesResult {
         sortDir?: InvoiceSortDirection
     ) => Promise<void>;
     save: (id: string, payload: Record<string, unknown>) => Promise<InvoiceRow | null>;
-    performAction: (id: string, action: InvoiceAction) => Promise<InvoiceActionResult>;
+    performAction: (id: string, action: InvoiceAction, payload?: Record<string, unknown>) => Promise<InvoiceActionResult>;
     create: (payload: Record<string, unknown>) => Promise<InvoiceRow | null>;
     sendBulkReminders: () => Promise<number | null>;
     remove: (id: string, force?: boolean) => Promise<boolean>;
@@ -176,7 +176,7 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
         }
     }, [safeFetch, handleApiError]);
 
-    const performAction = useCallback(async (id: string, action: InvoiceAction): Promise<InvoiceActionResult> => {
+    const performAction = useCallback(async (id: string, action: InvoiceAction, payload?: Record<string, unknown>): Promise<InvoiceActionResult> => {
         let endpoint = `/api/admin/invoices/${id}`;
         let method = "POST";
 
@@ -194,7 +194,7 @@ export function useInvoices(options: UseInvoicesOptions = {}): UseInvoicesResult
             const response = await safeFetch(endpoint, {
                 method,
                 headers: { "Content-Type": "application/json" },
-                body: method === "POST" ? JSON.stringify({ action }) : JSON.stringify({ action })
+                body: JSON.stringify({ action, ...payload })
             });
 
             if (!response.ok) {

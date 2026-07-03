@@ -1,7 +1,7 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
-import type { RefObject } from "react";
+import { useId, useMemo, useRef, useState } from "react";
+import type { DragEvent, RefObject } from "react";
 
 import { CaptchaField, useCaptcha } from "@/components/captcha";
 import { AdminCard } from "@/components/admin/ui/admin-card";
@@ -161,7 +161,13 @@ export function AdminMaterialsPanel({
 }: AdminMaterialsPanelProps) {
   const fileInputId = useId();
   const captcha = useCaptcha();
-  const [selectedFileName, setSelectedFileName] = useState("No file selected");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Tracks the batch of files staged for upload — the picker's <input multiple>
+  // selection merged with anything dropped onto the picker zone. The native
+  // input's FileList is kept in sync (via DataTransfer) so the surrounding
+  // <form>'s FormData still carries every file under name="file" on submit.
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [dialogState, setDialogState] = useState<MaterialsDialogState>(null);
   // Local "Add to library" (promote) status — self-contained so the action
   // needs no wiring through the parent dialog/orchestrator.
@@ -221,6 +227,64 @@ export function AdminMaterialsPanel({
   function handleDeleteMaterial(material: LearningMaterialRow) {
     setDialogState({ kind: "deleteMaterial", material });
   }
+
+  /** Writes `files` into the hidden native input's FileList via DataTransfer,
+   *  so the surrounding <form>'s FormData picks up every staged file under
+   *  name="file" on submit — this is what lets drag-and-drop participate in
+   *  the same plain-form upload flow as the native file picker. */
+  function syncFileInput(files: File[]) {
+    const input = fileInputRef.current;
+    if (!input) return;
+    const dataTransfer = new DataTransfer();
+    for (const file of files) {
+      dataTransfer.items.add(file);
+    }
+    input.files = dataTransfer.files;
+  }
+
+  function handleFileInputChange(files: FileList | null) {
+    const picked = Array.from(files ?? []);
+    if (picked.length === 0) return;
+    // Merge with whatever is already staged so Browse adds to (rather than
+    // replaces) files — matching the drag-drop behavior. syncFileInput rewrites
+    // the native input's FileList so the <form>'s FormData carries the full set.
+    const merged = [...selectedFiles, ...picked];
+    setSelectedFiles(merged);
+    syncFileInput(merged);
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDragOver(false);
+    const dropped = Array.from(event.dataTransfer.files ?? []);
+    if (dropped.length === 0) return;
+    // Merge with whatever is already staged so drag-drop adds to (rather than
+    // replaces) files chosen via Browse.
+    const merged = [...selectedFiles, ...dropped];
+    setSelectedFiles(merged);
+    syncFileInput(merged);
+  }
+
+  function handleDragOver(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDragOver(true);
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    // `dragleave` also fires when the cursor crosses onto a child element of the
+    // zone (e.g. the Browse button or filename label), which made the highlight
+    // flicker. Ignore leaves that stay within the zone.
+    if (event.currentTarget.contains(event.relatedTarget as Node)) return;
+    setIsDragOver(false);
+  }
+
+  const selectedFilesLabel =
+    selectedFiles.length === 0
+      ? "No file selected"
+      : selectedFiles.length === 1
+        ? selectedFiles[0].name
+        : `${selectedFiles.length} files selected`;
 
   // Destination menu for the move picker: student root + every folder labeled
   // by its breadcrumb path (mirrors the upload form's destination select).
@@ -307,7 +371,7 @@ export function AdminMaterialsPanel({
           <form
             ref={uploadFormRef}
             className="customer-materials-upload-form"
-            onReset={() => setSelectedFileName("No file selected")}
+            onReset={() => setSelectedFiles([])}
           >
             <AdminForm className="customer-materials-upload-grid">
               {bookingField ? (
@@ -355,30 +419,52 @@ export function AdminMaterialsPanel({
                   </div>
                 </AdminField>
               ) : null}
-              <AdminField label="Select file" tooltip="Choose the file to upload from your computer." fullWidth>
+              <AdminField
+                label="Select file(s)"
+                description="or drag & drop files here"
+                tooltip="Choose one or more files to upload from your computer, or drag and drop them onto the picker."
+                fullWidth
+              >
                 <input
+                  ref={fileInputRef}
                   id={fileInputId}
                   type="file"
                   name="file"
+                  multiple
                   accept={`${LEARNING_MATERIAL_ACCEPT},image/*`}
                   className="admin-visually-hidden-input"
                   onChange={(event) => {
-                    const file = event.currentTarget.files?.[0];
-                    // NOTE: We mirror the selected filename outside the hidden
+                    // NOTE: We mirror the selected filenames outside the hidden
                     // native input so the custom button UI stays accessible.
-                    setSelectedFileName(file?.name || "No file selected");
+                    handleFileInputChange(event.currentTarget.files);
                   }}
                 />
-                <div className="customer-materials-file-picker">
-                  <Tooltip content="Select a file from your device.">
+                <div
+                  className={`customer-materials-file-picker${isDragOver ? " customer-materials-file-picker--drag-over" : ""}`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
+                  <Tooltip content="Select files from your device, or drag and drop them here.">
                     <label htmlFor={fileInputId} className="btn btn-secondary">
                       Browse
                     </label>
                   </Tooltip>
-                  <span className="customer-materials-file-name" title={selectedFileName}>
-                    {selectedFileName}
+                  <span
+                    className="customer-materials-file-name"
+                    title={selectedFiles.map((file) => file.name).join(", ") || undefined}
+                  >
+                    {selectedFilesLabel}
                   </span>
                 </div>
+                {selectedFiles.length > 1 ? (
+                  <ul className="customer-materials-file-list">
+                    {selectedFiles.slice(0, 5).map((file, index) => (
+                      <li key={`${file.name}-${index}`}>{file.name}</li>
+                    ))}
+                    {selectedFiles.length > 5 ? <li>+{selectedFiles.length - 5} more</li> : null}
+                  </ul>
+                ) : null}
               </AdminField>
               <AdminField
                 label="Description (optional)"

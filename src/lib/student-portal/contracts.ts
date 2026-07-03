@@ -111,7 +111,9 @@ export const studentPortalBookingSchema = z.object({
   notesContent: z.record(z.unknown()).nullable(),
   lessonPlanSummary: studentPortalLessonPlanV2SummarySchema.nullable(),
   materials: z.array(studentPortalMaterialSchema),
-  pendingReschedule: studentPortalPendingRescheduleSchema.nullable()
+  pendingReschedule: studentPortalPendingRescheduleSchema.nullable(),
+  // Attendance is only set on past lessons by admin; null until marked.
+  attendanceStatus: z.enum(["attended", "no_show"]).nullable().default(null)
 });
 
 export const studentPortalPendingRequestSchema = z.object({
@@ -237,6 +239,7 @@ type BookingMapInput = Pick<
   | "endAt"
   | "notes"
   | "notesContent"
+  | "attendanceStatus"
 > & {
   lessonPlan?: {
     sections: unknown;
@@ -374,6 +377,7 @@ export function mapStudentPortalBooking(booking: BookingMapInput): StudentPortal
     notesContent: booking.notesContent ?? null,
     lessonPlanSummary: mapStudentPortalLessonPlanSummary(booking.lessonPlan),
     materials: booking.learningMaterials.map(mapStudentPortalMaterial),
+    attendanceStatus: booking.attendanceStatus ?? null,
     pendingReschedule: pendingReschedule
       ? {
           id: pendingReschedule.id,

@@ -377,7 +377,7 @@ export function AdminInvoicesClient({ defaultCurrency }: { defaultCurrency: stri
           isUsingSystemPaymentDetails={isUsingSystemPaymentDetails}
           selectedInvoiceDisplayStatus={selectedInvoiceDisplayStatus}
           onSave={actions.saveInvoiceEdits}
-          onPerformAction={actions.performAction}
+          onPerformAction={(action, payload) => actions.performAction(action, false, payload)}
           onOpenLinkedCustomer={openLinkedCustomer}
           onDeleteInvoice={async (force) => {
             await removeInvoiceApi(selectedInvoice!.id, force);
