@@ -635,6 +635,23 @@
   min-width: 58px;
 }
 
+/* Customers directory: keep the "Search" label inline to the LEFT of the field
+   (matching the adjacent "Sort" control) instead of wrapping above it. The
+   input flexes to fill the remaining width rather than claiming the full row. */
+.admin-shell-customers .admin-search-box {
+  flex-wrap: nowrap;
+}
+
+.admin-shell-customers .admin-search-box > label {
+  white-space: nowrap;
+}
+
+.admin-shell-customers .admin-search-box input {
+  width: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .invoice-row-item:hover,
 .customer-item:hover {
   background: rgba(37, 99, 235, 0.08) !important;
@@ -6601,6 +6618,68 @@
 
 #customer-dialog .customer-profile-panel {
   min-height: 0;
+}
+
+/* Materials tab: lay the "Materials List" and "Upload New" sections side by
+   side as two columns on desktop; they stack (flex column above) on smaller
+   screens. Specificity (both classes + id) beats the flex-column base rule. */
+@media (min-width: 1024px) {
+  #customer-dialog .customer-materials-panel.customer-tab-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+}
+
+/* Dark, subtle scrollbars matching the surrounding UI instead of the bright
+   native default. Firefox: scrollbar-color/width inherit to all descendants.
+   WebKit/Chromium: styled via the pseudo-elements below. */
+.admin-shell,
+#customer-dialog,
+#booking-detail-dialog {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+
+.admin-shell ::-webkit-scrollbar,
+#customer-dialog ::-webkit-scrollbar,
+#booking-detail-dialog ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.admin-shell ::-webkit-scrollbar-track,
+#customer-dialog ::-webkit-scrollbar-track,
+#booking-detail-dialog ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.admin-shell ::-webkit-scrollbar-thumb,
+#customer-dialog ::-webkit-scrollbar-thumb,
+#booking-detail-dialog ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.admin-shell ::-webkit-scrollbar-thumb:hover,
+#customer-dialog ::-webkit-scrollbar-thumb:hover,
+#booking-detail-dialog ::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.55);
+  background-clip: padding-box;
+}
+
+/* Materials tab Explorer: give the tree box a taller minimum height so it fills
+   the left column next to the (taller) upload form instead of collapsing to a
+   couple of rows. Scoped to the customer dialog so the shared tree used
+   elsewhere (student portal, booking dialog) keeps its compact default. */
+@media (min-width: 1024px) {
+  #customer-dialog .customer-materials-list-card [class*="treeViewport"] {
+    min-height: 440px;
+    max-height: 60vh;
+  }
 }
 
 #booking-detail-dialog .booking-appointment-panel,
