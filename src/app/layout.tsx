@@ -6,6 +6,7 @@ import { MotionProvider } from "@/components/motion/tween-orchestrator";
 import { PublicSiteFrame } from "@/components/public-site-frame";
 import { GlobalTooltipProvider } from "@/components/ui/global-tooltip-provider";
 import { getBranding, getSubjectLabel } from "@/lib/branding";
+import { buildOrganizationJsonLd } from "@/lib/seo";
 import { getPublicSiteUrl } from "@/lib/env";
 import "@/styles/globals.css";
 import "@/styles/admin.css";
@@ -100,10 +101,16 @@ export function generateMetadata(): Metadata {
 
 export default function RootLayout({ children }: PropsWithChildren) {
   const branding = getBranding();
+  const organizationJsonLd = buildOrganizationJsonLd();
 
   return (
-    <html lang="en" className={overpass.variable}>
+    <html lang="en-AU" className={overpass.variable}>
       <body className={overpass.className}>
+        <script
+          type="application/ld+json"
+          // JSON-LD is inert data (not executed); serialized from trusted branding config.
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        />
         <GlobalTooltipProvider>
           <MotionProvider>
             <PublicSiteFrame brandName={branding.PUBLIC_BRAND_NAME}>{children}</PublicSiteFrame>
