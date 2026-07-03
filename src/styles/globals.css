@@ -1731,6 +1731,38 @@ h1 {
   color: var(--ink-0);
 }
 
+.student-login-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 0 4px;
+  color: var(--ink-2);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.student-login-divider::before,
+.student-login-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.student-login-magic {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.student-login-magic-heading {
+  margin: 0;
+  color: var(--ink-0);
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+}
+
 .field label {
   color: var(--ink-1);
   font-size: 0.8rem;
@@ -1991,6 +2023,34 @@ h1 {
   .error-boundary-actions .btn,
   .not-found-page .btn {
     width: 100%;
+  }
+
+  /* .view-stage is a fixed 2-column grid (1.1fr / 0.9fr) with no mobile
+     override, which squished the copy into a narrow left column and left
+     dead space on the right. Stack to a single full-width column instead
+     (copy first, visual second — DOM order already puts copy first).
+     .view keeps overflow:hidden on the x-axis (no horizontal overflow) but
+     needs overflow-y:auto here because stacking makes .view-stage taller
+     than the fixed-height shell box it lives in. */
+  .view {
+    overflow-y: auto;
+  }
+
+  .view-stage {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: 100%;
+  }
+
+  .panel-visual {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .hero-image,
+  .hero-video {
+    aspect-ratio: 4 / 3;
+    min-height: 200px;
   }
 }
 

@@ -195,6 +195,7 @@ export function StudentMaterialsClient(): ReactElement {
                       <PracticeAudioPlayer
                         className={cx("material-audio-player", styles["audio-player"])}
                         src={item.previewUrl}
+                        size="large"
                       />
                     ) : (
                       <Tooltip content="Preview this file in a new browser tab.">

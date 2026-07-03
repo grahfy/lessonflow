@@ -287,6 +287,38 @@
   border: 0;
 }
 
+/* Large variant — a chunkier, easier-to-grab scrubber for touch use on the
+   student portal, student materials, and material-tree previews. The admin
+   Library rows stay on the default (compact) size. */
+.large {
+  width: min(420px, 100%);
+}
+
+.large .playButton {
+  width: 44px;
+  height: 44px;
+}
+
+.large .scrubber {
+  height: 32px;
+}
+
+.large .track {
+  height: 12px;
+}
+
+.large .playhead {
+  width: 20px;
+  height: 20px;
+  margin-left: -10px;
+}
+
+.large .flag {
+  width: 18px;
+  height: 18px;
+  font-size: 0.62rem;
+}
+
 @media (max-width: 520px) {
   .controls {
     justify-content: flex-start;

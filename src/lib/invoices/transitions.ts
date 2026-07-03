@@ -6,9 +6,11 @@
  * only occur when the document is in a valid precursor state.
  * 
  * DESIGN RATIONALE:
- * 1. Financial Integrity: Prevents illogical jumps (e.g. 'draft' -> 'paid'). 
- *    An invoice must be 'sent' (and thus assigned a legal invoice number) 
- *    before it can accept payment.
+ * 1. Financial Integrity: Prevents illogical jumps (e.g. 'void' -> 'paid').
+ *    An invoice must normally be 'sent' before it can accept payment, though
+ *    'draft' -> 'paid' is also permitted as an explicit escape hatch for
+ *    recording payments collected outside the system (no email is sent on
+ *    that path, since 'sent' is what triggers the email).
  * 2. Audit Safety: Defines 'voiding' as a terminal state for sent/paid docs, 
  *    preserving the record rather than deleting it, which is standard 
  *    accounting practice.
@@ -28,11 +30,15 @@ export type InvoiceLifecycleAction = "mark_paid" | "mark_unpaid" | "void";
  * it has been 'issued' (sent).
  */
 const ACTION_ALLOWED_STATUSES: Record<InvoiceLifecycleAction, readonly InvoiceLifecycleStatus[]> = {
-  /** 
-   * 'mark_paid': Can only occur once the client has actually received 
-   * the document ('sent').
+  /**
+   * 'mark_paid': Normally occurs once the client has actually received
+   * the document ('sent'). Also allowed directly from 'draft' so an
+   * admin can record a payment that was collected outside this system
+   * (e.g. migrated from a legacy invoicing tool) without emailing the
+   * customer — the 'sent' status is what triggers that email, and this
+   * path never passes through it.
    */
-  mark_paid: ["sent"],
+  mark_paid: ["draft", "sent"],
   
   /** 
    * 'mark_unpaid': Reversal status if a payment was marked in error.

@@ -3428,9 +3428,16 @@
   align-items: center;
   width: 100%;
   padding: 8px 10px;
-  border: 1px solid var(--line);
+  border: 1px dashed var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.02);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+/* Drag-and-drop highlight while a file is being dragged over the picker. */
+.customer-materials-file-picker--drag-over {
+  border-color: var(--brand-0);
+  background: rgba(107, 140, 255, 0.08);
 }
 
 .customer-materials-file-name {

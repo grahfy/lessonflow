@@ -619,6 +619,12 @@ function BookingList(input: BookingListProps) {
             <span className={cx(styles["chip"], booking.status === "cancelled" ? styles["chip-cancelled"] : styles["chip-approved"])}>
               {describeBookingStatus(booking.status)}
             </span>
+            {input.variant === "previous" && booking.attendanceStatus === "attended" ? (
+              <span className={cx(styles["chip"], styles["chip-success"])}>Attended</span>
+            ) : null}
+            {input.variant === "previous" && booking.attendanceStatus === "no_show" ? (
+              <span className={cx(styles["chip"], styles["chip-cancelled"])}>Not attended</span>
+            ) : null}
             {isWithin24Hours(booking.startAt) && booking.status !== "cancelled" ? (
               <span className={cx(styles["chip"], styles["chip-warning"])}>Within 24h — full fee</span>
             ) : null}
@@ -760,6 +766,7 @@ function BookingList(input: BookingListProps) {
                         <PracticeAudioPlayer
                           className={cx("material-audio-player", styles["audio-player"])}
                           src={material.previewUrl}
+                          size="large"
                         />
                       ) : (
                         <Tooltip content="Preview this file in a new browser tab.">
@@ -804,6 +811,7 @@ function BookingList(input: BookingListProps) {
                         <PracticeAudioPlayer
                           className={cx("material-audio-player", styles["audio-player"])}
                           src={material.previewUrl}
+                          size="large"
                         />
                       ) : (
                         <Tooltip content="Preview this file in a new browser tab.">

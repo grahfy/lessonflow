@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { AdminCard } from "@/components/admin/ui/admin-card";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { AdminForm, AdminField } from "@/components/admin/ui/admin-form";
@@ -16,6 +18,7 @@ import {
   toCurrency,
   type InvoiceDisplayStatus
 } from "@/lib/invoices/invoice-display-helpers";
+import { toDateKey } from "@/lib/time";
 import { type useInvoiceDetailForm } from "@/lib/admin/use-invoice-detail-form";
 import { type PendingConfirm } from "@/lib/admin/use-invoice-actions";
 import { InvoiceAccountCreditPanel } from "./invoice-account-credit-panel";
@@ -38,7 +41,10 @@ interface InvoiceDetailDialogProps {
   isUsingSystemPaymentDetails: boolean;
   selectedInvoiceDisplayStatus: InvoiceDisplayStatus | null;
   onSave: () => void;
-  onPerformAction: (action: "send" | "remind" | "mark_paid" | "mark_unpaid" | "void") => void;
+  onPerformAction: (
+    action: "send" | "remind" | "mark_paid" | "mark_unpaid" | "void",
+    payload?: Record<string, unknown>
+  ) => void;
   onOpenLinkedCustomer: () => void;
   onDeleteInvoice: (force: boolean) => void;
   setPendingConfirm: (value: PendingConfirm | null) => void;
@@ -116,6 +122,15 @@ export function InvoiceDetailDialog({
     updateLineItem
   } = detailForm;
 
+  // Payment date for the Mark Paid action. Defaults to today and lets the
+  // admin backdate a payment recorded from an external/legacy system; reports
+  // bucket revenue by this date. Reset whenever the open invoice changes so a
+  // backdated pick doesn't silently carry over to the next invoice.
+  const [markPaidDate, setMarkPaidDate] = useState(() => toDateKey(new Date()));
+  useEffect(() => {
+    setMarkPaidDate(toDateKey(new Date()));
+  }, [selectedInvoice?.id]);
+
   return (
     <AppDialog
       isOpen={!!selectedInvoice}
@@ -133,11 +148,29 @@ export function InvoiceDetailDialog({
             </Tooltip>
 
             {canMarkAsPaid && (
-              <Tooltip content="Record payment and move this invoice to paid status.">
-                <button className="btn btn-primary" disabled={!!busyAction} onClick={() => void onPerformAction('mark_paid')}>
-                  {busyAction === 'mark_paid' ? 'Saving...' : 'Mark Paid'}
-                </button>
-              </Tooltip>
+              <>
+                <AdminField
+                  label="Payment Date"
+                  tooltip="Date the payment was actually received. Defaults to today; backdate it to match an external record."
+                  className="field-compact"
+                >
+                  <input
+                    type="date"
+                    value={markPaidDate}
+                    disabled={!!busyAction}
+                    onChange={(e) => setMarkPaidDate(e.target.value)}
+                  />
+                </AdminField>
+                <Tooltip content="Record payment and move this invoice to paid status.">
+                  <button
+                    className="btn btn-primary"
+                    disabled={!!busyAction}
+                    onClick={() => void onPerformAction('mark_paid', { paidAt: markPaidDate })}
+                  >
+                    {busyAction === 'mark_paid' ? 'Saving...' : 'Mark Paid'}
+                  </button>
+                </Tooltip>
+              </>
             )}
             {canMarkAsUnpaid && (
               <Tooltip content="Move this invoice back to unpaid status.">
@@ -515,7 +548,7 @@ export function InvoiceDetailDialog({
 
                 {selectedInvoice.status === 'draft' && (
                   <p className="helper-text invoice-dialog-help-copy">
-                    Mark as Paid becomes available after sending the invoice.
+                    You can Mark Paid directly from Draft to record a payment collected outside this system — no email is sent to the customer. Send the invoice first if you want the customer notified.
                   </p>
                 )}
                 {selectedInvoice.status === 'sent' && (

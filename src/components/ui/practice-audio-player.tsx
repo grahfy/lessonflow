@@ -25,6 +25,12 @@ import styles from "./practice-audio-player.module.css";
 type PracticeAudioPlayerProps = {
   src: string;
   className?: string;
+  /**
+   * `large` grows the scrubber, playhead, and play button for easier
+   * touch-scrubbing. Defaults to `default` (compact) — the admin Library
+   * item rows rely on the compact size.
+   */
+  size?: "default" | "large";
 };
 
 const MIN_RATE = 0.5;
@@ -64,7 +70,7 @@ function keepPitch(el: HTMLAudioElement): void {
   anyEl.webkitPreservesPitch = true;
 }
 
-export function PracticeAudioPlayer({ src, className }: PracticeAudioPlayerProps): React.ReactElement {
+export function PracticeAudioPlayer({ src, className, size = "default" }: PracticeAudioPlayerProps): React.ReactElement {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const scrubberRef = useRef<HTMLDivElement | null>(null);
   const speedLabelId = useId();
@@ -245,7 +251,7 @@ export function PracticeAudioPlayer({ src, className }: PracticeAudioPlayerProps
   const speedPct = Math.round(rate * 100);
 
   return (
-    <div className={cx(styles.player, className)} data-testid="practice-audio-player">
+    <div className={cx(styles.player, size === "large" && styles.large, className)} data-testid="practice-audio-player">
       <audio
         ref={attachAudio}
         src={src}

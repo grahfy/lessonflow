@@ -46,6 +46,7 @@ describe("student-portal-contracts", () => {
       endAt: new Date("2026-04-01T09:00:00.000Z"),
       notes: "Focus on rhythm consistency.",
       notesContent: null,
+      attendanceStatus: "no_show",
       learningMaterials: [
         {
           id: "mat_1",
@@ -63,6 +64,7 @@ describe("student-portal-contracts", () => {
     // is why this test asserts the derived materials array rather than only top-level fields.
     expect(booking.materials).toHaveLength(1);
     expect(booking.lessonPlanSummary).toBeNull();
+    expect(booking.attendanceStatus).toBe("no_show");
 
     const pendingRequest = mapStudentPortalPendingRequest({
       id: "req_1",
