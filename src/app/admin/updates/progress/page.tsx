@@ -1,5 +1,3 @@
-import React from "react";
-
 import { AdminShell } from "@/components/admin/layout/admin-shell";
 import { requireOwner } from "@/lib/admin/server-auth";
 import { UpdateProgressClient } from "./update-progress-client";

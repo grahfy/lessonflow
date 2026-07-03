@@ -1,20 +1,9 @@
 /**
- * Admin Deployment Updates Button & Dialog
- * 
- * "use client"
- * 
- * Provides an interactive UI for administrators to review the technical details 
- * of the current and past application deployments (Git commits, versions, etc.).
- * 
- * KEY FEATURES:
- * 1. Auto-Prompt: Automatically opens the dialog when a NEW deployment is 
- *    detected that the current admin hasn't seen yet (tracked via localStorage).
- * 2. Tabbed View: Toggle between "Latest" (detailed) and "History" (summary).
- * 3. Commit Breakdown: Displays individual commit subjects and bodies included 
- *    in each deployment.
- * 
- * RATIONALE: Informing admins of updates directly in the app reduces "version 
- * confusion" and provides a clear audit trail of what code was applied and when.
+ * Admin deployment updates button and dialog.
+ *
+ * Shows the latest deployment's commits (tabbed "Latest"/"History") so admins
+ * can see what changed and when. Auto-opens once per new commit, tracked via
+ * localStorage, so updates surface without admins needing to check manually.
  */
 
 "use client";

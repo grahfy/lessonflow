@@ -58,8 +58,7 @@ export async function getMessageDetails(
 }
 
 /**
- * Sends an email using the Gmail API.
- * This is a lower-level wrapper around the Gmail API messages.send.
+ * Sends a raw RFC 2822 email via the Gmail API.
  */
 export async function sendGmailRaw(rawMessage: string) {
   const gmail = getGmailClient();

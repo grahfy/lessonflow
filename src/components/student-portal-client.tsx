@@ -577,6 +577,44 @@ function cx(...classNames: Array<string | false | null | undefined>): string {
 }
 
 /**
+ * Renders one learning-material list item (audio player or preview/download
+ * links). Shared by the per-booking and general-materials lists below so both
+ * stay in sync.
+ */
+function renderMaterialItem(material: StudentPortalMaterial, key: string) {
+  return (
+    <li className={styles["material-item"]} key={key}>
+      <span className={styles["material-title"]}>
+        <span>{material.description || material.title} ({material.materialType.toUpperCase()})</span>
+        {material.description ? (
+          <span className={cx("helper-text", styles["material-title-secondary"])}>{material.title}</span>
+        ) : null}
+      </span>
+      <span className={styles["material-actions"]}>
+        {material.materialType === "audio" ? (
+          <PracticeAudioPlayer
+            className={cx("material-audio-player", styles["audio-player"])}
+            src={material.previewUrl}
+            size="large"
+          />
+        ) : (
+          <Tooltip content="Preview this file in a new browser tab.">
+            <a className="btn btn-secondary" href={material.previewUrl} target="_blank" rel="noreferrer">
+              Preview
+            </a>
+          </Tooltip>
+        )}
+        <Tooltip content="Download this file to your device.">
+          <a className="btn btn-secondary" href={material.downloadUrl}>
+            Download
+          </a>
+        </Tooltip>
+      </span>
+    </li>
+  );
+}
+
+/**
  * Renders one portal booking list section with nested learning materials.
  */
 type BookingListProps = {
@@ -759,36 +797,7 @@ function BookingList(input: BookingListProps) {
             <strong className={styles["materials-section-title"]}>Learning materials</strong>
             {booking.materials.length ? (
               <ul className={styles["material-list"]}>
-                {booking.materials.map((material) => (
-                  <li className={styles["material-item"]} key={material.id}>
-                    <span className={styles["material-title"]}>
-                      <span>{material.description || material.title} ({material.materialType.toUpperCase()})</span>
-                      {material.description ? (
-                        <span className={cx("helper-text", styles["material-title-secondary"])}>{material.title}</span>
-                      ) : null}
-                    </span>
-                    <span className={styles["material-actions"]}>
-                      {material.materialType === "audio" ? (
-                        <PracticeAudioPlayer
-                          className={cx("material-audio-player", styles["audio-player"])}
-                          src={material.previewUrl}
-                          size="large"
-                        />
-                      ) : (
-                        <Tooltip content="Preview this file in a new browser tab.">
-                          <a className="btn btn-secondary" href={material.previewUrl} target="_blank" rel="noreferrer">
-                            Preview
-                          </a>
-                        </Tooltip>
-                      )}
-                      <Tooltip content="Download this file to your device.">
-                        <a className="btn btn-secondary" href={material.downloadUrl}>
-                          Download
-                        </a>
-                      </Tooltip>
-                    </span>
-                  </li>
-                ))}
+                {booking.materials.map((material) => renderMaterialItem(material, material.id))}
               </ul>
             ) : (
               <span className={styles["chip"]}>No materials yet</span>
@@ -804,36 +813,7 @@ function BookingList(input: BookingListProps) {
           <div className={styles["materials-group"]}>
             {standaloneMaterials.length ? (
               <ul className={styles["material-list"]}>
-                {standaloneMaterials.map((material) => (
-                  <li className={styles["material-item"]} key={`general-${material.id}`}>
-                    <span className={styles["material-title"]}>
-                      <span>{material.description || material.title} ({material.materialType.toUpperCase()})</span>
-                      {material.description ? (
-                        <span className={cx("helper-text", styles["material-title-secondary"])}>{material.title}</span>
-                      ) : null}
-                    </span>
-                    <span className={styles["material-actions"]}>
-                      {material.materialType === "audio" ? (
-                        <PracticeAudioPlayer
-                          className={cx("material-audio-player", styles["audio-player"])}
-                          src={material.previewUrl}
-                          size="large"
-                        />
-                      ) : (
-                        <Tooltip content="Preview this file in a new browser tab.">
-                          <a className="btn btn-secondary" href={material.previewUrl} target="_blank" rel="noreferrer">
-                            Preview
-                          </a>
-                        </Tooltip>
-                      )}
-                      <Tooltip content="Download this file to your device.">
-                        <a className="btn btn-secondary" href={material.downloadUrl}>
-                          Download
-                        </a>
-                      </Tooltip>
-                    </span>
-                  </li>
-                ))}
+                {standaloneMaterials.map((material) => renderMaterialItem(material, `general-${material.id}`))}
               </ul>
             ) : (
               <span className={styles["chip"]}>No general materials</span>

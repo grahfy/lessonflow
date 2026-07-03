@@ -11,6 +11,20 @@ type SiteShellProps = PropsWithChildren<{
   footerCopy: string;
 }>;
 
+const ROUTE_THEME_CLASS: Record<string, string> = {
+  "/": "site-shell-home-admin-theme",
+  "/lessons": "site-shell-theme-lessons",
+  "/teacher": "site-shell-theme-teacher",
+  "/videos": "site-shell-theme-videos",
+  "/vouchers": "site-shell-theme-vouchers",
+  "/contact": "site-shell-theme-contact",
+  "/book": "site-shell-theme-book",
+  "/terms": "site-shell-theme-terms",
+  "/privacy": "site-shell-theme-terms",
+  "/terms-of-service": "site-shell-theme-terms",
+  "/student/login": "site-shell-theme-student-login"
+};
+
 /**
  * Shared public-site chrome for navigation/footer around public pages.
  *
@@ -19,20 +33,7 @@ type SiteShellProps = PropsWithChildren<{
  */
 export function SiteShell({ brandName, footerCopy, children }: SiteShellProps) {
   const pathname = usePathname();
-  const routeThemeClass: Record<string, string> = {
-    "/": "site-shell-home-admin-theme",
-    "/lessons": "site-shell-theme-lessons",
-    "/teacher": "site-shell-theme-teacher",
-    "/videos": "site-shell-theme-videos",
-    "/vouchers": "site-shell-theme-vouchers",
-    "/contact": "site-shell-theme-contact",
-    "/book": "site-shell-theme-book",
-    "/terms": "site-shell-theme-terms",
-    "/privacy": "site-shell-theme-terms",
-    "/terms-of-service": "site-shell-theme-terms",
-    "/student/login": "site-shell-theme-student-login"
-  };
-  const themeClassName = routeThemeClass[pathname] || "";
+  const themeClassName = ROUTE_THEME_CLASS[pathname] || "";
   const shellClassName = themeClassName
     ? `site-shell site-shell-themed ${themeClassName}`
     : "site-shell";

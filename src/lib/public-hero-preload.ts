@@ -1,11 +1,6 @@
-import { publicHeroImageByRoute, publicRouteOrder, sharedVisualImageUrls } from "@/lib/site-data";
+import { normalizePath, publicHeroImageByRoute, publicRouteOrder, sharedVisualImageUrls } from "@/lib/site-data";
 
 const preloadCache = new Map<string, Promise<void>>();
-
-function normalizePath(pathname: string): string {
-  const [clean] = pathname.split(/[?#]/);
-  return clean || "/";
-}
 
 function preloadImage(url: string): Promise<void> {
   const existing = preloadCache.get(url);

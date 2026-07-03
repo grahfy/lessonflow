@@ -44,23 +44,15 @@ export function resolveProductionAwareStorageRoot(
   cwd: string = process.cwd()
 ): string {
   const trimmedConfiguredRoot = configuredRoot?.trim();
-  if (trimmedConfiguredRoot) {
-    if (path.isAbsolute(trimmedConfiguredRoot)) {
-      return path.resolve(trimmedConfiguredRoot);
-    }
-
-    if (process.env.NODE_ENV === "production") {
-      return path.resolve(productionAbsoluteRoot);
-    }
-
-    return path.resolve(resolveRuntimeAppRoot(cwd), trimmedConfiguredRoot);
+  if (trimmedConfiguredRoot && path.isAbsolute(trimmedConfiguredRoot)) {
+    return path.resolve(trimmedConfiguredRoot);
   }
 
   if (process.env.NODE_ENV === "production") {
     return path.resolve(productionAbsoluteRoot);
   }
 
-  return path.resolve(resolveRuntimeAppRoot(cwd), defaultRelativeRoot);
+  return path.resolve(resolveRuntimeAppRoot(cwd), trimmedConfiguredRoot || defaultRelativeRoot);
 }
 
 /**

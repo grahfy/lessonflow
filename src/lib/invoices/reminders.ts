@@ -1,7 +1,6 @@
 import { Invoice, InvoiceLineItem } from "@/generated/prisma/client";
 
 import { type InvoiceReminderPolicy } from "@/lib/email/notification-settings";
-import { sendCustomerInvoiceReminderEmail } from "@/lib/invoice-events";
 import { getInvoiceOverdueDays, getReminderStage } from "@/lib/invoices/aging";
 
 export type InvoiceWithLines = Invoice & {
@@ -45,20 +44,5 @@ export function buildInvoiceReminderPersistence(overdueDays: number, stage: numb
     lastReminderSentAt: new Date(),
     lastReminderStage: stage,
     details: `Overdue reminder sent at ${stage}-day stage (${overdueDays} days overdue)`
-  };
-}
-
-/**
- * Sends a reminder email and returns persistence fields for reminder tracking.
- *
- * The caller persists the returned fields so reminder sending can be composed into a larger
- * transaction/audit-log update without this helper owning database writes.
- */
-export async function sendInvoiceReminder(invoice: InvoiceWithLines, overdueDays: number, stage: number) {
-  const deliveryResult = await sendCustomerInvoiceReminderEmail(invoice, overdueDays);
-
-  return {
-    deliveryResult,
-    ...buildInvoiceReminderPersistence(overdueDays, stage)
   };
 }

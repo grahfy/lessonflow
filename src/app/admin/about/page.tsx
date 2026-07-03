@@ -1,4 +1,4 @@
-import React, { type ReactElement } from "react";
+import { type ReactElement } from "react";
 
 import { AdminAboutPageContent } from "@/components/admin/about/about-page-content";
 import { AdminShell } from "@/components/admin/layout/admin-shell";

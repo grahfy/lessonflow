@@ -45,10 +45,8 @@ export function AutoLogout() {
       return;
     }
 
-    // Set initial timer
     resetTimer();
 
-    // Events to track user activity
     const events = [
       "mousedown",
       "mousemove",
@@ -83,6 +81,5 @@ export function AutoLogout() {
     };
   }, [resetTimer, isLoginPage]);
 
-  // This component doesn't render anything visible
   return null;
 }

@@ -15,9 +15,8 @@
 import { InvoiceDocumentType, InvoiceStatus, InvoiceTaxMode, Prisma } from "@/generated/prisma/client";
 
 import { calculateInvoiceTotals } from "@/lib/invoices/calculate";
-import { isInvoiceNumberConflict } from "@/lib/invoices/numbering";
 import { getDefaultInvoiceTaxModeForCurrencyValue } from "@/lib/invoices/gst-policy";
-import { generateNextInvoiceNumber } from "@/lib/invoices/numbering";
+import { generateNextInvoiceNumber, isInvoiceNumberConflict } from "@/lib/invoices/numbering";
 import { sellerSnapshotFromEnv } from "@/lib/invoices/snapshots";
 import { getInvoiceCurrency } from "@/lib/invoices/tax-profile";
 import { InvoiceCustomerSnapshot, InvoiceDiscountDraft, InvoiceLineItemDraft } from "@/lib/invoices/types";

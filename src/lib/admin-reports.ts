@@ -229,15 +229,15 @@ function parseReportEmailRowLimit(value: string | undefined, fallback: number, m
 const REPORT_EMAIL_APPOINTMENT_ROWS = parseReportEmailRowLimit(process.env.ADMIN_REPORT_EMAIL_APPOINTMENT_ROWS, 10);
 const REPORT_EMAIL_OUTSTANDING_INVOICE_ROWS = parseReportEmailRowLimit(process.env.ADMIN_REPORT_EMAIL_OUTSTANDING_INVOICE_ROWS, 12);
 
-/**
- * Calculates start/end boundaries and the parallel comparative window 
- * (Prior Day/Week/Month/Year) for a given reporting key.
- */
 /** Inclusive upper bound (last representable ms) for a half-open window. */
 function inclusiveEnd(endExclusive: Date): Date {
   return new Date(endExclusive.getTime() - 1);
 }
 
+/**
+ * Calculates start/end boundaries and the parallel comparative window
+ * (Prior Day/Week/Month/Year) for a given reporting key.
+ */
 function periodBounds(period: AdminReportPeriodKey, now: Date): PeriodBounds {
   const anchor = localAnchor(now);
 
@@ -493,25 +493,38 @@ async function getOutstandingInvoiceDetailRows(now: Date) {
   }));
 }
 
-/** Builds the full comparative report set for a specific boundary. */
-async function buildPeriodMetrics(bounds: PeriodBounds, now: Date): Promise<PeriodReport> {
+/** Runs the shared set of parallel queries needed for a current + previous window comparison. */
+async function gatherPeriodMetrics(start: Date, end: Date, previousStart: Date, previousEnd: Date, now: Date) {
   const [appointments, appointmentPipeline, appointmentDetails, earnings, outstandingInvoices, outstandingInvoiceDetails, previousAppointments, previousEarnings] = await Promise.all([
-    getAppointmentCountsForWindow(bounds.start, bounds.end),
+    getAppointmentCountsForWindow(start, end),
     getAppointmentPipelineSnapshot(now),
-    getAppointmentDetailRows(bounds.start, bounds.end, now),
-    getEarningsForWindow(bounds.start, bounds.end),
+    getAppointmentDetailRows(start, end, now),
+    getEarningsForWindow(start, end),
     getOutstandingSnapshot(now),
     getOutstandingInvoiceDetailRows(now),
-    getAppointmentCountsForWindow(bounds.previousStart, bounds.previousEnd),
-    getEarningsForWindow(bounds.previousStart, bounds.previousEnd)
+    getAppointmentCountsForWindow(previousStart, previousEnd),
+    getEarningsForWindow(previousStart, previousEnd)
   ]);
 
-  // Delta calculation for "Growth" metrics
-  const earningsDeltaCents = earnings.netPaidCents - previousEarnings.netPaidCents;
+  return { appointments, appointmentPipeline, appointmentDetails, earnings, outstandingInvoices, outstandingInvoiceDetails, previousAppointments, previousEarnings };
+}
+
+/** Delta calculation for "Growth" metrics. */
+function computeEarningsDelta(netPaidCents: number, previousNetPaidCents: number) {
+  const earningsDeltaCents = netPaidCents - previousNetPaidCents;
   const earningsDeltaPercent =
-    previousEarnings.netPaidCents === 0
-      ? earnings.netPaidCents === 0 ? 0 : null
-      : (earningsDeltaCents / Math.abs(previousEarnings.netPaidCents)) * 100;
+    previousNetPaidCents === 0
+      ? netPaidCents === 0 ? 0 : null
+      : (earningsDeltaCents / Math.abs(previousNetPaidCents)) * 100;
+  return { earningsDeltaCents, earningsDeltaPercent };
+}
+
+/** Builds the full comparative report set for a specific boundary. */
+async function buildPeriodMetrics(bounds: PeriodBounds, now: Date): Promise<PeriodReport> {
+  const { appointments, appointmentPipeline, appointmentDetails, earnings, outstandingInvoices, outstandingInvoiceDetails, previousAppointments, previousEarnings } =
+    await gatherPeriodMetrics(bounds.start, bounds.end, bounds.previousStart, bounds.previousEnd, now);
+
+  const { earningsDeltaCents, earningsDeltaPercent } = computeEarningsDelta(earnings.netPaidCents, previousEarnings.netPaidCents);
 
   return {
     key: bounds.key,
@@ -545,22 +558,10 @@ async function buildCustomPeriodMetrics(start: Date, end: Date, now: Date): Prom
   const previousStart = startOfDay(subDays(startDate, daySpan));
   const previousEnd = endOfDay(subDays(startDate, 1));
 
-  const [appointments, appointmentPipeline, appointmentDetails, earnings, outstandingInvoices, outstandingInvoiceDetails, previousAppointments, previousEarnings] = await Promise.all([
-    getAppointmentCountsForWindow(startDate, endDate),
-    getAppointmentPipelineSnapshot(now),
-    getAppointmentDetailRows(startDate, endDate, now),
-    getEarningsForWindow(startDate, endDate),
-    getOutstandingSnapshot(now),
-    getOutstandingInvoiceDetailRows(now),
-    getAppointmentCountsForWindow(previousStart, previousEnd),
-    getEarningsForWindow(previousStart, previousEnd)
-  ]);
+  const { appointments, appointmentPipeline, appointmentDetails, earnings, outstandingInvoices, outstandingInvoiceDetails, previousAppointments, previousEarnings } =
+    await gatherPeriodMetrics(startDate, endDate, previousStart, previousEnd, now);
 
-  const earningsDeltaCents = earnings.netPaidCents - previousEarnings.netPaidCents;
-  const earningsDeltaPercent =
-    previousEarnings.netPaidCents === 0
-      ? earnings.netPaidCents === 0 ? 0 : null
-      : (earningsDeltaCents / Math.abs(previousEarnings.netPaidCents)) * 100;
+  const { earningsDeltaCents, earningsDeltaPercent } = computeEarningsDelta(earnings.netPaidCents, previousEarnings.netPaidCents);
 
   return {
     key: "custom",

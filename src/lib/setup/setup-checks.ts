@@ -56,10 +56,6 @@ export type SetupReadiness = {
 };
 
 /**
- * Stable machine-readable code for admin/setup flows when Prisma cannot reach
- * the configured database.
- */
-/**
  * Typed result for the first-read setup check used by admin and setup
  * entrypoints.
  *
@@ -99,13 +95,6 @@ function isValidHttpUrl(raw: string): boolean {
  */
 function hasStrongSecret(value: string, minLength: number): boolean {
   return value.trim().length >= minLength && !isLikelyPlaceholder(value);
-}
-
-/**
- * Resolves the configured local learning-material root directory.
- */
-function getLocalMaterialRoot(): string {
-  return getLocalMaterialStorageRoot();
 }
 
 /**
@@ -368,7 +357,7 @@ export async function evaluateSetupChecks(): Promise<SetupCheck[]> {
     });
   } else {
     const configuredMaterialRoot = process.env.LEARNING_MATERIALS_LOCAL_ROOT?.trim();
-    const resolvedMaterialRoot = getLocalMaterialRoot();
+    const resolvedMaterialRoot = getLocalMaterialStorageRoot();
     const localStorageWritable = await canWriteStorageRoot(resolvedMaterialRoot);
     const staffPhotoRoot = getStaffPhotoStorageRoot();
     const emailSignatureRoot = getEmailSignatureLogoStorageRoot();

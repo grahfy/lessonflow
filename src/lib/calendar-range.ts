@@ -1,4 +1,4 @@
-import { addDays, endOfDay, endOfMonth, endOfWeek, endOfYear, parseISO, startOfDay, startOfMonth, startOfWeek, startOfYear } from "date-fns";
+import { endOfDay, endOfMonth, endOfWeek, endOfYear, parseISO, startOfDay, startOfMonth, startOfWeek, startOfYear } from "date-fns";
 
 /**
  * Calendar view types for the booking interface.
@@ -38,12 +38,5 @@ export function getCalendarRange(view: CalendarView, dateIso?: string): { start:
   return {
     start: startOfMonth(baseDate),
     end: endOfMonth(baseDate)
-  };
-}
-
-export function getDayRange(baseDate: Date): { start: Date; end: Date } {
-  return {
-    start: startOfDay(baseDate),
-    end: endOfDay(addDays(baseDate, 0))
   };
 }

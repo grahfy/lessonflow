@@ -9,9 +9,9 @@
  * 1. CLI-First approach: We wrap raw `git` commands rather than using a 
  *    JS Git library to minimize dependency bloat and ensure 100% compatibility 
  *    with the server's Git installation.
- * 2. Caching: Remote fetch operations are expensive and potentially 
- *    rate-limited by providers. We implement a non-persistent in-memory 
- *    cache (5m TTL) to keep the UI snappy.
+ * 2. Caching: Remote fetch operations are expensive and potentially
+ *    rate-limited by providers. We implement a non-persistent in-memory
+ *    cache (2m TTL) to keep the UI snappy.
  * 3. Atomic SHA comparison: Comparisons are done between local `HEAD` and 
  *    `origin/main` to determine update availability.
  * 
@@ -54,7 +54,7 @@ const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
  * Checks if there are new commits on the remote repository.
  * Performs a `git fetch` and compares local HEAD with `origin/main`.
  * 
- * @param forceFetch - If true, bypasses the 5-minute cache.
+ * @param forceFetch - If true, bypasses the 2-minute cache.
  */
 export async function getUpdateStatus(forceFetch = false): Promise<UpdateStatus> {
   const now = new Date();

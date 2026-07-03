@@ -57,30 +57,35 @@ const MAX_CALENDAR_ROWS = 2000;
  */
 const MAX_CALENDAR_RANGE_DAYS = 400;
 
+type DbClient = Prisma.TransactionClient | typeof prisma;
+
+/** Shared field mapping from a manual-booking submission to a customer snapshot input. */
+function customerSnapshotArgsFromBookingInput(input: ManualBookingInput) {
+  return {
+    firstName: input.firstName,
+    lastName: input.lastName,
+    name: input.name,
+    email: input.email,
+    phone: input.phone,
+    skillLevel: input.skillLevel,
+    lessonMode: input.lessonMode,
+    unitNumber: input.unitNumber ?? undefined,
+    houseNumber: input.houseNumber,
+    streetName: input.streetName,
+    streetType: input.streetType,
+    suburb: input.suburb,
+    state: input.state,
+    postcode: input.postcode
+  };
+}
+
 /**
  * Internal helper to create a new customer record from booking data.
  */
-type DbClient = Prisma.TransactionClient | typeof prisma;
-
 async function createCustomerFromBooking(db: DbClient, input: ManualBookingInput, primaryTeacherId?: string | null) {
   return db.customer.create({
     data: {
-      ...customerSnapshotFromInput({
-        firstName: input.firstName,
-        lastName: input.lastName,
-        name: input.name,
-        email: input.email,
-        phone: input.phone,
-        skillLevel: input.skillLevel,
-        lessonMode: input.lessonMode,
-        unitNumber: input.unitNumber ?? undefined,
-        houseNumber: input.houseNumber,
-        streetName: input.streetName,
-        streetType: input.streetType,
-        suburb: input.suburb,
-        state: input.state,
-        postcode: input.postcode
-      }),
+      ...customerSnapshotFromInput(customerSnapshotArgsFromBookingInput(input)),
       ...(primaryTeacherId ? { primaryTeacherId } : {})
     }
   });
@@ -93,22 +98,7 @@ async function createCustomerFromBooking(db: DbClient, input: ManualBookingInput
 async function updateCustomerFromBooking(db: DbClient, id: string, input: ManualBookingInput) {
   return db.customer.update({
     where: { id },
-    data: customerSnapshotFromInput({
-      firstName: input.firstName,
-      lastName: input.lastName,
-      name: input.name,
-      email: input.email,
-      phone: input.phone,
-      skillLevel: input.skillLevel,
-      lessonMode: input.lessonMode,
-      unitNumber: input.unitNumber ?? undefined,
-      houseNumber: input.houseNumber,
-      streetName: input.streetName,
-      streetType: input.streetType,
-      suburb: input.suburb,
-      state: input.state,
-      postcode: input.postcode
-    })
+    data: customerSnapshotFromInput(customerSnapshotArgsFromBookingInput(input))
   });
 }
 

@@ -14,9 +14,9 @@ type Params = {
 /**
  * Returns one customer's booking history for the admin customer modal.
  */
-export async function GET(_request: NextRequest, { params }: Params) {
+export async function GET(request: NextRequest, { params }: Params) {
   try {
-    const admin = await requireAdminFromRequest(_request);
+    const admin = await requireAdminFromRequest(request);
     if (!admin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

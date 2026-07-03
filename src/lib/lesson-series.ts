@@ -41,6 +41,39 @@ export interface LessonSeriesState {
 
 // ─── Service functions ──────────────────────────────────────
 
+/** Maps a Prisma row (with customer/teacher/lessonPlans-count include) to the API shape. */
+function serializeLessonSeries(row: {
+  id: string;
+  title: string;
+  description: string | null;
+  customerId: string | null;
+  customer: { fullName: string } | null;
+  teacherId: string | null;
+  teacher: { displayName: string } | null;
+  totalLessons: number;
+  _count: { lessonPlans: number };
+  status: string;
+  sourceTemplateId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}): LessonSeriesState {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    customerId: row.customerId,
+    customerName: row.customer?.fullName ?? null,
+    teacherId: row.teacherId,
+    teacherName: row.teacher?.displayName ?? null,
+    totalLessons: row.totalLessons,
+    completedLessons: row._count.lessonPlans,
+    status: row.status,
+    sourceTemplateId: row.sourceTemplateId,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
 export async function listLessonSeries(filters?: {
   customerId?: string;
   teacherId?: string;
@@ -60,21 +93,7 @@ export async function listLessonSeries(filters?: {
     orderBy: { updatedAt: "desc" },
   });
 
-  return rows.map((row) => ({
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    customerId: row.customerId,
-    customerName: row.customer?.fullName ?? null,
-    teacherId: row.teacherId,
-    teacherName: row.teacher?.displayName ?? null,
-    totalLessons: row.totalLessons,
-    completedLessons: row._count.lessonPlans,
-    status: row.status,
-    sourceTemplateId: row.sourceTemplateId,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  }));
+  return rows.map(serializeLessonSeries);
 }
 
 export async function createLessonSeries(

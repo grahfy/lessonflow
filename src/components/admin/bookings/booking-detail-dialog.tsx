@@ -1,5 +1,5 @@
 /**
- * Booking Lifecycle & Detal Management Console
+ * Booking Lifecycle & Detail Management Console
  * 
  * Centralized dialog for managing a single booking event (Request or Confirmed).
  * Orchestrates customer details, scheduling, communication history, 
@@ -42,7 +42,7 @@ import { formatDateTime } from "@/lib/admin/formatters";
 import { type BookingEvent } from "@/lib/admin/use-bookings";
 import { type EmailRecord, type SendEmailResult } from "@/lib/admin/use-email-history";
 import { AU_STATES, type LearningMaterialBooking, type LearningMaterialRow } from "@/lib/admin/types";
-import { toAuState } from "@/lib/admin/utils";
+import { toAuState, toDigits } from "@/lib/admin/utils";
 import { AddressAutocomplete } from "@/components/admin/ui/address-autocomplete";
 import type {
   LessonPlanSection,
@@ -455,7 +455,7 @@ export function BookingDetailDialog({
                     <input value={dialogForm.email} onChange={e => updateForm({ email: e.target.value })} />
                   </AdminField>
                   <AdminField label="Phone" tooltip="Contact phone number (10 digits).">
-                    <input value={dialogForm.phone} maxLength={10} onChange={e => updateForm({ phone: e.target.value.replace(/\D/g, '').slice(0, 10) })} />
+                    <input value={dialogForm.phone} maxLength={10} onChange={e => updateForm({ phone: toDigits(e.target.value, 10) })} />
                   </AdminField>
                   
                   {/* UX: Address predictive search for lesson travel or billing accuracy. */}
@@ -491,7 +491,7 @@ export function BookingDetailDialog({
                     </select>
                   </AdminField>
                   <AdminField label="Postcode" tooltip="4-digit postal code.">
-                    <input value={dialogForm.postcode} maxLength={4} onChange={e => updateForm({ postcode: e.target.value.replace(/\D/g, '').slice(0, 4) })} />
+                    <input value={dialogForm.postcode} maxLength={4} onChange={e => updateForm({ postcode: toDigits(e.target.value, 4) })} />
                   </AdminField>
                 </AdminForm>
 

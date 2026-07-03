@@ -21,7 +21,7 @@ export function RequireAdmin({ children }: RequireAdminProps) {
   useEffect(() => {
     void (async () => {
       if (redirectingRef.current) return;
-      
+
       const setupComplete = await isSetupComplete();
       if (!setupComplete) {
         redirectingRef.current = true;

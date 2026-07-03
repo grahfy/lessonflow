@@ -20,10 +20,6 @@ function serializeLessonPricingOptions(rows: LessonPricingRecord): LessonPricing
   }));
 }
 
-export function getLessonPricingLabel(durationMinutes: number): string {
-  return `${durationMinutes} min`;
-}
-
 export async function getLessonPricingOptions(includeInactive = true) {
   return prisma.lessonPricingOption.findMany({
     where: includeInactive ? undefined : { isActive: true },
