@@ -1,0 +1,574 @@
+/*
+ * Shared learning-materials Library — admin surface.
+ *
+ * Design direction: a "setlist console". Results read as a dense track list
+ * rather than a card grid, and the signature element is the live AND-chain
+ * query readout that spells the active facet intersection as `80s + Rock +
+ * Drop-D` in a monospace console voice — making the search's AND semantics
+ * legible instead of decorative.
+ *
+ * Colour stays inside the admin blue/ink token system; exactly one library-
+ * scoped accent (amber "stage light") lights active facets and the AND
+ * connectors. Tokens carry fallbacks so the styling survives dialogs that
+ * portal outside the `.admin-shell` custom-property scope.
+ */
+
+.library {
+  --lib-accent: #f5b544;
+  --lib-accent-soft: rgba(245, 181, 68, 0.14);
+  --lib-accent-line: rgba(245, 181, 68, 0.42);
+  --lib-brand: var(--brand-0, #60a5fa);
+  --lib-ink-0: var(--ink-0, #e6ecf8);
+  --lib-ink-1: var(--ink-1, rgba(226, 232, 240, 0.66));
+  --lib-line: var(--line, rgba(148, 163, 184, 0.18));
+  --lib-panel: var(--panel, rgba(15, 23, 42, 0.78));
+  --lib-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", "Menlo", monospace;
+  display: grid;
+  gap: 14px;
+}
+
+/* ---- Workspace head ---------------------------------------------------- */
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.headCopy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.eyebrow {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--lib-ink-1);
+}
+
+.title {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--lib-ink-0);
+  letter-spacing: -0.01em;
+}
+
+.summary {
+  margin: 0;
+  color: var(--lib-ink-1);
+  font-size: 0.85rem;
+  max-width: 52ch;
+}
+
+/* ---- Search + facet console ------------------------------------------- */
+
+.console {
+  display: grid;
+  gap: 12px;
+}
+
+.searchRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--lib-line);
+  border-radius: var(--radius-sm, 12px);
+  background: var(--lib-panel);
+}
+
+.searchIcon {
+  flex: 0 0 auto;
+  color: var(--lib-ink-1);
+}
+
+.searchInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--lib-ink-0);
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.searchInput::placeholder {
+  color: var(--lib-ink-1);
+}
+
+.facets {
+  display: grid;
+  gap: 10px;
+}
+
+.facetGroup {
+  display: grid;
+  grid-template-columns: minmax(84px, max-content) 1fr;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.facetLabel {
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--lib-ink-1);
+  padding-top: 6px;
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--lib-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lib-ink-0);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.chip:hover {
+  border-color: var(--lib-accent-line);
+}
+
+.chipActive {
+  border-color: var(--lib-accent-line);
+  background: var(--lib-accent-soft);
+  color: var(--lib-accent);
+  font-weight: 600;
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--lib-accent);
+  outline-offset: 2px;
+}
+
+/* ---- Signature: AND-chain query readout -------------------------------- */
+
+.formula {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 9px 14px;
+  border: 1px solid var(--lib-line);
+  border-left: 2px solid var(--lib-accent-line);
+  border-radius: var(--radius-sm, 12px);
+  background: linear-gradient(90deg, var(--lib-accent-soft), transparent 60%);
+  font-family: var(--lib-mono);
+  font-size: 0.82rem;
+}
+
+.formulaLabel {
+  color: var(--lib-ink-1);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.62rem;
+}
+
+.formulaChain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: var(--lib-ink-0);
+}
+
+.formulaTerm {
+  color: var(--lib-accent);
+  font-weight: 600;
+}
+
+.formulaPlus {
+  color: var(--lib-accent-line);
+  font-weight: 700;
+}
+
+.formulaEmpty {
+  color: var(--lib-ink-1);
+  font-style: italic;
+}
+
+.formulaCount {
+  margin-left: auto;
+  color: var(--lib-ink-1);
+  font-variant-numeric: tabular-nums;
+}
+
+.formulaClear {
+  border: none;
+  background: transparent;
+  color: var(--lib-brand);
+  font-family: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.formulaClear:hover {
+  text-decoration: underline;
+}
+
+/* ---- Track list -------------------------------------------------------- */
+
+.list {
+  display: grid;
+  gap: 8px;
+}
+
+.empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--lib-ink-1);
+  border: 1px dashed var(--lib-line);
+  border-radius: var(--radius-sm, 12px);
+}
+
+.row {
+  border: 1px solid var(--lib-line);
+  border-radius: var(--radius-sm, 12px);
+  background: var(--lib-panel);
+  overflow: hidden;
+  transition: border-color 140ms ease;
+}
+
+.row:hover {
+  border-color: var(--admin-shell-border, rgba(96, 165, 250, 0.28));
+}
+
+.rowHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: inherit;
+}
+
+.rowIcon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: rgba(148, 163, 184, 0.1);
+  color: var(--lib-ink-1);
+}
+
+.rowIconAudio {
+  color: var(--lib-accent);
+  background: var(--lib-accent-soft);
+}
+
+.rowMain {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.rowTitleLine {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rowTitle {
+  font-weight: 600;
+  color: var(--lib-ink-0);
+  font-size: 0.92rem;
+}
+
+.rowArtist {
+  color: var(--lib-ink-1);
+  font-size: 0.82rem;
+}
+
+.rowTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.rowTag {
+  font-size: 0.68rem;
+  color: var(--lib-ink-1);
+  border: 1px solid var(--lib-line);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.rowMeta {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--lib-ink-1);
+  font-family: var(--lib-mono);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  text-transform: uppercase;
+}
+
+.chevron {
+  flex: 0 0 auto;
+  color: var(--lib-ink-1);
+  transition: transform 160ms ease;
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+/* ---- Expanded panel ---------------------------------------------------- */
+
+.panel {
+  border-top: 1px solid var(--lib-line);
+  padding: 14px 14px 16px;
+  display: grid;
+  gap: 14px;
+}
+
+.panelDesc {
+  margin: 0;
+  color: var(--lib-ink-1);
+  font-size: 0.84rem;
+}
+
+.player {
+  width: 100%;
+  max-width: 420px;
+}
+
+.previewImage {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm, 12px);
+  border: 1px solid var(--lib-line);
+}
+
+.previewDoc {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--lib-ink-1);
+  font-size: 0.82rem;
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ---- Assign & tag dialog internals ------------------------------------ */
+
+.dialogSection {
+  display: grid;
+  gap: 8px;
+}
+
+.dialogSectionTitle {
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-1, rgba(226, 232, 240, 0.66));
+  margin: 0;
+}
+
+.assignSearch {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line, rgba(148, 163, 184, 0.22));
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.5);
+  color: var(--ink-0, #e6ecf8);
+  font-size: 0.86rem;
+}
+
+.assignList {
+  display: grid;
+  gap: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.assignOption {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--ink-0, #e6ecf8);
+  font-size: 0.86rem;
+}
+
+.assignOption:hover {
+  border-color: var(--line, rgba(148, 163, 184, 0.22));
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.assignName {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.assignEmail {
+  color: var(--ink-1, rgba(226, 232, 240, 0.6));
+  font-size: 0.76rem;
+}
+
+.assignedRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--line, rgba(148, 163, 184, 0.2));
+  border-radius: 10px;
+  font-size: 0.86rem;
+  color: var(--ink-0, #e6ecf8);
+}
+
+.assignedMeta {
+  margin-left: auto;
+  color: var(--ink-1, rgba(226, 232, 240, 0.6));
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.emptyHint {
+  color: var(--ink-1, rgba(226, 232, 240, 0.6));
+  font-size: 0.82rem;
+  margin: 0;
+}
+
+/* Tag editor: current tags as removable pills grouped nowhere special. */
+.tagPillRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tagPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--line, rgba(148, 163, 184, 0.22));
+  border-radius: 999px;
+  font-size: 0.76rem;
+  color: var(--ink-0, #e6ecf8);
+}
+
+.tagPillCat {
+  color: var(--ink-1, rgba(226, 232, 240, 0.6));
+  text-transform: uppercase;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+}
+
+.tagPillRemove {
+  border: none;
+  background: transparent;
+  color: var(--ink-1, rgba(226, 232, 240, 0.6));
+  cursor: pointer;
+  display: inline-flex;
+  padding: 0;
+}
+
+.tagPillRemove:hover {
+  color: #f87171;
+}
+
+.addTagGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.addTagField {
+  display: grid;
+  gap: 4px;
+}
+
+.addTagInput {
+  padding: 7px 9px;
+  border: 1px solid var(--line, rgba(148, 163, 184, 0.22));
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.5);
+  color: var(--ink-0, #e6ecf8);
+  font-size: 0.84rem;
+}
+
+.addTagLabel {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-1, rgba(226, 232, 240, 0.6));
+}
+
+/* Hidden native file input paired with a styled label button. */
+.fileButtonRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fileName {
+  color: var(--lib-ink-1);
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .facetGroup {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .rowMeta {
+    display: none;
+  }
+  .addTagGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron,
+  .chip,
+  .row {
+    transition: none;
+  }
+}

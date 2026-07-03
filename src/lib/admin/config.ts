@@ -90,6 +90,13 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     featured: true
   },
   {
+    label: "Library",
+    href: "/admin/library",
+    tooltip: "Upload, tag, and assign shared learning materials to any student.",
+    description: "Maintain the shared materials library and assign items to students by reference.",
+    group: "education"
+  },
+  {
     label: "Chords",
     href: "/admin/chords",
     tooltip: "Build and manage chord diagrams and chord charts.",

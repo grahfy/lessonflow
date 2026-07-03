@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import {
   mapStudentPortalBooking,
   mapStudentPortalFolder,
+  mapStudentPortalLibraryItem,
   mapStudentPortalMaterial,
   mapStudentPortalPendingRequest,
   studentPortalPayloadSchema
@@ -95,6 +96,29 @@ export async function GET(request: NextRequest) {
     })
   ]);
 
+  // Library items assigned to this student by a teacher ("Assigned by teacher").
+  // Authorized purely by the LibraryAssignment join (no ownership field on the
+  // shared master); tags are included for display. Ordered newest-assigned first.
+  const libraryAssignments = await prisma.libraryAssignment.findMany({
+    where: {
+      customerId: student.id
+    },
+    include: {
+      libraryItem: {
+        include: {
+          tags: {
+            include: {
+              tag: true
+            }
+          }
+        }
+      }
+    },
+    orderBy: {
+      createdAt: "desc"
+    }
+  });
+
   // Split into upcoming/previous here so all student-facing clients can reuse the same route shape.
   const upcoming = bookings
     .filter((booking) => booking.startAt >= now && booking.status !== "cancelled")
@@ -133,6 +157,7 @@ export async function GET(request: NextRequest) {
     previous,
     standaloneMaterials: standaloneMaterials.map(mapStudentPortalMaterial),
     folders: folderTree,
+    assignedByTeacher: libraryAssignments.map(mapStudentPortalLibraryItem),
     pendingRequests: pendingRequests.map(mapStudentPortalPendingRequest),
     lessonCredits: {
       totalRemaining: creditSummary.totalRemaining,

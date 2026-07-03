@@ -23,6 +23,7 @@ import { type ReactElement, useCallback, useEffect, useMemo, useState } from "re
 
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import styles from "@/components/student-portal.module.css";
+import { PracticeAudioPlayer } from "@/components/ui/practice-audio-player";
 import { UnifiedMaterialTree, type TreeFolder } from "@/components/ui/unified-material-tree";
 import {
   parseStudentPortalPayload,
@@ -158,6 +159,60 @@ export function StudentMaterialsClient(): ReactElement {
             onNavigate={() => {}}
             isReadOnly={true}
           />
+        </section>
+      ) : null}
+
+      {!loading && !error && data?.assignedByTeacher?.length ? (
+        <section className={cx("admin-card", styles["drive-panel"])}>
+          <div className={styles["drive-toolbar"]} style={{ marginBottom: "16px" }}>
+            <h2 className={styles["drive-title"]}>Assigned by teacher</h2>
+            <p className={cx("helper-text", styles["drive-name-meta"])}>
+              Shared resources your teacher has assigned to you directly.
+            </p>
+          </div>
+
+          <div className={styles["materials-group"]}>
+            <ul className={styles["material-list"]}>
+              {data.assignedByTeacher.map((item) => (
+                <li className={styles["material-item"]} key={item.id}>
+                  <span className={styles["material-title"]}>
+                    <span>{item.title} ({item.materialType.toUpperCase()})</span>
+                    {item.description ? (
+                      <span className={cx("helper-text", styles["material-title-secondary"])}>{item.description}</span>
+                    ) : null}
+                    {item.tags.length ? (
+                      <span className={styles["booking-chip-row"]}>
+                        {item.tags.map((tag) => (
+                          <span className={styles["chip"]} key={`${tag.category}:${tag.value}`}>
+                            {tag.category}: {tag.value}
+                          </span>
+                        ))}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className={styles["material-actions"]}>
+                    {item.materialType === "audio" ? (
+                      <PracticeAudioPlayer
+                        className={cx("material-audio-player", styles["audio-player"])}
+                        src={item.previewUrl}
+                      />
+                    ) : (
+                      <Tooltip content="Preview this file in a new browser tab.">
+                        <a className="btn btn-secondary" href={item.previewUrl} target="_blank" rel="noreferrer">
+                          Preview
+                        </a>
+                      </Tooltip>
+                    )}
+                    <Tooltip content="Download this file to your device.">
+                      <a className="btn btn-secondary" href={item.downloadUrl}>
+                        Download
+                      </a>
+                    </Tooltip>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </section>
       ) : null}
     </div>
