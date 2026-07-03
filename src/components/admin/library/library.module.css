@@ -22,7 +22,6 @@
   --lib-ink-1: var(--ink-1, rgba(226, 232, 240, 0.66));
   --lib-line: var(--line, rgba(148, 163, 184, 0.18));
   --lib-panel: var(--panel, rgba(15, 23, 42, 0.78));
-  --lib-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", "Menlo", monospace;
   display: grid;
   gap: 14px;
 }
@@ -171,7 +170,7 @@
   border-left: 2px solid var(--lib-accent-line);
   border-radius: var(--radius-sm, 12px);
   background: linear-gradient(90deg, var(--lib-accent-soft), transparent 60%);
-  font-family: var(--lib-mono);
+  font-family: inherit;
   font-size: 0.82rem;
 }
 
@@ -327,7 +326,7 @@
   align-items: center;
   gap: 8px;
   color: var(--lib-ink-1);
-  font-family: var(--lib-mono);
+  font-family: inherit;
   font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
   text-transform: uppercase;
@@ -475,6 +474,19 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Inline "Remove access?" confirm shown in place of the meta + ✕ on unassign. */
+.assignedConfirm {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.assignedConfirmText {
+  color: var(--ink-1, rgba(226, 232, 240, 0.6));
+  font-size: 0.78rem;
+}
+
 .emptyHint {
   color: var(--ink-1, rgba(226, 232, 240, 0.6));
   font-size: 0.82rem;
@@ -606,4 +618,19 @@
   .row {
     transition: none;
   }
+}
+
+/* Form controls and custom buttons don't inherit the page font by default, so
+   without this they fall back to the UA default (Arial) instead of the app's
+   Overpass — making the Library's rows, search, chips and dialogs look off from
+   the rest of the console. Re-inherit so every control matches the app font. */
+.searchInput,
+.rowHead,
+.chip,
+.formulaClear,
+.assignSearch,
+.assignOption,
+.tagPillRemove,
+.addTagInput {
+  font-family: inherit;
 }

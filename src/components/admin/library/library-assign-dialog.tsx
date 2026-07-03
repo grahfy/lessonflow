@@ -43,6 +43,10 @@ export function LibraryAssignDialog({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Two-step unassign: the first click arms a confirm on that row; the second
+  // commits. `unassigningId` disables the row while the request is in flight.
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [unassigningId, setUnassigningId] = useState<string | null>(null);
 
   const refreshAssignments = useCallback(async () => {
     const rows = await loadAssignments(item.id);
@@ -112,7 +116,10 @@ export function LibraryAssignDialog({
   }
 
   async function handleUnassign(customerId: string) {
+    setUnassigningId(customerId);
     const ok = await onUnassign(item.id, customerId);
+    setUnassigningId(null);
+    setConfirmingId(null);
     if (ok) await refreshAssignments();
   }
 
@@ -193,22 +200,50 @@ export function LibraryAssignDialog({
           <p className={styles.emptyHint}>Not assigned to anyone yet.</p>
         ) : (
           <div className={styles.assignList}>
-            {assignments.map((assignment) => (
-              <div key={assignment.customerId} className={styles.assignedRow}>
-                <span className={styles.assignName}>{assignment.customerName}</span>
-                <span className={styles.assignedMeta}>
-                  {new Date(assignment.createdAt).toLocaleDateString("en-AU")}
-                </span>
-                <button
-                  type="button"
-                  className={styles.tagPillRemove}
-                  aria-label={`Unassign ${assignment.customerName}`}
-                  onClick={() => handleUnassign(assignment.customerId)}
-                >
-                  <X size={15} />
-                </button>
-              </div>
-            ))}
+            {assignments.map((assignment) => {
+              const confirming = confirmingId === assignment.customerId;
+              const removing = unassigningId === assignment.customerId;
+              return (
+                <div key={assignment.customerId} className={styles.assignedRow}>
+                  <span className={styles.assignName}>{assignment.customerName}</span>
+                  {confirming ? (
+                    <span className={styles.assignedConfirm}>
+                      <span className={styles.assignedConfirmText}>Remove access?</span>
+                      <button
+                        type="button"
+                        className="btn btn-danger btn-sm"
+                        disabled={removing}
+                        onClick={() => handleUnassign(assignment.customerId)}
+                      >
+                        {removing ? "Removing…" : "Remove"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        disabled={removing}
+                        onClick={() => setConfirmingId(null)}
+                      >
+                        Keep
+                      </button>
+                    </span>
+                  ) : (
+                    <>
+                      <span className={styles.assignedMeta}>
+                        {new Date(assignment.createdAt).toLocaleDateString("en-AU")}
+                      </span>
+                      <button
+                        type="button"
+                        className={styles.tagPillRemove}
+                        aria-label={`Unassign ${assignment.customerName}`}
+                        onClick={() => setConfirmingId(assignment.customerId)}
+                      >
+                        <X size={15} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
