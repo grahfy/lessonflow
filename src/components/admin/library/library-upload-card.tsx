@@ -24,6 +24,7 @@ export function LibraryUploadCard({ uploading, onSubmit }: LibraryUploadCardProp
   const captcha = useCaptcha();
   const formRef = useRef<HTMLFormElement | null>(null);
   const [selectedFileName, setSelectedFileName] = useState("No file selected");
+  const [hasFile, setHasFile] = useState(false);
 
   async function handleUpload() {
     if (!formRef.current) return;
@@ -35,18 +36,25 @@ export function LibraryUploadCard({ uploading, onSubmit }: LibraryUploadCardProp
     if (ok) {
       formRef.current.reset();
       setSelectedFileName("No file selected");
+      setHasFile(false);
     }
   }
 
   return (
     <AdminCard ghost>
-      <form ref={formRef} onReset={() => setSelectedFileName("No file selected")}>
+      <form
+        ref={formRef}
+        onReset={() => {
+          setSelectedFileName("No file selected");
+          setHasFile(false);
+        }}
+      >
         <AdminForm>
           <AdminField label="Title (optional)" tooltip="Defaults to the file name when left blank." fullWidth>
             <input type="text" name="title" maxLength={255} placeholder="e.g. Sweet Child O' Mine" />
           </AdminField>
 
-          <AdminField label="Select file" tooltip="PDF, common audio, or image files up to 100MB." fullWidth>
+          <AdminField label="Select file" tooltip="PDF, common audio, or image files up to 100MB." required fullWidth>
             <input
               id={fileInputId}
               type="file"
@@ -56,6 +64,7 @@ export function LibraryUploadCard({ uploading, onSubmit }: LibraryUploadCardProp
               onChange={(event) => {
                 const file = event.currentTarget.files?.[0];
                 setSelectedFileName(file?.name || "No file selected");
+                setHasFile(Boolean(file));
               }}
             />
             <div className={styles.fileButtonRow}>
@@ -76,8 +85,8 @@ export function LibraryUploadCard({ uploading, onSubmit }: LibraryUploadCardProp
 
           <CaptchaField idPrefix="library-upload" captcha={captcha} />
 
-          <Tooltip content="Add this file to the shared library.">
-            <button type="button" className="btn btn-primary" disabled={uploading} onClick={handleUpload}>
+          <Tooltip content={hasFile ? "Add this file to the shared library." : "Choose a file first."}>
+            <button type="button" className="btn btn-primary" disabled={uploading || !hasFile} onClick={handleUpload}>
               {uploading ? "Uploading…" : "Add to library"}
             </button>
           </Tooltip>

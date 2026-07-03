@@ -132,6 +132,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  min-height: 30px;
   padding: 4px 10px;
   border: 1px solid var(--lib-line);
   border-radius: 999px;
@@ -217,7 +218,10 @@
   font-family: inherit;
   font-size: 0.78rem;
   cursor: pointer;
-  padding: 2px 4px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 2px 8px;
 }
 
 .formulaClear:hover {
@@ -524,6 +528,11 @@
   color: var(--ink-1, rgba(226, 232, 240, 0.6));
   cursor: pointer;
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Comfortable tap area around the small ✕ icon (was a ~13px target). */
+  min-width: 28px;
+  min-height: 28px;
   padding: 0;
 }
 
