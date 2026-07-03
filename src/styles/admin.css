@@ -3696,6 +3696,13 @@
   padding-inline: 10px;
 }
 
+/* Browser-back control shown in the toolbar only while the header is collapsed
+   (the inline nav grid is hidden then). Icon + label need an explicit gap since
+   the base .btn is inline-flex without one. */
+.admin-header-back-toggle {
+  gap: 6px;
+}
+
 .admin-header-nav {
   grid-area: nav;
   display: grid;
@@ -8469,7 +8476,8 @@
   /* Touch-friendly tap target (WCAG 2.5.5). Specificity 0,3,0 (three classes)
      strictly beats the later `.admin-shell .btn { min-height: 38px }` (0,2,0)
      so 44px reliably wins at this narrow viewport. */
-  .admin-shell .admin-header-menu-toggle.btn {
+  .admin-shell .admin-header-menu-toggle.btn,
+  .admin-shell .admin-header-back-toggle.btn {
     min-height: 44px;
   }
 
@@ -8540,8 +8548,11 @@
 
   /* Touch-friendly tap targets in the drawer (WCAG 2.5.5).
      Scoped under .admin-shell so the 44px minimum wins over the
-     narrower-viewport `.admin-shell .btn { min-height: 38px }` rule. */
+     narrower-viewport `.admin-shell .btn { min-height: 38px }` rule.
+     Includes the per-group accordion toggle, which is a primary drawer
+     control and must meet the same touch minimum. */
   .admin-shell .admin-header-nav .admin-header-nav-button,
+  .admin-shell .admin-header-nav .admin-header-group-collapse.btn,
   .admin-shell .admin-header-nav-actions .btn {
     min-height: 44px;
   }

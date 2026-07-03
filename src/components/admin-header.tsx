@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { AdminDeployUpdatesButton } from "@/components/admin-deploy-updates-button";
 import { invalidateCustomerEmailAlertsSessionCache } from "@/lib/admin/customer-email-alerts";
@@ -31,6 +32,15 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
   // (see CSS); persisted so each group's state survives page navigation.
   const [collapsedNavGroups, setCollapsedNavGroups] = useState<Record<string, boolean>>({});
   const navPanelRef = useRef<HTMLDivElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  // The open drawer is portaled OUT of .admin-card (whose backdrop-filter traps
+  // position:fixed) but INTO the surrounding .admin-shell, so it keeps the
+  // shell's font-family and --admin-* theme tokens. Captured after mount.
+  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setPortalHost((rootRef.current?.closest(".admin-shell") as HTMLElement | null) ?? document.body);
+  }, []);
 
   useEffect(() => {
     try {
@@ -90,6 +100,15 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
   // the toggle is visible — so desktop inline nav is unaffected.
   useOverlay({ isOpen: menuOpen, panelRef: navPanelRef, onClose: closeMenu });
 
+  // On desktop the open drawer pushes the shell content aside (CSS reads this
+  // class at ≥1181px) instead of overlapping it; below that it stays a mobile
+  // overlay. The class is a no-op when the host is <body> (shell not found).
+  useEffect(() => {
+    if (!menuOpen || !portalHost) return;
+    portalHost.classList.add("is-nav-drawer-open");
+    return () => portalHost.classList.remove("is-nav-drawer-open");
+  }, [menuOpen, portalHost]);
+
   /** Ends the admin session and sends the browser back to the login screen. */
   async function logout() {
     try {
@@ -112,50 +131,14 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
     </div>
   ) : null;
 
-  return (
-    <div
-      className={`admin-card admin-header-row${collapsed ? " is-collapsed" : ""}`}
-      data-motion-item="admin-header-card"
-    >
-      <div className="admin-header-overview">
-        <div className="admin-header-title-group">
-          <p className="admin-console-kicker">Admin Console</p>
-          <h1 className="admin-console-title" data-motion-item="admin-title">
-            {title}
-          </h1>
-          <p className="helper-text admin-console-subtitle">
-            Shared operations workspace for bookings, teaching, billing, and system admin.
-          </p>
-        </div>
-
-      </div>
-
-      <div className="admin-header-toolbar">
-        {sessionChips}
-        <Tooltip content={collapsed ? "Expand the header." : "Collapse the header."} side="bottom">
-          <button
-            className="btn btn-secondary admin-header-collapse-toggle"
-            type="button"
-            aria-expanded={!collapsed}
-            aria-label={collapsed ? "Expand header" : "Collapse header"}
-            onClick={toggleCollapsed}
-          >
-            {collapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-          </button>
-        </Tooltip>
-        <Tooltip content="Toggle mobile navigation menu." side="bottom">
-          <button
-            className="btn btn-secondary admin-header-menu-toggle"
-            type="button"
-            aria-expanded={menuOpen}
-            aria-controls="admin-header-menu-panel"
-            onClick={() => setMenuOpen((current) => !current)}
-          >
-            Menu
-          </button>
-        </Tooltip>
-      </div>
-
+  // The navigation lives inside .admin-card, whose backdrop-filter makes it the
+  // containing block for position:fixed descendants — which traps the mobile
+  // drawer as a thin strip at the header. When open (only possible at mobile
+  // widths, where the Menu toggle is shown), the drawer is portaled to
+  // <body> so its fixed positioning resolves against the viewport instead.
+  // When closed it renders inline, where it is the desktop 3-box nav grid.
+  const drawerContent = (
+    <>
       {/* Mobile drawer backdrop — only rendered while open so it never blocks
           interaction on the desktop inline layout. Click closes the drawer. */}
       {menuOpen ? (
@@ -165,7 +148,7 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
       <div
         id="admin-header-menu-panel"
         ref={navPanelRef}
-        className={`admin-header-nav ${menuOpen ? "is-open" : ""}`.trim()}
+        className={`admin-header-nav ${menuOpen ? "is-open admin-header-nav--portal" : ""}`.trim()}
         // RATIONALE: At mobile widths this collapses into a slide-in drawer; the
         // dialog semantics only apply while open (when it is an overlay), so the
         // desktop inline nav keeps its plain region role.
@@ -255,6 +238,73 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
           </div>
         </div>
       </div>
+    </>
+  );
+
+  return (
+    <div
+      ref={rootRef}
+      className={`admin-card admin-header-row${collapsed ? " is-collapsed" : ""}`}
+      data-motion-item="admin-header-card"
+    >
+      <div className="admin-header-overview">
+        <div className="admin-header-title-group">
+          <p className="admin-console-kicker">Admin Console</p>
+          <h1 className="admin-console-title" data-motion-item="admin-title">
+            {title}
+          </h1>
+          <p className="helper-text admin-console-subtitle">
+            Shared operations workspace for bookings, teaching, billing, and system admin.
+          </p>
+        </div>
+
+      </div>
+
+      <div className="admin-header-toolbar">
+        {sessionChips}
+        {/* With the header collapsed the inline nav grid is hidden, so surface a
+            browser-back control to keep navigation reachable. */}
+        {collapsed ? (
+          <Tooltip content="Go back to the previous page." side="bottom">
+            <button
+              className="btn btn-secondary admin-header-back-toggle"
+              type="button"
+              aria-label="Go back to the previous page"
+              onClick={() => router.back()}
+            >
+              <ArrowLeft size={16} />
+              Back
+            </button>
+          </Tooltip>
+        ) : null}
+        <Tooltip content={collapsed ? "Expand the header." : "Collapse the header."} side="bottom">
+          <button
+            className="btn btn-secondary admin-header-collapse-toggle"
+            type="button"
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? "Expand header" : "Collapse header"}
+            onClick={toggleCollapsed}
+          >
+            {collapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+          </button>
+        </Tooltip>
+        <Tooltip content="Toggle mobile navigation menu." side="bottom">
+          <button
+            className="btn btn-secondary admin-header-menu-toggle"
+            type="button"
+            aria-expanded={menuOpen}
+            aria-controls="admin-header-menu-panel"
+            onClick={() => setMenuOpen((current) => !current)}
+          >
+            Menu
+          </button>
+        </Tooltip>
+      </div>
+
+      {/* Open → portal into .admin-shell to escape the .admin-card
+          backdrop-filter containing block while keeping the shell's font and
+          theme tokens; closed → render inline as the desktop nav grid. */}
+      {menuOpen && portalHost ? createPortal(drawerContent, portalHost) : drawerContent}
     </div>
   );
 }
