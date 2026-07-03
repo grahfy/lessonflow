@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useSafeFetch } from "./use-safe-fetch";
 
@@ -64,6 +64,16 @@ export function useLibrary(options: UseLibraryOptions = {}) {
   const { onAuthError, onError } = options;
   const { safeFetch, handleApiError } = useSafeFetch({ onAuthError, onError });
 
+  // Keep `onError` behind a ref so the data callbacks below can depend only on
+  // the stable `safeFetch`/`handleApiError`. Callers routinely pass an inline
+  // `onError` arrow (a new identity every render); without this, every callback
+  // would be recreated each render and the mount effects that call `load`/
+  // `loadVocabulary` would re-fire forever (infinite fetch loop, empty list).
+  const onErrorRef = useRef(onError);
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
+
   const [items, setItems] = useState<LibraryItemRow[]>([]);
   const [categories, setCategories] = useState<LibraryTagCategory[]>([]);
   const [loading, setLoading] = useState(false);
@@ -99,12 +109,12 @@ export function useLibrary(options: UseLibraryOptions = {}) {
         if (isCancelled()) return;
         setItems(data.items || []);
       } catch {
-        if (!isCancelled() && onError) onError("Network error loading the library.");
+        if (!isCancelled()) onErrorRef.current?.("Network error loading the library.");
       } finally {
         if (!isCancelled()) setLoading(false);
       }
     },
-    [safeFetch, handleApiError, onError]
+    [safeFetch, handleApiError]
   );
 
   /** Loads the distinct facet vocabulary (categories → values). */
@@ -118,9 +128,9 @@ export function useLibrary(options: UseLibraryOptions = {}) {
       const data = await response.json();
       setCategories(data.categories || []);
     } catch {
-      if (onError) onError("Network error loading tags.");
+      onErrorRef.current?.("Network error loading tags.");
     }
-  }, [safeFetch, handleApiError, onError]);
+  }, [safeFetch, handleApiError]);
 
   /** Uploads a new item; `form` carries file/title/description (+ captcha parity). */
   const upload = useCallback(
@@ -147,13 +157,13 @@ export function useLibrary(options: UseLibraryOptions = {}) {
         }
         return true;
       } catch {
-        if (onError) onError("Network error uploading to the library.");
+        onErrorRef.current?.("Network error uploading to the library.");
         return false;
       } finally {
         setUploading(false);
       }
     },
-    [safeFetch, handleApiError, onError]
+    [safeFetch, handleApiError]
   );
 
   /** Edits an item's title/description (the master seen by every assignee). */
@@ -178,13 +188,13 @@ export function useLibrary(options: UseLibraryOptions = {}) {
         );
         return true;
       } catch {
-        if (onError) onError("Network error updating the item.");
+        onErrorRef.current?.("Network error updating the item.");
         return false;
       } finally {
         setBusyId(null);
       }
     },
-    [safeFetch, handleApiError, onError]
+    [safeFetch, handleApiError]
   );
 
   /** Replaces an item's master file (write-new-key → pointer-swap on the server). */
@@ -215,13 +225,13 @@ export function useLibrary(options: UseLibraryOptions = {}) {
         );
         return true;
       } catch {
-        if (onError) onError("Network error replacing the file.");
+        onErrorRef.current?.("Network error replacing the file.");
         return false;
       } finally {
         setBusyId(null);
       }
     },
-    [safeFetch, handleApiError, onError]
+    [safeFetch, handleApiError]
   );
 
   /** Deletes an item (cascades tags + assignments and the master blob). */
@@ -237,13 +247,13 @@ export function useLibrary(options: UseLibraryOptions = {}) {
         setItems((prev) => prev.filter((item) => item.id !== id));
         return true;
       } catch {
-        if (onError) onError("Network error deleting the item.");
+        onErrorRef.current?.("Network error deleting the item.");
         return false;
       } finally {
         setBusyId(null);
       }
     },
-    [safeFetch, handleApiError, onError]
+    [safeFetch, handleApiError]
   );
 
   /** Attaches a typed tag (add-on-the-fly). Returns the created/reused tag. */
@@ -283,11 +293,11 @@ export function useLibrary(options: UseLibraryOptions = {}) {
         });
         return created;
       } catch {
-        if (onError) onError("Network error adding the tag.");
+        onErrorRef.current?.("Network error adding the tag.");
         return null;
       }
     },
-    [safeFetch, handleApiError, onError]
+    [safeFetch, handleApiError]
   );
 
   /** Detaches a typed tag from an item (leaves the shared vocabulary intact). */
@@ -312,11 +322,11 @@ export function useLibrary(options: UseLibraryOptions = {}) {
         );
         return true;
       } catch {
-        if (onError) onError("Network error removing the tag.");
+        onErrorRef.current?.("Network error removing the tag.");
         return false;
       }
     },
-    [safeFetch, handleApiError, onError]
+    [safeFetch, handleApiError]
   );
 
   /** Lists the students an item is currently assigned to. */
@@ -331,11 +341,11 @@ export function useLibrary(options: UseLibraryOptions = {}) {
         const data = await response.json();
         return data.assignments || [];
       } catch {
-        if (onError) onError("Network error loading assignments.");
+        onErrorRef.current?.("Network error loading assignments.");
         return null;
       }
     },
-    [safeFetch, handleApiError, onError]
+    [safeFetch, handleApiError]
   );
 
   /** Assigns an item to one or more students by reference. */
@@ -353,11 +363,11 @@ export function useLibrary(options: UseLibraryOptions = {}) {
         }
         return true;
       } catch {
-        if (onError) onError("Network error assigning the item.");
+        onErrorRef.current?.("Network error assigning the item.");
         return false;
       }
     },
-    [safeFetch, handleApiError, onError]
+    [safeFetch, handleApiError]
   );
 
   /** Unassigns an item from a single student. */
@@ -371,11 +381,11 @@ export function useLibrary(options: UseLibraryOptions = {}) {
         }
         return true;
       } catch {
-        if (onError) onError("Network error unassigning the item.");
+        onErrorRef.current?.("Network error unassigning the item.");
         return false;
       }
     },
-    [safeFetch, handleApiError, onError]
+    [safeFetch, handleApiError]
   );
 
   return {

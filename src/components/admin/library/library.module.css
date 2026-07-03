@@ -358,9 +358,13 @@
   font-size: 0.84rem;
 }
 
-.player {
+/* Override the shared PracticeAudioPlayer's own `width: min(320px, 100%)` cap
+   for THIS page only (higher specificity than the component's single-class
+   rule) so the player spans the full panel width, lining up with the action
+   button row below it. Other usages of the player are unaffected. */
+.panel .player {
   width: 100%;
-  max-width: 420px;
+  max-width: none;
 }
 
 .previewImage {
@@ -423,10 +427,17 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
   padding: 7px 10px;
   border: 1px solid transparent;
   border-radius: 10px;
   cursor: pointer;
+  /* Reset the native button face — otherwise the UA default (#efefef) shows
+     behind the near-white text and the student name is invisible on dark. */
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  text-align: left;
   color: var(--ink-0, #e6ecf8);
   font-size: 0.86rem;
 }
@@ -518,9 +529,15 @@
 .addTagField {
   display: grid;
   gap: 4px;
+  /* Allow the 1fr columns to shrink below the input's intrinsic width so the
+     `1fr 1fr auto` row fits inside the dialog instead of overflowing (which
+     pushed the Add button off the panel's right edge). */
+  min-width: 0;
 }
 
 .addTagInput {
+  width: 100%;
+  box-sizing: border-box;
   padding: 7px 9px;
   border: 1px solid var(--line, rgba(148, 163, 184, 0.22));
   border-radius: 10px;
@@ -535,6 +552,24 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-1, rgba(226, 232, 240, 0.6));
+}
+
+/* Size the Add button to line up with the 31px inputs beside it — the global
+   .btn padding otherwise renders it 41px tall and ~38px wide, so the pill
+   radius squashes "Add" into a cramped, misaligned circle. Scoped under
+   .addTagGrid to outrank the global .btn padding at equal specificity. */
+.addTagGrid .addTagButton {
+  align-self: end;
+  height: 33px;
+  min-width: 64px;
+  padding: 0 18px;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .addTagGrid .addTagButton {
+    width: 100%;
+  }
 }
 
 /* Hidden native file input paired with a styled label button. */

@@ -129,7 +129,7 @@ export function LibraryTagDialog({ item, categories, onAdd, onRemove, onClose }:
               ))}
             </datalist>
           </div>
-          <button type="button" className="btn btn-primary" disabled={!canAdd} onClick={handleAdd}>
+          <button type="button" className={`btn btn-primary ${styles.addTagButton}`} disabled={!canAdd} onClick={handleAdd}>
             Add
           </button>
         </div>
