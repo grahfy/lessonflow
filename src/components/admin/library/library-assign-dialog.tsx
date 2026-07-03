@@ -172,18 +172,9 @@ export function LibraryAssignDialog({
                 >
                   <span
                     aria-hidden="true"
-                    style={{
-                      display: "inline-flex",
-                      width: 18,
-                      height: 18,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      borderRadius: 5,
-                      border: "1px solid var(--line, rgba(148,163,184,0.35))",
-                      background: isSelected ? "var(--brand-0, #60a5fa)" : "transparent"
-                    }}
+                    className={isSelected ? `${styles.assignCheckbox} ${styles.assignCheckboxChecked}` : styles.assignCheckbox}
                   >
-                    {isSelected ? <Check size={13} color="#0a0e22" /> : null}
+                    {isSelected ? <Check size={13} /> : null}
                   </span>
                   <span className={styles.assignName}>{customer.fullName}</span>
                   <span className={styles.assignEmail}>{customer.email}</span>

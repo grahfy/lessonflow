@@ -491,6 +491,25 @@
   font-size: 0.78rem;
 }
 
+/* Multi-select checkbox on each searchable student row. `color` is the
+   checkmark (Check inherits currentColor); it flips to the brand fill when
+   selected. Uses theme tokens rather than inline hex. */
+.assignCheckbox {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  border: 1px solid var(--line, rgba(148, 163, 184, 0.35));
+  color: var(--bg-0, #060b1f);
+}
+
+.assignCheckboxChecked {
+  background: var(--brand-0, #6b8cff);
+  border-color: var(--brand-0, #6b8cff);
+}
+
 .emptyHint {
   color: var(--ink-1, rgba(226, 232, 240, 0.6));
   font-size: 0.82rem;
