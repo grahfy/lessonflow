@@ -25,16 +25,26 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-  // Collapsed state persists in localStorage so it survives page navigation
-  // across the whole admin console. Read after mount to avoid hydration mismatch.
+  // Whole-header collapse (persisted across navigation).
   const [collapsed, setCollapsed] = useState(false);
+  // Per-group nav collapse (accordion). Only takes visual effect on mobile
+  // (see CSS); persisted so each group's state survives page navigation.
+  const [collapsedNavGroups, setCollapsedNavGroups] = useState<Record<string, boolean>>({});
   const navPanelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     try {
       setCollapsed(window.localStorage.getItem("admin-header-collapsed") === "1");
+      const raw = window.localStorage.getItem("admin-nav-collapsed-groups");
+      if (raw) {
+        setCollapsedNavGroups(JSON.parse(raw) as Record<string, boolean>);
+      } else {
+        // First visit: default every group to collapsed. Only affects the
+        // mobile drawer (CSS) — on desktop the groups always show in full.
+        setCollapsedNavGroups({ business: true, education: true, system: true });
+      }
     } catch {
-      /* localStorage unavailable — keep expanded default */
+      /* localStorage unavailable or malformed — keep everything expanded */
     }
   }, []);
 
@@ -43,6 +53,18 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
       const next = !current;
       try {
         window.localStorage.setItem("admin-header-collapsed", next ? "1" : "0");
+      } catch {
+        /* ignore persistence failure */
+      }
+      return next;
+    });
+  };
+
+  const toggleNavGroup = (key: string) => {
+    setCollapsedNavGroups((current) => {
+      const next = { ...current, [key]: !current[key] };
+      try {
+        window.localStorage.setItem("admin-nav-collapsed-groups", JSON.stringify(next));
       } catch {
         /* ignore persistence failure */
       }
@@ -78,6 +100,18 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
     }
   }
 
+  // "Signed in as" chips. Rendered inside the toolbar so they always sit on one
+  // row, right beside the collapse + Menu buttons.
+  const sessionChips = admin ? (
+    <div className="admin-header-session" aria-label={`Signed in as ${admin.displayName} (${adminRoleLabel})`}>
+      <span className="admin-header-session-label">Signed in as</span>
+      <div className="admin-header-session-chips">
+        <span className="admin-header-session-name">{admin.displayName}</span>
+        <span className="admin-header-session-role">{adminRoleLabel}</span>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div
       className={`admin-card admin-header-row${collapsed ? " is-collapsed" : ""}`}
@@ -94,19 +128,11 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
           </p>
         </div>
 
-        {admin ? (
-          <div className="admin-header-session" aria-label={`Signed in as ${admin.displayName} (${adminRoleLabel})`}>
-            <span className="admin-header-session-label">Signed in as</span>
-            <div className="admin-header-session-chips">
-              <span className="admin-header-session-name">{admin.displayName}</span>
-              <span className="admin-header-session-role">{adminRoleLabel}</span>
-            </div>
-          </div>
-        ) : null}
       </div>
 
       <div className="admin-header-toolbar">
-        <Tooltip content={collapsed ? "Expand the header." : "Collapse the header."}>
+        {sessionChips}
+        <Tooltip content={collapsed ? "Expand the header." : "Collapse the header."} side="bottom">
           <button
             className="btn btn-secondary admin-header-collapse-toggle"
             type="button"
@@ -117,7 +143,7 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
             {collapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
           </button>
         </Tooltip>
-        <Tooltip content="Toggle mobile navigation menu.">
+        <Tooltip content="Toggle mobile navigation menu." side="bottom">
           <button
             className="btn btn-secondary admin-header-menu-toggle"
             type="button"
@@ -166,12 +192,24 @@ export function AdminHeader({ title, admin, adminLoading = false }: AdminHeaderP
             return (
               <section
                 key={group.key}
-                className={`admin-header-nav-group admin-header-nav-group-${group.key} ${isGroupActive ? "is-active" : ""}`}
+                className={`admin-header-nav-group admin-header-nav-group-${group.key} ${isGroupActive ? "is-active" : ""} ${collapsedNavGroups[group.key] ? "is-collapsed" : ""}`.trim()}
                 aria-label={group.label}
               >
                 <div className="admin-header-group-heading">
-                  <p className="admin-header-group-label">{group.label}</p>
-                  <p className="admin-header-group-description">{group.description}</p>
+                  <div className="admin-header-group-heading-text">
+                    <p className="admin-header-group-label">{group.label}</p>
+                    <p className="admin-header-group-description">{group.description}</p>
+                  </div>
+                  {/* Mobile-only accordion toggle (hidden on desktop via CSS). */}
+                  <button
+                    type="button"
+                    className="btn btn-secondary admin-header-group-collapse"
+                    aria-expanded={!collapsedNavGroups[group.key]}
+                    aria-label={`${collapsedNavGroups[group.key] ? "Expand" : "Collapse"} ${group.label}`}
+                    onClick={() => toggleNavGroup(group.key)}
+                  >
+                    <ChevronDown size={16} />
+                  </button>
                 </div>
                 <nav className="admin-header-nav-primary" aria-label={`${group.label} sections`}>
                   {group.items.map((item) => {

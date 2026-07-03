@@ -3534,21 +3534,45 @@
   overflow: hidden;
 }
 
-/* Collapsed header: hide the descriptive kicker, subtitle, and session chips
-   so the box shrinks to the title + controls row. Navigation is preserved.
-   Collapsed state is persisted across page loads (see AdminHeader). */
-.admin-header-row.is-collapsed {
-  gap: 0 18px;
+/* Nav-group accordion: each group (Business/Education/System) can collapse to
+   just its heading. The toggle only appears in the drawer/mobile view
+   (<=1180px, where the nav stacks vertically); on wider screens the inline nav
+   stays fully expanded. Per-group state persists across navigation. */
+.admin-header-group-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
 }
 
-.admin-header-row.is-collapsed .admin-console-kicker,
-.admin-header-row.is-collapsed .admin-console-subtitle,
-.admin-header-row.is-collapsed .admin-header-session {
+.admin-header-group-heading-text {
+  min-width: 0;
+}
+
+.admin-header-group-collapse {
   display: none;
+  flex: 0 0 auto;
+  padding-inline: 8px;
 }
 
-.admin-header-collapse-toggle {
-  padding-inline: 10px;
+.admin-header-group-collapse svg {
+  transition: transform 0.2s ease;
+}
+
+.admin-header-nav-group.is-collapsed .admin-header-group-collapse svg {
+  transform: rotate(-90deg);
+}
+
+@media (max-width: 1180px) {
+  .admin-header-group-collapse {
+    display: inline-flex;
+  }
+
+  /* Collapsed group keeps only its featured shortcut (Bookings / Lesson Plans /
+     Settings) visible; the rest of the group's links hide. */
+  .admin-header-nav-group.is-collapsed .admin-header-nav-button:not(.is-featured) {
+    display: none;
+  }
 }
 
 .admin-header-overview {
@@ -3648,9 +3672,27 @@
   grid-area: toolbar;
   display: flex;
   justify-content: flex-end;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
   min-width: fit-content;
+}
+
+/* The "Signed in as" chips live in the toolbar so they always sit on one row,
+   right beside the collapse + Menu buttons. */
+.admin-header-toolbar .admin-header-session {
+  margin-right: 4px;
+}
+
+/* Collapsed header just hides the kicker and subtitle; the toolbar (session +
+   buttons) is unchanged. */
+.admin-header-row.is-collapsed .admin-console-kicker,
+.admin-header-row.is-collapsed .admin-console-subtitle {
+  display: none;
+}
+
+.admin-header-collapse-toggle {
+  padding-inline: 10px;
 }
 
 .admin-header-nav {
