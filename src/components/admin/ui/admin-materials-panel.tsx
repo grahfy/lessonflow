@@ -5,6 +5,7 @@ import type { RefObject } from "react";
 
 import { CaptchaField, useCaptcha } from "@/components/captcha";
 import { AdminCard } from "@/components/admin/ui/admin-card";
+import { AdminNotice } from "@/components/admin/ui/admin-notice";
 import { AdminField, AdminForm } from "@/components/admin/ui/admin-form";
 import {
   MaterialsConfirmDialog,
@@ -162,6 +163,40 @@ export function AdminMaterialsPanel({
   const captcha = useCaptcha();
   const [selectedFileName, setSelectedFileName] = useState("No file selected");
   const [dialogState, setDialogState] = useState<MaterialsDialogState>(null);
+  // Local "Add to library" (promote) status — self-contained so the action
+  // needs no wiring through the parent dialog/orchestrator.
+  const [promotingId, setPromotingId] = useState<string | null>(null);
+  const [promoteStatus, setPromoteStatus] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+
+  /**
+   * Promotes a per-customer material into the shared library by copying its
+   * bytes server-side (the source material is untouched). Any admin may add to
+   * the library, but the endpoint still gates the SOURCE read by the per-customer
+   * predicate, so an unentitled teacher gets a 403 surfaced here.
+   */
+  async function handlePromoteMaterial(material: { id: string; title: string }) {
+    if (promotingId) return;
+    setPromotingId(material.id);
+    setPromoteStatus(null);
+    try {
+      const response = await fetch(`/api/admin/learning-materials/${material.id}/promote-to-library`, {
+        method: "POST"
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        setPromoteStatus({
+          tone: "error",
+          message: body?.error || "Unable to add this file to the library."
+        });
+        return;
+      }
+      setPromoteStatus({ tone: "success", message: `Added "${material.title}" to the library.` });
+    } catch {
+      setPromoteStatus({ tone: "error", message: "Network error adding to the library." });
+    } finally {
+      setPromotingId(null);
+    }
+  }
 
   const folders = useMemo<AdminFolderRow[]>(() => folderField?.folders ?? [], [folderField]);
   const currentFolderId = folderField?.currentFolderId ?? null;
@@ -201,6 +236,10 @@ export function AdminMaterialsPanel({
     <>
       <div className="dialog-col dialog-tab-section">
         <h3 className="manual-section-title">Materials List</h3>
+
+        {promoteStatus ? (
+          <AdminNotice tone={promoteStatus.tone}>{promoteStatus.message}</AdminNotice>
+        ) : null}
 
         <AdminCard ghost className="customer-materials-list-card">
           {materialsLoading ? (
@@ -256,6 +295,7 @@ export function AdminMaterialsPanel({
                   ? (material) => setDialogState({ kind: "copyMaterial", material: material as unknown as LearningMaterialRow })
                   : undefined
               }
+              onPromoteMaterial={(material) => handlePromoteMaterial({ id: material.id, title: material.title })}
             />
           )}
         </AdminCard>

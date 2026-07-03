@@ -17,7 +17,8 @@ import {
   Download,
   Eye,
   Search,
-  Copy
+  Copy,
+  Library
 } from "lucide-react";
 
 import { Tooltip } from "@/components/admin/ui/tooltip";
@@ -64,6 +65,8 @@ interface UnifiedMaterialTreeProps {
   onMoveMaterial?: (material: TreeFile) => void;
   onRenameMaterial?: (material: TreeFile) => void;
   onCopyMaterial?: (material: TreeFile) => void;
+  /** "Add to library" — promotes a per-customer material into the shared library. */
+  onPromoteMaterial?: (material: TreeFile) => void;
 }
 
 /** Recursively checks if a folder or any of its children match the search query. */
@@ -117,7 +120,8 @@ export function UnifiedMaterialTree({
   onCopyFolder,
   onMoveMaterial,
   onRenameMaterial,
-  onCopyMaterial
+  onCopyMaterial,
+  onPromoteMaterial
 }: UnifiedMaterialTreeProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({
@@ -476,6 +480,17 @@ export function UnifiedMaterialTree({
                   onClick={() => onCopyMaterial(file)}
                 >
                   <Copy size={14} />
+                </button>
+              </Tooltip>
+            )}
+            {!isReadOnly && onPromoteMaterial && (
+              <Tooltip content="Add a copy of this file to the shared library.">
+                <button
+                  type="button"
+                  className={styles.actionBtn}
+                  onClick={() => onPromoteMaterial(file)}
+                >
+                  <Library size={14} />
                 </button>
               </Tooltip>
             )}

@@ -483,6 +483,8 @@ model AdminUser {
   createdSeriesTemplates     LessonSeriesTemplate[]             @relation("LessonSeriesTemplateCreatedBy")
   createdChords              Chord[]                            @relation("ChordCreatedBy")
   createdChordCharts         ChordChart[]                       @relation("ChordChartCreatedBy")
+  uploadedLibraryItems       LibraryItem[]                      @relation("LibraryItemUploadedBy")
+  assignedLibraryAssignments LibraryAssignment[]                @relation("LibraryAssignmentAssignedBy")
 }
 
 // Canonical customer profile derived from booking requests/bookings. Multiple
@@ -526,6 +528,7 @@ model Customer {
   lessonSeries              LessonSeries[]
   lessonCreditBatches       LessonCreditBatch[]
   creditLedger              CustomerCreditLedger[]
+  libraryAssignments        LibraryAssignment[]
 
   @@index([isArchived, fullName])
   @@index([normalizedFullName, postcode, isArchived])
@@ -644,6 +647,76 @@ model StudentMaterialFolder {
   @@unique([customerId, sourceBookingId])
   @@index([customerId, parentId])
   @@index([sourceBookingId])
+}
+
+// Shared, NON-customer-scoped learning-materials Library. Unlike LearningMaterial
+// (strictly per-customer), a LibraryItem is a single master blob referenced BY
+// REFERENCE by many students through LibraryAssignment — one storageKey, N
+// assignees, edits propagate to all. Bytes live under a `library/<uuid>`
+// namespace that never collides with per-customer keys (`{customerId}/...`).
+model LibraryItem {
+  id           String               @id @default(cuid())
+  title        String
+  description  String?
+  materialType LearningMaterialType
+  storageKey   String               @unique
+  mimeType     String
+  sizeBytes    Int
+  uploadedById String?
+  uploadedBy   AdminUser?           @relation("LibraryItemUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  tags         LibraryItemTag[]
+  assignments  LibraryAssignment[]
+
+  @@index([uploadedById])
+}
+
+// Controlled tag vocabulary shared across all LibraryItems. `category` is the
+// typed axis (Decade, Style, Key, Artist, ...) and `value` the picked/added
+// term; `@@unique([category, value])` makes add-on-the-fly idempotent.
+model Tag {
+  id        String           @id @default(cuid())
+  category  String
+  value     String
+  createdAt DateTime         @default(now())
+  items     LibraryItemTag[]
+
+  @@unique([category, value])
+  @@index([category])
+}
+
+// Join between LibraryItem and Tag. The `@@index([tagId, libraryItemId])`
+// covering index backs the `tags.some` EXISTS pattern the AND-search generates
+// (one existence probe per selected category).
+model LibraryItemTag {
+  id            String      @id @default(cuid())
+  libraryItemId String
+  libraryItem   LibraryItem @relation(fields: [libraryItemId], references: [id], onDelete: Cascade)
+  tagId         String
+  tag           Tag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([libraryItemId, tagId])
+  @@index([tagId])
+  @@index([tagId, libraryItemId])
+}
+
+// By-reference assignment of a LibraryItem to a Customer. `@@unique` makes assign
+// idempotent and unassign a single delete; cascade on either side removes the
+// join (never the master blob). `assignedById` carries provenance.
+model LibraryAssignment {
+  id            String      @id @default(cuid())
+  libraryItemId String
+  libraryItem   LibraryItem @relation(fields: [libraryItemId], references: [id], onDelete: Cascade)
+  customerId    String
+  customer      Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  assignedById  String?
+  assignedBy    AdminUser?  @relation("LibraryAssignmentAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime    @default(now())
+
+  @@unique([libraryItemId, customerId])
+  @@index([customerId])
+  @@index([assignedById])
 }
 
 // Reusable structured lesson-plan templates that staff can apply to a booking

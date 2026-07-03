@@ -173,6 +173,20 @@ export function buildLearningMaterialStorageKey(input: {
 }
 
 /**
+ * Builds a unique storage key in the shared, non-customer-scoped `library/`
+ * namespace for shared-library items.
+ *
+ * RATIONALE: Library items are not tied to a customer, so their keys live under
+ * a dedicated `library/` prefix that can never collide with the
+ * `{customerId}/{bookingScope}/timestamp-uuid.ext` keys produced by
+ * buildLearningMaterialStorageKey (which always start with a customer id).
+ */
+export function buildLibraryItemStorageKey(input: { extension: string }): string {
+  const suffix = `${Date.now()}-${crypto.randomUUID()}`;
+  return `library/${suffix}${input.extension}`;
+}
+
+/**
  * Produces a download filename from metadata while preserving extension semantics.
  */
 export function buildLearningMaterialDownloadFilename(input: {
