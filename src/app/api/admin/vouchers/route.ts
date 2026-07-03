@@ -4,7 +4,10 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getDefaultCurrency } from "@/lib/branding";
 import { requireOwnerFromRequest } from "@/lib/admin-route";
-import { logEvent } from "@/lib/observability";
+import { sendTemplateEmail } from "@/lib/email/service";
+import { customerGiftVoucherTemplate } from "@/lib/email/templates";
+import { getPublicSiteUrl } from "@/lib/env";
+import { logError, logEvent } from "@/lib/observability";
 import { generateUniqueVoucherCode } from "@/lib/vouchers/code";
 import { voucherExpiryFrom } from "@/lib/vouchers/expiry";
 
@@ -141,6 +144,35 @@ export async function POST(request: NextRequest) {
     valueCents: voucher.valueCents,
     actorId: admin.id,
   });
+
+  if (voucher.recipientEmail) {
+    try {
+      await sendTemplateEmail({
+        to: voucher.recipientEmail,
+        templateKey: "gift_voucher_delivery",
+        context: {
+          recipientName: voucher.recipientName ?? "",
+          code: voucher.code,
+        },
+        fallbackRenderer: () =>
+          customerGiftVoucherTemplate({
+            recipientName: voucher.recipientName ?? "there",
+            purchaserName: null,
+            code: voucher.code,
+            valueCents: voucher.valueCents,
+            expiresAt: voucher.expiresAt,
+            message: parsed.data.note?.trim() || null,
+            redeemUrl: `${getPublicSiteUrl().replace(/\/+$/, "")}/student/login`,
+          }),
+        skipAuditBcc: true,
+        skipNotificationPolicyCheck: true,
+        bcc: admin.email,
+      });
+      logEvent("voucher.code_emailed", { voucherId: voucher.id });
+    } catch (error) {
+      logError("voucher.code_email_failed", error, { voucherId: voucher.id });
+    }
+  }
 
   return NextResponse.json({
     voucher: {
