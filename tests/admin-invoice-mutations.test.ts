@@ -411,19 +411,23 @@ describe("admin-invoice-mutations", () => {
     const token = createSessionToken(admin.email);
     const invoice = await seedInvoice(admin.id, "MGS-2026-9910");
 
-    const markPaidFromDraftReq = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}`, "PATCH", token, {
-      action: "mark_paid"
+    // mark_unpaid is only valid from 'paid', so applying it to a draft is an
+    // invalid transition. (mark_paid is intentionally allowed from draft as an
+    // escape hatch — see src/lib/invoices/transitions.ts — so it is no longer a
+    // rejection case here.)
+    const markUnpaidFromDraftReq = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}`, "PATCH", token, {
+      action: "mark_unpaid"
     });
-    const markPaidFromDraftRes = await PATCH(markPaidFromDraftReq, { params: Promise.resolve({ id: invoice.id }) });
-    expect(markPaidFromDraftRes.status).toBe(400);
-    const markPaidFromDraftBody = (await markPaidFromDraftRes.json()) as {
+    const markUnpaidFromDraftRes = await PATCH(markUnpaidFromDraftReq, { params: Promise.resolve({ id: invoice.id }) });
+    expect(markUnpaidFromDraftRes.status).toBe(400);
+    const markUnpaidFromDraftBody = (await markUnpaidFromDraftRes.json()) as {
       error: string;
       details: { action: string; status: string; allowedFrom: string[] };
     };
-    expect(markPaidFromDraftBody.error).toBe("Invalid invoice transition.");
-    expect(markPaidFromDraftBody.details.action).toBe("mark_paid");
-    expect(markPaidFromDraftBody.details.status).toBe("draft");
-    expect(markPaidFromDraftBody.details.allowedFrom).toEqual(["sent"]);
+    expect(markUnpaidFromDraftBody.error).toBe("Invalid invoice transition.");
+    expect(markUnpaidFromDraftBody.details.action).toBe("mark_unpaid");
+    expect(markUnpaidFromDraftBody.details.status).toBe("draft");
+    expect(markUnpaidFromDraftBody.details.allowedFrom).toEqual(["paid"]);
 
     const sendReq = adminRequest(`http://localhost/api/admin/invoices/${invoice.id}/send`, "POST", token);
     const sendRes = await sendInvoice(sendReq, { params: Promise.resolve({ id: invoice.id }) });
