@@ -182,6 +182,16 @@ export const updateInvoiceSchema = z
     taxMode: invoiceTaxModeSchema.optional(),
     notes: z.string().trim().max(2_000).optional().nullable(),
     dueAt: z.string().datetime({ offset: true }).optional(),
+    // Only meaningful for the `mark_paid` action: lets an admin backdate the
+    // payment date (reports bucket revenue by `paidAt`). Accepts either a
+    // date-only value ("2026-01-15") or a full ISO datetime string; when
+    // omitted, the route defaults to the current time.
+    paidAt: z
+      .string()
+      .trim()
+      .min(1)
+      .refine((value) => !Number.isNaN(new Date(value).getTime()), "Enter a valid payment date.")
+      .optional(),
     lineItems: z.array(invoiceLineItemInputSchema).min(1).max(100).optional()
   })
   .extend(optionalDiscountFieldShape)

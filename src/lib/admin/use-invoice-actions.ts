@@ -30,7 +30,7 @@ export interface UseInvoiceActionsOptions {
   createForm: CreateForm;
   /** API surface from useInvoices. */
   saveInvoiceApi: (id: string, payload: Record<string, unknown>) => Promise<InvoiceRow | null>;
-  performActionApi: (id: string, action: InvoiceAction) => Promise<InvoiceActionResult>;
+  performActionApi: (id: string, action: InvoiceAction, payload?: Record<string, unknown>) => Promise<InvoiceActionResult>;
   sendBulkRemindersApi: () => Promise<number | null>;
   removeInvoiceApi: (id: string, force?: boolean) => Promise<boolean>;
   /** Reloads the backing list with the current filter/sort/page state. */
@@ -135,7 +135,7 @@ export function useInvoiceActions({
    * Runs one lifecycle action from the detail dialog and refreshes both the
    * open dialog and the surrounding table state.
    */
-  async function performAction(action: InvoiceAction, confirmed: boolean = false) {
+  async function performAction(action: InvoiceAction, confirmed: boolean = false, payload?: Record<string, unknown>) {
     if (!selectedInvoice) return;
     if (action === "void" && !confirmed) {
       setPendingConfirm({
@@ -150,7 +150,7 @@ export function useInvoiceActions({
 
     setBusyAction(action);
     setError("");
-    const result = await performActionApi(selectedInvoice.id, action);
+    const result = await performActionApi(selectedInvoice.id, action, payload);
     setBusyAction(null);
 
     if (result.invoice) {

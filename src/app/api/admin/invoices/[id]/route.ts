@@ -13,6 +13,7 @@ import { updateInvoiceSchema } from "@/lib/invoices/schema";
 import { allowedStatusesForAction, canApplyInvoiceAction, type InvoiceLifecycleAction, type InvoiceLifecycleStatus } from "@/lib/invoices/transitions";
 import { getInvoiceCurrency } from "@/lib/invoices/tax-profile";
 import { InvoiceLineItemDraft } from "@/lib/invoices/types";
+import { APP_TIMEZONE, dateTimeLocalToDate, toDateKey } from "@/lib/time";
 
 type Params = {
   params: Promise<{
@@ -180,11 +181,42 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 
   if (parsed.data.action === "mark_paid") {
+    // Admins may backdate the payment date (e.g. recording a payment that was
+    // actually collected earlier via a legacy system); reports bucket revenue
+    // by `paidAt`, so this directly affects those figures. Default to now
+    // when no date is supplied.
+    let paidAt: Date;
+    if (parsed.data.paidAt) {
+      // The date picker sends a date-only string ("2026-07-04"); `new Date(...)`
+      // would parse that as UTC midnight, which lands on the previous calendar
+      // day for negative-offset zones. Resolve date-only values at midday in
+      // APP_TIMEZONE so the calendar day is stable; full ISO datetimes (which
+      // already carry an offset) are parsed as-is.
+      const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(parsed.data.paidAt);
+      const resolved = isDateOnly
+        ? dateTimeLocalToDate(`${parsed.data.paidAt}T12:00`, APP_TIMEZONE)
+        : new Date(parsed.data.paidAt);
+      if (!resolved || Number.isNaN(resolved.getTime())) {
+        return NextResponse.json({ error: "Invalid payment date." }, { status: 400 });
+      }
+      paidAt = resolved;
+    } else {
+      paidAt = new Date();
+    }
+
+    // A payment cannot have happened in the future; a future `paidAt` would
+    // corrupt revenue report bucketing. Reject anything past the end of today in
+    // APP_TIMEZONE.
+    const endOfTodayLocal = dateTimeLocalToDate(`${toDateKey(new Date(), APP_TIMEZONE)}T23:59`, APP_TIMEZONE);
+    if (endOfTodayLocal && paidAt.getTime() > endOfTodayLocal.getTime()) {
+      return NextResponse.json({ error: "Payment date cannot be in the future." }, { status: 400 });
+    }
+
     const paid = await prisma.invoice.update({
       where: { id },
       data: {
         status: "paid",
-        paidAt: new Date(),
+        paidAt,
         paidVia: "manual",
         updatedById: admin.id,
         auditLogs: {
