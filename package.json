@@ -27,6 +27,7 @@
     "prisma:studio": "prisma studio"
   },
   "dependencies": {
+    "@coderline/alphatab": "^1.8.4",
     "@prisma/adapter-mariadb": "7.8.0",
     "@prisma/client": "7.8.0",
     "@radix-ui/react-tooltip": "^1.2.8",

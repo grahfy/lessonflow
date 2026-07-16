@@ -24,6 +24,7 @@ import { type ReactElement, useCallback, useEffect, useMemo, useState } from "re
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import styles from "@/components/student-portal.module.css";
 import { formatBytes } from "@/lib/admin/formatters";
+import { GuitarProViewerDialog } from "@/components/ui/guitar-pro-viewer";
 import { PracticeAudioPlayer } from "@/components/ui/practice-audio-player";
 import { UnifiedMaterialTree, type TreeFolder } from "@/components/ui/unified-material-tree";
 import {
@@ -46,6 +47,7 @@ export function StudentMaterialsClient(): ReactElement {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [loggingOut, setLoggingOut] = useState(false);
+  const [openGpId, setOpenGpId] = useState<string | null>(null);
   /**
    * Loads authenticated portal data.
    * RATIONALE: We reuse the main portal endpoint to ensure permissions
@@ -199,11 +201,21 @@ export function StudentMaterialsClient(): ReactElement {
                         size="large"
                       />
                     ) : item.materialType === "guitar_pro" ? (
-                      /* Guitar Pro is octet-stream — a browser "Preview" tab renders
-                         garbage, so this card is download-only (type label + size). */
-                      <span className={cx("helper-text", styles["material-title-secondary"])}>
-                        Guitar Pro file · {formatBytes(item.sizeBytes)}
-                      </span>
+                      <>
+                        <span className={cx("helper-text", styles["material-title-secondary"])}>
+                          Guitar Pro file · {formatBytes(item.sizeBytes)}
+                        </span>
+                        <button type="button" className="btn btn-secondary" onClick={() => setOpenGpId(item.id)}>
+                          View
+                        </button>
+                        <GuitarProViewerDialog
+                          isOpen={openGpId === item.id}
+                          onClose={() => setOpenGpId(null)}
+                          src={item.previewUrl}
+                          downloadUrl={item.downloadUrl}
+                          title={item.title}
+                        />
+                      </>
                     ) : (
                       <Tooltip content="Preview this file in a new browser tab.">
                         <a className="btn btn-secondary" href={item.previewUrl} target="_blank" rel="noreferrer">

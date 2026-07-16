@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { Tooltip } from "@/components/admin/ui/tooltip";
+import { GuitarProViewerDialog } from "@/components/ui/guitar-pro-viewer";
 import { PracticeAudioPlayer } from "@/components/ui/practice-audio-player";
 import type { LibraryItemRow as LibraryItem } from "@/lib/admin/use-library";
 import { LIBRARY_ACCEPT } from "@/lib/library/library-file-classification";
@@ -108,6 +109,7 @@ export function LibraryItemRow({
   const fileInputId = useId();
   const replaceInputRef = useRef<HTMLInputElement | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
+  const [gpOpen, setGpOpen] = useState(false);
   const artist = artistOf(item);
   const tags = displayTags(item);
 
@@ -185,8 +187,7 @@ export function LibraryItemRow({
             <div className={styles.previewDoc}>
               <FileText size={16} />
               <span>
-                Guitar Pro tab ({formatBytes(item.sizeBytes)}) — no in-browser preview yet. Download to open it in
-                Guitar Pro or TuxGuitar.
+                Guitar Pro tab ({formatBytes(item.sizeBytes)}) — open the interactive viewer or download it.
               </span>
             </div>
           ) : null}
@@ -199,7 +200,14 @@ export function LibraryItemRow({
                 label="Preview"
                 onClick={() => window.open(item.previewUrl, "_blank")}
               />
-            ) : null}
+            ) : (
+              <RowActionButton
+                tooltip="Open the interactive Guitar Pro viewer."
+                icon={Eye}
+                label="View"
+                onClick={() => setGpOpen(true)}
+              />
+            )}
             <Tooltip content="Download the master file.">
               <a href={item.downloadUrl} download className="btn btn-secondary btn-sm">
                 <Download size={13} style={{ marginRight: 4 }} /> Download
@@ -246,6 +254,16 @@ export function LibraryItemRow({
             />
           </div>
         </div>
+      ) : null}
+
+      {item.materialType === "guitar_pro" ? (
+        <GuitarProViewerDialog
+          isOpen={gpOpen}
+          onClose={() => setGpOpen(false)}
+          src={item.previewUrl}
+          downloadUrl={item.downloadUrl}
+          title={item.title}
+        />
       ) : null}
     </div>
   );

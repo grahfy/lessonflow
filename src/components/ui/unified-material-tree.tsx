@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 
 import { Tooltip } from "@/components/admin/ui/tooltip";
+import { GuitarProViewerDialog } from "@/components/ui/guitar-pro-viewer";
 import { PracticeAudioPlayer } from "@/components/ui/practice-audio-player";
 import styles from "./unified-material-tree.module.css";
 
@@ -132,6 +133,7 @@ export function UnifiedMaterialTree({
   });
   const [expandedFiles, setExpandedFiles] = useState<Record<string, boolean>>({});
   const [failedPreviewIds, setFailedPreviewIds] = useState<string[]>([]);
+  const [openGpId, setOpenGpId] = useState<string | null>(null);
 
   // Expand all folders containing query matches when searching
   useEffect(() => {
@@ -267,16 +269,35 @@ export function UnifiedMaterialTree({
           </div>
         ) : null}
 
+        {file.materialType === "guitar_pro" ? (
+          <div className={styles.previewDocInfo}>
+            <FileText size={16} className={styles.fileIcon} />
+            <span>Guitar Pro tab ({formatBytes(file.sizeBytes)})</span>
+          </div>
+        ) : null}
+
         <div className={styles.previewActions}>
-          <Tooltip content="Open file in a new browser tab.">
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => window.open(rawUrl, "_blank")}
-            >
-              <Eye size={13} style={{ marginRight: "4px" }} /> Preview
-            </button>
-          </Tooltip>
+          {file.materialType === "guitar_pro" ? (
+            <Tooltip content="Open the interactive Guitar Pro viewer.">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setOpenGpId(file.id)}
+              >
+                <Eye size={13} style={{ marginRight: "4px" }} /> View
+              </button>
+            </Tooltip>
+          ) : (
+            <Tooltip content="Open file in a new browser tab.">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => window.open(rawUrl, "_blank")}
+              >
+                <Eye size={13} style={{ marginRight: "4px" }} /> Preview
+              </button>
+            </Tooltip>
+          )}
           <Tooltip content="Download file directly to your device.">
             <a href={dlUrl} download className="btn btn-secondary btn-sm">
               <Download size={13} style={{ marginRight: "4px" }} /> Download
@@ -523,6 +544,11 @@ export function UnifiedMaterialTree({
   const hasRootContents = rootFolders.length > 0 || rootFiles.length > 0;
   const isRootExpanded = !!expandedFolders.__root__;
 
+  // Resolve the open Guitar Pro file from the FULL materials list (not the
+  // filtered one) so the viewer's mount is driven solely by `openGpId` — a
+  // search change or a "Collapse All" cannot unmount an open viewer.
+  const openGpFile = openGpId ? materials.find((m) => m.id === openGpId) ?? null : null;
+
   return (
     <div className={styles.treeContainer}>
       {/* Search Input */}
@@ -611,6 +637,16 @@ export function UnifiedMaterialTree({
           </div>
         )}
       </div>
+
+      {openGpFile ? (
+        <GuitarProViewerDialog
+          isOpen
+          onClose={() => setOpenGpId(null)}
+          src={openGpFile.previewUrl || `/api/admin/learning-materials/${openGpFile.id}`}
+          downloadUrl={openGpFile.downloadUrl || `/api/admin/learning-materials/${openGpFile.id}`}
+          title={openGpFile.title}
+        />
+      ) : null}
     </div>
   );
 }

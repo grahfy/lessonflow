@@ -1,0 +1,415 @@
+/*
+ * GuitarProViewer — "Studio Console" chrome for the in-app Guitar Pro viewer.
+ *
+ * Layout is a DAW-style shell: a dark top bar of transport controls, a left
+ * rail of instrument track lanes (the track selector), and a stage holding an
+ * always-light "paper" card that the alphaTab score renders onto. The dark
+ * chrome uses the app's :root design tokens (the --bg, --ink and --brand
+ * scales); the paper card is deliberately light in every theme so notation stays
+ * legible (the one intentional break from the dark theme).
+ *
+ * The whole shell fills an AppDialog `media` panel (90vw × 90vh, padding 0);
+ * its overlaid circular close button sits top-right, so the top bar reserves
+ * right padding to clear it.
+ */
+
+.viewer {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: min(90vh, calc(100dvh - 48px));
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--surface-modal-radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  color: var(--ink-0);
+}
+
+/* ---- Top bar ---------------------------------------------------------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  /* Reserve room on the right for the AppDialog media close button. */
+  padding-right: 60px;
+  background: var(--bg-0);
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+
+.titleBlock {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: auto;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.subtitle {
+  font-size: 12px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cluster {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+/* Icon + segmented controls */
+.iconBtn,
+.segBtn,
+.linkBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ink-1);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  transition: background var(--motion-fast) var(--ease-out),
+    border-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out);
+}
+
+.iconBtn:hover,
+.segBtn:hover,
+.linkBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink-0);
+}
+
+/* App-standard focus ring (matches .btn / .admin-input :focus-visible). */
+.iconBtn:focus-visible,
+.segBtn:focus-visible,
+.linkBtn:focus-visible,
+.lane:focus-visible {
+  outline: 2px solid rgba(103, 232, 249, 0.75);
+  outline-offset: 2px;
+}
+
+.iconBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.zoomGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.zoomValue {
+  min-width: 48px;
+  text-align: center;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-1);
+}
+
+.segGroup {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.segBtn {
+  min-width: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.segBtn[aria-pressed="true"] {
+  background: linear-gradient(135deg, var(--brand-0), var(--brand-1));
+  color: #fff;
+}
+
+.linkBtn {
+  text-decoration: none;
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--brand-0), var(--brand-1));
+  color: #fff;
+}
+
+.linkBtn:hover {
+  filter: brightness(1.08);
+  color: #fff;
+}
+
+/* ---- Body: rail + stage ---------------------------------------------- */
+.body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.rail {
+  flex: 0 0 220px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-0);
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+  padding: 12px 10px;
+  gap: 4px;
+}
+
+/* Dark scrollbars: the dialog portals into document.body (outside .admin-shell),
+   so the app's scoped scrollbar theming doesn't reach it — theme it locally to
+   avoid default light OS scrollbars on the dark chrome (a known portaled-sheet
+   bug class in this repo). */
+.rail,
+.stage {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+
+.rail::-webkit-scrollbar,
+.stage::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.rail::-webkit-scrollbar-track,
+.stage::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.rail::-webkit-scrollbar-thumb,
+.stage::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 8px;
+}
+
+.railHeading {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  padding: 4px 8px 8px;
+}
+
+.lane {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-left: 3px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-1);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: background var(--motion-fast) var(--ease-out);
+}
+
+.lane:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.lane[aria-pressed="true"] {
+  background: rgba(107, 140, 255, 0.14);
+  border-left-color: var(--brand-0);
+  color: var(--ink-0);
+}
+
+.laneIcon {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink-2);
+}
+
+.lane[aria-pressed="true"] .laneIcon {
+  color: var(--brand-0);
+  background: rgba(107, 140, 255, 0.18);
+}
+
+.laneCopy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.laneName {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.laneMeta {
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+/* ---- Stage + paper --------------------------------------------------- */
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: auto;
+  background: var(--bg-2);
+  padding: 24px;
+  display: flex;
+  /* Only ever one instrument is shown, so center it. `safe center` centers the
+     score when it fits and falls back to start-alignment (no left clipping)
+     when a wide horizontal score overflows and must scroll. */
+  justify-content: safe center;
+}
+
+.paper {
+  width: 100%;
+  max-width: 900px;
+  min-height: 100%;
+  height: max-content;
+  background: #fdfbf6;
+  border: 1px solid #e7ddc4;
+  border-radius: 6px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.4);
+  padding: 32px 36px;
+  color: #1a1a1a;
+}
+
+/* alphaTab renders its SVG into here. Dark ink is guaranteed legible on the
+   light paper regardless of app theme. */
+.score {
+  width: 100%;
+}
+
+/* Horizontal layout: the score is one wide strip. The paper must grow to
+   contain it (so notation never spills onto the dark stage) while the stage
+   scrolls horizontally. */
+.viewer[data-layout="horizontal"] .paper {
+  width: max-content;
+  max-width: none;
+  margin-inline: 0;
+}
+
+.viewer[data-layout="horizontal"] .score {
+  width: max-content;
+  min-width: 100%;
+}
+
+/* ---- Status overlays (loading / error) -------------------------------
+   Absolutely positioned over the always-mounted paper so the score container
+   is never unmounted while its alphaTab instance is alive. */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 32px;
+  text-align: center;
+  color: var(--ink-1);
+  background: color-mix(in srgb, var(--bg-2) 78%, transparent);
+}
+
+.statusError {
+  color: var(--ink-0);
+}
+
+.statusActions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+/* ---- Responsive: collapse the rail into a horizontal track strip ----- */
+@media (max-width: 720px) {
+  .viewer {
+    height: min(92vh, calc(100dvh - 24px));
+  }
+
+  .topbar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-right: 56px;
+  }
+
+  .body {
+    flex-direction: column;
+  }
+
+  .rail {
+    flex: 0 0 auto;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    padding: 10px;
+  }
+
+  .railHeading {
+    display: none;
+  }
+
+  .lane {
+    flex: 0 0 auto;
+    width: auto;
+    border-left: none;
+    border-bottom: 3px solid transparent;
+    border-radius: var(--radius-sm);
+  }
+
+  .lane[aria-pressed="true"] {
+    border-left-color: transparent;
+    border-bottom-color: var(--brand-0);
+  }
+
+  .laneMeta {
+    display: none;
+  }
+
+  .stage {
+    padding: 12px;
+  }
+
+  .paper {
+    padding: 20px 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iconBtn,
+  .segBtn,
+  .linkBtn,
+  .lane {
+    transition: none;
+  }
+}
