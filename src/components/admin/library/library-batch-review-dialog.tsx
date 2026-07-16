@@ -330,26 +330,13 @@ export function LibraryBatchReviewDialog({
       size="lg"
       title={`Review batch — ${entries.length} ${entries.length === 1 ? "item" : "items"} uploaded`}
       description="Everything is already saved to the library. Closing keeps the items, just untagged — you can tag them one by one later."
-      footer={
-        <div className={styles.libScope} style={{ display: "contents" }}>
-          <span className={styles.commitSummary}>
-            <b>{entries.length} items</b> · {entries.length - duplicateEntries.length} new ·{" "}
-            {duplicateEntries.length} duplicates{discardCount > 0 ? ` (${discardCount} set to discard)` : ""}
-            {commitError ? (
-              <>
-                {" — "}
-                <span className={styles.fSubErr}>{commitError}</span>
-              </>
-            ) : null}
-          </span>
-          <button type="button" className="btn btn-secondary" disabled={committing} onClick={onClose}>
-            Close — keep untagged
-          </button>
-          <button type="button" className="btn btn-primary" disabled={committing} onClick={() => void handleCommit()}>
-            {committing ? "Committing…" : `Commit ${keepEntries.length} ${keepEntries.length === 1 ? "item" : "items"}`}
-          </button>
-        </div>
-      }
+      // The commit bar lives INSIDE the scroll area as a sticky element (see
+      // .commitBar) instead of the dialog `footer` slot: .dialog-actions is
+      // transparent and .dialog-body-scroll does not scroll on its own, so a
+      // long batch overflowed the overflow:hidden panel and painted rows
+      // straight across the footer. `bodyClassName` makes the body the scroll
+      // container the sticky bar pins to.
+      bodyClassName={styles.reviewScroll}
     >
       <div className={`${styles.libScope} ${styles.reviewBody}`}>
         {suggestions.some((s) => !s.cleared) ? (
@@ -563,6 +550,27 @@ export function LibraryBatchReviewDialog({
               </div>
             );
           })}
+        </div>
+
+        <div className={styles.commitBar}>
+          <span className={styles.commitSummary}>
+            <b>{entries.length} items</b> · {entries.length - duplicateEntries.length} new ·{" "}
+            {duplicateEntries.length} duplicates{discardCount > 0 ? ` (${discardCount} set to discard)` : ""}
+            {commitError ? (
+              <>
+                {" — "}
+                <span className={styles.fSubErr}>{commitError}</span>
+              </>
+            ) : null}
+          </span>
+          <div className={styles.commitBtns}>
+            <button type="button" className="btn btn-secondary" disabled={committing} onClick={onClose}>
+              Close — keep untagged
+            </button>
+            <button type="button" className="btn btn-primary" disabled={committing} onClick={() => void handleCommit()}>
+              {committing ? "Committing…" : `Commit ${keepEntries.length} ${keepEntries.length === 1 ? "item" : "items"}`}
+            </button>
+          </div>
         </div>
       </div>
     </AppDialog>

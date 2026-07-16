@@ -1724,6 +1724,49 @@
   font-weight: 700;
 }
 
+/* Applied to AppDialog's .dialog-body-scroll via bodyClassName: the base
+   primitive has no overflow of its own, so a long batch overflows the
+   overflow:hidden panel and paints rows across the transparent footer area.
+   This makes the body the scroll container the commit bar pins to. */
+.reviewScroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Sticky commit bar, rendered as the LAST CHILD of the scroll content — not
+   the dialog footer slot (transparent .dialog-actions). FULLY OPAQUE solid
+   fill, deliberately no backdrop-filter (lightningcss drops
+   backdrop-filter:none, and translucency is what let rows and their dashed
+   dividers show through the bar). Being in normal flow means the last row
+   always scrolls fully clear of it — the reserved space is the bar's own
+   flow height, so no manual bottom padding can drift out of sync. */
+.commitBar {
+  position: sticky;
+  /* Negative offset = the scroller's own bottom padding, so the stuck bar
+     sits flush with the scrollport edge — with bottom: 0 it rests ABOVE the
+     padding and rows stay visible in a see-through strip beneath the bar.
+     The token is on :root, so it resolves inside the body-portaled dialog. */
+  bottom: calc(var(--surface-modal-body-padding, 20px) * -1);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 13px 16px;
+  margin-top: 2px;
+  background: #0d1128;
+  border-top: 1px solid var(--lib-accent-line);
+  box-shadow: 0 -14px 26px rgba(4, 8, 20, 0.5);
+}
+
+.commitBtns {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
 .commitSummary {
   margin-right: auto;
   color: var(--lib-ink-1);
@@ -1818,6 +1861,13 @@
 
   .rSize {
     display: none;
+  }
+
+  .commitBtns {
+    margin-left: 0;
+    width: 100%;
+    display: grid;
+    gap: 8px;
   }
 
   .dropHintInline {
