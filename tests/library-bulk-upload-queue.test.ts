@@ -22,10 +22,10 @@ const grantOk: MintGrant = async () => ({ ok: true, grantId: "grant-1" });
 
 /** Transport whose resolution is manual, for asserting in-flight scheduling. */
 function deferredTransport() {
-  const inFlight: { fileName: string; resolve: (outcome: UploadOutcome) => void }[] = [];
-  const transport: UploadTransport = ({ file }) =>
+  const inFlight: { fileName: string; grantId: string | null; resolve: (outcome: UploadOutcome) => void }[] = [];
+  const transport: UploadTransport = ({ file, grantId }) =>
     new Promise<UploadOutcome>((resolve) => {
-      inFlight.push({ fileName: file.name, resolve });
+      inFlight.push({ fileName: file.name, grantId, resolve });
     });
   const finish = (fileName: string, outcome?: UploadOutcome) => {
     const index = inFlight.findIndex((entry) => entry.fileName === fileName);
@@ -220,6 +220,80 @@ describe("library-bulk-upload-queue", () => {
     // The resumed upload carried the SECOND grant id.
     expect(seenGrants.at(-1)).toBe("grant-1");
     expect(queue.getState().entries.every((e) => e.status.phase === "done")).toBe(true);
+  });
+
+  it("a late grant_* response from a superseded grant never re-pauses the resumed queue (MED 2)", async () => {
+    let mintCount = 0;
+    const mintGrant = vi.fn<MintGrant>(async () => ({ ok: true, grantId: `grant-${mintCount++}` }));
+    const { transport, inFlight, finish } = deferredTransport();
+
+    const queue = createBulkUploadQueue({
+      files: [fakeFile("a.mp3"), fakeFile("b.mp3")],
+      transport,
+      mintGrant,
+      concurrency: 2
+    });
+    await queue.start();
+    expect(inFlight.map((e) => e.grantId)).toEqual(["grant-0", "grant-0"]);
+
+    // a.mp3 dies on the CURRENT grant → queue pauses, a re-queued.
+    finish("a.mp3", { ok: false, status: 400, code: "grant_expired", error: "Upload session expired." });
+    await flush();
+    expect(queue.getState().phase).toBe("expired");
+
+    // Resume: the new grant must be sized for queued (a) AND still-uploading (b).
+    await queue.resumeExpired();
+    expect(mintGrant).toHaveBeenLastCalledWith(2, undefined);
+    await flush();
+    // a restarted on the new grant; b's ORIGINAL request still rides grant-0.
+    expect(inFlight.map((e) => `${e.fileName}:${e.grantId}`).sort()).toEqual(["a.mp3:grant-1", "b.mp3:grant-0"]);
+
+    // b's STALE grant_expired lands after the resume — must NOT re-pause.
+    finish("b.mp3", { ok: false, status: 400, code: "grant_expired", error: "Upload session expired." });
+    await flush();
+    expect(queue.getState().phase).toBe("uploading");
+    expect(queue.getState().grantMessage).toBeNull();
+    // b silently re-queued and re-sent under the new grant.
+    expect(inFlight.map((e) => `${e.fileName}:${e.grantId}`).sort()).toEqual(["a.mp3:grant-1", "b.mp3:grant-1"]);
+
+    finish("a.mp3");
+    finish("b.mp3");
+    await flush();
+    expect(queue.getState().phase).toBe("done");
+    expect(queue.getState().entries.every((e) => e.status.phase === "done")).toBe(true);
+    expect(mintGrant).toHaveBeenCalledTimes(2);
+  });
+
+  it("retryFailed never re-sends locally-failed oversize/empty files (MED 3)", async () => {
+    let failOnce = true;
+    const transport = vi.fn<UploadTransport>(async ({ file }) => {
+      if (file.name === "flaky.mp3" && failOnce) {
+        failOnce = false;
+        return { ok: false, status: 500, error: "Server exploded." };
+      }
+      return { ok: true, itemId: `item-${file.name}`, duplicateOf: null };
+    });
+    const queue = createBulkUploadQueue({
+      files: [fakeFile("huge.mp3", 100 * 1024 * 1024 + 1), fakeFile("empty.mp3", 0), fakeFile("flaky.mp3")],
+      transport,
+      mintGrant: grantOk
+    });
+    await queue.start();
+    await vi.waitFor(() => {
+      expect(queue.getState().phase).toBe("done");
+    });
+    expect(transport).toHaveBeenCalledTimes(1);
+
+    queue.retryFailed();
+    await vi.waitFor(() => {
+      expect(queue.getState().entries.find((e) => e.fileName === "flaky.mp3")?.status.phase).toBe("done");
+    });
+    // Only the server failure was retried — the local failures never hit the wire.
+    expect(transport).toHaveBeenCalledTimes(2);
+    const byName = new Map(queue.getState().entries.map((e) => [e.fileName, e.status]));
+    // Still visibly FAILED with their reasons (not reclassified as skipped).
+    expect(byName.get("huge.mp3")).toMatchObject({ phase: "failed", error: expect.stringContaining("100MB") });
+    expect(byName.get("empty.mp3")).toMatchObject({ phase: "failed" });
   });
 
   it("surfaces a mint failure as a paused state with the server's message", async () => {
