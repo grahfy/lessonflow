@@ -219,6 +219,22 @@ export function LibraryBatchReviewDialog({
   const discardCount = duplicateEntries.filter((entry) => stateFor(entry).resolution !== "keep").length;
   const keepEntries = entries.filter(isKept);
 
+  // Discards execute AT COMMIT TIME (the onDiscard loop in handleCommit), so
+  // the commit button must count them: "Commit 0 items" with pending discards
+  // is not a no-op — it finalizes the deletions. Only a batch with zero
+  // decisions of any kind (nothing kept, nothing left to discard) disables.
+  const pendingDiscardCount = duplicateEntries.filter((entry) => stateFor(entry).resolution === "discard").length;
+  const hasDecisions = keepEntries.length > 0 || pendingDiscardCount > 0;
+  const commitLabel = committing
+    ? "Committing…"
+    : keepEntries.length > 0 && pendingDiscardCount > 0
+      ? `Commit ${keepEntries.length} · discard ${pendingDiscardCount}`
+      : keepEntries.length > 0
+        ? `Commit ${keepEntries.length} ${keepEntries.length === 1 ? "item" : "items"}`
+        : pendingDiscardCount > 0
+          ? `Discard ${pendingDiscardCount} & finish`
+          : "Commit 0 items";
+
   async function handleCommit() {
     if (committing) return;
     setCommitting(true);
@@ -567,8 +583,13 @@ export function LibraryBatchReviewDialog({
             <button type="button" className="btn btn-secondary" disabled={committing} onClick={onClose}>
               Close — keep untagged
             </button>
-            <button type="button" className="btn btn-primary" disabled={committing} onClick={() => void handleCommit()}>
-              {committing ? "Committing…" : `Commit ${keepEntries.length} ${keepEntries.length === 1 ? "item" : "items"}`}
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={committing || !hasDecisions}
+              onClick={() => void handleCommit()}
+            >
+              {commitLabel}
             </button>
           </div>
         </div>

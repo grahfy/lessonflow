@@ -29,6 +29,36 @@
   --lib-panel: var(--panel, rgba(15, 23, 42, 0.78));
 }
 
+/* Dark scrollbars for portaled library surfaces (progress drawer's file list,
+   review sheet internals): they render on document.body, outside the
+   .admin-shell scrollbar scope in admin.css, so descendants would otherwise
+   get the bright native default. Same pattern as admin.css:6744-6781. */
+.libScope {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+
+.libScope ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.libScope ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.libScope ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.libScope ::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.55);
+  background-clip: padding-box;
+}
+
 .library {
   display: grid;
   gap: 14px;
@@ -1731,6 +1761,33 @@
 .reviewScroll {
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* Dark scrollbar: AppDialog portals to document.body, OUTSIDE the
+     .admin-shell scope that darkens native scrollbars (admin.css:6747), so
+     without this the sheet scrolls with the bright UA default. Mirrors the
+     admin.css pattern (Firefox props + WebKit pseudo-elements). */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+
+.reviewScroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.reviewScroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.reviewScroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.reviewScroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.55);
+  background-clip: padding-box;
 }
 
 /* Sticky commit bar, rendered as the LAST CHILD of the scroll content — not

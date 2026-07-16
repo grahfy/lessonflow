@@ -505,6 +505,10 @@ export function AdminLibraryClient() {
           onClose={() => setFiltersOpen(false)}
           size="sm"
           title="Filters"
+          // Same platform gap as the review sheet: .dialog-body-scroll never
+          // scrolls on its own, and this dialog portals outside the
+          // .admin-shell dark-scrollbar scope. reviewScroll adds both.
+          bodyClassName={styles.reviewScroll}
           footer={
             <div className={styles.libScope} style={{ display: "contents" }}>
               <button type="button" className="btn btn-primary" onClick={() => setFiltersOpen(false)}>
