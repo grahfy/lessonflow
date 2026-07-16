@@ -107,6 +107,13 @@ export type StreamMaterialDescriptor = {
   mimeType: string;
   title: string;
   materialType: LearningMaterialType;
+  /**
+   * Original upload filename (LibraryItem.originalFilename). Optional: personal
+   * LearningMaterial rows and legacy library rows never captured one. Supplies
+   * the download extension when the MIME type doesn't reverse-map (Guitar Pro
+   * files are stored as application/octet-stream).
+   */
+  originalFilename?: string | null;
 };
 
 export type StreamMaterialOptions = {
@@ -157,7 +164,8 @@ export async function streamMaterialBlob(
     buildLearningMaterialDownloadFilename({
       title: descriptor.title,
       materialType: descriptor.materialType,
-      mimeType: descriptor.mimeType
+      mimeType: descriptor.mimeType,
+      originalFilename: descriptor.originalFilename ?? null
     }),
     request.headers.get("range")
   );

@@ -75,6 +75,10 @@ async function createBooking(overrides: Partial<Record<string, unknown>> = {}) {
 }
 
 async function cleanup() {
+  // Booking edit 400s when ACTIVE pricing rows exist that don't cover the
+  // duration. Unlike the PREFIX-scoped rows below, pricing is global (unique
+  // per duration) and other files wipe it globally too — start pricing-empty.
+  await prisma.lessonPricingOption.deleteMany();
   await prisma.bookingAuditLog.deleteMany({ where: { booking: { name: { startsWith: PREFIX } } } });
   await prisma.booking.deleteMany({ where: { name: { startsWith: PREFIX } } });
   await prisma.adminUser.deleteMany({ where: { email: { startsWith: `${PREFIX}-` } } });

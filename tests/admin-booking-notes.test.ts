@@ -67,6 +67,10 @@ async function expectStorageMissing(storageKey: string) {
 
 describe("admin-booking-notes", () => {
   beforeEach(async () => {
+    // Booking create/edit 400s when ACTIVE pricing rows exist that don't cover
+    // the booking's duration; other test files (and aborted runs) leave such
+    // rows behind — start pricing-empty (empty table = validation passes).
+    await prisma.lessonPricingOption.deleteMany();
     await (prisma as any).storageCleanupTask.deleteMany();
     await prisma.bookingRequestNoteImage.deleteMany();
     await prisma.bookingNoteImage.deleteMany();
@@ -351,6 +355,8 @@ describe("tiptap-utils", () => {
 
 describe("notes-image upload", () => {
   beforeEach(async () => {
+    // See the pricing-empty rationale in the first describe's beforeEach.
+    await prisma.lessonPricingOption.deleteMany();
     await (prisma as any).storageCleanupTask.deleteMany();
     await prisma.bookingRequestNoteImage.deleteMany();
     await prisma.bookingNoteImage.deleteMany();

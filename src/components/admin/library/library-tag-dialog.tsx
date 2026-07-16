@@ -30,7 +30,10 @@ export function LibraryTagDialog({ item, categories, onAdd, onRemove, onClose }:
 
   // Values offered for the chosen category (drives the value datalist).
   const valueSuggestions = useMemo(
-    () => categories.find((c) => c.category.toLowerCase() === category.trim().toLowerCase())?.values ?? [],
+    () =>
+      (categories.find((c) => c.category.toLowerCase() === category.trim().toLowerCase())?.values ?? []).map(
+        (v) => v.value
+      ),
     [categories, category]
   );
 

@@ -27,18 +27,21 @@ export async function GET(request: NextRequest) {
     const tags = await prisma.tag.findMany({
       where: { items: { some: {} } },
       orderBy: [{ category: "asc" }, { value: "asc" }],
-      select: { category: true, value: true }
+      // Per-value item counts drive the facet rail's "Rock 34" labels (a
+      // binding element of the approved Split Workbench design record).
+      select: { category: true, value: true, _count: { select: { items: true } } }
     });
 
     // Group values under their category so the client can render one facet per
     // category with its selectable values.
-    const byCategory = new Map<string, string[]>();
-    for (const { category, value } of tags) {
+    const byCategory = new Map<string, Array<{ value: string; count: number }>>();
+    for (const { category, value, _count } of tags) {
+      const entry = { value, count: _count.items };
       const values = byCategory.get(category);
       if (values) {
-        values.push(value);
+        values.push(entry);
       } else {
-        byCategory.set(category, [value]);
+        byCategory.set(category, [entry]);
       }
     }
 

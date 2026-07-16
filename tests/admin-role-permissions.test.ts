@@ -65,6 +65,10 @@ function baseBookingPayload(startAt: string) {
 
 describe("admin role permissions", () => {
   beforeEach(async () => {
+    // Booking create 400s when ACTIVE pricing rows exist that don't cover the
+    // booking's duration; other test files (and aborted runs) leave such rows
+    // behind — start pricing-empty (empty table = validation passes).
+    await prisma.lessonPricingOption.deleteMany();
     await prisma.learningMaterial.deleteMany();
     await prisma.customerPortalCredentialAuditLog.deleteMany();
     await prisma.customerPortalCredential.deleteMany();
