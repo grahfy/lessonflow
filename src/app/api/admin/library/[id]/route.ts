@@ -5,19 +5,21 @@ import { canManageLibrary } from "@/lib/admin/permissions";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
+import { classifyLibraryFile, normalizeOriginalFilename } from "@/lib/library/library-file-classification";
 import { deleteLibraryItem, replaceLibraryItemFile } from "@/lib/library/library-service";
+import {
+  declaredContentLengthExceedsUploadCap,
+  MAX_MATERIAL_SIZE_BYTES
+} from "@/lib/library/upload-limits";
 import { logError } from "@/lib/observability";
 import { streamMaterialBlob } from "@/lib/student-portal/material-response";
 import { createMaterialStorageDriver } from "@/lib/student-portal/material-storage";
-import { classifyLearningMaterialFile } from "@/lib/student-portal/materials";
 
 type Params = {
   params: Promise<{
     id: string;
   }>;
 };
-
-const MAX_MATERIAL_SIZE_BYTES = 100 * 1024 * 1024;
 
 /**
  * Streams the master file of a library item for admin preview/download. Auth is
@@ -46,7 +48,8 @@ export async function GET(request: NextRequest, { params }: Params) {
         storageKey: item.storageKey,
         mimeType: item.mimeType,
         title: item.title,
-        materialType: item.materialType
+        materialType: item.materialType,
+        originalFilename: item.originalFilename
       },
       request,
       { notFoundMessage: "Library item not found." }
@@ -132,6 +135,13 @@ export async function PUT(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Library item not found." }, { status: 404 });
     }
 
+    // Reject clearly-oversized requests off the declared content-length BEFORE
+    // formData() buffers the body. Absent/unparseable header falls through to
+    // the post-parse file-size guard below.
+    if (declaredContentLengthExceedsUploadCap(request.headers.get("content-length"))) {
+      return NextResponse.json({ error: "File must be between 1 byte and 100MB." }, { status: 400 });
+    }
+
     const form = await request.formData().catch((error) => {
       logError("api.library.form_data_failed", error);
       return null;
@@ -148,13 +158,16 @@ export async function PUT(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "File must be between 1 byte and 100MB." }, { status: 400 });
     }
 
-    const classification = classifyLearningMaterialFile({
+    const classification = classifyLibraryFile({
       fileName: file.name,
       mimeType: file.type
     });
     if (!classification) {
       return NextResponse.json(
-        { error: "Only PDF, common audio, and image files (JPEG, PNG, GIF, WebP) are supported." },
+        {
+          error:
+            "Only PDF, common audio, image (JPEG, PNG, GIF, WebP), and Guitar Pro (.gp3, .gp4, .gp5, .gpx, .gp) files are supported."
+        },
         { status: 400 }
       );
     }
@@ -168,7 +181,8 @@ export async function PUT(request: NextRequest, { params }: Params) {
         materialType: classification.materialType,
         mimeType: classification.mimeType,
         extension: classification.extension,
-        sizeBytes: file.size
+        sizeBytes: file.size,
+        originalFilename: normalizeOriginalFilename(file.name)
       });
 
       return NextResponse.json({

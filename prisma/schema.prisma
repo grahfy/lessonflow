@@ -130,6 +130,7 @@ enum LearningMaterialType {
   audio
   pdf
   image
+  guitar_pro
 }
 
 enum AdminRole {
@@ -662,7 +663,12 @@ model LibraryItem {
   storageKey   String               @unique
   mimeType     String
   sizeBytes    Int
-  uploadedById String?
+  // Normalized original upload filename (normalizeOriginalFilename). Nullable:
+  // legacy rows and promoted per-customer materials never captured one. Explicit
+  // VarChar(255) — Prisma's MySQL default of VARCHAR(191) would truncate below
+  // the 255-char normalization rule and desync the duplicate probe.
+  originalFilename String?             @db.VarChar(255)
+  uploadedById     String?
   uploadedBy   AdminUser?           @relation("LibraryItemUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
   createdAt    DateTime             @default(now())
   updatedAt    DateTime             @updatedAt
@@ -670,6 +676,7 @@ model LibraryItem {
   assignments  LibraryAssignment[]
 
   @@index([uploadedById])
+  @@index([originalFilename])
 }
 
 // Controlled tag vocabulary shared across all LibraryItems. `category` is the

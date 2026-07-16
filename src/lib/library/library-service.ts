@@ -104,6 +104,13 @@ export async function replaceLibraryItemFile(input: {
   mimeType: string;
   extension: string;
   sizeBytes: number;
+  /**
+   * Normalized original filename of the REPLACEMENT file (the caller applies
+   * normalizeOriginalFilename). Updated in the pointer-swap so a replaced
+   * master keeps duplicate-detection and download-name fidelity — a stale
+   * originalFilename would flag/name against the superseded file.
+   */
+  originalFilename: string;
 }): Promise<LibraryItem> {
   const storage = createMaterialStorageDriver();
   const newStorageKey = buildLibraryItemStorageKey({ extension: input.extension });
@@ -129,7 +136,8 @@ export async function replaceLibraryItemFile(input: {
         storageKey: newStorageKey,
         mimeType: input.mimeType,
         materialType: input.materialType,
-        sizeBytes: input.sizeBytes
+        sizeBytes: input.sizeBytes,
+        originalFilename: input.originalFilename
       }
     });
   } catch (error) {

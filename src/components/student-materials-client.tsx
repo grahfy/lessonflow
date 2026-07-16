@@ -23,6 +23,7 @@ import { type ReactElement, useCallback, useEffect, useMemo, useState } from "re
 
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import styles from "@/components/student-portal.module.css";
+import { formatBytes } from "@/lib/admin/formatters";
 import { PracticeAudioPlayer } from "@/components/ui/practice-audio-player";
 import { UnifiedMaterialTree, type TreeFolder } from "@/components/ui/unified-material-tree";
 import {
@@ -176,7 +177,7 @@ export function StudentMaterialsClient(): ReactElement {
               {data.assignedByTeacher.map((item) => (
                 <li className={styles["material-item"]} key={item.id}>
                   <span className={styles["material-title"]}>
-                    <span>{item.title} ({item.materialType.toUpperCase()})</span>
+                    <span>{item.title} ({materialTypeLabel(item.materialType)})</span>
                     {item.description ? (
                       <span className={cx("helper-text", styles["material-title-secondary"])}>{item.description}</span>
                     ) : null}
@@ -197,6 +198,12 @@ export function StudentMaterialsClient(): ReactElement {
                         src={item.previewUrl}
                         size="large"
                       />
+                    ) : item.materialType === "guitar_pro" ? (
+                      /* Guitar Pro is octet-stream — a browser "Preview" tab renders
+                         garbage, so this card is download-only (type label + size). */
+                      <span className={cx("helper-text", styles["material-title-secondary"])}>
+                        Guitar Pro file · {formatBytes(item.sizeBytes)}
+                      </span>
                     ) : (
                       <Tooltip content="Preview this file in a new browser tab.">
                         <a className="btn btn-secondary" href={item.previewUrl} target="_blank" rel="noreferrer">
@@ -222,6 +229,11 @@ export function StudentMaterialsClient(): ReactElement {
 
 function cx(...classNames: Array<string | false | null | undefined>): string {
   return classNames.filter(Boolean).join(" ");
+}
+
+/** Human-readable type suffix for the assigned-item title ("guitar_pro" reads badly raw). */
+function materialTypeLabel(materialType: string): string {
+  return materialType === "guitar_pro" ? "GUITAR PRO" : materialType.toUpperCase();
 }
 
 /**

@@ -1,97 +1,165 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { AlertCircle, FilePlus2, FolderOpen } from "lucide-react";
 
 import { CaptchaField, useCaptcha } from "@/components/captcha";
-import { AdminCard } from "@/components/admin/ui/admin-card";
-import { AdminField, AdminForm } from "@/components/admin/ui/admin-form";
 import { Tooltip } from "@/components/admin/ui/tooltip";
-import { LEARNING_MATERIAL_ACCEPT } from "@/lib/admin/types";
+import { BULK_UPLOAD_MAX_FILES } from "@/lib/admin/use-bulk-upload";
 import styles from "./library.module.css";
 
+/** Precheck counts over the staged batch, computed by the page from `precheckLibraryFile`. */
+export interface StagedBatchSummary {
+  /** Everything handed over, junk included. */
+  total: number;
+  /** Files that will actually upload. */
+  accepted: number;
+  /** Unsupported/oversize/empty files that will be listed with a reason. */
+  flagged: number;
+  /** OS/sync artifacts silently ignored. */
+  junk: number;
+}
+
 interface LibraryUploadCardProps {
-  uploading: boolean;
-  onSubmit: (form: HTMLFormElement, captcha: { captchaToken: string; captchaAnswer: string }) => Promise<boolean>;
+  /** "start" launches a fresh batch; "resume" re-mints a grant after mid-batch expiry. */
+  mode: "start" | "resume";
+  stagedSummary: StagedBatchSummary | null;
+  /** True while the grant is being minted / the queue is starting. */
+  busy: boolean;
+  /** Queue message shown in resume mode ("upload session expired…"). */
+  grantMessage: string | null;
+  folderPickSupported: boolean;
+  onAddFiles: () => void;
+  onAddFolder: () => void;
+  onStart: (captcha: { captchaToken: string; captchaAnswer: string }) => Promise<void>;
+  onDismiss: () => void;
 }
 
 /**
- * Upload form for a new library item. Mirrors the customer-material upload —
- * same file allow-list and CAPTCHA parity (skipped in dev/test server-side) —
- * but has no customer/booking/folder context: the library is a flat shared store.
+ * "Add to library" batch launcher (Split Workbench). Replaces the old one-file
+ * upload form: files/folders are staged via the dual pickers (or a page drop),
+ * and ONE security check covers the whole batch — the answer mints the
+ * bulk-upload grant, not a per-file captcha. Tagging happens after upload, in
+ * review, so there are no title/description fields here.
  */
-export function LibraryUploadCard({ uploading, onSubmit }: LibraryUploadCardProps) {
-  const fileInputId = useId();
+export function LibraryUploadCard({
+  mode,
+  stagedSummary,
+  busy,
+  grantMessage,
+  folderPickSupported,
+  onAddFiles,
+  onAddFolder,
+  onStart,
+  onDismiss
+}: LibraryUploadCardProps) {
   const captcha = useCaptcha();
-  const formRef = useRef<HTMLFormElement | null>(null);
-  const [selectedFileName, setSelectedFileName] = useState("No file selected");
-  const [hasFile, setHasFile] = useState(false);
 
-  async function handleUpload() {
-    if (!formRef.current) return;
-    if (!captcha.validateAnswer()) return;
+  const canStart = !busy && (mode === "resume" || (stagedSummary !== null && stagedSummary.accepted > 0));
 
-    const ok = await onSubmit(formRef.current, captcha.getPayload());
+  async function handleStart() {
+    if (!canStart) return;
+    if (!captcha.validateAnswer()) {
+      // Move focus to the invalid field so the error (role=alert +
+      // aria-invalid) is announced and correctable without hunting for it.
+      // CaptchaField derives the id from our idPrefix ("library-bulk").
+      document.getElementById("library-bulk-captcha")?.focus();
+      return;
+    }
+    const payload = captcha.getPayload();
     // Fresh challenge every attempt to avoid stale-answer replay.
     void captcha.regenerate();
-    if (ok) {
-      formRef.current.reset();
-      setSelectedFileName("No file selected");
-      setHasFile(false);
-    }
+    await onStart(payload);
   }
 
   return (
-    <AdminCard ghost>
-      <form
-        ref={formRef}
-        onReset={() => {
-          setSelectedFileName("No file selected");
-          setHasFile(false);
-        }}
-      >
-        <AdminForm>
-          <AdminField label="Title (optional)" tooltip="Defaults to the file name when left blank." fullWidth>
-            <input type="text" name="title" maxLength={255} placeholder="e.g. Sweet Child O' Mine" />
-          </AdminField>
+    <div className={styles.uploadCard}>
+      <div className={styles.uploadHead}>
+        <div className={styles.uploadHeadCopy}>
+          <span className={styles.uploadTitle}>{mode === "resume" ? "Resume upload batch" : "Add to library"}</span>
+          <span className={styles.uploadSub}>
+            {mode === "resume"
+              ? grantMessage || "The upload session expired mid-batch. Solve a new check to resume the remaining files."
+              : "Pick files, or a whole folder — types are detected automatically and folder names become suggested tags in review."}
+          </span>
+        </div>
+        <button type="button" className={styles.iconBtn} aria-label="Close upload panel" onClick={onDismiss}>
+          ✕
+        </button>
+      </div>
 
-          <AdminField label="Select file" tooltip="PDF, common audio, or image files up to 100MB." required fullWidth>
-            <input
-              id={fileInputId}
-              type="file"
-              name="file"
-              accept={`${LEARNING_MATERIAL_ACCEPT},image/*`}
-              className="admin-visually-hidden-input"
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                setSelectedFileName(file?.name || "No file selected");
-                setHasFile(Boolean(file));
-              }}
-            />
-            <div className={styles.fileButtonRow}>
-              <Tooltip content="Select a file from your device.">
-                <label htmlFor={fileInputId} className="btn btn-secondary">
-                  Browse
-                </label>
-              </Tooltip>
-              <span className={styles.fileName} title={selectedFileName}>
-                {selectedFileName}
-              </span>
-            </div>
-          </AdminField>
-
-          <AdminField label="Description (optional)" tooltip="Context or practice notes shown with the item." fullWidth>
-            <textarea name="description" rows={2} maxLength={500} placeholder="E.g. Intro riff, capo 2nd fret" />
-          </AdminField>
-
-          <CaptchaField idPrefix="library-upload" captcha={captcha} />
-
-          <Tooltip content={hasFile ? "Add this file to the shared library." : "Choose a file first."}>
-            <button type="button" className="btn btn-primary" disabled={uploading || !hasFile} onClick={handleUpload}>
-              {uploading ? "Uploading…" : "Add to library"}
+      {mode === "start" ? (
+        <>
+          <div className={styles.pickRow}>
+            <button type="button" className="btn btn-primary" onClick={onAddFiles}>
+              <FilePlus2 size={14} style={{ marginRight: 6 }} />
+              Add files
             </button>
-          </Tooltip>
-        </AdminForm>
-      </form>
-    </AdminCard>
+            {folderPickSupported ? (
+              <>
+                <span className={styles.pickOr}>or</span>
+                <button type="button" className="btn btn-secondary" onClick={onAddFolder}>
+                  <FolderOpen size={14} style={{ marginRight: 6 }} />
+                  Add folder
+                </button>
+              </>
+            ) : null}
+            <span className={styles.pickOr}>…or just drop them anywhere on this page.</span>
+          </div>
+
+          <div className={styles.acceptHint}>
+            Accepted:
+            <span className={styles.typeTag}>Audio · MP3 WAV M4A OGG FLAC</span>
+            <span className={styles.typeTag}>PDF</span>
+            <span className={styles.typeTag}>Image · PNG JPG GIF WebP</span>
+            <span className={styles.typeTag}>Guitar Pro · .gp3 .gp4 .gp5 .gpx .gp</span>
+            <span>— anything else is listed as skipped, with the reason.</span>
+          </div>
+
+          <div className={styles.limits}>
+            Up to <b>{BULK_UPLOAD_MAX_FILES} files</b> per batch · <b>100 MB</b> per file · junk files (.DS_Store,
+            Thumbs.db) are ignored silently.
+          </div>
+
+          {stagedSummary ? (
+            <div className={styles.stagedLine} role="status">
+              <b>{stagedSummary.accepted}</b>
+              {stagedSummary.accepted === 1 ? "file ready to upload" : "files ready to upload"}
+              {stagedSummary.flagged > 0 ? (
+                <span className={styles.stagedWarn}>
+                  · {stagedSummary.flagged} will be listed as skipped/failed with a reason
+                </span>
+              ) : null}
+              {stagedSummary.junk > 0 ? (
+                <span className={styles.stagedWarn}>· {stagedSummary.junk} junk ignored</span>
+              ) : null}
+            </div>
+          ) : (
+            <div className={styles.stagedLine} role="status">
+              <AlertCircle size={14} aria-hidden="true" />
+              <span className={styles.stagedWarn}>Nothing staged yet — pick or drop files to get started.</span>
+            </div>
+          )}
+        </>
+      ) : null}
+
+      <CaptchaField idPrefix="library-bulk" captcha={captcha} />
+
+      <div className={styles.startRow}>
+        <Tooltip
+          content={
+            canStart
+              ? mode === "resume"
+                ? "Mint a new upload session and resume the remaining files."
+                : "One check starts the whole batch — uploads run in the background."
+              : "Stage at least one supported file first."
+          }
+        >
+          <button type="button" className="btn btn-primary" disabled={!canStart} onClick={() => void handleStart()}>
+            {busy ? "Starting…" : mode === "resume" ? "Resume upload" : "Start upload"}
+          </button>
+        </Tooltip>
+        <span className={styles.limits}>One check covers the whole batch.</span>
+      </div>
+    </div>
   );
 }
