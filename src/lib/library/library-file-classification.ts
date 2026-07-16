@@ -22,7 +22,7 @@
  */
 
 import { LEARNING_MATERIAL_ACCEPT } from "@/lib/admin/types";
-import { classifyLearningMaterialFile } from "@/lib/student-portal/materials";
+import { classifyLearningMaterialFile } from "@/lib/student-portal/material-classification";
 import type { LearningMaterialType } from "@/generated/prisma/client";
 
 /** Guitar Pro extensions accepted by the library (lowercase, dot-prefixed). */
