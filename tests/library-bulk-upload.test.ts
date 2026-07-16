@@ -30,8 +30,10 @@ describe("library-bulk-upload (production-mode grant lifecycle, AC-I4)", () => {
     vi.stubEnv("NODE_ENV", "production");
     // In production the local root resolves under /var/www/... — pin it to an
     // absolute test-writable dir (absolute configured roots always win) so
-    // storage puts succeed under the stubbed env.
-    vi.stubEnv("LEARNING_MATERIALS_LOCAL_ROOT", path.resolve(process.cwd(), ".data/learning-materials"));
+    // storage puts succeed under the stubbed env. MUST be a dedicated -test
+    // dir: ".data/learning-materials" is the LIVE dev server's blob store and
+    // the fs.rm below would recursively destroy it on every suite run.
+    vi.stubEnv("LEARNING_MATERIALS_LOCAL_ROOT", path.resolve(process.cwd(), ".data/learning-materials-test"));
     await fs.rm(getLocalMaterialStorageRoot(), { recursive: true, force: true });
   });
 

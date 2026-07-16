@@ -52,6 +52,9 @@ describe("admin-manual-booking-customer-match", () => {
   beforeEach(async () => {
     // NOTE: Manual booking can create both direct bookings and recurring series,
     // so cleanup must remove both paths before each deterministic scenario.
+    // Booking create 400s when ACTIVE pricing rows exist that don't cover the
+    // duration; other files leave rows behind — start pricing-empty.
+    await prisma.lessonPricingOption.deleteMany();
     await prisma.customerPortalCredentialAuditLog.deleteMany();
     await prisma.customerPortalCredential.deleteMany();
     await prisma.bookingAuditLog.deleteMany();

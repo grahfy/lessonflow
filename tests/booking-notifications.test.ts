@@ -24,6 +24,9 @@ function adminRequest(url: string, body: Record<string, unknown>, token: string)
 describe("booking-notifications", () => {
   beforeEach(async () => {
     process.env.ADMIN_EMAIL = "admin@example.com";
+    // Booking edit 400s when ACTIVE pricing rows exist that don't cover the
+    // duration; other files leave rows behind — start pricing-empty.
+    await prisma.lessonPricingOption.deleteMany();
     await prisma.outboundEmail.deleteMany();
     await prisma.geoblockingSettings.deleteMany();
     await prisma.booking.deleteMany();
