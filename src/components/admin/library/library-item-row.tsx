@@ -20,6 +20,7 @@ import {
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import { PracticeAudioPlayer } from "@/components/ui/practice-audio-player";
 import type { LibraryItemRow as LibraryItem } from "@/lib/admin/use-library";
+import { LIBRARY_ACCEPT } from "@/lib/library/library-file-classification";
 import styles from "./library.module.css";
 
 interface LibraryItemRowProps {
@@ -52,6 +53,9 @@ function formatBytes(bytes: number): string {
 }
 
 function formatLabel(item: LibraryItem): string {
+  // GP files are stored as application/octet-stream — the MIME subtype would
+  // render as the meaningless "OCTET-STREAM".
+  if (item.materialType === "guitar_pro") return "GUITAR PRO";
   const subtype = item.mimeType.split("/")[1] || item.materialType;
   return subtype.toUpperCase();
 }
@@ -121,6 +125,7 @@ export function LibraryItemRow({
         <span className={styles.rowMain}>
           <span className={styles.rowTitleLine}>
             <span className={styles.rowTitle}>{item.title}</span>
+            {item.materialType === "guitar_pro" ? <span className={styles.gpBadge}>Guitar Pro</span> : null}
             {artist ? <span className={styles.rowArtist}>{artist}</span> : null}
           </span>
           {tags.length > 0 ? (
@@ -176,13 +181,25 @@ export function LibraryItemRow({
             </div>
           ) : null}
 
+          {item.materialType === "guitar_pro" ? (
+            <div className={styles.previewDoc}>
+              <FileText size={16} />
+              <span>
+                Guitar Pro tab ({formatBytes(item.sizeBytes)}) — no in-browser preview yet. Download to open it in
+                Guitar Pro or TuxGuitar.
+              </span>
+            </div>
+          ) : null}
+
           <div className={styles.rowActions}>
-            <RowActionButton
-              tooltip="Open the master file in a new tab."
-              icon={Eye}
-              label="Preview"
-              onClick={() => window.open(item.previewUrl, "_blank")}
-            />
+            {item.materialType !== "guitar_pro" ? (
+              <RowActionButton
+                tooltip="Open the master file in a new tab."
+                icon={Eye}
+                label="Preview"
+                onClick={() => window.open(item.previewUrl, "_blank")}
+              />
+            ) : null}
             <Tooltip content="Download the master file.">
               <a href={item.downloadUrl} download className="btn btn-secondary btn-sm">
                 <Download size={13} style={{ marginRight: 4 }} /> Download
@@ -219,7 +236,7 @@ export function LibraryItemRow({
               id={fileInputId}
               ref={replaceInputRef}
               type="file"
-              accept="application/pdf,audio/*,image/*"
+              accept={`${LIBRARY_ACCEPT},image/*`}
               className="admin-visually-hidden-input"
               onChange={(event) => {
                 const file = event.currentTarget.files?.[0];
