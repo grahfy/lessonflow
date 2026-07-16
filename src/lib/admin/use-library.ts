@@ -16,7 +16,7 @@ export interface LibraryItemRow {
   id: string;
   title: string;
   description: string | null;
-  materialType: "audio" | "pdf" | "image";
+  materialType: "audio" | "pdf" | "image" | "guitar_pro";
   mimeType: string;
   sizeBytes: number;
   createdAt: string;

@@ -193,6 +193,7 @@ export function buildLearningMaterialDownloadFilename(input: {
   title: string;
   materialType: LearningMaterialType;
   mimeType: string;
+  originalFilename?: string | null;
 }): string {
   const base = input.title
     .trim()
@@ -201,9 +202,27 @@ export function buildLearningMaterialDownloadFilename(input: {
     .trim()
     .slice(0, 120) || "lesson-material";
 
-  const FALLBACK_EXT: Record<string, string> = { pdf: ".pdf", image: ".jpg", audio: ".mp3" };
-  const ext = inferExtensionFromMime(input.mimeType) || FALLBACK_EXT[input.materialType] || ".bin";
+  const FALLBACK_EXT: Record<string, string> = { pdf: ".pdf", image: ".jpg", audio: ".mp3", guitar_pro: ".gp" };
+  const ext =
+    inferExtensionFromMime(input.mimeType) ||
+    sanitizedExtensionFromOriginalFilename(input.originalFilename) ||
+    FALLBACK_EXT[input.materialType] ||
+    ".bin";
   return `${base}${ext}`;
+}
+
+/**
+ * Extracts a header-safe extension from a stored original upload filename.
+ * The only source of a real extension for MIME types that never reverse-map
+ * (Guitar Pro files arrive as application/octet-stream), so it sits between
+ * MIME inference and the per-type fallback in the download-name resolution.
+ */
+function sanitizedExtensionFromOriginalFilename(originalFilename: string | null | undefined): string | null {
+  if (!originalFilename) {
+    return null;
+  }
+  const ext = path.extname(originalFilename.trim()).toLowerCase();
+  return /^\.[a-z0-9]{1,10}$/.test(ext) ? ext : null;
 }
 
 /**

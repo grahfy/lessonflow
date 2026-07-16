@@ -15,7 +15,7 @@ import {
 const studentPortalLessonModeSchema = z.enum(["in_person", "video"]);
 const studentPortalLessonDurationSchema = z.enum(["min30", "min60"]);
 const studentPortalBookingStatusSchema = z.enum(["approved", "cancelled"]);
-const studentPortalMaterialTypeSchema = z.enum(["audio", "pdf", "image"]);
+const studentPortalMaterialTypeSchema = z.enum(["audio", "pdf", "image", "guitar_pro"]);
 
 export const studentPortalMaterialSchema = z.object({
   id: z.string(),

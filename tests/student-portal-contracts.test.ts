@@ -124,4 +124,39 @@ describe("student-portal-contracts", () => {
     // "pending" belongs to the separate pendingRequests collection.
     expect(invalid.success).toBe(false);
   });
+
+  it("parses a payload with a guitar_pro item assigned by teacher (AC-I2)", () => {
+    // P1 guard: parseStudentPortalPayload runs over the WHOLE portal payload, so
+    // a materialType the enum doesn't know would dead-page the portal the moment
+    // a Guitar Pro library item is assigned to any student.
+    const payload = parseStudentPortalPayload({
+      student: {
+        id: "cus_1",
+        fullName: "Jamie Student",
+        postcode: "3000"
+      },
+      now: "2026-07-16T01:00:00.000Z",
+      upcoming: [],
+      previous: [],
+      standaloneMaterials: [],
+      folders: [],
+      assignedByTeacher: [
+        {
+          id: "lib_1",
+          title: "Sweet Child O Mine",
+          description: null,
+          materialType: "guitar_pro",
+          mimeType: "application/octet-stream",
+          sizeBytes: 40960,
+          createdAt: "2026-07-15T10:00:00.000Z",
+          downloadUrl: "/api/student/library/lib_1/download",
+          previewUrl: "/api/student/library/lib_1/download?disposition=inline",
+          tags: [{ category: "Style", value: "Rock" }]
+        }
+      ],
+      pendingRequests: []
+    });
+    expect(payload.assignedByTeacher).toHaveLength(1);
+    expect(payload.assignedByTeacher?.[0]?.materialType).toBe("guitar_pro");
+  });
 });

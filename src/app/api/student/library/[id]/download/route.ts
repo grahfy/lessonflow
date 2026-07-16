@@ -71,7 +71,8 @@ export async function GET(request: NextRequest, { params }: Params) {
       storageKey: item.storageKey,
       mimeType: item.mimeType,
       title: item.title,
-      materialType: item.materialType
+      materialType: item.materialType,
+      originalFilename: item.originalFilename
     },
     request
   );
