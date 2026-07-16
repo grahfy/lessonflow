@@ -506,9 +506,11 @@ export function AdminLibraryClient() {
           size="sm"
           title="Filters"
           footer={
-            <button type="button" className="btn btn-primary" onClick={() => setFiltersOpen(false)}>
-              Show {items.length} {items.length === 1 ? "item" : "items"}
-            </button>
+            <div className={styles.libScope} style={{ display: "contents" }}>
+              <button type="button" className="btn btn-primary" onClick={() => setFiltersOpen(false)}>
+                Show {items.length} {items.length === 1 ? "item" : "items"}
+              </button>
+            </div>
           }
         >
           <div className={styles.libScope} style={{ display: "grid", gap: 10 }}>
