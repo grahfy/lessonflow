@@ -18,6 +18,7 @@ import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/li
 import { customerSnapshotFromInput } from "@/lib/customer-match";
 import { prisma } from "@/lib/db";
 import { replaceLibraryItemFile } from "@/lib/library/library-service";
+import { MAX_UPLOAD_REQUEST_BYTES } from "@/lib/library/upload-limits";
 import * as observability from "@/lib/observability";
 import { createMaterialStorageDriver } from "@/lib/student-portal/material-storage";
 import { getLocalMaterialStorageRoot } from "@/lib/student-portal/material-storage.local";
@@ -379,6 +380,30 @@ describe("admin-library", () => {
     const storage = createMaterialStorageDriver();
     const streamed = await storage.get({ storageKey: after!.storageKey });
     expect(streamed.buffer.toString()).toBe("replacement-bytes");
+  });
+
+  it("AC-replace pre-guard: an oversized declared content-length is rejected before the body is parsed", async () => {
+    const { cookie } = await ownerCookie();
+    const item = await uploadItem(cookie);
+    const before = await prisma.libraryItem.findUnique({ where: { id: item.id } });
+
+    const form = new FormData();
+    form.set("file", new File([Buffer.from("replacement-bytes")], "new.mp3", { type: "audio/mpeg" }));
+    const response = await replaceLibraryFile(
+      new NextRequest(`http://localhost/api/admin/library/${item.id}`, {
+        method: "PUT",
+        body: form,
+        headers: { cookie, "content-length": String(MAX_UPLOAD_REQUEST_BYTES + 1) }
+      }),
+      { params: Promise.resolve({ id: item.id }) }
+    );
+    expect(response.status).toBe(400);
+    expect(((await response.json()) as { error?: string }).error).toBe("File must be between 1 byte and 100MB.");
+
+    // The live master is untouched: same pointer, blob still present.
+    const after = await prisma.libraryItem.findUnique({ where: { id: item.id } });
+    expect(after!.storageKey).toBe(before!.storageKey);
+    expect(await blobExists(before!.storageKey)).toBe(true);
   });
 
   it("AC-replace failure: a failed pointer-swap leaves the old blob + row intact and cleans the stray new blob", async () => {

@@ -15,7 +15,9 @@ import { POST as mintBatch } from "@/app/api/admin/library/bulk-batches/route";
 import { POST as uploadLibrary } from "@/app/api/admin/library/route";
 import { createSessionToken, ensureOwnerAdmin, getSessionCookieName } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
+import * as bulkUploadGrant from "@/lib/library/bulk-upload-grant";
 import { BULK_UPLOAD_GRANT_TTL_MS, mintBulkUploadGrant } from "@/lib/library/bulk-upload-grant";
+import { MAX_UPLOAD_REQUEST_BYTES } from "@/lib/library/upload-limits";
 import { getLocalMaterialStorageRoot } from "@/lib/student-portal/material-storage.local";
 
 describe("library-bulk-upload (production-mode grant lifecycle, AC-I4)", () => {
@@ -97,12 +99,16 @@ describe("library-bulk-upload (production-mode grant lifecycle, AC-I4)", () => {
   it("prod: a failed upload refunds its unit — retries never strand a batch", async () => {
     const { admin, cookie } = await ownerCookie();
     const { grantId } = mintBulkUploadGrant({ adminId: admin.id, fileCount: 1 });
+    const refundSpy = vi.spyOn(bulkUploadGrant, "refundBulkUploadGrantUnit");
 
     // Unclassifiable file: reserved at accept, refunded on the classify 400.
     const rejected = await uploadLibrary(
       uploadRequest(cookie, new File([Buffer.from("doc-bytes")], "notes.docx", { type: "" }), { grantId })
     );
     expect(rejected.status).toBe(400);
+    // Exactly one refund for the one failure — the self-nulling closure can
+    // never fire twice for a single reserved unit.
+    expect(refundSpy).toHaveBeenCalledTimes(1);
 
     // The refund makes the retry succeed on the same grant...
     expect((await uploadLibrary(uploadRequest(cookie, mp3(), { grantId }))).status).toBe(201);
@@ -164,5 +170,28 @@ describe("library-bulk-upload (production-mode grant lifecycle, AC-I4)", () => {
       }
     }
     expect(await prisma.libraryItem.count()).toBe(1);
+  });
+
+  it("prod: an oversized declared content-length is rejected pre-buffer and consumes no grant unit", async () => {
+    const { admin, cookie } = await ownerCookie();
+    const { grantId } = mintBulkUploadGrant({ adminId: admin.id, fileCount: 1 });
+
+    const form = new FormData();
+    form.set("grantId", grantId);
+    form.set("file", mp3("huge.mp3"));
+    const oversized = await uploadLibrary(
+      new NextRequest("http://localhost/api/admin/library", {
+        method: "POST",
+        body: form,
+        headers: { cookie, "content-length": String(MAX_UPLOAD_REQUEST_BYTES + 1) }
+      })
+    );
+    expect(oversized.status).toBe(400);
+    expect(((await oversized.json()) as { error?: string }).error).toBe("File must be between 1 byte and 100MB.");
+    expect(await prisma.libraryItem.count()).toBe(0);
+
+    // The guard fired before the form (and its grantId) was ever read — the
+    // grant's single unit is intact, so a normal retry on the same grant lands.
+    expect((await uploadLibrary(uploadRequest(cookie, mp3("retry.mp3"), { grantId }))).status).toBe(201);
   });
 });

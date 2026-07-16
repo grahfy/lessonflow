@@ -9,6 +9,10 @@ import { AppError } from "@/lib/errors";
 import { refundBulkUploadGrantUnit, reserveBulkUploadGrantUnit } from "@/lib/library/bulk-upload-grant";
 import { classifyLibraryFile, normalizeOriginalFilename } from "@/lib/library/library-file-classification";
 import { buildLibrarySearchWhere, type LibraryTagFilter } from "@/lib/library/library-search";
+import {
+  declaredContentLengthExceedsUploadCap,
+  MAX_MATERIAL_SIZE_BYTES
+} from "@/lib/library/upload-limits";
 import { logError } from "@/lib/observability";
 import {
   createMaterialStorageDriver,
@@ -19,8 +23,6 @@ import {
   buildLibraryItemStorageKey,
   sanitizeLearningMaterialTitle
 } from "@/lib/student-portal/materials";
-
-const MAX_MATERIAL_SIZE_BYTES = 100 * 1024 * 1024;
 
 /**
  * Parses repeatable `?tag=Category:Value` params into typed tag filters. Only the
@@ -174,6 +176,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // Reject clearly-oversized requests off the declared content-length BEFORE
+    // formData() buffers the body. This runs before the grant unit is reserved
+    // (the grantId lives in the form, which is never read here), so there is no
+    // refund interaction. Absent/unparseable header falls through to the
+    // post-parse file-size guard below.
+    if (declaredContentLengthExceedsUploadCap(request.headers.get("content-length"))) {
+      return NextResponse.json({ error: "File must be between 1 byte and 100MB." }, { status: 400 });
+    }
+
     const form = await request.formData().catch((error) => {
       logError("api.library.form_data_failed", error);
       return null;
@@ -198,7 +209,12 @@ export async function POST(request: NextRequest) {
         if (!reservation.ok) {
           return NextResponse.json({ error: reservation.message, code: reservation.code }, { status: 400 });
         }
-        refundReservedUnit = () => refundBulkUploadGrantUnit({ grantId, adminId: admin.id });
+        // Self-nulling: disarm BEFORE refunding so a failure path that refunds
+        // and then throws can't refund a second time from the outer catch.
+        refundReservedUnit = () => {
+          refundReservedUnit = null;
+          refundBulkUploadGrantUnit({ grantId, adminId: admin.id });
+        };
       } else {
         const captchaToken = String(form.get("captchaToken") || "").trim();
         const captchaAnswer = String(form.get("captchaAnswer") || "").trim();

@@ -7,6 +7,10 @@ import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
 import { classifyLibraryFile, normalizeOriginalFilename } from "@/lib/library/library-file-classification";
 import { deleteLibraryItem, replaceLibraryItemFile } from "@/lib/library/library-service";
+import {
+  declaredContentLengthExceedsUploadCap,
+  MAX_MATERIAL_SIZE_BYTES
+} from "@/lib/library/upload-limits";
 import { logError } from "@/lib/observability";
 import { streamMaterialBlob } from "@/lib/student-portal/material-response";
 import { createMaterialStorageDriver } from "@/lib/student-portal/material-storage";
@@ -16,8 +20,6 @@ type Params = {
     id: string;
   }>;
 };
-
-const MAX_MATERIAL_SIZE_BYTES = 100 * 1024 * 1024;
 
 /**
  * Streams the master file of a library item for admin preview/download. Auth is
@@ -131,6 +133,13 @@ export async function PUT(request: NextRequest, { params }: Params) {
     const existing = await prisma.libraryItem.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: "Library item not found." }, { status: 404 });
+    }
+
+    // Reject clearly-oversized requests off the declared content-length BEFORE
+    // formData() buffers the body. Absent/unparseable header falls through to
+    // the post-parse file-size guard below.
+    if (declaredContentLengthExceedsUploadCap(request.headers.get("content-length"))) {
+      return NextResponse.json({ error: "File must be between 1 byte and 100MB." }, { status: 400 });
     }
 
     const form = await request.formData().catch((error) => {
