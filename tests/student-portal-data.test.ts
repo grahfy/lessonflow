@@ -7,7 +7,7 @@ import { GET as studentPortal } from "@/app/api/student/portal/route";
 import { ensureOwnerAdmin } from "@/lib/admin-auth";
 import { customerSnapshotFromInput } from "@/lib/customer-match";
 import { prisma } from "@/lib/db";
-import { studentPortalPayloadSchema } from "@/lib/student-portal/contracts";
+import { mapStudentPortalLibraryItem, studentPortalPayloadSchema } from "@/lib/student-portal/contracts";
 import { createMaterialStorageDriver } from "@/lib/student-portal/material-storage";
 import { createStudentSessionToken, getStudentSessionCookieName } from "@/lib/student-portal/session";
 
@@ -330,6 +330,31 @@ describe("student-portal-data", () => {
     // players and browser save dialogs rely on, not just route reachability.
     expect(response.headers.get("content-type")).toBe("audio/mpeg");
     expect(response.headers.get("content-disposition") || "").toContain("Warmup track");
+  });
+
+  it("maps a guitar_pro library assignment to the assigned-by-teacher contract shape", () => {
+    // F6: pure mapper check — a GP assignment must survive the contract parse
+    // (P1: one unparseable item kills the whole portal payload, not just its card).
+    const assignedAt = new Date("2026-07-01T10:00:00.000Z");
+    const mapped = mapStudentPortalLibraryItem({
+      createdAt: assignedAt,
+      libraryItem: {
+        id: "lib-gp-1",
+        title: "Sweet Child O' Mine",
+        description: "Full transcription",
+        materialType: "guitar_pro",
+        mimeType: "application/octet-stream",
+        sizeBytes: 40960,
+        tags: [{ tag: { category: "artist", value: "Guns N' Roses" } }]
+      }
+    });
+
+    expect(mapped.materialType).toBe("guitar_pro");
+    expect(mapped.sizeBytes).toBe(40960);
+    expect(mapped.createdAt).toBe(assignedAt.toISOString());
+    expect(mapped.downloadUrl).toBe("/api/student/library/lib-gp-1/download");
+    expect(mapped.previewUrl).toBe("/api/student/library/lib-gp-1/download?disposition=inline");
+    expect(mapped.tags).toEqual([{ category: "artist", value: "Guns N' Roses" }]);
   });
 
   it("returns not found when an owned learning material file is missing", async () => {
