@@ -278,8 +278,11 @@ test.describe("library bulk upload", () => {
     // two tagged items remain in the list.
     const rail = page.getByRole("group", { name: "Filter by category" }).first();
     await expect(rail.getByRole("button", { name: `Genre ${RUN}` })).toBeVisible({ timeout: 10_000 });
-    await rail.getByRole("button", { name: `Blues ${RUN}`, exact: true }).click();
-    await rail.getByRole("button", { name: `Beginner ${RUN}`, exact: true }).click();
+    // Facet value buttons carry a per-value count in their accessible name
+    // since the task-13 wave ("Blues <run> · 2 items"), so anchor on the
+    // run-unique value prefix instead of an exact match.
+    await rail.getByRole("button", { name: new RegExp(`^Blues ${RUN}`) }).click();
+    await rail.getByRole("button", { name: new RegExp(`^Beginner ${RUN}`) }).click();
     await expect(page.getByText(`${RUN}-riff-a`)).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(`${RUN}-riff-b`)).toBeVisible();
     await expect(page.getByText(`${RUN}-riff-c`)).toHaveCount(0);
@@ -322,7 +325,8 @@ test.describe("library bulk upload", () => {
     await expect(riffBResolution.getByRole("radio", { name: "Discard — keep existing" })).toHaveAttribute("aria-checked", "true");
     await riffBResolution.getByRole("radio", { name: "Keep both" }).click();
 
-    await dialog.getByRole("button", { name: /Commit 1 item/ }).click();
+    // With pending discards the commit button counts both sides (248f48f).
+    await dialog.getByRole("button", { name: /Commit 1 · discard 1/ }).click();
     await expect(page.getByText("Batch committed to the library.")).toBeVisible({ timeout: 20_000 });
 
     // Discard left exactly one riff-a master; Keep both created a second riff-b.
