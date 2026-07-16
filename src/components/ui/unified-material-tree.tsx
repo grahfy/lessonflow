@@ -38,7 +38,9 @@ export interface TreeFile {
   description: string | null;
   folderId: string | null;
   mimeType: string;
-  materialType: "audio" | "pdf" | "image";
+  // guitar_pro is representable (shared enum) but per-customer surfaces never
+  // produce it; the type branches below fall through to plain download links.
+  materialType: "audio" | "pdf" | "image" | "guitar_pro";
   sizeBytes: number;
   createdAt: string;
   previewUrl?: string;

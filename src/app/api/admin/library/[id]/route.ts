@@ -5,11 +5,11 @@ import { canManageLibrary } from "@/lib/admin/permissions";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { prisma } from "@/lib/db";
+import { classifyLibraryFile, normalizeOriginalFilename } from "@/lib/library/library-file-classification";
 import { deleteLibraryItem, replaceLibraryItemFile } from "@/lib/library/library-service";
 import { logError } from "@/lib/observability";
 import { streamMaterialBlob } from "@/lib/student-portal/material-response";
 import { createMaterialStorageDriver } from "@/lib/student-portal/material-storage";
-import { classifyLearningMaterialFile } from "@/lib/student-portal/materials";
 
 type Params = {
   params: Promise<{
@@ -149,13 +149,16 @@ export async function PUT(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "File must be between 1 byte and 100MB." }, { status: 400 });
     }
 
-    const classification = classifyLearningMaterialFile({
+    const classification = classifyLibraryFile({
       fileName: file.name,
       mimeType: file.type
     });
     if (!classification) {
       return NextResponse.json(
-        { error: "Only PDF, common audio, and image files (JPEG, PNG, GIF, WebP) are supported." },
+        {
+          error:
+            "Only PDF, common audio, image (JPEG, PNG, GIF, WebP), and Guitar Pro (.gp3, .gp4, .gp5, .gpx, .gp) files are supported."
+        },
         { status: 400 }
       );
     }
@@ -169,7 +172,8 @@ export async function PUT(request: NextRequest, { params }: Params) {
         materialType: classification.materialType,
         mimeType: classification.mimeType,
         extension: classification.extension,
-        sizeBytes: file.size
+        sizeBytes: file.size,
+        originalFilename: normalizeOriginalFilename(file.name)
       });
 
       return NextResponse.json({

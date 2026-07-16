@@ -399,7 +399,8 @@ describe("admin-library", () => {
         materialType: "audio",
         mimeType: "audio/mpeg",
         extension: ".mp3",
-        sizeBytes: 12
+        sizeBytes: 12,
+        originalFilename: "doomed.mp3"
       })
     ).rejects.toBeTruthy();
 

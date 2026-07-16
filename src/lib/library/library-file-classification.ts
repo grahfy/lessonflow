@@ -121,9 +121,13 @@ function baseNameOf(fileName: string): string {
   return normalized.slice(normalized.lastIndexOf("/") + 1);
 }
 
-/** Lowercased dot-prefixed extension; "" for dotfiles and extension-less names. */
+/**
+ * Lowercased dot-prefixed extension; "" for dotfiles and extension-less names.
+ * Trimmed first so padded OS filenames classify the same value that
+ * normalizeOriginalFilename stores.
+ */
 function extensionOf(fileName: string): string {
-  const baseName = baseNameOf(fileName);
+  const baseName = baseNameOf(fileName).trim();
   const dot = baseName.lastIndexOf(".");
   if (dot <= 0 || dot === baseName.length - 1) {
     return "";

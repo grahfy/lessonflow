@@ -40,6 +40,10 @@ describe("library-file-classification", () => {
     expect(classifyLibraryFile({ fileName: "README", mimeType: "" })).toBeNull();
   });
 
+  it("tolerates padded filenames (matches normalizeOriginalFilename's trim)", () => {
+    expect(classifyLibraryFile({ fileName: "  Sweet Child.gp5 ", mimeType: "" })?.materialType).toBe("guitar_pro");
+  });
+
   it("appends the GP extensions to the shared accept set", () => {
     expect(LIBRARY_ACCEPT).toBe(`${LEARNING_MATERIAL_ACCEPT},.gp3,.gp4,.gp5,.gpx,.gp`);
   });
