@@ -26,10 +26,16 @@ export interface LibraryItemRow {
   downloadUrl: string;
 }
 
+/** One selectable facet value with the number of items carrying it. */
+export interface LibraryTagValue {
+  value: string;
+  count: number;
+}
+
 /** One facet category with its distinct values (the pick-from-list vocabulary). */
 export interface LibraryTagCategory {
   category: string;
-  values: string[];
+  values: LibraryTagValue[];
 }
 
 /** A selected facet used to narrow the search (AND-combined across categories). */
@@ -282,13 +288,22 @@ export function useLibrary(options: UseLibraryOptions = {}) {
         setCategories((prev) => {
           const existing = prev.find((c) => c.category === created.category);
           if (!existing) {
-            return [...prev, { category: created.category, values: [created.value] }].sort((a, b) =>
-              a.category.localeCompare(b.category)
+            return [...prev, { category: created.category, values: [{ value: created.value, count: 1 }] }].sort(
+              (a, b) => a.category.localeCompare(b.category)
             );
           }
-          if (existing.values.includes(created.value)) return prev;
+          // Known value: leave its count as-is (we can't tell here whether the
+          // attach was new); counts refresh on the next loadVocabulary.
+          if (existing.values.some((v) => v.value === created.value)) return prev;
           return prev.map((c) =>
-            c.category === created.category ? { ...c, values: [...c.values, created.value].sort() } : c
+            c.category === created.category
+              ? {
+                  ...c,
+                  values: [...c.values, { value: created.value, count: 1 }].sort((a, b) =>
+                    a.value.localeCompare(b.value)
+                  )
+                }
+              : c
           );
         });
         return created;

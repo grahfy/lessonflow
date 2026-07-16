@@ -143,12 +143,7 @@ export function LibraryBulkProgress({
   const title = expired ? "Upload paused" : drained ? "Batch finished" : "Uploading batch";
 
   return createPortal(
-    <aside
-      className={`${styles.libScope} ${styles.drawer}`}
-      role="region"
-      aria-label="Batch upload progress"
-      aria-live="polite"
-    >
+    <aside className={`${styles.libScope} ${styles.drawer}`} role="region" aria-label="Batch upload progress">
       <div className={styles.drawerHead}>
         <div className={styles.drawerTitleRow}>
           <span className={styles.drawerTitle}>{title}</span>
@@ -162,7 +157,9 @@ export function LibraryBulkProgress({
             : "Uploads run in the background — keep working, tagging opens when the batch finishes."}
         </span>
         <div className={styles.aggRow}>
-          <div className={styles.aggText}>
+          {/* aria-live is scoped to THIS summary line — a drawer-wide region
+              re-announced every per-file progress tick (L3). */}
+          <div className={styles.aggText} aria-live="polite">
             <span>
               <b>
                 {summary.done} of {acceptedTotal}
@@ -171,7 +168,14 @@ export function LibraryBulkProgress({
             </span>
             <span>4 running at a time</span>
           </div>
-          <div className={styles.aggBar}>
+          <div
+            className={styles.aggBar}
+            role="progressbar"
+            aria-label="Batch upload progress"
+            aria-valuemin={0}
+            aria-valuemax={acceptedTotal}
+            aria-valuenow={summary.done}
+          >
             <div
               className={styles.aggFill}
               style={{ width: `${acceptedTotal > 0 ? Math.round((summary.done / acceptedTotal) * 100) : 0}%` }}

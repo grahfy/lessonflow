@@ -58,7 +58,13 @@ export function LibraryUploadCard({
 
   async function handleStart() {
     if (!canStart) return;
-    if (!captcha.validateAnswer()) return;
+    if (!captcha.validateAnswer()) {
+      // Move focus to the invalid field so the error (role=alert +
+      // aria-invalid) is announced and correctable without hunting for it.
+      // CaptchaField derives the id from our idPrefix ("library-bulk").
+      document.getElementById("library-bulk-captcha")?.focus();
+      return;
+    }
     const payload = captcha.getPayload();
     // Fresh challenge every attempt to avoid stale-answer replay.
     void captcha.regenerate();

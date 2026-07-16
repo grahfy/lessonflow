@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AlertCircle } from "lucide-react";
 
 /**
  * Shape returned by `/api/captcha`.
@@ -175,7 +176,12 @@ export function CaptchaField(props: {
         />
       </div>
 
-      <label htmlFor={inputId}>Security check</label>
+      <label htmlFor={inputId}>
+        Security check{" "}
+        <span className="field-error" aria-hidden="true">
+          *
+        </span>
+      </label>
       <div id={imageId} aria-live="polite">
         {props.captcha.captcha ? (
           /* eslint-disable-next-line @next/next/no-img-element */
@@ -201,6 +207,7 @@ export function CaptchaField(props: {
           autoComplete="off"
           required
           maxLength={12}
+          aria-invalid={props.captcha.error ? true : undefined}
           aria-describedby={imageId}
           value={props.captcha.userAnswer}
           onChange={(event) => props.captcha.handleChange(event.currentTarget.value)}
@@ -209,7 +216,14 @@ export function CaptchaField(props: {
           New image
         </button>
       </div>
-      {props.captcha.error ? <p className="helper-text" role="alert">{props.captcha.error}</p> : null}
+      {props.captcha.error ? (
+        // Danger styling (not grey helper text): validation failures must
+        // read as errors. `.field-error` is the shared inline-error class.
+        <p className="field-error" role="alert" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <AlertCircle size={13} aria-hidden="true" />
+          {props.captcha.error}
+        </p>
+      ) : null}
       {props.captcha.captcha ? <p className="helper-text">{props.captcha.captcha.prompt}</p> : null}
     </div>
   );

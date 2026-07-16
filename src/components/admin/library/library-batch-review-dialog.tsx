@@ -353,6 +353,11 @@ export function LibraryBatchReviewDialog({
       // straight across the footer. `bodyClassName` makes the body the scroll
       // container the sticky bar pins to.
       bodyClassName={styles.reviewScroll}
+      // libScope on the BACKDROP (the outermost portaled element) puts the
+      // whole dialog — header Close button included — inside the admin token
+      // mirror + 44px mobile .btn rules (H1): without it the sheet resolves
+      // :root's public violet brand tokens.
+      backdropClassName={styles.libScope}
     >
       <div className={`${styles.libScope} ${styles.reviewBody}`}>
         {suggestions.some((s) => !s.cleared) ? (

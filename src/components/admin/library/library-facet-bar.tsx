@@ -92,11 +92,10 @@ export function LibraryFacetRail({ categories, selected, onToggleFacet, onClear 
                     aria-hidden="true"
                   />
                   {group.category}
-                  <span className={styles.catCount}>{group.values.length}</span>
                 </button>
                 {!isCollapsed ? (
                   <div className={styles.vals}>
-                    {group.values.map((value) => {
+                    {group.values.map(({ value, count }) => {
                       const facet = { category: group.category, value };
                       const active = isSelected(selected, facet);
                       return (
@@ -108,6 +107,9 @@ export function LibraryFacetRail({ categories, selected, onToggleFacet, onClear 
                           onClick={() => onToggleFacet(facet)}
                         >
                           {value}
+                          <span className={styles.valCount} aria-label={`${count} ${count === 1 ? "item" : "items"}`}>
+                            {count}
+                          </span>
                         </button>
                       );
                     })}

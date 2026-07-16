@@ -45,6 +45,34 @@ function sameFacet(a: LibraryFacet, b: LibraryFacet): boolean {
   return a.category === b.category && a.value === b.value;
 }
 
+/** Toolbar sort orders. The server returns createdAt desc — "newest". */
+type LibrarySort = "newest" | "oldest" | "title-asc" | "title-desc";
+
+const LIBRARY_SORTS: Array<{ value: LibrarySort; label: string }> = [
+  { value: "newest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+  { value: "title-asc", label: "Title A–Z" },
+  { value: "title-desc", label: "Title Z–A" }
+];
+
+function sortItems(items: LibraryItemRow[], sort: LibrarySort): LibraryItemRow[] {
+  const sorted = [...items];
+  switch (sort) {
+    case "oldest":
+      sorted.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      break;
+    case "title-asc":
+      sorted.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }));
+      break;
+    case "title-desc":
+      sorted.sort((a, b) => b.title.localeCompare(a.title, undefined, { sensitivity: "base" }));
+      break;
+    default:
+      sorted.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+  return sorted;
+}
+
 /** True while the given DragEvent is carrying OS files (not text/element drags). */
 function dragHasFiles(event: DragEvent): boolean {
   return Array.from(event.dataTransfer?.types ?? []).includes("Files");
@@ -74,6 +102,7 @@ export function AdminLibraryClient() {
 
   const [facets, setFacets] = useState<LibraryFacet[]>([]);
   const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<LibrarySort>("newest");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<DialogState>(null);
 
@@ -160,43 +189,86 @@ export function AdminLibraryClient() {
   // listeners live on window. The entry snapshot in `collectDroppedFiles` must
   // happen synchronously inside the drop handler (the DataTransfer item list
   // is neutered after the first await).
+  //
+  // STUCK-OVERLAY DEFENSES (M6): only dragENTER requires a Files payload —
+  // Safari emits dragleave events with EMPTY types mid-drag, so gating the
+  // decrement on the payload left the depth counter unbalanced and the
+  // overlay stuck fullscreen. Belt-and-braces on top: dragend, Escape, and a
+  // heartbeat that clears the overlay when dragover stops arriving (a drag
+  // abandoned outside the window produces no further events at all).
   useEffect(() => {
     let depth = 0;
+    let lastDragOver = 0;
+    let heartbeat: number | null = null;
+
+    const reset = () => {
+      depth = 0;
+      setDragActive(false);
+      if (heartbeat !== null) {
+        window.clearInterval(heartbeat);
+        heartbeat = null;
+      }
+    };
+
+    const activate = () => {
+      setDragActive(true);
+      lastDragOver = Date.now();
+      if (heartbeat === null) {
+        heartbeat = window.setInterval(() => {
+          if (Date.now() - lastDragOver > 800) {
+            reset();
+          }
+        }, 300);
+      }
+    };
 
     const onDragEnter = (event: DragEvent) => {
       if (!dragHasFiles(event)) return;
       event.preventDefault();
       depth += 1;
-      setDragActive(true);
+      activate();
     };
     const onDragOver = (event: DragEvent) => {
       if (!dragHasFiles(event)) return;
       event.preventDefault();
+      lastDragOver = Date.now();
     };
-    const onDragLeave = (event: DragEvent) => {
-      if (!dragHasFiles(event)) return;
-      depth = Math.max(0, depth - 1);
-      if (depth === 0) setDragActive(false);
+    const onDragLeave = () => {
+      if (depth === 0) return;
+      depth -= 1;
+      if (depth === 0) reset();
     };
     const onDrop = (event: DragEvent) => {
-      if (!dragHasFiles(event)) return;
+      if (!dragHasFiles(event)) {
+        reset();
+        return;
+      }
       event.preventDefault();
-      depth = 0;
-      setDragActive(false);
-      if (!event.dataTransfer) return;
-      const collecting = collectDroppedFiles(event.dataTransfer);
+      const dataTransfer = event.dataTransfer;
+      reset();
+      if (!dataTransfer) return;
+      const collecting = collectDroppedFiles(dataTransfer);
       void collecting.then(stageFiles);
+    };
+    const onDragEnd = () => reset();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") reset();
     };
 
     window.addEventListener("dragenter", onDragEnter);
     window.addEventListener("dragover", onDragOver);
     window.addEventListener("dragleave", onDragLeave);
     window.addEventListener("drop", onDrop);
+    window.addEventListener("dragend", onDragEnd);
+    window.addEventListener("keydown", onKeyDown);
     return () => {
       window.removeEventListener("dragenter", onDragEnter);
       window.removeEventListener("dragover", onDragOver);
       window.removeEventListener("dragleave", onDragLeave);
       window.removeEventListener("drop", onDrop);
+      window.removeEventListener("dragend", onDragEnd);
+      window.removeEventListener("keydown", onKeyDown);
+      if (heartbeat !== null) window.clearInterval(heartbeat);
     };
   }, [stageFiles]);
 
@@ -241,6 +313,8 @@ export function AdminLibraryClient() {
         : []
     );
   }, [bulk.state]);
+
+  const sortedItems = useMemo(() => sortItems(items, sort), [items, sort]);
 
   const openFilesPicker = useCallback(() => filesInputRef.current?.click(), []);
   const openFolderPicker = useCallback(() => folderInputRef.current?.click(), []);
@@ -304,8 +378,13 @@ export function AdminLibraryClient() {
               <span className={styles.eyebrow}>Shared teaching material</span>
               <h2 className={styles.title}>Library</h2>
               <p className={styles.summary}>
-                Songs, scales, and backing tracks the whole school can find and assign — filter on the left, work on
-                the right, drop files anywhere to add them.
+                Songs, scales, and backing tracks the whole school can find and assign —{" "}
+                <span className={styles.copyDesktop}>
+                  filter on the left, work on the right, drop files anywhere to add them.
+                </span>
+                <span className={styles.copyMobile}>
+                  tap Filters to narrow the list, and add or drop files anywhere to upload them.
+                </span>
               </p>
             </div>
             <Tooltip content="Add files or folders to the shared library.">
@@ -344,6 +423,18 @@ export function AdminLibraryClient() {
                     aria-label="Search the library by title or artist"
                   />
                 </label>
+                <select
+                  className={styles.sortSelect}
+                  aria-label="Sort library items"
+                  value={sort}
+                  onChange={(event) => setSort(event.target.value as LibrarySort)}
+                >
+                  {LIBRARY_SORTS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      Sort · {option.label}
+                    </option>
+                  ))}
+                </select>
                 <button
                   type="button"
                   className={`btn btn-secondary ${styles.filtersBtn}`}
@@ -400,7 +491,7 @@ export function AdminLibraryClient() {
                   </p>
                 ) : (
                   <div className={styles.list}>
-                    {items.map((item) => (
+                    {sortedItems.map((item) => (
                       <LibraryItemRowView
                         key={item.id}
                         item={item}
@@ -509,6 +600,10 @@ export function AdminLibraryClient() {
           // scrolls on its own, and this dialog portals outside the
           // .admin-shell dark-scrollbar scope. reviewScroll adds both.
           bodyClassName={styles.reviewScroll}
+          // libScope on the BACKDROP (the outermost portaled element) puts the
+          // whole dialog — header Close button included — inside the admin
+          // token mirror + 44px mobile .btn rules (H1).
+          backdropClassName={styles.libScope}
           footer={
             <div className={styles.libScope} style={{ display: "contents" }}>
               <button type="button" className="btn btn-primary" onClick={() => setFiltersOpen(false)}>
