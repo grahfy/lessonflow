@@ -155,10 +155,10 @@ function progressDrawer(page: Page) {
 async function fetchRunItems(
   request: APIRequestContext,
   q: string
-): Promise<Array<{ id: string; title: string; materialType: string; tags: Array<{ category: string; value: string }> }>> {
+): Promise<Array<{ id: string; title: string; materialType: string; previewUrl: string; tags: Array<{ category: string; value: string }> }>> {
   const response = await request.get(`/api/admin/library?q=${encodeURIComponent(q)}`);
   expect(response.ok(), `Library search for "${q}" should succeed.`).toBeTruthy();
-  const body = (await response.json()) as { items: Array<{ id: string; title: string; materialType: string; tags: Array<{ category: string; value: string }> }> };
+  const body = (await response.json()) as { items: Array<{ id: string; title: string; materialType: string; previewUrl: string; tags: Array<{ category: string; value: string }> }> };
   return body.items;
 }
 
@@ -270,6 +270,10 @@ test.describe("library bulk upload", () => {
       ])
     );
 
+    // The committed masters must be streamable, not just present as rows.
+    const riffAStream = await page.request.get(byTitle.get(`${RUN}-riff-a`)!.previewUrl);
+    expect(riffAStream.status(), "riff-a master blob should stream right after upload").toBe(200);
+
     // AND-facet search via the facet rail: both facets selected → exactly the
     // two tagged items remain in the list.
     const rail = page.getByRole("group", { name: "Filter by category" }).first();
@@ -332,6 +336,11 @@ test.describe("library bulk upload", () => {
     expect(riffA[0].tags).toEqual(
       expect.arrayContaining([expect.objectContaining({ category: `Genre ${RUN}`, value: `Blues ${RUN}` })])
     );
+
+    // P3 at the blob level: the surviving master must still STREAM after the
+    // duplicate's discard — a row without its bytes is a silent data loss.
+    const masterStream = await page.request.get(riffA[0].previewUrl);
+    expect(masterStream.status(), "master blob should survive the duplicate discard").toBe(200);
   });
 
   test("webkitdirectory folder picker: real nested tree with >100 files in one directory — full count + folder suggestion chips", async ({ page }) => {
@@ -510,11 +519,10 @@ test.describe("library bulk upload", () => {
     const sheetBox = await filterSheet.boundingBox();
     expect(sheetBox).not.toBeNull();
     expect(sheetBox!.x + sheetBox!.width).toBeLessThanOrEqual(391);
-    // Functional tappability floor. The plan's 44px touch-target bar is owned
-    // by the UI/UX review sweep; as of writing the shared .btn measures 34px.
+    // Plan AC: 44px touch targets on new library controls at mobile widths.
     const showButton = filterSheet.getByRole("button", { name: /Show \d+ items?/ });
     const showBox = await showButton.boundingBox();
-    expect(showBox!.height, "Filter sheet primary action should be tappable.").toBeGreaterThanOrEqual(32);
+    expect(showBox!.height, "Filter sheet primary action should meet the 44px touch target.").toBeGreaterThanOrEqual(44);
     await showButton.click();
     await expect(filterSheet).toBeHidden();
 
@@ -534,7 +542,7 @@ test.describe("library bulk upload", () => {
 
     const commitButton = dialog.getByRole("button", { name: /Commit 2 items/ });
     const commitBox = await commitButton.boundingBox();
-    expect(commitBox!.height, "Commit button should be tappable.").toBeGreaterThanOrEqual(32);
+    expect(commitBox!.height, "Commit button should meet the 44px touch target.").toBeGreaterThanOrEqual(44);
     await commitButton.click();
     await expect(page.getByText("Batch committed to the library.")).toBeVisible({ timeout: 20_000 });
 
