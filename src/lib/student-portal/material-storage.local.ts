@@ -15,7 +15,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { resolveConfiguredStorageRoot } from "@/lib/runtime-paths";
+import { resolveProductionAwareStorageRoot } from "@/lib/runtime-paths";
 import { rethrowAsStoragePermissionDeniedError } from "@/lib/storage-errors";
 import type {
   DeleteMaterialInput,
@@ -32,13 +32,18 @@ const PRODUCTION_LOCAL_ROOT = "/var/www/lessonflow/data/learning-materials";
  * Resolves the root directory used for local learning-material persistence.
  */
 export function getLocalMaterialStorageRoot(): string {
-  return process.env.NODE_ENV === "production"
-    ? resolveConfiguredStorageRoot(
-        process.env.LEARNING_MATERIALS_LOCAL_ROOT,
-        DEFAULT_LOCAL_ROOT,
-        PRODUCTION_LOCAL_ROOT
-      )
-    : resolveConfiguredStorageRoot(process.env.LEARNING_MATERIALS_LOCAL_ROOT, DEFAULT_LOCAL_ROOT);
+  // resolveProductionAwareStorageRoot handles the prod-vs-dev branch internally:
+  // an absolute LEARNING_MATERIALS_LOCAL_ROOT wins; otherwise in production it
+  // falls back to the shared volume (PRODUCTION_LOCAL_ROOT), and in dev/test it
+  // resolves DEFAULT_LOCAL_ROOT against the app root. (This previously called
+  // resolveConfiguredStorageRoot with PRODUCTION_LOCAL_ROOT wrongly passed as the
+  // `cwd` argument, which yielded a doubled path in production; this now matches
+  // the staff-photo and email-signature storage modules.)
+  return resolveProductionAwareStorageRoot(
+    process.env.LEARNING_MATERIALS_LOCAL_ROOT,
+    DEFAULT_LOCAL_ROOT,
+    PRODUCTION_LOCAL_ROOT
+  );
 }
 
 /**
