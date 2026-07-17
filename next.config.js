@@ -1,4 +1,5 @@
 const path = require("path");
+const { AlphaTabWebPackPlugin } = require("@coderline/alphatab-webpack");
 const isProduction = process.env.NODE_ENV === "production";
 const isLowMemoryDeployBuild = process.env.NEXT_LOW_MEMORY_BUILD === "1";
 
@@ -8,15 +9,25 @@ const isLowMemoryDeployBuild = process.env.NEXT_LOW_MEMORY_BUILD === "1";
 // production bundle does not use eval, so it is dropped there to tighten the
 // policy. 'unsafe-inline' is retained because Next.js injects inline bootstrap/
 // hydration scripts that would otherwise require a per-request nonce.
+// 'blob:' is required by alphaTab's AudioWorklet (Guitar Pro playback, B.2):
+// it bootstraps its processor module via addModule(URL.createObjectURL(...)),
+// and an AudioWorklet MODULE fetch is governed by script-src (not worker-src) —
+// live QA confirmed the worklet AbortErrors without it. Scoped to blob: only
+// (no 'unsafe-eval' in prod; alphaTab's synth is pure JS and needs none).
 const scriptSrc = isProduction
-  ? "script-src 'self' 'unsafe-inline'"
-  : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
+  ? "script-src 'self' 'unsafe-inline' blob:"
+  : "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:";
 
 const cspDirectives = [
   "default-src 'self'",
   scriptSrc,
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self'",
+  // alphaTab's synth Web Worker loads same-origin from /_next/static (emitted by
+  // @coderline/alphatab-webpack), so 'self' suffices here. The AudioWorklet's
+  // blob: need is handled in script-src above (worklet MODULE fetches are a
+  // script-src concern, not worker-src — verified via live QA A/B test).
+  "worker-src 'self'",
   "img-src 'self' data: blob: https://images.unsplash.com https://i.ytimg.com",
   "frame-src https://www.youtube-nocookie.com",
   "connect-src 'self' https://nominatim.openstreetmap.org",
@@ -93,6 +104,24 @@ const nextConfig = {
   },
   typescript: {
     ignoreBuildErrors: true
+  },
+  // alphaTab (Guitar Pro playback, Phase B.2) ships its synthesizer as a Web
+  // Worker + AudioWorklet, resolved internally via
+  // `new URL('./alphaTab.worker(let).mjs', import.meta.url)`. Plain webpack does
+  // not emit those ESM assets and bakes in an unfetchable file:// path, so the
+  // player silently fails at runtime. The official plugin emits the worker/
+  // worklet into /_next/static (same-origin, satisfies `worker-src 'self'`) and
+  // rewrites the references. Client build only (the synth never runs on the
+  // server). assetOutputDir:false because the Bravura font and SONiVOX soundfont
+  // are already self-hosted under public/alphatab/. NOTE: this plugin only runs
+  // under webpack, which is the Next 15.5 default for both `next dev` and
+  // `next build` — so `dev` intentionally does NOT pass `--turbopack` (Turbopack
+  // has no plugin API and would skip this hook, breaking playback in dev).
+  webpack(config, { isServer }) {
+    if (!isServer) {
+      config.plugins.push(new AlphaTabWebPackPlugin({ assetOutputDir: false }));
+    }
+    return config;
   },
   async headers() {
     return [
