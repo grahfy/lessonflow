@@ -540,6 +540,10 @@ export function GuitarProViewer({ src, downloadUrl, title }: GuitarProViewerProp
                 ? alphaTab.PlayerOutputMode.WebAudioAudioWorklets
                 : alphaTab.PlayerOutputMode.WebAudioScriptProcessor,
             enableCursor: true,
+            // Only scroll when the cursor leaves the visible area (reaches the
+            // last on-screen bar), instead of scrolling continuously on every
+            // beat. Lets the cursor travel to the bottom before the next jump.
+            scrollMode: alphaTab.ScrollMode.OffScreen,
             // Auto-scroll the stage (not the window) to keep the cursor visible.
             scrollElement: stageRef.current ?? "html,body"
           },
