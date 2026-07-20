@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useEffect } from "react";
-import { readApiErrorFromResponse } from "./utils";
+import { readApiErrorDetail, type ApiFieldErrors } from "./utils";
 
 export interface UseSafeFetchOptions {
   /** Called when API returns 401 (unauthenticated). 403 (forbidden) is treated
@@ -53,19 +53,22 @@ export function useSafeFetch(options: UseSafeFetchOptions = {}) {
     }
   }, []);
 
+  /** Reports the failure through `onError` and returns any field-level messages
+   *  so a form can show them inline next to the offending inputs. */
   const handleApiError = useCallback(
-    async (response: Response, fallback: string) => {
+    async (response: Response, fallback: string): Promise<ApiFieldErrors> => {
       // Only 401 (unauthenticated) forces a re-login. A 403 (forbidden) means
       // the session is valid but lacks permission for this resource — logging
       // out would not help, so it falls through to the normal error handler.
       if (response.status === 401) {
         redirectToAdminLogin();
-        return;
+        return {};
       }
-      const message = await readApiErrorFromResponse(response, fallback);
+      const { message, fieldErrors } = await readApiErrorDetail(response, fallback);
       if (onErrorRef.current) {
         onErrorRef.current(message);
       }
+      return fieldErrors;
     },
     [redirectToAdminLogin]
   );

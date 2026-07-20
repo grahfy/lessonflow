@@ -35,6 +35,177 @@ describe("admin-customers", () => {
     expect(res.status).toBe(401);
   });
 
+  it("names the missing address fields when creating a customer", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const res = await POST(
+      adminRequest("http://localhost/api/admin/customers", "POST", token, {
+        firstName: "Nomad",
+        lastName: "Student",
+        fullName: "Nomad Student",
+        email: "nomad@example.com",
+        phone: "0400123999",
+        skillLevel: "beginner"
+      })
+    );
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { details: { fieldErrors: Record<string, string[]> } };
+    expect(body.details.fieldErrors.houseNumber).toEqual(["House number is required."]);
+    expect(body.details.fieldErrors.suburb).toEqual(["Suburb is required."]);
+    expect(body.details.fieldErrors.firstName).toBeUndefined();
+  });
+
+  it("does not return the matched record on a duplicate conflict", async () => {
+    // SECURITY: the duplicate lookup spans every customer, including ones the
+    // caller cannot manage. Returning the row let a teacher read another
+    // teacher's student by guessing an email or phone.
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const other = await prisma.customer.create({
+      data: {
+        firstName: "Private",
+        lastName: "Student",
+        fullName: "Private Student",
+        email: "private@example.com",
+        normalizedEmail: "private@example.com",
+        phone: "0400888111",
+        normalizedPhone: "0400888111",
+        skillLevel: "beginner",
+        lessonMode: "in_person",
+        houseNumber: "99",
+        streetName: "Secret",
+        streetType: "Lane",
+        suburb: "Fitzroy",
+        state: "VIC",
+        postcode: "3065"
+      }
+    });
+
+    const createRes = await POST(
+      adminRequest("http://localhost/api/admin/customers", "POST", token, {
+        firstName: "Probe",
+        lastName: "Attacker",
+        fullName: "Probe Attacker",
+        email: "private@example.com",
+        phone: "0400999222",
+        houseNumber: "1",
+        streetName: "Main",
+        streetType: "Street",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070"
+      })
+    );
+    expect(createRes.status).toBe(409);
+    const createBody = (await createRes.json()) as Record<string, unknown>;
+    expect(createBody.customer).toBeUndefined();
+    expect(JSON.stringify(createBody)).not.toContain("Secret");
+    expect(JSON.stringify(createBody)).not.toContain("private@example.com");
+
+    const mine = await prisma.customer.create({
+      data: {
+        firstName: "Mine",
+        lastName: "Student",
+        fullName: "Mine Student",
+        email: "mine@example.com",
+        normalizedEmail: "mine@example.com",
+        phone: "0400888222",
+        normalizedPhone: "0400888222",
+        skillLevel: "beginner",
+        lessonMode: "in_person"
+      }
+    });
+
+    const patchRes = await PATCH(
+      adminRequest(`http://localhost/api/admin/customers/${mine.id}`, "PATCH", token, {
+        email: "private@example.com"
+      }),
+      { params: Promise.resolve({ id: mine.id }) }
+    );
+    expect(patchRes.status).toBe(409);
+    const patchBody = (await patchRes.json()) as Record<string, unknown>;
+    expect(patchBody.customer).toBeUndefined();
+    expect(JSON.stringify(patchBody)).not.toContain(other.id);
+    expect(JSON.stringify(patchBody)).not.toContain("Secret");
+  });
+
+  it("refuses to clear a stored address but still saves legacy blank-address customers", async () => {
+    const admin = await ensureOwnerAdmin();
+    const token = createSessionToken(admin.email);
+
+    const filled = await prisma.customer.create({
+      data: {
+        firstName: "Filled",
+        lastName: "Address",
+        fullName: "Filled Address",
+        email: "filled@example.com",
+        normalizedEmail: "filled@example.com",
+        phone: "0400777111",
+        normalizedPhone: "0400777111",
+        skillLevel: "beginner",
+        lessonMode: "in_person",
+        houseNumber: "10",
+        streetName: "Main",
+        streetType: "Street",
+        suburb: "Northcote",
+        state: "VIC",
+        postcode: "3070"
+      }
+    });
+
+    // Legacy shape: CSV imports and early bookings stored blank address parts.
+    const legacy = await prisma.customer.create({
+      data: {
+        firstName: "Legacy",
+        lastName: "Blank",
+        fullName: "Legacy Blank",
+        email: "legacy@example.com",
+        normalizedEmail: "legacy@example.com",
+        phone: "0400777222",
+        normalizedPhone: "0400777222",
+        skillLevel: "beginner",
+        lessonMode: "in_person",
+        houseNumber: "",
+        streetName: "",
+        streetType: "",
+        suburb: "",
+        state: "VIC",
+        postcode: "3070"
+      }
+    });
+
+    const clearRes = await PATCH(
+      adminRequest(`http://localhost/api/admin/customers/${filled.id}`, "PATCH", token, {
+        houseNumber: "",
+        suburb: ""
+      }),
+      { params: Promise.resolve({ id: filled.id }) }
+    );
+    expect(clearRes.status).toBe(400);
+    const clearBody = (await clearRes.json()) as { details: { fieldErrors: Record<string, string[]> } };
+    expect(clearBody.details.fieldErrors.houseNumber).toEqual(["House number is required and cannot be cleared."]);
+    expect(clearBody.details.fieldErrors.suburb).toEqual(["Suburb is required and cannot be cleared."]);
+
+    // The dialog PATCHes the whole form, so a legacy record must stay saveable
+    // when the admin only edits an unrelated field.
+    const legacyRes = await PATCH(
+      adminRequest(`http://localhost/api/admin/customers/${legacy.id}`, "PATCH", token, {
+        phone: "0400777333",
+        houseNumber: "",
+        streetName: "",
+        streetType: "",
+        suburb: ""
+      }),
+      { params: Promise.resolve({ id: legacy.id }) }
+    );
+    expect(legacyRes.status).toBe(200);
+    const saved = await prisma.customer.findUnique({ where: { id: legacy.id } });
+    expect(saved?.phone).toBe("0400777333");
+  });
+
   it("creates, lists, and updates customers", async () => {
     const admin = await ensureOwnerAdmin();
     const token = createSessionToken(admin.email);
@@ -45,7 +216,13 @@ describe("admin-customers", () => {
       fullName: "Alex Student",
       email: "alex@example.com",
       phone: "0400123456",
-      skillLevel: "intermediate"
+      skillLevel: "intermediate",
+      houseNumber: "10",
+      streetName: "Main",
+      streetType: "Street",
+      suburb: "Northcote",
+      state: "VIC",
+      postcode: "3070"
     });
     const createRes = await POST(createReq);
     expect(createRes.status).toBe(201);
@@ -93,7 +270,13 @@ describe("admin-customers", () => {
       fullName: "Rollback Student",
       email: "rollback@example.com",
       phone: "0400555444",
-      skillLevel: "intermediate"
+      skillLevel: "intermediate",
+      houseNumber: "11",
+      streetName: "Main",
+      streetType: "Street",
+      suburb: "Northcote",
+      state: "VIC",
+      postcode: "3070"
     });
     const createRes = await POST(createReq);
     expect(createRes.status).toBe(500);

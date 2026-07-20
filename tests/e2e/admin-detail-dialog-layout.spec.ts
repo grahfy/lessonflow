@@ -30,7 +30,13 @@ async function createCustomerFixture(page: Page, suffix: string): Promise<{
       fullName,
       email,
       phone,
-      skillLevel: "intermediate"
+      skillLevel: "intermediate",
+      houseNumber: "10",
+      streetName: "Main",
+      streetType: "Street",
+      suburb: "Northcote",
+      state: "VIC",
+      postcode: "3070"
     }
   });
 
