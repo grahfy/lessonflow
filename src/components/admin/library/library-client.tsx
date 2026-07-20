@@ -15,6 +15,7 @@ import { AppDialog } from "@/components/ui/app-dialog";
 import {
   collectDroppedFiles,
   collectPickedFiles,
+  dragHasFiles,
   type CollectedFile
 } from "@/lib/admin/folder-traversal";
 import { useBulkUpload } from "@/lib/admin/use-bulk-upload";
@@ -71,11 +72,6 @@ function sortItems(items: LibraryItemRow[], sort: LibrarySort): LibraryItemRow[]
       sorted.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
   return sorted;
-}
-
-/** True while the given DragEvent is carrying OS files (not text/element drags). */
-function dragHasFiles(event: DragEvent): boolean {
-  return Array.from(event.dataTransfer?.types ?? []).includes("Files");
 }
 
 /**

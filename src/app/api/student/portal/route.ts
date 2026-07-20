@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db";
+import { materialOrderBy } from "@/lib/materials/reorder";
 import {
   mapStudentPortalBooking,
   mapStudentPortalFolder,
@@ -36,9 +37,7 @@ export async function GET(request: NextRequest) {
           where: {
             customerId: student.id
           },
-          orderBy: {
-            createdAt: "desc"
-          }
+          orderBy: materialOrderBy
         },
         lessonPlan: {
           select: {
@@ -85,9 +84,7 @@ export async function GET(request: NextRequest) {
         customerId: student.id,
         bookingId: null
       },
-      orderBy: {
-        createdAt: "desc"
-      }
+      orderBy: materialOrderBy
     }),
     prisma.studentMaterialFolder.findMany({
       where: {

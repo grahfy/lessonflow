@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import { loginAdminViaApi, loginStudentViaApi } from "./auth-helpers";
 
@@ -19,6 +19,7 @@ import { loginAdminViaApi, loginStudentViaApi } from "./auth-helpers";
  */
 
 const phase = process.env.GUI_SWEEP_PHASE || "current";
+const FORWARDED_IP = `198.51.${100 + Math.floor(Math.random() * 100)}.${1 + Math.floor(Math.random() * 200)}`;
 const outputDir = path.resolve(process.cwd(), "artifacts", "gui-sweep", phase);
 
 const viewports = [
@@ -403,17 +404,55 @@ async function removeUpdateApiStubs(page: PW) {
 }
 
 /**
- * Opens the seeded demo student's customer dialog ("Alex Student" owns the
- * seeded materials and email history; the other customer has neither).
+ * Email of a customer that actually owns learning materials, resolved once via
+ * the admin API and cached for the run.
+ *
+ * The old hardcoded "alex.student@example.com" does not exist in every dev
+ * database (it is absent from mgs_dev, where only 3 of 51 customers own any
+ * material at all). When it missed, the helper silently fell back to the first
+ * row — a customer with no materials — so every materials dialog shot resolved
+ * to nothing. That was invisible while `captureDialog` swallowed errors; now
+ * that missing shots fail the spec it has to be correct, not lucky.
  */
+let materialsCustomerEmail: string | null | undefined;
+
+async function findCustomerWithMaterials(page: PW): Promise<string | null> {
+  if (materialsCustomerEmail !== undefined) return materialsCustomerEmail;
+  materialsCustomerEmail = null;
+  try {
+    const list = await page.request.get("/api/admin/customers?pageSize=50");
+    if (list.ok()) {
+      const customers = (await list.json()).customers ?? [];
+      for (const customer of customers) {
+        const owned = await page.request.get(`/api/admin/customers/${customer.id}/learning-materials`);
+        if (!owned.ok()) continue;
+        if (((await owned.json()).materials ?? []).length > 0) {
+          materialsCustomerEmail = customer.email as string;
+          break;
+        }
+      }
+    }
+  } catch {
+    materialsCustomerEmail = null;
+  }
+  return materialsCustomerEmail;
+}
+
+/** Opens the customer dialog of a customer that owns learning materials. */
 async function openSeededCustomerDialog(page: PW) {
+  const email = await findCustomerWithMaterials(page);
   await gotoWithRetry(page, "/admin/customers");
   await waitForPageSettle(page);
   await dismissDeployUpdatesModal(page);
-  // Exact email match — a generic /alex/i would also hit the "Alex Student"
-  // e2e login fixture (student.mobile.e2e@example.com), which owns neither
-  // materials nor email history.
-  const seededRow = page.locator(".customer-table-row").filter({ hasText: "alex.student@example.com" });
+  if (email) {
+    // 51 customers vs a 50-row page: filter rather than hope the row is on page 1.
+    await page.getByPlaceholder("Name, email, or phone").first().fill(email);
+    await page.locator(".customer-table-row").first().waitFor({ timeout: 10_000 }).catch(() => null);
+    await waitForPageSettle(page);
+  }
+  const seededRow = email
+    ? page.locator(".customer-table-row").filter({ hasText: email })
+    : page.locator(".customer-table-row");
   if ((await seededRow.count().catch(() => 0)) > 0) {
     await seededRow.first().click();
   } else {
@@ -468,11 +507,7 @@ async function captureAdminDialogs(page: PW, viewport: ViewportName) {
     '.dialog-panel:has(h3:text-is("Move material"))',
     async () => {
       await openCustomerMaterialsTab(page);
-      await page
-        .locator(".customer-materials-item-actions")
-        .first()
-        .getByRole("button", { name: /^move$/i })
-        .click();
+      await page.getByRole("button", { name: "Move material" }).first().click();
     }
   );
 
@@ -483,11 +518,7 @@ async function captureAdminDialogs(page: PW, viewport: ViewportName) {
     '.dialog-panel:has(h3:text-is("Delete material")), .dialog-panel:has(h3:text-is("Delete folder"))',
     async () => {
       await openCustomerMaterialsTab(page);
-      await page
-        .locator(".customer-materials-item-actions")
-        .first()
-        .getByRole("button", { name: /^delete$/i })
-        .click();
+      await page.getByRole("button", { name: "Delete material" }).first().click();
     }
   );
 
@@ -644,7 +675,11 @@ async function captureUpdateProgressRoute(page: PW, viewport: ViewportName) {
 
 async function captureAdmin(page: PW, viewport: ViewportName) {
   try {
-    await loginWithRetry(() => loginAdminViaApi(page));
+    // Fresh forwarded IP per run: the admin login limiter is 12 per IP per 15
+    // minutes and the sweep is meant to be re-runnable while iterating on a
+    // selector. Scoped to the login POST only — a forwarded IP on every request
+    // would put /book through the geo path. Same trick as materials-dnd.spec.
+    await loginWithRetry(() => loginAdminViaApi(page, { forwardedIp: FORWARDED_IP }));
   } catch (error) {
     const everything = [...adminRoutes, { path: "/admin/updates/progress", name: "admin-updates-progress" }];
     for (const route of everything) {
@@ -814,6 +849,15 @@ test.describe("gui consistency sweep", () => {
       } finally {
         await context.close();
       }
+
+      // Per-shot failures are still recorded in the gallery rather than
+      // aborting the sweep, but the run as a whole must FAIL when a shot is
+      // missing — otherwise a selector can rot for months (as
+      // `.customer-materials-item-actions` did) with a permanently green spec.
+      const missing = results
+        .filter((entry) => entry.viewport === viewport.name && entry.status === "missing")
+        .map((entry) => `${entry.name}: ${entry.note ?? "no note"}`);
+      expect(missing, `missing shots at ${viewport.name}`).toEqual([]);
     });
   }
 });

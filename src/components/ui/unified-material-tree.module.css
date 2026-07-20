@@ -3,6 +3,8 @@
   flex-direction: column;
   gap: 12px;
   width: 100%;
+  /* Containing block for the drag ghost. */
+  position: relative;
 }
 
 .searchBar {
@@ -223,6 +225,28 @@
   opacity: 1;
 }
 
+/*
+ * Also width-keyed: a narrow FINE-pointer window (desktop resized to 390px)
+ * has hover but not the room, and clipped to 6px just the same.
+ *
+ * On a coarse pointer there is no hover to reveal the action cluster, yet
+ * `opacity: 0` still reserves its ~146px of layout — which crushed the file
+ * title to 6px of visible width at 390px. Wrap the cluster onto its own line
+ * and keep it permanently visible: the title gets the full row, and the buttons
+ * become reachable by touch at all (they never were).
+ */
+@media (pointer: coarse), (max-width: 480px) {
+  .nodeRow {
+    flex-wrap: wrap;
+  }
+
+  .nodeActions {
+    opacity: 1;
+    flex-basis: 100%;
+    justify-content: flex-end;
+  }
+}
+
 .actionBtn {
   background: transparent;
   border: none;
@@ -245,6 +269,74 @@
 .actionBtnDanger:hover {
   background: rgba(248, 113, 113, 0.15);
   color: var(--red);
+}
+
+/* Drag grip. `font-family: inherit` because bare (non-.btn) controls in this
+   app fall back to Arial. */
+.dragHandle {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--ink-2);
+  font-family: inherit;
+  cursor: grab;
+  /* NO `touch-action: none` — it made the grip a dead stripe a finger could not
+     pan from. Scrolling is suppressed in use-tree-drag.ts by a non-passive
+     touchmove listener that preventDefaults only once the 180ms hold has armed,
+     so panning works until the drag actually starts.
+     ponytail: unverifiable by Playwright (synthetic touch doesn't drive native
+     panning). Confirm on a real device. */
+  flex-shrink: 0;
+  /* 32, not 44: a permanently-visible non-pannable grip was 18% of a 250px row
+     on a phone. 32px takes it to ~13% and still clears WCAG 2.5.8 AA (24x24).
+     The `pointer: fine` block below overrides to 24x24, so this is touch-only. */
+  min-width: 32px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+/* A mouse can hit a small target, so the grip shrinks and hides until hover.
+   Touch keeps the full 44px target, always visible. */
+@media (pointer: fine) {
+  .dragHandle {
+    min-width: 24px;
+    min-height: 24px;
+    opacity: 0;
+    transition: opacity var(--motion-fast) var(--ease-out);
+  }
+
+  .nodeRow:hover .dragHandle,
+  .nodeRow:focus-within .dragHandle {
+    opacity: 1;
+  }
+}
+
+.dropInto {
+  outline: 2px solid var(--brand-0);
+  outline-offset: -2px;
+}
+
+.dragGhost {
+  position: absolute;
+  z-index: 5;
+  transform: translate(8px, 8px);
+  pointer-events: none;
+  max-width: 220px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--brand-0);
+  background: rgba(10, 14, 34, 0.92);
+  color: var(--ink-0);
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Indented connection lines for nested elements */
@@ -316,4 +408,17 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Visually-hidden polite live region (pattern: guitar-pro-viewer.module.css:586). */
+.srStatus {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

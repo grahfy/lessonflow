@@ -616,6 +616,10 @@ model LearningMaterial {
   sizeBytes       Int
   folderId        String?
   folder          StudentMaterialFolder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  /// Shared display order within (customerId, folderId). 0 = unpinned: unpinned rows
+  /// sort above pinned rows, newest first. Every relocating write sets this to 0
+  /// explicitly so a stale index is never carried into a new folder.
+  sortOrder       Int                      @default(0)
   createdAt       DateTime                 @default(now())
   updatedAt       DateTime                 @updatedAt
   lessonPlanLinks LessonPlanMaterialLink[]
@@ -623,6 +627,7 @@ model LearningMaterial {
   @@index([customerId, bookingId, createdAt])
   @@index([bookingId, createdAt])
   @@index([customerId, folderId, createdAt])
+  @@index([customerId, folderId, sortOrder])
 }
 
 // Per-student tree of folders that organize LearningMaterial rows. A folder is
@@ -642,6 +647,7 @@ model StudentMaterialFolder {
   sourceBookingId String?
   sourceBooking   Booking?                @relation("FolderSourceBooking", fields: [sourceBookingId], references: [id], onDelete: SetNull)
   materials       LearningMaterial[]
+  libraryAssignments LibraryAssignment[]
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
 
@@ -719,11 +725,18 @@ model LibraryAssignment {
   customer      Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
   assignedById  String?
   assignedBy    AdminUser?  @relation("LibraryAssignmentAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  /// Placement inside the student's folder tree. NULL = root, which is exactly
+  /// where the separate "Assigned by teacher" list already effectively sat.
+  /// Shares one order with LearningMaterial behind `lib:`-prefixed tree ids.
+  folderId      String?
+  folder        StudentMaterialFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  sortOrder     Int         @default(0)
   createdAt     DateTime    @default(now())
 
   @@unique([libraryItemId, customerId])
   @@index([customerId])
   @@index([assignedById])
+  @@index([customerId, folderId, sortOrder])
 }
 
 // Reusable structured lesson-plan templates that staff can apply to a booking

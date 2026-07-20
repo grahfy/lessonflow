@@ -27,6 +27,7 @@ export interface UseLearningMaterialsResult {
     moveFolder: (customerId: string, folderId: string, parentId: string | null) => Promise<boolean>;
     copyFolder: (customerId: string, folderId: string, parentId: string | null) => Promise<boolean>;
     moveMaterial: (customerId: string, materialId: string, folderId: string | null) => Promise<boolean>;
+    reorderMaterials: (customerId: string, folderId: string | null, movedId: string | null, orderedIds: string[]) => Promise<boolean>;
     renameMaterial: (customerId: string, materialId: string, title: string, description: string | null) => Promise<boolean>;
     copyMaterial: (customerId: string, materialId: string, folderId: string | null) => Promise<boolean>;
 }
@@ -266,12 +267,48 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
       });
       if (!response.ok) {
         await handleApiError(response, "Unable to move material.");
+        // Refetch on failure too: the caller may have applied the move
+        // optimistically, and returning false alone leaves that on screen.
+        await load(customerId);
         return false;
       }
       await load(customerId);
       return true;
     } catch {
       if (onError) onError("Network error moving material.");
+      await load(customerId);
+      return false;
+    }
+  }, [safeFetch, handleApiError, load, onError]);
+
+  /**
+   * Atomic move+reorder of one folder's file list. `orderedIds` is the folder's
+   * complete post-drop order; `movedId` is the single row arriving from
+   * elsewhere (null for an in-folder reorder). A 409 means another client
+   * reordered first — the refetch below is what resolves it.
+   */
+  const reorderMaterials = useCallback(async (
+    customerId: string,
+    folderId: string | null,
+    movedId: string | null,
+    orderedIds: string[]
+  ): Promise<boolean> => {
+    try {
+      const response = await safeFetch("/api/admin/learning-materials/reorder", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ customerId, folderId, movedId, orderedIds })
+      });
+      if (!response.ok) {
+        await handleApiError(response, "Unable to reorder materials.");
+        await load(customerId);
+        return false;
+      }
+      await load(customerId);
+      return true;
+    } catch {
+      if (onError) onError("Network error reordering materials.");
+      await load(customerId);
       return false;
     }
   }, [safeFetch, handleApiError, load, onError]);
@@ -330,6 +367,7 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
     moveFolder,
     copyFolder,
     moveMaterial,
+    reorderMaterials,
     renameMaterial,
     copyMaterial
   };

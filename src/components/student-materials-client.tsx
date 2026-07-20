@@ -19,25 +19,30 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type ReactElement, useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import styles from "@/components/student-portal.module.css";
 import { formatBytes } from "@/lib/admin/formatters";
 import { GuitarProViewerDialog } from "@/components/ui/guitar-pro-viewer";
 import { PracticeAudioPlayer } from "@/components/ui/practice-audio-player";
-import { UnifiedMaterialTree, type TreeFolder } from "@/components/ui/unified-material-tree";
+import { UnifiedMaterialTree } from "@/components/ui/unified-material-tree";
 import {
   parseStudentPortalPayload,
   type StudentPortalMaterial,
   type StudentPortalPayload
 } from "@/lib/student-portal/contracts";
 
-/** Local wrapper for material items enriched with (display-only) booking context. */
+/**
+ * Local wrapper for material items enriched with (display-only) booking context.
+ * `libraryItemId` is set for assigned library items, which share the tree and
+ * the order with per-customer materials behind `lib:`-prefixed ids.
+ */
 type StudentMaterialEntry = {
   bookingId: string | null;
   bookingStartAt: string | null;
   lessonMode: "in_person" | "video" | null;
+  libraryItemId: string | null;
   material: StudentPortalMaterial;
 };
 
@@ -46,6 +51,10 @@ export function StudentMaterialsClient(): ReactElement {
   const [data, setData] = useState<StudentPortalPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Separate from `error`: the tree render is gated on `!error`, so reusing it
+  // for a transient reorder failure would blank the whole page.
+  const [reorderError, setReorderError] = useState("");
+  const reorderInFlight = useRef(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [openGpId, setOpenGpId] = useState<string | null>(null);
   /**
@@ -103,6 +112,44 @@ export function StudentMaterialsClient(): ReactElement {
     return collectAllStudentMaterials(data);
   }, [data]);
 
+  /**
+   * Placement + ordering. `orderedIds` comes from `resolveDrop` (or the Move
+   * up/down controls) and carries the exact insertion position — it is NOT
+   * re-derived here, which is what made every drop land at the bottom.
+   * ponytail: refetch-on-settle, no optimistic apply. Add one if the round-trip
+   * ever feels slow.
+   */
+  const handleReorder = useCallback(async (
+    folderId: string | null,
+    materialId: string,
+    orderedIds: string[]
+  ) => {
+    // In-flight guard: two quick drags would compute the second `orderedIds`
+    // against the pre-refetch list and 409 against a state the user never saw.
+    if (reorderInFlight.current) return;
+    reorderInFlight.current = true;
+    setReorderError("");
+
+    const response = await fetch("/api/student/learning-materials/reorder", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ folderId, movedId: materialId, orderedIds })
+    }).catch(() => null);
+
+    await load();
+    reorderInFlight.current = false;
+
+    if (!response) {
+      setReorderError("Network error moving that file. Nothing was changed.");
+    } else if (response.status === 409) {
+      // The whole point of the 409 — swallowing it left the tree silently
+      // re-rendered in the old order with no explanation.
+      setReorderError("Someone else changed these materials. The list has been refreshed — try again.");
+    } else if (!response.ok) {
+      setReorderError("Unable to move that file.");
+    }
+  }, [load]);
+
   return (
     <div className={styles["portal-shell"]} data-motion-root="student-materials">
       <div className={cx("admin-card", "booking-row", styles["portal-header"], styles["materials-header"])}>
@@ -132,6 +179,7 @@ export function StudentMaterialsClient(): ReactElement {
 
       {loading ? <p className="notice" role="status">Loading learning materials...</p> : null}
       {error ? <p className="notice error" role="alert">{error}</p> : null}
+      {reorderError ? <p className="notice error" role="alert">{reorderError}</p> : null}
 
       {!loading && !error && data ? (
         <section className={cx("admin-card", styles["drive-panel"])}>
@@ -143,7 +191,7 @@ export function StudentMaterialsClient(): ReactElement {
           </div>
 
           <UnifiedMaterialTree
-            folders={data.folders as unknown as TreeFolder[]}
+            folders={data.folders}
             materials={allMaterials.map((entry) => ({
               id: entry.material.id,
               title: entry.material.description || entry.material.title,
@@ -152,89 +200,29 @@ export function StudentMaterialsClient(): ReactElement {
               mimeType: entry.material.mimeType,
               materialType: entry.material.materialType,
               sizeBytes: entry.material.sizeBytes,
+              sortOrder: entry.material.sortOrder,
               createdAt: entry.material.createdAt,
               previewUrl: entry.material.previewUrl,
               downloadUrl: entry.material.downloadUrl,
               bookingStartAt: entry.bookingStartAt,
-              lessonMode: entry.lessonMode
+              lessonMode: entry.lessonMode,
+              ...(entry.libraryItemId ? { libraryItemId: entry.libraryItemId } : {})
             }))}
             currentFolderId={null}
             onNavigate={() => {}}
+            // Stays true: it only hides the folder-action cluster, which students
+            // must not get. `dndEnabled` keys off `onDropMaterial`, not this.
             isReadOnly={true}
+            onDropMaterial={(materialId, folderId, orderedIds) =>
+              void handleReorder(folderId, materialId, orderedIds)
+            }
+            onReorder={(folderId, movedId, orderedIds) =>
+              void handleReorder(folderId, movedId, orderedIds)
+            }
           />
         </section>
       ) : null}
 
-      {!loading && !error && data?.assignedByTeacher?.length ? (
-        <section className={cx("admin-card", styles["drive-panel"])}>
-          <div className={styles["drive-toolbar"]} style={{ marginBottom: "16px" }}>
-            <h2 className={styles["drive-title"]}>Assigned by teacher</h2>
-            <p className={cx("helper-text", styles["drive-name-meta"])}>
-              Shared resources your teacher has assigned to you directly.
-            </p>
-          </div>
-
-          <div className={styles["materials-group"]}>
-            <ul className={styles["material-list"]}>
-              {data.assignedByTeacher.map((item) => (
-                <li className={styles["material-item"]} key={item.id}>
-                  <span className={styles["material-title"]}>
-                    <span>{item.title} ({materialTypeLabel(item.materialType)})</span>
-                    {item.description ? (
-                      <span className={cx("helper-text", styles["material-title-secondary"])}>{item.description}</span>
-                    ) : null}
-                    {item.tags.length ? (
-                      <span className={styles["booking-chip-row"]}>
-                        {item.tags.map((tag) => (
-                          <span className={styles["chip"]} key={`${tag.category}:${tag.value}`}>
-                            {tag.category}: {tag.value}
-                          </span>
-                        ))}
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className={styles["material-actions"]}>
-                    {item.materialType === "audio" ? (
-                      <PracticeAudioPlayer
-                        className={cx("material-audio-player", styles["audio-player"])}
-                        src={item.previewUrl}
-                        size="large"
-                      />
-                    ) : item.materialType === "guitar_pro" ? (
-                      <>
-                        <span className={cx("helper-text", styles["material-title-secondary"])}>
-                          Guitar Pro file · {formatBytes(item.sizeBytes)}
-                        </span>
-                        <button type="button" className="btn btn-secondary" onClick={() => setOpenGpId(item.id)}>
-                          View
-                        </button>
-                        <GuitarProViewerDialog
-                          isOpen={openGpId === item.id}
-                          onClose={() => setOpenGpId(null)}
-                          src={item.previewUrl}
-                          downloadUrl={item.downloadUrl}
-                          title={item.title}
-                        />
-                      </>
-                    ) : (
-                      <Tooltip content="Preview this file in a new browser tab.">
-                        <a className="btn btn-secondary" href={item.previewUrl} target="_blank" rel="noreferrer">
-                          Preview
-                        </a>
-                      </Tooltip>
-                    )}
-                    <Tooltip content="Download this file to your device.">
-                      <a className="btn btn-secondary" href={item.downloadUrl}>
-                        Download
-                      </a>
-                    </Tooltip>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-      ) : null}
     </div>
   );
 }
@@ -264,6 +252,7 @@ function collectAllStudentMaterials(payload: StudentPortalPayload): StudentMater
         bookingId: booking.id,
         bookingStartAt: booking.startAt,
         lessonMode: booking.lessonMode,
+        libraryItemId: null,
         material
       });
     }
@@ -275,9 +264,49 @@ function collectAllStudentMaterials(payload: StudentPortalPayload): StudentMater
       bookingId: null,
       bookingStartAt: null,
       lessonMode: null,
+      libraryItemId: null,
       material
     });
   }
 
-  return [...byId.values()];
+  // Assigned library items join the same tree behind `lib:` ids. They are join
+  // rows on a shared master: no copy, no per-student blob, and the separate
+  // "Assigned by teacher" list is gone because this IS that list, placed.
+  for (const item of payload.assignedByTeacher || []) {
+    const treeId = `lib:${item.id}`;
+    if (byId.has(treeId)) continue;
+    byId.set(treeId, {
+      bookingId: null,
+      bookingStartAt: null,
+      lessonMode: null,
+      libraryItemId: item.id,
+      material: {
+        id: treeId,
+        title: item.title,
+        description: item.description,
+        materialType: item.materialType,
+        mimeType: item.mimeType,
+        sizeBytes: item.sizeBytes,
+        folderId: item.folderId,
+        sortOrder: item.sortOrder,
+        createdAt: item.createdAt,
+        downloadUrl: item.downloadUrl,
+        previewUrl: item.previewUrl
+      }
+    });
+  }
+
+  // The tree renders its file list in ARRAY order, so the server's `orderBy`
+  // means nothing here — this Map is built booking-by-booking then standalone.
+  // Re-apply the canonical key: sortOrder asc (0 = unpinned, on top), then
+  // newest first, then id for a stable tiebreak.
+  return [...byId.values()].sort((a, b) => {
+    if (a.material.sortOrder !== b.material.sortOrder) {
+      return a.material.sortOrder - b.material.sortOrder;
+    }
+    if (a.material.createdAt !== b.material.createdAt) {
+      return a.material.createdAt < b.material.createdAt ? 1 : -1;
+    }
+    return a.material.id < b.material.id ? -1 : 1;
+  });
 }

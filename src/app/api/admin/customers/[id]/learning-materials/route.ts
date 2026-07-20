@@ -6,6 +6,7 @@ import { jsonUnexpectedError } from "@/lib/api-errors";
 import { AppError } from "@/lib/errors";
 import { verifyCaptchaSubmission } from "@/lib/captcha";
 import { prisma } from "@/lib/db";
+import { compareTreeOrder, libraryTreeId, materialOrderBy } from "@/lib/materials/reorder";
 import { logError } from "@/lib/observability";
 import { createMaterialStorageDriver, getMaterialStorageDriverName } from "@/lib/student-portal/material-storage";
 import { getLocalMaterialStorageRoot } from "@/lib/student-portal/material-storage.local";
@@ -103,9 +104,7 @@ export async function GET(request: NextRequest, { params }: Params) {
               }
             : {})
         },
-        orderBy: {
-          createdAt: "desc"
-        }
+        orderBy: materialOrderBy
       }),
       prisma.studentMaterialFolder.findMany({
         where: {
@@ -113,6 +112,51 @@ export async function GET(request: NextRequest, { params }: Params) {
         }
       })
     ]);
+
+    // Assigned library items share the tree and the order with per-customer
+    // materials, behind `lib:`-prefixed ids. They are join rows: no blob, no
+    // storageKey, and the shared master is never touched from here.
+    const libraryAssignments = await prisma.libraryAssignment.findMany({
+      where: { customerId: customer.id },
+      include: { libraryItem: true }
+    });
+
+    const treeMaterials = [
+      ...materials.map((material) => ({
+        id: material.id,
+        title: material.title,
+        description: material.description,
+        bookingId: material.bookingId,
+        folderId: material.folderId,
+        sortOrder: material.sortOrder,
+        materialType: material.materialType,
+        mimeType: material.mimeType,
+        sizeBytes: material.sizeBytes,
+        createdAt: material.createdAt,
+        previewUrl: `/api/admin/learning-materials/${material.id}?disposition=inline`,
+        downloadUrl: `/api/admin/learning-materials/${material.id}?disposition=attachment`
+      })),
+      ...libraryAssignments.map((assignment) => ({
+        id: libraryTreeId(assignment.libraryItemId),
+        libraryItemId: assignment.libraryItemId,
+        title: assignment.libraryItem.title,
+        description: assignment.libraryItem.description,
+        bookingId: null,
+        folderId: assignment.folderId,
+        sortOrder: assignment.sortOrder,
+        materialType: assignment.libraryItem.materialType,
+        mimeType: assignment.libraryItem.mimeType,
+        sizeBytes: assignment.libraryItem.sizeBytes,
+        // Assignment time, not the master's creation time.
+        createdAt: assignment.createdAt,
+        // There is no /api/admin/library/{id}/download route; the stream is the
+        // collection route itself.
+        previewUrl: `/api/admin/library/${assignment.libraryItemId}?disposition=inline`,
+        downloadUrl: `/api/admin/library/${assignment.libraryItemId}?disposition=attachment`
+      }))
+    ]
+      .sort(compareTreeOrder)
+      .map((entry) => ({ ...entry, createdAt: entry.createdAt.toISOString() }));
 
     return NextResponse.json({
       bookings: bookings.map((booking) => ({
@@ -124,19 +168,7 @@ export async function GET(request: NextRequest, { params }: Params) {
         lessonDuration: booking.lessonDuration,
         customDurationMinutes: booking.customDurationMinutes
       })),
-      materials: materials.map((material) => ({
-        id: material.id,
-        title: material.title,
-        description: material.description,
-        bookingId: material.bookingId,
-        folderId: material.folderId,
-        materialType: material.materialType,
-        mimeType: material.mimeType,
-        sizeBytes: material.sizeBytes,
-        createdAt: material.createdAt.toISOString(),
-        previewUrl: `/api/admin/learning-materials/${material.id}?disposition=inline`,
-        downloadUrl: `/api/admin/learning-materials/${material.id}?disposition=attachment`
-      })),
+      materials: treeMaterials,
       folders: buildFolderTree(folders)
     });
   } catch (error) {
@@ -151,6 +183,7 @@ type UploadedMaterialPayload = {
   description: string | null;
   bookingId: string | null;
   folderId: string | null;
+  sortOrder: number;
   materialType: string;
   mimeType: string;
   sizeBytes: number;
@@ -384,6 +417,7 @@ export async function POST(request: NextRequest, { params }: Params) {
           description: material.description,
           bookingId: material.bookingId,
           folderId: material.folderId,
+          sortOrder: material.sortOrder,
           materialType: material.materialType,
           mimeType: material.mimeType,
           sizeBytes: material.sizeBytes,
