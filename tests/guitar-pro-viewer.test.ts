@@ -21,10 +21,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * export, transport getters/setters, `tickCache`, and the player events
  * (`playerReady`/`soundFontLoaded`/`playerFinished`/`playerStateChanged`/
  * `playerPositionChanged`), plus the `PlayerMode`/`PlayerOutputMode`/
- * `PlayerState` enums the component reads at construction time. Without the
- * enums, the component throws while building its constructor options
- * (`alphaTab.PlayerMode.EnabledAutomatic`) BEFORE ever constructing an
- * instance — which is what broke every render-path test below until fixed.
+ * `PlayerState`/`ScrollMode` enums the component reads at construction time.
+ * Without the enums, the component throws while building its constructor
+ * options (`alphaTab.PlayerMode.EnabledAutomatic`,
+ * `alphaTab.ScrollMode.OffScreen`) BEFORE ever constructing an instance —
+ * which is what broke every render-path test below until fixed. Any new enum
+ * the component reads must be added here too.
  */
 const alphaTabMocks = vi.hoisted(() => {
   class Emitter<Callback extends (...args: never[]) => void> {
@@ -50,6 +52,10 @@ const alphaTabMocks = vi.hoisted(() => {
     endTick: number;
     isSeek: boolean;
   };
+  type FakeSettings = {
+    display: { scale: number; layoutMode: number };
+    player: { scrollMode: number };
+  };
   type FakeAudioExportChunk = { samples: Float32Array; currentTime: number; endTime: number };
 
   const instances: FakeAlphaTabApi[] = [];
@@ -74,7 +80,7 @@ const alphaTabMocks = vi.hoisted(() => {
   }
 
   class FakeAlphaTabApi {
-    settings: { display: { scale: number; layoutMode: number } };
+    settings: FakeSettings;
 
     // REALITY MODEL (BUG 1): alphaTab's `playerReady` fires only once ALL
     // playback prerequisites are met — crucially INCLUDING a loaded soundfont
@@ -135,7 +141,7 @@ const alphaTabMocks = vi.hoisted(() => {
 
     constructor(
       public container: unknown,
-      settings: { display: { scale: number; layoutMode: number } }
+      settings: FakeSettings
     ) {
       this.settings = settings;
       // Enforce the reality model: `playerReady` must not fire before a
@@ -171,6 +177,7 @@ const alphaTabMocks = vi.hoisted(() => {
   return {
     FakeAlphaTabApi,
     LayoutMode: { Page: 0, Horizontal: 1 },
+    ScrollMode: { Off: 0, Continuous: 1, OffScreen: 2, Smooth: 3 },
     PlayerMode: { Disabled: 0, EnabledAutomatic: 1, EnabledManual: 2 },
     PlayerOutputMode: { WebAudioAudioWorklets: 0, WebAudioScriptProcessor: 1 },
     PlayerState: { Paused: 0, Playing: 1 },
@@ -192,6 +199,7 @@ const alphaTabMocks = vi.hoisted(() => {
 vi.mock("@coderline/alphatab", () => ({
   AlphaTabApi: alphaTabMocks.FakeAlphaTabApi,
   LayoutMode: alphaTabMocks.LayoutMode,
+  ScrollMode: alphaTabMocks.ScrollMode,
   PlayerMode: alphaTabMocks.PlayerMode,
   PlayerOutputMode: alphaTabMocks.PlayerOutputMode,
   PlayerState: alphaTabMocks.PlayerState
@@ -376,6 +384,17 @@ describe("GuitarProViewer", () => {
 
     expect(container.querySelector('[role="status"]')).toBeFalsy();
     expect(container.querySelector('[role="alert"]')).toBeFalsy();
+  });
+
+  // Regression cover for 5b8b047: the cursor must only scroll once it leaves the
+  // visible area, not continuously on every beat. This assertion also pins the
+  // `ScrollMode` enum the component reads at construction — the enum whose
+  // absence from the fake previously broke every render-path test here.
+  it("constructs alphaTab with OffScreen cursor scrolling", async () => {
+    await renderViewer();
+    const api = await waitForApi();
+
+    expect(api.settings.player.scrollMode).toBe(alphaTabMocks.ScrollMode.OffScreen);
   });
 
   it("populates the track rail from scoreLoaded with the first lane active", async () => {
