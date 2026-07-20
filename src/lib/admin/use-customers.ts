@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { useSafeFetch } from "./use-safe-fetch";
 import { type CustomerRow } from "@/components/admin/customers/customer-profile-dialog";
 import { type CustomersSortBy, type CustomersSortDirection } from "@/lib/customers/schema";
+import { type ApiFieldErrors } from "./utils";
 
 export interface UseCustomersOptions {
     /** Number of customers per page */
@@ -31,6 +32,10 @@ export interface UseCustomersResult {
     ) => Promise<void>;
     save: (customer: Partial<CustomerRow>, id?: string) => Promise<CustomerRow | null>;
     remove: (id: string) => Promise<{ archived: boolean } | null>;
+    /** Per-field validation messages from the last failed save, keyed by field name. */
+    saveFieldErrors: ApiFieldErrors;
+    /** Clears the inline field errors, e.g. when the form is reopened or edited. */
+    clearSaveFieldErrors: () => void;
 }
 
 /**
@@ -42,6 +47,7 @@ export function useCustomers(options: UseCustomersOptions = {}): UseCustomersRes
     const [loading, setLoading] = useState(false);
     const [total, setTotal] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
+    const [saveFieldErrors, setSaveFieldErrors] = useState<ApiFieldErrors>({});
 
     const { safeFetch, handleApiError } = useSafeFetch({ onAuthError, onError });
 
@@ -95,6 +101,7 @@ export function useCustomers(options: UseCustomersOptions = {}): UseCustomersRes
     const save = useCallback(async (customer: Partial<CustomerRow>, id?: string): Promise<CustomerRow | null> => {
         const method = id ? "PATCH" : "POST";
         const endpoint = id ? `/api/admin/customers/${id}` : "/api/admin/customers";
+        setSaveFieldErrors({});
 
         try {
             const response = await safeFetch(endpoint, {
@@ -104,7 +111,7 @@ export function useCustomers(options: UseCustomersOptions = {}): UseCustomersRes
             });
 
             if (!response.ok) {
-                await handleApiError(response, "Unable to save customer.");
+                setSaveFieldErrors(await handleApiError(response, "Unable to save customer."));
                 return null;
             }
 
@@ -132,6 +139,8 @@ export function useCustomers(options: UseCustomersOptions = {}): UseCustomersRes
         }
     }, [safeFetch, handleApiError]);
 
+    const clearSaveFieldErrors = useCallback(() => setSaveFieldErrors({}), []);
+
     return {
         customers,
         setCustomers,
@@ -140,6 +149,8 @@ export function useCustomers(options: UseCustomersOptions = {}): UseCustomersRes
         totalPages,
         load,
         save,
-        remove
+        remove,
+        saveFieldErrors,
+        clearSaveFieldErrors
     };
 }

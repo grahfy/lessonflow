@@ -6,40 +6,17 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 
 import { isOwner } from "@/lib/admin/permissions";
 import { resolveAssignedTeacherId } from "@/lib/admin/teacher-assignment";
-import { lessonModeSchema, skillLevelSchema, auPostcodeSchema, auPhoneSchema, auStateSchema } from "@/lib/booking-rules";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { customerSnapshotFromInput, normalizeEmail, normalizePhone } from "@/lib/customer-match";
 import { getCustomerNamePresentation } from "@/lib/customers/name";
 import { prisma } from "@/lib/db";
 import { ensurePortalCredentialForCustomer } from "@/lib/student-portal/credentials";
-import { listCustomersQuerySchema } from "@/lib/customers/schema";
-
-/**
- * Validation schema for manual customer creation.
- */
-const createCustomerSchema = z.object({
-  firstName: z.string().trim().min(1).max(60),
-  lastName: z.string().trim().min(1).max(60),
-  fullName: z.string().trim().min(2).max(120),
-  email: z.string().trim().email().max(200),
-  phone: auPhoneSchema,
-  skillLevel: skillLevelSchema.default("beginner"),
-  lessonMode: lessonModeSchema.default("in_person"),
-  unitNumber: z.string().trim().max(20).optional().nullable(),
-  houseNumber: z.string().trim().max(20).optional().default(""),
-  streetName: z.string().trim().max(120).optional().default(""),
-  streetType: z.string().trim().max(40).optional().default(""),
-  suburb: z.string().trim().max(80).optional().default(""),
-  state: auStateSchema.optional().default("VIC"),
-  postcode: auPostcodeSchema.optional().default("3000"),
-  primaryTeacherId: z.string().trim().min(1).nullable().optional()
-});
+import { createCustomerSchema, listCustomersQuerySchema } from "@/lib/customers/schema";
 
 function compareCustomersByDisplayName(
   left: {
@@ -260,11 +237,11 @@ export async function POST(request: NextRequest) {
     });
     
     if (existing) {
+      // SECURITY: see the PATCH route — the duplicate lookup is unscoped, so
+      // returning the matched record would expose customers this admin has no
+      // permission to read.
       return NextResponse.json(
-        {
-          error: "A customer with this email or phone already exists.",
-          customer: existing
-        },
+        { error: "A customer with this email or phone already exists." },
         { status: 409 }
       );
     }
