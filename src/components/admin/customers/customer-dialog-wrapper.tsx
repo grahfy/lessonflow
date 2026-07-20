@@ -37,6 +37,7 @@ type Props = {
     canDeleteCustomer: boolean;
     revealedPortalPasswords: Record<string, string>;
     portalCredentialBusyCustomerId: string | null;
+    fieldErrors?: Record<string, string>;
     onSaveCustomer: () => void;
     onCancelEdit: () => void;
     onStartEdit: () => void;
@@ -170,6 +171,7 @@ export function CustomerDialogWrapper({
                             canDeleteCustomer={rest.canDeleteCustomer}
                             revealedPortalPasswords={rest.revealedPortalPasswords}
                             portalCredentialBusyCustomerId={rest.portalCredentialBusyCustomerId}
+                            fieldErrors={rest.fieldErrors}
                             onSave={rest.onSaveCustomer}
                             onCancelEdit={rest.onCancelEdit}
                             onStartEdit={rest.onStartEdit}

@@ -152,8 +152,10 @@ export function AdminCustomersClient() {
     total: totalCount, 
     totalPages, 
     load: loadCustomers, 
-    save: saveCustomerApi, 
-    remove: removeCustomerApi 
+    save: saveCustomerApi,
+    remove: removeCustomerApi,
+    saveFieldErrors,
+    clearSaveFieldErrors
   } = useCustomers({
     pageSize,
     onError: setError,
@@ -230,6 +232,7 @@ export function AdminCustomersClient() {
   const openCustomerDialog = useCallback(async (customer: CustomerRow | null, editMode = false) => {
     setError("");
     setNotice("");
+    clearSaveFieldErrors();
     setSelectedCustomer(customer);
     setIsEditing(editMode);
     const nextForm = customer ? customerFormFromRow(customer) : emptyCustomerForm();
@@ -253,7 +256,7 @@ export function AdminCustomersClient() {
     if (dialogRootRef.current) {
       animateIn(dialogRootRef.current);
     }
-  }, [currentAdmin, loadEmailHistory, loadMaterials, showDialog, singleTeacherOptionId]);
+  }, [clearSaveFieldErrors, currentAdmin, loadEmailHistory, loadMaterials, showDialog, singleTeacherOptionId]);
 
   const closeCustomerDialog = useCallback(async () => {
     if (dialogRootRef.current) {
@@ -265,9 +268,10 @@ export function AdminCustomersClient() {
     setCustomerForm(emptyCustomerForm());
     setMaterialsBookingId("");
     setCurrentMaterialsFolderId(null);
+    clearSaveFieldErrors();
     // Clear URL segments to maintain clean routing
     router.replace(customersBasePath, { scroll: false });
-  }, [customersBasePath, hideDialog, router]);
+  }, [clearSaveFieldErrors, customersBasePath, hideDialog, router]);
 
   // -- EFFECTS --
 
@@ -755,6 +759,7 @@ export function AdminCustomersClient() {
           savingCustomer={savingCustomer}
           deletingCustomerId={deletingCustomerId}
           canEditProfile={canManageSelectedCustomer}
+          fieldErrors={saveFieldErrors}
           onSaveCustomer={saveCustomer}
           onClose={closeCustomerDialog}
           error={error}
@@ -835,7 +840,10 @@ export function AdminCustomersClient() {
           onCopyPortalPassword={copyPortalPassword}
           
           // Profile Tab Internal Actions
-          onCancelEdit={() => setIsEditing(false)}
+          onCancelEdit={() => {
+            clearSaveFieldErrors();
+            setIsEditing(false);
+          }}
           onStartEdit={() => canManageSelectedCustomer && setIsEditing(true)}
           onDeleteCustomer={() => selectedCustomer && currentAdmin?.role === "owner" && setPendingDeleteCustomer(selectedCustomer)}
           onViewBillingHistory={() => selectedCustomer && currentAdmin?.role === "owner" && void beginExitTransition(null, 0, () => router.push(`/admin/invoices?q=${encodeURIComponent(selectedCustomer.fullName)}`))}

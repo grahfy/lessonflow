@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 
 import { canManagePrimaryTeacherCustomer, isOwner } from "@/lib/admin/permissions";
 import { resolveAssignedTeacherId } from "@/lib/admin/teacher-assignment";
-import { auPhoneSchema, auPostcodeSchema, auStateSchema, lessonModeSchema, skillLevelSchema } from "@/lib/booking-rules";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { normalizeEmail, normalizePhone } from "@/lib/customer-match";
+import { updateCustomerSchema } from "@/lib/customers/schema";
 import { prisma } from "@/lib/db";
 import { buildNameSearchTokens, normalizeFullNameForLookup } from "@/lib/student-portal/credentials";
 
@@ -16,24 +15,45 @@ type Params = {
   }>;
 };
 
-const updateCustomerSchema = z.object({
-  firstName: z.string().trim().min(1).max(60).optional(),
-  lastName: z.string().trim().min(1).max(60).optional(),
-  fullName: z.string().trim().min(2).max(120).optional(),
-  email: z.string().trim().email().max(200).optional(),
-  phone: auPhoneSchema.optional(),
-  skillLevel: skillLevelSchema.optional(),
-  lessonMode: lessonModeSchema.optional(),
-  unitNumber: z.string().trim().max(20).optional().nullable(),
-  houseNumber: z.string().trim().min(1).max(20).optional(),
-  streetName: z.string().trim().max(120).optional(),
-  streetType: z.string().trim().max(40).optional(),
-  suburb: z.string().trim().max(80).optional(),
-  state: auStateSchema.optional(),
-  postcode: auPostcodeSchema.optional(),
-  primaryTeacherId: z.string().trim().min(1).nullable().optional(),
-  isArchived: z.boolean().optional()
-});
+/** Address fields the admin dialog marks required, with their form labels. */
+const ADDRESS_FIELD_LABELS = {
+  houseNumber: "House number",
+  streetName: "Street name",
+  streetType: "Street type",
+  suburb: "Suburb",
+  state: "State",
+  postcode: "Postcode"
+} as const;
+
+/**
+ * Rejects an edit that would blank out an address field that currently holds a
+ * value.
+ *
+ * RATIONALE: the dialog PATCHes the whole form, and some legacy customers
+ * (CSV imports, early bookings) were stored with empty address parts. Requiring
+ * every field outright would make those records unsaveable for unrelated edits
+ * like a phone number, so the rule is "you may not erase what is there".
+ *
+ * @returns Per-field messages for a 400 response, or null when the edit is fine
+ */
+function findClearedAddressFields(
+  patch: Partial<Record<keyof typeof ADDRESS_FIELD_LABELS, string | undefined>>,
+  existing: Record<keyof typeof ADDRESS_FIELD_LABELS, string | null>
+): Record<string, string[]> | null {
+  const fieldErrors: Record<string, string[]> = {};
+
+  for (const field of Object.keys(ADDRESS_FIELD_LABELS) as Array<keyof typeof ADDRESS_FIELD_LABELS>) {
+    const incoming = patch[field];
+    if (incoming === undefined || incoming.trim() !== "") {
+      continue;
+    }
+    if ((existing[field] ?? "").trim() !== "") {
+      fieldErrors[field] = [`${ADDRESS_FIELD_LABELS[field]} is required and cannot be cleared.`];
+    }
+  }
+
+  return Object.keys(fieldErrors).length > 0 ? fieldErrors : null;
+}
 
 /**
  * Returns one customer record for admin detail flows.
@@ -102,6 +122,17 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const clearedAddressFields = findClearedAddressFields(parsed.data, existing);
+    if (clearedAddressFields) {
+      return NextResponse.json(
+        {
+          error: "Invalid customer payload.",
+          details: { formErrors: [], fieldErrors: clearedAddressFields }
+        },
+        { status: 400 }
+      );
+    }
+
     const nextPrimaryTeacherId =
       parsed.data.primaryTeacherId === undefined
         ? existing.primaryTeacherId
@@ -135,11 +166,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       }
     });
     if (duplicate) {
+      // SECURITY: the match is looked up across every customer, including ones
+      // this admin cannot manage, so the record itself must not be returned —
+      // it would let a teacher read another teacher's student by guessing an
+      // email or phone. The message is all the UI needs.
       return NextResponse.json(
-        {
-          error: "Another customer already uses this email or phone.",
-          customer: duplicate
-        },
+        { error: "Another customer already uses this email or phone." },
         { status: 409 }
       );
     }
