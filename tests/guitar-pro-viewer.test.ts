@@ -437,6 +437,24 @@ describe("GuitarProViewer", () => {
     expect(container.querySelector('[role="status"]')).toBeFalsy();
   });
 
+  // L10 guard (`setStatus((prev) => (prev === "ready" ? prev : "error"))`): a
+  // transient PLAYER error after the score is already rendered must not blow
+  // away a working score. The pre-ready half of the branch is pinned by the
+  // "shows an error alert…" test above.
+  it("keeps the rendered score visible when a player error arrives after ready", async () => {
+    await renderViewer();
+    const api = await waitForApi();
+    await makeScoreReady(api);
+
+    await act(async () => {
+      api.error.trigger(new Error("transient player error"));
+    });
+
+    const alerts = Array.from(container.querySelectorAll('[role="alert"]'));
+    expect(alerts.some((el) => el.textContent?.includes("displayed here"))).toBe(false);
+    expect(container.querySelector('[role="img"]')).toBeTruthy();
+  });
+
   it("shows the error state when load() returns false", async () => {
     alphaTabMocks.setNextLoadResult(false);
     await renderViewer();
