@@ -181,6 +181,13 @@ interface MaterialsMoveDialogProps {
   options: MoveTargetOption[];
   /** The material's current folder — indicated and disabled in the list. */
   currentFolderId: string | null;
+  /**
+   * Position within the current folder, 0-based, and how many files are in it.
+   * Drives the ordering controls. Omit ⇒ ordering section is not rendered.
+   */
+  position?: { index: number; total: number };
+  /** Moves the material one slot up (-1) or down (+1) within its folder. */
+  onReorder?: (delta: -1 | 1) => void;
   onSelect: (folderId: string | null) => void;
   onClose: () => void;
 }
@@ -190,6 +197,8 @@ export function MaterialsMoveDialog({
   materialTitle,
   options,
   currentFolderId,
+  position,
+  onReorder,
   onSelect,
   onClose
 }: MaterialsMoveDialogProps) {
@@ -207,6 +216,46 @@ export function MaterialsMoveDialog({
       }
     >
       <div className="dialog-col">
+        {position && onReorder ? (
+          <>
+            {/*
+              The keyboard/AT ordering path. The tree's drag grips are
+              aria-hidden + tabIndex={-1}, so without these there is no
+              accessible way to reorder at all. They live here rather than in
+              the tree's inline action cluster because that cluster already
+              crushes the row title to 6px at 390px.
+            */}
+            {/*
+              Doubles as the announcement: it already carries exactly the
+              success information, and re-announces when the position changes.
+              Polite — a reorder is not an interruption. Failures are NOT
+              mirrored here; the surface's error notice is already role="alert"
+              (admin-notice.tsx:29) and would be read twice.
+            */}
+            <p className="helper-text" aria-live="polite" aria-atomic="true">
+              {materialTitle} — position {position.index + 1} of {position.total} in this folder.
+            </p>
+            <div className="dialog-row">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={position.index <= 0}
+                onClick={() => onReorder(-1)}
+              >
+                Move up
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={position.index < 0 || position.index >= position.total - 1}
+                onClick={() => onReorder(1)}
+              >
+                Move down
+              </button>
+            </div>
+            <hr />
+          </>
+        ) : null}
         {options.map((option) => {
           const isCurrent = option.folderId === currentFolderId;
           return (

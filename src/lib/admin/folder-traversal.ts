@@ -23,6 +23,19 @@ export type CollectedFile = {
   relativePath: string;
 };
 
+/**
+ * True while a drag is carrying OS files rather than an in-page element or
+ * text selection. Every drop handler that reads `dataTransfer.files` must gate
+ * on this: an element drag (a tree row, a text selection) reports an empty
+ * `files` list, so an ungated handler silently swallows the drop instead of
+ * letting the page's own drag logic run.
+ *
+ * Accepts both the native and React synthetic DragEvent.
+ */
+export function dragHasFiles(event: { dataTransfer: DataTransfer | null }): boolean {
+  return Array.from(event.dataTransfer?.types ?? []).includes("Files");
+}
+
 /** Strips leading slashes and normalizes separators to forward slashes. */
 function normalizeRelativePath(rawPath: string, fallbackName: string): string {
   const normalized = rawPath.replace(/\\/g, "/").replace(/^\/+/, "");

@@ -338,6 +338,8 @@ describe("student-portal-data", () => {
     const assignedAt = new Date("2026-07-01T10:00:00.000Z");
     const mapped = mapStudentPortalLibraryItem({
       createdAt: assignedAt,
+      folderId: "folder-1",
+      sortOrder: 3,
       libraryItem: {
         id: "lib-gp-1",
         title: "Sweet Child O' Mine",
@@ -355,6 +357,9 @@ describe("student-portal-data", () => {
     expect(mapped.downloadUrl).toBe("/api/student/library/lib-gp-1/download");
     expect(mapped.previewUrl).toBe("/api/student/library/lib-gp-1/download?disposition=inline");
     expect(mapped.tags).toEqual([{ category: "artist", value: "Guns N' Roses" }]);
+    // Placement rides on the assignment, not the shared master.
+    expect(mapped.folderId).toBe("folder-1");
+    expect(mapped.sortOrder).toBe(3);
   });
 
   it("returns not found when an owned learning material file is missing", async () => {

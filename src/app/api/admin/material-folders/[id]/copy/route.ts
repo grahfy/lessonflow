@@ -127,6 +127,8 @@ export async function POST(request: NextRequest, { params }: Params) {
             customerId: activeCustomerId,
             bookingId: mat.bookingId,
             folderId: newFolder.id,
+            // Never inherit the source row's order key into the copied folder.
+            sortOrder: 0,
             uploadedById: activeAdminId,
             title: mat.title,
             description: mat.description,
@@ -137,6 +139,16 @@ export async function POST(request: NextRequest, { params }: Params) {
           }
         });
       }
+
+      // Assigned library items are deliberately NOT copied. A folder copy is
+      // always same-customer (`activeCustomerId` is bound to `folder.customerId`
+      // and a cross-customer destination parent is rejected above), and
+      // `@@unique([libraryItemId, customerId])` means a student can hold exactly
+      // one assignment per item. There is nothing to duplicate: the student
+      // already has the item, and it stays in the source folder. Relocating it
+      // into the copy would silently REMOVE it from the original, which is a
+      // move, not a copy. So the copied folder contains no library items by
+      // design. Pinned by tests/material-folder-library-placement.test.ts.
 
       // Copy children
       for (const child of currentFolder.children) {

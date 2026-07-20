@@ -18,6 +18,7 @@ describe("student-portal-contracts", () => {
       mimeType: "application/pdf",
       sizeBytes: 2048,
       folderId: null,
+      sortOrder: 0,
       createdAt: new Date("2026-03-01T10:00:00.000Z")
     });
     expect(material.downloadUrl).toBe("/api/student/learning-materials/mat_1/download");
@@ -30,6 +31,7 @@ describe("student-portal-contracts", () => {
       mimeType: "image/png",
       sizeBytes: 1024,
       folderId: null,
+      sortOrder: 0,
       createdAt: new Date("2026-03-05T10:00:00.000Z")
     });
     expect(imageMaterial.materialType).toBe("image");
@@ -56,6 +58,7 @@ describe("student-portal-contracts", () => {
           mimeType: "application/pdf",
           sizeBytes: 2048,
           folderId: null,
+          sortOrder: 0,
           createdAt: new Date("2026-03-01T10:00:00.000Z")
         }
       ]
@@ -148,6 +151,8 @@ describe("student-portal-contracts", () => {
           materialType: "guitar_pro",
           mimeType: "application/octet-stream",
           sizeBytes: 40960,
+          folderId: "folder-9",
+          sortOrder: 7,
           createdAt: "2026-07-15T10:00:00.000Z",
           downloadUrl: "/api/student/library/lib_1/download",
           previewUrl: "/api/student/library/lib_1/download?disposition=inline",
@@ -158,5 +163,9 @@ describe("student-portal-contracts", () => {
     });
     expect(payload.assignedByTeacher).toHaveLength(1);
     expect(payload.assignedByTeacher?.[0]?.materialType).toBe("guitar_pro");
+    // Non-zero on purpose: `null`/`0` would pass equally if the schema carried
+    // the `.default()` these fields deliberately do NOT have.
+    expect(payload.assignedByTeacher?.[0]?.folderId).toBe("folder-9");
+    expect(payload.assignedByTeacher?.[0]?.sortOrder).toBe(7);
   });
 });
