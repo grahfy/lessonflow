@@ -43,6 +43,7 @@ export type LearningMaterialRow = {
     description: string | null;
     bookingId: string | null;
     folderId: string | null;
+    sortOrder: number;
     materialType: "audio" | "pdf" | "image" | "guitar_pro";
     mimeType: string;
     sizeBytes: number;

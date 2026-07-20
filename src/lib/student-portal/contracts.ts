@@ -27,9 +27,27 @@ export const studentPortalMaterialSchema = z.object({
   // `folderId` is the canonical tree location (null = student root). `bookingId`
   // context remains available via the owning booking; folders are the grouping axis.
   folderId: z.string().nullable(),
+  // Shared display order within the folder. REQUIRED, deliberately not
+  // `.default(0)`: a default on an output schema lets a server that forgets to
+  // map the field silently emit 0 for every row, destroying the order with no
+  // error anywhere.
+  sortOrder: z.number().int(),
   createdAt: z.string().datetime({ offset: true }),
   downloadUrl: z.string().min(1),
   previewUrl: z.string().min(1)
+});
+
+/**
+ * Student reorder request. Deliberately has NO `customerId` (taken from the
+ * session) and NO folder-mutation fields: students may place and order their
+ * own materials, never restructure the teacher's folder hierarchy.
+ */
+export const studentReorderRequestSchema = z.object({
+  folderId: z.string().trim().min(1).nullable(),
+  movedId: z.string().trim().min(1).nullable(),
+  // 200 mirrors REORDER_MAX_IDS; not imported because this module is bundled
+  // into client components and `reorder.ts` pulls in prisma.
+  orderedIds: z.array(z.string().min(1)).min(1).max(200)
 });
 
 /**
@@ -42,11 +60,13 @@ export const studentPortalLibraryItemTagSchema = z.object({
 });
 
 /**
- * A LibraryItem assigned to the student by a teacher ("Assigned by teacher"
- * area). Deliberately NOT the same shape as `studentPortalMaterialSchema`:
- * library items are shared-by-reference masters with no `folderId`/`bookingId`
- * context (they live outside the per-student folder tree), and their `id` is the
- * `LibraryItem.id` used to build the `/api/student/library/{id}/download` URLs.
+ * A LibraryItem assigned to the student by a teacher. Still NOT the same shape
+ * as `studentPortalMaterialSchema` — library items are shared-by-reference
+ * masters with no `bookingId` context, and their `id` is the `LibraryItem.id`
+ * used to build the `/api/student/library/{id}/download` URLs. They now DO
+ * carry `folderId`/`sortOrder`: placement lives on the `LibraryAssignment` join
+ * row, so an assigned item sits in the student's folder tree beside per-customer
+ * materials without the shared master being copied or altered.
  * `createdAt` is the ASSIGNMENT time (when the student received the item), not
  * the item's own creation time.
  */
@@ -57,6 +77,8 @@ export const studentPortalLibraryItemSchema = z.object({
   materialType: studentPortalMaterialTypeSchema,
   mimeType: z.string(),
   sizeBytes: z.number().int().nonnegative(),
+  folderId: z.string().nullable(),
+  sortOrder: z.number().int(),
   createdAt: z.string().datetime({ offset: true }),
   downloadUrl: z.string().min(1),
   previewUrl: z.string().min(1),
@@ -224,7 +246,15 @@ export type StudentPortalRescheduleRequestResponse = z.infer<typeof studentPorta
 
 type MaterialMapInput = Pick<
   LearningMaterial,
-  "id" | "title" | "description" | "materialType" | "mimeType" | "sizeBytes" | "folderId" | "createdAt"
+  | "id"
+  | "title"
+  | "description"
+  | "materialType"
+  | "mimeType"
+  | "sizeBytes"
+  | "folderId"
+  | "sortOrder"
+  | "createdAt"
 >;
 
 type BookingMapInput = Pick<
@@ -272,6 +302,7 @@ export function mapStudentPortalMaterial(material: MaterialMapInput): StudentPor
     mimeType: material.mimeType,
     sizeBytes: material.sizeBytes,
     folderId: material.folderId,
+    sortOrder: material.sortOrder,
     createdAt: material.createdAt.toISOString(),
     downloadUrl: `/api/student/learning-materials/${material.id}/download`,
     previewUrl: `/api/student/learning-materials/${material.id}/download?disposition=inline`
@@ -280,6 +311,8 @@ export function mapStudentPortalMaterial(material: MaterialMapInput): StudentPor
 
 type LibraryAssignmentMapInput = {
   createdAt: Date;
+  folderId: string | null;
+  sortOrder: number;
   libraryItem: {
     id: string;
     title: string;
@@ -305,6 +338,8 @@ export function mapStudentPortalLibraryItem(assignment: LibraryAssignmentMapInpu
     materialType: item.materialType,
     mimeType: item.mimeType,
     sizeBytes: item.sizeBytes,
+    folderId: assignment.folderId,
+    sortOrder: assignment.sortOrder,
     createdAt: assignment.createdAt.toISOString(),
     downloadUrl: `/api/student/library/${item.id}/download`,
     previewUrl: `/api/student/library/${item.id}/download?disposition=inline`,

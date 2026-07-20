@@ -22,6 +22,8 @@ import {
   type LearningMaterialBooking,
   type LearningMaterialRow
 } from "@/lib/admin/types";
+import { dragHasFiles } from "@/lib/admin/folder-traversal";
+import { getDescendantFolderIds } from "@/lib/materials/tree-dnd";
 import { UnifiedMaterialTree, type TreeFolder, type TreeFile } from "@/components/ui/unified-material-tree";
 
 /** A folder with the breadcrumb path leading to it (root excluded). */
@@ -49,6 +51,8 @@ export interface MaterialsFolderActions {
   onMoveFolder?: (folderId: string, parentId: string | null) => void | boolean | Promise<void | boolean>;
   onCopyFolder?: (folderId: string, parentId: string | null) => void | boolean | Promise<void | boolean>;
   onMoveMaterial: (materialId: string, folderId: string | null) => void | boolean | Promise<void | boolean>;
+  /** Atomic move+reorder. Absent ⇒ Move up/down and drop-position are off. */
+  onReorderMaterials?: (folderId: string | null, movedId: string, orderedIds: string[]) => void | boolean | Promise<void | boolean>;
   onRenameMaterial?: (materialId: string, title: string, description: string | null) => void | boolean | Promise<void | boolean>;
   onCopyMaterial?: (materialId: string, folderId: string | null) => void | boolean | Promise<void | boolean>;
 }
@@ -116,24 +120,6 @@ function folderPathLabel(folderId: string, byId: Map<string, FlatFolder>): strin
     cursor = node.parentId;
   }
   return segments.join(" / ");
-}
-
-/** Recursively aggregates all descendant folder IDs to prevent circular folder moves. */
-function getDescendantFolderIds(nodes: AdminFolderRow[], folderId: string): Set<string> {
-  const descendants = new Set<string>();
-  const targetNode = findNode(nodes, folderId);
-  if (targetNode) {
-    const walk = (n: AdminFolderRow) => {
-      descendants.add(n.id);
-      for (const child of n.children) {
-        walk(child);
-      }
-    };
-    for (const child of targetNode.children) {
-      walk(child);
-    }
-  }
-  return descendants;
 }
 
 /**
@@ -254,6 +240,7 @@ export function AdminMaterialsPanel({
   }
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
+    if (!dragHasFiles(event)) return;
     event.preventDefault();
     setIsDragOver(false);
     const dropped = Array.from(event.dataTransfer.files ?? []);
@@ -266,6 +253,7 @@ export function AdminMaterialsPanel({
   }
 
   function handleDragOver(event: DragEvent<HTMLDivElement>) {
+    if (!dragHasFiles(event)) return;
     event.preventDefault();
     setIsDragOver(true);
   }
@@ -310,8 +298,8 @@ export function AdminMaterialsPanel({
             <p className="helper-text">Loading materials...</p>
           ) : (
             <UnifiedMaterialTree
-              folders={folders as unknown as TreeFolder[]}
-              materials={materialsList as unknown as TreeFile[]}
+              folders={folders}
+              materials={materialsList}
               currentFolderId={currentFolderId}
               onNavigate={(folderId) => folderField?.onNavigate(folderId)}
               materialsDeletingId={materialsDeletingId}
@@ -360,6 +348,21 @@ export function AdminMaterialsPanel({
                   : undefined
               }
               onPromoteMaterial={(material) => handlePromoteMaterial({ id: material.id, title: material.title })}
+              onDropMaterial={
+                folderActions
+                  ? (materialId, folderId, orderedIds) =>
+                      // `orderedIds` carries the exact insertion position; the
+                      // move-only route would drop it and land the file last.
+                      folderActions.onReorderMaterials
+                        ? void folderActions.onReorderMaterials(folderId, materialId, orderedIds)
+                        : void folderActions.onMoveMaterial(materialId, folderId)
+                  : undefined
+              }
+              onDropFolder={
+                folderActions?.onMoveFolder
+                  ? (folderId, parentId) => void folderActions.onMoveFolder?.(folderId, parentId)
+                  : undefined
+              }
             />
           )}
         </AdminCard>
@@ -562,6 +565,29 @@ export function AdminMaterialsPanel({
           materialTitle={dialogState.material.title}
           options={moveOptions}
           currentFolderId={dialogState.material.folderId ?? null}
+          position={(() => {
+            const ids = materialsList
+              .filter((m) => (m.folderId ?? null) === (dialogState.material.folderId ?? null))
+              .map((m) => m.id);
+            return { index: ids.indexOf(dialogState.material.id), total: ids.length };
+          })()}
+          onReorder={
+            folderActions.onReorderMaterials
+              ? (delta) => {
+                  const folderId = dialogState.material.folderId ?? null;
+                  const ids = materialsList
+                    .filter((m) => (m.folderId ?? null) === folderId)
+                    .map((m) => m.id);
+                  const index = ids.indexOf(dialogState.material.id);
+                  const next = index + delta;
+                  if (index < 0 || next < 0 || next >= ids.length) return;
+                  const reordered = [...ids];
+                  reordered.splice(index, 1);
+                  reordered.splice(next, 0, dialogState.material.id);
+                  void folderActions.onReorderMaterials?.(folderId, dialogState.material.id, reordered);
+                }
+              : undefined
+          }
           onSelect={(folderId) => {
             void folderActions.onMoveMaterial(dialogState.material.id, folderId);
             setDialogState(null);

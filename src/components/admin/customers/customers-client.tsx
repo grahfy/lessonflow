@@ -195,6 +195,7 @@ export function AdminCustomersClient() {
     moveFolder: moveFolderApi,
     copyFolder: copyFolderApi,
     moveMaterial: moveMaterialApi,
+    reorderMaterials: reorderMaterialsApi,
     renameMaterial: renameMaterialApi,
     copyMaterial: copyMaterialApi
   } = useLearningMaterials({ onAuthError, onError: setError });
@@ -493,6 +494,16 @@ export function AdminCustomersClient() {
     const success = await moveMaterialApi(selectedCustomer.id, materialId, folderId);
     if (success) setNotice("Material moved.");
     return success;
+  }
+
+  async function handleReorderMaterials(
+    folderId: string | null,
+    movedId: string,
+    orderedIds: string[]
+  ) {
+    if (!selectedCustomer) return false;
+    setError("");
+    return reorderMaterialsApi(selectedCustomer.id, folderId, movedId, orderedIds);
   }
 
   async function handleMoveFolder(folderId: string, parentId: string | null) {
@@ -804,6 +815,7 @@ export function AdminCustomersClient() {
             onMoveFolder: handleMoveFolder,
             onCopyFolder: handleCopyFolder,
             onMoveMaterial: handleMoveMaterial,
+            onReorderMaterials: handleReorderMaterials,
             onRenameMaterial: handleRenameMaterial,
             onCopyMaterial: handleCopyMaterial
           }}

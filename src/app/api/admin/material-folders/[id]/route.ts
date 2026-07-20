@@ -179,6 +179,19 @@ export async function DELETE(request: NextRequest, { params }: Params) {
           folderId: folder.parentId
         }
       }),
+      // Assigned library items must follow their siblings UP ONE LEVEL. The FK's
+      // `ON DELETE SET NULL` would send them to root instead, so a nested
+      // library item would teleport to the top while everything around it moved
+      // to the parent. This runs before the delete, so the FK never fires.
+      // (The INV-4 pre-check above correctly skips these: they have no booking.)
+      prisma.libraryAssignment.updateMany({
+        where: {
+          folderId: folder.id
+        },
+        data: {
+          folderId: folder.parentId
+        }
+      }),
       prisma.studentMaterialFolder.updateMany({
         where: {
           parentId: folder.id

@@ -82,7 +82,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         id: material.id
       },
       data: {
-        folderId: targetFolderId
+        folderId: targetFolderId,
+        // Relocating writes reset the order key so a stale index from the old
+        // folder is never carried into the new one (0 = unpinned, sorts on top).
+        sortOrder: 0
       }
     });
 

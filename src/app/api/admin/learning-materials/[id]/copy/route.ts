@@ -111,6 +111,8 @@ export async function POST(request: NextRequest, { params }: Params) {
         customerId: material.customerId,
         bookingId: material.bookingId,
         folderId: targetFolderId,
+        // Never inherit the source row's order key into the destination folder.
+        sortOrder: 0,
         uploadedById: admin.id,
         title,
         description: material.description,

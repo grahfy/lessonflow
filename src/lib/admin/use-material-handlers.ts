@@ -47,6 +47,7 @@ export function useMaterialHandlers({
     moveFolder: moveFolderApi,
     copyFolder: copyFolderApi,
     moveMaterial: moveMaterialApi,
+    reorderMaterials: reorderMaterialsApi,
     renameMaterial: renameMaterialApi,
     copyMaterial: copyMaterialApi
   } = materials;
@@ -112,6 +113,17 @@ export function useMaterialHandlers({
     return success;
   }, [getSelectedEvent, setError, setNotice, moveMaterialApi]);
 
+  const handleReorderMaterials = useCallback(async (
+    folderId: string | null,
+    movedId: string,
+    orderedIds: string[]
+  ) => {
+    const event = getSelectedEvent();
+    if (!event?.row.customerId) return false;
+    setError("");
+    return reorderMaterialsApi(event.row.customerId, folderId, movedId, orderedIds);
+  }, [getSelectedEvent, setError, reorderMaterialsApi]);
+
   const handleMoveFolder = useCallback(async (folderId: string, parentId: string | null) => {
     const event = getSelectedEvent();
     if (!event?.row.customerId) return false;
@@ -155,6 +167,7 @@ export function useMaterialHandlers({
     handleRenameMaterialFolder,
     handleDeleteMaterialFolder,
     handleMoveMaterial,
+    handleReorderMaterials,
     handleMoveFolder,
     handleCopyFolder,
     handleRenameMaterial,

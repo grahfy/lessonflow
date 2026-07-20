@@ -799,6 +799,7 @@ export function AdminBookingsClient() {
     handleRenameMaterialFolder,
     handleDeleteMaterialFolder,
     handleMoveMaterial,
+    handleReorderMaterials,
     handleMoveFolder,
     handleCopyFolder,
     handleRenameMaterial,
@@ -1007,6 +1008,7 @@ export function AdminBookingsClient() {
               onMoveFolder: handleMoveFolder,
               onCopyFolder: handleCopyFolder,
               onMoveMaterial: handleMoveMaterial,
+              onReorderMaterials: handleReorderMaterials,
               onRenameMaterial: handleRenameMaterial,
               onCopyMaterial: handleCopyMaterial
             }
