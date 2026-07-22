@@ -1,0 +1,275 @@
+/* Presentational styling for SitePopup (src/components/public/site-popup.tsx).
+   Author-supplied colours/radius/width arrive as inline styles from props;
+   everything here is layout, the six entrance-animation presets, and the
+   44px/reduced-motion/no-mobile-overflow constraints that apply regardless
+   of what the author picked. */
+
+/* ---------- shared controls ---------- */
+
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  font-family: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  border: none;
+  text-decoration: none;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.heading {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.body {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.imageTop {
+  position: relative;
+  height: 140px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.imageTop img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.imageSide {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.imageSide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ---------- corner factor (non-blocking card, cookie-consent-banner precedent) ---------- */
+
+.corner {
+  position: fixed;
+  inset: auto 20px max(20px, env(safe-area-inset-bottom, 0px)) auto;
+  z-index: 120;
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42);
+}
+
+.cornerHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cornerHead .heading {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------- bar factor (AC-45 change: content-constrained) ---------- */
+
+.bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 10px 44px 10px 16px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+.barText {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.barHeading {
+  flex-shrink: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+/* Heading + ONE clipped line, whatever the author's rich text actually contains — a bar that grows tall enough to cover the page header defeats the point of the compact form factor. white-space/ellipsis only clip inline overflow, so bodyHtml's own block tags (p, ul, li, ...) are flattened to inline here first — otherwise a second authored paragraph would still stack a second line. */
+.barBody {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 0.86rem;
+  opacity: 0.85;
+}
+
+.barBody * {
+  display: inline;
+  margin: 0;
+  padding: 0;
+}
+
+.barClose {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+}
+
+/* ---------- entrance animation presets (AC-34/AC-35) ---------- */
+
+/* No permanent hidden state on any factor: the base markup is already the
+   "settled" look. Under prefers-reduced-motion these rules simply don't
+   match, so the popup appears immediately with no animation — nothing to
+   suppress separately. */
+@media (prefers-reduced-motion: no-preference) {
+  .enter-fade {
+    animation: enterFade 420ms ease-out;
+  }
+
+  .enter-slide_up {
+    animation: enterSlideUp 420ms cubic-bezier(0, 0, 0.2, 1);
+  }
+
+  .enter-slide_in_right {
+    animation: enterSlideInRight 420ms cubic-bezier(0, 0, 0.2, 1);
+  }
+
+  .enter-zoom {
+    animation: enterZoom 380ms cubic-bezier(0.34, 1.4, 0.64, 1);
+  }
+
+  .enter-bounce {
+    animation: enterBounce 640ms cubic-bezier(0.28, 0.84, 0.42, 1);
+  }
+
+  .enter-pulse {
+    animation: enterPulse 780ms ease-out;
+  }
+}
+
+@keyframes enterFade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes enterSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+
+@keyframes enterSlideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(48px);
+  }
+}
+
+@keyframes enterZoom {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+@keyframes enterBounce {
+  0% {
+    opacity: 0;
+    transform: translateY(-36px);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  70% {
+    transform: translateY(-12px);
+  }
+  85% {
+    transform: translateY(0);
+  }
+  93% {
+    transform: translateY(-4px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes enterPulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(1);
+  }
+  85% {
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+  }
+}

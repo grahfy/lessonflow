@@ -1,0 +1,187 @@
+/* Admin popup list + form. Scoped controls get a 44px minimum touch target
+   and inherit the page font — bare (non-.btn) inputs/selects otherwise fall
+   back to the browser default (Arial), same gap documented for the library
+   surface. */
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.statsChart {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.statsSvg {
+  width: 100%;
+  height: auto;
+}
+
+.statsAxis {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.statsLegend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  color: var(--ink-1);
+}
+
+.statsLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.statsSwatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.badgeOn,
+.badgeOff {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.badgeOn {
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+}
+
+.badgeOff {
+  background: rgba(148, 163, 184, 0.16);
+  color: var(--ink-2);
+}
+
+.rowActions {
+  display: flex;
+  gap: 8px;
+}
+
+.linkButton {
+  background: none;
+  border: none;
+  color: var(--brand-0);
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+  min-height: 44px;
+}
+
+.dialogBody {
+  padding: 20px;
+}
+
+.dialogFooter {
+  display: flex;
+  gap: 10px;
+}
+
+.formRoot {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 44px controls + inherited font on every bare input/select/textarea in this
+   form (excluded on checkbox/color, which have their own native sizing). */
+.formRoot input:not([type="checkbox"]):not([type="color"]),
+.formRoot select,
+.formRoot textarea {
+  min-height: 44px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.formError {
+  color: var(--red);
+  font-size: 0.86rem;
+}
+
+.colorField {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.colorInput {
+  width: 44px;
+  height: 44px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: none;
+}
+
+.previewFrame {
+  position: relative;
+  min-height: 220px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  /* SitePopup's corner/bar form factors are `position: fixed` (real page
+     placement). A `transform` on this ancestor makes it their containing
+     block instead of the viewport, trapping the preview inside this box —
+     same fixed-inside-a-transformed-ancestor trick already used for the
+     admin nav drawer over .admin-shell. */
+  transform: translateZ(0);
+}
+
+.imageRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.imagePreview {
+  max-width: 120px;
+  max-height: 80px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.helperNote {
+  color: var(--ink-2);
+  font-size: 0.84rem;
+}
+
+.warningStack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.contrastWarning {
+  background: rgba(250, 204, 21, 0.12);
+  border: 1px solid rgba(250, 204, 21, 0.4);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 0.86rem;
+  color: #facc15;
+}

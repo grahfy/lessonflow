@@ -22,6 +22,7 @@ import { sendCustomerBookingStatusEmail } from "@/lib/booking-events";
 import { customerSnapshotFromInput, normalizeEmail, normalizePhone } from "@/lib/customer-match";
 import { requireAdminFromRequest } from "@/lib/admin-route";
 import { jsonUnexpectedError } from "@/lib/api-errors";
+import { BookingConflictError, createBookingChecked } from "@/lib/booking/create";
 import { prisma } from "@/lib/db";
 import { getStudentPortalLoginUrl } from "@/lib/env";
 import { autoCreateDraftInvoicesForApproval } from "@/lib/invoices/auto-invoice";
@@ -265,40 +266,38 @@ export async function PATCH(request: NextRequest, { params }: Params) {
                 bookingRequest.customDurationMinutes
               )
             });
-            const createdBooking = await tx.booking.create({
-              data: {
-                firstName: bookingRequest.firstName,
-                lastName: bookingRequest.lastName,
-                name: bookingRequest.name,
-                email: bookingRequest.email,
-                phone: bookingRequest.phone,
-                address: bookingRequest.address,
-                unitNumber: bookingRequest.unitNumber,
-                houseNumber: bookingRequest.houseNumber,
-                streetName: bookingRequest.streetName,
-                streetType: bookingRequest.streetType,
-                suburb: bookingRequest.suburb,
-                state: bookingRequest.state,
-                postcode: bookingRequest.postcode,
-                lessonMode: bookingRequest.lessonMode,
-                skillLevel: bookingRequest.skillLevel,
-                lessonDuration: bookingRequest.lessonDuration,
-                customDurationMinutes: bookingRequest.customDurationMinutes,
-                startAt,
-                endAt: getBookingEnd(startAt, bookingRequest.lessonDuration, bookingRequest.customDurationMinutes),
-                timezone: APP_TIMEZONE,
-                requestId: bookingRequest.id,
-                seriesId: seriesId ?? null,
-                assignedTeacherId: requestedAssignedTeacherId,
-                customerId,
-                lessonCreditBatchId,
-                modifiedById: admin.id,
-                notes: bookingRequest.notes,
-                notesContent:
-                  bookingRequest.notesContent === null
-                    ? undefined
-                    : (bookingRequest.notesContent as Prisma.InputJsonValue),
-              }
+            const createdBooking = await createBookingChecked(tx, {
+              firstName: bookingRequest.firstName,
+              lastName: bookingRequest.lastName,
+              name: bookingRequest.name,
+              email: bookingRequest.email,
+              phone: bookingRequest.phone,
+              address: bookingRequest.address,
+              unitNumber: bookingRequest.unitNumber,
+              houseNumber: bookingRequest.houseNumber,
+              streetName: bookingRequest.streetName,
+              streetType: bookingRequest.streetType,
+              suburb: bookingRequest.suburb,
+              state: bookingRequest.state,
+              postcode: bookingRequest.postcode,
+              lessonMode: bookingRequest.lessonMode,
+              skillLevel: bookingRequest.skillLevel,
+              lessonDuration: bookingRequest.lessonDuration,
+              customDurationMinutes: bookingRequest.customDurationMinutes,
+              startAt,
+              endAt: getBookingEnd(startAt, bookingRequest.lessonDuration, bookingRequest.customDurationMinutes),
+              timezone: APP_TIMEZONE,
+              requestId: bookingRequest.id,
+              seriesId: seriesId ?? null,
+              assignedTeacherId: requestedAssignedTeacherId,
+              customerId,
+              lessonCreditBatchId,
+              modifiedById: admin.id,
+              notes: bookingRequest.notes,
+              notesContent:
+                bookingRequest.notesContent === null
+                  ? undefined
+                  : (bookingRequest.notesContent as Prisma.InputJsonValue),
             });
 
             const copyResult = await copyBookingRequestNotesToBooking({
@@ -861,6 +860,15 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     return NextResponse.json({ error: "Unsupported action." }, { status: 400 });
   } catch (error) {
+    // The slot was taken between the request arriving and the owner approving
+    // it (AC-57). The message names the conflicting booking so the owner knows
+    // which lesson is in the way.
+    if (error instanceof BookingConflictError) {
+      return NextResponse.json(
+        { error: error.message, conflictBookingId: error.conflict.id },
+        { status: 409 }
+      );
+    }
     return jsonUnexpectedError(error, "Unable to update booking request.");
   }
 }

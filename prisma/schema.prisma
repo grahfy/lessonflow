@@ -207,6 +207,41 @@ enum CreditLedgerReason {
   refund
 }
 
+// Shape a promo popup takes on the public site.
+enum PopupFormFactor {
+  modal
+  corner
+  bar
+}
+
+// Entrance animation preset for a promo popup. Suppressed under
+// prefers-reduced-motion; the popup still appears.
+enum PopupAnimation {
+  fade
+  slide_up
+  slide_in_right
+  zoom
+  bounce
+  pulse
+}
+
+// Where the popup image sits relative to its text.
+enum PopupImagePlacement {
+  top
+  side
+  background
+  none
+}
+
+// How often a visitor who has already seen a popup sees it again.
+// `days` pairs with SitePopup.repeatDays.
+enum PopupRepeatPolicy {
+  once
+  session
+  days
+  always
+}
+
 // Public website contact form submissions. These are stored even when email
 // delivery fails so admins can follow up later and inspect retry logs.
 model ContactSubmission {
@@ -415,6 +450,11 @@ model BookingRescheduleRequest {
   // booking (NULLs never collide, so resolved rows are unconstrained). Defined as
   // raw SQL in the migration; modeled here as Unsupported so Prisma never
   // reads/writes it and introspection stays in sync.
+  // WARNING: Prisma cannot express STORED generated columns, so every
+  // `migrate dev` emits a phantom `MODIFY pendingFlag tinyint NULL DEFAULT (...)`
+  // for this column. That statement DEGRADES the generated column to a plain
+  // default and breaks the guard on UPDATE — always delete it from a freshly
+  // generated migration.
   pendingFlag Unsupported("tinyint")? @default(dbgenerated("(if(`status` = 'pending',1,NULL))"))
 
   @@unique([bookingId, pendingFlag], map: "BookingRescheduleRequest_bookingId_pendingFlag_key")
@@ -484,6 +524,7 @@ model AdminUser {
   createdSeriesTemplates     LessonSeriesTemplate[]             @relation("LessonSeriesTemplateCreatedBy")
   createdChords              Chord[]                            @relation("ChordCreatedBy")
   createdChordCharts         ChordChart[]                       @relation("ChordChartCreatedBy")
+  createdSitePopups          SitePopup[]                        @relation("SitePopupCreatedBy")
   uploadedLibraryItems       LibraryItem[]                      @relation("LibraryItemUploadedBy")
   assignedLibraryAssignments LibraryAssignment[]                @relation("LibraryAssignmentAssignedBy")
 }
@@ -1335,7 +1376,9 @@ model LessonCreditBatch {
   createdAt         DateTime           @default(now())
   bookings          Booking[]
 
-  @@unique([sourceInvoiceId, packageId, note], name: "LessonCreditBatch_grant_dedupe")
+  // `map` pins the DB index name to the one 20260617010000 created; without it
+  // every `migrate dev` emits a drop/recreate of this index as phantom drift.
+  @@unique([sourceInvoiceId, packageId, note], name: "LessonCreditBatch_grant_dedupe", map: "LessonCreditBatch_grant_dedupe")
   @@index([customerId])
 }
 
@@ -1380,4 +1423,80 @@ model CustomerCreditLedger {
   createdAt        DateTime           @default(now())
 
   @@index([customerId])
+}
+
+// Admin-authored promotional popup for the public site. Content, styling,
+// animation, schedule and display rules all live on the row so the public
+// renderer needs a single query. A popup with no startAt/endAt is always-on
+// while enabled; when several are live the most recently created wins.
+model SitePopup {
+  id                    String              @id @default(cuid())
+  title                 String // internal name, never shown to visitors
+  enabled               Boolean             @default(false)
+  heading               String
+  bodyHtml              String              @db.Text // TipTap output
+  imageUrl              String?
+  imageAlt              String?
+  ctaLabel              String?
+  ctaUrl                String?
+  formFactor            PopupFormFactor     @default(modal)
+  animation             PopupAnimation      @default(fade)
+  backgroundColor       String              @default("#ffffff")
+  textColor             String              @default("#111111")
+  buttonBackgroundColor String              @default("#2247d8")
+  buttonTextColor       String              @default("#ffffff")
+  widthPx               Int?
+  cornerRadiusPx        Int?
+  imagePlacement        PopupImagePlacement @default(none)
+  startAt               DateTime?
+  endAt                 DateTime?
+  targetPaths           Json? // array of public paths; null/empty means every public page
+  delaySeconds          Int                 @default(0)
+  repeatPolicy          PopupRepeatPolicy   @default(session)
+  repeatDays            Int? // only read when repeatPolicy is `days`
+  createdById           String
+  createdBy             AdminUser           @relation("SitePopupCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  dayStats              PopupDayStat[]
+
+  @@index([enabled, startAt, endAt])
+  @@index([enabled, createdAt])
+  @@index([createdById])
+}
+
+// Per-day performance counters for a popup, written by upsert on the
+// (popupId, day) unique key. `day` is start-of-day, matching PageViewDaily.
+model PopupDayStat {
+  id          String    @id @default(cuid())
+  popupId     String
+  popup       SitePopup @relation(fields: [popupId], references: [id], onDelete: Cascade)
+  day         DateTime // start-of-day, e.g. 2026-07-22T00:00:00
+  impressions Int       @default(0)
+  clicks      Int       @default(0)
+  dismissals  Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // The unique key already indexes (popupId, day) for range queries.
+  @@unique([popupId, day])
+}
+
+// Singleton config for the school's global opening hours, used to derive
+// bookable slots (business hours minus a teacher's existing bookings).
+// `weekdays` is a POSITIONAL array of exactly 7 entries — the array index IS
+// the weekday, 0=Sunday..6=Saturday (matching `Date#getDay`), and an entry
+// carries no weekday tag of its own:
+//   [{ "isOpen": false, "openMinute": 540, "closeMinute": 1020 }, ...]
+// Positional by construction, so a duplicate or missing weekday is structurally
+// impossible rather than something anyone has to validate. Minutes are
+// wall-clock minutes from midnight in the school's local timezone.
+// Read and validated by `getBusinessHours()` in src/lib/booking/business-hours.ts.
+model BusinessHours {
+  id                     String   @id
+  weekdays               Json
+  slotGranularityMinutes Int      @default(30)
+  minimumNoticeHours     Int      @default(24)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 }

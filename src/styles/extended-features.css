@@ -314,6 +314,14 @@
   .site-header {
     border-radius: 20px;
     display: grid;
+    /* The base rule is `display: flex; justify-content: space-between`. Only
+       `display` is overridden here, so `space-between` carries over to the
+       grid — where it sizes the single implicit track to its content and
+       parks the free space around it. The nav's `width: 100%` then resolves
+       against a content-width track (241px of a 348px content box), which is
+       why the menu sat right-aligned and off-centre on mobile. Pin an
+       explicit full-width track so the rows stretch and centre. */
+    grid-template-columns: minmax(0, 1fr);
     gap: 10px;
     align-items: start;
     background: var(--panel-strong);
@@ -1066,7 +1074,8 @@
   }
 
   .site-nav a {
-    min-height: 42px;
+    /* 44px is the minimum comfortable touch target; 42 was just under it. */
+    min-height: 44px;
     justify-content: center;
     text-align: center;
     white-space: normal;
@@ -1377,12 +1386,14 @@
   }
 
   .site-nav {
-    grid-template-columns: 1fr;
+    /* Deliberately inherits the two-column grid from the 760px block rather
+       than collapsing to one: eight links in a single column pushes the page
+       content below the fold on a 390px screen. */
     gap: 4px;
   }
 
   .site-nav a {
-    min-height: 40px;
+    min-height: 44px;
     font-size: 0.68rem;
     padding: 7px 10px;
   }

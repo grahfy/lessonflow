@@ -75,6 +75,14 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     roles: ["owner"]
   },
   {
+    label: "Popups",
+    href: "/admin/popups",
+    tooltip: "Create and schedule promotional popups for the public site.",
+    description: "Author, schedule, and measure public-site promotional popups.",
+    group: "business",
+    roles: ["owner"]
+  },
+  {
     label: "Teachers",
     href: "/admin/teachers",
     tooltip: "Manage teacher accounts, profiles, and assignment defaults.",

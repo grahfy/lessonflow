@@ -7,7 +7,9 @@
 
 const { spawnSync } = require("node:child_process");
 
-const testDatabaseUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
+const { resolveTestDatabaseUrl } = require("./test-database-url.cjs");
+
+const testDatabaseUrl = resolveTestDatabaseUrl();
 
 if (!testDatabaseUrl) {
   console.error("Missing TEST_DATABASE_URL (or DATABASE_URL) for Vitest run.");

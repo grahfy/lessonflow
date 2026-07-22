@@ -497,6 +497,12 @@ a {
   background: color-mix(in srgb, var(--panel) 86%, transparent);
   backdrop-filter: blur(8px);
   flex-shrink: 0;
+  /* A `bar` popup is `position: fixed; top: 0` and would otherwise paint over
+     this header. `SitePopup` publishes the bar's measured height as
+     `--site-popup-bar-offset` while one is open, and clears it on dismiss.
+     Margin rather than shell padding: the responsive blocks reset `padding`
+     with a shorthand, which would silently drop the offset at those widths. */
+  margin-top: var(--site-popup-bar-offset, 0px);
 }
 
 .admin-auth-header {
