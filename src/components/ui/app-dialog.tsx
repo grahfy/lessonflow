@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useRef } from "react";
-import { type PropsWithChildren, type ReactNode, type RefObject } from "react";
+import { type CSSProperties, type PropsWithChildren, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { useOverlay } from "@/lib/ui/use-overlay";
 
@@ -25,6 +25,10 @@ import { useOverlay } from "@/lib/ui/use-overlay";
  * NOTE (portal-scoping invariant): the dialog portals into document.body, so
  * `.admin-shell`-scoped CSS custom properties never reach dialog content —
  * all dialog tokens live on :root (see src/styles/AGENTS.md).
+ *
+ * `panelClassName`/`panelStyle` are a direct hook onto .dialog-panel for a
+ * caller that needs per-instance styling (e.g. an author-configurable
+ * background/radius/animation) instead of a global token change.
  */
 
 export type AppDialogSize = "sm" | "md" | "lg" | "media";
@@ -44,6 +48,10 @@ type AppDialogBaseProps = PropsWithChildren<{
   bodyClassName?: string;
   /** Extra class on the backdrop (e.g. the `is-secondary` lighter skin). */
   backdropClassName?: string;
+  /** Extra class on .dialog-panel itself — e.g. a per-instance entrance-animation class. */
+  panelClassName?: string;
+  /** Inline style on .dialog-panel — e.g. per-instance background/border/radius overrides. */
+  panelStyle?: CSSProperties;
   lockBodyScrollArea?: boolean;
   hideHeaderClose?: boolean;
   /** Override the ARIA role on the dialog panel (default: "dialog"). Use
@@ -65,6 +73,8 @@ export function AppDialog({
   id,
   bodyClassName,
   backdropClassName,
+  panelClassName,
+  panelStyle,
   lockBodyScrollArea,
   hideHeaderClose,
   panelRole,
@@ -103,7 +113,8 @@ export function AppDialog({
       <div
         ref={dialogPanelRef}
         id={id}
-        className="dialog-panel"
+        className={["dialog-panel", panelClassName || ""].filter(Boolean).join(" ")}
+        style={panelStyle}
         data-size={resolvedSize}
         // NOTE: Stop propagation so click-away close only applies to the
         // backdrop, not interactive controls inside the dialog panel.

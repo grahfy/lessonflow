@@ -15,6 +15,7 @@ import { canManagePrimaryTeacherCustomer } from "@/lib/admin/permissions";
 import { ensureCustomerPrimaryTeacher, resolveAssignedTeacherId } from "@/lib/admin/teacher-assignment";
 import { jsonUnexpectedError } from "@/lib/api-errors";
 import { adminManualBookingSchema, formatBookingAddress, generateRecurringStartDates, getBookingEnd, getDurationMinutes } from "@/lib/booking-rules";
+import { BookingConflictError, createBookingChecked } from "@/lib/booking/create";
 import { customerSnapshotFromInput, normalizeEmail, normalizePhone } from "@/lib/customer-match";
 import { getCalendarRange } from "@/lib/calendar-range";
 import { log } from "@/lib/observability";
@@ -455,52 +456,7 @@ export async function POST(request: NextRequest) {
             customerId,
             durationMinutes: seriesDurationMinutes
           });
-          await tx.booking.create({
-            data: {
-              firstName: parsed.data.firstName,
-              lastName: parsed.data.lastName,
-              name: parsed.data.name,
-              email: parsed.data.email,
-              phone: parsed.data.phone,
-              address: formatBookingAddress(parsed.data),
-              unitNumber: parsed.data.unitNumber,
-              houseNumber: parsed.data.houseNumber,
-              streetName: parsed.data.streetName,
-              streetType: parsed.data.streetType,
-              suburb: parsed.data.suburb,
-              state: parsed.data.state,
-              postcode: parsed.data.postcode,
-              lessonMode: parsed.data.lessonMode,
-              skillLevel: parsed.data.skillLevel,
-              lessonDuration: parsed.data.lessonDuration,
-              customDurationMinutes: parsed.data.customDurationMinutes ?? null,
-              startAt: start,
-              endAt: getBookingEnd(start, parsed.data.lessonDuration, parsed.data.customDurationMinutes),
-              timezone: APP_TIMEZONE,
-              notes: parsed.data.notesContent ? tiptapJsonToPlainText(parsed.data.notesContent) || parsed.data.notes : parsed.data.notes,
-              notesContent: parsed.data.notesContent ? (parsed.data.notesContent as Prisma.InputJsonValue) : undefined,
-              seriesId: series.id,
-              assignedTeacherId: requestedAssignedTeacherId,
-              customerId,
-              lessonCreditBatchId,
-              modifiedById: admin.id
-            }
-          });
-        }
-      } else {
-        // Single booking creation. Consume one matching lesson credit (if any)
-        // and tag the booking so the auto-invoice step skips credit-covered rows.
-        const singleDurationMinutes = getDurationMinutes(
-          parsed.data.lessonDuration,
-          parsed.data.customDurationMinutes
-        );
-        const lessonCreditBatchId = await consumeLessonCredit({
-          tx,
-          customerId,
-          durationMinutes: singleDurationMinutes
-        });
-        await tx.booking.create({
-          data: {
+          await createBookingChecked(tx, {
             firstName: parsed.data.firstName,
             lastName: parsed.data.lastName,
             name: parsed.data.name,
@@ -518,20 +474,69 @@ export async function POST(request: NextRequest) {
             skillLevel: parsed.data.skillLevel,
             lessonDuration: parsed.data.lessonDuration,
             customDurationMinutes: parsed.data.customDurationMinutes ?? null,
-            startAt,
-            endAt: getBookingEnd(startAt, parsed.data.lessonDuration, parsed.data.customDurationMinutes),
+            startAt: start,
+            endAt: getBookingEnd(start, parsed.data.lessonDuration, parsed.data.customDurationMinutes),
             timezone: APP_TIMEZONE,
             notes: parsed.data.notesContent ? tiptapJsonToPlainText(parsed.data.notesContent) || parsed.data.notes : parsed.data.notes,
             notesContent: parsed.data.notesContent ? (parsed.data.notesContent as Prisma.InputJsonValue) : undefined,
+            seriesId: series.id,
             assignedTeacherId: requestedAssignedTeacherId,
             customerId,
             lessonCreditBatchId,
             modifiedById: admin.id
-          }
+          });
+        }
+      } else {
+        // Single booking creation. Consume one matching lesson credit (if any)
+        // and tag the booking so the auto-invoice step skips credit-covered rows.
+        const singleDurationMinutes = getDurationMinutes(
+          parsed.data.lessonDuration,
+          parsed.data.customDurationMinutes
+        );
+        const lessonCreditBatchId = await consumeLessonCredit({
+          tx,
+          customerId,
+          durationMinutes: singleDurationMinutes
+        });
+        await createBookingChecked(tx, {
+          firstName: parsed.data.firstName,
+          lastName: parsed.data.lastName,
+          name: parsed.data.name,
+          email: parsed.data.email,
+          phone: parsed.data.phone,
+          address: formatBookingAddress(parsed.data),
+          unitNumber: parsed.data.unitNumber,
+          houseNumber: parsed.data.houseNumber,
+          streetName: parsed.data.streetName,
+          streetType: parsed.data.streetType,
+          suburb: parsed.data.suburb,
+          state: parsed.data.state,
+          postcode: parsed.data.postcode,
+          lessonMode: parsed.data.lessonMode,
+          skillLevel: parsed.data.skillLevel,
+          lessonDuration: parsed.data.lessonDuration,
+          customDurationMinutes: parsed.data.customDurationMinutes ?? null,
+          startAt,
+          endAt: getBookingEnd(startAt, parsed.data.lessonDuration, parsed.data.customDurationMinutes),
+          timezone: APP_TIMEZONE,
+          notes: parsed.data.notesContent ? tiptapJsonToPlainText(parsed.data.notesContent) || parsed.data.notes : parsed.data.notes,
+          notesContent: parsed.data.notesContent ? (parsed.data.notesContent as Prisma.InputJsonValue) : undefined,
+          assignedTeacherId: requestedAssignedTeacherId,
+          customerId,
+          lessonCreditBatchId,
+          modifiedById: admin.id
         });
       }
     });
   } catch (error) {
+    // The teacher is already booked for this slot (AC-58). 409 so the calendar
+    // UI can tell a conflict apart from a validation or server failure.
+    if (error instanceof BookingConflictError) {
+      return NextResponse.json(
+        { error: error.message, conflictBookingId: error.conflict.id },
+        { status: 409 }
+      );
+    }
     const message = error instanceof Error ? error.message : "Unable to create booking.";
     const status =
       message === "Teachers can only book students assigned to themselves." || message === "Selected staff member does not exist."

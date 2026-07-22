@@ -1,0 +1,82 @@
+/* Student self-service lesson booking: derived availability for the
+   student's assigned teacher only. Selecting a slot creates a pending
+   BookingRequest, not a confirmed booking — the owner still approves it. */
+.shell {
+  width: min(1300px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.panel {
+  display: grid;
+  gap: 12px;
+}
+
+.controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.controls-row .field {
+  min-width: 160px;
+  flex: 1 1 200px;
+}
+
+/* Bare .btn/.field controls run 34-38px tall at mobile widths; this repo
+   has no global 44px control-size reset, so every control here opts in. */
+.control {
+  min-height: 44px;
+}
+
+.slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 8px;
+}
+
+/* A plain custom button, not `.btn` and not inside `.field` — neither of
+   which it inherits a font from, so it falls back to Arial without this. */
+.slot {
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--surface-panel-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-0);
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.slot:hover {
+  border-color: var(--brand-0);
+}
+
+.slot-selected {
+  color: #fff;
+  background: var(--brand-0);
+  border-color: var(--brand-0);
+}
+
+.confirm-panel {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--surface-panel-border);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

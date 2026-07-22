@@ -5,6 +5,8 @@ import { NextRequest } from "next/server";
 
 import { PATCH as cancelStudentBooking } from "@/app/api/student/bookings/[id]/route";
 import { POST as createStudentBooking } from "@/app/api/student/bookings/route";
+import { deriveAvailableSlots } from "@/lib/booking/availability";
+import { getBusinessHours, toWeeklyBusinessHours } from "@/lib/booking/business-hours";
 import { customerSnapshotFromInput } from "@/lib/customer-match";
 import { prisma } from "@/lib/db";
 import * as emailService from "@/lib/email/service";
@@ -13,6 +15,31 @@ import {
   studentPortalCancelBookingResponseSchema
 } from "@/lib/student-portal/contracts";
 import { createStudentSessionToken, getStudentSessionCookieName } from "@/lib/student-portal/session";
+
+/**
+ * AC-61: the route re-derives availability and rejects anything that is not a
+ * real slot, so these fixtures have to ask for one. Reads the live business
+ * hours rather than assuming defaults, so a config left behind by another
+ * suite cannot turn these into false failures.
+ */
+async function nextAvailableStartAt(durationMinutes: number): Promise<Date> {
+  const now = new Date();
+  const config = await getBusinessHours();
+  const [slot] = deriveAvailableSlots({
+    rangeStart: now,
+    rangeEnd: addDays(now, 30),
+    businessHours: toWeeklyBusinessHours(config.weekdays),
+    durationMinutes,
+    bookings: [],
+    now,
+    slotMinutes: config.slotGranularityMinutes,
+    minimumNoticeHours: config.minimumNoticeHours
+  });
+  if (!slot) {
+    throw new Error("Business hours leave no bookable slot in the next 30 days.");
+  }
+  return slot.startAt;
+}
 
 describe("student-portal-booking-actions", () => {
   beforeEach(async () => {
@@ -28,6 +55,10 @@ describe("student-portal-booking-actions", () => {
     await prisma.customer.deleteMany();
     await prisma.adminUser.deleteMany();
     await prisma.outboundEmail.deleteMany();
+    // POST runs the public geoblocking policy. The env-file save path upserts
+    // this singleton, so a suite that rotates admin settings can leave a
+    // restrictive row behind and turn every POST here into a 403.
+    await prisma.geoblockingSettings.deleteMany();
   });
 
   it("creates pending booking requests linked to the student customer", async () => {
@@ -53,7 +84,7 @@ describe("student-portal-booking-actions", () => {
     const request = new NextRequest("http://localhost/api/student/bookings", {
       method: "POST",
       body: JSON.stringify({
-        requestedStartAt: addDays(new Date(), 2).toISOString(),
+        requestedStartAt: (await nextAvailableStartAt(30)).toISOString(),
         lessonMode: "video",
         lessonDuration: "min30",
         notes: "Can we focus on chord transitions?"
@@ -120,7 +151,7 @@ describe("student-portal-booking-actions", () => {
     const request = new NextRequest("http://localhost/api/student/bookings", {
       method: "POST",
       body: JSON.stringify({
-        requestedStartAt: addDays(new Date(), 2).toISOString(),
+        requestedStartAt: (await nextAvailableStartAt(60)).toISOString(),
         lessonMode: "video",
         lessonDuration: "min60",
         notes: "Auto-assign me."
@@ -173,7 +204,7 @@ describe("student-portal-booking-actions", () => {
     const request = new NextRequest("http://localhost/api/student/bookings", {
       method: "POST",
       body: JSON.stringify({
-        requestedStartAt: addDays(new Date(), 2).toISOString(),
+        requestedStartAt: (await nextAvailableStartAt(30)).toISOString(),
         lessonMode: "video",
         lessonDuration: "min30"
       }),
@@ -227,7 +258,7 @@ describe("student-portal-booking-actions", () => {
     const request = new NextRequest("http://localhost/api/student/bookings", {
       method: "POST",
       body: JSON.stringify({
-        requestedStartAt: addDays(new Date(), 2).toISOString(),
+        requestedStartAt: (await nextAvailableStartAt(30)).toISOString(),
         lessonMode: "video",
         lessonDuration: "min30"
       }),

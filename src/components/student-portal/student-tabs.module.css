@@ -1,0 +1,45 @@
+/* Shared 4-tab navigation for the student portal (Lessons, Materials,
+   Chord Library, Book a Lesson). Normal document flow only — nothing
+   fixed, sticky or portaled. */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 auto 12px;
+  width: min(1300px, 100%);
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 18px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--surface-panel-border);
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink-1);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  border-color: var(--brand-0);
+}
+
+.tab-active {
+  color: #fff;
+  background: var(--brand-0);
+  border-color: var(--brand-0);
+}
+
+/* Below this width four tabs no longer fit on one row; force a clean
+   2x2 grid instead of an uneven wrap. */
+@media (max-width: 600px) {
+  .tab {
+    flex: 0 1 calc(50% - 4px);
+  }
+}

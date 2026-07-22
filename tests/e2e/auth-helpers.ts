@@ -133,6 +133,14 @@ export async function loginStudentViaApi(
     fullName?: string;
     postcode?: string;
     password?: string;
+    /**
+     * Buckets the student-login rate limiter (20 attempts / 15 min per IP) and
+     * the CAPTCHA guard separately. Specs that log in repeatedly need distinct
+     * values or they exhaust the shared bucket and start getting 429s — which
+     * is the limiter working correctly, not a product defect. Mirrors the
+     * `forwardedIp` option on `loginAdminViaApi`.
+     */
+    forwardedIp?: string;
   }
 ): Promise<void> {
   const fullName = options?.fullName
@@ -150,6 +158,11 @@ export async function loginStudentViaApi(
   await page.goto("/student/login", { waitUntil: "domcontentloaded" });
   const captchaPayload = await createCaptchaPayload(page.request, "student login");
   const response = await page.request.post("/api/student/login", {
+    headers: options?.forwardedIp
+      ? {
+          "x-forwarded-for": options.forwardedIp
+        }
+      : undefined,
     data: {
       fullName,
       postcode,

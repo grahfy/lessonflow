@@ -191,6 +191,15 @@ export const studentPortalBookingRequestInputSchema = z.object({
   lessonMode: studentPortalLessonModeSchema.optional(),
   lessonDuration: studentPortalLessonDurationSchema.default("min60"),
   customDurationMinutes: nullableOptionalCustomDurationMinutesSchema,
+  // Canonical lesson length. ADDITIVE: the legacy `lessonDuration` /
+  // `customDurationMinutes` pair still decides when this is absent, so every
+  // payload that validated before validates identically. Present because
+  // `LessonPricingOption.durationMinutes` is an arbitrary Int and the
+  // `min30 | min60` enum structurally cannot express every length the school
+  // sells — callers should not have to know the custom-minutes encoding.
+  // The route validates it against the active pricing rows and rejects a
+  // conflicting legacy pair rather than silently picking a winner.
+  durationMinutes: z.number().int().min(5).max(480).optional(),
   notes: z.string().trim().max(1000).optional()
 });
 
