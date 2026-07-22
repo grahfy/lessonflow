@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { StudentPortalClient } from "@/components/student-portal-client";
+import { StudentTabs } from "@/components/student-portal/student-tabs";
 import { getCurrentStudent } from "@/lib/student-portal/session";
 
 export default async function StudentPortalPage() {
@@ -9,5 +10,10 @@ export default async function StudentPortalPage() {
     redirect("/student/login");
   }
 
-  return <StudentPortalClient />;
+  return (
+    <>
+      <StudentTabs />
+      <StudentPortalClient />
+    </>
+  );
 }
