@@ -32,6 +32,7 @@ import { AdminPackagesEditor } from "@/components/admin/settings/packages-editor
 import { AdminContentEditor } from "@/components/admin/settings/content-editor";
 import { AdminEmailSignatureEditor } from "@/components/admin/settings/email-signature-editor";
 import { AdminGeoblockingSettingsEditor } from "@/components/admin/settings/geoblocking-settings-editor";
+import { AdminBusinessHoursEditor } from "@/components/admin/settings/business-hours-editor";
 import { AdminLessonPricingEditor } from "@/components/admin/settings/lesson-pricing-editor";
 import { AdminNotificationSettingsEditor } from "@/components/admin/settings/notification-settings-editor";
 import { AdminEmailTemplateEditor } from "@/components/admin/settings/email-template-editor";
@@ -491,8 +492,15 @@ export function AdminSettingsClient() {
             {/* Prepaid lesson packages (grant lesson credits when paid) */}
             {activeTab === "packages" && <AdminPackagesEditor />}
 
-            {/* 6. Lesson duration and pricing catalog */}
-            {activeTab === "lesson-pricing" && <AdminLessonPricingEditor />}
+            {/* 6. Lesson duration and pricing catalog, plus the weekly opening
+                hours that derive the student booking slots — the other half of
+                what feeds booking. */}
+            {activeTab === "lesson-pricing" && (
+              <>
+                <AdminLessonPricingEditor />
+                <AdminBusinessHoursEditor />
+              </>
+            )}
             
             {/* 7. System & Security Console */}
             {activeTab === "system" && (

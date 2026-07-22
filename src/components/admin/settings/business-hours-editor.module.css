@@ -1,0 +1,51 @@
+/* Owner-only weekly business-hours editor. Seven rows, each an open/closed
+   toggle plus two native time inputs. */
+.day-list {
+  display: grid;
+  gap: 8px;
+}
+
+.day-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--surface-panel-border);
+}
+
+.day-row:last-child {
+  border-bottom: none;
+}
+
+.day-toggle {
+  flex: 1 1 150px;
+  gap: 8px;
+}
+
+/* The open/close pair + "to" must wrap together as a unit, not split
+   mid-pair — each `<input type="time">` gets a fixed width since native
+   time-input intrinsic sizing varies by browser. */
+.time-range {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 240px;
+}
+
+.time-range .control {
+  width: 100px;
+}
+
+.day-error {
+  width: 100%;
+  margin: 0;
+}
+
+/* These inputs sit outside `.field`, the only thing in this repo giving
+   controls a 44px height and an inherited (non-Arial) font — so every
+   control here opts in directly. */
+.control {
+  min-height: 44px;
+  font-family: inherit;
+}
