@@ -33,3 +33,23 @@ export function middleware(request: NextRequest): NextResponse {
 
   return NextResponse.next();
 }
+
+/**
+ * Never run on `/api/*`.
+ *
+ * Server Actions are POSTed to page routes, so the `next-action` guard above has
+ * nothing to do on API traffic — and running it there silently corrupts uploads.
+ * Whenever middleware matches a request, Next.js clones the request body through
+ * `getCloneableBody`, which truncates at `experimental.middlewareClientMaxBodySize`
+ * (10 MB by default) and hands the truncated copy to the route handler as well.
+ * A learning-material upload over 10 MB therefore reached the route as a
+ * multipart body with no closing boundary, and `request.formData()` threw
+ * "Failed to parse body as FormData" — surfacing as "Invalid upload payload."
+ *
+ * Raising `middlewareClientMaxBodySize` instead would work, but it makes Next
+ * buffer the full body of every request in memory; this app's prod unit runs
+ * under `MemoryMax=1G`. Not matching is free.
+ */
+export const config = {
+  matcher: ["/((?!api/).*)"]
+};
