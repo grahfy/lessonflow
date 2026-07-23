@@ -153,7 +153,14 @@ export function PopupForm({ isOpen, onClose, onSaved, popup }: PopupFormProps) {
   // The modal form factor's preview renders a real, portaled AppDialog (see
   // the preview section below) — its own close/Escape/backdrop only work if
   // onDismiss actually closes something. This is that something.
-  const [previewOpen, setPreviewOpen] = useState(true);
+  //
+  // Starts open only when editing. A new popup defaults to the `modal` form
+  // factor with an empty heading, so opening the preview immediately puts a
+  // blank portaled dialog over the form the owner has not filled in yet, and
+  // it has to be dismissed before anything can be typed. Editing is the
+  // opposite case: there is real content, and seeing it straight away is the
+  // point. "Show preview" reopens it either way.
+  const [previewOpen, setPreviewOpen] = useState(() => Boolean(popup));
 
   function set<K extends keyof PopupFormValues>(key: K, value: PopupFormValues[K]) {
     setValues((current) => ({ ...current, [key]: value }));

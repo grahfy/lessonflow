@@ -56,6 +56,13 @@
   cursor: pointer;
 }
 
+/* Same focus convention as `.tab` and `.chord-tile` — see the note above: this
+   is a bare custom button, so it inherits nothing from `.btn` or `.field`. */
+.slot:focus-visible {
+  outline: 2px solid rgba(103, 232, 249, 0.75);
+  outline-offset: 2px;
+}
+
 .slot:hover {
   border-color: var(--brand-0);
 }

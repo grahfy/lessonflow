@@ -11,6 +11,21 @@ type RouteContext = { params: Promise<{ id: string }> };
  * Trims an admin-shaped chart row (creator names, raw diagram JSON) down to
  * what the read-only student chord browser needs.
  */
+/**
+ * Chart items are NOT filtered by the chord's `isArchived`, deliberately —
+ * unlike the chord list (AC-2) and the chart list (AC-3), which both hide
+ * archived rows.
+ *
+ * A chart is a curated progression a teacher assigned. Archiving a chord is a
+ * library-hygiene action meaning "stop offering this when browsing", not
+ * "delete it": dropping it from the chart would silently leave a hole in a
+ * progression the student is meant to play, and the numbering of everything
+ * after it would shift. Showing a chord that is merely hidden from browse is
+ * the lesser surprise.
+ *
+ * If this is ever changed, the two behaviours have to move together — a chart
+ * that renders a gap is worse than one that renders a retired chord.
+ */
 function serializeChartForStudent(chart: NonNullable<Awaited<ReturnType<typeof getChordChart>>>) {
   return {
     id: chart.id,
