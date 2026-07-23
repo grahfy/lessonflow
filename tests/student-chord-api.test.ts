@@ -110,6 +110,28 @@ describe("student-chord-api", () => {
     expect(payload.chords.map((c) => c.id)).toEqual([active.id]);
   });
 
+  it("keeps an archived chord inside a live chart, unlike the chord list (AC-2 boundary)", async () => {
+    const student = await createStudent("Cleo", "cleo@example.com", "0400400009");
+    const cookie = cookieFor(student.id);
+    const active = await createChord({ name: "G Major", root: "G", quality: "major" });
+    const retired = await createChord({ name: "Retired D", root: "D", quality: "major", isArchived: true });
+    const chart = await createChart({ title: "Progression", chordIds: [active.id, retired.id] });
+
+    // Deliberate asymmetry, not an oversight: archiving means "stop offering
+    // this when browsing", not "delete it". Filtering the chart would leave a
+    // hole in a progression a teacher assigned and shift everything after it.
+    // If this ever changes, the route comment has to change with it.
+    const listPayload = (await (await chordsGET(chordsRequest(cookie))).json()) as { chords: { id: string }[] };
+    expect(listPayload.chords.map((c) => c.id)).not.toContain(retired.id);
+
+    const chartResponse = await chordChartByIdGET(chartByIdRequest(cookie, chart.id), {
+      params: Promise.resolve({ id: chart.id })
+    });
+    expect(chartResponse.status).toBe(200);
+    const chartPayload = (await chartResponse.json()) as { chart: { items: { chordId: string }[] } };
+    expect(chartPayload.chart.items.map((item) => item.chordId)).toEqual([active.id, retired.id]);
+  });
+
   it("excludes archived charts from the list and 404s the archived chart by id (AC-3)", async () => {
     const student = await createStudent("Ben", "ben@example.com", "0400400002");
     const cookie = cookieFor(student.id);

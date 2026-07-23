@@ -26,6 +26,15 @@
   white-space: nowrap;
 }
 
+/* Matches the site's focus convention (`.chord-tile`, `.btn`, `.field`). The
+   browser default is visible but differs from every other focusable control on
+   these pages, which is the one thing a keyboard user should not have to
+   re-learn per surface. */
+.tab:focus-visible {
+  outline: 2px solid rgba(103, 232, 249, 0.75);
+  outline-offset: 2px;
+}
+
 .tab:hover {
   border-color: var(--brand-0);
 }

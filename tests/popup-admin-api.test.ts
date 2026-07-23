@@ -249,6 +249,48 @@ describe("popup admin API validation", () => {
     expect(data.details.fieldErrors.ctaUrl).toBeTruthy();
   });
 
+  // Each of these passed the old `!value.startsWith("//")` prefix check while
+  // resolving to https://evil.com/ in a browser: the URL parser treats `\` as
+  // `/` for special schemes, and strips tab/newline/CR — which reconstructs the
+  // leading `//` after the check has already run. A CTA saved as a same-origin
+  // path would have sent every visitor offsite.
+  it.each([
+    ["protocol-relative", "//evil.com"],
+    ["backslash", "/\\evil.com"],
+    ["backslash-slash", "/\\/evil.com"],
+    ["tab-reconstructed", "/\t/evil.com"],
+    ["newline-reconstructed", "/\n/evil.com"],
+    ["carriage-return-reconstructed", "/\r/evil.com"]
+  ])("rejects a ctaUrl that escapes this origin (%s)", async (_label, ctaUrl) => {
+    const owner = await ensureOwnerAdmin();
+    const token = createSessionToken(owner.email);
+
+    const res = await createPopup(
+      jsonRequest("http://localhost/api/admin/popups", "POST", { ...validPopupInput, ctaUrl }, token)
+    );
+    expect(res.status, `${ctaUrl} was accepted`).toBe(400);
+
+    const data = await res.json();
+    expect(data.details.fieldErrors.ctaUrl).toBeTruthy();
+  });
+
+  it("still accepts a genuine same-origin path with a query and fragment", async () => {
+    const owner = await ensureOwnerAdmin();
+    const token = createSessionToken(owner.email);
+
+    const res = await createPopup(
+      jsonRequest(
+        "http://localhost/api/admin/popups",
+        "POST",
+        { ...validPopupInput, ctaUrl: "/book?lesson=30#top" },
+        token
+      )
+    );
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.popup.ctaUrl).toBe("/book?lesson=30#top");
+  });
+
   it("requires repeatDays when repeatPolicy is days", async () => {
     const owner = await ensureOwnerAdmin();
     const token = createSessionToken(owner.email);
