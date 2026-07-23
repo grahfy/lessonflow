@@ -8,13 +8,20 @@ import { createPopup, listPopups, requireOwnerAdminOrResponse } from "@/lib/popu
  * Lists every popup, newest first. Owner-only (AC-26).
  */
 export async function GET(request: NextRequest) {
-  const guard = await requireOwnerAdminOrResponse(request);
-  if ("response" in guard) {
-    return guard.response;
-  }
+  try {
+    const guard = await requireOwnerAdminOrResponse(request);
+    if ("response" in guard) {
+      return guard.response;
+    }
 
-  const popups = await listPopups();
-  return NextResponse.json({ ok: true, popups });
+    const popups = await listPopups();
+    return NextResponse.json({ ok: true, popups });
+  } catch (error) {
+    // Every other handler in this feature funnels failures through
+    // `jsonUnexpectedError`; without it a database error here returns a raw
+    // Next 500 whose body does not match the shape the admin client parses.
+    return jsonUnexpectedError(error, "Unable to load popups.");
+  }
 }
 
 /**

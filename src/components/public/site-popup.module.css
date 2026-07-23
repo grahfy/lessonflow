@@ -137,8 +137,21 @@
   flex: 1 1 auto;
 }
 
+/* Clamped for the same reason as `.barBody` below. `flex-shrink: 0` gave the
+   heading its max-content width, so it never wrapped and never shrank — a
+   realistic 39-character promo headline rendered 982px wide inside a 390px
+   screen, painting ~600px past the edge with no ellipsis and no horizontal
+   scrollbar to reveal it (a `position: fixed` element does not extend the
+   document's scroll width). `heading` accepts up to 150 characters, so this is
+   the ordinary case rather than an edge one. Shrinkable + ellipsis keeps the
+   bar one line AND inside the viewport; `min-width: 0` is required or the
+   flex item refuses to shrink below its content. */
 .barHeading {
-  flex-shrink: 0;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   font-size: 0.9rem;
   font-weight: 700;
 }

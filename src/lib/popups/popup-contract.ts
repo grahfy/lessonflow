@@ -43,9 +43,33 @@ const hexColorSchema = z
   .trim()
   .regex(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i, "Must be a hex color like #fff or #ffffff.");
 
-/** True for a same-origin path (`/book`); false for a protocol-relative one (`//host`), which browsers resolve as absolute. */
+/**
+ * True for a same-origin path (`/book`); false for anything a browser would
+ * resolve to a different origin.
+ *
+ * Resolved through the URL parser rather than matched on its prefix, because a
+ * prefix check cannot see the ways `//host` can be spelled. `!startsWith("//")`
+ * accepted every one of these, each of which resolves to `https://evil.com/`:
+ * `/\evil.com` and `/\/evil.com` (the parser treats `\` as `/` for special
+ * schemes), and `/\t/evil.com`, `/\n/evil.com`, `/\r/evil.com` (tab, newline
+ * and carriage return are stripped, reconstructing the leading `//`). Adding
+ * `\` to the prefix check would still have missed the whitespace family.
+ *
+ * Resolving against a placeholder origin and requiring the result to stay there
+ * delegates the question to the same parser the browser will use, so it cannot
+ * drift from browser behaviour the way an enumerated blocklist does.
+ */
+const SAME_ORIGIN_PROBE = "https://same-origin.invalid";
+
 function isSameOriginPath(value: string): boolean {
-  return value.startsWith("/") && !value.startsWith("//");
+  if (!value.startsWith("/")) {
+    return false;
+  }
+  try {
+    return new URL(value, SAME_ORIGIN_PROBE).origin === SAME_ORIGIN_PROBE;
+  } catch {
+    return false;
+  }
 }
 
 /**

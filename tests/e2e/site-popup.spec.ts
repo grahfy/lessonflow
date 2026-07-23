@@ -10,9 +10,11 @@
  * a test failed before reaching its own explicit delete (deleting an
  * already-deleted id just 404s, swallowed by `deletePopup`).
  *
- * `x-forwarded-for` is randomized and scoped to the admin login POST only —
- * same reasoning as gui-sweep.spec.ts: spoofing it on every request would
- * route unrelated public traffic through the geoblocking path.
+ * `x-forwarded-for` is scoped to the login POST only — same reasoning as
+ * gui-sweep.spec.ts: spoofing it on every request would route unrelated public
+ * traffic through the geoblocking path. It is allocated sequentially, one per
+ * login rather than one per file, because both admin and student login are rate
+ * limited and this file logs in more than twenty times in a full run.
  *
  * Cookie consent is pre-seeded to "accepted" via `page.addInitScript` for
  * every test except the one that specifically exercises the consent-gating
@@ -23,7 +25,18 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { loginAdminViaApi, loginStudentViaApi } from "./auth-helpers";
 
-const FORWARDED_IP = `198.51.${100 + Math.floor(Math.random() * 100)}.${1 + Math.floor(Math.random() * 200)}`;
+// One bucket per login, not one per file. Admin login is limited to 20
+// attempts per 15 minutes and the CAPTCHA guard to 24 per 10; this file logs in
+// at least once per test plus once in afterAll, so a single shared address ran
+// the file straight into 429s as soon as a test was added. 198.51.100.0/24 is
+// TEST-NET-2 (reserved for documentation), so these cannot collide with a real
+// client address.
+let forwardedIpSeq = 0;
+function nextForwardedIp(): string {
+  forwardedIpSeq += 1;
+  return `198.51.100.${forwardedIpSeq}`;
+}
+const FORWARDED_IP = nextForwardedIp();
 
 const ROLE_BY_FORM_FACTOR = { modal: "dialog", corner: "complementary", bar: "region" } as const;
 
@@ -83,7 +96,7 @@ test.describe("promo popup system", () => {
   test.afterAll(async ({ browser }) => {
     if (createdPopupIds.length === 0) return;
     const page = await browser.newPage({ extraHTTPHeaders: { "x-forwarded-for": FORWARDED_IP } });
-    await loginAdminViaApi(page, { forwardedIp: FORWARDED_IP });
+    await loginAdminViaApi(page, { forwardedIp: nextForwardedIp() });
     for (const id of createdPopupIds.splice(0)) {
       await deletePopup(page, id);
     }
@@ -91,7 +104,7 @@ test.describe("promo popup system", () => {
   });
 
   test("a popup outside its schedule window does not appear (AC-36)", async ({ page }) => {
-    await loginAdminViaApi(page, { forwardedIp: FORWARDED_IP });
+    await loginAdminViaApi(page, { forwardedIp: nextForwardedIp() });
     await acceptConsentUpfront(page);
     const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     const popup = await createPopup(page, { startAt: future });
@@ -102,7 +115,7 @@ test.describe("promo popup system", () => {
   });
 
   test("a popup with no start/end renders while enabled (AC-37)", async ({ page }) => {
-    await loginAdminViaApi(page, { forwardedIp: FORWARDED_IP });
+    await loginAdminViaApi(page, { forwardedIp: nextForwardedIp() });
     await acceptConsentUpfront(page);
     const popup = await createPopup(page, { startAt: null, endAt: null });
 
@@ -111,7 +124,7 @@ test.describe("promo popup system", () => {
   });
 
   test("a disabled popup never appears regardless of schedule (AC-38)", async ({ page }) => {
-    await loginAdminViaApi(page, { forwardedIp: FORWARDED_IP });
+    await loginAdminViaApi(page, { forwardedIp: nextForwardedIp() });
     await acceptConsentUpfront(page);
     const popup = await createPopup(page, { enabled: false, startAt: null, endAt: null });
 
@@ -121,7 +134,7 @@ test.describe("promo popup system", () => {
   });
 
   test("a path-scoped popup appears only on its target paths (AC-39)", async ({ page }) => {
-    await loginAdminViaApi(page, { forwardedIp: FORWARDED_IP });
+    await loginAdminViaApi(page, { forwardedIp: nextForwardedIp() });
     await acceptConsentUpfront(page);
     const popup = await createPopup(page, { targetPaths: ["/lessons"] });
 
@@ -134,7 +147,7 @@ test.describe("promo popup system", () => {
   });
 
   test("repeat policy 'once': shows the first time, not after (AC-40)", async ({ page }) => {
-    await loginAdminViaApi(page, { forwardedIp: FORWARDED_IP });
+    await loginAdminViaApi(page, { forwardedIp: nextForwardedIp() });
     await acceptConsentUpfront(page);
     const popup = await createPopup(page, { repeatPolicy: "once" });
 
@@ -149,7 +162,7 @@ test.describe("promo popup system", () => {
   });
 
   test("repeat policy 'session': shows once per session, not again on reload (AC-40)", async ({ page }) => {
-    await loginAdminViaApi(page, { forwardedIp: FORWARDED_IP });
+    await loginAdminViaApi(page, { forwardedIp: nextForwardedIp() });
     await acceptConsentUpfront(page);
     const popup = await createPopup(page, { repeatPolicy: "session" });
 
@@ -163,7 +176,7 @@ test.describe("promo popup system", () => {
   });
 
   test("with multiple live popups exactly one renders — the most recently created (AC-41)", async ({ page }) => {
-    await loginAdminViaApi(page, { forwardedIp: FORWARDED_IP });
+    await loginAdminViaApi(page, { forwardedIp: nextForwardedIp() });
     await acceptConsentUpfront(page);
     const first = await createPopup(page);
     const second = await createPopup(page);
@@ -176,7 +189,7 @@ test.describe("promo popup system", () => {
   });
 
   test("suppressed until cookie consent is resolved, then appears (cookie-banner coexistence)", async ({ page }) => {
-    await loginAdminViaApi(page, { forwardedIp: FORWARDED_IP });
+    await loginAdminViaApi(page, { forwardedIp: nextForwardedIp() });
     // Deliberately no acceptConsentUpfront — this is the real first-visit state.
     const popup = await createPopup(page);
 
@@ -196,7 +209,7 @@ test.describe("promo popup system", () => {
   });
 
   test("all three form factors are fully contained at 390px; the bar never covers the header (AC-45)", async ({ page }) => {
-    await loginAdminViaApi(page, { forwardedIp: FORWARDED_IP });
+    await loginAdminViaApi(page, { forwardedIp: nextForwardedIp() });
     await acceptConsentUpfront(page);
     await page.setViewportSize({ width: 390, height: 844 });
 
@@ -230,8 +243,62 @@ test.describe("promo popup system", () => {
     }
   });
 
+  test("the bar still clears the header with a maximum-length heading (AC-45)", async ({ page }) => {
+    await loginAdminViaApi(page, { forwardedIp: nextForwardedIp() });
+    await acceptConsentUpfront(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    // The AC-45 case above uses a short generated heading, so it only proves the
+    // bar is short when its content is short. `heading` accepts up to 150 chars
+    // (popup-contract.ts), and the height guarantee has to hold at that bound —
+    // an owner writing a real promo headline is the expected case, not an edge
+    // one. Both shapes are covered: normal words, which can wrap to a second
+    // line, and one unbroken token, which can neither wrap nor shrink.
+    for (const [label, heading] of [
+      ["wrapping words", "Melbourne Guitar School Winter Special Enrol Now And Save On Every Lesson Package Booked Before The End Of August This Year Only Hurry"],
+      ["unbroken token", `Special${"o".repeat(120)}Offer`]
+    ] as const) {
+      const popup = await createPopup(page, { formFactor: "bar", heading });
+      try {
+        await page.goto("/", { waitUntil: "domcontentloaded" });
+        const bar = page.getByRole("region", { name: popup.heading });
+        await expect(bar).toBeVisible({ timeout: 10_000 });
+
+        const barBox = await bar.boundingBox();
+        const headerBox = await page.locator(".site-header").boundingBox();
+        expect(barBox && headerBox, `${label}: bar/header not laid out`).toBeTruthy();
+        expect(barBox!.y + barBox!.height, `${label}: bar covers the site header`).toBeLessThanOrEqual(headerBox!.y);
+
+        // Measure the heading against the BAR's own right edge, not
+        // documentElement.scrollWidth. The bar is `position: fixed`, and a fixed
+        // element's overflow does not extend the document's scroll width — so a
+        // heading running 600px off the side of a 390px screen leaves
+        // scrollWidth === clientWidth and a document-level check sees nothing.
+        const contained = await page.evaluate(() => {
+          const heading = document.querySelector('[class*="barHeading"]') as HTMLElement | null;
+          // Select the bar by role, NOT `closest('[class*="bar"]')` — that
+          // matches the heading itself (its own class contains "bar"), which
+          // compares the element to itself and passes unconditionally.
+          const bar = document.querySelector('[role="region"]') as HTMLElement | null;
+          if (!heading || !bar) return null;
+          return {
+            headingRight: Math.round(heading.getBoundingClientRect().right),
+            barRight: Math.round(bar.getBoundingClientRect().right)
+          };
+        });
+        expect(contained, `${label}: bar heading not found`).toBeTruthy();
+        expect(
+          contained!.headingRight,
+          `${label}: heading overflows the bar (${contained!.headingRight}px vs ${contained!.barRight}px) — it is painted off-screen with no ellipsis`
+        ).toBeLessThanOrEqual(contained!.barRight + 1);
+      } finally {
+        await deletePopup(page, popup.id);
+      }
+    }
+  });
+
   test("still appears under prefers-reduced-motion: reduce (AC-35)", async ({ page }) => {
-    await loginAdminViaApi(page, { forwardedIp: FORWARDED_IP });
+    await loginAdminViaApi(page, { forwardedIp: nextForwardedIp() });
     await acceptConsentUpfront(page);
     await page.emulateMedia({ reducedMotion: "reduce" });
     const popup = await createPopup(page, { animation: "bounce" });
@@ -241,7 +308,7 @@ test.describe("promo popup system", () => {
   });
 
   test("never renders in the admin console or the student portal (containment)", async ({ page }) => {
-    await loginAdminViaApi(page, { forwardedIp: FORWARDED_IP });
+    await loginAdminViaApi(page, { forwardedIp: nextForwardedIp() });
     await acceptConsentUpfront(page);
     // Untargeted and always-on — would show on every PUBLIC page, so its
     // absence here is entirely down to admin/student pages not mounting
@@ -255,7 +322,7 @@ test.describe("promo popup system", () => {
     // Same randomised bucket the admin logins in this file use: student login
     // has its own 20-per-15-minute limiter, and sharing the default bucket with
     // the other specs in a full run exhausts it.
-    await loginStudentViaApi(page, { forwardedIp: FORWARDED_IP });
+    await loginStudentViaApi(page, { forwardedIp: nextForwardedIp() });
     await page.goto("/student/portal", { waitUntil: "domcontentloaded" });
     await settlePopupFetch(page);
     await expect(page.getByText(popup.heading)).toHaveCount(0);
