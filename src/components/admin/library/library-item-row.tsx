@@ -30,15 +30,16 @@ interface LibraryItemRowProps {
   busy: boolean;
   onToggle: () => void;
   onEditTags: (item: LibraryItem) => void;
+  onReviewTags: (item: LibraryItem) => void;
   onAssign: (item: LibraryItem) => void;
   onEdit: (item: LibraryItem) => void;
   onDelete: (item: LibraryItem) => void;
   onReplaceFile: (item: LibraryItem, file: File) => void;
 }
 
-/** The Artist tag doubles as the "artist" line on a track row. */
+/** Stored artist is preferred; legacy/manual Artist tags remain a fallback. */
 function artistOf(item: LibraryItem): string | null {
-  return item.tags.find((tag) => tag.category === "Artist")?.value ?? null;
+  return item.artist ?? item.tags.find((tag) => tag.category === "Artist")?.value ?? null;
 }
 
 /** Non-artist tags shown as inline chips on the row (artist has its own line). */
@@ -101,6 +102,7 @@ export function LibraryItemRow({
   busy,
   onToggle,
   onEditTags,
+  onReviewTags,
   onAssign,
   onEdit,
   onDelete,
@@ -220,6 +222,7 @@ export function LibraryItemRow({
               label="Tags"
               onClick={() => onEditTags(item)}
             />
+            <RowActionButton tooltip="Review automatic tag evidence." icon={Tags} label="Review tags" disabled={busy} onClick={() => onReviewTags(item)} />
             <RowActionButton
               tooltip="Assign this item to students."
               icon={UserPlus}

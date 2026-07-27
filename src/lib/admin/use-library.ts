@@ -15,6 +15,7 @@ export interface LibraryTag {
 export interface LibraryItemRow {
   id: string;
   title: string;
+  artist: string | null;
   description: string | null;
   materialType: "audio" | "pdf" | "image" | "guitar_pro";
   mimeType: string;
@@ -174,7 +175,7 @@ export function useLibrary(options: UseLibraryOptions = {}) {
 
   /** Edits an item's title/description (the master seen by every assignee). */
   const updateItem = useCallback(
-    async (id: string, updates: { title?: string; description?: string | null }): Promise<boolean> => {
+    async (id: string, updates: { title?: string; artist?: string | null; description?: string | null }): Promise<boolean> => {
       setBusyId(id);
       try {
         const response = await safeFetch(`/api/admin/library/${id}`, {
@@ -189,7 +190,7 @@ export function useLibrary(options: UseLibraryOptions = {}) {
         const data = await response.json();
         setItems((prev) =>
           prev.map((item) =>
-            item.id === id ? { ...item, title: data.item.title, description: data.item.description } : item
+            item.id === id ? { ...item, title: data.item.title, artist: data.item.artist, description: data.item.description } : item
           )
         );
         return true;

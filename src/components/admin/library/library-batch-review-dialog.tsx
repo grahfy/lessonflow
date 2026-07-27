@@ -20,6 +20,7 @@ export interface BatchReviewEntry {
   fileName: string;
   relativePath: string;
   defaultTitle: string;
+  artist: string | null;
   sizeBytes: number;
   materialType: "audio" | "pdf" | "image" | "guitar_pro";
   duplicateOf: BulkUploadDuplicate | null;
@@ -40,6 +41,7 @@ type SuggestionState = { folderName: string; category: string; cleared: boolean 
 
 type ItemState = {
   title: string;
+  artist: string;
   selected: boolean;
   extraTags: LibraryFacet[];
   /** Folder names whose auto-tag this item opted out of. */
@@ -55,6 +57,7 @@ type ItemState = {
 function defaultItemState(entry: BatchReviewEntry): ItemState {
   return {
     title: entry.defaultTitle,
+    artist: entry.artist ?? "",
     selected: false,
     extraTags: [],
     removedAuto: [],
@@ -265,6 +268,7 @@ export function LibraryBatchReviewDialog({
             items: keepEntries.map((entry) => ({
               id: entry.itemId,
               title: stateFor(entry).title.trim() || entry.defaultTitle,
+              artist: stateFor(entry).artist.trim() || null,
               tags: effectiveTags(entry)
                 .slice(0, 50)
                 .map(({ category, value }) => ({ category, value }))
@@ -477,6 +481,7 @@ export function LibraryBatchReviewDialog({
                       value={item.title}
                       onChange={(event) => patchItem(entry, { title: event.target.value })}
                     />
+                    <input className={styles.titleInput} aria-label={`Artist for ${entry.fileName}`} placeholder="Artist (optional)" maxLength={191} value={item.artist} onChange={(event) => patchItem(entry, { artist: event.target.value })} />
                     {entry.materialType === "guitar_pro" ? <span className={styles.gpBadge}>Guitar Pro</span> : null}
                   </span>
                   <span className={styles.rFile}>{entry.relativePath}</span>
@@ -516,6 +521,7 @@ export function LibraryBatchReviewDialog({
                     value={item.title}
                     onChange={(event) => patchItem(entry, { title: event.target.value })}
                   />
+                  <input className={styles.titleInput} aria-label={`Artist for ${entry.fileName}`} placeholder="Artist (optional)" maxLength={191} disabled={discarding} value={item.artist} onChange={(event) => patchItem(entry, { artist: event.target.value })} />
                   {entry.materialType === "guitar_pro" ? <span className={styles.gpBadge}>Guitar Pro</span> : null}
                   <span
                     className={
