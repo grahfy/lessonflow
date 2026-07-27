@@ -61,6 +61,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 
 const updateLibraryItemSchema = z.object({
   title: z.string().min(1).max(255).optional(),
+  artist: z.string().trim().max(191).nullable().optional(),
   description: z.string().max(1000).nullable().optional()
 });
 
@@ -93,6 +94,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       where: { id },
       data: {
         title: parsed.data.title !== undefined ? parsed.data.title : existing.title,
+        artist: parsed.data.artist !== undefined ? parsed.data.artist || null : existing.artist,
         description: parsed.data.description !== undefined ? parsed.data.description : existing.description
       }
     });
@@ -101,6 +103,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       item: {
         id: updated.id,
         title: updated.title,
+        artist: updated.artist,
         description: updated.description,
         materialType: updated.materialType,
         mimeType: updated.mimeType,

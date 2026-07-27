@@ -707,6 +707,10 @@ model StudentMaterialFolder {
 model LibraryItem {
   id           String               @id @default(cuid())
   title        String
+  // Optional performer/composer supplied by staff or extracted locally. This is
+  // deliberately separate from tags so remote identity lookups have an
+  // unambiguous, non-user-visible input while existing Artist tags keep working.
+  artist       String?
   description  String?
   materialType LearningMaterialType
   storageKey   String               @unique
@@ -724,9 +728,66 @@ model LibraryItem {
   tags         LibraryItemTag[]
   assignments  LibraryAssignment[]
   bookingMaterials BookingLibraryMaterial[]
+  enrichmentRuns LibraryEnrichmentRun[]
 
   @@index([uploadedById])
   @@index([originalFilename])
+  @@index([artist])
+}
+
+/// A durable, idempotent enrichment job. Uploads only enqueue this row; a
+/// separately authenticated runner performs provider calls so an outage never
+/// delays or fails an upload.
+model LibraryEnrichmentRun {
+  id            String   @id @default(cuid())
+  libraryItemId String
+  libraryItem   LibraryItem @relation(fields: [libraryItemId], references: [id], onDelete: Cascade)
+  status        String   @default("queued")
+  attempts      Int      @default(0)
+  nextAttemptAt DateTime @default(now())
+  startedAt     DateTime?
+  completedAt   DateTime?
+  lastError     String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  findings      LibraryEnrichmentFinding[]
+
+  @@index([status, nextAttemptAt])
+  @@index([libraryItemId, createdAt])
+}
+
+/// Every proposal is retained, including withheld proposals, so staff can
+/// understand why a tag was or was not applied without changing manual tags.
+model LibraryEnrichmentFinding {
+  id              String   @id @default(cuid())
+  enrichmentRunId String
+  enrichmentRun   LibraryEnrichmentRun @relation(fields: [enrichmentRunId], references: [id], onDelete: Cascade)
+  category        String
+  value           String
+  confidence      Float
+  status          String
+  sourceId        String?
+  sourceUrl       String? @db.VarChar(1000)
+  evidence        String? @db.Text
+  createdAt       DateTime @default(now())
+
+  @@index([enrichmentRunId])
+  @@index([status])
+}
+
+/// Provider responses are cached by normalized identity. The runner never
+/// stores score bytes, only compact metadata needed to corroborate a finding.
+model LibraryEnrichmentCache {
+  id        String   @id @default(cuid())
+  provider  String
+  cacheKey  String   @db.VarChar(512)
+  payload   Json
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, cacheKey])
+  @@index([expiresAt])
 }
 
 // Controlled tag vocabulary shared across all LibraryItems. `category` is the

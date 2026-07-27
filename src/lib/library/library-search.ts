@@ -11,7 +11,7 @@
  *    category, so an item must carry a matching tag in EVERY selected category
  *    (set INTERSECTION across categories, union within one).
  *  - The free-text `q` is nested as a DISCRETE AND element alongside the
- *    category clauses. It matches the title OR the `Artist` tag value, but it
+ *    category clauses. It matches the title, optional artist field, OR `Artist` tag value, but it
  *    can only ever NARROW within the category intersection — a title/artist
  *    text match must NEVER widen the result set past the selected facets.
  *
@@ -93,6 +93,7 @@ export function buildLibrarySearchWhere(input: LibrarySearchInput): Prisma.Libra
     andClauses.push({
       OR: [
         { title: { contains: pattern } },
+        { artist: { contains: pattern } },
         {
           tags: {
             some: {
