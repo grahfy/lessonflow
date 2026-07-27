@@ -115,9 +115,14 @@ interface BookingDetailDialogProps {
     materialsList: LearningMaterialRow[];
     materialsLoading: boolean;
     materialsUploading: boolean;
+    bookingLibraryAttaching?: boolean;
     materialsDeletingId: string | null;
     onUpload: (captcha?: { captchaToken: string; captchaAnswer: string }) => void;
     onDelete: (id: string) => void;
+    onAttachLibrary?: (libraryItemIds: string[]) => Promise<boolean>;
+    onUnlinkLibrary?: (libraryItemId: string) => Promise<boolean>;
+    onLibraryError?: (message: string) => void;
+    bookingLibraryBookingId?: string;
     uploadFormRef: RefObject<HTMLFormElement | null>;
     bookingField?: {
       bookingId: string;
@@ -667,6 +672,11 @@ export function BookingDetailDialog({
                 uploadFormRef={materialsDialogProps.uploadFormRef}
                 onUpload={materialsDialogProps.onUpload}
                 onDelete={materialsDialogProps.onDelete}
+                bookingLibraryAttaching={materialsDialogProps.bookingLibraryAttaching}
+                onAttachLibrary={materialsDialogProps.onAttachLibrary}
+                onUnlinkLibrary={materialsDialogProps.onUnlinkLibrary}
+                onLibraryError={materialsDialogProps.onLibraryError}
+                bookingLibraryBookingId={materialsDialogProps.bookingLibraryBookingId}
                 bookingField={materialsDialogProps.bookingField}
                 folderField={materialsDialogProps.folderField}
                 folderActions={materialsDialogProps.folderActions}

@@ -402,6 +402,7 @@ model Booking {
   invoices              Invoice[]
   invoiceLinks          InvoiceBookingLink[]
   learningMaterials     LearningMaterial[]
+  bookingLibraryMaterials BookingLibraryMaterial[]
   sourceMaterialFolders StudentMaterialFolder[] @relation("FolderSourceBooking")
   lessonPlan            LessonPlan?
   noteImages            BookingNoteImage[]
@@ -527,6 +528,7 @@ model AdminUser {
   createdSitePopups          SitePopup[]                        @relation("SitePopupCreatedBy")
   uploadedLibraryItems       LibraryItem[]                      @relation("LibraryItemUploadedBy")
   assignedLibraryAssignments LibraryAssignment[]                @relation("LibraryAssignmentAssignedBy")
+  assignedBookingLibraryMaterials BookingLibraryMaterial[]      @relation("BookingLibraryMaterialAssignedBy")
 }
 
 // Canonical customer profile derived from booking requests/bookings. Multiple
@@ -721,6 +723,7 @@ model LibraryItem {
   updatedAt    DateTime             @updatedAt
   tags         LibraryItemTag[]
   assignments  LibraryAssignment[]
+  bookingMaterials BookingLibraryMaterial[]
 
   @@index([uploadedById])
   @@index([originalFilename])
@@ -778,6 +781,24 @@ model LibraryAssignment {
   @@index([customerId])
   @@index([assignedById])
   @@index([customerId, folderId, sortOrder])
+}
+
+// Booking-scoped references to shared Library masters. This stays separate from
+// LibraryAssignment so the same item can be generally assigned to a student and
+// independently linked to one or more of their bookings.
+model BookingLibraryMaterial {
+  id            String      @id @default(cuid())
+  bookingId     String
+  booking       Booking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  libraryItemId String
+  libraryItem   LibraryItem @relation(fields: [libraryItemId], references: [id], onDelete: Cascade)
+  assignedById  String?
+  assignedBy    AdminUser?  @relation("BookingLibraryMaterialAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime    @default(now())
+
+  @@unique([bookingId, libraryItemId])
+  @@index([libraryItemId])
+  @@index([assignedById])
 }
 
 // Reusable structured lesson-plan templates that staff can apply to a booking

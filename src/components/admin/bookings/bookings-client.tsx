@@ -245,8 +245,11 @@ export function AdminBookingsClient() {
     folders: materialsFolders,
     loading: materialsLoading,
     uploading: materialsUploading,
+    attachingLibrary: bookingLibraryAttaching,
     deletingId: materialsDeletingId,
-    load: loadMaterials
+    load: loadMaterials,
+    attachBookingLibrary: attachBookingLibraryApi,
+    unlinkBookingLibrary: unlinkBookingLibraryApi
   } = materials;
   const { templates: lessonPlanTemplates, loading: lessonPlanTemplatesLoading, load: loadLessonPlanTemplates } = useLessonPlanTemplates({ onAuthError, onError: setError });
   const {
@@ -572,7 +575,7 @@ export function AdminBookingsClient() {
       void loadEmailHistory(emailTarget);
       if (currentAdmin?.role === "owner" || row.assignedTeacherId === currentAdmin?.id) {
         if (typeof row.customerId === "string" && row.customerId) {
-          void loadMaterials(row.customerId);
+          void loadMaterials(row.customerId, event.entityType === "booking" ? event.id : null);
         }
       }
     }
@@ -813,6 +816,28 @@ export function AdminBookingsClient() {
     materials
   });
 
+  const attachBookingLibrary = useCallback(async (libraryItemIds: string[]): Promise<boolean> => {
+    const event = events.find((entry) => entry.id === selectedKey) || null;
+    if (!event?.row.customerId || event.entityType !== "booking") return false;
+    const success = await attachBookingLibraryApi(event.id, libraryItemIds);
+    if (success) {
+      await loadMaterials(event.row.customerId, event.id);
+      setNotice(libraryItemIds.length === 1 ? "Library file attached to this booking." : "Library files attached to this booking.");
+    }
+    return success;
+  }, [attachBookingLibraryApi, events, loadMaterials, selectedKey, setNotice]);
+
+  const unlinkBookingLibrary = useCallback(async (libraryItemId: string): Promise<boolean> => {
+    const event = events.find((entry) => entry.id === selectedKey) || null;
+    if (!event?.row.customerId || event.entityType !== "booking") return false;
+    const success = await unlinkBookingLibraryApi(event.id, libraryItemId);
+    if (success) {
+      await loadMaterials(event.row.customerId, event.id);
+      setNotice("Library file removed from this booking.");
+    }
+    return success;
+  }, [events, loadMaterials, selectedKey, setNotice, unlinkBookingLibraryApi]);
+
   const {
     createScratchLessonPlanDraft,
     applySelectedLessonPlanTemplate,
@@ -988,8 +1013,13 @@ export function AdminBookingsClient() {
             materialsLoading,
             materialsUploading,
             materialsDeletingId,
+            bookingLibraryAttaching,
             onUpload: (captcha) => uploadMaterial(materialsBookingId, captcha),
             onDelete: deleteMaterial,
+            onAttachLibrary: attachBookingLibrary,
+            onUnlinkLibrary: unlinkBookingLibrary,
+            onLibraryError: setError,
+            bookingLibraryBookingId: selectedEvent?.entityType === "booking" ? selectedEvent.id : undefined,
             uploadFormRef: materialsUploadFormRef,
             bookingField: {
               bookingId: materialsBookingId,

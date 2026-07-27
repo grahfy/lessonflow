@@ -50,6 +50,10 @@ export type LearningMaterialRow = {
     createdAt: string;
     previewUrl?: string;
     downloadUrl?: string;
+    /** Identifies shared-by-reference rows without overloading uploaded files. */
+    source?: "upload" | "library_general" | "library_booking";
+    libraryItemId?: string;
+    bookingLibraryMaterialId?: string;
 };
 
 // One folder in the admin materials tree. `children`/`materialIds` are populated

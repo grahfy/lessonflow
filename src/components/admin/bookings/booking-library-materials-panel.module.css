@@ -1,0 +1,151 @@
+.section {
+  margin-top: 20px;
+}
+
+.headingRow,
+.fileRow,
+.pickerToolbar,
+.pickerFooter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.headingRow {
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.heading {
+  margin: 0;
+}
+
+.hint {
+  margin: 0 0 12px;
+  color: var(--ink-2);
+  font-size: 0.875rem;
+}
+
+.fileList,
+.pickerList {
+  display: grid;
+  gap: 8px;
+}
+
+.fileRow {
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 1px solid var(--line-1);
+  border-radius: 10px;
+  background: var(--surface-1);
+}
+
+.fileMeta {
+  min-width: 0;
+}
+
+.fileTitle {
+  display: block;
+  color: var(--ink-0);
+  font-weight: 600;
+}
+
+.fileDescription {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+}
+
+.fileActions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.pickerToolbar {
+  margin-bottom: 12px;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.search input {
+  min-width: 0;
+  width: 100%;
+}
+
+.typeFilter {
+  width: auto;
+}
+
+.pickerList {
+  max-height: min(52vh, 420px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.pickerRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line-1);
+  border-radius: 10px;
+  background: var(--surface-1);
+  color: inherit;
+  text-align: left;
+}
+
+.pickerRow[data-selected="true"] {
+  border-color: var(--brand-0);
+  box-shadow: inset 3px 0 0 var(--brand-0);
+  background: color-mix(in srgb, var(--brand-0) 7%, var(--surface-1));
+}
+
+.pickerRow:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--brand-0) 45%, transparent);
+  outline-offset: 2px;
+}
+
+.pickerTitle {
+  display: block;
+  font-weight: 650;
+}
+
+.pickerDetails {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+}
+
+.pickerFooter {
+  justify-content: space-between;
+  margin-top: 16px;
+}
+
+@media (max-width: 620px) {
+  .headingRow,
+  .pickerToolbar,
+  .pickerFooter {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .typeFilter {
+    width: 100%;
+  }
+
+  .fileRow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
