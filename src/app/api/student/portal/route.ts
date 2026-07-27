@@ -39,6 +39,10 @@ export async function GET(request: NextRequest) {
           },
           orderBy: materialOrderBy
         },
+        bookingLibraryMaterials: {
+          include: { libraryItem: true },
+          orderBy: { createdAt: "asc" }
+        },
         lessonPlan: {
           select: {
             sections: true,

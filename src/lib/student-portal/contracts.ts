@@ -286,12 +286,26 @@ type BookingMapInput = Pick<
     quickCaptureNotes: string | null;
   } | null;
   learningMaterials: MaterialMapInput[];
+  bookingLibraryMaterials?: BookingLibraryMaterialMapInput[];
   // Pending reschedule requests for this booking. Application logic guarantees at
   // most one pending request per booking, so the portal surfaces the first.
   rescheduleRequests?: Pick<
     BookingRescheduleRequest,
     "id" | "requestedStartAt" | "reason" | "status" | "createdAt"
   >[];
+};
+
+type BookingLibraryMaterialMapInput = {
+  id: string;
+  libraryItemId: string;
+  createdAt: Date;
+  libraryItem: {
+    title: string;
+    description: string | null;
+    materialType: StudentPortalMaterial["materialType"];
+    mimeType: string;
+    sizeBytes: number;
+  };
 };
 
 type PendingRequestMapInput = Pick<
@@ -315,6 +329,27 @@ export function mapStudentPortalMaterial(material: MaterialMapInput): StudentPor
     createdAt: material.createdAt.toISOString(),
     downloadUrl: `/api/student/learning-materials/${material.id}/download`,
     previewUrl: `/api/student/learning-materials/${material.id}/download?disposition=inline`
+  });
+}
+
+/** Maps one booking-specific Library reference with explicit booking-safe URLs. */
+export function mapStudentPortalBookingLibraryMaterial(
+  bookingId: string,
+  link: BookingLibraryMaterialMapInput
+): StudentPortalMaterial {
+  const item = link.libraryItem;
+  return studentPortalMaterialSchema.parse({
+    id: `blm:${link.id}`,
+    title: item.title,
+    description: item.description,
+    materialType: item.materialType,
+    mimeType: item.mimeType,
+    sizeBytes: item.sizeBytes,
+    folderId: null,
+    sortOrder: 0,
+    createdAt: link.createdAt.toISOString(),
+    downloadUrl: `/api/student/bookings/${bookingId}/library-materials/${link.libraryItemId}/download`,
+    previewUrl: `/api/student/bookings/${bookingId}/library-materials/${link.libraryItemId}/download?disposition=inline`
   });
 }
 
@@ -420,7 +455,10 @@ export function mapStudentPortalBooking(booking: BookingMapInput): StudentPortal
     notes: booking.notes,
     notesContent: booking.notesContent ?? null,
     lessonPlanSummary: mapStudentPortalLessonPlanSummary(booking.lessonPlan),
-    materials: booking.learningMaterials.map(mapStudentPortalMaterial),
+    materials: [
+      ...booking.learningMaterials.map(mapStudentPortalMaterial),
+      ...(booking.bookingLibraryMaterials ?? []).map((link) => mapStudentPortalBookingLibraryMaterial(booking.id, link))
+    ],
     attendanceStatus: booking.attendanceStatus ?? null,
     pendingReschedule: pendingReschedule
       ? {
@@ -454,4 +492,3 @@ export function mapStudentPortalPendingRequest(requestRow: PendingRequestMapInpu
 export function parseStudentPortalPayload(input: unknown): StudentPortalPayload {
   return studentPortalPayloadSchema.parse(input);
 }
-
