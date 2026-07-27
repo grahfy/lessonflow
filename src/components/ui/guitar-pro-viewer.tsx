@@ -184,6 +184,13 @@ const EXPORT_CHANNELS = 2;
  * past this duration and free the accumulation as soon as it is encoded.
  */
 const WAV_EXPORT_WARN_DURATION_MS = 10 * 60 * 1000; // 10 minutes
+
+/**
+ * Leave a completed browser download enough time to claim its Blob URL before
+ * releasing the in-memory export. Revoking synchronously after anchor.click()
+ * can cancel downloads in some desktop and mobile browsers.
+ */
+const WAV_DOWNLOAD_URL_REVOKE_DELAY_MS = 1000;
 /**
  * Belt-and-suspenders timeout for the lazy soundfont fetch. alphaTab fires
  * `player.soundFontLoadFailed` on a real failure (see H2), but if that signal
@@ -944,6 +951,7 @@ export function GuitarProViewer({ src, downloadUrl, title }: GuitarProViewerProp
         // anything after `createObjectURL` (e.g. `anchor.click()`) throws, an
         // inline revoke would be skipped and leak the URL for the page lifetime.
         let objectUrl: string | null = null;
+        let downloadTriggered = false;
         try {
           // alphaTab's exporter emits fixed interleaved stereo; there is no
           // `channels` option to pass (see EXPORT_CHANNELS). Only sampleRate +
@@ -982,13 +990,23 @@ export function GuitarProViewer({ src, downloadUrl, title }: GuitarProViewerProp
           anchor.download = `${title || "guitar-pro-score"}.wav`;
           document.body.appendChild(anchor);
           anchor.click();
+          downloadTriggered = true;
           anchor.remove();
         } catch (error) {
           console.warn("[GuitarProViewer] WAV export failed", error);
         } finally {
           exporter?.destroy();
-          // Always revoke — even if click()/append threw after createObjectURL.
-          if (objectUrl !== null) URL.revokeObjectURL(objectUrl);
+          if (objectUrl !== null) {
+            if (downloadTriggered) {
+              // Let the browser begin its normal desktop/mobile download flow
+              // before releasing the generated file.
+              const completedDownloadUrl = objectUrl;
+              window.setTimeout(() => URL.revokeObjectURL(completedDownloadUrl), WAV_DOWNLOAD_URL_REVOKE_DELAY_MS);
+            } else {
+              // Nothing can consume this URL if preparation or the click fails.
+              URL.revokeObjectURL(objectUrl);
+            }
+          }
           if (!cancelledRef.current) {
             setWavRendering(false);
             setWavProgress(0);

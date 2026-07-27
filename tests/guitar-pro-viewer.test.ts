@@ -951,11 +951,16 @@ describe("GuitarProViewer", () => {
   });
 
   it("the Export menu's WAV item disables the control while rendering, then re-enables and downloads once finished", async () => {
-    vi.stubGlobal("URL", {
-      createObjectURL: vi.fn(() => "blob:fake-export"),
-      revokeObjectURL: vi.fn()
+    vi.useFakeTimers();
+    const createObjectURL = vi.fn(() => "blob:fake-export");
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
+    let downloadHref: string | null = null;
+    let downloadFilename: string | null = null;
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      downloadHref = this.href;
+      downloadFilename = this.download;
     });
-    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
 
     try {
       await renderViewer();
@@ -992,8 +997,52 @@ describe("GuitarProViewer", () => {
       });
 
       expect(api.exportAudio).toHaveBeenCalledWith({ sampleRate: 44100, masterVolume: 1 });
+      expect(createObjectURL).toHaveBeenCalledTimes(1);
       expect(clickSpy).toHaveBeenCalledTimes(1);
+      expect(downloadHref).toBe("blob:fake-export");
+      expect(downloadFilename).toBe("guitar-pro-score.wav");
+      // The URL must survive the synchronous click so browsers can begin a
+      // normal download (including mobile save/share flows).
+      expect(revokeObjectURL).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(revokeObjectURL).toHaveBeenCalledWith("blob:fake-export");
       expect(exportToggle.textContent).toContain("Export");
+    } finally {
+      clickSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it("revokes a generated WAV URL immediately when triggering its download fails", async () => {
+    const createObjectURL = vi.fn(() => "blob:failed-export");
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {
+      throw new Error("download blocked");
+    });
+
+    try {
+      await renderViewer();
+      const api = await waitForApi();
+      await makeScoreReady(api);
+
+      await act(async () => {
+        findExportToggle().dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+      const wavItem = exportItems().find((el) => el.textContent?.includes("WAV")) as HTMLButtonElement;
+      await act(async () => {
+        wavItem.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+      await completeSoundFontLoad(api);
+
+      await vi.waitFor(() => {
+        expect(createObjectURL).toHaveBeenCalledTimes(1);
+        expect(revokeObjectURL).toHaveBeenCalledWith("blob:failed-export");
+      });
+      expect(findExportToggle().disabled).toBe(false);
     } finally {
       clickSpy.mockRestore();
     }
