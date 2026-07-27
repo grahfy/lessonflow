@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { refundBulkUploadGrantUnit, reserveBulkUploadGrantUnit } from "@/lib/library/bulk-upload-grant";
 import { classifyLibraryFile, normalizeOriginalFilename } from "@/lib/library/library-file-classification";
+import { enqueueLibraryEnrichment } from "@/lib/library/library-enrichment";
 import { buildLibrarySearchWhere, type LibraryTagFilter } from "@/lib/library/library-search";
 import {
   declaredContentLengthExceedsUploadCap,
@@ -51,6 +52,7 @@ function parseTagFilters(searchParams: URLSearchParams): LibraryTagFilter[] {
 function serializeLibraryItem(item: {
   id: string;
   title: string;
+  artist: string | null;
   description: string | null;
   materialType: string;
   mimeType: string;
@@ -62,6 +64,7 @@ function serializeLibraryItem(item: {
   return {
     id: item.id,
     title: item.title,
+    artist: item.artist,
     description: item.description,
     materialType: item.materialType,
     mimeType: item.mimeType,
@@ -194,6 +197,7 @@ export async function POST(request: NextRequest) {
     }
 
     const title = sanitizeLearningMaterialTitle(String(form.get("title") || ""));
+    const artist = String(form.get("artist") || "").trim().replace(/\s+/g, " ").slice(0, 191) || null;
     const rawDescription = String(form.get("description") || "").trim().slice(0, 500);
     const description = rawDescription || null;
     const file = form.get("file");
@@ -299,6 +303,7 @@ export async function POST(request: NextRequest) {
       const item = await prisma.libraryItem.create({
         data: {
           title,
+          artist,
           description,
           materialType: classification.materialType,
           storageKey,
@@ -319,6 +324,11 @@ export async function POST(request: NextRequest) {
       // `duplicateOf` lives only in this POST envelope — serializeLibraryItem is
       // shared with GET and stays duplicate-free. The item IS still created on a
       // duplicate hit (spec: "uploaded but flagged"); the review step resolves it.
+      // A failed enqueue must never turn a successful blob + metadata write
+      // into a failed upload. The job runner is deliberately best-effort here.
+      await enqueueLibraryEnrichment(item.id).catch((error) => {
+        logError("library_item.enrichment_enqueue_failed", error, { libraryItemId: item.id });
+      });
       return NextResponse.json({ item: serializeLibraryItem(item), duplicateOf }, { status: 201 });
     } catch (error) {
       refundReservedUnit?.();

@@ -39,6 +39,7 @@ const batchCommitTagSchema = z.object({
 const batchCommitItemSchema = z.object({
   id: z.string().min(1),
   title: z.string().trim().min(1).max(255).optional(),
+  artist: z.string().trim().max(191).nullable().optional(),
   tags: z.array(batchCommitTagSchema).max(50)
 });
 
@@ -81,8 +82,10 @@ export async function POST(request: NextRequest) {
           if (entry.title !== undefined) {
             await tx.libraryItem.update({
               where: { id: item.id },
-              data: { title: sanitizeLearningMaterialTitle(entry.title) }
+              data: { title: sanitizeLearningMaterialTitle(entry.title), artist: entry.artist || null }
             });
+          } else if (entry.artist !== undefined) {
+            await tx.libraryItem.update({ where: { id: item.id }, data: { artist: entry.artist || null } });
           }
 
           for (const { category, value } of entry.tags) {

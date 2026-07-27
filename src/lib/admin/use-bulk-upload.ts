@@ -30,6 +30,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 
 import type { CollectedFile } from "@/lib/admin/folder-traversal";
 import { normalizeOriginalFilename, precheckLibraryFile } from "@/lib/library/library-file-classification";
+import { inferArtistAndTitle } from "@/lib/library/library-enrichment-taxonomy";
 
 export const BULK_UPLOAD_CONCURRENCY = 4;
 export const BULK_UPLOAD_MAX_FILES = 200;
@@ -59,6 +60,8 @@ export type BulkUploadEntry = {
   relativePath: string;
   /** Default title: file name sans extension (same rule as single upload). */
   title: string;
+  /** Filename-derived hint, sent as an optional structured lookup input. */
+  artist: string | null;
   sizeBytes: number;
   file: File;
   status: BulkUploadEntryStatus;
@@ -97,6 +100,7 @@ export type UploadOutcome =
 export type UploadTransport = (input: {
   file: File;
   title: string;
+  artist: string | null;
   grantId: string | null;
   onProgress: (fraction: number) => void;
 }) => Promise<UploadOutcome>;
@@ -155,11 +159,6 @@ export function summarizeBulkUpload(state: BulkUploadState): BulkUploadSummary {
   return summary;
 }
 
-/** Same default-title rule as the single-file upload card. */
-function defaultTitleFor(fileName: string): string {
-  return fileName.replace(/\.[^.]+$/, "") || fileName;
-}
-
 export function createBulkUploadQueue(input: {
   files: CollectedFile[];
   transport: UploadTransport;
@@ -198,11 +197,13 @@ export function createBulkUploadQueue(input: {
       status = { phase: "queued" };
     }
 
+    const inferred = inferArtistAndTitle(file.name);
     entries.push({
       id: `bulk-${index}-${file.name}`,
       fileName: file.name,
       relativePath,
-      title: defaultTitleFor(file.name),
+      title: inferred.title,
+      artist: inferred.artist,
       sizeBytes: file.size,
       file,
       status
@@ -286,6 +287,7 @@ export function createBulkUploadQueue(input: {
       .transport({
         file: entry.file,
         title: entry.title,
+        artist: entry.artist,
         grantId: sentGrantId,
         onProgress: (fraction) => {
           if (entry.status.phase === "uploading") {
@@ -405,7 +407,7 @@ export function createBulkUploadQueue(input: {
 
 /** Default transport: XHR POST to the library upload route (fetch cannot report upload progress). */
 export function createLibraryUploadTransport(): UploadTransport {
-  return ({ file, title, grantId, onProgress }) =>
+  return ({ file, title, artist, grantId, onProgress }) =>
     new Promise<UploadOutcome>((resolve) => {
       const xhr = new XMLHttpRequest();
       xhr.open("POST", "/api/admin/library");
@@ -444,6 +446,7 @@ export function createLibraryUploadTransport(): UploadTransport {
 
       const form = new FormData();
       form.set("title", title);
+      if (artist) form.set("artist", artist);
       if (grantId) {
         form.set("grantId", grantId);
       }

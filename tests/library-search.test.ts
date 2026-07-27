@@ -46,13 +46,14 @@ describe("library-search / buildLibrarySearchWhere", () => {
     expect(buildLibrarySearchWhere({ tagFilters: [], q: "   " })).toEqual({});
   });
 
-  it("nests the free-text q as a discrete AND element (title OR Artist tag)", () => {
+  it("nests the free-text q as a discrete AND element (title OR stored artist OR Artist tag)", () => {
     const where = buildLibrarySearchWhere({ tagFilters: [], q: "Hendrix" });
     expect(where).toEqual({
       AND: [
         {
           OR: [
             { title: { contains: "Hendrix" } },
+            { artist: { contains: "Hendrix" } },
             { tags: { some: { tag: { category: "Artist", value: { contains: "Hendrix" } } } } }
           ]
         }
@@ -180,6 +181,7 @@ describe("library-search / buildLibrarySearchWhere", () => {
         {
           OR: [
             { title: { contains: "Nirvana" } },
+            { artist: { contains: "Nirvana" } },
             { tags: { some: { tag: { category: "Artist", value: { contains: "Nirvana" } } } } }
           ]
         }

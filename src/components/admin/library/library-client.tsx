@@ -32,11 +32,13 @@ import { LibraryBulkProgress } from "./library-bulk-progress";
 import { LibraryFacetRail, LibraryQueryReadout } from "./library-facet-bar";
 import { LibraryItemRow as LibraryItemRowView } from "./library-item-row";
 import { LibraryTagDialog } from "./library-tag-dialog";
+import { LibraryEnrichmentDialog } from "./library-enrichment-dialog";
 import { LibraryUploadCard, type StagedBatchSummary } from "./library-upload-card";
 import styles from "./library.module.css";
 
 type DialogState =
   | { kind: "tags"; itemId: string }
+  | { kind: "enrichment"; itemId: string }
   | { kind: "assign"; itemId: string }
   | { kind: "edit"; itemId: string }
   | { kind: "delete"; itemId: string }
@@ -300,6 +302,7 @@ export function AdminLibraryClient() {
               fileName: entry.fileName,
               relativePath: entry.relativePath,
               defaultTitle: entry.title,
+              artist: entry.artist,
               sizeBytes: entry.sizeBytes,
               materialType:
                 classifyLibraryFile({ fileName: entry.fileName, mimeType: entry.file.type })?.materialType ?? "pdf",
@@ -495,6 +498,7 @@ export function AdminLibraryClient() {
                         busy={library.busyId === item.id}
                         onToggle={() => setExpandedId((prev) => (prev === item.id ? null : item.id))}
                         onEditTags={(target) => setDialog({ kind: "tags", itemId: target.id })}
+                        onReviewTags={(target) => setDialog({ kind: "enrichment", itemId: target.id })}
                         onAssign={(target) => setDialog({ kind: "assign", itemId: target.id })}
                         onEdit={(target) => setDialog({ kind: "edit", itemId: target.id })}
                         onDelete={(target) => setDialog({ kind: "delete", itemId: target.id })}
@@ -628,6 +632,8 @@ export function AdminLibraryClient() {
           onClose={() => setDialog(null)}
         />
       ) : null}
+
+      {dialog?.kind === "enrichment" && dialogItem ? <LibraryEnrichmentDialog itemId={dialogItem.id} title={dialogItem.title} onClose={() => setDialog(null)} /> : null}
 
       {dialog?.kind === "assign" && dialogItem ? (
         <LibraryAssignDialog
