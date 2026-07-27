@@ -77,7 +77,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     // Load bookings, materials, and folders together because the modal needs all
     // datasets to drive the selectors, the list, and the folder tree (C0).
-    const [bookings, materials, folders] = await Promise.all([
+    const [bookings, materials, folders, libraryAssignments, bookingLibraryMaterials] = await Promise.all([
       prisma.booking.findMany({
         where: {
           customerId: customer.id,
@@ -110,20 +110,27 @@ export async function GET(request: NextRequest, { params }: Params) {
         where: {
           customerId: customer.id
         }
-      })
+      }),
+      // General Library references belong only to the unfiltered customer
+      // materials view. A booking tab must not leak them into the lesson list.
+      bookingId
+        ? Promise.resolve([])
+        : prisma.libraryAssignment.findMany({
+            where: { customerId: customer.id },
+            include: { libraryItem: true }
+          }),
+      bookingId
+        ? prisma.bookingLibraryMaterial.findMany({
+            where: { bookingId },
+            include: { libraryItem: true }
+          })
+        : Promise.resolve([])
     ]);
-
-    // Assigned library items share the tree and the order with per-customer
-    // materials, behind `lib:`-prefixed ids. They are join rows: no blob, no
-    // storageKey, and the shared master is never touched from here.
-    const libraryAssignments = await prisma.libraryAssignment.findMany({
-      where: { customerId: customer.id },
-      include: { libraryItem: true }
-    });
 
     const treeMaterials = [
       ...materials.map((material) => ({
         id: material.id,
+        source: "upload" as const,
         title: material.title,
         description: material.description,
         bookingId: material.bookingId,
@@ -139,6 +146,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       ...libraryAssignments.map((assignment) => ({
         id: libraryTreeId(assignment.libraryItemId),
         libraryItemId: assignment.libraryItemId,
+        source: "library_general" as const,
         title: assignment.libraryItem.title,
         description: assignment.libraryItem.description,
         bookingId: null,
@@ -153,6 +161,26 @@ export async function GET(request: NextRequest, { params }: Params) {
         // collection route itself.
         previewUrl: `/api/admin/library/${assignment.libraryItemId}?disposition=inline`,
         downloadUrl: `/api/admin/library/${assignment.libraryItemId}?disposition=attachment`
+      })),
+      // Booking Library rows deliberately use their own stable UI id. They are
+      // not folder/reorder participants in phase 1; the booking dialog renders
+      // their safe unlink action in a dedicated adjacent section.
+      ...bookingLibraryMaterials.map((link) => ({
+        id: `blm:${link.id}`,
+        bookingLibraryMaterialId: link.id,
+        libraryItemId: link.libraryItemId,
+        source: "library_booking" as const,
+        title: link.libraryItem.title,
+        description: link.libraryItem.description,
+        bookingId: link.bookingId,
+        folderId: null,
+        sortOrder: 0,
+        materialType: link.libraryItem.materialType,
+        mimeType: link.libraryItem.mimeType,
+        sizeBytes: link.libraryItem.sizeBytes,
+        createdAt: link.createdAt,
+        previewUrl: `/api/admin/bookings/${link.bookingId}/library-materials/${link.libraryItemId}?disposition=inline`,
+        downloadUrl: `/api/admin/bookings/${link.bookingId}/library-materials/${link.libraryItemId}?disposition=attachment`
       }))
     ]
       .sort(compareTreeOrder)

@@ -17,10 +17,13 @@ export interface UseLearningMaterialsResult {
     folders: AdminFolderRow[];
     loading: boolean;
     uploading: boolean;
+    attachingLibrary: boolean;
     deletingId: string | null;
     load: (customerId: string, bookingId?: string | null) => Promise<void>;
     upload: (customerId: string, bookingId: string, form: HTMLFormElement, captcha?: { captchaToken: string; captchaAnswer: string }) => Promise<boolean>;
     remove: (materialId: string) => Promise<boolean>;
+    attachBookingLibrary: (bookingId: string, libraryItemIds: string[]) => Promise<boolean>;
+    unlinkBookingLibrary: (bookingId: string, libraryItemId: string) => Promise<boolean>;
     createFolder: (customerId: string, name: string, parentId: string | null) => Promise<boolean>;
     renameFolder: (customerId: string, folderId: string, name: string) => Promise<boolean>;
     deleteFolder: (customerId: string, folderId: string) => Promise<boolean>;
@@ -42,6 +45,7 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
   const [folders, setFolders] = useState<AdminFolderRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [attachingLibrary, setAttachingLibrary] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const { safeFetch, handleApiError } = useSafeFetch({ onAuthError, onError });
@@ -133,9 +137,9 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
         onError(`Some files failed to upload — ${payload.errors.map((entry) => `${entry.filename}: ${entry.message}`).join("; ")}`);
       }
 
-      // Reload unfiltered so the folder tree stays complete after an upload;
-      // the booking link only affects the uploaded material's metadata.
-      void load(customerId);
+      // Keep the active booking scope after a booking-tab upload. Customer-wide
+      // dialogs pass an empty booking id and still receive the full tree.
+      void load(customerId, bookingId || null);
       return true;
     } catch {
       return false;
@@ -143,6 +147,45 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
       setUploading(false);
     }
   }, [safeFetch, handleApiError, load, onError]);
+
+  const attachBookingLibrary = useCallback(async (bookingId: string, libraryItemIds: string[]): Promise<boolean> => {
+    if (!bookingId || libraryItemIds.length === 0) return false;
+    setAttachingLibrary(true);
+    try {
+      const response = await safeFetch(`/api/admin/bookings/${bookingId}/library-materials`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ libraryItemIds })
+      });
+      if (!response.ok) {
+        await handleApiError(response, "Unable to attach Library files.");
+        return false;
+      }
+      return true;
+    } catch {
+      if (onError) onError("Network error attaching Library files.");
+      return false;
+    } finally {
+      setAttachingLibrary(false);
+    }
+  }, [safeFetch, handleApiError, onError]);
+
+  const unlinkBookingLibrary = useCallback(async (bookingId: string, libraryItemId: string): Promise<boolean> => {
+    if (!bookingId || !libraryItemId) return false;
+    try {
+      const response = await safeFetch(`/api/admin/bookings/${bookingId}/library-materials/${libraryItemId}`, {
+        method: "DELETE"
+      });
+      if (!response.ok) {
+        await handleApiError(response, "Unable to remove the Library file from this booking.");
+        return false;
+      }
+      return true;
+    } catch {
+      if (onError) onError("Network error removing the Library file from this booking.");
+      return false;
+    }
+  }, [safeFetch, handleApiError, onError]);
 
   const remove = useCallback(async (materialId: string): Promise<boolean> => {
     setDeletingId(materialId);
@@ -357,10 +400,13 @@ export function useLearningMaterials(options: UseLearningMaterialsOptions = {}):
     folders,
     loading,
     uploading,
+    attachingLibrary,
     deletingId,
     load,
     upload,
     remove,
+    attachBookingLibrary,
+    unlinkBookingLibrary,
     createFolder,
     renameFolder,
     deleteFolder,
