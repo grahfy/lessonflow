@@ -22,7 +22,7 @@ import {
   type LearningMaterialBooking,
   type LearningMaterialRow
 } from "@/lib/admin/types";
-import { dragHasFiles } from "@/lib/admin/folder-traversal";
+import { collectDroppedFiles, dragHasFiles, isUploadableFile } from "@/lib/admin/folder-traversal";
 import { getDescendantFolderIds } from "@/lib/materials/tree-dnd";
 import { UnifiedMaterialTree, type TreeFolder, type TreeFile } from "@/components/ui/unified-material-tree";
 
@@ -154,6 +154,10 @@ export function AdminMaterialsPanel({
   // <form>'s FormData still carries every file under name="file" on submit.
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  // Explains anything rejected at staging time (folders, empty files). Without
+  // this the rejection is silent and the count in "N files selected" just
+  // quietly disagrees with what the user picked.
+  const [stagingNotice, setStagingNotice] = useState<string | null>(null);
   const [dialogState, setDialogState] = useState<MaterialsDialogState>(null);
   // Local "Add to library" (promote) status — self-contained so the action
   // needs no wiring through the parent dialog/orchestrator.
@@ -228,28 +232,48 @@ export function AdminMaterialsPanel({
     input.files = dataTransfer.files;
   }
 
+  /**
+   * Merges `incoming` into the staged batch, dropping anything the browser
+   * cannot actually read bytes for — see `isUploadableFile` for why staging an
+   * unreadable entry kills the whole upload request before it leaves the page.
+   */
+  function stageFiles(incoming: File[]) {
+    const uploadable = incoming.filter(isUploadableFile);
+    const skipped = incoming.length - uploadable.length;
+    setStagingNotice(
+      skipped > 0
+        ? `${skipped} item${skipped === 1 ? "" : "s"} skipped — folders and empty files can't be uploaded. Open the folder and select the files inside it.`
+        : null
+    );
+    if (uploadable.length === 0) return;
+    // Merge with whatever is already staged so Browse and drag-drop add to
+    // (rather than replace) each other. syncFileInput rewrites the native
+    // input's FileList so the <form>'s FormData carries the full set.
+    const merged = [...selectedFiles, ...uploadable];
+    setSelectedFiles(merged);
+    syncFileInput(merged);
+  }
+
   function handleFileInputChange(files: FileList | null) {
     const picked = Array.from(files ?? []);
     if (picked.length === 0) return;
-    // Merge with whatever is already staged so Browse adds to (rather than
-    // replaces) files — matching the drag-drop behavior. syncFileInput rewrites
-    // the native input's FileList so the <form>'s FormData carries the full set.
-    const merged = [...selectedFiles, ...picked];
-    setSelectedFiles(merged);
-    syncFileInput(merged);
+    stageFiles(picked);
   }
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
     if (!dragHasFiles(event)) return;
     event.preventDefault();
     setIsDragOver(false);
-    const dropped = Array.from(event.dataTransfer.files ?? []);
-    if (dropped.length === 0) return;
-    // Merge with whatever is already staged so drag-drop adds to (rather than
-    // replaces) files chosen via Browse.
-    const merged = [...selectedFiles, ...dropped];
-    setSelectedFiles(merged);
-    syncFileInput(merged);
+    // Folder-aware, matching the Library uploader. Reading `dataTransfer.files`
+    // directly instead stages a dropped FOLDER as an unreadable zero-byte File;
+    // collectDroppedFiles recurses into directories and yields only file leaves.
+    // It MUST be called synchronously here — it snapshots the DataTransfer
+    // entries before its first await, since the item list is neutered after.
+    void collectDroppedFiles(event.dataTransfer)
+      .then((collected) => stageFiles(collected.map((entry) => entry.file)))
+      .catch(() =>
+        setStagingNotice("Could not read the dropped items. Try picking them with Browse instead.")
+      );
   }
 
   function handleDragOver(event: DragEvent<HTMLDivElement>) {
@@ -374,7 +398,10 @@ export function AdminMaterialsPanel({
           <form
             ref={uploadFormRef}
             className="customer-materials-upload-form"
-            onReset={() => setSelectedFiles([])}
+            onReset={() => {
+              setSelectedFiles([]);
+              setStagingNotice(null);
+            }}
           >
             <AdminForm className="customer-materials-upload-grid">
               {bookingField ? (
@@ -468,6 +495,7 @@ export function AdminMaterialsPanel({
                     {selectedFiles.length > 5 ? <li>+{selectedFiles.length - 5} more</li> : null}
                   </ul>
                 ) : null}
+                {stagingNotice ? <AdminNotice tone="info">{stagingNotice}</AdminNotice> : null}
               </AdminField>
               <AdminField
                 label="Description (optional)"
