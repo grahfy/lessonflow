@@ -33,11 +33,25 @@ export function useSafeFetch(options: UseSafeFetchOptions = {}) {
     async (...args: Parameters<typeof globalThis.fetch>): Promise<Response> => {
       try {
         return await globalThis.fetch(...args);
-      } catch {
-        return new Response(JSON.stringify({ error: "Network request failed. Please try again." }), {
-          status: 503,
-          headers: { "Content-Type": "application/json" }
-        });
+      } catch (error) {
+        // A thrown fetch means the request never completed a round-trip, so
+        // there is NO access-log line and NO server-side error row to find
+        // later — this catch is the only place the cause is ever visible.
+        // Discarding it (as this used to) makes the whole failure class
+        // undiagnosable after the fact, so the detail is both logged and
+        // carried in the message the user can screenshot back to us.
+        const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+        const [input] = args;
+        const target =
+          typeof input === "string" ? input : input instanceof URL ? input.href : input?.url ?? "unknown";
+        console.error(`[safeFetch] ${target} never completed — ${detail}`);
+        return new Response(
+          JSON.stringify({ error: `Network request failed. Please try again. (${detail})` }),
+          {
+            status: 503,
+            headers: { "Content-Type": "application/json" }
+          }
+        );
       }
     },
     []

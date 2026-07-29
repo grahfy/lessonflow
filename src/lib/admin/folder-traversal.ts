@@ -36,6 +36,25 @@ export function dragHasFiles(event: { dataTransfer: DataTransfer | null }): bool
   return Array.from(event.dataTransfer?.types ?? []).includes("Files");
 }
 
+/**
+ * True when the browser can actually read bytes for this entry.
+ *
+ * A folder that reaches a plain `<input type="file">` — dropped on an engine
+ * without the entry API, or returned by a picker that permits directory
+ * selection — surfaces as a zero-byte, type-less `File` named after the
+ * directory. Nothing rejects it until submit, when the browser fails to read
+ * its bytes while building the multipart body and aborts the request BEFORE it
+ * leaves the page. That is a thrown `fetch()`: no HTTP response, no access-log
+ * line, no server-side error row — the failure is invisible everywhere except
+ * the user's screen. Staging code must filter on this, not on name or type.
+ *
+ * Genuinely empty files are rejected by the same guard; an upload route has
+ * nothing to store for them either.
+ */
+export function isUploadableFile(file: File): boolean {
+  return file.size > 0;
+}
+
 /** Strips leading slashes and normalizes separators to forward slashes. */
 function normalizeRelativePath(rawPath: string, fallbackName: string): string {
   const normalized = rawPath.replace(/\\/g, "/").replace(/^\/+/, "");
