@@ -4,7 +4,8 @@ import {
   collectDroppedFiles,
   collectPickedFiles,
   deriveFolderSuggestions,
-  folderSegmentsOf
+  folderSegmentsOf,
+  isUploadableFile
 } from "@/lib/admin/folder-traversal";
 
 /** Builds a FileSystemFileEntry-shaped mock. */
@@ -91,6 +92,22 @@ describe("library-folder-traversal", () => {
     const loose = new File([Buffer.from("x")], "plain.mp3");
     const dropped = await collectDroppedFiles(dataTransferOf([], [loose]));
     expect(dropped).toEqual([{ file: loose, relativePath: "plain.mp3" }]);
+  });
+
+  it("isUploadableFile rejects the zero-byte entry a dropped folder becomes", () => {
+    // Regression guard: a folder reaching a plain file input arrives as a
+    // zero-byte, type-less File named after the directory. Staging one aborts
+    // the whole multipart request in the browser — a thrown fetch that surfaces
+    // as "Network request failed. Please try again." with NO server-side trace.
+    const droppedFolder = new File([], "Reading Music");
+    const emptyFile = new File([], "notes.pdf", { type: "application/pdf" });
+    const realFile = new File([Buffer.from("x")], "riff.mp3", { type: "audio/mpeg" });
+
+    expect(isUploadableFile(droppedFolder)).toBe(false);
+    expect(isUploadableFile(emptyFile)).toBe(false);
+    expect(isUploadableFile(realFile)).toBe(true);
+    // The staging filter keeps only the readable entry.
+    expect([droppedFolder, emptyFile, realFile].filter(isUploadableFile)).toEqual([realFile]);
   });
 
   it("collectPickedFiles uses webkitRelativePath and falls back to the name", () => {
