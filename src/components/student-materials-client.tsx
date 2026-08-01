@@ -23,9 +23,6 @@ import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } 
 
 import { Tooltip } from "@/components/admin/ui/tooltip";
 import styles from "@/components/student-portal.module.css";
-import { formatBytes } from "@/lib/admin/formatters";
-import { GuitarProViewerDialog } from "@/components/ui/guitar-pro-viewer";
-import { PracticeAudioPlayer } from "@/components/ui/practice-audio-player";
 import { UnifiedMaterialTree } from "@/components/ui/unified-material-tree";
 import {
   parseStudentPortalPayload,
@@ -56,7 +53,6 @@ export function StudentMaterialsClient(): ReactElement {
   const [reorderError, setReorderError] = useState("");
   const reorderInFlight = useRef(false);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [openGpId, setOpenGpId] = useState<string | null>(null);
   /**
    * Loads authenticated portal data.
    * RATIONALE: We reuse the main portal endpoint to ensure permissions
@@ -229,11 +225,6 @@ export function StudentMaterialsClient(): ReactElement {
 
 function cx(...classNames: Array<string | false | null | undefined>): string {
   return classNames.filter(Boolean).join(" ");
-}
-
-/** Human-readable type suffix for the assigned-item title ("guitar_pro" reads badly raw). */
-function materialTypeLabel(materialType: string): string {
-  return materialType === "guitar_pro" ? "GUITAR PRO" : materialType.toUpperCase();
 }
 
 /**
