@@ -6,6 +6,7 @@ import { jsonUnexpectedError } from "@/lib/api-errors";
 import { AppError } from "@/lib/errors";
 import { verifyCaptchaSubmission } from "@/lib/captcha";
 import { prisma } from "@/lib/db";
+import { reserveBulkUploadGrantUnit } from "@/lib/library/bulk-upload-grant";
 import { compareTreeOrder, libraryTreeId, materialOrderBy } from "@/lib/materials/reorder";
 import { logError } from "@/lib/observability";
 import { createMaterialStorageDriver, getMaterialStorageDriverName } from "@/lib/student-portal/material-storage";
@@ -28,11 +29,15 @@ type Params = {
 };
 
 const MAX_MATERIAL_SIZE_BYTES = 100 * 1024 * 1024;
-// Upper bound on files accepted in a single batch upload. `form.getAll("file")`
-// is otherwise unbounded, so a crafted multipart request could enqueue an
-// arbitrary number of large files for storage/DB work. The admin UI batches well
-// under this cap; the single-file path (1 file) is never affected.
-const MAX_FILES_PER_BATCH = 25;
+// Upper bound on files accepted in ONE request. `form.getAll("file")` is
+// otherwise unbounded, so a crafted multipart request could enqueue an arbitrary
+// number of large files for storage/DB work.
+//
+// This is NOT a batch limit: the admin uploader splits a staged batch across as
+// many requests as it needs (planUploadChunks, 20 files / 64MB per request), so
+// an admin can upload any number of files. Only a hand-crafted request that
+// ignores the split can reach this guard.
+const MAX_FILES_PER_REQUEST = 25;
 
 /**
  * Lists customer-owned appointments and learning materials for the selected booking scope.
@@ -281,24 +286,39 @@ export async function POST(request: NextRequest, { params }: Params) {
     const files = form.getAll("file").filter((entry): entry is File => entry instanceof File);
     const rawTitles = form.getAll("title").map((entry) => String(entry));
 
-    // CAPTCHA verification — enforced in production to add defence-in-depth on top of
-    // session authentication. Dev/test environments bypass this to keep workflows fast.
-    // Verified once for the whole batch, not per file.
+    // Human check — enforced in production as defence-in-depth on top of session
+    // authentication. Dev/test environments bypass it to keep workflows fast.
+    //
+    // A batch too large for one request is split client-side, and a CAPTCHA
+    // challenge is single-use (captcha.ts deletes the token on verify), so one
+    // solve cannot cover N requests. The uploader therefore trades the solve for
+    // a bulk-upload grant and spends one unit per request. Grant checks fail
+    // closed: invalid/expired/exhausted is a 400, never a silent bypass, and the
+    // grant is not the auth boundary — the admin session and the per-customer
+    // predicate above are already enforced.
+    const grantId = String(form.get("grantId") || "").trim();
     if (process.env.NODE_ENV !== "test" && process.env.NODE_ENV !== "development") {
-      const captchaToken = String(form.get("captchaToken") || "").trim();
-      const captchaAnswer = String(form.get("captchaAnswer") || "").trim();
-      const captchaResult = verifyCaptchaSubmission({ captchaToken, captchaAnswer });
-      if (!captchaResult.ok) {
-        return NextResponse.json({ error: captchaResult.message, code: captchaResult.code }, { status: 400 });
+      if (grantId) {
+        const reservation = reserveBulkUploadGrantUnit({ grantId, adminId: admin.id });
+        if (!reservation.ok) {
+          return NextResponse.json({ error: reservation.message, code: reservation.code }, { status: 400 });
+        }
+      } else {
+        const captchaToken = String(form.get("captchaToken") || "").trim();
+        const captchaAnswer = String(form.get("captchaAnswer") || "").trim();
+        const captchaResult = verifyCaptchaSubmission({ captchaToken, captchaAnswer });
+        if (!captchaResult.ok) {
+          return NextResponse.json({ error: captchaResult.message, code: captchaResult.code }, { status: 400 });
+        }
       }
     }
 
     if (files.length === 0) {
       return NextResponse.json({ error: "Learning material file is required." }, { status: 400 });
     }
-    if (files.length > MAX_FILES_PER_BATCH) {
+    if (files.length > MAX_FILES_PER_REQUEST) {
       return NextResponse.json(
-        { error: `You can upload at most ${MAX_FILES_PER_BATCH} files at once.` },
+        { error: `Too many files in one request (max ${MAX_FILES_PER_REQUEST}).` },
         { status: 400 }
       );
     }

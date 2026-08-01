@@ -6,12 +6,14 @@ import {
   type MaterialsFolderField
 } from "@/components/admin/ui/admin-materials-panel";
 import { type LearningMaterialBooking, type LearningMaterialRow } from "@/lib/admin/types";
+import { type LearningMaterialUploadProgress } from "@/lib/admin/use-learning-materials";
 import { BookingLibraryMaterialsPanel } from "./booking-library-materials-panel";
 
 type Props = {
   materialsLoading: boolean;
   materialsList: LearningMaterialRow[];
   materialsUploading: boolean;
+  materialsUploadProgress?: LearningMaterialUploadProgress | null;
   materialsDeletingId: string | null;
   uploadFormRef: RefObject<HTMLFormElement | null>;
   onUpload: (captcha?: { captchaToken: string; captchaAnswer: string }) => void;
@@ -34,6 +36,7 @@ export function BookingMaterialsDialog({
   materialsLoading,
   materialsList,
   materialsUploading,
+  materialsUploadProgress,
   materialsDeletingId,
   uploadFormRef,
   onUpload,
@@ -53,6 +56,7 @@ export function BookingMaterialsDialog({
         materialsLoading={materialsLoading}
         materialsList={materialsList.filter((material) => material.source !== "library_booking")}
         materialsUploading={materialsUploading}
+        materialsUploadProgress={materialsUploadProgress}
         materialsDeletingId={materialsDeletingId}
         uploadFormRef={uploadFormRef}
         onUpload={onUpload}

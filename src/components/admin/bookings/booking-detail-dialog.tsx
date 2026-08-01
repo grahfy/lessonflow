@@ -42,6 +42,7 @@ import { formatDateTime } from "@/lib/admin/formatters";
 import { type BookingEvent } from "@/lib/admin/use-bookings";
 import { type EmailRecord, type SendEmailResult } from "@/lib/admin/use-email-history";
 import { AU_STATES, type LearningMaterialBooking, type LearningMaterialRow } from "@/lib/admin/types";
+import { type LearningMaterialUploadProgress } from "@/lib/admin/use-learning-materials";
 import { toAuState, toDigits } from "@/lib/admin/utils";
 import { AddressAutocomplete } from "@/components/admin/ui/address-autocomplete";
 import type {
@@ -115,6 +116,7 @@ interface BookingDetailDialogProps {
     materialsList: LearningMaterialRow[];
     materialsLoading: boolean;
     materialsUploading: boolean;
+    materialsUploadProgress?: LearningMaterialUploadProgress | null;
     bookingLibraryAttaching?: boolean;
     materialsDeletingId: string | null;
     onUpload: (captcha?: { captchaToken: string; captchaAnswer: string }) => void;
@@ -668,6 +670,7 @@ export function BookingDetailDialog({
                 materialsLoading={materialsDialogProps.materialsLoading}
                 materialsList={materialsDialogProps.materialsList}
                 materialsUploading={materialsDialogProps.materialsUploading}
+                materialsUploadProgress={materialsDialogProps.materialsUploadProgress}
                 materialsDeletingId={materialsDialogProps.materialsDeletingId}
                 uploadFormRef={materialsDialogProps.uploadFormRef}
                 onUpload={materialsDialogProps.onUpload}
