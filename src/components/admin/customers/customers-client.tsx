@@ -185,6 +185,7 @@ export function AdminCustomersClient() {
     folders: materialsFolders,
     loading: materialsLoading,
     uploading: materialsUploading,
+    uploadProgress: materialsUploadProgress,
     deletingId: materialsDeletingId,
     load: loadMaterials,
     upload: uploadMaterialApi,
@@ -797,6 +798,7 @@ export function AdminCustomersClient() {
           materialsBookings={materialsBookings}
           materialsLoading={materialsLoading}
           materialsUploading={materialsUploading}
+          materialsUploadProgress={materialsUploadProgress}
           materialsDeletingId={materialsDeletingId}
           materialsBookingId={materialsBookingId}
           setMaterialsBookingId={setMaterialsBookingId}

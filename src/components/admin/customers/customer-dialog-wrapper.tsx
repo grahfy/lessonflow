@@ -10,6 +10,7 @@ import { CustomerMaterialsDialog } from "./customer-materials-dialog";
 import { type MaterialsFolderActions, type MaterialsFolderField } from "@/components/admin/ui/admin-materials-panel";
 import { type EmailRecord, type SendEmailResult } from "@/lib/admin/use-email-history";
 import { type CustomerBookingHistoryRow, type LearningMaterialBooking, type LearningMaterialRow } from "@/lib/admin/types";
+import { type LearningMaterialUploadProgress } from "@/lib/admin/use-learning-materials";
 
 type Tab = "profile" | "history" | "emails" | "materials";
 
@@ -73,6 +74,7 @@ type Props = {
     materialsBookingId: string;
     setMaterialsBookingId: (id: string) => void;
     materialsUploading: boolean;
+    materialsUploadProgress?: LearningMaterialUploadProgress | null;
     materialsDeletingId: string | null;
     materialsUploadFormRef: RefObject<HTMLFormElement | null>;
     onUploadMaterial: (captcha?: { captchaToken: string; captchaAnswer: string }) => void;
@@ -219,6 +221,7 @@ export function CustomerDialogWrapper({
                         materialsBookingId={rest.materialsBookingId}
                         setMaterialsBookingId={rest.setMaterialsBookingId}
                         materialsUploading={rest.materialsUploading}
+                        materialsUploadProgress={rest.materialsUploadProgress}
                         materialsDeletingId={rest.materialsDeletingId}
                         materialsUploadFormRef={rest.materialsUploadFormRef}
                         onUpload={rest.onUploadMaterial}
