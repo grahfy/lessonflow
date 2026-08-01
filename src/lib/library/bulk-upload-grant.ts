@@ -2,8 +2,13 @@
  * Bulk-Upload Grant Store
  *
  * One CAPTCHA solve mints a short-lived grant covering a whole bulk-upload
- * batch (≤200 files), because CAPTCHA challenges are single-use (consumed on
- * first verification — src/lib/captcha.ts) and cannot cover N per-file POSTs.
+ * batch (≤200 units), because CAPTCHA challenges are single-use (consumed on
+ * first verification — src/lib/captcha.ts) and cannot cover N POSTs.
+ *
+ * A unit is ONE UPLOAD REQUEST, which the two callers size differently: the
+ * library uploader posts one file per request (unit = file), while the customer
+ * materials uploader posts a chunk of up to 20 files per request (unit = chunk).
+ * Both are bounded by their route's own per-request file cap.
  *
  * SECURITY FRAMING: the grant is CAPTCHA-convention parity plus server-side
  * batch-cap enforcement — it is NOT the auth boundary. Every file POST is still

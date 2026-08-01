@@ -23,8 +23,9 @@ import {
   type LearningMaterialRow
 } from "@/lib/admin/types";
 import { collectDroppedFiles, dragHasFiles, isUploadableFile } from "@/lib/admin/folder-traversal";
+import { type LearningMaterialUploadProgress } from "@/lib/admin/use-learning-materials";
 import { getDescendantFolderIds } from "@/lib/materials/tree-dnd";
-import { UnifiedMaterialTree, type TreeFolder, type TreeFile } from "@/components/ui/unified-material-tree";
+import { UnifiedMaterialTree } from "@/components/ui/unified-material-tree";
 
 /** A folder with the breadcrumb path leading to it (root excluded). */
 type FlatFolder = {
@@ -77,6 +78,8 @@ interface AdminMaterialsPanelProps {
   materialsLoading: boolean;
   materialsList: LearningMaterialRow[];
   materialsUploading: boolean;
+  /** Chunk-by-chunk progress for a split batch; absent for a single request. */
+  materialsUploadProgress?: LearningMaterialUploadProgress | null;
   materialsDeletingId: string | null;
   uploadFormRef: RefObject<HTMLFormElement | null>;
   onUpload: (captcha?: { captchaToken: string; captchaAnswer: string }) => void;
@@ -137,6 +140,7 @@ export function AdminMaterialsPanel({
   materialsLoading,
   materialsList,
   materialsUploading,
+  materialsUploadProgress,
   materialsDeletingId,
   uploadFormRef,
   onUpload,
@@ -290,6 +294,15 @@ export function AdminMaterialsPanel({
     if (event.currentTarget.contains(event.relatedTarget as Node)) return;
     setIsDragOver(false);
   }
+
+  // A multi-request batch reports "Uploading 40 of 120 files..." so a long run
+  // is visibly progressing. A single-request upload keeps the plain label —
+  // "1 of 1" would be noise.
+  const uploadButtonLabel = !materialsUploading
+    ? "Upload Material"
+    : materialsUploadProgress && materialsUploadProgress.total > 1
+      ? `Uploading ${materialsUploadProgress.completed} of ${materialsUploadProgress.total} files...`
+      : "Uploading...";
 
   const selectedFilesLabel =
     selectedFiles.length === 0
@@ -517,7 +530,7 @@ export function AdminMaterialsPanel({
                   onClick={handleUpload}
                   className="btn btn-primary customer-materials-upload-btn"
                 >
-                  {materialsUploading ? "Uploading..." : "Upload Material"}
+                  {uploadButtonLabel}
                 </button>
               </Tooltip>
             </AdminForm>
